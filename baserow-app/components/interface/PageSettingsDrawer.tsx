@@ -49,11 +49,6 @@ interface InterfaceGroup {
   name: string
 }
 
-interface View {
-  id: string
-  name: string
-  table_id: string | null
-}
 
 export default function PageSettingsDrawer({
   page,
@@ -67,10 +62,7 @@ export default function PageSettingsDrawer({
   const [icon, setIcon] = useState("")
   const [isAdminOnly, setIsAdminOnly] = useState(page.is_admin_only ?? true)
   const [groupId, setGroupId] = useState<string | null>(null)
-  const [defaultView, setDefaultView] = useState<string | null>(null)
-  const [hideViewSwitcher, setHideViewSwitcher] = useState(false)
   const [groups, setGroups] = useState<InterfaceGroup[]>([])
-  const [views, setViews] = useState<View[]>([])
   const [saving, setSaving] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -85,7 +77,6 @@ export default function PageSettingsDrawer({
   useEffect(() => {
     if (open) {
       loadGroups()
-      loadViews()
       // Load fields if this is a Record Review page (has primary_table_id)
       if (page.settings?.primary_table_id) {
         loadTableFields()
@@ -107,16 +98,15 @@ export default function PageSettingsDrawer({
       const pageIcon = page.settings?.icon || ""
       setIcon(pageIcon)
       setIsAdminOnly(page.is_admin_only ?? true)
-      // Load group_id and other settings from page
-      // Note: These might be in the page object or need to be fetched
+      // Load group_id from page
+      // Note: default_view and hide_view_switcher are legacy settings not used in blocks-first UI
+      // They are kept for backward-compatible reads but not exposed in UI
       setGroupId((page as any).group_id || null)
-      setDefaultView((page as any).default_view || null)
-      setHideViewSwitcher((page as any).hide_view_switcher || false)
       
       previousPageIdRef.current = page.id
       isInitialMountRef.current = false
     }
-  }, [open, page.id, page.name, page.description, page.settings?.icon, page.is_admin_only, (page as any).group_id, (page as any).default_view, (page as any).hide_view_switcher])
+  }, [open, page.id, page.name, page.description, page.settings?.icon, page.is_admin_only, (page as any).group_id])
   
   // Reset refs when drawer closes
   useEffect(() => {
@@ -135,22 +125,6 @@ export default function PageSettingsDrawer({
     }
   }
 
-  async function loadViews() {
-    try {
-      const supabase = createClient()
-      // Load all views that could be used as default views
-      // These would typically be grid/kanban/calendar views from tables
-      const { data: viewsData } = await supabase
-        .from('views')
-        .select('id, name, table_id, type')
-        .neq('type', 'interface')
-        .order('name', { ascending: true })
-      
-      setViews((viewsData || []) as View[])
-    } catch (error) {
-      console.error('Error loading views:', error)
-    }
-  }
 
   async function loadTableFields() {
     const tableId = page.settings?.primary_table_id
@@ -247,8 +221,8 @@ export default function PageSettingsDrawer({
           name: name.trim(),
           description: description.trim() || null,
           group_id: groupId || null,
-          default_view: defaultView || null,
-          hide_view_switcher: hideViewSwitcher,
+          // Note: default_view and hide_view_switcher are not persisted from UI
+          // They remain in database for backward compatibility but are not used in blocks-first UI
           is_admin_only: isAdminOnly,
           settings: {
             ...page.settings,
@@ -367,48 +341,6 @@ export default function PageSettingsDrawer({
                 Organize this page into an Interface in the sidebar
               </p>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="default-view">Default View</Label>
-              <Select
-                value={defaultView || "__none__"}
-                onValueChange={(value) => setDefaultView(value === "__none__" ? null : value)}
-              >
-                <SelectTrigger id="default-view">
-                  <SelectValue placeholder="None (use interface blocks)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">None (use interface blocks)</SelectItem>
-                  {views.map((view) => (
-                    <SelectItem key={view.id} value={view.id}>
-                      {view.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Optional: Default view to show when opening this interface
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="hide-view-switcher"
-                  checked={hideViewSwitcher}
-                  onChange={(e) => setHideViewSwitcher(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300"
-                />
-                <Label htmlFor="hide-view-switcher" className="text-sm font-normal cursor-pointer">
-                  Hide view switcher
-                </Label>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                If enabled, the view switcher will be hidden in this interface
-              </p>
-            </div>
-
 
             <div className="space-y-2">
               <div className="flex items-center space-x-2">

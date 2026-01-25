@@ -97,6 +97,7 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}
         blockType={ctx.blockType}
+        fields={ctx.fields}
       />
     </>
   ),
@@ -107,6 +108,7 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}
         blockType={ctx.blockType}
+        fields={ctx.fields}
       />
     </>
   ),
@@ -117,6 +119,7 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}
         blockType={ctx.blockType}
+        fields={ctx.fields}
       />
     </>
   ),
@@ -131,6 +134,7 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}
         blockType={ctx.blockType}
+        fields={ctx.fields}
       />
     </>
   ),
@@ -141,6 +145,7 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}
         blockType={ctx.blockType}
+        fields={ctx.fields}
       />
     </>
   ),
@@ -151,6 +156,7 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}
         blockType={ctx.blockType}
+        fields={ctx.fields}
       />
     </>
   ),
@@ -161,6 +167,7 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}
         blockType={ctx.blockType}
+        fields={ctx.fields}
       />
     </>
   ),
@@ -171,6 +178,7 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}
         blockType={ctx.blockType}
+        fields={ctx.fields}
       />
     </>
   ),
@@ -181,6 +189,7 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}
         blockType={ctx.blockType}
+        fields={ctx.fields}
       />
     </>
   ),
@@ -191,6 +200,7 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}
         blockType={ctx.blockType}
+        fields={ctx.fields}
       />
     </>
   ),
@@ -201,6 +211,7 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}
         blockType={ctx.blockType}
+        fields={ctx.fields}
       />
     </>
   ),
@@ -211,6 +222,7 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}
         blockType={ctx.blockType}
+        fields={ctx.fields}
       />
     </>
   ),
@@ -221,6 +233,7 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}
         blockType={ctx.blockType}
+        fields={ctx.fields}
       />
     </>
   ),
@@ -231,6 +244,7 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}
         blockType={ctx.blockType}
+        fields={ctx.fields}
       />
     </>
   ),
@@ -241,6 +255,7 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}
         blockType={ctx.blockType}
+        fields={ctx.fields}
       />
     </>
   ),
@@ -251,6 +266,7 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}
         blockType={ctx.blockType}
+        fields={ctx.fields}
       />
     </>
   ),
@@ -261,6 +277,7 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}
         blockType={ctx.blockType}
+        fields={ctx.fields}
       />
     </>
   ),
@@ -271,6 +288,7 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}
         blockType={ctx.blockType}
+        fields={ctx.fields}
       />
     </>
   ),
@@ -281,6 +299,7 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}
         blockType={ctx.blockType}
+        fields={ctx.fields}
       />
     </>
   ),
@@ -291,6 +310,7 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}
         blockType={ctx.blockType}
+        fields={ctx.fields}
       />
     </>
   ),
@@ -317,6 +337,7 @@ export function renderBlockAppearanceSettings(
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}
         blockType={ctx.blockType}
+        fields={ctx.fields}
       />
     )
   )

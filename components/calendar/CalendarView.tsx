@@ -318,21 +318,22 @@ export default function CalendarView({ tableId, viewId, rows, visibleFields }: C
         if (!table) return
 
         const updateData: any = {}
-        if (updates.date !== undefined) {
+        if (updates.date !== undefined && updates.date !== null) {
+          const dateValue = updates.date
           if (config.calendar_date_field) {
-            updateData[config.calendar_date_field] = updates.date.toISOString()
+            updateData[config.calendar_date_field] = dateValue.toISOString()
           }
           if (config.calendar_start_field) {
-            updateData[config.calendar_start_field] = updates.date.toISOString()
+            updateData[config.calendar_start_field] = dateValue.toISOString()
           }
           if (config.calendar_end_field) {
-            updateData[config.calendar_end_field] = updates.date.toISOString()
+            updateData[config.calendar_end_field] = dateValue.toISOString()
           }
         }
-        if (updates.start_date !== undefined && config.calendar_start_field) {
+        if (updates.start_date !== undefined && updates.start_date !== null && config.calendar_start_field) {
           updateData[config.calendar_start_field] = updates.start_date.toISOString()
         }
-        if (updates.end_date !== undefined && config.calendar_end_field) {
+        if (updates.end_date !== undefined && updates.end_date !== null && config.calendar_end_field) {
           updateData[config.calendar_end_field] = updates.end_date.toISOString()
         }
 

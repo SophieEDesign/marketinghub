@@ -1,220 +1,97 @@
 /**
  * Discriminated Union Types for Block Configs
  * Each block type has its own config shape for better type safety
+ * 
+ * NOTE: These types extend the base BlockConfig from types.ts to provide
+ * type narrowing and validation, while avoiding duplication.
  */
 
-import type { ViewType, ChartType, AggregateType } from './types'
+import type { BlockConfig, ViewType, ChartType, AggregateType } from './types'
 
-// Base config shared by all blocks
-interface BaseBlockConfig {
-  title?: string
-  appearance?: {
-    title?: string
-    title_color?: string
-    text_color?: string
-    background_color?: string
-    border_color?: string
-    border_width?: number
-    border_radius?: number
-    padding?: number
-    show_title?: boolean
-    header_background?: string
-    header_text_color?: string
-  }
-  visibility_rules?: Array<{
-    field?: string
-    condition?: string
-    value?: any
-  }>
-}
+// Base config shared by all blocks - extends BlockConfig to avoid duplication
+// Specific block configs add required fields and constraints
+type BaseBlockConfig = BlockConfig
 
 // Grid Block Config
+// Extends BlockConfig with grid-specific constraints
 export interface GridBlockConfig extends BaseBlockConfig {
-  table_id?: string // Required - no fallback to page table
-  view_id?: string // Optional - for view-specific settings
-  view_type?: ViewType
-  source_type?: 'table' | 'sql_view'
+  // Grid-specific: table_id or source_view required
+  table_id?: string
   source_view?: string
-  group_by?: string
-  fields?: string[] // Legacy - use visible_fields instead
-  visible_fields?: string[] // Required - array of field names to display
-  filters?: Array<{
-    field: string
-    operator: string
-    value?: any
-  }>
-  sorts?: Array<{
-    field: string
-    direction: 'asc' | 'desc'
-  }>
+  view_type?: ViewType
+  // Note: filters, sorts, group_by, visible_fields are already in BlockConfig
 }
 
 // Form Block Config
 export interface FormBlockConfig extends BaseBlockConfig {
   table_id: string // Required for forms
-  form_fields?: Array<{
-    field_id: string
-    field_name: string
-    required: boolean
-    visible: boolean
-    order: number
-  }>
-  submit_action?: 'create' | 'update' | 'custom'
-  appearance?: BaseBlockConfig['appearance'] & {
-    form_layout?: 'single' | 'two'
-    label_position?: 'top' | 'left' | 'inline'
-    field_spacing?: number
-    button_alignment?: 'left' | 'center' | 'right' | 'full'
-  }
+  // Note: form_fields, submit_action are already in BlockConfig
 }
 
 // Record Block Config
 export interface RecordBlockConfig extends BaseBlockConfig {
   table_id: string // Required
-  record_id?: string
-  detail_fields?: string[]
-  allow_editing?: boolean
+  // Note: record_id, detail_fields, allow_editing are already in BlockConfig
 }
 
 // Chart Block Config
 export interface ChartBlockConfig extends BaseBlockConfig {
   table_id: string // Required
-  view_id?: string
   chart_type: ChartType // Required
-  chart_x_axis?: string
-  chart_y_axis?: string
-  group_by_field?: string
-  metric_field?: string
-  appearance?: BaseBlockConfig['appearance'] & {
-    show_legend?: boolean
-    legend_position?: string
-    color_scheme?: string
-    show_grid?: boolean
-  }
+  // Note: chart_x_axis, chart_y_axis, group_by_field, metric_field are already in BlockConfig
 }
 
 // KPI Block Config
 export interface KPIBlockConfig extends BaseBlockConfig {
   table_id: string // Required
-  view_id?: string
-  kpi_field?: string
   kpi_aggregate: AggregateType // Required
-  kpi_label?: string
-  comparison?: {
-    date_field: string
-    current_start: string
-    current_end: string
-    previous_start: string
-    previous_end: string
-  }
-  target_value?: number | string
-  click_through?: {
-    view_id?: string
-  }
-  appearance?: BaseBlockConfig['appearance'] & {
-    number_format?: string
-    show_trend?: boolean
-    alignment?: string
-    value_size?: string
-  }
+  // Note: kpi_field, kpi_label, comparison, target_value, click_through are already in BlockConfig
 }
 
 // Text Block Config
 // CRITICAL: This is the contract for TextBlock
-// - content: The text/markdown content to display (required for rendering)
-// - markdown: Whether to render as markdown (default: true)
-// - text_content: Legacy alias for content (for backward compatibility)
 export interface TextBlockConfig extends BaseBlockConfig {
-  // Primary content field - TipTap JSON format (preferred)
-  content_json?: any
-  // Plain text content - extracted from JSON for compatibility/search
-  content?: string
-  // Legacy alias - maps to content
-  text_content?: string
-  // Legacy text field
-  text?: string
-  // Whether to render markdown (deprecated - TipTap handles formatting natively)
-  markdown?: boolean
-  appearance?: BaseBlockConfig['appearance'] & {
-    text_size?: 'sm' | 'md' | 'lg' | 'xl'
-    text_align?: 'left' | 'center' | 'right' | 'justify'
-  }
+  // Note: content, text_content, markdown are already in BlockConfig
 }
 
 // Image Block Config
 export interface ImageBlockConfig extends BaseBlockConfig {
-  image_url: string // Required
-  image_alt?: string
-  appearance?: BaseBlockConfig['appearance'] & {
-    image_size?: 'auto' | 'contain' | 'cover' | 'small' | 'medium' | 'large'
-    image_align?: 'left' | 'center' | 'right'
-    aspect_ratio?: 'auto' | '1:1' | '16:9' | '4:3' | '3:2'
-    max_width?: number
-  }
+  image_url: string // Required (but can be empty for upload prompt)
+  // Note: image_alt is already in BlockConfig
 }
 
 // Gallery Block Config (table-based, card/grid layout)
-// Uses the same base config as Grid blocks, with view_type='gallery'
 export interface GalleryBlockConfig extends GridBlockConfig {
   view_type?: 'gallery'
 }
 
 // Divider Block Config
 export interface DividerBlockConfig extends BaseBlockConfig {
-  appearance?: BaseBlockConfig['appearance'] & {
-    divider_thickness?: number
-    divider_color?: string
-    divider_style?: 'solid' | 'dashed' | 'dotted'
-    divider_spacing_top?: number
-    divider_spacing_bottom?: number
-  }
+  // Note: divider appearance settings are already in BlockConfig.appearance
 }
 
 // Button Block Config
 export interface ButtonBlockConfig extends BaseBlockConfig {
   button_label: string // Required
-  button_automation_id?: string
+  // Note: button_automation_id is already in BlockConfig
 }
 
 // Action Block Config
 export interface ActionBlockConfig extends BaseBlockConfig {
   action_type: 'navigate' | 'create_record' | 'redirect' // Required
   label: string // Required
-  url?: string // Required for redirect
-  route?: string // Required for navigate
-  table_id?: string // Required for create_record
-  confirmation_message?: string
-  icon?: string
-  appearance?: BaseBlockConfig['appearance'] & {
-    button_background?: string
-    button_text_color?: string
-    button_style?: string
-  }
+  // Note: url, route, table_id, confirmation_message, icon are already in BlockConfig
 }
 
 // Link Preview Block Config
 export interface LinkPreviewBlockConfig extends BaseBlockConfig {
   link_url: string // Required
-  link_title?: string
-  link_description?: string
-  appearance?: BaseBlockConfig['appearance'] & {
-    display_mode?: string
-    show_provider?: boolean
-    show_thumbnail?: boolean
-  }
+  // Note: link_title, link_description are already in BlockConfig
 }
 
 // Filter Block Config
 export interface FilterBlockConfig extends BaseBlockConfig {
-  table_id?: string // Optional - can use page table_id
-  target_blocks?: 'all' | string[] // Which blocks to filter
-  allowed_fields?: string[] // Empty array means all fields allowed
-  allowed_operators?: string[] // Empty array means all operators allowed
-  filters?: Array<{
-    field: string
-    operator: string
-    value?: any
-  }>
+  // Note: table_id, target_blocks, allowed_fields, allowed_operators, filters are already in BlockConfig
 }
 
 /**
