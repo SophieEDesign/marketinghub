@@ -78,17 +78,22 @@ export function useGridData({
       physicalColumnsRef.current = null
       try {
         // Add timeout to prevent hanging on RPC call
-        const rpcPromise = supabase.rpc('get_table_columns', {
+        const rpcCall = supabase.rpc('get_table_columns', {
           table_name: tableName,
         })
-        const timeoutPromise = new Promise((_, reject) => 
+        // Explicitly type as Promise to satisfy TypeScript constraint for Promise.race
+        // PostgrestFilterBuilder is thenable but TypeScript needs explicit Promise type
+        const rpcPromise: Promise<{ data: any; error: any }> = rpcCall as unknown as Promise<{ data: any; error: any }>
+        const timeoutPromise = new Promise<never>((_, reject) => 
           setTimeout(() => reject(new Error('RPC timeout after 10 seconds')), 10000)
         )
         
-        const { data: cols, error: colsError } = await Promise.race([
+        const result = await Promise.race([
           rpcPromise,
           timeoutPromise,
-        ]) as Awaited<ReturnType<typeof rpcPromise>>
+        ])
+        
+        const { data: cols, error: colsError } = result
         
         if (!colsError && Array.isArray(cols)) {
           physicalColumnsRef.current = new Set(
