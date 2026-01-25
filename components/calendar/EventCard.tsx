@@ -5,6 +5,11 @@ import { cn, formatDateUK } from '@/lib/utils'
 import type { CalendarEvent } from './CalendarView'
 import type { TableField } from '@/types/fields'
 
+// Type guard to ensure date is valid and not null/undefined
+function isValidDate(date: Date | null | undefined): date is Date {
+  return date !== null && date !== undefined && isValid(date)
+}
+
 interface EventCardProps {
   event: CalendarEvent
   onDragStart: (e: React.MouseEvent) => void
@@ -44,9 +49,9 @@ export default function EventCard({
   // Ensure displayFields is always an array
   const safeDisplayFields = Array.isArray(displayFields) ? displayFields : []
   const timeStr =
-    event.start_date && event.end_date && isValid(event.start_date) && isValid(event.end_date)
+    isValidDate(event.start_date) && isValidDate(event.end_date)
       ? `${format(event.start_date, 'HH:mm')} - ${format(event.end_date, 'HH:mm')}`
-      : event.date && isValid(event.date)
+      : isValidDate(event.date)
       ? format(event.date, 'HH:mm')
       : ''
 

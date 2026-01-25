@@ -8,6 +8,11 @@ import EventCard from './EventCard'
 import type { CalendarEvent } from './CalendarView'
 import type { TableField } from '@/types/fields'
 
+// Type guard to ensure date is valid and not null/undefined
+function isValidDate(date: Date | null | undefined): date is Date {
+  return date !== null && date !== undefined && isValid(date)
+}
+
 interface AgendaPanelProps {
   selectedDate: Date | null
   events: CalendarEvent[]
@@ -21,9 +26,9 @@ export default function AgendaPanel({ selectedDate, events, onEventClick, onCrea
   // Ensure displayFields is always an array
   const safeDisplayFields = Array.isArray(displayFields) ? displayFields : []
   const groupedEvents = events.reduce((acc, event) => {
-    const dateKey = event.start_date && isValid(event.start_date)
+    const dateKey = isValidDate(event.start_date)
       ? format(event.start_date, 'yyyy-MM-dd')
-      : event.date && isValid(event.date)
+      : isValidDate(event.date)
       ? format(event.date, 'yyyy-MM-dd')
       : 'no-date'
 
@@ -66,8 +71,8 @@ export default function AgendaPanel({ selectedDate, events, onEventClick, onCrea
                 <div className="space-y-2">
                   {dayEvents
                     .sort((a, b) => {
-                      const timeA = (a.start_date && isValid(a.start_date)) ? a.start_date : (a.date && isValid(a.date)) ? a.date : new Date(0)
-                      const timeB = (b.start_date && isValid(b.start_date)) ? b.start_date : (b.date && isValid(b.date)) ? b.date : new Date(0)
+                      const timeA = isValidDate(a.start_date) ? a.start_date : isValidDate(a.date) ? a.date : new Date(0)
+                      const timeB = isValidDate(b.start_date) ? b.start_date : isValidDate(b.date) ? b.date : new Date(0)
                       return timeA.getTime() - timeB.getTime()
                     })
                     .map((event) => (
@@ -83,7 +88,7 @@ export default function AgendaPanel({ selectedDate, events, onEventClick, onCrea
                           displayFields={safeDisplayFields}
                           tableFields={tableFields}
                         />
-                        {event.start_date && event.end_date && isValid(event.start_date) && isValid(event.end_date) && (
+                        {isValidDate(event.start_date) && isValidDate(event.end_date) && (
                           <p className="text-xs text-gray-500 mt-1">
                             {format(event.start_date, 'HH:mm')} - {format(event.end_date, 'HH:mm')}
                           </p>
