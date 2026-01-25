@@ -157,6 +157,40 @@ export async function createInterfacePage(
       break
   }
 
+  // Ensure group_id is set (required after migration)
+  let finalGroupId = groupId
+  if (!finalGroupId) {
+    // Get or create default "Ungrouped" group
+    const { data: defaultGroup } = await supabase
+      .from('interface_groups')
+      .select('id')
+      .or('name.eq.Ungrouped,is_system.eq.true')
+      .order('is_system', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    
+    if (defaultGroup) {
+      finalGroupId = defaultGroup.id
+    } else {
+      // Create "Ungrouped" group if it doesn't exist
+      const { data: newGroup, error: groupError } = await supabase
+        .from('interface_groups')
+        .insert([{ name: 'Ungrouped', order_index: 9999, collapsed: false, is_system: true }])
+        .select('id')
+        .single()
+      
+      if (groupError) {
+        throw new Error(`Failed to get or create default group: ${groupError.message}`)
+      }
+      
+      if (newGroup) {
+        finalGroupId = newGroup.id
+      } else {
+        throw new Error('Failed to get or create default group for interface page')
+      }
+    }
+  }
+
   const { data, error } = await supabase
     .from('interface_pages')
     .insert({
@@ -169,7 +203,7 @@ export async function createInterfacePage(
       form_config_id,
       record_config_id,
       config: mergedConfig,
-      group_id: groupId,
+      group_id: finalGroupId, // Always set - required after migration
       order_index: 0,
     })
     .select()

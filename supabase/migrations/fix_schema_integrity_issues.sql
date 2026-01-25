@@ -780,6 +780,9 @@ DROP FUNCTION IF EXISTS convert_array_to_text_array(text, text);
 
 -- interface_pages.group_id - already has CHECK, but add NOT NULL for clarity
 DO $$
+DECLARE
+    default_group_id uuid;
+    null_count integer;
 BEGIN
     IF EXISTS (
         SELECT 1 FROM information_schema.columns 
@@ -788,11 +791,46 @@ BEGIN
         AND column_name = 'group_id'
         AND is_nullable = 'YES'
     ) THEN
-        -- First, ensure no NULL values exist
-        UPDATE public.interface_pages 
-        SET group_id = (SELECT id FROM public.interface_groups WHERE is_system = true LIMIT 1)
+        -- First, ensure a default group exists
+        -- Try to get existing system group
+        SELECT id INTO default_group_id
+        FROM public.interface_groups
+        WHERE is_system = true
+        ORDER BY created_at ASC
+        LIMIT 1;
+        
+        -- If no system group exists, try to get "Ungrouped" group
+        IF default_group_id IS NULL THEN
+            SELECT id INTO default_group_id
+            FROM public.interface_groups
+            WHERE name = 'Ungrouped'
+            LIMIT 1;
+        END IF;
+        
+        -- If still no group, create one
+        IF default_group_id IS NULL THEN
+            INSERT INTO public.interface_groups (name, order_index, collapsed, is_system)
+            VALUES ('Ungrouped', 9999, false, true)
+            RETURNING id INTO default_group_id;
+            
+            RAISE NOTICE 'Created default "Ungrouped" group with id: %', default_group_id;
+        END IF;
+        
+        -- Count NULL values
+        SELECT COUNT(*) INTO null_count
+        FROM public.interface_pages
         WHERE group_id IS NULL;
         
+        -- Set NULL values to default group
+        IF null_count > 0 AND default_group_id IS NOT NULL THEN
+            UPDATE public.interface_pages 
+            SET group_id = default_group_id
+            WHERE group_id IS NULL;
+            
+            RAISE NOTICE 'Updated % NULL group_id values to default group', null_count;
+        END IF;
+        
+        -- Now add NOT NULL constraint
         ALTER TABLE public.interface_pages
         ALTER COLUMN group_id SET NOT NULL;
         

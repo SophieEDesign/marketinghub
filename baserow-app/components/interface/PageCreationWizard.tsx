@@ -486,6 +486,35 @@ export default function PageCreationWizard({
         
         // If name doesn't exist, try to create it
         if (!existingPages || existingPages.length === 0) {
+          // Ensure group_id is set (required after migration)
+          let finalGroupId = selectedInterfaceId && selectedInterfaceId.trim() ? selectedInterfaceId.trim() : null
+          
+          if (!finalGroupId) {
+            // Get or create default "Ungrouped" group
+            const { data: defaultGroup } = await supabase
+              .from('interface_groups')
+              .select('id')
+              .or('name.eq.Ungrouped,is_system.eq.true')
+              .order('is_system', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+            
+            if (defaultGroup) {
+              finalGroupId = defaultGroup.id
+            } else {
+              // Create "Ungrouped" group if it doesn't exist
+              const { data: newGroup } = await supabase
+                .from('interface_groups')
+                .insert([{ name: 'Ungrouped', order_index: 9999, collapsed: false, is_system: true }])
+                .select('id')
+                .single()
+              
+              if (newGroup) {
+                finalGroupId = newGroup.id
+              }
+            }
+          }
+          
           const { data: newPage, error: pageError } = await supabase
             .from('interface_pages')
             .insert([
@@ -497,7 +526,7 @@ export default function PageCreationWizard({
                 dashboard_layout_id,
                 form_config_id,
                 record_config_id,
-                group_id: selectedInterfaceId && selectedInterfaceId.trim() ? selectedInterfaceId.trim() : null, // Required
+                group_id: finalGroupId, // Always set - required after migration
                 config: pageConfig, // Store tableId in config for record_view pages
                 created_by: user?.id,
               },
