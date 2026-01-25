@@ -209,7 +209,8 @@ export default function MultiCalendarView({
   // Creation flow
   const [createOpen, setCreateOpen] = useState(false)
   const [createSourceId, setCreateSourceId] = useState<string>("")
-  const [createDate, setCreateDate] = useState<Date>(new Date())
+  // CRITICAL: Use undefined initially to prevent hydration mismatch, then set to Date after mount
+  const [createDate, setCreateDate] = useState<Date | undefined>(undefined)
   const [createDraft, setCreateDraft] = useState<{
     sourceId: string
     tableId: string
@@ -221,10 +222,14 @@ export default function MultiCalendarView({
   // Lifecycle: Mark as mounted to prevent hydration mismatch with FullCalendar
   useEffect(() => {
     setMounted(true)
+    // Initialize createDate after mount to prevent hydration mismatch
+    if (createDate === undefined) {
+      setCreateDate(new Date())
+    }
     return () => {
       setMounted(false)
     }
-  }, [])
+  }, [createDate])
 
   const effectiveEnabledSources = useMemo(() => {
     const enabledSet = new Set(enabledSourceIds)
@@ -485,6 +490,12 @@ export default function MultiCalendarView({
   }, [sourcesKey, filtersKey]) // Only depend on stable keys, not the callback or sources array
 
   const events = useMemo<EventInput[]>(() => {
+    // CRITICAL: Don't compute events during SSR - return empty array until mounted
+    // This prevents hydration mismatches from date parsing or FullCalendar event generation
+    if (!mounted) {
+      return []
+    }
+    
     const enabledSet = new Set(enabledSourceIds)
 
     const out: EventInput[] = []
@@ -581,6 +592,7 @@ export default function MultiCalendarView({
 
     return out
   }, [
+    mounted, // CRITICAL: Only compute events after mount
     sources,
     enabledSourceIds,
     tablesBySource,
@@ -676,7 +688,7 @@ export default function MultiCalendarView({
       if (!canCreateRecord) return
       // Force explicit table selection (no implicit default).
       setCreateSourceId("")
-      setCreateDate(arg.date)
+      setCreateDate(arg.date || new Date())
       setCreateOpen(true)
     },
     [canCreateRecord]
@@ -705,8 +717,9 @@ export default function MultiCalendarView({
       ...defaultsFromFilters,
     }
     // Ensure date fields are set so record appears in view
-    if (startFieldName) newData[startFieldName] = safeDateOnly(createDate)
-    if (endFieldName) newData[endFieldName] = newData[endFieldName] || safeDateOnly(createDate)
+    const dateToUse = createDate || new Date()
+    if (startFieldName) newData[startFieldName] = safeDateOnly(dateToUse)
+    if (endFieldName) newData[endFieldName] = newData[endFieldName] || safeDateOnly(dateToUse)
 
     // Do NOT insert yet — open the record modal with pre-filled data.
     setCreateOpen(false)
@@ -807,7 +820,10 @@ export default function MultiCalendarView({
                     // Force the user to choose a source/table when multiple tables are present.
                     // (Do not preselect the first enabled source.)
                     setCreateSourceId("")
-                    setCreateDate(new Date())
+                    // Only set date if mounted (prevents hydration issues)
+                    if (mounted) {
+                      setCreateDate(new Date())
+                    }
                     setCreateOpen(true)
                   }}
                 >
@@ -953,7 +969,7 @@ export default function MultiCalendarView({
 
             <div className="space-y-2">
               <Label>Date</Label>
-              <Input value={safeDateOnly(createDate)} readOnly />
+              <Input value={createDate ? safeDateOnly(createDate) : ""} readOnly />
             </div>
           </div>
 
@@ -961,7 +977,7 @@ export default function MultiCalendarView({
             <Button variant="outline" onClick={() => setCreateOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleCreate} disabled={!createSourceId}>
+            <Button onClick={handleCreate} disabled={!createSourceId || !createDate}>
               Continue
             </Button>
           </DialogFooter>

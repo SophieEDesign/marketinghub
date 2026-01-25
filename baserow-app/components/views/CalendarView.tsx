@@ -377,32 +377,43 @@ export default function CalendarView({
 
   // Memoize filters to prevent unnecessary re-renders
   // Include date range filters in the key
+  // CRITICAL: Compare dates by value (formatted string) not by reference to prevent infinite loops
+  // Date objects are compared by reference in useMemo, so we need to extract the value first
+  const dateFromKey = useMemo(() => {
+    if (!dateFrom || isNaN(dateFrom.getTime())) return ''
+    return format(dateFrom, 'yyyy-MM-dd')
+  }, [dateFrom ? dateFrom.getTime() : null]) // Use getTime() to compare by value, not reference
+  
+  const dateToKey = useMemo(() => {
+    if (!dateTo || isNaN(dateTo.getTime())) return ''
+    return format(dateTo, 'yyyy-MM-dd')
+  }, [dateTo ? dateTo.getTime() : null]) // Use getTime() to compare by value, not reference
+  
   const filtersKey = useMemo(() => {
-    const fromKey = dateFrom && !isNaN(dateFrom.getTime()) ? format(dateFrom, 'yyyy-MM-dd') : ''
-    const toKey = dateTo && !isNaN(dateTo.getTime()) ? format(dateTo, 'yyyy-MM-dd') : ''
-    const dateRangeKey = fromKey || toKey ? `${fromKey}|${toKey}` : ''
+    const dateRangeKey = dateFromKey || dateToKey ? `${dateFromKey}|${dateToKey}` : ''
     return JSON.stringify(filters || []) + dateRangeKey
-  }, [filters, dateFrom, dateTo])
+  }, [filters, dateFromKey, dateToKey])
   
   // Build combined filters including date range
+  // CRITICAL: Use dateFromKey and dateToKey (string values) instead of Date objects to prevent infinite loops
   const combinedFilters = useMemo(() => {
     const baseFilters = filterTree ? stripFilterBlockFilters(filters || []) : (filters || [])
     const allFilters: FilterConfig[] = [...baseFilters]
     
     // Add date range filter if dates are set
-    if (resolvedDateFieldId && (dateFrom || dateTo)) {
+    if (resolvedDateFieldId && (dateFromKey || dateToKey)) {
       allFilters.push({
         field: resolvedDateFieldId,
         operator: 'date_range',
         // IMPORTANT: use local date formatting (not UTC via toISOString),
         // otherwise the day can shift for users outside UTC.
-        value: dateFrom && !isNaN(dateFrom.getTime()) ? format(dateFrom, 'yyyy-MM-dd') : undefined,
-        value2: dateTo && !isNaN(dateTo.getTime()) ? format(dateTo, 'yyyy-MM-dd') : undefined,
+        value: dateFromKey || undefined,
+        value2: dateToKey || undefined,
       })
     }
     
     return allFilters
-  }, [filters, filterTree, resolvedDateFieldId, dateFrom, dateTo])
+  }, [filters, filterTree, resolvedDateFieldId, dateFromKey, dateToKey])
 
   // For "new record defaults" (Airtable-like), include flattened filter-tree conditions as best-effort.
   const combinedFiltersForDefaults = useMemo(() => {
