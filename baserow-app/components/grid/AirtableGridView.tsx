@@ -1541,17 +1541,6 @@ export default function AirtableGridView({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedCell, selectedRowIds, selectedColumnId, safeFields, dataView, getCurrentSelection])
 
-  // Check for missing tableName - this is a critical error
-  if (!tableName) {
-    return (
-      <ErrorState
-        title="Table not configured"
-        message="The grid cannot load because no table name is provided. Please check the table configuration."
-        className="h-64"
-      />
-    )
-  }
-
   // Track loading time to show warning if it takes too long
   const [loadingTime, setLoadingTime] = useState(0)
   useEffect(() => {
@@ -1569,6 +1558,17 @@ export default function AirtableGridView({
       setLoadingTime(0)
     }
   }, [loading])
+
+  // Check for missing tableName - this is a critical error
+  if (!tableName) {
+    return (
+      <ErrorState
+        title="Table not configured"
+        message="The grid cannot load because no table name is provided. Please check the table configuration."
+        className="h-64"
+      />
+    )
+  }
 
   if (loading) {
     return (
