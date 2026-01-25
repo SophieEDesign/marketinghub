@@ -1552,10 +1552,43 @@ export default function AirtableGridView({
     )
   }
 
+  // Track loading time to show warning if it takes too long
+  const [loadingTime, setLoadingTime] = useState(0)
+  useEffect(() => {
+    if (loading) {
+      const startTime = Date.now()
+      const interval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000)
+        setLoadingTime(elapsed)
+      }, 1000)
+      return () => {
+        clearInterval(interval)
+        setLoadingTime(0)
+      }
+    } else {
+      setLoadingTime(0)
+    }
+  }, [loading])
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading...</div>
+      <div className="flex flex-col items-center justify-center h-64">
+        <div className="text-gray-500 mb-2">Loading grid data...</div>
+        {loadingTime > 5 && (
+          <div className="text-sm text-yellow-600 mt-2">
+            Taking longer than expected ({loadingTime}s). 
+            {loadingTime > 10 && (
+              <span className="block mt-1 text-xs">
+                If this continues, try refreshing the page or check the browser console for errors.
+              </span>
+            )}
+          </div>
+        )}
+        {typeof window !== 'undefined' && (process.env.NODE_ENV === 'development' || localStorage.getItem('DEBUG_GRID') === '1') && (
+          <div className="text-xs text-gray-400 mt-2">
+            Debug: tableName={tableName}, tableId={tableIdState || tableId}, fields={fields?.length || 0}
+          </div>
+        )}
       </div>
     )
   }

@@ -77,16 +77,32 @@ export function useGridData({
       physicalColumnsTableRef.current = tableName
       physicalColumnsRef.current = null
       try {
-        const { data: cols, error: colsError } = await supabase.rpc('get_table_columns', {
+        // Add timeout to prevent hanging on RPC call
+        const rpcPromise = supabase.rpc('get_table_columns', {
           table_name: tableName,
         })
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('RPC timeout after 10 seconds')), 10000)
+        )
+        
+        const { data: cols, error: colsError } = await Promise.race([
+          rpcPromise,
+          timeoutPromise,
+        ]) as Awaited<ReturnType<typeof rpcPromise>>
+        
         if (!colsError && Array.isArray(cols)) {
           physicalColumnsRef.current = new Set(
             cols.map((c: { column_name?: string }) => String(c?.column_name ?? '')).filter(Boolean)
           )
+          if (typeof window !== 'undefined' && (process.env.NODE_ENV === 'development' || localStorage.getItem('DEBUG_GRID_DATA') === '1')) {
+            console.log('[useGridData] Physical columns loaded:', Array.from(physicalColumnsRef.current))
+          }
+        } else if (colsError) {
+          console.warn('[useGridData] Error loading physical columns:', colsError)
         }
-      } catch {
-        // Non-fatal: if RPC isn't available, we fall back to best-effort behaviour.
+      } catch (error) {
+        // Non-fatal: if RPC isn't available or times out, we fall back to best-effort behaviour.
+        console.warn('[useGridData] Could not load physical columns (RPC may not be available or timed out):', error)
         physicalColumnsRef.current = null
       }
     },
@@ -291,6 +307,16 @@ export function useGridData({
     setLoading(true)
     setError(null)
 
+    // Add timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      if (isLoadingRef.current) {
+        console.error('[useGridData] Load timeout after 30 seconds - request may be stuck')
+        setError('Request timed out. The data may be taking too long to load. Please refresh the page.')
+        setLoading(false)
+        isLoadingRef.current = false
+      }
+    }, 30000) // 30 second timeout
+
     try {
       // Reset missing-column cache when table changes
       if (missingColumnsTableRef.current !== tableName) {
@@ -299,7 +325,13 @@ export function useGridData({
       }
 
       // Load physical columns (once per tableName) so we can avoid PostgREST 400s.
+      if (typeof window !== 'undefined' && (process.env.NODE_ENV === 'development' || localStorage.getItem('DEBUG_GRID_DATA') === '1')) {
+        console.log('[useGridData] Starting load:', { tableName, tableId })
+      }
       await refreshPhysicalColumns()
+      if (typeof window !== 'undefined' && (process.env.NODE_ENV === 'development' || localStorage.getItem('DEBUG_GRID_DATA') === '1')) {
+        console.log('[useGridData] Physical columns loaded')
+      }
 
       const maybeSyncSchema = async () => {
         if (!tableId) return false
@@ -503,14 +535,22 @@ export function useGridData({
         return null
       }
 
+      if (typeof window !== 'undefined' && (process.env.NODE_ENV === 'development' || localStorage.getItem('DEBUG_GRID_DATA') === '1')) {
+        console.log('[useGridData] Running query...')
+      }
       await runQuery(0)
+      if (typeof window !== 'undefined' && (process.env.NODE_ENV === 'development' || localStorage.getItem('DEBUG_GRID_DATA') === '1')) {
+        console.log('[useGridData] Query completed successfully')
+      }
+      clearTimeout(timeoutId)
     } catch (err: unknown) {
+      clearTimeout(timeoutId)
       if (isAbortError(err)) {
         isLoadingRef.current = false
         return
       }
       const errorMessage = (err as { message?: string })?.message || 'Failed to load data'
-      console.error('Error loading grid data:', err)
+      console.error('[useGridData] Error loading grid data:', err)
       setError(errorMessage)
       setRows([])
       // Notify parent component of error for toast display
@@ -518,6 +558,7 @@ export function useGridData({
         onError(err, errorMessage)
       }
     } finally {
+      clearTimeout(timeoutId)
       setLoading(false)
       isLoadingRef.current = false
     }
@@ -528,6 +569,7 @@ export function useGridData({
   // Track table name and ID to detect changes
   const prevTableNameRef = useRef<string | undefined>(tableName)
   const prevTableIdRef = useRef<string | undefined>(tableId)
+  const hasLoadedRef = useRef(false)
   
   // Separate effect to trigger reload when filters/sorts/fields actually change
   useEffect(() => {
@@ -546,6 +588,14 @@ export function useGridData({
     
     // Only trigger reload if something actually changed
     if (filtersChanged || sortsChanged || fieldsChanged || tableNameChanged || tableIdChanged) {
+      hasLoadedRef.current = true
+      loadData()
+    } else if (!hasLoadedRef.current && tableName) {
+      // Initial load on mount if tableName exists
+      hasLoadedRef.current = true
+      if (typeof window !== 'undefined' && (process.env.NODE_ENV === 'development' || localStorage.getItem('DEBUG_GRID_DATA') === '1')) {
+        console.log('[useGridData] Initial load triggered')
+      }
       loadData()
     }
   }, [filtersString, sortsString, fieldsString, tableName, tableId, loadData])

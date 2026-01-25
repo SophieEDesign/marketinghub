@@ -4,6 +4,7 @@ import type { PageBlock, BlockType } from "@/lib/interface/types"
 import { normalizeBlockConfig, isBlockConfigComplete } from "@/lib/interface/block-validator"
 import { assertBlockConfig, shouldShowBlockSetupUI } from "@/lib/interface/assertBlockConfig"
 import { useMemo } from "react"
+import dynamic from "next/dynamic"
 import GridBlock from "./blocks/GridBlock"
 import FormBlock from "./blocks/FormBlock"
 import RecordBlock from "./blocks/RecordBlock"
@@ -18,8 +19,11 @@ import LinkPreviewBlock from "./blocks/LinkPreviewBlock"
 import FilterBlock from "./blocks/FilterBlock"
 import FieldBlock from "./blocks/FieldBlock"
 import CalendarBlock from "./blocks/CalendarBlock"
-import MultiCalendarBlock from "./blocks/MultiCalendarBlock"
 import KanbanBlock from "./blocks/KanbanBlock"
+
+// CRITICAL: MultiCalendarBlock uses FullCalendar which causes hydration mismatches
+// Disable SSR to prevent React error #185
+const MultiCalendarBlock = dynamic(() => import("./blocks/MultiCalendarBlock"), { ssr: false })
 import TimelineBlock from "./blocks/TimelineBlock"
 import MultiTimelineBlock from "./blocks/MultiTimelineBlock"
 import GalleryBlock from "./blocks/GalleryBlock"

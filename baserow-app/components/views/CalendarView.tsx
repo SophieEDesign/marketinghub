@@ -100,6 +100,13 @@ export default function CalendarView({
   }, [fieldIdsProp])
   const router = useRouter()
   const [rows, setRows] = useState<TableRow[]>([])
+  // CRITICAL: Use ref to access latest rows in callbacks without causing re-renders
+  const rowsRef = useRef<TableRow[]>([])
+  // Keep ref in sync with state
+  useEffect(() => {
+    rowsRef.current = rows
+  }, [rows])
+  
   const [loading, setLoading] = useState(true)
   // CRITICAL: Prevent hydration mismatch - FullCalendar generates dynamic IDs that differ between server/client
   const [mounted, setMounted] = useState(false)
@@ -919,7 +926,13 @@ export default function CalendarView({
     return { fromFieldName, toFieldName }
   }
 
-  async function handleEventDrop(info: EventDropArg) {
+  // CRITICAL: Memoize handleEventDrop to prevent FullCalendar infinite update loops
+  // This callback must be stable across renders to prevent React error #185
+  // Use ref to access latest loadRows function without including it in dependencies
+  const loadRowsRef = useRef<() => Promise<void>>()
+  loadRowsRef.current = loadRows
+  
+  const handleEventDrop = useCallback(async (info: EventDropArg) => {
     const rowId = info.event?.id
     const newStart = info.event?.start
 
@@ -946,7 +959,8 @@ export default function CalendarView({
     }
 
     // Prefer original values from our row state, fallback to FullCalendar's oldEvent.
-    const currentRow = rows.find((r) => r.id === rowId)
+    // Use ref to get latest rows without causing callback recreation
+    const currentRow = rowsRef.current.find((r) => r.id === rowId)
     const currentRowData = currentRow?.data || (info.event.extendedProps as any)?.rowData
 
     const oldFromRaw = currentRowData?.[fromFieldName]
@@ -990,7 +1004,9 @@ export default function CalendarView({
       }
 
       // Ensure the UI is in sync with any DB-side transforms.
-      await loadRows()
+      if (loadRowsRef.current) {
+        await loadRowsRef.current()
+      }
     } catch (error) {
       debugError('CALENDAR', "Calendar: Failed to persist event drop", {
         error,
@@ -1003,9 +1019,11 @@ export default function CalendarView({
       const code = e?.code ? ` (code: ${e.code})` : ""
       alert(`Failed to save change${code}: ${message}`)
       info.revert()
-      await loadRows()
+      if (loadRowsRef.current) {
+        await loadRowsRef.current()
+      }
     }
-  }
+  }, [supabaseTableName, resolvedDateFieldId, blockConfig, viewConfig, loadedTableFields, startField, endField])
 
   function getEvents(): EventInput[] {
     // Use resolved date field from config or fallback
