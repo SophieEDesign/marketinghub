@@ -6,6 +6,8 @@ import { supabase } from "@/lib/supabase/client"
 
 import type { TableField } from "@/types/fields"
 import FieldEditor from "@/components/fields/FieldEditor"
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
 
 interface RecordDrawerProps {
   isOpen: boolean

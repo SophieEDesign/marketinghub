@@ -6,11 +6,13 @@ import EmptyState from "./EmptyState"
 interface EmptyTableStateProps {
   onCreateRecord?: () => void
   onImportData?: () => void
+  onConfigureView?: () => void
 }
 
 export default function EmptyTableState({
   onCreateRecord,
   onImportData,
+  onConfigureView,
 }: EmptyTableStateProps) {
   return (
     <EmptyState
@@ -24,6 +26,9 @@ export default function EmptyTableState({
       secondaryAction={onImportData ? {
         label: "Import CSV",
         onClick: onImportData,
+      } : onConfigureView ? {
+        label: "Configure view",
+        onClick: onConfigureView,
       } : undefined}
     />
   )

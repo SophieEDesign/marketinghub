@@ -2478,7 +2478,7 @@ export default function GridView({
         return
       }
 
-      debugLog('LAYOUT', 'Field deleted successfully:', fieldName)
+      debugLog('LAYOUT', 'Field deleted successfully:', fieldToDelete)
       // Refresh table fields and reload page
       onTableFieldsRefresh?.()
       window.location.reload()
@@ -3099,7 +3099,14 @@ export default function GridView({
                     ) : (
                       <div className="flex justify-center">
                         <EmptyTableState
-                          onCreateRecord={editable && !isEditing && handleAddRow ? handleAddRow : undefined}
+                          onCreateRecord={allowInlineCreate && !isEditing && handleAddRow ? handleAddRow : undefined}
+                          onConfigureView={isEditing && onEditField ? () => {
+                            // Open view settings or field configuration
+                            // This could open a settings panel or navigate to view settings
+                            if (onAddField) {
+                              onAddField()
+                            }
+                          } : undefined}
                         />
                       </div>
                     )}
@@ -3530,7 +3537,14 @@ export default function GridView({
       <ConfirmDialog
         open={showRequiredFieldsConfirm}
         onOpenChange={setShowRequiredFieldsConfirm}
-        onConfirm={handleCreateRowWithConfirmation}
+        onConfirm={async () => {
+          if (pendingAction) {
+            await pendingAction()
+            setPendingAction(null)
+          }
+          setShowRequiredFieldsConfirm(false)
+          setMissingRequiredFields([])
+        }}
         title="Missing Required Fields"
         description={`Warning: The following required fields are empty:\n\n${missingRequiredFields.join('\n')}\n\nDo you want to create the record anyway? You can fill these fields after creation.\n\nNote: If the database enforces NOT NULL constraints, the creation will fail.`}
         confirmLabel="Create Anyway"

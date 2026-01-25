@@ -8,6 +8,7 @@ import { parseCSV, sanitizeTableName, type ParsedCSV } from "@/lib/import/csvPar
 import { createSupabaseTable } from "@/lib/import/createSupabaseTable"
 import { insertRows } from "@/lib/import/insertRows"
 import { createImportMetadata } from "@/lib/import/metadata"
+import { useOperationFeedback } from "@/hooks/useOperationFeedback"
 
 type ImportStatus = 'idle' | 'parsing' | 'preview' | 'importing' | 'success' | 'error'
 

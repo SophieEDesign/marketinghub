@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from "react"
 import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { ChevronRight, Plus } from "lucide-react"
+import { ChevronRight, Plus, Settings, Columns } from "lucide-react"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
 import type { TableRow } from "@/types/database"
 import type { TableField } from "@/types/fields"
@@ -13,6 +13,8 @@ import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { CellFactory } from "@/components/grid/CellFactory"
 import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
 import { isAbortError } from "@/lib/api/error-handling"
+import EmptyState from "@/components/empty-states/EmptyState"
+import { Button } from "@/components/ui/button"
 
 interface KanbanViewProps {
   tableId: string
@@ -29,6 +31,8 @@ interface KanbanViewProps {
   onRecordClick?: (recordId: string) => void
   /** Bump to force a refetch (e.g. after external record creation). */
   reloadKey?: number
+  /** Callback to open block settings (for configuration) */
+  onOpenSettings?: () => void
 }
 
 export default function KanbanView({ 
@@ -45,6 +49,7 @@ export default function KanbanView({
   blockConfig = {},
   onRecordClick,
   reloadKey,
+  onOpenSettings,
 }: KanbanViewProps) {
   // All hooks must be at the top level, before any conditional returns
   const { openRecord } = useRecordPanel()
@@ -297,26 +302,52 @@ export default function KanbanView({
     return <div className="p-4">Loading...</div>
   }
 
+  // Empty state: no grouping field configured
+  if (!groupingFieldName) {
+    return (
+      <EmptyState
+        icon={<Columns className="h-12 w-12" />}
+        title="Grouping field required"
+        description="Kanban view needs a grouping field to organize cards into columns. Configure the grouping field in block settings."
+        action={onOpenSettings ? {
+          label: "Configure Grouping",
+          onClick: onOpenSettings,
+        } : undefined}
+      />
+    )
+  }
+
   const groupedRows = groupRowsByField()
   const groups = Object.keys(groupedRows)
 
   // Empty state for search
   if (searchQuery && filteredRows.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-gray-500">
-        <div className="text-sm mb-2">No records match your search</div>
-        <button
-          onClick={() => {
+      <EmptyState
+        icon={<Columns className="h-12 w-12" />}
+        title="No records match your search"
+        description="Try adjusting your search query or clear it to see all records."
+        action={{
+          label: "Clear Search",
+          onClick: () => {
             const params = new URLSearchParams(window.location.search)
             params.delete("q")
             window.history.replaceState({}, "", `?${params.toString()}`)
             window.location.reload()
-          }}
-          className="text-xs text-blue-600 hover:text-blue-700 underline"
-        >
-          Clear search
-        </button>
-      </div>
+          },
+        }}
+      />
+    )
+  }
+
+  // Empty state: no records
+  if (filteredRows.length === 0 && !searchQuery) {
+    return (
+      <EmptyState
+        icon={<Columns className="h-12 w-12" />}
+        title="No records yet"
+        description="This table doesn't have any records. Create your first record to get started with the Kanban board."
+      />
     )
   }
 

@@ -9,12 +9,14 @@ import { filterRowsBySearch } from "@/lib/search/filterRows"
 import { applyFiltersToQuery, stripFilterBlockFilters, type FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import { resolveChoiceColor, normalizeHexColor } from "@/lib/field-colors"
-import { ChevronDown, ChevronRight } from "lucide-react"
+import { ChevronDown, ChevronRight, Settings, Image, Database } from "lucide-react"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { CellFactory } from "@/components/grid/CellFactory"
 import { buildGroupTree } from "@/lib/grouping/groupTree"
 import type { GroupedNode } from "@/lib/grouping/types"
 import { resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
+import { Button } from "@/components/ui/button"
+import EmptyState from "@/components/empty-states/EmptyState"
 
 interface GalleryViewProps {
   tableId: string
@@ -52,6 +54,7 @@ export default function GalleryView({
   fitImageSize = false,
   blockConfig = {},
   defaultGroupsCollapsed = true,
+  onOpenSettings,
 }: GalleryViewProps) {
   const { openRecord } = useRecordPanel()
   const [rows, setRows] = useState<TableRow[]>([])
@@ -533,34 +536,48 @@ export default function GalleryView({
 
   if (!supabaseTableName) {
     return (
-      <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
-        <div className="text-center">
-          <p className="mb-1">Gallery view requires a table connection.</p>
-          <p className="text-xs text-gray-400">Configure a table in block settings.</p>
-        </div>
-      </div>
+      <EmptyState
+        icon={<Database className="h-12 w-12" />}
+        title="Table connection required"
+        description="Gallery view needs to be connected to a table to display records."
+        action={onOpenSettings ? {
+          label: "Configure Table",
+          onClick: onOpenSettings,
+        } : undefined}
+      />
     )
   }
 
   if (!imageField) {
     return (
-      <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
-        <div className="text-center">
-          <p className="mb-1">Gallery view needs an image field.</p>
-          <p className="text-xs text-gray-400">Set it in Appearance → Cover image field.</p>
-        </div>
-      </div>
+      <EmptyState
+        icon={<Image className="h-12 w-12" />}
+        title="Image field required"
+        description="Gallery view needs an image field to display cards. Set the cover image field in block settings."
+        action={onOpenSettings ? {
+          label: "Configure Image Field",
+          onClick: onOpenSettings,
+        } : undefined}
+      />
     )
   }
 
   if (filteredRows.length === 0) {
     return (
-      <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
-        <div className="text-center">
-          <p className="mb-1">No records found</p>
-          {filters.length > 0 && <p className="text-xs text-gray-400">Try adjusting filters.</p>}
-        </div>
-      </div>
+      <EmptyState
+        icon={<Database className="h-12 w-12" />}
+        title="No records found"
+        description={filters.length > 0 
+          ? "No records match your current filters. Try adjusting your filters or create a new record."
+          : "This table doesn't have any records yet. Create your first record to get started."}
+        action={filters.length === 0 ? {
+          label: "Create Record",
+          onClick: () => {
+            // Try to open record creation - this would need to be passed as a prop
+            // For now, just show the message
+          },
+        } : undefined}
+      />
     )
   }
 

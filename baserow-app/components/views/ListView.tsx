@@ -9,9 +9,10 @@ import { formatDateUK } from "@/lib/utils"
 import type { TableField } from "@/types/fields"
 import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
 import type { FilterType } from "@/types/database"
-import { ChevronDown, ChevronRight, Filter, Group, MapPin, MoreHorizontal, Plus } from "lucide-react"
+import { ChevronDown, ChevronRight, Filter, Group, MapPin, MoreHorizontal, Plus, Database } from "lucide-react"
 import { useIsMobile } from "@/hooks/useResponsive"
 import { Button } from "@/components/ui/button"
+import EmptyState from "@/components/empty-states/EmptyState"
 import RecordModal from "@/components/calendar/RecordModal"
 import GroupDialog from "@/components/grid/GroupDialog"
 import FilterDialog from "@/components/grid/FilterDialog"
@@ -933,13 +934,25 @@ export default function ListView({
             )}
           </Button>
         </div>
-        <div className="flex-1 flex items-center justify-center text-gray-400 text-sm p-4">
-          <div className="text-center">
-            <p className="mb-2">No records found</p>
-            {searchQuery && (
-              <p className="text-xs text-gray-400">Try adjusting your search or filters</p>
-            )}
-          </div>
+        <div className="flex-1 flex items-center justify-center p-4">
+          <EmptyState
+            icon={<Database className="h-12 w-12" />}
+            title="No records found"
+            description={searchQuery 
+              ? "No records match your search query. Try adjusting your search or clear it to see all records."
+              : filters.length > 0
+              ? "No records match your current filters. Try adjusting your filters or create a new record."
+              : "This table doesn't have any records yet. Create your first record to get started."}
+            action={searchQuery ? {
+              label: "Clear Search",
+              onClick: () => {
+                const params = new URLSearchParams(window.location.search)
+                params.delete("q")
+                window.history.replaceState({}, "", `?${params.toString()}`)
+                window.location.reload()
+              },
+            } : undefined}
+          />
         </div>
         {/* Dialogs */}
         {viewId ? (
