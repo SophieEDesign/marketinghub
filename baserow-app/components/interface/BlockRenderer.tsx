@@ -23,7 +23,14 @@ import KanbanBlock from "./blocks/KanbanBlock"
 
 // CRITICAL: MultiCalendarBlock uses FullCalendar which causes hydration mismatches
 // Disable SSR to prevent React error #185
-const MultiCalendarBlock = dynamic(() => import("./blocks/MultiCalendarBlock"), { ssr: false })
+const MultiCalendarBlock = dynamic(() => import("./blocks/MultiCalendarBlock"), { 
+  ssr: false,
+  loading: () => (
+    <div className="h-full flex items-center justify-center">
+      <LoadingSpinner size="lg" text="Loading calendar..." />
+    </div>
+  )
+})
 import TimelineBlock from "./blocks/TimelineBlock"
 import MultiTimelineBlock from "./blocks/MultiTimelineBlock"
 import GalleryBlock from "./blocks/GalleryBlock"
@@ -33,6 +40,7 @@ import { ErrorBoundary } from "./ErrorBoundary"
 import type { FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import LazyBlockWrapper from "./LazyBlockWrapper"
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 
 // Module-level Set to track warned blocks across all component instances
 const warnedBlocks = new Set<string>()

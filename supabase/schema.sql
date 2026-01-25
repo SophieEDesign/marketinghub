@@ -238,6 +238,7 @@ CREATE TABLE IF NOT EXISTS public.grid_view_settings (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   view_id uuid NOT NULL UNIQUE,
   group_by_field text,
+  group_by_rules jsonb DEFAULT NULL,
   column_widths jsonb DEFAULT '{}'::jsonb,
   column_order jsonb DEFAULT '[]'::jsonb,
   column_wrap_text jsonb DEFAULT '{}'::jsonb,

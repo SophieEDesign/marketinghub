@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState, useEffect } from "react"
 import type { PageBlock } from "@/lib/interface/types"
 import type { FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
@@ -30,6 +30,13 @@ export default function MultiCalendarBlock({
   onRecordClick,
   pageShowAddRecord = false,
 }: MultiCalendarBlockProps) {
+  // CRITICAL: Prevent hydration mismatch - don't render until mounted
+  const [mounted, setMounted] = useState(false)
+  
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   const rawSources = Array.isArray((block.config as any)?.sources)
     ? ((block.config as any).sources as any[])
     : []
@@ -70,6 +77,15 @@ export default function MultiCalendarBlock({
       type_field: s?.type_field ?? s?.typeField,
     }))
   }, [rawSourcesKey])
+
+  // CRITICAL: Don't render until mounted to prevent hydration mismatches
+  if (!mounted) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-gray-400 text-sm">Loading calendar...</div>
+      </div>
+    )
+  }
 
   if (sources.length === 0) {
     return (

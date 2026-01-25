@@ -341,6 +341,32 @@ export default function GridDataSettings({
               fields={fields}
             />
 
+            {/* Default Date Range Preset */}
+            <div className="space-y-2">
+              <Label className="text-sm">Default Date Range</Label>
+              <Select
+                value={config.default_date_range_preset || 'thisWeek'}
+                onValueChange={(value) =>
+                  onUpdate({ default_date_range_preset: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select default date range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="thisWeek">This Week</SelectItem>
+                  <SelectItem value="thisMonth">This Month</SelectItem>
+                  <SelectItem value="nextWeek">Next Week</SelectItem>
+                  <SelectItem value="nextMonth">Next Month</SelectItem>
+                  <SelectItem value="none">No Default (Custom)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500">
+                The calendar will automatically show this date range when first loaded. Default: This Week
+              </p>
+            </div>
+
             {/* Sort */}
             <SortSelector
               value={Array.isArray(config.sorts) ? config.sorts : undefined}

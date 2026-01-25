@@ -27,6 +27,7 @@ import CalendarDateRangeControls from "@/components/views/calendar/CalendarDateR
 import { VIEWS_ENABLED } from "@/lib/featureFlags"
 import { normalizeUuid } from "@/lib/utils/ids"
 import { isAbortError } from "@/lib/api/error-handling"
+import { startOfWeek, endOfWeek, startOfDay, addWeeks, startOfMonth, endOfMonth, addMonths } from "date-fns"
 
 interface GridBlockProps {
   block: PageBlock
@@ -95,6 +96,50 @@ export default function GridBlock({
   // Calendar-only: date range filter state (lifted here so we can render controls in a unified header panel)
   const [calendarDateFrom, setCalendarDateFrom] = useState<Date | undefined>(undefined)
   const [calendarDateTo, setCalendarDateTo] = useState<Date | undefined>(undefined)
+  
+  // Initialize calendar date range based on config or default to "this week"
+  useEffect(() => {
+    if (viewType === 'calendar' && calendarDateFrom === undefined && calendarDateTo === undefined) {
+      const preset = config?.default_date_range_preset || 'thisWeek'
+      const today = startOfDay(new Date())
+      let from: Date | undefined
+      let to: Date | undefined
+      
+      switch (preset) {
+        case 'today':
+          from = today
+          to = today
+          break
+        case 'thisWeek':
+          from = startOfWeek(today, { weekStartsOn: 1 }) // Monday
+          to = endOfWeek(today, { weekStartsOn: 1 }) // Sunday
+          break
+        case 'thisMonth':
+          from = startOfMonth(today)
+          to = endOfMonth(today)
+          break
+        case 'nextWeek':
+          const nextWeekStart = addWeeks(startOfWeek(today, { weekStartsOn: 1 }), 1)
+          from = nextWeekStart
+          to = endOfWeek(nextWeekStart, { weekStartsOn: 1 })
+          break
+        case 'nextMonth':
+          const nextMonthStart = addMonths(startOfMonth(today), 1)
+          from = nextMonthStart
+          to = endOfMonth(nextMonthStart)
+          break
+        case 'none':
+        default:
+          // Don't set default dates
+          return
+      }
+      
+      if (from && to) {
+        setCalendarDateFrom(from)
+        setCalendarDateTo(to)
+      }
+    }
+  }, [viewType, calendarDateFrom, calendarDateTo, config?.default_date_range_preset])
   // Bump to force views to refetch after record creation.
   const [refreshKey, setRefreshKey] = useState(0)
 
