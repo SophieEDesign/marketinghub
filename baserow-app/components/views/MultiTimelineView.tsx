@@ -38,6 +38,7 @@ import { asArray } from "@/lib/utils/asArray"
 import { normalizeUuid } from "@/lib/utils/ids"
 import { isAbortError } from "@/lib/api/error-handling"
 import { useOperationFeedback } from "@/hooks/useOperationFeedback"
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 
 type MultiSource = {
   id: string
@@ -625,7 +626,11 @@ export default function MultiTimelineView({
   }, [sources, tablesBySource])
 
   if (loading) {
-    return <div className="h-full flex items-center justify-center text-gray-400 text-sm">Loading…</div>
+    return (
+      <div className="h-full flex items-center justify-center">
+        <LoadingSpinner size="lg" text="Loading timeline data..." />
+      </div>
+    )
   }
 
   // Show errors if any sources failed to load

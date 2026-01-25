@@ -1214,7 +1214,7 @@ function InterfacePageClientInternal({
           // We should always attempt to render InterfaceBuilder after loading completes
           blocksLoading ? (
             <div className="h-full flex items-center justify-center">
-              <div className="text-gray-500">Loading blocks...</div>
+              <LoadingSpinner size="lg" text="Loading blocks..." />
             </div>
           ) : (
             // CRITICAL: Always render the same component tree to prevent remounts
