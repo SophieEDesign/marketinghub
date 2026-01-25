@@ -1198,7 +1198,7 @@ function InterfacePageClientInternal({
         {/* Show loading/error states as overlays, not separate trees */}
         {loading && !page ? (
           <div className="h-full flex items-center justify-center">
-            <div className="text-gray-500">Loading page...</div>
+            <LoadingSpinner size="lg" text="Loading page..." />
           </div>
         ) : !page ? (
           <div className="h-full flex items-center justify-center">
