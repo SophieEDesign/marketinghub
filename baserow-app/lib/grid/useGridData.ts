@@ -238,24 +238,38 @@ export function useGridData({
     }
   }
   
-  // Store filters and sorts in refs to avoid dependency issues
+  // Store filters, sorts, and fields in refs to avoid dependency issues
   // Only update when content actually changes (via stringified comparison)
   const filtersRef = useRef(filters)
   const sortsRef = useRef(sorts)
+  const fieldsRef = useRef(fields)
   
-  // Memoize filters and sorts strings to detect actual content changes
+  // Memoize filters, sorts, and fields strings to detect actual content changes
   // Only re-compute when the actual content changes, not when references change
   const filtersString = useMemo(() => JSON.stringify(filters), [filters])
   const sortsString = useMemo(() => JSON.stringify(sorts), [sorts])
+  const fieldsString = useMemo(() => JSON.stringify(fields), [fields])
+  
+  // Track previous stringified values to detect actual changes
+  const prevFiltersStringRef = useRef<string>(filtersString)
+  const prevSortsStringRef = useRef<string>(sortsString)
+  const prevFieldsStringRef = useRef<string>(fieldsString)
   
   // Update refs when content changes (but not on every render)
   useEffect(() => {
     filtersRef.current = filters
-  }, [filtersString])
+    prevFiltersStringRef.current = filtersString
+  }, [filtersString, filters])
   
   useEffect(() => {
     sortsRef.current = sorts
-  }, [sortsString])
+    prevSortsStringRef.current = sortsString
+  }, [sortsString, sorts])
+  
+  useEffect(() => {
+    fieldsRef.current = fields
+    prevFieldsStringRef.current = fieldsString
+  }, [fieldsString, fields])
   
   // Cap limit to prevent memory exhaustion
   const safeLimit = limit > MAX_SAFE_LIMIT ? MAX_SAFE_LIMIT : limit
@@ -263,6 +277,7 @@ export function useGridData({
   const loadData = useCallback(async () => {
     if (!tableName) {
       setLoading(false)
+      isLoadingRef.current = false
       return
     }
     
@@ -313,13 +328,14 @@ export function useGridData({
       }
 
       const runQuery = async (attempt: number): Promise<null> => {
-        // Use refs to get current filters/sorts without causing dependency issues
+        // Use refs to get current filters/sorts/fields without causing dependency issues
         const currentFilters = filtersRef.current
         const currentSorts = sortsRef.current
+        const currentFields = fieldsRef.current
       
       // If field metadata is provided, avoid over-fetching.
       // Only select physical columns; virtual fields (formula/lookup) are computed elsewhere.
-        const safeFields = asArray<TableField>(fields)
+        const safeFields = asArray<TableField>(currentFields)
         const physicalFieldNames = safeFields
           .filter((f) => f && typeof f === 'object' && f.name && f.type !== 'formula' && f.type !== 'lookup')
           .map((f) => f.name)
@@ -428,7 +444,10 @@ export function useGridData({
 
       await runQuery(0)
     } catch (err: unknown) {
-      if (isAbortError(err)) return
+      if (isAbortError(err)) {
+        isLoadingRef.current = false
+        return
+      }
       const errorMessage = (err as { message?: string })?.message || 'Failed to load data'
       console.error('Error loading grid data:', err)
       setError(errorMessage)
@@ -441,13 +460,34 @@ export function useGridData({
       setLoading(false)
       isLoadingRef.current = false
     }
-    // CRITICAL: Only depend on stringified versions to prevent infinite loops
-    // Refs ensure we always use latest values without causing re-renders
-  }, [tableName, tableId, filtersString, refreshPhysicalColumns, safeLimit, sortsString, onError, toast])
+    // CRITICAL: Remove filtersString, sortsString, and fields from dependencies to prevent infinite loops
+    // We use refs to access current values, and a separate effect triggers reloads when they change
+  }, [tableName, tableId, refreshPhysicalColumns, safeLimit, onError, toast])
 
+  // Track table name and ID to detect changes
+  const prevTableNameRef = useRef<string | undefined>(tableName)
+  const prevTableIdRef = useRef<string | undefined>(tableId)
+  
+  // Separate effect to trigger reload when filters/sorts/fields actually change
   useEffect(() => {
-    loadData()
-  }, [loadData])
+    const filtersChanged = prevFiltersStringRef.current !== filtersString
+    const sortsChanged = prevSortsStringRef.current !== sortsString
+    const fieldsChanged = prevFieldsStringRef.current !== fieldsString
+    const tableNameChanged = prevTableNameRef.current !== tableName
+    const tableIdChanged = prevTableIdRef.current !== tableId
+    
+    // Update refs
+    prevFiltersStringRef.current = filtersString
+    prevSortsStringRef.current = sortsString
+    prevFieldsStringRef.current = fieldsString
+    prevTableNameRef.current = tableName
+    prevTableIdRef.current = tableId
+    
+    // Only trigger reload if something actually changed
+    if (filtersChanged || sortsChanged || fieldsChanged || tableNameChanged || tableIdChanged) {
+      loadData()
+    }
+  }, [filtersString, sortsString, fieldsString, tableName, tableId, loadData])
 
   const updateCell = useCallback(
     async (rowId: string, fieldName: string, value: unknown) => {

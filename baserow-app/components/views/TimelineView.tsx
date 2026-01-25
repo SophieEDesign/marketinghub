@@ -1551,14 +1551,16 @@ export default function TimelineView({
                             }}
                           >
                             <Card
-                              className={`${rowSizeSpacing.cardHeight} shadow-sm hover:shadow-md transition-shadow ${
+                              className={`${rowSizeSpacing.cardHeight} shadow-sm transition-all ${
                                 event.color ? `border-l-4` : ""
                               } ${isDragging || isResizing ? 'opacity-75' : ''} ${
                                 draggingEvent || resizingEvent ? 'cursor-grabbing' : 'cursor-pointer'
-                              } ${selectedEventId === event.rowId ? 'ring-1 ring-blue-400/40' : ''}`}
+                              }`}
                               style={{
                                 borderLeftColor: event.color,
                                 backgroundColor: event.color ? `${event.color}15` : "white",
+                                outline: selectedEventId === event.rowId ? '2px solid rgba(96, 165, 250, 0.4)' : 'none',
+                                outlineOffset: selectedEventId === event.rowId ? '2px' : '0',
                               }}
                               onMouseDown={(e) => handleDragStart(event, e)}
                               onClick={(e) => handleEventSelect(event, e)}
@@ -1645,14 +1647,16 @@ export default function TimelineView({
                     }}
                   >
                     <Card
-                      className={`${rowSizeSpacing.cardHeight} shadow-sm hover:shadow-md transition-shadow ${
+                      className={`${rowSizeSpacing.cardHeight} shadow-sm transition-all ${
                         event.color ? `border-l-4` : ""
                       } ${isDragging || isResizing ? 'opacity-75' : ''} ${
                         draggingEvent || resizingEvent ? 'cursor-grabbing' : 'cursor-pointer'
-                      } ${selectedEventId === event.rowId ? 'ring-1 ring-blue-400/40' : ''}`}
+                      }`}
                       style={{
                         borderLeftColor: event.color,
                         backgroundColor: event.color ? `${event.color}15` : "white",
+                        outline: selectedEventId === event.rowId ? '2px solid rgba(96, 165, 250, 0.4)' : 'none',
+                        outlineOffset: selectedEventId === event.rowId ? '2px' : '0',
                       }}
                       onMouseDown={(e) => handleDragStart(event, e)}
                       onClick={(e) => handleEventSelect(event, e)}

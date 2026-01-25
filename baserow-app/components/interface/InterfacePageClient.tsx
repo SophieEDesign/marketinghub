@@ -785,16 +785,59 @@ function InterfacePageClientInternal({
         return
       }
       
-      // Replace state entirely - database is source of truth
-      console.log(`[loadBlocks] setBlocks CALLED: pageId=${page.id}, page_type=${page.page_type}`, {
+      // CRITICAL: Compare blocks before updating to prevent unnecessary re-renders
+      // Only update if blocks actually changed (different IDs, positions, or config)
+      const oldBlockIds = blocks.map((b: any) => b.id).sort().join(',')
+      const newBlockIds = pageBlocks.map((b: any) => b.id).sort().join(',')
+      const blockIdsChanged = oldBlockIds !== newBlockIds
+      
+      // Check if block positions or config changed (shallow comparison)
+      let blockContentChanged = false
+      if (!blockIdsChanged && blocks.length === pageBlocks.length) {
+        // Same IDs and count - check if positions or config changed
+        for (let i = 0; i < blocks.length; i++) {
+          const oldBlock = blocks[i]
+          const newBlock = pageBlocks.find((b: any) => b.id === oldBlock.id)
+          if (!newBlock) {
+            blockContentChanged = true
+            break
+          }
+          // Compare key properties that would cause re-render
+          if (
+            oldBlock.x !== newBlock.x ||
+            oldBlock.y !== newBlock.y ||
+            oldBlock.w !== newBlock.w ||
+            oldBlock.h !== newBlock.h ||
+            JSON.stringify(oldBlock.config) !== JSON.stringify(newBlock.config)
+          ) {
+            blockContentChanged = true
+            break
+          }
+        }
+      }
+      
+      const blocksChanged = blockIdsChanged || blockContentChanged
+      
+      console.log(`[loadBlocks] setBlocks CHECK: pageId=${page.id}, page_type=${page.page_type}`, {
         forceReload,
         oldBlocksCount: blocks.length,
         newBlocksCount: pageBlocks.length,
         oldBlockIds: blocks.map((b: any) => b.id),
         newBlockIds: pageBlocks.map((b: any) => b.id),
-        willReplace: true,
+        blockIdsChanged,
+        blockContentChanged,
+        blocksChanged,
+        willUpdate: blocksChanged || forceReload,
       })
-      setBlocks(pageBlocks)
+      
+      // Only update if blocks actually changed or forceReload is true
+      if (blocksChanged || forceReload) {
+        setBlocks(pageBlocks)
+      } else {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[loadBlocks] Blocks unchanged - skipping setBlocks to prevent re-render`)
+        }
+      }
       blocksLoadedRef.current = { pageId: page.id, loaded: true }
     } catch (error) {
       console.error("Error loading blocks:", error)

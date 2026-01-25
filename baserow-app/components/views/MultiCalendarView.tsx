@@ -194,6 +194,8 @@ export default function MultiCalendarView({
   const [searchQuery, setSearchQuery] = useState("")
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined)
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined)
+  // CRITICAL: Prevent hydration mismatch - FullCalendar generates dynamic IDs that differ between server/client
+  const [mounted, setMounted] = useState(false)
 
   const [tablesBySource, setTablesBySource] = useState<Record<string, { tableId: string; supabaseTable: string; name: string }>>({})
   const [fieldsBySource, setFieldsBySource] = useState<Record<string, TableField[]>>({})
@@ -215,6 +217,14 @@ export default function MultiCalendarView({
   } | null>(null)
 
   const loadingRef = useRef(false)
+
+  // Lifecycle: Mark as mounted to prevent hydration mismatch with FullCalendar
+  useEffect(() => {
+    setMounted(true)
+    return () => {
+      setMounted(false)
+    }
+  }, [])
 
   const effectiveEnabledSources = useMemo(() => {
     const enabledSet = new Set(enabledSourceIds)
@@ -263,7 +273,10 @@ export default function MultiCalendarView({
 
           if (tableRes.error) {
             if (isAbortError(tableRes.error)) {
-              return // Component unmounted, exit early
+              // Component unmounted, exit early but clear loading state
+              setLoading(false)
+              loadingRef.current = false
+              return
             }
             const errorMsg = tableRes.error.message || "Failed to load table"
             nextErrors[s.id] = errorMsg
@@ -290,6 +303,9 @@ export default function MultiCalendarView({
 
           if (fieldsRes.error) {
             if (isAbortError(fieldsRes.error)) {
+              // Component unmounted, exit early but clear loading state
+              setLoading(false)
+              loadingRef.current = false
               return
             }
             console.error(`MultiCalendar: Error loading fields for source ${s.id}:`, fieldsRes.error)
@@ -309,6 +325,9 @@ export default function MultiCalendarView({
 
             if (viewFiltersRes.error) {
               if (isAbortError(viewFiltersRes.error)) {
+                // Component unmounted, exit early but clear loading state
+                setLoading(false)
+                loadingRef.current = false
                 return
               }
               // Non-critical error - log but continue
@@ -329,6 +348,9 @@ export default function MultiCalendarView({
           }
         } catch (err: any) {
           if (isAbortError(err)) {
+            // Component unmounted, exit early but clear loading state
+            setLoading(false)
+            loadingRef.current = false
             return
           }
           console.error(`MultiCalendar: Exception loading source ${s.id}:`, err)
@@ -362,6 +384,9 @@ export default function MultiCalendarView({
 
           if (rowsRes.error) {
             if (isAbortError(rowsRes.error)) {
+              // Component unmounted, exit early but clear loading state
+              setLoading(false)
+              loadingRef.current = false
               return
             }
             const errorMsg = rowsRes.error.message || "Failed to load rows"
@@ -380,6 +405,9 @@ export default function MultiCalendarView({
           })) as TableRow[]
         } catch (err: any) {
           if (isAbortError(err)) {
+            // Component unmounted, exit early but clear loading state
+            setLoading(false)
+            loadingRef.current = false
             return
           }
           const errorMsg = err.message || "Unexpected error loading rows"
@@ -395,6 +423,9 @@ export default function MultiCalendarView({
       setErrorsBySource(nextErrors)
     } catch (err: any) {
       if (isAbortError(err)) {
+        // Component unmounted, exit early but clear loading state
+        setLoading(false)
+        loadingRef.current = false
         return
       }
       const errorMsg = err.message || "Failed to load calendar data"
@@ -408,8 +439,15 @@ export default function MultiCalendarView({
 
   // Reload whenever sources change (and on first mount). Quick filters are applied via dedicated reload button (keeps it predictable).
   useEffect(() => {
+    // Only load if we have valid sources
+    if (!sources || sources.length === 0) {
+      // No sources configured - clear loading state immediately
+      setLoading(false)
+      loadingRef.current = false
+      return
+    }
     loadAll()
-  }, [loadAll, sourcesKey, filtersKey])
+  }, [loadAll, sourcesKey, filtersKey, sources])
 
   const events = useMemo<EventInput[]>(() => {
     const enabledSet = new Set(enabledSourceIds)
@@ -807,37 +845,45 @@ export default function MultiCalendarView({
       )}
 
       <div className="flex-1 min-h-0">
-        <FullCalendar
-          plugins={calendarPlugins}
-          initialView="dayGridMonth"
-          height="100%"
-          events={events}
-          editable={!isViewOnly && !isEditing}
-          eventDrop={handleEventDrop}
-          eventClick={onCalendarEventClick}
-          dateClick={onCalendarDateClick}
-          // Enforce unified styling even if FullCalendar/theme CSS overrides event colors.
-          eventDidMount={(arg: any) => {
-            const el = arg?.el as HTMLElement | undefined
-            if (!el) return
-            el.style.setProperty("background-color", "#ffffff", "important")
-            el.style.setProperty("border-color", "#e5e7eb", "important")
-            el.style.setProperty("color", "#111827", "important")
-            el.style.setProperty("border-width", "1px", "important")
-            el.style.setProperty("border-style", "solid", "important")
-            el.style.setProperty("box-shadow", "0 1px 2px rgba(0,0,0,0.05)", "important")
-            el.style.setProperty("border-radius", "6px", "important")
+        {/* CRITICAL: Only render FullCalendar after mount to prevent hydration mismatch (React error #185) */}
+        {/* FullCalendar generates dynamic DOM IDs that differ between server and client */}
+        {mounted ? (
+          <FullCalendar
+            plugins={calendarPlugins}
+            initialView="dayGridMonth"
+            height="100%"
+            events={events}
+            editable={!isViewOnly && !isEditing}
+            eventDrop={handleEventDrop}
+            eventClick={onCalendarEventClick}
+            dateClick={onCalendarDateClick}
+            // Enforce unified styling even if FullCalendar/theme CSS overrides event colors.
+            eventDidMount={(arg: any) => {
+              const el = arg?.el as HTMLElement | undefined
+              if (!el) return
+              el.style.setProperty("background-color", "#ffffff", "important")
+              el.style.setProperty("border-color", "#e5e7eb", "important")
+              el.style.setProperty("color", "#111827", "important")
+              el.style.setProperty("border-width", "1px", "important")
+              el.style.setProperty("border-style", "solid", "important")
+              el.style.setProperty("box-shadow", "0 1px 2px rgba(0,0,0,0.05)", "important")
+              el.style.setProperty("border-radius", "6px", "important")
 
-            // FullCalendar often renders the title inside an <a>; force link text color too.
-            try {
-              el.querySelectorAll("a").forEach((a) => {
-                ;(a as HTMLElement).style.setProperty("color", "#111827", "important")
-              })
-            } catch {
-              // ignore
-            }
-          }}
-        />
+              // FullCalendar often renders the title inside an <a>; force link text color too.
+              try {
+                el.querySelectorAll("a").forEach((a) => {
+                  ;(a as HTMLElement).style.setProperty("color", "#111827", "important")
+                })
+              } catch {
+                // ignore
+              }
+            }}
+          />
+        ) : (
+          <div className="flex items-center justify-center h-full text-gray-500">
+            Loading calendar...
+          </div>
+        )}
       </div>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>

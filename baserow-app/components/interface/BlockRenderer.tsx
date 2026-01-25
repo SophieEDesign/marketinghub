@@ -372,9 +372,11 @@ export default function BlockRenderer({
 
       case "list":
         // List block - wrapper around GridBlock with view_type='grid'
+        // CRITICAL: key={block.id} ONLY - no index, no compound keys, no pageId
         return (
           <LazyBlockWrapper enabled={!isEditing}>
             <ListBlock
+              key={block.id}
               block={safeBlock}
               isEditing={canEdit}
               pageTableId={pageTableId}

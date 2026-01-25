@@ -467,16 +467,15 @@ export default function CalendarView({
     const currentFiltersKey = filtersKey
     const combinedKey = `${currentFiltersKey}|${searchQuery}|${currentFieldsKey}|${reloadKey ?? 0}`
     
-    // CRITICAL: Only treat "rows is empty" as a load trigger on the *first* load.
-    // If a table legitimately has 0 rows (or the last fetch errored and returned []),
-    // re-triggering on every render causes an update loop (React #185).
-    const isFirstLoadForThisView = prevFiltersRef.current === ""
-    const shouldLoad = prevFiltersRef.current !== combinedKey || (isFirstLoadForThisView && rows.length === 0)
+    // CRITICAL: Only reload if the combined key actually changed.
+    // DO NOT check rows.length === 0 as it causes infinite loops (React error #185).
+    // If a table has 0 rows, that's a valid state and we should not keep reloading.
+    // The first load is triggered when prevFiltersRef.current === "" (initial state).
+    const shouldLoad = prevFiltersRef.current !== combinedKey
     
     if (shouldLoad) {
       debugLog('CALENDAR', 'Calendar: Triggering loadRows', {
         keyChanged: prevFiltersRef.current !== combinedKey,
-        noRowsYet: rows.length === 0,
         combinedKey: combinedKey.substring(0, 50) + '...'
       })
       prevFiltersRef.current = combinedKey
