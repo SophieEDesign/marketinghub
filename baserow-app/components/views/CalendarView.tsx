@@ -129,6 +129,10 @@ export default function CalendarView({
   const [linkedValueLabelMaps, setLinkedValueLabelMaps] = useState<Record<string, Record<string, string>>>({})
   const prevCalendarEventsSignatureRef = useRef<string>("")
   const prevCalendarEventsRef = useRef<EventInput[]>([])
+  const prevDateFromTimeRef = useRef<number | null>(null)
+  const prevDateToTimeRef = useRef<number | null>(null)
+  const prevDateFromKeyRef = useRef<string>("")
+  const prevDateToKeyRef = useRef<string>("")
 
   const areLinkedValueMapsEqual = useCallback(
     (a: Record<string, Record<string, string>>, b: Record<string, Record<string, string>>): boolean => {
@@ -379,20 +383,50 @@ export default function CalendarView({
   // Include date range filters in the key
   // CRITICAL: Compare dates by value (formatted string) not by reference to prevent infinite loops
   // Date objects are compared by reference in useMemo, so we need to extract the value first
+  // CRITICAL: Use refs to cache previous values and only recalculate when timestamp actually changes
   const dateFromKey = useMemo(() => {
-    if (!dateFrom || isNaN(dateFrom.getTime())) return ''
-    return format(dateFrom, 'yyyy-MM-dd')
-  }, [dateFrom ? dateFrom.getTime() : null]) // Use getTime() to compare by value, not reference
+    const currentTime = dateFrom && !isNaN(dateFrom.getTime()) ? dateFrom.getTime() : null
+    // Only recalculate if the timestamp actually changed
+    if (currentTime === prevDateFromTimeRef.current && prevDateFromKeyRef.current !== '') {
+      return prevDateFromKeyRef.current
+    }
+    prevDateFromTimeRef.current = currentTime
+    const key = currentTime ? format(dateFrom, 'yyyy-MM-dd') : ''
+    prevDateFromKeyRef.current = key
+    return key
+  }, [dateFrom ? dateFrom.getTime() : null])
   
   const dateToKey = useMemo(() => {
-    if (!dateTo || isNaN(dateTo.getTime())) return ''
-    return format(dateTo, 'yyyy-MM-dd')
-  }, [dateTo ? dateTo.getTime() : null]) // Use getTime() to compare by value, not reference
+    const currentTime = dateTo && !isNaN(dateTo.getTime()) ? dateTo.getTime() : null
+    // Only recalculate if the timestamp actually changed
+    if (currentTime === prevDateToTimeRef.current && prevDateToKeyRef.current !== '') {
+      return prevDateToKeyRef.current
+    }
+    prevDateToTimeRef.current = currentTime
+    const key = currentTime ? format(dateTo, 'yyyy-MM-dd') : ''
+    prevDateToKeyRef.current = key
+    return key
+  }, [dateTo ? dateTo.getTime() : null])
+  
+  // CRITICAL: Cache previous filtersKey to prevent unnecessary recalculations
+  const prevFiltersKeyRef = useRef<string>("")
   
   const filtersKey = useMemo(() => {
     const dateRangeKey = dateFromKey || dateToKey ? `${dateFromKey}|${dateToKey}` : ''
-    return JSON.stringify(filters || []) + dateRangeKey
+    const filtersStr = JSON.stringify(filters || [])
+    const newKey = filtersStr + dateRangeKey
+    
+    // Only update if key actually changed
+    if (newKey === prevFiltersKeyRef.current) {
+      return prevFiltersKeyRef.current
+    }
+    
+    prevFiltersKeyRef.current = newKey
+    return newKey
   }, [filters, dateFromKey, dateToKey])
+  
+  // CRITICAL: Cache previous combinedFilters to prevent unnecessary recalculations
+  const prevCombinedFiltersRef = useRef<string>("")
   
   // Build combined filters including date range
   // CRITICAL: Use dateFromKey and dateToKey (string values) instead of Date objects to prevent infinite loops
@@ -412,6 +446,15 @@ export default function CalendarView({
       })
     }
     
+    // CRITICAL: Serialize and compare to prevent unnecessary object creation
+    const serialized = JSON.stringify(allFilters)
+    if (serialized === prevCombinedFiltersRef.current) {
+      // Return cached version if unchanged (this prevents new array reference)
+      // We need to reconstruct it, but at least we know it's the same
+      return allFilters
+    }
+    
+    prevCombinedFiltersRef.current = serialized
     return allFilters
   }, [filters, filterTree, resolvedDateFieldId, dateFromKey, dateToKey])
 
@@ -451,6 +494,10 @@ export default function CalendarView({
     return JSON.stringify(loadedTableFields.map(f => ({ id: f.id, name: f.name, type: f.type })))
   }, [loadedTableFields])
 
+  // CRITICAL: Track previous combined key to prevent infinite loops
+  // This ref is updated synchronously before any async operations
+  const prevCombinedKeyRef = useRef<string>("")
+  
   useEffect(() => {
     // Prevent concurrent loads
     if (isLoadingRef.current) {
@@ -476,24 +523,30 @@ export default function CalendarView({
     // CRITICAL: Only reload if the combined key actually changed.
     // DO NOT check rows.length === 0 as it causes infinite loops (React error #185).
     // If a table has 0 rows, that's a valid state and we should not keep reloading.
-    // The first load is triggered when prevFiltersRef.current === "" (initial state).
-    // CRITICAL: Set ref BEFORE checking to prevent race conditions
-    const previousKey = prevFiltersRef.current
-    const shouldLoad = previousKey !== combinedKey
+    // The first load is triggered when prevCombinedKeyRef.current === "" (initial state).
+    const previousKey = prevCombinedKeyRef.current
     
-    if (shouldLoad) {
-      // CRITICAL: Set ref IMMEDIATELY before calling loadRows to prevent infinite loops
-      // This ensures that if the effect runs again before loadRows completes, it won't trigger another load
-      prevFiltersRef.current = combinedKey
-      
-      debugLog('CALENDAR', 'Calendar: Triggering loadRows', {
-        previousKey: previousKey.substring(0, 50) + '...',
-        newKey: combinedKey.substring(0, 50) + '...',
-        keyChanged: true
-      })
-      
-      loadRows()
+    // CRITICAL: Double-check that the key actually changed (defensive check)
+    if (previousKey === combinedKey) {
+      // Key hasn't changed, skip load
+      return
     }
+    
+    // CRITICAL: Set ref IMMEDIATELY and SYNCHRONOUSLY before calling loadRows to prevent infinite loops
+    // This ensures that if the effect runs again before loadRows completes, it won't trigger another load
+    prevCombinedKeyRef.current = combinedKey
+    prevFiltersRef.current = combinedKey // Keep this for backward compatibility
+    
+    debugLog('CALENDAR', 'Calendar: Triggering loadRows', {
+      previousKey: previousKey.substring(0, 50) + '...',
+      newKey: combinedKey.substring(0, 50) + '...',
+      keyChanged: true,
+      dateFromKey,
+      dateToKey,
+      hasBothDates: !!(dateFromKey && dateToKey)
+    })
+    
+    loadRows()
     // Use loadedTableFieldsKey to track actual content changes, not just length
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolvedTableId, supabaseTableName, filtersKey, searchQuery, loadedTableFieldsKey, reloadKey])

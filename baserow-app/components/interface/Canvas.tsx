@@ -1039,6 +1039,14 @@ export default function Canvas({
             // Block shrunk - compact layout vertically (removes gaps)
             finalLayout = compactLayoutVertically(snappedLayout, blocks)
             debugLog('LAYOUT', '[Canvas] Applied compaction after resize shrink')
+          } else if (draggedBlockId && !needsPushDown && !needsCompaction) {
+            // After dragging (not resizing), preserve the snapped layout
+            // Snapping should align blocks, and compaction would break that alignment
+            // Only compact when blocks are resized or deleted, not when dragging
+            finalLayout = snappedLayout
+            debugLog('LAYOUT', '[Canvas] Preserved snapped layout after drag', {
+              draggedBlockId,
+            })
           }
           
           // Check if layout changed (either from snapping, push down, or compaction)
