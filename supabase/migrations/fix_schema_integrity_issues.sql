@@ -850,12 +850,25 @@ BEGIN
                 
                 RAISE NOTICE 'Updated % NULL workspace_id values to default (text)', null_count;
             ELSIF col_data_type = 'uuid' THEN
-                -- For uuid type, delete rows with NULL workspace_id
-                -- (No clear default uuid to use, and these are likely orphaned records)
-                DELETE FROM public.workspace_settings
-                WHERE workspace_id IS NULL;
+                -- For uuid type, try to use first available workspace
+                -- Don't delete - these might be valid settings for single-workspace apps
+                SELECT id INTO default_workspace_id
+                FROM public.workspaces
+                ORDER BY created_at ASC
+                LIMIT 1;
                 
-                RAISE NOTICE 'Deleted % rows with NULL workspace_id (uuid type)', null_count;
+                IF default_workspace_id IS NOT NULL THEN
+                    -- Set NULL workspace_id values to first available workspace
+                    UPDATE public.workspace_settings
+                    SET workspace_id = default_workspace_id
+                    WHERE workspace_id IS NULL;
+                    
+                    RAISE NOTICE 'Updated % NULL workspace_id values to workspace: % (uuid type)', null_count, default_workspace_id;
+                ELSE
+                    -- No workspace exists - skip NOT NULL constraint
+                    RAISE WARNING 'Skipping NOT NULL constraint on workspace_settings.workspace_id - no workspace exists and % rows have NULL values. Please create a workspace first.', null_count;
+                    RETURN;
+                END IF;
             ELSE
                 -- Unknown type, skip
                 RAISE WARNING 'Skipping NOT NULL constraint on workspace_settings.workspace_id - unknown data type: %', col_data_type;

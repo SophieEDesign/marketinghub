@@ -46,20 +46,75 @@ export async function getWorkspaceSettings(): Promise<WorkspaceSettings | null> 
 export async function updateWorkspaceSettings(settings: Partial<WorkspaceSettings>): Promise<WorkspaceSettings | null> {
   const supabase = await createClient()
   
+  // Get or create workspace ID
+  // First, try to get existing workspace
+  let workspaceId: string | null = null
+  
+  // Check workspace_id type by trying to get a workspace
+  const { data: workspace } = await supabase
+    .from('workspaces')
+    .select('id')
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  
+  if (workspace) {
+    workspaceId = workspace.id
+  } else {
+    // Create default workspace if it doesn't exist
+    // Don't specify id - let database generate it (works for both text and UUID)
+    const { data: newWorkspace, error: createError } = await supabase
+      .from('workspaces')
+      .insert([{ name: 'Marketing Hub' }])
+      .select('id')
+      .single()
+    
+    if (!createError && newWorkspace) {
+      workspaceId = newWorkspace.id
+    } else {
+      // If creation failed, try to get any existing workspace
+      const { data: anyWorkspace } = await supabase
+        .from('workspaces')
+        .select('id')
+        .limit(1)
+        .maybeSingle()
+      
+      if (anyWorkspace) {
+        workspaceId = anyWorkspace.id
+      } else {
+        // Last resort: try creating with 'default' id (only works if id is text type)
+        const { data: defaultWorkspace } = await supabase
+          .from('workspaces')
+          .insert([{ id: 'default', name: 'Marketing Hub' }])
+          .select('id')
+          .single()
+        
+        if (defaultWorkspace) {
+          workspaceId = defaultWorkspace.id
+        }
+      }
+    }
+  }
+  
+  if (!workspaceId) {
+    throw new Error('No workspace found. Please create a workspace first.')
+  }
+  
   // Check if settings exist
   const { data: existing } = await supabase
     .from('workspace_settings')
-    .select('id')
+    .select('id, workspace_id')
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
   
   if (existing) {
-    // Update existing
+    // Update existing - ensure workspace_id is set
     const { data, error } = await supabase
       .from('workspace_settings')
       .update({
         ...settings,
+        workspace_id: workspaceId, // Ensure workspace_id is set
         updated_at: new Date().toISOString(),
       })
       .eq('id', existing.id)
@@ -69,10 +124,13 @@ export async function updateWorkspaceSettings(settings: Partial<WorkspaceSetting
     if (error) throw error
     return data as WorkspaceSettings
   } else {
-    // Create new
+    // Create new - include workspace_id
     const { data, error } = await supabase
       .from('workspace_settings')
-      .insert([settings])
+      .insert([{
+        ...settings,
+        workspace_id: workspaceId, // Required field
+      }])
       .select()
       .single()
     

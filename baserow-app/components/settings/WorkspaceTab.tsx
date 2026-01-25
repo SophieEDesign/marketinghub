@@ -262,13 +262,46 @@ export default function SettingsWorkspaceTab() {
           }
         } else if (existingSettings) {
           // Update existing row
-          console.log('[WorkspaceTab] Updating existing workspace_settings row:', existingSettings.id)
+          // Ensure workspace_id is set (in case it was NULL before the migration)
+          let workspaceId: string | null = null
+          
+          // Get existing workspace
+          const { data: workspace } = await supabase
+            .from('workspaces')
+            .select('id')
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .maybeSingle()
+          
+          if (workspace) {
+            workspaceId = workspace.id
+          } else {
+            // Create workspace if it doesn't exist
+            const { data: newWorkspace } = await supabase
+              .from('workspaces')
+              .insert([{ name: workspaceName.trim() || 'Marketing Hub' }])
+              .select('id')
+              .single()
+            
+            if (newWorkspace) {
+              workspaceId = newWorkspace.id
+            }
+          }
+          
+          console.log('[WorkspaceTab] Updating existing workspace_settings row:', existingSettings.id, 'with workspace_id:', workspaceId)
+          const updateData: any = {
+            default_interface_id: defaultInterfaceId,
+            updated_at: new Date().toISOString(),
+          }
+          
+          // Only include workspace_id if we have one (don't overwrite with NULL)
+          if (workspaceId) {
+            updateData.workspace_id = workspaceId
+          }
+          
           const { data: updatedRows, error: updateError } = await supabase
             .from('workspace_settings')
-            .update({
-              default_interface_id: defaultInterfaceId,
-              updated_at: new Date().toISOString(),
-            })
+            .update(updateData)
             .eq('id', existingSettings.id)
             .select('default_interface_id')
           
@@ -292,10 +325,52 @@ export default function SettingsWorkspaceTab() {
           }
         } else {
           // No row exists, insert a new one
-          console.log('[WorkspaceTab] No existing row, inserting new workspace_settings')
+          // First, get or create workspace_id
+          let workspaceId: string | null = null
+          
+          // Get existing workspace
+          const { data: workspace } = await supabase
+            .from('workspaces')
+            .select('id')
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .maybeSingle()
+          
+          if (workspace) {
+            workspaceId = workspace.id
+          } else {
+            // Create workspace if it doesn't exist
+            const { data: newWorkspace, error: createError } = await supabase
+              .from('workspaces')
+              .insert([{ name: workspaceName.trim() || 'Marketing Hub' }])
+              .select('id')
+              .single()
+            
+            if (!createError && newWorkspace) {
+              workspaceId = newWorkspace.id
+            } else {
+              // Last resort: try 'default' if id is text type
+              const { data: defaultWorkspace } = await supabase
+                .from('workspaces')
+                .insert([{ id: 'default', name: workspaceName.trim() || 'Marketing Hub' }])
+                .select('id')
+                .single()
+              
+              if (defaultWorkspace) {
+                workspaceId = defaultWorkspace.id
+              }
+            }
+          }
+          
+          if (!workspaceId) {
+            throw new Error('No workspace found. Please create a workspace first.')
+          }
+          
+          console.log('[WorkspaceTab] No existing row, inserting new workspace_settings with workspace_id:', workspaceId)
           const { data: insertedRows, error: insertError } = await supabase
             .from('workspace_settings')
             .insert({
+              workspace_id: workspaceId,
               default_interface_id: defaultInterfaceId,
             })
             .select('id, default_interface_id')
