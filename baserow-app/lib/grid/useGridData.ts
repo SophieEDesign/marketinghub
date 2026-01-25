@@ -413,6 +413,27 @@ export function useGridData({
 
         const { data, error: queryError } = await query
 
+        // Enhanced debugging for core data loading issues
+        if (typeof window !== 'undefined' && (process.env.NODE_ENV === 'development' || localStorage.getItem('DEBUG_GRID_DATA') === '1')) {
+          console.log('[useGridData] Query result:', {
+            tableName,
+            tableId,
+            attempt,
+            rowCount: data?.length ?? 0,
+            hasError: !!queryError,
+            error: queryError ? {
+              code: (queryError as any)?.code,
+              message: (queryError as any)?.message,
+              details: (queryError as any)?.details,
+              hint: (queryError as any)?.hint,
+            } : null,
+            selectClause,
+            filtersCount: safeFilterConfigs.length,
+            sortsCount: currentSorts.length,
+            fieldsCount: existingPhysicalFieldNames.length,
+          })
+        }
+
         if (queryError) {
           // Self-heal: if the physical table is missing (common when metadata exists but
           // table creation failed), attempt a server-side schema sync once.
@@ -438,6 +459,46 @@ export function useGridData({
 
         // CRITICAL: Normalize data to array
         const normalizedRows = asArray<GridRow>(data)
+        
+        // Diagnostic: If we got 0 rows, check if data might be in table_rows instead
+        // This helps identify storage system mismatches
+        if (normalizedRows.length === 0 && tableId) {
+          if (typeof window !== 'undefined' && (process.env.NODE_ENV === 'development' || localStorage.getItem('DEBUG_GRID_DATA') === '1')) {
+            console.warn('[useGridData] Query succeeded but returned 0 rows from supabase_table:', {
+              tableName,
+              tableId,
+              selectClause,
+              filters: safeFilterConfigs,
+              sorts: currentSorts,
+              hint: 'Checking if data exists in table_rows (JSONB storage) instead...',
+            })
+            
+            // Diagnostic check: see if data exists in table_rows
+            try {
+              const { data: tableRowsData, error: tableRowsError } = await supabase
+                .from('table_rows')
+                .select('id, data, created_at')
+                .eq('table_id', tableId)
+                .limit(5)
+              
+              if (!tableRowsError && tableRowsData && tableRowsData.length > 0) {
+                console.warn('[useGridData] ⚠️ DATA FOUND IN table_rows but querying supabase_table!', {
+                  tableRowsCount: tableRowsData.length,
+                  tableId,
+                  tableName,
+                  hint: 'This table appears to use JSONB storage (table_rows) but useGridData is querying the physical table (supabase_table). Data may need to be migrated or the query should use table_rows.',
+                  sampleRow: tableRowsData[0],
+                })
+              } else if (!tableRowsError && tableRowsData && tableRowsData.length === 0) {
+                console.log('[useGridData] No data found in either supabase_table or table_rows. Table appears to be empty.')
+              }
+            } catch (checkError) {
+              // Non-fatal diagnostic check
+              console.warn('[useGridData] Could not check table_rows:', checkError)
+            }
+          }
+        }
+        
         setRows(normalizedRows)
         return null
       }
