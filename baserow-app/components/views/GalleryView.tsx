@@ -39,6 +39,10 @@ interface GalleryViewProps {
   defaultGroupsCollapsed?: boolean
   /** Callback to open block settings (for configuration) */
   onOpenSettings?: () => void
+  /** Callback when block content height changes (for grouped blocks) */
+  onHeightChange?: (height: number) => void
+  /** Row height in pixels (for height calculation) */
+  rowHeight?: number
 }
 
 export default function GalleryView({
@@ -57,6 +61,8 @@ export default function GalleryView({
   blockConfig = {},
   defaultGroupsCollapsed = true,
   onOpenSettings,
+  onHeightChange,
+  rowHeight = 30,
 }: GalleryViewProps) {
   const { openRecord } = useRecordPanel()
   const [rows, setRows] = useState<TableRow[]>([])
@@ -65,6 +71,8 @@ export default function GalleryView({
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set())
   const [groupValueLabelMaps, setGroupValueLabelMaps] = useState<Record<string, Record<string, string>>>({})
+  // Ref for measuring content height
+  const contentRef = useRef<HTMLDivElement>(null)
 
   // Resolve supabase table name
   useEffect(() => {
@@ -375,6 +383,33 @@ export default function GalleryView({
     })
   }, [])
 
+  // Measure content height when grouping changes (expand/collapse or enable/disable)
+  // Only trigger on group state changes, not on data refresh, inline editing, etc.
+  useEffect(() => {
+    if (!onHeightChange || !contentRef.current) return
+    
+    const isGrouped = !!effectiveGroupByField && !!groupedRows && groupedRows.length > 0
+    if (!isGrouped) return // No grouping, skip measurement
+
+    // Debounce measurement to avoid excessive updates
+    const timeoutId = setTimeout(() => {
+      if (!contentRef.current) return
+      
+      // Measure the actual scroll height of the content
+      const pixelHeight = contentRef.current.scrollHeight || contentRef.current.clientHeight || 0
+      
+      // Convert to grid units (round up to ensure content fits)
+      const heightInGridUnits = Math.ceil(pixelHeight / rowHeight)
+      
+      // Minimum height of 2 grid units to prevent blocks from being too small
+      const finalHeight = Math.max(heightInGridUnits, 2)
+      
+      onHeightChange(finalHeight)
+    }, 100) // Small debounce to allow DOM to update
+
+    return () => clearTimeout(timeoutId)
+  }, [collapsedGroups, effectiveGroupByField, groupedRows, onHeightChange, rowHeight])
+
   const handleOpenRecord = useCallback((recordId: string) => {
     if (onRecordClick) {
       onRecordClick(recordId)
@@ -584,7 +619,7 @@ export default function GalleryView({
   }
 
   return (
-    <div className="w-full h-full overflow-auto bg-gray-50">
+    <div ref={contentRef} className="w-full h-full overflow-auto bg-gray-50">
       {Array.isArray(groupedRows) && groupedRows.length > 0 ? (
         <div className="p-6 space-y-6">
           {groupedRows.map((group) => {

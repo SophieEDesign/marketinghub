@@ -110,6 +110,10 @@ interface GridViewProps {
   onFilterCreate?: (filter: { field_name: string; operator: string; value?: string }) => Promise<void>
   /** Optional callback to change groupBy (for "Group by this field" action) */
   onGroupByChange?: (fieldName: string | null) => Promise<void>
+  /** Callback when block content height changes (for grouped blocks) */
+  onHeightChange?: (height: number) => void
+  /** Row height in pixels (for height calculation) */
+  rowHeight?: number
 }
 
 const ITEMS_PER_PAGE = 100
@@ -548,6 +552,8 @@ export default function GridView({
   defaultGroupsCollapsed = true,
   onFilterCreate,
   onGroupByChange,
+  onHeightChange,
+  rowHeight = 30,
 }: GridViewProps) {
   const { openRecord } = useRecordPanel()
   const isMobile = useIsMobile()
@@ -579,6 +585,8 @@ export default function GridView({
   const prevGroupByRef = useRef<string | undefined>(groupBy)
   // Track whether we've initialized collapsed groups for the current groupBy
   const didInitGroupCollapseRef = useRef(false)
+  // Ref for measuring content height
+  const contentRef = useRef<HTMLDivElement>(null)
 
   // Prevent runaway "create table" loops on repeated errors.
   // (E.g. when the error is actually a missing column, not a missing table.)
@@ -2675,6 +2683,33 @@ export default function GridView({
     })
   }
 
+  // Measure content height when grouping changes (expand/collapse or enable/disable)
+  // Only trigger on group state changes, not on data refresh, inline editing, etc.
+  useEffect(() => {
+    if (!onHeightChange || !contentRef.current) return
+    
+    const isGrouped = effectiveGroupRules.length > 0
+    if (!isGrouped) return // No grouping, skip measurement
+
+    // Debounce measurement to avoid excessive updates
+    const timeoutId = setTimeout(() => {
+      if (!contentRef.current) return
+      
+      // Measure the actual scroll height of the content
+      const pixelHeight = contentRef.current.scrollHeight || contentRef.current.clientHeight || 0
+      
+      // Convert to grid units (round up to ensure content fits)
+      const heightInGridUnits = Math.ceil(pixelHeight / rowHeight)
+      
+      // Minimum height of 2 grid units to prevent blocks from being too small
+      const finalHeight = Math.max(heightInGridUnits, 2)
+      
+      onHeightChange(finalHeight)
+    }, 100) // Small debounce to allow DOM to update
+
+    return () => clearTimeout(timeoutId)
+  }, [collapsedGroups, effectiveGroupRules.length, groupBy, onHeightChange, rowHeight])
+
   // CRITICAL: Defensive guards - ensure we have required data before rendering
   // These checks happen AFTER all hooks are called (React rules compliance)
   
@@ -2871,7 +2906,11 @@ export default function GridView({
   }
 
   return (
-    <div className="w-full h-full flex flex-col relative" style={{ paddingBottom: isEditing ? '60px' : '0' }}>
+    <div 
+      ref={contentRef}
+      className="w-full h-full flex flex-col relative" 
+      style={{ paddingBottom: isEditing ? '60px' : '0' }}
+    >
       {/* Toolbar - Only show builder controls in edit mode */}
       {/* NOTE: "Add Row" button removed from top toolbar per Airtable-style refinement rules */}
       {/* Records are added via bottom-of-table button or inline creation */}

@@ -55,6 +55,10 @@ interface ListViewProps {
   onFiltersChange?: (filters: FilterConfig[]) => void
   /** Optional external trigger to reload rows (e.g. after create in a parent block). */
   reloadKey?: any
+  /** Callback when block content height changes (for grouped blocks) */
+  onHeightChange?: (height: number) => void
+  /** Row height in pixels (for height calculation) */
+  rowHeight?: number
 }
 
 export default function ListView({
@@ -79,6 +83,8 @@ export default function ListView({
   onGroupByChange,
   onFiltersChange,
   reloadKey,
+  onHeightChange,
+  rowHeight = 30,
 }: ListViewProps) {
   const { openRecord } = useRecordPanel()
   const isMobile = useIsMobile()
@@ -89,6 +95,8 @@ export default function ListView({
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const prevGroupByRef = useRef<string | undefined>(undefined)
   const didInitChoiceGroupCollapseRef = useRef(false)
+  // Ref for measuring content height
+  const contentRef = useRef<HTMLDivElement>(null)
   const [tableName, setTableName] = useState<string | null>(null)
   const [groupDialogOpen, setGroupDialogOpen] = useState(false)
   const [filterDialogOpen, setFilterDialogOpen] = useState(false)
@@ -448,6 +456,33 @@ export default function ListView({
     setCollapsedGroups(new Set(top.map((n) => n.pathKey)))
     didInitChoiceGroupCollapseRef.current = true
   }, [currentGroupBy, defaultChoiceGroupsCollapsed, effectiveGroupRules.length, groupModel?.rootGroups])
+
+  // Measure content height when grouping changes (expand/collapse or enable/disable)
+  // Only trigger on group state changes, not on data refresh, inline editing, etc.
+  useEffect(() => {
+    if (!onHeightChange || !contentRef.current) return
+    
+    const isGrouped = effectiveGroupRules.length > 0
+    if (!isGrouped) return // No grouping, skip measurement
+
+    // Debounce measurement to avoid excessive updates
+    const timeoutId = setTimeout(() => {
+      if (!contentRef.current) return
+      
+      // Measure the actual scroll height of the content
+      const pixelHeight = contentRef.current.scrollHeight || contentRef.current.clientHeight || 0
+      
+      // Convert to grid units (round up to ensure content fits)
+      const heightInGridUnits = Math.ceil(pixelHeight / rowHeight)
+      
+      // Minimum height of 2 grid units to prevent blocks from being too small
+      const finalHeight = Math.max(heightInGridUnits, 2)
+      
+      onHeightChange(finalHeight)
+    }, 100) // Small debounce to allow DOM to update
+
+    return () => clearTimeout(timeoutId)
+  }, [collapsedGroups, effectiveGroupRules.length, currentGroupBy, onHeightChange, rowHeight])
 
   // Handle group change
   const handleGroupChange = useCallback(async (fieldName: string | null) => {
@@ -850,7 +885,7 @@ export default function ListView({
   // Render grouped (nested) or ungrouped
   if (flattenedGroups && flattenedGroups.length > 0) {
     return (
-      <div className="h-full flex flex-col">
+      <div ref={contentRef} className="h-full flex flex-col">
         {/* Toolbar */}
         <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 border-b bg-white">
           <Button
@@ -1020,7 +1055,7 @@ export default function ListView({
 
   if (rowsToRender.length === 0) {
     return (
-      <div className="h-full flex flex-col">
+      <div ref={contentRef} className="h-full flex flex-col">
         {/* Toolbar */}
         <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 border-b bg-white">
           <Button

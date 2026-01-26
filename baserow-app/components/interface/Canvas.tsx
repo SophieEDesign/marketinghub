@@ -1640,6 +1640,40 @@ export default function Canvas({
                     editableFieldNames={editableFieldNames}
                     hideEditButton={topTwoFieldBlockIds.has(block.id)}
                     allBlocks={blocks}
+                    onHeightChange={(height) => {
+                      // Update block height in layout when grouping changes
+                      const currentLayoutItem = layout.find(l => l.i === block.id)
+                      if (currentLayoutItem && currentLayoutItem.h !== height) {
+                        const newLayout = layout.map(l => 
+                          l.i === block.id ? { ...l, h: height } : l
+                        )
+                        setLayout(newLayout)
+                        // Persist to parent via onLayoutChange
+                        if (onLayoutChange) {
+                          const layoutItems: LayoutItem[] = newLayout.map((item) => ({
+                            i: item.i,
+                            x: item.x || 0,
+                            y: item.y || 0,
+                            w: item.w || 4,
+                            h: item.h || 4,
+                          }))
+                          onLayoutChange(layoutItems)
+                        }
+                        // Store collapsed height in block config when grouping is active
+                        // This allows us to restore the height when grouping is re-enabled
+                        // Check if grouping is active by looking at block config
+                        const hasGrouping = !!(block.config?.group_by || block.config?.group_by_field || 
+                          (block.config as any)?.gallery_group_by)
+                        if (hasGrouping && onBlockUpdate) {
+                          // Store the collapsed height (when groups are collapsed, height is smaller)
+                          // We'll use this to restore the height when grouping is re-enabled
+                          onBlockUpdate(block.id, {
+                            grouped_collapsed_height: height,
+                          } as any)
+                        }
+                      }
+                    }}
+                    rowHeight={layoutSettings.rowHeight || 30}
                   />
                 </div>
               </BlockAppearanceWrapper>

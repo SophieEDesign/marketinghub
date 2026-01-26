@@ -87,6 +87,10 @@ interface GridViewWrapperProps {
   }
   /** When grouping, should groups start collapsed? Default: true (closed). */
   defaultGroupsCollapsed?: boolean
+  /** Callback when block content height changes (for grouped blocks) */
+  onHeightChange?: (height: number) => void
+  /** Row height in pixels (for height calculation) */
+  rowHeight?: number
 }
 
 export default function GridViewWrapper({
@@ -109,6 +113,8 @@ export default function GridViewWrapper({
   reloadKey,
   blockLevelSettings = {},
   defaultGroupsCollapsed = true,
+  onHeightChange,
+  rowHeight = 30,
 }: GridViewWrapperProps) {
   // CRITICAL: Normalize all inputs at wrapper entry point
   const safeInitialFilters = asArray<Filter>(initialFilters)
@@ -854,6 +860,8 @@ export default function GridViewWrapper({
           defaultGroupsCollapsed={defaultGroupsCollapsed}
           onFilterCreate={handleFilterCreate}
           onGroupByChange={handleGroupByChange}
+          onHeightChange={onHeightChange}
+          rowHeight={rowHeight}
         />
       </div>
       <FieldBuilderDrawer

@@ -458,13 +458,16 @@ export async function resolvePastedLinkedValue(
  * 
  * When a linked field is updated, this function ensures the reciprocal field
  * in the linked table is also updated to maintain bidirectional consistency.
+ * Works in both directions:
+ * - Source field updated → syncs to reciprocal field
+ * - Reciprocal field updated → syncs back to source field
  * 
- * @param sourceTableId - ID of the table containing the source field
- * @param sourceTableName - Physical table name (supabase_table) of source table
- * @param sourceFieldName - Name of the source field that was updated
+ * @param sourceTableId - ID of the table containing the field that was updated
+ * @param sourceTableName - Physical table name (supabase_table) of the table containing the updated field
+ * @param sourceFieldName - Name of the field that was updated
  * @param sourceRecordId - ID of the record that was updated
- * @param newValue - New value set in the source field (string, string[], or null)
- * @param oldValue - Previous value in the source field (string, string[], or null)
+ * @param newValue - New value set in the field (string, string[], or null)
+ * @param oldValue - Previous value in the field (string, string[], or null)
  * @param skipSync - Guard flag to prevent infinite loops (set to true when called from reciprocal sync)
  * @returns Promise that resolves when sync is complete
  */
@@ -489,76 +492,162 @@ export async function syncLinkedFieldBidirectional(
 
   const supabase = createClient()
 
-  // Fetch source field metadata
-  const { data: sourceField, error: sourceFieldError } = await supabase
+  // Fetch the field that was updated
+  const { data: updatedField, error: fieldError } = await supabase
     .from('table_fields')
-    .select('id, name, type, options')
+    .select('id, name, type, options, table_id')
     .eq('table_id', sourceTableId)
     .eq('name', sourceFieldName)
     .single()
 
-  if (sourceFieldError || !sourceField) {
-    console.warn('[syncLinkedFieldBidirectional] Source field not found:', sourceFieldName)
+  if (fieldError || !updatedField) {
+    console.warn('[syncLinkedFieldBidirectional] Field not found:', sourceFieldName)
     return
   }
 
-  if (sourceField.type !== 'link_to_table') {
+  if (updatedField.type !== 'link_to_table') {
     // Not a linked field, nothing to sync
     return
   }
 
-  const sourceOptions = (sourceField.options || {}) as any
-  const linkedTableId = sourceOptions?.linked_table_id
-  const linkedFieldId = sourceOptions?.linked_field_id
+  const updatedFieldOptions = (updatedField.options || {}) as any
+  const linkedFieldId = updatedFieldOptions?.linked_field_id
 
-  if (!linkedTableId) {
-    // No target table configured
-    return
+  // Determine sync direction:
+  // - If updatedField has a linked_field_id, it's a reciprocal field → sync back to source
+  // - If updatedField has linked_table_id but no linked_field_id, it's a source field → sync forward to reciprocal
+  // - If updatedField has both, check which one points to the other to determine direction
+
+  let isReciprocalField = false
+  let sourceField: any = null
+  let reciprocalField: any = null
+  let sourceTable: any = null
+  let targetTable: any = null
+  let sourceFieldName_final: string
+  let reciprocalFieldName: string
+  let sourceTableName_final: string
+  let targetTableName: string
+
+  if (linkedFieldId) {
+    // This field is a reciprocal field - sync back to source
+    isReciprocalField = true
+    reciprocalField = updatedField
+    
+    // Find the source field (the one this reciprocal points to)
+    const { data: sourceFieldData, error: sourceFieldError } = await supabase
+      .from('table_fields')
+      .select('id, name, type, options, table_id')
+      .eq('id', linkedFieldId)
+      .single()
+
+    if (sourceFieldError || !sourceFieldData) {
+      console.warn('[syncLinkedFieldBidirectional] Source field not found for reciprocal:', linkedFieldId)
+      return
+    }
+
+    if (sourceFieldData.type !== 'link_to_table') {
+      console.warn('[syncLinkedFieldBidirectional] Source field is not a link_to_table field')
+      return
+    }
+
+    sourceField = sourceFieldData
+    const sourceFieldOptions = (sourceField.options || {}) as any
+    const sourceTableId_final = sourceField.table_id
+    const targetTableId = (sourceFieldOptions?.linked_table_id) as string
+
+    if (!targetTableId) {
+      console.warn('[syncLinkedFieldBidirectional] Source field has no linked_table_id')
+      return
+    }
+
+    // Get table info
+    const { data: sourceTableData, error: sourceTableError } = await supabase
+      .from('tables')
+      .select('id, supabase_table')
+      .eq('id', sourceTableId_final)
+      .single()
+
+    const { data: targetTableData, error: targetTableError } = await supabase
+      .from('tables')
+      .select('id, supabase_table')
+      .eq('id', targetTableId)
+      .single()
+
+    if (sourceTableError || !sourceTableData || targetTableError || !targetTableData) {
+      console.warn('[syncLinkedFieldBidirectional] Table not found')
+      return
+    }
+
+    sourceTable = sourceTableData
+    targetTable = targetTableData
+    sourceFieldName_final = sourceField.name
+    reciprocalFieldName = reciprocalField.name
+    sourceTableName_final = sourceTable.supabase_table
+    targetTableName = targetTable.supabase_table
+
+    // For reverse sync: sourceRecordId is in the target table, we need to update the source table
+    // The newValue/oldValue are IDs in the target table that should point to records in the source table
+  } else {
+    // This field is a source field - sync forward to reciprocal
+    isReciprocalField = false
+    sourceField = updatedField
+    const sourceFieldOptions = (sourceField.options || {}) as any
+    const linkedTableId = sourceFieldOptions?.linked_table_id
+
+    if (!linkedTableId) {
+      // No target table configured
+      return
+    }
+
+    if (!linkedFieldId) {
+      // No reciprocal field configured - this is a one-way link
+      return
+    }
+
+    // Fetch reciprocal field metadata
+    const { data: reciprocalFieldData, error: reciprocalFieldError } = await supabase
+      .from('table_fields')
+      .select('id, name, type, options, table_id')
+      .eq('id', linkedFieldId)
+      .single()
+
+    if (reciprocalFieldError || !reciprocalFieldData) {
+      console.warn('[syncLinkedFieldBidirectional] Reciprocal field not found:', linkedFieldId)
+      return
+    }
+
+    if (reciprocalFieldData.type !== 'link_to_table') {
+      console.warn('[syncLinkedFieldBidirectional] Reciprocal field is not a link_to_table field')
+      return
+    }
+
+    reciprocalField = reciprocalFieldData
+
+    // Get target table info
+    const { data: targetTableData, error: targetTableError } = await supabase
+      .from('tables')
+      .select('id, supabase_table')
+      .eq('id', linkedTableId)
+      .single()
+
+    if (targetTableError || !targetTableData) {
+      console.warn('[syncLinkedFieldBidirectional] Target table not found:', linkedTableId)
+      return
+    }
+
+    targetTable = targetTableData
+    sourceFieldName_final = sourceField.name
+    reciprocalFieldName = reciprocalField.name
+    sourceTableName_final = sourceTableName
+    targetTableName = targetTable.supabase_table
   }
-
-  if (!linkedFieldId) {
-    // No reciprocal field configured - this is a one-way link
-    return
-  }
-
-  // Fetch reciprocal field metadata
-  const { data: reciprocalField, error: reciprocalFieldError } = await supabase
-    .from('table_fields')
-    .select('id, name, type, options, table_id')
-    .eq('id', linkedFieldId)
-    .single()
-
-  if (reciprocalFieldError || !reciprocalField) {
-    console.warn('[syncLinkedFieldBidirectional] Reciprocal field not found:', linkedFieldId)
-    return
-  }
-
-  if (reciprocalField.type !== 'link_to_table') {
-    console.warn('[syncLinkedFieldBidirectional] Reciprocal field is not a link_to_table field')
-    return
-  }
-
-  // Get target table info
-  const { data: targetTable, error: targetTableError } = await supabase
-    .from('tables')
-    .select('id, supabase_table')
-    .eq('id', linkedTableId)
-    .single()
-
-  if (targetTableError || !targetTable) {
-    console.warn('[syncLinkedFieldBidirectional] Target table not found:', linkedTableId)
-    return
-  }
-
-  const reciprocalOptions = (reciprocalField.options || {}) as any
-  const reciprocalFieldName = reciprocalField.name
-  const targetTableName = targetTable.supabase_table
 
   // Determine if multi-link based on source field options
+  const sourceFieldOptions = (sourceField.options || {}) as any
   const sourceIsMulti = 
-    sourceOptions?.relationship_type === 'one-to-many' ||
-    sourceOptions?.relationship_type === 'many-to-many' ||
-    (typeof sourceOptions?.max_selections === 'number' && sourceOptions.max_selections > 1)
+    sourceFieldOptions?.relationship_type === 'one-to-many' ||
+    sourceFieldOptions?.relationship_type === 'many-to-many' ||
+    (typeof sourceFieldOptions?.max_selections === 'number' && sourceFieldOptions.max_selections > 1)
 
   // Normalize values to arrays for processing
   const normalizeToArray = (val: string | string[] | null): string[] => {
@@ -580,107 +669,222 @@ export async function syncLinkedFieldBidirectional(
     return
   }
 
-  if (sourceIsMulti) {
-    // Multi-link: Update arrays in target records
-    // For each added ID, add sourceRecordId to that target record's reciprocal array
-    // For each removed ID, remove sourceRecordId from that target record's reciprocal array
+  if (isReciprocalField) {
+    // REVERSE SYNC: Reciprocal field was updated → sync back to source field
+    // sourceRecordId is in targetTable, newValue/oldValue are source record IDs
+    // We need to update sourceTable records
 
-    // Handle additions
-    if (addedIds.length > 0) {
-      for (const targetRecordId of addedIds) {
-        if (!isUuid(targetRecordId)) continue
+    if (sourceIsMulti) {
+      // Multi-link reverse: Update source records' source field arrays
+      // For each added source ID, add sourceRecordId to that source record's source field array
+      // For each removed source ID, remove sourceRecordId from that source record's source field array
 
-        // Get current value of reciprocal field
-        const { data: targetRecord, error: fetchError } = await supabase
-          .from(targetTableName)
-          .select(`id, ${reciprocalFieldName}`)
-          .eq('id', targetRecordId)
-          .single()
+      // Handle additions
+      if (addedIds.length > 0) {
+        for (const sourceRecordIdToUpdate of addedIds) {
+          if (!isUuid(sourceRecordIdToUpdate)) continue
 
-        if (fetchError || !targetRecord) {
-          console.warn(`[syncLinkedFieldBidirectional] Target record not found: ${targetRecordId}`)
-          continue
-        }
+          // Get current value of source field
+          const { data: sourceRecord, error: fetchError } = await supabase
+            .from(sourceTableName_final)
+            .select(`id, ${sourceFieldName_final}`)
+            .eq('id', sourceRecordIdToUpdate)
+            .single()
 
-        const currentValue = targetRecord[reciprocalFieldName]
-        const currentArray = normalizeToArray(currentValue)
+          if (fetchError || !sourceRecord) {
+            console.warn(`[syncLinkedFieldBidirectional] Source record not found: ${sourceRecordIdToUpdate}`)
+            continue
+          }
 
-        // Add sourceRecordId if not already present
-        if (!currentArray.includes(sourceRecordId)) {
-          const updatedArray = [...currentArray, sourceRecordId]
+          const currentValue = sourceRecord[sourceFieldName_final]
+          const currentArray = normalizeToArray(currentValue)
 
-          const { error: updateError } = await supabase
-            .from(targetTableName)
-            .update({ [reciprocalFieldName]: updatedArray })
-            .eq('id', targetRecordId)
+          // Add sourceRecordId (from target table) if not already present
+          if (!currentArray.includes(sourceRecordId)) {
+            const updatedArray = [...currentArray, sourceRecordId]
 
-          if (updateError) {
-            console.error(`[syncLinkedFieldBidirectional] Failed to update reciprocal for record ${targetRecordId}:`, updateError)
+            const { error: updateError } = await supabase
+              .from(sourceTableName_final)
+              .update({ [sourceFieldName_final]: updatedArray })
+              .eq('id', sourceRecordIdToUpdate)
+
+            if (updateError) {
+              console.error(`[syncLinkedFieldBidirectional] Failed to update source field for record ${sourceRecordIdToUpdate}:`, updateError)
+            }
           }
         }
       }
-    }
 
-    // Handle removals
-    if (removedIds.length > 0) {
-      for (const targetRecordId of removedIds) {
-        if (!isUuid(targetRecordId)) continue
+      // Handle removals
+      if (removedIds.length > 0) {
+        for (const sourceRecordIdToUpdate of removedIds) {
+          if (!isUuid(sourceRecordIdToUpdate)) continue
 
-        // Get current value of reciprocal field
-        const { data: targetRecord, error: fetchError } = await supabase
-          .from(targetTableName)
-          .select(`id, ${reciprocalFieldName}`)
-          .eq('id', targetRecordId)
-          .single()
+          // Get current value of source field
+          const { data: sourceRecord, error: fetchError } = await supabase
+            .from(sourceTableName_final)
+            .select(`id, ${sourceFieldName_final}`)
+            .eq('id', sourceRecordIdToUpdate)
+            .single()
 
-        if (fetchError || !targetRecord) {
-          continue
-        }
-
-        const currentValue = targetRecord[reciprocalFieldName]
-        const currentArray = normalizeToArray(currentValue)
-
-        // Remove sourceRecordId if present
-        if (currentArray.includes(sourceRecordId)) {
-          const updatedArray = currentArray.filter(id => id !== sourceRecordId)
-
-          const { error: updateError } = await supabase
-            .from(targetTableName)
-            .update({ [reciprocalFieldName]: updatedArray.length > 0 ? updatedArray : null })
-            .eq('id', targetRecordId)
-
-          if (updateError) {
-            console.error(`[syncLinkedFieldBidirectional] Failed to update reciprocal for record ${targetRecordId}:`, updateError)
+          if (fetchError || !sourceRecord) {
+            continue
           }
+
+          const currentValue = sourceRecord[sourceFieldName_final]
+          const currentArray = normalizeToArray(currentValue)
+
+          // Remove sourceRecordId (from target table) if present
+          if (currentArray.includes(sourceRecordId)) {
+            const updatedArray = currentArray.filter(id => id !== sourceRecordId)
+
+            const { error: updateError } = await supabase
+              .from(sourceTableName_final)
+              .update({ [sourceFieldName_final]: updatedArray.length > 0 ? updatedArray : null })
+              .eq('id', sourceRecordIdToUpdate)
+
+            if (updateError) {
+              console.error(`[syncLinkedFieldBidirectional] Failed to update source field for record ${sourceRecordIdToUpdate}:`, updateError)
+            }
+          }
+        }
+      }
+    } else {
+      // Single-link reverse: Update source record's source field to point to sourceRecordId (in target table)
+      // If newValue is set, update the source record's source field to sourceRecordId
+      // If newValue is null, clear the old source record's source field
+
+      if (newValue && isUuid(newValue as string)) {
+        // Set source field in new source record to point to sourceRecordId (in target table)
+        const { error: updateError } = await supabase
+          .from(sourceTableName_final)
+          .update({ [sourceFieldName_final]: sourceRecordId })
+          .eq('id', newValue as string)
+
+        if (updateError) {
+          console.error(`[syncLinkedFieldBidirectional] Failed to update source field for record ${newValue}:`, updateError)
+        }
+      }
+
+      // Clear source field in old source record (if different from new)
+      if (oldValue && isUuid(oldValue as string) && oldValue !== newValue) {
+        const { error: updateError } = await supabase
+          .from(sourceTableName_final)
+          .update({ [sourceFieldName_final]: null })
+          .eq('id', oldValue as string)
+
+        if (updateError) {
+          console.error(`[syncLinkedFieldBidirectional] Failed to clear source field for record ${oldValue}:`, updateError)
         }
       }
     }
   } else {
-    // Single-link: Set reciprocal to point back to source record
-    // If newValue is set, update the target record's reciprocal to sourceRecordId
-    // If newValue is null, clear the old target record's reciprocal
+    // FORWARD SYNC: Source field was updated → sync to reciprocal field
+    // sourceRecordId is in sourceTable, newValue/oldValue are target record IDs
+    // We need to update targetTable records
 
-    if (newValue && isUuid(newValue as string)) {
-      // Set reciprocal in new target record
-      const { error: updateError } = await supabase
-        .from(targetTableName)
-        .update({ [reciprocalFieldName]: sourceRecordId })
-        .eq('id', newValue as string)
+    if (sourceIsMulti) {
+      // Multi-link forward: Update target records' reciprocal field arrays
+      // For each added target ID, add sourceRecordId to that target record's reciprocal array
+      // For each removed target ID, remove sourceRecordId from that target record's reciprocal array
 
-      if (updateError) {
-        console.error(`[syncLinkedFieldBidirectional] Failed to update reciprocal for record ${newValue}:`, updateError)
+      // Handle additions
+      if (addedIds.length > 0) {
+        for (const targetRecordId of addedIds) {
+          if (!isUuid(targetRecordId)) continue
+
+          // Get current value of reciprocal field
+          const { data: targetRecord, error: fetchError } = await supabase
+            .from(targetTableName)
+            .select(`id, ${reciprocalFieldName}`)
+            .eq('id', targetRecordId)
+            .single()
+
+          if (fetchError || !targetRecord) {
+            console.warn(`[syncLinkedFieldBidirectional] Target record not found: ${targetRecordId}`)
+            continue
+          }
+
+          const currentValue = targetRecord[reciprocalFieldName]
+          const currentArray = normalizeToArray(currentValue)
+
+          // Add sourceRecordId if not already present
+          if (!currentArray.includes(sourceRecordId)) {
+            const updatedArray = [...currentArray, sourceRecordId]
+
+            const { error: updateError } = await supabase
+              .from(targetTableName)
+              .update({ [reciprocalFieldName]: updatedArray })
+              .eq('id', targetRecordId)
+
+            if (updateError) {
+              console.error(`[syncLinkedFieldBidirectional] Failed to update reciprocal for record ${targetRecordId}:`, updateError)
+            }
+          }
+        }
       }
-    }
 
-    // Clear reciprocal in old target record (if different from new)
-    if (oldValue && isUuid(oldValue as string) && oldValue !== newValue) {
-      const { error: updateError } = await supabase
-        .from(targetTableName)
-        .update({ [reciprocalFieldName]: null })
-        .eq('id', oldValue as string)
+      // Handle removals
+      if (removedIds.length > 0) {
+        for (const targetRecordId of removedIds) {
+          if (!isUuid(targetRecordId)) continue
 
-      if (updateError) {
-        console.error(`[syncLinkedFieldBidirectional] Failed to clear reciprocal for record ${oldValue}:`, updateError)
+          // Get current value of reciprocal field
+          const { data: targetRecord, error: fetchError } = await supabase
+            .from(targetTableName)
+            .select(`id, ${reciprocalFieldName}`)
+            .eq('id', targetRecordId)
+            .single()
+
+          if (fetchError || !targetRecord) {
+            continue
+          }
+
+          const currentValue = targetRecord[reciprocalFieldName]
+          const currentArray = normalizeToArray(currentValue)
+
+          // Remove sourceRecordId if present
+          if (currentArray.includes(sourceRecordId)) {
+            const updatedArray = currentArray.filter(id => id !== sourceRecordId)
+
+            const { error: updateError } = await supabase
+              .from(targetTableName)
+              .update({ [reciprocalFieldName]: updatedArray.length > 0 ? updatedArray : null })
+              .eq('id', targetRecordId)
+
+            if (updateError) {
+              console.error(`[syncLinkedFieldBidirectional] Failed to update reciprocal for record ${targetRecordId}:`, updateError)
+            }
+          }
+        }
+      }
+    } else {
+      // Single-link forward: Set reciprocal to point back to source record
+      // If newValue is set, update the target record's reciprocal to sourceRecordId
+      // If newValue is null, clear the old target record's reciprocal
+
+      if (newValue && isUuid(newValue as string)) {
+        // Set reciprocal in new target record
+        const { error: updateError } = await supabase
+          .from(targetTableName)
+          .update({ [reciprocalFieldName]: sourceRecordId })
+          .eq('id', newValue as string)
+
+        if (updateError) {
+          console.error(`[syncLinkedFieldBidirectional] Failed to update reciprocal for record ${newValue}:`, updateError)
+        }
+      }
+
+      // Clear reciprocal in old target record (if different from new)
+      if (oldValue && isUuid(oldValue as string) && oldValue !== newValue) {
+        const { error: updateError } = await supabase
+          .from(targetTableName)
+          .update({ [reciprocalFieldName]: null })
+          .eq('id', oldValue as string)
+
+        if (updateError) {
+          console.error(`[syncLinkedFieldBidirectional] Failed to clear reciprocal for record ${oldValue}:`, updateError)
+        }
       }
     }
   }

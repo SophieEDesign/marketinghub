@@ -63,6 +63,8 @@ interface BlockRendererProps {
   editableFieldNames?: string[] // Field-level editable list (for field blocks)
   hideEditButton?: boolean // Hide Edit button for top field blocks (inline editing only)
   allBlocks?: PageBlock[] // All blocks on the page (for FilterBlock connection awareness)
+  onHeightChange?: (height: number) => void // Callback when block content height changes (for grouped blocks)
+  rowHeight?: number // Row height in pixels (for height calculation)
 }
 
 export default function BlockRenderer({
@@ -83,6 +85,8 @@ export default function BlockRenderer({
   editableFieldNames = [],
   hideEditButton = false,
   allBlocks = [],
+  onHeightChange,
+  rowHeight = 30,
 }: BlockRendererProps) {
   const diagnosticsEnabled = process.env.NODE_ENV === 'development'
 
@@ -175,6 +179,8 @@ export default function BlockRenderer({
               filterTree={filterTree}
               onRecordClick={onRecordClick}
               pageShowAddRecord={pageShowAddRecord}
+              onHeightChange={onHeightChange}
+              rowHeight={rowHeight}
             />
           </LazyBlockWrapper>
         )
@@ -397,6 +403,8 @@ export default function BlockRenderer({
               filterTree={filterTree}
               onRecordClick={onRecordClick}
               pageShowAddRecord={pageShowAddRecord}
+              onHeightChange={onHeightChange}
+              rowHeight={rowHeight}
             />
           </LazyBlockWrapper>
         )

@@ -39,6 +39,8 @@ interface GridBlockProps {
   filterTree?: FilterTree // Canonical filter tree from filter blocks (supports groups/OR)
   onRecordClick?: (recordId: string, tableId?: string) => void // Callback for record clicks (for RecordReview integration)
   pageShowAddRecord?: boolean // Page-level default for showing Add record
+  onHeightChange?: (height: number) => void // Callback when block content height changes (for grouped blocks)
+  rowHeight?: number // Row height in pixels (for height calculation)
 }
 
 export default function GridBlock({
@@ -51,6 +53,8 @@ export default function GridBlock({
   filterTree = null,
   onRecordClick,
   pageShowAddRecord = false,
+  onHeightChange,
+  rowHeight = 30,
 }: GridBlockProps) {
   const { config } = block
   // Grid block table_id resolution: use config.table_id first, fallback to pageTableId
@@ -837,6 +841,9 @@ export default function GridBlock({
           groupBy: !!effectiveGroupBy && (!!config.group_by_field || !!config.group_by), // GroupBy from block config
         }
 
+        // Only pass onHeightChange when grouping is active
+        const isGrouped = !!effectiveGroupBy
+
         return (
           <GridViewWrapper
             tableId={tableId!}
@@ -870,6 +877,8 @@ export default function GridBlock({
             }}
             hideEmptyState={hideEmptyState}
             blockLevelSettings={blockLevelSettings}
+            onHeightChange={isGrouped ? onHeightChange : undefined}
+            rowHeight={rowHeight}
           />
         )
     }

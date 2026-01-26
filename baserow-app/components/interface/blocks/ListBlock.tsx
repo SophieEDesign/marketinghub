@@ -36,6 +36,8 @@ interface ListBlockProps {
   filterTree?: FilterTree
   onRecordClick?: (recordId: string) => void
   pageShowAddRecord?: boolean // Page-level default for showing Add record
+  onHeightChange?: (height: number) => void // Callback when block content height changes (for grouped blocks)
+  rowHeight?: number // Row height in pixels (for height calculation)
 }
 
 export default function ListBlock({
@@ -47,6 +49,8 @@ export default function ListBlock({
   filterTree = null,
   onRecordClick,
   pageShowAddRecord = false,
+  onHeightChange,
+  rowHeight = 30,
 }: ListBlockProps) {
   const { toast } = useToast()
   const { config } = block
@@ -433,6 +437,8 @@ export default function ListBlock({
         pillFields={pillFields}
         metaFields={metaFields}
         reloadKey={refreshKey}
+        onHeightChange={groupBy ? onHeightChange : undefined}
+        rowHeight={rowHeight}
       />
     </div>
   )
