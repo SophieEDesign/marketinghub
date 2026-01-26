@@ -2374,53 +2374,31 @@ export default function Canvas({
                         const oldHeight = currentLayoutItem.h
                         const heightDelta = height - oldHeight
                         
-                        // CRITICAL: Immediately reflow blocks below when height changes
-                        // With compactType: null, we must manually adjust Y positions
-                        // This ensures content below moves up immediately on collapse
-                        // Height changes must be synchronous - no useEffect delay
-                        const blockY = currentLayoutItem.y || 0
-                        const blockX = currentLayoutItem.x || 0
-                        const blockW = currentLayoutItem.w || 4
-                        const blockBottomY = blockY + oldHeight // Use old height to determine what's below
+                        // CRITICAL: Update only the changed block's height
+                        // Do NOT manually adjust sibling block Y positions
+                        // Height changes affect only the resized block
+                        const updatedLayout = layout.map(l => 
+                          l.i === block.id ? { ...l, h: height } : l
+                        )
                         
-                        const newLayout = layout.map(l => {
-                          if (l.i === block.id) {
-                            // Update the changed block's height
-                            return { ...l, h: height }
-                          }
-                          
-                          // CRITICAL: Move blocks below this block up/down by the height delta
-                          // Only adjust blocks that are positioned below this block (same column or overlapping)
-                          const itemY = l.y || 0
-                          const itemX = l.x || 0
-                          const itemW = l.w || 4
-                          
-                          // Check if this item is below the changed block
-                          // Items are "below" if their Y position is >= the block's bottom edge
-                          const isBelow = itemY >= blockBottomY
-                          
-                          // Also check if blocks overlap horizontally (same column or adjacent)
-                          const blocksOverlapHorizontally = !(
-                            (itemX + itemW <= blockX) || 
-                            (itemX >= blockX + blockW)
-                          )
-                          
-                          if (isBelow && blocksOverlapHorizontally) {
-                            // Move this block up/down by the height delta
-                            // Negative delta (shrink) moves blocks up, positive (grow) moves down
-                            return { ...l, y: itemY + heightDelta }
-                          }
-                          
-                          return l
-                        })
+                        // CRITICAL: After height change, recompute layout declaratively
+                        // Use existing compaction functions to handle reflow
+                        // This ensures blocks behave like a vertical stack
+                        let finalLayout: Layout[]
+                        if (heightDelta > 0) {
+                          // Block grew - push blocks below down
+                          finalLayout = pushBlocksDown(updatedLayout, block.id)
+                        } else {
+                          // Block shrunk - compact layout vertically (removes gaps)
+                          finalLayout = compactLayoutVertically(updatedLayout, blocks)
+                        }
                         
                         // CRITICAL: Update layout state synchronously - no useEffect delay
-                        setLayout(newLayout)
+                        setLayout(finalLayout)
                         
                         // CRITICAL: Persist to parent via onLayoutChange immediately
-                        // Call synchronously with the new layout we just computed
                         if (onLayoutChange) {
-                          const layoutItems: LayoutItem[] = newLayout.map((item) => ({
+                          const layoutItems: LayoutItem[] = finalLayout.map((item) => ({
                             i: item.i,
                             x: item.x || 0,
                             y: item.y || 0,

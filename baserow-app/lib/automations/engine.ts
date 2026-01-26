@@ -289,8 +289,8 @@ export async function executeAutomation(
           run_id: runId,
           level: 'info',
           message: `Executing action ${i + 1}: ${action.type}`,
-        created_at: new Date().toISOString(),
-      })
+          created_at: new Date().toISOString(),
+        })
 
       const result = await executeAction(action, context)
 
@@ -357,6 +357,7 @@ export async function executeAutomation(
           }
         }
       }
+    }
     }
 
     // Mark run as completed
