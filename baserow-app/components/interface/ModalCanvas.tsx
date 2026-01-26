@@ -69,7 +69,7 @@ export default function ModalCanvas({
       cols: { lg: layoutSettings.cols, md: 6, sm: 4, xs: 2, xxs: 2 },
       rowHeight: layoutSettings.rowHeight,
       margin: layoutSettings.margin,
-      compactType: null as const, // Disabled - use explicit coordinates
+      compactType: null, // Disabled - use explicit coordinates
       isBounded: false,
       preventCollision: false,
       allowOverlap: false,
@@ -107,7 +107,7 @@ export default function ModalCanvas({
       >
         {blocks.map((block) => (
           <div key={block.id} className="block-wrapper">
-            <ErrorBoundary blockId={block.id} blockType={block.type}>
+            <ErrorBoundary>
               <BlockAppearanceWrapper block={block}>
                 <BlockRenderer
                   block={block}

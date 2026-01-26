@@ -656,10 +656,11 @@ export async function syncLinkedFieldBidirectional(
     if (typeof val === 'string') {
       if (isUuid(val)) return [val]
       // Handle stringified arrays (e.g., "["uuid"]" from database)
-      const trimmed = val.trim()
+      const strVal: string = val
+      const trimmed = strVal.trim()
       if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
         try {
-          const parsed = JSON.parse(val)
+          const parsed = JSON.parse(strVal)
           if (Array.isArray(parsed)) {
             return parsed.filter(isUuid)
           }

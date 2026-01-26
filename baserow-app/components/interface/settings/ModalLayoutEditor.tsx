@@ -72,23 +72,25 @@ export default function ModalLayoutEditor({
     } else if ((config as any).modal_fields && Array.isArray((config as any).modal_fields)) {
       // Initialize from modal_fields (backward compatibility)
       const modalFields = (config as any).modal_fields as string[]
-      const initialBlocks: ModalLayoutBlock[] = modalFields.map((fieldName, index) => {
-        const field = fields.find(f => f.name === fieldName || f.id === fieldName)
-        if (!field) return null
-        return {
-          id: `field-${field.id}`,
-          type: 'field',
-          fieldName: field.name,
-          x: index % 2 === 0 ? 0 : 4,
-          y: Math.floor(index / 2),
-          w: 4,
-          h: 3,
-          config: {
-            field_id: field.id,
-            field_name: field.name,
-          },
-        }
-      }).filter((b): b is ModalLayoutBlock => b !== null)
+      const initialBlocks: ModalLayoutBlock[] = modalFields
+        .map((fieldName, index) => {
+          const field = fields.find(f => f.name === fieldName || f.id === fieldName)
+          if (!field || !field.name) return null
+          return {
+            id: `field-${field.id}`,
+            type: 'field' as const,
+            fieldName: field.name,
+            x: index % 2 === 0 ? 0 : 4,
+            y: Math.floor(index / 2),
+            w: 4,
+            h: 3,
+            config: {
+              field_id: field.id,
+              field_name: field.name,
+            },
+          } as ModalLayoutBlock
+        })
+        .filter((b): b is ModalLayoutBlock => b !== null)
       setLayoutBlocks(initialBlocks)
     } else {
       // Empty layout
@@ -123,7 +125,7 @@ export default function ModalLayoutEditor({
     cols: { lg: 8, md: 6, sm: 4, xs: 2, xxs: 2 },
     rowHeight: 30,
     margin: [8, 8] as [number, number],
-    compactType: null as const,
+    compactType: null,
     isBounded: false,
     preventCollision: false,
     allowOverlap: false,
@@ -217,23 +219,25 @@ export default function ModalLayoutEditor({
   const handleReset = useCallback(() => {
     if ((config as any).modal_fields && Array.isArray((config as any).modal_fields)) {
       const modalFields = (config as any).modal_fields as string[]
-      const defaultBlocks: ModalLayoutBlock[] = modalFields.map((fieldName, index) => {
-        const field = fields.find(f => f.name === fieldName || f.id === fieldName)
-        if (!field) return null
-        return {
-          id: `field-${field.id}`,
-          type: 'field',
-          fieldName: field.name,
-          x: index % 2 === 0 ? 0 : 4,
-          y: Math.floor(index / 2),
-          w: 4,
-          h: 3,
-          config: {
-            field_id: field.id,
-            field_name: field.name,
-          },
-        }
-      }).filter((b): b is ModalLayoutBlock => b !== null)
+      const defaultBlocks: ModalLayoutBlock[] = modalFields
+        .map((fieldName, index) => {
+          const field = fields.find(f => f.name === fieldName || f.id === fieldName)
+          if (!field || !field.name) return null
+          return {
+            id: `field-${field.id}`,
+            type: 'field' as const,
+            fieldName: field.name,
+            x: index % 2 === 0 ? 0 : 4,
+            y: Math.floor(index / 2),
+            w: 4,
+            h: 3,
+            config: {
+              field_id: field.id,
+              field_name: field.name,
+            },
+          } as ModalLayoutBlock
+        })
+        .filter((b): b is ModalLayoutBlock => b !== null)
       setLayoutBlocks(defaultBlocks)
     } else {
       setLayoutBlocks([])
@@ -305,7 +309,7 @@ export default function ModalLayoutEditor({
               >
                 {pageBlocks.map((block) => (
                   <div key={block.id} className="block-wrapper bg-white border rounded shadow-sm relative group">
-                    <ErrorBoundary blockId={block.id} blockType={block.type}>
+                    <ErrorBoundary>
                       <BlockAppearanceWrapper block={block}>
                         <div className="p-2">
                           <div className="flex items-center justify-between mb-2">
