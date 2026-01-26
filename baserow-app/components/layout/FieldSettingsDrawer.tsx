@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { X, Plus } from 'lucide-react'
+import { X, Plus, ExternalLink } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { TableField, FieldType, FieldOptions, ChoiceColorTheme } from '@/types/fields'
 import { FIELD_TYPES } from '@/types/fields'
@@ -31,6 +31,7 @@ import { getPrimaryFieldName } from '@/lib/fields/primary'
 import FormulaEditor from '@/components/fields/FormulaEditor'
 import type { SelectOption } from '@/types/fields'
 import { normalizeSelectOptionsForUi } from '@/lib/fields/select-options'
+import Link from 'next/link'
 import {
   Dialog,
   DialogContent,
@@ -85,6 +86,14 @@ export default function FieldSettingsDrawer({
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false)
   const [pendingLookupType, setPendingLookupType] = useState<FieldType | null>(null)
   const [duplicating, setDuplicating] = useState(false)
+  const [reciprocalFieldInfo, setReciprocalFieldInfo] = useState<{
+    field: { id: string; name: string; label?: string | null }
+    table: { id: string; name: string }
+  } | null>(null)
+  const [sourceFieldInfo, setSourceFieldInfo] = useState<{
+    field: { id: string; name: string; label?: string | null }
+    table: { id: string; name: string }
+  } | null>(null)
   const previousTypeRef = useRef<FieldType | null>(null)
   const hasPromptedForOptionsRef = useRef(false)
   const hasPromptedForDuplicateRef = useRef(false)
@@ -106,6 +115,16 @@ export default function FieldSettingsDrawer({
       setLookupTableFields([])
     }
   }, [open, type, options.lookup_table_id, options.linked_table_id])
+
+  // Load reciprocal/source field info for link_to_table fields
+  useEffect(() => {
+    if (open && type === 'link_to_table' && field?.id) {
+      loadLinkedFieldInfo()
+    } else {
+      setReciprocalFieldInfo(null)
+      setSourceFieldInfo(null)
+    }
+  }, [open, type, field?.id, options.linked_field_id])
 
   async function loadTables() {
     setLoadingTables(true)
@@ -149,6 +168,80 @@ export default function FieldSettingsDrawer({
       setLookupTableFields([])
     } finally {
       setLoadingLookupFields(false)
+    }
+  }
+
+  async function loadLinkedFieldInfo() {
+    if (!field?.id || type !== 'link_to_table') return
+
+    try {
+      const supabase = createClient()
+      const linkedFieldId = options.linked_field_id
+
+      // Check if this field has a reciprocal field (linked_field_id points to another field)
+      if (linkedFieldId) {
+        // This field has a reciprocal - load the reciprocal field info
+        const { data: reciprocalField, error: fieldError } = await supabase
+          .from('table_fields')
+          .select('id, name, label, table_id')
+          .eq('id', linkedFieldId)
+          .single()
+
+        if (!fieldError && reciprocalField) {
+          const { data: reciprocalTable, error: tableError } = await supabase
+            .from('tables')
+            .select('id, name')
+            .eq('id', reciprocalField.table_id)
+            .single()
+
+          if (!tableError && reciprocalTable) {
+            setReciprocalFieldInfo({
+              field: {
+                id: reciprocalField.id,
+                name: reciprocalField.name,
+                label: reciprocalField.label,
+              },
+              table: {
+                id: reciprocalTable.id,
+                name: reciprocalTable.name,
+              },
+            })
+          }
+        }
+      }
+
+      // Check if this field IS a reciprocal field (another field's linked_field_id points to this field)
+      const { data: sourceFields, error: sourceFieldsError } = await supabase
+        .from('table_fields')
+        .select('id, name, label, table_id, options')
+        .eq('type', 'link_to_table')
+        .contains('options', { linked_field_id: field.id })
+
+      if (!sourceFieldsError && sourceFields && sourceFields.length > 0) {
+        // This field is a reciprocal - find the source field
+        const sourceField = sourceFields[0]
+        const { data: sourceTable, error: sourceTableError } = await supabase
+          .from('tables')
+          .select('id, name')
+          .eq('id', sourceField.table_id)
+          .single()
+
+        if (!sourceTableError && sourceTable) {
+          setSourceFieldInfo({
+            field: {
+              id: sourceField.id,
+              name: sourceField.name,
+              label: sourceField.label,
+            },
+            table: {
+              id: sourceTable.id,
+              name: sourceTable.name,
+            },
+          })
+        }
+      }
+    } catch (error) {
+      console.error('Error loading linked field info:', error)
     }
   }
 
@@ -1142,6 +1235,61 @@ export default function FieldSettingsDrawer({
                   )
                 })()}
               </div>
+
+              {/* Linked Field Information */}
+              {(reciprocalFieldInfo || sourceFieldInfo) && (
+                <div className="space-y-2 border-t pt-4">
+                  <Label>Linked Field</Label>
+                  {reciprocalFieldInfo && (
+                    <div className="px-3 py-2 border border-gray-200 rounded-md bg-gray-50">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-900">
+                            Reciprocal field
+                          </p>
+                          <p className="text-xs text-gray-600 mt-0.5">
+                            {getFieldDisplayName(reciprocalFieldInfo.field as any)} in {reciprocalFieldInfo.table.name}
+                          </p>
+                        </div>
+                        <Link
+                          href={`/tables/${reciprocalFieldInfo.table.id}/fields`}
+                          className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          View
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                  {sourceFieldInfo && (
+                    <div className="px-3 py-2 border border-gray-200 rounded-md bg-gray-50">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-900">
+                            Linked to
+                          </p>
+                          <p className="text-xs text-gray-600 mt-0.5">
+                            {getFieldDisplayName(sourceFieldInfo.field as any)} in {sourceFieldInfo.table.name}
+                          </p>
+                        </div>
+                        <Link
+                          href={`/tables/${sourceFieldInfo.table.id}/fields`}
+                          className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          View
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    {reciprocalFieldInfo 
+                      ? 'This field has a reciprocal field that automatically syncs bidirectionally.'
+                      : 'This field is a reciprocal field that automatically syncs with the source field.'}
+                  </p>
+                </div>
+              )}
+
               {options.linked_table_id && (
                 <div className="space-y-3 border-t pt-4">
                   <Label>Display Configuration</Label>

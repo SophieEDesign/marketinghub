@@ -258,10 +258,13 @@ async function main() {
     if (targetFieldsError) throw targetFieldsError
     const existingNames = new Set((targetFields || []).map((f: any) => String(f.name || '').toLowerCase()))
 
-    const reciprocalLabel =
-      String(sourceTable.name || '').trim() ||
-      String(sourceField.label || '').trim() ||
-      'Linked records'
+    // Reciprocal label: source field name with source table name in brackets
+    // Example: "Projects (Clients)" if the source field is "Projects" in the "Clients" table.
+    const sourceFieldLabel = String(sourceField.label || sourceField.name || '').trim() || 'Linked records'
+    const sourceTableLabel = String(sourceTable.name || '').trim()
+    const reciprocalLabel = sourceTableLabel
+      ? `${sourceFieldLabel} (${sourceTableLabel})`
+      : sourceFieldLabel
 
     const baseName = sanitizeFieldName(reciprocalLabel) || 'linked_records'
     let candidate = baseName

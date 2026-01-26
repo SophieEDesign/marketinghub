@@ -323,9 +323,13 @@ export async function POST(
       const targetExistingFields = await getTableFields(targetTableId)
       const targetExistingNames = targetExistingFields.map((f) => f.name.toLowerCase())
 
-      // Default reciprocal label: the *source* table name (human-friendly), falling back to the created field label.
+      // Default reciprocal label: the source field name with the source table name in brackets.
+      // Example: "Projects (Clients)" if the source field is "Projects" in the "Clients" table.
       const sourceTableLabel = String((table as any)?.name || '').trim()
-      const reciprocalLabelRaw = sourceTableLabel || rawLabel || 'Linked records'
+      const sourceFieldLabel = rawLabel || 'Linked records'
+      const reciprocalLabelRaw = sourceTableLabel 
+        ? `${sourceFieldLabel} (${sourceTableLabel})`
+        : sourceFieldLabel
 
       // Sanitize + ensure uniqueness in the target table.
       let desiredReciprocalName = sanitizeFieldName(reciprocalLabelRaw)
