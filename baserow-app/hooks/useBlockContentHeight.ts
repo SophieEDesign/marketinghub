@@ -13,8 +13,6 @@ interface UseBlockContentHeightOptions {
   maxHeight?: number
   /** Callback when height changes (in grid units) */
   onHeightChange?: (height: number) => void
-  /** Debounce delay in milliseconds (default: 100) */
-  debounceMs?: number
   /** Whether manual resize is in progress (disables autofit) */
   isManuallyResizing?: boolean
 }
@@ -31,13 +29,14 @@ export function useBlockContentHeight(
   ref: React.RefObject<HTMLElement>,
   options: UseBlockContentHeightOptions
 ): number {
-  const { rowHeight, isGrouped, onHeightChange, debounceMs = 100, autofitEnabled, isManuallyResizing } = options
+  const { rowHeight, isGrouped, onHeightChange, autofitEnabled, isManuallyResizing } = options
   const [height, setHeight] = useState<number>(0)
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const observerRef = useRef<ResizeObserver | null>(null)
-  const previousHeightRef = useRef<number>(0)
   const imageLoadListenersRef = useRef<Set<(event: Event) => void>>(new Set())
 
+  // CRITICAL: Measure height immediately, no debouncing
+  // Height must be DERIVED from content, not remembered
+  // Old heights must never be cached after collapse
   const measureHeight = useCallback(() => {
     if (!ref.current || !isGrouped) {
       return
@@ -56,35 +55,33 @@ export function useBlockContentHeight(
     
     setHeight(finalHeight)
     
-    // Call callback if provided
-    if (onHeightChange && finalHeight !== height) {
+    // Call callback immediately (no debouncing)
+    // This ensures immediate reflow on collapse
+    if (onHeightChange) {
       onHeightChange(finalHeight)
     }
-  }, [ref, isGrouped, rowHeight, onHeightChange, height])
+  }, [ref, isGrouped, rowHeight, onHeightChange])
 
   const shouldAutofit = autofitEnabled ?? (isGrouped ?? false)
 
   useEffect(() => {
     if (!shouldAutofit || isManuallyResizing) {
-      // Clear height when autofit is disabled
+      // CRITICAL: Clear height immediately when autofit is disabled
+      // Do NOT cache or remember previous height
       setHeight(0)
-      previousHeightRef.current = 0
       return
     }
 
-    // Initial measurement
+    // Initial measurement - immediate, no debounce
     measureHeight()
 
     // Set up ResizeObserver to watch for content size changes
+    // CRITICAL: No debouncing - measure immediately for instant reflow
     if (typeof ResizeObserver !== 'undefined' && ref.current) {
       observerRef.current = new ResizeObserver(() => {
-        // Debounce measurements to avoid excessive updates
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current)
-        }
-        timeoutRef.current = setTimeout(() => {
-          measureHeight()
-        }, debounceMs)
+        // Measure immediately - no debouncing
+        // This ensures immediate reflow on collapse
+        measureHeight()
       })
 
       observerRef.current.observe(ref.current)
@@ -96,6 +93,7 @@ export function useBlockContentHeight(
       images.forEach(img => {
         if (!img.complete) {
           const onLoad = () => {
+            // Measure immediately when image loads
             measureHeight()
             imageLoadListenersRef.current.delete(onLoad)
           }
@@ -106,15 +104,13 @@ export function useBlockContentHeight(
     }
     
     // Set up MutationObserver for DOM changes
+    // CRITICAL: No debouncing - measure immediately for instant reflow
     let mutationObserver: MutationObserver | null = null
     if (typeof MutationObserver !== 'undefined' && ref.current) {
       mutationObserver = new MutationObserver(() => {
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current)
-        }
-        timeoutRef.current = setTimeout(() => {
-          measureHeight()
-        }, debounceMs)
+        // Measure immediately - no debouncing
+        // This ensures immediate reflow on collapse
+        measureHeight()
       })
       
       mutationObserver.observe(ref.current, {
@@ -134,10 +130,6 @@ export function useBlockContentHeight(
         mutationObserver.disconnect()
         mutationObserver = null
       }
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-        timeoutRef.current = null
-      }
       // Clean up image load listeners
       imageLoadListenersRef.current.forEach((listener: (event: Event) => void) => {
         // Remove listeners if elements still exist
@@ -148,7 +140,7 @@ export function useBlockContentHeight(
       })
       imageLoadListenersRef.current.clear()
     }
-  }, [shouldAutofit, isManuallyResizing, measureHeight, debounceMs, ref])
+  }, [shouldAutofit, isManuallyResizing, measureHeight, ref])
 
   return height
 }

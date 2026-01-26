@@ -24,7 +24,7 @@ export interface RecordModalProps {
   tableFields: TableField[]
   modalFields?: string[] // Fields to show in modal (if empty, show all)
   initialData?: Record<string, any> // Initial data for creating new records
-  onSave?: () => void
+  onSave?: (createdRecordId?: string | null) => void // Callback with created record ID for new records
   onDeleted?: () => void | Promise<void>
   supabaseTableName?: string | null // Optional: if provided, skips table info fetch for faster loading
 }
@@ -166,9 +166,11 @@ export default function RecordModal({
         }
       } else {
         // Create new record
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from(effectiveTableName)
           .insert(formData)
+          .select()
+          .single()
 
         if (error) {
           if (!isAbortError(error)) {
@@ -179,6 +181,12 @@ export default function RecordModal({
           }
           return
         }
+
+        // Pass the created record ID to onSave callback
+        const createdRecordId = data?.id || null
+        onSave?.(createdRecordId)
+        onClose()
+        return
       }
 
       onSave?.()

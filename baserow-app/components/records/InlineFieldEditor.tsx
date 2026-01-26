@@ -11,6 +11,7 @@ import RichTextEditor from "@/components/fields/RichTextEditor"
 import AttachmentPreview, { type Attachment } from "@/components/attachments/AttachmentPreview"
 import InlineSelectDropdown from "@/components/fields/InlineSelectDropdown"
 import { isUserField, getUserDisplayName } from "@/lib/users/userDisplay"
+import RecordModal from "@/components/calendar/RecordModal"
 
 import {
   resolveChoiceColor,
@@ -56,6 +57,10 @@ export default function InlineFieldEditor({
   const [localValue, setLocalValue] = useState(value)
   const [userDisplayName, setUserDisplayName] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(null)
+  const [createRecordModalOpen, setCreateRecordModalOpen] = useState(false)
+  const [createRecordTableId, setCreateRecordTableId] = useState<string | null>(null)
+  const [createRecordTableFields, setCreateRecordTableFields] = useState<TableField[]>([])
+  const [createRecordResolve, setCreateRecordResolve] = useState<((id: string | null) => void) | null>(null)
   const showLabel = propShowLabel
   const labelClassName = propLabelClassName || "block text-sm font-medium text-gray-700"
   const containerClassName = showLabel ? "space-y-1.5" : ""
@@ -153,58 +158,59 @@ export default function InlineFieldEditor({
       allowCreate: field.options?.allow_create,
     } : undefined
 
-    // Handle create new record
+    // Handle create new record - opens RecordModal
     const handleCreateRecord = async (tableId: string): Promise<string | null> => {
-      try {
+      return new Promise((resolve) => {
         const supabase = createClient()
         
-        // Get table info
-        const { data: table } = await supabase
-          .from("tables")
-          .select("supabase_table")
-          .eq("id", tableId)
-          .single()
-
-        if (!table) return null
-
-        // Get fields to create a minimal record
-        const { data: fields } = await supabase
+        // Fetch table fields for the modal
+        supabase
           .from("table_fields")
           .select("*")
           .eq("table_id", tableId)
           .order("position", { ascending: true })
-          .limit(5) // Just get first few fields
+          .then(({ data: fields, error }) => {
+            if (error) {
+              console.error("Error loading table fields:", error)
+              toast({
+                title: "Failed to load fields",
+                description: error.message || "Please try again",
+                variant: "destructive",
+              })
+              resolve(null)
+              return
+            }
 
-        // Create minimal record with default values
-        const newRecord: Record<string, any> = {}
-        fields?.forEach(f => {
-          if (f.default_value !== null && f.default_value !== undefined) {
-            newRecord[f.name] = f.default_value
-          }
-        })
-
-        const { data, error } = await supabase
-          .from(table.supabase_table)
-          .insert([newRecord])
-          .select()
-          .single()
-
-        if (error) {
-          console.error("Error creating record:", error)
-          toast({
-            title: "Failed to create record",
-            description: error.message || "Please try again",
-            variant: "destructive",
+            // Store the resolve function and open modal
+            setCreateRecordResolve(() => resolve)
+            setCreateRecordTableId(tableId)
+            setCreateRecordTableFields(fields || [])
+            setCreateRecordModalOpen(true)
           })
-          return null
-        }
-
-        return data?.id || null
-      } catch (error: any) {
-        console.error("Error in handleCreateRecord:", error)
-        return null
-      }
+      })
     }
+
+    // Handle modal save - called when RecordModal saves successfully
+    const handleModalSave = useCallback((createdRecordId?: string | null) => {
+      if (createRecordResolve) {
+        createRecordResolve(createdRecordId || null)
+        setCreateRecordResolve(null)
+      }
+      setCreateRecordModalOpen(false)
+      setCreateRecordTableId(null)
+      setCreateRecordTableFields([])
+    }, [createRecordResolve])
+
+    // Handle modal close - called when RecordModal is closed without saving
+    const handleModalClose = useCallback(() => {
+      if (createRecordResolve) {
+        createRecordResolve(null)
+        setCreateRecordResolve(null)
+      }
+      setCreateRecordModalOpen(false)
+      setCreateRecordTableId(null)
+      setCreateRecordTableFields([])
+    }, [createRecordResolve])
 
     // LOOKUP FIELDS (derived, read-only) - Show as informational pills
     if (isLookupField) {
@@ -241,28 +247,42 @@ export default function InlineFieldEditor({
 
     // LINKED FIELDS (editable) - Show as editable with clear affordances
     return (
-      <div className={containerClassName} onPaste={handlePaste}>
-        {showLabel && (
-          <label className={labelClassName}>{field.name}</label>
-        )}
-        {lookupConfig ? (
-          <LookupFieldPicker
-            field={field}
-            value={value}
-            onChange={onChange}
-            config={lookupConfig}
-            disabled={isReadOnly}
-            placeholder={`Add ${field.name}...`}
-            onRecordClick={onLinkedRecordClick}
-            onCreateRecord={lookupConfig.allowCreate ? handleCreateRecord : undefined}
-            isLookupField={false}
+      <>
+        <div className={containerClassName} onPaste={handlePaste}>
+          {showLabel && (
+            <label className={labelClassName}>{field.name}</label>
+          )}
+          {lookupConfig ? (
+            <LookupFieldPicker
+              field={field}
+              value={value}
+              onChange={onChange}
+              config={lookupConfig}
+              disabled={isReadOnly}
+              placeholder={`Add ${field.name}...`}
+              onRecordClick={onLinkedRecordClick}
+              onCreateRecord={lookupConfig.allowCreate ? handleCreateRecord : undefined}
+              isLookupField={false}
+            />
+          ) : (
+            <div className={readOnlyBoxClassName}>
+              Configure linked table in field settings
+            </div>
+          )}
+        </div>
+        
+        {/* Record creation modal */}
+        {createRecordTableId && (
+          <RecordModal
+            open={createRecordModalOpen}
+            onClose={handleModalClose}
+            tableId={createRecordTableId}
+            recordId={null}
+            tableFields={createRecordTableFields}
+            onSave={handleModalSave}
           />
-        ) : (
-          <div className={readOnlyBoxClassName}>
-            Configure linked table in field settings
-          </div>
         )}
-      </div>
+      </>
     )
   }
 

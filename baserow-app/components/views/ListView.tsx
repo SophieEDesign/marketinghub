@@ -952,7 +952,26 @@ export default function ListView({
 
               return (
                 <div key={node.pathKey} className="border-b border-gray-200 last:border-b-0">
-                  <div className="flex items-center justify-between px-4 py-2 bg-gray-50 hover:bg-gray-100 transition-colors">
+                  <div 
+                    className="flex items-center justify-between px-4 py-2 transition-colors"
+                    style={{
+                      backgroundColor: groupColor ? `${groupColor}80` : 'rgb(249, 250, 251)',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (groupColor) {
+                        e.currentTarget.style.backgroundColor = `${groupColor}90`
+                      } else {
+                        e.currentTarget.style.backgroundColor = 'rgb(243, 244, 246)'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (groupColor) {
+                        e.currentTarget.style.backgroundColor = `${groupColor}80`
+                      } else {
+                        e.currentTarget.style.backgroundColor = 'rgb(249, 250, 251)'
+                      }
+                    }}
+                  >
                     <button
                       onClick={() => {
                         setCollapsedGroups((prev) => {
@@ -973,9 +992,9 @@ export default function ListView({
                       <span
                         className="inline-flex items-center px-2 py-0.5 rounded-full text-sm font-medium"
                         style={{
-                          backgroundColor: groupColor ? `${groupColor}20` : undefined,
+                          backgroundColor: groupColor ? `${groupColor}CC` : undefined,
                           color: groupColor || undefined,
-                          border: groupColor ? `1px solid ${groupColor}40` : undefined,
+                          border: groupColor ? `1px solid ${groupColor}FF` : undefined,
                         }}
                       >
                         {ruleLabel}: {node.label}

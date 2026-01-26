@@ -2686,41 +2686,37 @@ export default function GridView({
   }
 
   // Measure content height when grouping changes (expand/collapse or enable/disable)
-  // Only trigger on group state changes, not on data refresh, inline editing, etc.
-  // Enhanced with better measurement accuracy and max height cap
+  // CRITICAL: No debouncing - measure immediately for instant reflow on collapse
+  // Height must be DERIVED from content, not remembered
   useEffect(() => {
     if (!onHeightChange || !contentRef.current) return
     
     const isGrouped = effectiveGroupRules.length > 0
     if (!isGrouped) return // No grouping, skip measurement
 
-    // Debounce measurement to avoid excessive updates
-    const timeoutId = setTimeout(() => {
-      if (!contentRef.current) return
-      
-      // Get computed styles to account for padding and margins
-      const computedStyle = window.getComputedStyle(contentRef.current)
-      const paddingTop = parseFloat(computedStyle.paddingTop) || 0
-      const paddingBottom = parseFloat(computedStyle.paddingBottom) || 0
-      const marginTop = parseFloat(computedStyle.marginTop) || 0
-      const marginBottom = parseFloat(computedStyle.marginBottom) || 0
-      
-      // Measure the actual scroll height of the content
-      const pixelHeight = contentRef.current.scrollHeight || contentRef.current.clientHeight || 0
-      
-      // Add padding and margins to total height
-      const totalPixelHeight = pixelHeight + paddingTop + paddingBottom + marginTop + marginBottom
-      
-      // Convert to grid units (round up to ensure content fits)
-      const heightInGridUnits = Math.ceil(totalPixelHeight / rowHeightPixels)
-      
-      // Apply min and max constraints (max: 50 grid units)
-      const finalHeight = Math.max(2, Math.min(heightInGridUnits, 50))
-      
-      onHeightChange(finalHeight)
-    }, 100) // Small debounce to allow DOM to update
-
-    return () => clearTimeout(timeoutId)
+    // Measure immediately - no debouncing
+    // This ensures immediate reflow when blocks collapse
+    // Get computed styles to account for padding and margins
+    const computedStyle = window.getComputedStyle(contentRef.current)
+    const paddingTop = parseFloat(computedStyle.paddingTop) || 0
+    const paddingBottom = parseFloat(computedStyle.paddingBottom) || 0
+    const marginTop = parseFloat(computedStyle.marginTop) || 0
+    const marginBottom = parseFloat(computedStyle.marginBottom) || 0
+    
+    // Measure the actual scroll height of the content
+    const pixelHeight = contentRef.current.scrollHeight || contentRef.current.clientHeight || 0
+    
+    // Add padding and margins to total height
+    const totalPixelHeight = pixelHeight + paddingTop + paddingBottom + marginTop + marginBottom
+    
+    // Convert to grid units (round up to ensure content fits)
+    const heightInGridUnits = Math.ceil(totalPixelHeight / rowHeightPixels)
+    
+    // Apply min and max constraints (max: 50 grid units)
+    const finalHeight = Math.max(2, Math.min(heightInGridUnits, 50))
+    
+    // Update height immediately - no delay
+    onHeightChange(finalHeight)
   }, [collapsedGroups, effectiveGroupRules.length, groupBy, onHeightChange, rowHeightPixels])
 
   // CRITICAL: Defensive guards - ensure we have required data before rendering

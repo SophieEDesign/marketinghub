@@ -384,30 +384,26 @@ export default function GalleryView({
   }, [])
 
   // Measure content height when grouping changes (expand/collapse or enable/disable)
-  // Only trigger on group state changes, not on data refresh, inline editing, etc.
+  // CRITICAL: No debouncing - measure immediately for instant reflow on collapse
+  // Height must be DERIVED from content, not remembered
   useEffect(() => {
     if (!onHeightChange || !contentRef.current) return
     
     const isGrouped = !!effectiveGroupByField && !!groupedRows && groupedRows.length > 0
     if (!isGrouped) return // No grouping, skip measurement
 
-    // Debounce measurement to avoid excessive updates
-    const timeoutId = setTimeout(() => {
-      if (!contentRef.current) return
-      
-      // Measure the actual scroll height of the content
-      const pixelHeight = contentRef.current.scrollHeight || contentRef.current.clientHeight || 0
-      
-      // Convert to grid units (round up to ensure content fits)
-      const heightInGridUnits = Math.ceil(pixelHeight / rowHeight)
-      
-      // Minimum height of 2 grid units to prevent blocks from being too small
-      const finalHeight = Math.max(heightInGridUnits, 2)
-      
-      onHeightChange(finalHeight)
-    }, 100) // Small debounce to allow DOM to update
-
-    return () => clearTimeout(timeoutId)
+    // Measure immediately - no debouncing
+    // This ensures immediate reflow when blocks collapse
+    const pixelHeight = contentRef.current.scrollHeight || contentRef.current.clientHeight || 0
+    
+    // Convert to grid units (round up to ensure content fits)
+    const heightInGridUnits = Math.ceil(pixelHeight / rowHeight)
+    
+    // Minimum height of 2 grid units to prevent blocks from being too small
+    const finalHeight = Math.max(heightInGridUnits, 2)
+    
+    // Update height immediately - no delay
+    onHeightChange(finalHeight)
   }, [collapsedGroups, effectiveGroupByField, groupedRows, onHeightChange, rowHeight])
 
   const handleOpenRecord = useCallback((recordId: string) => {

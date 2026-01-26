@@ -115,78 +115,60 @@ export default function LinkedRecordCell({
     window.location.href = `/tables/${tableId}/records/${recordId}`
   }
 
+  const [createRecordModalOpen, setCreateRecordModalOpen] = useState(false)
+  const [createRecordTableId, setCreateRecordTableId] = useState<string | null>(null)
+  const [createRecordTableFields, setCreateRecordTableFields] = useState<any[]>([])
+  const [createRecordResolve, setCreateRecordResolve] = useState<((id: string | null) => void) | null>(null)
+
   const handleCreateLinkedRecord = async (tableId: string): Promise<string | null> => {
     if (!tableId) return null
-    try {
+    
+    return new Promise((resolve) => {
       const supabase = createClient()
-
-      // Load table metadata to find the physical table name.
-      const { data: table, error: tableError } = await supabase
-        .from("tables")
-        .select("supabase_table, primary_field_name")
-        .eq("id", tableId)
-        .maybeSingle()
-
-      if (tableError || !table?.supabase_table) {
-        console.error("[LinkedRecordCell] Failed to load linked table metadata:", tableError)
-        return null
-      }
-
-      // Best-effort: try to prefill a primary text-like field so the record isn't "blank".
-      // If we can't safely determine a physical column name, fall back to inserting an empty row.
-      const payload: Record<string, any> = {}
-      const { data: linkedFields } = await supabase
+      
+      // Fetch table fields for the modal
+      supabase
         .from("table_fields")
-        .select("name, type, position, order_index, options")
+        .select("*")
         .eq("table_id", tableId)
         .order("position", { ascending: true })
+        .then(({ data: fields, error }) => {
+          if (error) {
+            console.error("[LinkedRecordCell] Error loading table fields:", error)
+            resolve(null)
+            return
+          }
 
-      const configuredPrimary =
-        typeof (table as any)?.primary_field_name === "string" &&
-        String((table as any).primary_field_name).trim().length > 0 &&
-        String((table as any).primary_field_name).trim() !== "id"
-          ? String((table as any).primary_field_name).trim()
-          : null
-
-      const candidatePrimaryName = configuredPrimary || getPrimaryFieldName(linkedFields as any)
-      if (candidatePrimaryName) {
-        const safePrimaryCol = toPostgrestColumn(candidatePrimaryName)
-        const primaryField = Array.isArray(linkedFields)
-          ? linkedFields.find((f: any) => f?.name === candidatePrimaryName)
-          : null
-
-        const isTextLike =
-          primaryField && ["text", "long_text", "email", "url"].includes(String(primaryField.type))
-
-        if (safePrimaryCol && safePrimaryCol !== "id" && isTextLike) {
-          payload[safePrimaryCol] = "New record"
-        }
-      }
-
-      // Try insert with payload first, then fall back to empty row if needed.
-      const attemptInsert = async (data: Record<string, any>) => {
-        return await supabase.from(table.supabase_table).insert([data]).select().single()
-      }
-
-      let inserted = await attemptInsert(payload)
-      if (inserted.error && Object.keys(payload).length > 0) {
-        inserted = await attemptInsert({})
-      }
-
-      if (inserted.error) {
-        console.error("[LinkedRecordCell] Failed to create linked record:", inserted.error)
-        alert("Failed to create linked record. Please check required fields and permissions.")
-        return null
-      }
-
-      const createdId = (inserted.data as any)?.id || (inserted.data as any)?.record_id
-      return createdId ? String(createdId) : null
-    } catch (e) {
-      console.error("[LinkedRecordCell] Failed to create linked record:", e)
-      alert("Failed to create linked record. Please try again.")
-      return null
-    }
+          // Store the resolve function and open modal
+          setCreateRecordResolve(() => resolve)
+          setCreateRecordTableId(tableId)
+          setCreateRecordTableFields(fields || [])
+          setCreateRecordModalOpen(true)
+        })
+    })
   }
+
+  // Handle modal save - called when RecordModal saves successfully
+  const handleModalSave = useCallback((createdRecordId?: string | null) => {
+    if (createRecordResolve) {
+      createRecordResolve(createdRecordId || null)
+      setCreateRecordResolve(null)
+    }
+    setCreateRecordModalOpen(false)
+    setCreateRecordTableId(null)
+    setCreateRecordTableFields([])
+  }, [createRecordResolve])
+
+  // Handle modal close - called when RecordModal is closed without saving
+  const handleModalClose = useCallback(() => {
+    if (createRecordResolve) {
+      createRecordResolve(null)
+      setCreateRecordResolve(null)
+    }
+    setCreateRecordModalOpen(false)
+    setCreateRecordTableId(null)
+    setCreateRecordTableFields([])
+  }, [createRecordResolve])
 
   if (!linkedTableId || !lookupConfig) {
     return (
@@ -200,33 +182,47 @@ export default function LinkedRecordCell({
   }
 
   return (
-    <div
-      className="w-full h-full px-2 flex items-center overflow-hidden"
-      style={rowHeight ? { height: `${rowHeight}px` } : undefined}
-      onClick={(e) => e.stopPropagation()}
-      onDoubleClick={(e) => e.stopPropagation()}
-    >
-      <LookupFieldPicker
-        field={field}
-        value={normalizedIds as any}
-        onChange={async (newValue) => {
-          if (isDisabled) return
-          try {
-            await onSave(newValue)
-          } catch (e: any) {
-            console.error("[LinkedRecordCell] Error saving linked record value:", e)
-            alert(e?.message || "Failed to save. Please check your permissions and try again.")
-          }
-        }}
-        config={lookupConfig}
-        disabled={isDisabled}
-        placeholder={isDisabled ? placeholder : `Add ${field.name}...`}
-        onRecordClick={handleLinkedRecordClick}
-        onCreateRecord={lookupConfig.allowCreate && !isDisabled ? handleCreateLinkedRecord : undefined}
-        isLookupField={false}
-        compact={true}
-      />
-    </div>
+    <>
+      <div
+        className="w-full h-full px-2 flex items-center overflow-hidden"
+        style={rowHeight ? { height: `${rowHeight}px` } : undefined}
+        onClick={(e) => e.stopPropagation()}
+        onDoubleClick={(e) => e.stopPropagation()}
+      >
+        <LookupFieldPicker
+          field={field}
+          value={normalizedIds as any}
+          onChange={async (newValue) => {
+            if (isDisabled) return
+            try {
+              await onSave(newValue)
+            } catch (e: any) {
+              console.error("[LinkedRecordCell] Error saving linked record value:", e)
+              alert(e?.message || "Failed to save. Please check your permissions and try again.")
+            }
+          }}
+          config={lookupConfig}
+          disabled={isDisabled}
+          placeholder={isDisabled ? placeholder : `Add ${field.name}...`}
+          onRecordClick={handleLinkedRecordClick}
+          onCreateRecord={lookupConfig.allowCreate && !isDisabled ? handleCreateLinkedRecord : undefined}
+          isLookupField={false}
+          compact={true}
+        />
+      </div>
+      
+      {/* Record creation modal */}
+      {createRecordTableId && (
+        <RecordModal
+          open={createRecordModalOpen}
+          onClose={handleModalClose}
+          tableId={createRecordTableId}
+          recordId={null}
+          tableFields={createRecordTableFields}
+          onSave={handleModalSave}
+        />
+      )}
+    </>
   )
 }
 

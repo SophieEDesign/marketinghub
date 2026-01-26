@@ -25,6 +25,7 @@ import {
 import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/LookupFieldPicker"
 import RichTextEditor from "@/components/fields/RichTextEditor"
 import AttachmentPreview, { type Attachment } from "@/components/attachments/AttachmentPreview"
+import RecordModal from "@/components/calendar/RecordModal"
 
 function AttachmentFieldEditor({
   field,
@@ -323,6 +324,10 @@ export default function FieldEditor({
 }: FieldEditorProps) {
   const { toast } = useToast()
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(null)
+  const [createRecordModalOpen, setCreateRecordModalOpen] = useState(false)
+  const [createRecordTableId, setCreateRecordTableId] = useState<string | null>(null)
+  const [createRecordTableFields, setCreateRecordTableFields] = useState<TableField[]>([])
+  const [createRecordResolve, setCreateRecordResolve] = useState<((id: string | null) => void) | null>(null)
 
   useEffect(() => {
     if (autoFocus && inputRef.current) {
@@ -436,82 +441,100 @@ export default function FieldEditor({
     }
 
     // LINKED FIELDS (editable) - Show as editable with clear affordances
+    // Handle create new record - opens RecordModal
+    const handleCreateRecord = useCallback(async (tableId: string): Promise<string | null> => {
+      return new Promise((resolve) => {
+        const supabase = createClient()
+        
+        // Fetch table fields for the modal
+        supabase
+          .from("table_fields")
+          .select("*")
+          .eq("table_id", tableId)
+          .order("position", { ascending: true })
+          .then(({ data: fields, error }) => {
+            if (error) {
+              console.error("Error loading table fields:", error)
+              toast({
+                title: "Failed to load fields",
+                description: error.message || "Please try again",
+                variant: "destructive",
+              })
+              resolve(null)
+              return
+            }
+
+            // Store the resolve function and open modal
+            setCreateRecordResolve(() => resolve)
+            setCreateRecordTableId(tableId)
+            setCreateRecordTableFields(fields || [])
+            setCreateRecordModalOpen(true)
+          })
+      })
+    }, [toast])
+
+    // Handle modal save - called when RecordModal saves successfully
+    const handleModalSave = useCallback((createdRecordId?: string | null) => {
+      if (createRecordResolve) {
+        createRecordResolve(createdRecordId || null)
+        setCreateRecordResolve(null)
+      }
+      setCreateRecordModalOpen(false)
+      setCreateRecordTableId(null)
+      setCreateRecordTableFields([])
+    }, [createRecordResolve])
+
+    // Handle modal close - called when RecordModal is closed without saving
+    const handleModalClose = useCallback(() => {
+      if (createRecordResolve) {
+        createRecordResolve(null)
+        setCreateRecordResolve(null)
+      }
+      setCreateRecordModalOpen(false)
+      setCreateRecordTableId(null)
+      setCreateRecordTableFields([])
+    }, [createRecordResolve])
+
     return (
-      <div className="space-y-2.5" onPaste={handlePaste}>
-        {showLabel && (
-          <label className={`${labelClassName} flex items-center gap-2`}>
-            {getFieldDisplayName(field)}
-            {required && <span className="text-red-500">*</span>}
-          </label>
-        )}
-        {lookupConfig ? (
-          <LookupFieldPicker
-            field={field}
-            value={value}
-            onChange={onChange}
-            config={lookupConfig}
-            disabled={isReadOnly}
-            placeholder={`Select ${getFieldDisplayName(field)}...`}
-            onRecordClick={onLinkedRecordClick}
-            onCreateRecord={onCreateRecord || (lookupConfig.allowCreate ? async (tableId: string) => {
-              try {
-                const supabase = createClient()
-                
-                // Get table info
-                const { data: table } = await supabase
-                  .from("tables")
-                  .select("supabase_table")
-                  .eq("id", tableId)
-                  .single()
-
-                if (!table) return null
-
-                // Get fields to create a minimal record
-                const { data: fields } = await supabase
-                  .from("table_fields")
-                  .select("*")
-                  .eq("table_id", tableId)
-                  .order("position", { ascending: true })
-                  .limit(5)
-
-                // Create minimal record with default values
-                const newRecord: Record<string, any> = {}
-                fields?.forEach(f => {
-                  if (f.default_value !== null && f.default_value !== undefined) {
-                    newRecord[f.name] = f.default_value
-                  }
-                })
-
-                const { data, error } = await supabase
-                  .from(table.supabase_table)
-                  .insert([newRecord])
-                  .select()
-                  .single()
-
-                if (error) {
-                  console.error("Error creating record:", error)
-                  toast({
-                    title: "Failed to create record",
-                    description: error.message || "Please try again",
-                    variant: "destructive",
-                  })
-                  return null
-                }
-
-                return data?.id || null
-              } catch (error: any) {
-                console.error("Error in handleCreateRecord:", error)
-                return null
-              }
-            } : undefined)}
-            isLookupField={false}
+      <>
+        <div className="space-y-2.5" onPaste={handlePaste}>
+          {showLabel && (
+            <label className={`${labelClassName} flex items-center gap-2`}>
+              {getFieldDisplayName(field)}
+              {required && <span className="text-red-500">*</span>}
+            </label>
+          )}
+          {lookupConfig ? (
+            <LookupFieldPicker
+              field={field}
+              value={value}
+              onChange={onChange}
+              config={lookupConfig}
+              disabled={isReadOnly}
+              placeholder={`Select ${getFieldDisplayName(field)}...`}
+              onRecordClick={onLinkedRecordClick}
+              onCreateRecord={onCreateRecord || (lookupConfig.allowCreate ? handleCreateRecord : undefined)}
+              isLookupField={false}
+            />
+          ) : (
+            <div className={`px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-500 ${inputClassName}`}>
+              Configure linked table in field settings
+            </div>
+          )}
+        </div>
+        
+        {/* Record creation modal */}
+        {createRecordTableId && (
+          <RecordModal
+            open={createRecordModalOpen}
+            onClose={handleModalClose}
+            tableId={createRecordTableId}
+            recordId={null}
+            tableFields={createRecordTableFields}
+            onSave={handleModalSave}
           />
-        ) : (
-          <div className={`px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-500 ${inputClassName}`}>
-            Configure linked table in field settings
-          </div>
         )}
-      </div>
+      </>
     )
   }
 

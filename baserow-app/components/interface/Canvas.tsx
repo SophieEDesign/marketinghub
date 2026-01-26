@@ -2318,15 +2318,18 @@ export default function Canvas({
             {/* CRITICAL: No min-height - height must be DERIVED from content */}
             {/* min-h-0 allows flex children to shrink below content size */}
             <div 
-              className={`h-full w-full min-h-0 overflow-hidden rounded-lg transition-all duration-300 ease-in-out ${block.config?.locked ? 'pointer-events-none opacity-75' : ''}`}
+              className={`h-full w-full min-h-0 overflow-hidden rounded-lg ${block.config?.locked ? 'pointer-events-none opacity-75' : ''}`}
               data-block-id={block.id}
               style={{
                 // CRITICAL: Do NOT set minHeight - height must be DERIVED from content
                 // minHeight causes gaps when blocks collapse - it persists after collapse
                 // Height must come from content and current expansion state only
-                // Use transform for smooth animations
+                // CRITICAL: No height transitions - they delay reflow on collapse
+                // Airtable prioritises correctness over animation
+                // Only animate non-layout properties (transform, opacity) if needed
                 willChange: keyboardMoveHighlight === block.id ? 'transform' : 'auto',
-                transitionProperty: 'height, transform, opacity',
+                // Removed height from transition - height changes must be immediate
+                transitionProperty: 'transform, opacity',
               }}
             >
               <BlockAppearanceWrapper 
@@ -2358,14 +2361,16 @@ export default function Canvas({
                         return
                       }
                       
-                      // Update block height in layout when content changes
+                      // CRITICAL: Update block height immediately when content changes
+                      // No debouncing, no height caching
+                      // Height must be DERIVED from content, not remembered
                       const currentLayoutItem = layout.find(l => l.i === block.id)
                       if (currentLayoutItem && currentLayoutItem.h !== height) {
                         const newLayout = layout.map(l => 
                           l.i === block.id ? { ...l, h: height } : l
                         )
                         setLayout(newLayout)
-                        // Persist to parent via onLayoutChange
+                        // Persist to parent via onLayoutChange immediately
                         if (onLayoutChange) {
                           const layoutItems: LayoutItem[] = newLayout.map((item) => ({
                             i: item.i,
@@ -2376,18 +2381,9 @@ export default function Canvas({
                           }))
                           onLayoutChange(layoutItems)
                         }
-                        // Store collapsed height in block config when grouping is active
-                        // This allows us to restore the height when grouping is re-enabled
-                        // Check if grouping is active by looking at block config
-                        const hasGrouping = !!(block.config?.group_by || block.config?.group_by_field || 
-                          (block.config as any)?.gallery_group_by)
-                        if (hasGrouping && onBlockUpdate) {
-                          // Store the collapsed height (when groups are collapsed, height is smaller)
-                          // We'll use this to restore the height when grouping is re-enabled
-                          onBlockUpdate(block.id, {
-                            grouped_collapsed_height: height,
-                          } as any)
-                        }
+                        // CRITICAL: Do NOT store height in block config
+                        // Old heights must never be cached after collapse
+                        // Height must come from content and current expansion state only
                       }
                     }}
                     rowHeight={layoutSettings.rowHeight || 30}
