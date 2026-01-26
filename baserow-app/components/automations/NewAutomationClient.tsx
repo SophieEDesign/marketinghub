@@ -4,10 +4,13 @@ import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import AutomationBuilder from "./AutomationBuilder"
+import AutomationTemplates from "./AutomationTemplates"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import type { Automation, TableField } from "@/types/database"
+import type { AutomationTemplate } from "@/lib/automations/templates"
+import { Sparkles } from "lucide-react"
 
 export default function NewAutomationClient() {
   const router = useRouter()
@@ -16,6 +19,8 @@ export default function NewAutomationClient() {
   const [tables, setTables] = useState<Array<{ id: string; name: string }>>([])
   const [loading, setLoading] = useState(true)
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null)
+  const [showTemplates, setShowTemplates] = useState(false)
+  const [templateAutomation, setTemplateAutomation] = useState<Partial<Automation> | null>(null)
 
   // Get tableId from URL or use selected table
   const urlTableId = searchParams.get("tableId")
@@ -136,21 +141,58 @@ export default function NewAutomationClient() {
     )
   }
 
+  function handleTemplateSelect(template: AutomationTemplate) {
+    setTemplateAutomation({
+      name: template.name,
+      description: template.description,
+      trigger_type: template.triggerType,
+      trigger_config: template.triggerConfig,
+      actions: template.actions,
+      conditions: template.conditions,
+    })
+    setShowTemplates(false)
+  }
+
   // Show table selector if no table is selected
-  if (!tableId) {
+  if (!tableId && !templateAutomation) {
     return (
       <div className="max-w-4xl mx-auto p-6">
+        {showTemplates && (
+          <AutomationTemplates
+            onSelectTemplate={handleTemplateSelect}
+            onClose={() => setShowTemplates(false)}
+          />
+        )}
         <Card>
           <CardHeader>
-            <CardTitle>Select a Table</CardTitle>
+            <CardTitle>Create New Automation</CardTitle>
             <CardDescription>
-              Choose a table to create an automation for
+              Start with a template or create from scratch
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+              <Card className="border-2 border-dashed hover:border-blue-500 transition-colors cursor-pointer" onClick={() => setShowTemplates(true)}>
+                <CardContent className="p-6 text-center">
+                  <Sparkles className="h-12 w-12 mx-auto mb-4 text-blue-600" />
+                  <h3 className="text-lg font-semibold mb-2">Start with a Template</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Choose from pre-built automation templates
+                  </p>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setShowTemplates(true)
+                    }}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    Browse Templates
+                  </button>
+                </CardContent>
+              </Card>
+              <div className="text-center text-sm text-gray-500">or</div>
               <div className="space-y-2">
-                <Label htmlFor="table-select">Table</Label>
+                <Label htmlFor="table-select">Select a Table</Label>
                 <Select
                   value={selectedTableId || ""}
                   onValueChange={(value) => setSelectedTableId(value)}
@@ -179,9 +221,51 @@ export default function NewAutomationClient() {
     )
   }
 
+  function handleTemplateSelect(template: AutomationTemplate) {
+    setTemplateAutomation({
+      name: template.name,
+      description: template.description,
+      trigger_type: template.triggerType,
+      trigger_config: template.triggerConfig,
+      actions: template.actions,
+      conditions: template.conditions,
+    })
+    setShowTemplates(false)
+  }
+
   return (
     <div className="max-w-4xl mx-auto p-6">
-      {!urlTableId && (
+      {showTemplates && (
+        <AutomationTemplates
+          onSelectTemplate={handleTemplateSelect}
+          onClose={() => setShowTemplates(false)}
+        />
+      )}
+
+      {!templateAutomation && !tableId && (
+        <div className="mb-6">
+          <Card className="p-6 border-2 border-dashed border-gray-300 hover:border-blue-500 transition-colors">
+            <div className="text-center">
+              <Sparkles className="h-12 w-12 mx-auto mb-4 text-blue-600" />
+              <h3 className="text-lg font-semibold mb-2">Start with a Template</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Choose from pre-built automation templates to get started quickly
+              </p>
+              <button
+                onClick={() => setShowTemplates(true)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Browse Templates
+              </button>
+              <div className="mt-4 text-sm text-gray-500">
+                or
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {!urlTableId && !templateAutomation && (
         <div className="mb-6">
           <Label htmlFor="table-select" className="mb-2 block">Table</Label>
           <Select
@@ -201,11 +285,14 @@ export default function NewAutomationClient() {
           </Select>
         </div>
       )}
-      <AutomationBuilder
-        tableId={tableId}
-        tableFields={tableFields}
-        onSave={handleSave}
-      />
+      {(tableId || templateAutomation) && (
+        <AutomationBuilder
+          automation={templateAutomation as Automation}
+          tableId={tableId || urlTableId || ''}
+          tableFields={tableFields}
+          onSave={handleSave}
+        />
+      )}
     </div>
   )
 }

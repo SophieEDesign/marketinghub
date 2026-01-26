@@ -6,6 +6,7 @@ import { Tokenizer } from '@/lib/formulas/tokenizer'
 import { Parser } from '@/lib/formulas/parser'
 import { Evaluator } from '@/lib/formulas/evaluator'
 import type { TableField } from '@/types/fields'
+import { getUserFriendlyError } from './error-messages'
 
 export interface ActionResult {
   success: boolean
@@ -92,9 +93,13 @@ async function executeUpdateRecord(
   context: AutomationContext
 ): Promise<ActionResult> {
   if (!action.table_id || !action.record_id) {
+    const friendlyError = getUserFriendlyError(
+      new Error('table_id and record_id are required'),
+      { actionType: 'update_record' }
+    )
     return {
       success: false,
-      error: 'table_id and record_id are required for update_record',
+      error: friendlyError.message,
     }
   }
 
@@ -102,9 +107,13 @@ async function executeUpdateRecord(
   const table = await getTable(action.table_id)
   
   if (!table) {
+    const friendlyError = getUserFriendlyError(
+      new Error(`Table ${action.table_id} not found`),
+      { actionType: 'update_record', tableId: action.table_id }
+    )
     return {
       success: false,
-      error: `Table ${action.table_id} not found`,
+      error: friendlyError.message,
     }
   }
 
@@ -193,9 +202,13 @@ async function executeCreateRecord(
   context: AutomationContext
 ): Promise<ActionResult> {
   if (!action.table_id) {
+    const friendlyError = getUserFriendlyError(
+      new Error('table_id is required'),
+      { actionType: 'create_record' }
+    )
     return {
       success: false,
-      error: 'table_id is required for create_record',
+      error: friendlyError.message,
     }
   }
 
@@ -203,9 +216,13 @@ async function executeCreateRecord(
   const table = await getTable(action.table_id)
   
   if (!table) {
+    const friendlyError = getUserFriendlyError(
+      new Error(`Table ${action.table_id} not found`),
+      { actionType: 'create_record', tableId: action.table_id }
+    )
     return {
       success: false,
-      error: `Table ${action.table_id} not found`,
+      error: friendlyError.message,
     }
   }
 
@@ -235,9 +252,13 @@ async function executeCreateRecord(
     .single()
 
   if (error) {
+    const friendlyError = getUserFriendlyError(error, {
+      actionType: 'create_record',
+      tableId: action.table_id
+    })
     return {
       success: false,
-      error: `Failed to create record: ${error.message}`,
+      error: friendlyError.message,
     }
   }
 
@@ -274,9 +295,13 @@ async function executeDeleteRecord(
     .eq('id', action.record_id)
 
   if (error) {
+    const friendlyError = getUserFriendlyError(error, {
+      actionType: 'delete_record',
+      tableId: action.table_id
+    })
     return {
       success: false,
-      error: `Failed to delete record: ${error.message}`,
+      error: friendlyError.message,
     }
   }
 
@@ -310,9 +335,13 @@ async function executeCallWebhook(
   context: AutomationContext
 ): Promise<ActionResult> {
   if (!action.url) {
+    const friendlyError = getUserFriendlyError(
+      new Error('url is required'),
+      { actionType: 'call_webhook' }
+    )
     return {
       success: false,
-      error: 'url is required for call_webhook',
+      error: friendlyError.message,
     }
   }
 
@@ -320,15 +349,23 @@ async function executeCallWebhook(
   try {
     const url = new URL(action.url)
     if (!['http:', 'https:'].includes(url.protocol)) {
+      const friendlyError = getUserFriendlyError(
+        new Error('Only HTTP and HTTPS URLs are allowed'),
+        { actionType: 'call_webhook' }
+      )
       return {
         success: false,
-        error: 'Only HTTP and HTTPS URLs are allowed',
+        error: friendlyError.message,
       }
     }
   } catch {
+    const friendlyError = getUserFriendlyError(
+      new Error('Invalid URL format'),
+      { actionType: 'call_webhook' }
+    )
     return {
       success: false,
-      error: 'Invalid URL format',
+      error: friendlyError.message,
     }
   }
 
@@ -357,9 +394,12 @@ async function executeCallWebhook(
       error: response.ok ? undefined : `Webhook returned ${response.status}`,
     }
   } catch (error: any) {
+    const friendlyError = getUserFriendlyError(error, {
+      actionType: 'call_webhook'
+    })
     return {
       success: false,
-      error: `Webhook call failed: ${error.message}`,
+      error: friendlyError.message,
     }
   }
 }
@@ -395,9 +435,12 @@ async function executeRunScript(
       data: { result },
     }
   } catch (error: any) {
+    const friendlyError = getUserFriendlyError(error, {
+      actionType: 'run_script'
+    })
     return {
       success: false,
-      error: `Script execution failed: ${error.message}`,
+      error: friendlyError.message,
     }
   }
 }

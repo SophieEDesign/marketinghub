@@ -4,7 +4,9 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import AutomationBuilder from "./AutomationBuilder"
+import AutomationRunHistory from "./AutomationRunHistory"
 import type { Automation, TableField } from "@/types/database"
+import { Settings, History } from "lucide-react"
 
 interface EditAutomationClientProps {
   automationId: string
@@ -15,6 +17,7 @@ export default function EditAutomationClient({ automationId }: EditAutomationCli
   const [automation, setAutomation] = useState<Automation | null>(null)
   const [tableFields, setTableFields] = useState<TableField[]>([])
   const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState<'edit' | 'history'>('edit')
 
   useEffect(() => {
     loadData()
@@ -135,14 +138,50 @@ export default function EditAutomationClient({ automationId }: EditAutomationCli
 
   return (
     <div className="max-w-4xl mx-auto">
-      <AutomationBuilder
-        automation={automation}
-        tableId={automation.table_id}
-        tableFields={tableFields}
-        onSave={handleSave}
-        onTest={handleTest}
-        onDelete={handleDelete}
-      />
+      {/* Tabs */}
+      <div className="border-b border-gray-200 mb-6">
+        <nav className="flex gap-4">
+          <button
+            onClick={() => setActiveTab('edit')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
+              activeTab === 'edit'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Settings className="h-4 w-4" />
+            Edit Automation
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
+              activeTab === 'history'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <History className="h-4 w-4" />
+            Run History
+          </button>
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'edit' ? (
+        <AutomationBuilder
+          automation={automation}
+          tableId={automation.table_id}
+          tableFields={tableFields}
+          onSave={handleSave}
+          onTest={handleTest}
+          onDelete={handleDelete}
+        />
+      ) : (
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Execution History</h2>
+          <AutomationRunHistory automationId={automationId} />
+        </div>
+      )}
     </div>
   )
 }

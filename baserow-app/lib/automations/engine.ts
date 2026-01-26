@@ -11,6 +11,7 @@ import type {
   ActionConfig,
 } from './types'
 import type { TableField } from '@/types/fields'
+import { getUserFriendlyError } from './error-messages'
 
 export interface AutomationExecutionResult {
   success: boolean
@@ -271,22 +272,27 @@ export async function executeAutomation(
       logs,
     }
   } catch (error: any) {
+    // Convert to user-friendly error
+    const friendlyError = getUserFriendlyError(error, {
+      triggerType: automation.trigger_type
+    })
+    
     // Mark run as failed
     await supabase
       .from('automation_runs')
       .update({
         status: 'failed',
         completed_at: new Date().toISOString(),
-        error: error.message || 'Automation execution failed',
+        error: friendlyError.message,
       })
       .eq('id', runId)
 
-    await logMessage(supabase, automation.id, runId, 'error', `Automation failed: ${error.message}`)
+    await logMessage(supabase, automation.id, runId, 'error', `Automation failed: ${friendlyError.message}`)
 
     return {
       success: false,
       runId,
-      error: error.message || 'Automation execution failed',
+      error: friendlyError.message,
       logs: [
         ...logs,
         {
@@ -294,7 +300,7 @@ export async function executeAutomation(
           automation_id: automation.id,
           run_id: runId,
           level: 'error',
-          message: `Automation failed: ${error.message}`,
+          message: `Automation failed: ${friendlyError.message}`,
           created_at: new Date().toISOString(),
         },
       ],

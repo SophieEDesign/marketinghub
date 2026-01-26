@@ -3,8 +3,9 @@ import { createClient } from "@/lib/supabase/server"
 import { isAdmin } from "@/lib/roles"
 import Link from "next/link"
 import WorkspaceShellWrapper from "@/components/layout/WorkspaceShellWrapper"
-import { Plus, Play, Pause, Settings } from "lucide-react"
+import { Plus } from "lucide-react"
 import type { Automation } from "@/types/database"
+import AutomationCard from "@/components/automations/AutomationCard"
 
 export default async function AutomationsPage() {
   // Security: Only admins can access automations
@@ -75,43 +76,7 @@ export default async function AutomationsPage() {
         ) : (
           <div className="grid gap-4">
             {automationList.map((automation) => (
-              <div
-                key={automation.id}
-                className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3 className="text-lg font-semibold">{automation.name}</h3>
-                      {automation.enabled ? (
-                        <span className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded">
-                          Enabled
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 rounded">
-                          Disabled
-                        </span>
-                      )}
-                    </div>
-                    {automation.description && (
-                      <p className="text-sm text-gray-600 mb-2">{automation.description}</p>
-                    )}
-                    <div className="flex items-center gap-4 text-xs text-gray-500">
-                      <span>Trigger: {automation.trigger_type || 'N/A'}</span>
-                      <span>Actions: {(automation.actions || []).length}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Link
-                      href={`/automations/${automation.id}`}
-                      className="p-2 text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                      title="Edit automation"
-                    >
-                      <Settings className="h-4 w-4" />
-                    </Link>
-                  </div>
-                </div>
-              </div>
+              <AutomationCard key={automation.id} automation={automation} />
             ))}
           </div>
         )}

@@ -1,13 +1,16 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
-import { Save, Play, Trash2, Plus, X, GripVertical, AlertCircle } from "lucide-react"
+import { Save, Play, Trash2, Plus, X, GripVertical, AlertCircle, Sparkles, RefreshCw, Trash, Clock, Webhook, Filter, Edit, FilePlus, Mail, Code, Timer, MessageSquare, Square, Layout, List, Variable } from "lucide-react"
 import type { Automation, TableField } from "@/types/database"
 import type { TriggerType, ActionType, ActionConfig, TriggerConfig } from "@/lib/automations/types"
 import AutomationConditionBuilder from "./AutomationConditionBuilder"
+import VisualWorkflowBuilder from "./VisualWorkflowBuilder"
+import VariablePicker from "./VariablePicker"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import { filterTreeToFormula } from "@/lib/automations/condition-formula"
 import FormulaEditor from "@/components/fields/FormulaEditor"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface AutomationBuilderProps {
   automation?: Automation | null
@@ -18,25 +21,127 @@ interface AutomationBuilderProps {
   onDelete?: () => Promise<void>
 }
 
-const TRIGGER_TYPES: { value: TriggerType; label: string }[] = [
-  { value: 'row_created', label: 'When a record is created' },
-  { value: 'row_updated', label: 'When a record is updated' },
-  { value: 'row_deleted', label: 'When a record is deleted' },
-  { value: 'schedule', label: 'On a schedule' },
-  { value: 'webhook', label: 'When webhook is called' },
-  { value: 'condition', label: 'When conditions match' },
+const TRIGGER_TYPES: { 
+  value: TriggerType
+  label: string
+  icon: typeof Sparkles
+  description: string
+  category: string
+}[] = [
+  { 
+    value: 'row_created', 
+    label: 'When a record is created',
+    icon: Sparkles,
+    description: 'Runs automatically whenever a new record is added to this table',
+    category: 'Record Events'
+  },
+  { 
+    value: 'row_updated', 
+    label: 'When a record is updated',
+    icon: RefreshCw,
+    description: 'Runs when any field in a record changes, or only when specific fields change',
+    category: 'Record Events'
+  },
+  { 
+    value: 'row_deleted', 
+    label: 'When a record is deleted',
+    icon: Trash,
+    description: 'Runs automatically when a record is removed from this table',
+    category: 'Record Events'
+  },
+  { 
+    value: 'schedule', 
+    label: 'On a schedule',
+    icon: Clock,
+    description: 'Runs at specific times, like daily at 9 AM or every Monday',
+    category: 'Time-based'
+  },
+  { 
+    value: 'webhook', 
+    label: 'When webhook is called',
+    icon: Webhook,
+    description: 'Runs when an external system sends data to your webhook URL',
+    category: 'External Events'
+  },
+  { 
+    value: 'condition', 
+    label: 'When conditions match',
+    icon: Filter,
+    description: 'Continuously checks if records match certain criteria',
+    category: 'Conditional'
+  },
 ]
 
-const ACTION_TYPES: { value: ActionType; label: string }[] = [
-  { value: 'update_record', label: 'Update record' },
-  { value: 'create_record', label: 'Create record' },
-  { value: 'delete_record', label: 'Delete record' },
-  { value: 'send_email', label: 'Send email' },
-  { value: 'call_webhook', label: 'Call webhook' },
-  { value: 'run_script', label: 'Run script' },
-  { value: 'delay', label: 'Delay' },
-  { value: 'log_message', label: 'Log message' },
-  { value: 'stop_execution', label: 'Stop execution' },
+const ACTION_TYPES: { 
+  value: ActionType
+  label: string
+  icon: typeof Edit
+  description: string
+  category: string
+}[] = [
+  { 
+    value: 'update_record', 
+    label: 'Update a record',
+    icon: Edit,
+    description: 'Modify fields in an existing record',
+    category: 'Data Operations'
+  },
+  { 
+    value: 'create_record', 
+    label: 'Create a record',
+    icon: FilePlus,
+    description: 'Add a new record to a table',
+    category: 'Data Operations'
+  },
+  { 
+    value: 'delete_record', 
+    label: 'Delete a record',
+    icon: Trash,
+    description: 'Remove a record from a table',
+    category: 'Data Operations'
+  },
+  { 
+    value: 'send_email', 
+    label: 'Send an email',
+    icon: Mail,
+    description: 'Send an email notification with dynamic content',
+    category: 'Notifications'
+  },
+  { 
+    value: 'call_webhook', 
+    label: 'Call a webhook',
+    icon: Webhook,
+    description: 'Send data to an external URL or service',
+    category: 'Integrations'
+  },
+  { 
+    value: 'run_script', 
+    label: 'Run a script',
+    icon: Code,
+    description: 'Execute custom JavaScript code (advanced)',
+    category: 'Advanced'
+  },
+  { 
+    value: 'delay', 
+    label: 'Wait',
+    icon: Timer,
+    description: 'Pause execution for a specified amount of time',
+    category: 'Flow Control'
+  },
+  { 
+    value: 'log_message', 
+    label: 'Log a message',
+    icon: MessageSquare,
+    description: 'Add a message to the automation execution log',
+    category: 'Debugging'
+  },
+  { 
+    value: 'stop_execution', 
+    label: 'Stop execution',
+    icon: Square,
+    description: 'Immediately stop the automation from continuing',
+    category: 'Flow Control'
+  },
 ]
 
 export default function AutomationBuilder({
@@ -57,6 +162,7 @@ export default function AutomationBuilder({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [editingActionIndex, setEditingActionIndex] = useState<number | null>(null)
+  const [viewMode, setViewMode] = useState<'form' | 'visual'>('visual')
 
   useEffect(() => {
     if (automation) {
@@ -348,12 +454,17 @@ export default function AutomationBuilder({
 
   function renderActionEditor(action: ActionConfig, index: number) {
     if (editingActionIndex !== index) {
+      const actionType = ACTION_TYPES.find(a => a.value === action.type)
+      const Icon = actionType?.icon || Edit
       return (
-        <div className="flex items-center gap-2 p-3 border border-gray-200 rounded-md">
+        <div className="flex items-center gap-2 p-3 border border-gray-200 rounded-md hover:border-gray-300 transition-colors">
           <GripVertical className="h-4 w-4 text-gray-400" />
-          <div className="flex-1">
-            <div className="font-medium text-sm">{ACTION_TYPES.find(a => a.value === action.type)?.label}</div>
-            <div className="text-xs text-gray-500">{action.type}</div>
+          <Icon className="h-4 w-4 text-gray-500 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="font-medium text-sm">{actionType?.label || action.type}</div>
+            {actionType?.description && (
+              <div className="text-xs text-gray-500 truncate">{actionType.description}</div>
+            )}
           </div>
           <button
             onClick={() => setEditingActionIndex(index)}
@@ -385,16 +496,63 @@ export default function AutomationBuilder({
 
         <div className="space-y-3">
           <div>
-            <label className="block text-sm font-medium mb-1">Action Type</label>
-            <select
+            <label className="block text-sm font-medium mb-1">What should this action do?</label>
+            <Select
               value={action.type}
-              onChange={(e) => updateAction(index, { type: e.target.value as ActionType })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              onValueChange={(value) => updateAction(index, { type: value as ActionType })}
             >
-              {ACTION_TYPES.map(at => (
-                <option key={at.value} value={at.value}>{at.label}</option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full">
+                <SelectValue>
+                  {(() => {
+                    const selected = ACTION_TYPES.find(at => at.value === action.type)
+                    if (!selected) return "Select action type"
+                    const Icon = selected.icon
+                    return (
+                      <div className="flex items-center gap-2">
+                        <Icon className="h-4 w-4" />
+                        <span>{selected.label}</span>
+                      </div>
+                    )
+                  })()}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(
+                  ACTION_TYPES.reduce((acc, at) => {
+                    if (!acc[at.category]) acc[at.category] = []
+                    acc[at.category].push(at)
+                    return acc
+                  }, {} as Record<string, typeof ACTION_TYPES>)
+                ).map(([category, actions]) => (
+                  <div key={category}>
+                    <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      {category}
+                    </div>
+                    {actions.map(at => {
+                      const Icon = at.icon
+                      return (
+                        <SelectItem key={at.value} value={at.value}>
+                          <div className="flex items-start gap-2 py-1">
+                            <Icon className="h-4 w-4 mt-0.5 text-gray-500 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium">{at.label}</div>
+                              <div className="text-xs text-gray-500 mt-0.5">{at.description}</div>
+                            </div>
+                          </div>
+                        </SelectItem>
+                      )
+                    })}
+                  </div>
+                ))}
+              </SelectContent>
+            </Select>
+            {(() => {
+              const selected = ACTION_TYPES.find(at => at.value === action.type)
+              if (!selected) return null
+              return (
+                <p className="text-xs text-gray-500 mt-1.5">{selected.description}</p>
+              )
+            })()}
           </div>
 
           {renderActionConfig(action, index)}
@@ -485,19 +643,56 @@ export default function AutomationBuilder({
                       </select>
                     </div>
 
-                    <div className="col-span-4">
+                    <div className="col-span-4 relative">
                       <label className="block text-xs text-gray-600 mb-1">Value</label>
-                      <input
-                        type="text"
-                        value={typeof m.value === 'string' ? m.value : (m.value ?? '')}
-                        onChange={(e) => {
-                          const next = [...mappings]
-                          next[mIndex] = { ...next[mIndex], value: e.target.value }
-                          updateAction(index, { field_update_mappings: next, field_updates: undefined })
-                        }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                        placeholder='e.g. {{status}} or Static text or =FORMULA(...)'
-                      />
+                      <div className="relative">
+                        <input
+                          type="text"
+                          ref={(el) => {
+                            if (variablePickerOpen?.actionIndex === index && variablePickerOpen?.mappingIndex === mIndex) {
+                              variablePickerOpen.inputRef = el
+                            }
+                          }}
+                          value={typeof m.value === 'string' ? m.value : (m.value ?? '')}
+                          onChange={(e) => {
+                            const next = [...mappings]
+                            next[mIndex] = { ...next[mIndex], value: e.target.value }
+                            updateAction(index, { field_update_mappings: next, field_updates: undefined })
+                          }}
+                          className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm"
+                          placeholder='e.g. {{status}} or Static text or =FORMULA(...)'
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setVariablePickerOpen({ actionIndex: index, mappingIndex: mIndex, inputRef: null })}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-blue-600 transition-colors"
+                          title="Insert variable"
+                        >
+                          <Variable className="h-4 w-4" />
+                        </button>
+                        {variablePickerOpen?.actionIndex === index && variablePickerOpen?.mappingIndex === mIndex && (
+                          <div className="absolute right-0 top-full mt-1">
+                            <VariablePicker
+                              tableFields={tableFields}
+                              onInsert={(variable) => {
+                                const next = [...mappings]
+                                const currentValue = typeof next[mIndex].value === 'string' ? next[mIndex].value : ''
+                                const cursorPos = variablePickerOpen.inputRef?.selectionStart || currentValue.length
+                                const newValue = currentValue.slice(0, cursorPos) + variable + currentValue.slice(cursorPos)
+                                next[mIndex] = { ...next[mIndex], value: newValue }
+                                updateAction(index, { field_update_mappings: next, field_updates: undefined })
+                                setVariablePickerOpen(null)
+                                setTimeout(() => {
+                                  variablePickerOpen.inputRef?.focus()
+                                  const newPos = cursorPos + variable.length
+                                  variablePickerOpen.inputRef?.setSelectionRange(newPos, newPos)
+                                }, 0)
+                              }}
+                              onClose={() => setVariablePickerOpen(null)}
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     <div className="col-span-1 flex items-end">
@@ -596,15 +791,25 @@ export default function AutomationBuilder({
                 placeholder="Email subject"
               />
             </div>
-            <div>
+            <div className="relative">
               <label className="block text-sm font-medium mb-1">Body</label>
-              <textarea
-                value={action.email_body || ''}
-                onChange={(e) => updateAction(index, { email_body: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                rows={4}
-                placeholder="Email body (supports {{variables}})"
-              />
+              <div className="relative">
+                <textarea
+                  value={action.email_body || ''}
+                  onChange={(e) => updateAction(index, { email_body: e.target.value })}
+                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm"
+                  rows={4}
+                  placeholder="Email body (supports {{variables}})"
+                />
+                <button
+                  type="button"
+                  onClick={() => setVariablePickerOpen({ actionIndex: index, mappingIndex: -1, inputRef: null })}
+                  className="absolute right-2 top-2 p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-blue-600 transition-colors"
+                  title="Insert variable"
+                >
+                  <Variable className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           </>
         )
@@ -748,9 +953,14 @@ export default function AutomationBuilder({
   return (
     <div className="space-y-6">
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700 flex items-start gap-2">
-          <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-          <span>{error}</span>
+        <div className="p-4 bg-red-50 border border-red-200 rounded-md text-sm">
+          <div className="flex items-start gap-2 text-red-700">
+            <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <div className="font-medium mb-1">Error</div>
+              <div>{error}</div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -796,11 +1006,11 @@ export default function AutomationBuilder({
       <div className="space-y-4 border-t pt-4">
         <h3 className="text-lg font-semibold">Trigger</h3>
         <div>
-          <label className="block text-sm font-medium mb-1">Trigger Type</label>
-          <select
+          <label className="block text-sm font-medium mb-1">When should this automation run?</label>
+          <Select
             value={triggerType}
-            onChange={(e) => {
-              const nextType = e.target.value as TriggerType
+            onValueChange={(value) => {
+              const nextType = value as TriggerType
               setTriggerType(nextType)
               // Convenience: if user already built "Only run when..." conditions
               // and selects the "When conditions match" trigger, seed the trigger formula.
@@ -810,12 +1020,46 @@ export default function AutomationBuilder({
                 setTriggerConfig({ table_id: tableId })
               }
             }}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            {TRIGGER_TYPES.map(tt => (
-              <option key={tt.value} value={tt.value}>{tt.label}</option>
-            ))}
-          </select>
+            <SelectTrigger className="w-full">
+              <SelectValue>
+                {(() => {
+                  const selected = TRIGGER_TYPES.find(tt => tt.value === triggerType)
+                  if (!selected) return "Select trigger type"
+                  const Icon = selected.icon
+                  return (
+                    <div className="flex items-center gap-2">
+                      <Icon className="h-4 w-4" />
+                      <span>{selected.label}</span>
+                    </div>
+                  )
+                })()}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {TRIGGER_TYPES.map(tt => {
+                const Icon = tt.icon
+                return (
+                  <SelectItem key={tt.value} value={tt.value}>
+                    <div className="flex items-start gap-2 py-1">
+                      <Icon className="h-4 w-4 mt-0.5 text-gray-500 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium">{tt.label}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">{tt.description}</div>
+                      </div>
+                    </div>
+                  </SelectItem>
+                )
+              })}
+            </SelectContent>
+          </Select>
+          {(() => {
+            const selected = TRIGGER_TYPES.find(tt => tt.value === triggerType)
+            if (!selected) return null
+            return (
+              <p className="text-xs text-gray-500 mt-1.5">{selected.description}</p>
+            )
+          })()}
         </div>
 
         {renderTriggerConfig()}
@@ -851,7 +1095,7 @@ export default function AutomationBuilder({
             </div>
           ) : (
             actions.map((action, index) => (
-              <div key={index}>
+              <div key={index} data-action-index={index}>
                 {renderActionEditor(action, index)}
               </div>
             ))
@@ -890,6 +1134,8 @@ export default function AutomationBuilder({
           </button>
         </div>
       </div>
+        </>
+      )}
     </div>
   )
 }
