@@ -945,6 +945,7 @@ export default function GridBlock({
                 onDateFromChange={setCalendarDateFrom}
                 onDateToChange={setCalendarDateTo}
                 disabled={false}
+                defaultPreset={(config?.default_date_range_preset || 'thisWeek') as 'today' | 'thisWeek' | 'thisMonth' | 'nextWeek' | 'nextMonth' | 'custom'}
               />
             )}
           </div>

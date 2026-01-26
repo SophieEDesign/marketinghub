@@ -1839,6 +1839,7 @@ export default function CalendarView({
           dateTo={dateTo}
           onDateFromChange={setDateFrom}
           onDateToChange={setDateTo}
+          defaultPreset={((blockConfig as any)?.default_date_range_preset || 'thisWeek') as 'today' | 'thisWeek' | 'thisMonth' | 'nextWeek' | 'nextMonth' | 'custom'}
         />
       </div>
     )
