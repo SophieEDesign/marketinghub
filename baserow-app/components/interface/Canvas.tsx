@@ -2333,16 +2333,6 @@ export default function Canvas({
               </div>
             )}
             
-            {/* Autofit Indicator - Show when autofit is explicitly enabled */}
-            {isEditing && (block.config as any)?.autofit_enabled === true && (
-              <div className="absolute top-10 left-2 z-10 flex items-center gap-1 px-2 py-1 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700 opacity-0 group-hover:opacity-100 transition-opacity">
-                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                </svg>
-                Auto-fit
-              </div>
-            )}
-
             {/* Block Content */}
             {/* CRITICAL: No min-height - height must be DERIVED from content */}
             {/* min-h-0 allows flex children to shrink below content size */}
@@ -2384,58 +2374,7 @@ export default function Canvas({
                     editableFieldNames={editableFieldNames}
                     hideEditButton={topTwoFieldBlockIds.has(block.id)}
                     allBlocks={blocks}
-                    onHeightChange={(height) => {
-                      // Don't update if manually resizing
-                      if (currentlyResizingBlockIdRef.current === block.id) {
-                        return
-                      }
-                      
-                      // CRITICAL: Update block height immediately when content changes
-                      // No debouncing, no height caching
-                      // Height must be DERIVED from content, not remembered
-                      const currentLayoutItem = layout.find(l => l.i === block.id)
-                      if (currentLayoutItem && currentLayoutItem.h !== height) {
-                        const oldHeight = currentLayoutItem.h
-                        const heightDelta = height - oldHeight
-                        
-                        // CRITICAL: Update only the changed block's height
-                        // Do NOT manually adjust sibling block Y positions
-                        // Height changes affect only the resized block
-                        const updatedLayout = layout.map(l => 
-                          l.i === block.id ? { ...l, h: height } : l
-                        )
-                        
-                        // CRITICAL: After height change, recompute layout declaratively
-                        // Use existing compaction functions to handle reflow
-                        // This ensures blocks behave like a vertical stack
-                        let finalLayout: Layout[]
-                        if (heightDelta > 0) {
-                          // Block grew - push blocks below down
-                          finalLayout = pushBlocksDown(updatedLayout, block.id)
-                        } else {
-                          // Block shrunk - compact layout vertically (removes gaps)
-                          finalLayout = compactLayoutVertically(updatedLayout, blocks)
-                        }
-                        
-                        // CRITICAL: Update layout state synchronously - no useEffect delay
-                        setLayout(finalLayout)
-                        
-                        // CRITICAL: Persist to parent via onLayoutChange immediately
-                        if (onLayoutChange) {
-                          const layoutItems: LayoutItem[] = finalLayout.map((item) => ({
-                            i: item.i,
-                            x: item.x || 0,
-                            y: item.y || 0,
-                            w: item.w || 4,
-                            h: item.h || 4,
-                          }))
-                          onLayoutChange(layoutItems)
-                        }
-                        // CRITICAL: Do NOT store height in block config
-                        // Old heights must never be cached after collapse
-                        // Height must come from content and current expansion state only
-                      }
-                    }}
+                    onHeightChange={undefined}
                     rowHeight={layoutSettings.rowHeight || 30}
                   />
                 </div>
