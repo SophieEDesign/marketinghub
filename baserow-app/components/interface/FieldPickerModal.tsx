@@ -43,6 +43,9 @@ import type { TableField } from "@/types/fields"
 import { getFieldDisplayName } from "@/lib/fields/display"
 import { cn } from "@/lib/utils"
 import { ChoicePill, ChoicePillList } from "@/components/fields/ChoicePill"
+import { sectionAndSortFields } from "@/lib/fields/sectioning"
+import { SelectGroup, SelectLabel, SelectSeparator } from "@/components/ui/select"
+import { Plus, ChevronDown, ChevronRight } from "lucide-react"
 
 interface FieldPickerModalProps {
   open: boolean
@@ -71,6 +74,7 @@ export default function FieldPickerModal({
   const [localSelectedFields, setLocalSelectedFields] = useState<string[]>(selectedFields)
   const [pasteText, setPasteText] = useState("")
   const [pasteSummary, setPasteSummary] = useState<{ added: number; missing: number } | null>(null)
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
 
   // Load fields and table name
   useEffect(() => {
@@ -203,6 +207,35 @@ export default function FieldPickerModal({
     })
     return sorted
   }, [fields, fieldSearch, fieldSort])
+
+  // Section fields by group_name
+  const sectionedFields = useMemo(() => {
+    return sectionAndSortFields(filteredFields)
+  }, [filteredFields])
+
+  // Toggle section collapse
+  const toggleSection = (sectionName: string) => {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev)
+      if (next.has(sectionName)) {
+        next.delete(sectionName)
+      } else {
+        next.add(sectionName)
+      }
+      return next
+    })
+  }
+
+  // Handle adding all fields from a section
+  const handleAddAllFromSection = (sectionFields: TableField[]) => {
+    const newFields = sectionFields
+      .filter((field) => !localSelectedFields.includes(field.name))
+      .map((field) => field.name)
+    
+    if (newFields.length > 0) {
+      setLocalSelectedFields([...localSelectedFields, ...newFields])
+    }
+  }
 
   const handleFieldToggle = (fieldName: string, checked: boolean) => {
     if (checked) {
@@ -386,32 +419,79 @@ export default function FieldPickerModal({
             <div className="flex-1 overflow-y-auto p-4 space-y-2">
               {loading ? (
                 <div className="text-sm text-gray-500 text-center py-8">Loading fields...</div>
-              ) : filteredFields.length === 0 ? (
+              ) : sectionedFields.length === 0 ? (
                 <div className="text-sm text-gray-500 text-center py-8">No fields found</div>
               ) : (
-                filteredFields.map((field) => {
-                  const isSelected = localSelectedFields.includes(field.name)
-                  const FieldIcon = getFieldIcon(field.type)
-
+                sectionedFields.map(([sectionName, sectionFields]) => {
+                  const isCollapsed = collapsedSections.has(sectionName)
+                  
                   return (
-                    <label
-                      key={field.id}
-                      className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded cursor-pointer"
-                    >
-                      <Switch
-                        checked={isSelected}
-                        onCheckedChange={(checked) => handleFieldToggle(field.name, checked)}
-                      />
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <div className="flex-shrink-0">{FieldIcon}</div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-gray-900 truncate">
-                            {getFieldDisplayName(field)}
-                          </div>
-                          <div className="text-xs text-gray-500">{field.type}</div>
+                    <div key={sectionName} className="space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleSection(sectionName)}
+                        className="w-full flex items-center justify-between text-left py-1 -mx-1 px-1 rounded-md hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
+                        aria-expanded={!isCollapsed}
+                        aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${sectionName} section`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-gray-900">{sectionName}</span>
+                          <span className="text-xs text-gray-500">({sectionFields.length})</span>
                         </div>
-                      </div>
-                    </label>
+                        <div className="flex items-center gap-2">
+                          {sectionFields.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleAddAllFromSection(sectionFields)
+                              }}
+                              className="text-xs text-blue-600 hover:text-blue-700 underline flex items-center gap-1"
+                              title={`Add all ${sectionFields.length} fields from ${sectionName}`}
+                            >
+                              <Plus className="h-3 w-3" />
+                              Add All
+                            </button>
+                          )}
+                          <span className="text-gray-400">
+                            {isCollapsed ? (
+                              <ChevronRight className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                          </span>
+                        </div>
+                      </button>
+                      {!isCollapsed && (
+                        <div className="space-y-1 pl-4">
+                          {sectionFields.map((field) => {
+                            const isSelected = localSelectedFields.includes(field.name)
+                            const FieldIcon = getFieldIcon(field.type)
+
+                            return (
+                              <label
+                                key={field.id}
+                                className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded cursor-pointer"
+                              >
+                                <Switch
+                                  checked={isSelected}
+                                  onCheckedChange={(checked) => handleFieldToggle(field.name, checked)}
+                                />
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                  <div className="flex-shrink-0">{FieldIcon}</div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-sm font-medium text-gray-900 truncate">
+                                      {getFieldDisplayName(field)}
+                                    </div>
+                                    <div className="text-xs text-gray-500">{field.type}</div>
+                                  </div>
+                                </div>
+                              </label>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
                   )
                 })
               )}

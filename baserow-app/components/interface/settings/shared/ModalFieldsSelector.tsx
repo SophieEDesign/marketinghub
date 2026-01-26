@@ -26,9 +26,11 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { X, GripVertical } from "lucide-react"
+import { X, GripVertical, Plus } from "lucide-react"
 import type { TableField } from "@/types/database"
 import { getFieldDisplayName } from "@/lib/fields/display"
+import { sectionAndSortFields } from "@/lib/fields/sectioning"
+import { SelectGroup, SelectLabel, SelectSeparator } from "@/components/ui/select"
 
 interface ModalFieldsSelectorProps {
   value: string[]
@@ -122,6 +124,26 @@ export default function ModalFieldsSelector({
       (f) => !selectedNames.includes(f.name) && !selectedNames.includes(f.id)
     )
   }, [availableDisplayFields, value])
+
+  // Section fields by group_name for dropdown
+  const sectionedAvailableFields = useMemo(() => {
+    return sectionAndSortFields(availableToAdd)
+  }, [availableToAdd])
+
+  // Handle adding all fields from a section
+  const handleAddAllFromSection = (sectionFields: TableField[]) => {
+    const currentFields = value || []
+    const newFields = sectionFields
+      .filter((field) => {
+        return !currentFields.includes(field.name) && !currentFields.includes(field.id)
+      })
+      .map((field) => field.name)
+    
+    if (newFields.length > 0) {
+      onChange([...currentFields, ...newFields])
+      setAddFieldValue("")
+    }
+  }
 
   // Set up drag and drop sensors
   const sensors = useSensors(
@@ -218,11 +240,45 @@ export default function ModalFieldsSelector({
             <SelectValue placeholder="Add a field..." />
           </SelectTrigger>
           <SelectContent>
-            {availableToAdd.map((field) => (
-              <SelectItem key={field.id} value={field.name}>
-                {getFieldDisplayName(field)} ({field.type})
-              </SelectItem>
-            ))}
+            {sectionedAvailableFields && sectionedAvailableFields.length > 0 ? (
+              sectionedAvailableFields.map(([sectionName, sectionFields]: [string, TableField[]], sectionIndex: number) => (
+                <SelectGroup key={sectionName}>
+                  <div className="flex items-center justify-between px-2 py-1.5">
+                    <SelectLabel className="text-xs font-semibold text-gray-700">
+                      {sectionName}
+                    </SelectLabel>
+                    {sectionFields.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleAddAllFromSection(sectionFields)
+                        }}
+                        className="text-xs text-blue-600 hover:text-blue-700 underline flex items-center gap-1"
+                        title={`Add all ${sectionFields.length} fields from ${sectionName}`}
+                      >
+                        <Plus className="h-3 w-3" />
+                        Add All
+                      </button>
+                    )}
+                  </div>
+                  {sectionFields.map((field: TableField) => (
+                    <SelectItem key={field.id} value={field.name}>
+                      {getFieldDisplayName(field)} ({field.type})
+                    </SelectItem>
+                  ))}
+                  {sectionIndex < sectionedAvailableFields.length - 1 && (
+                    <SelectSeparator />
+                  )}
+                </SelectGroup>
+              ))
+            ) : (
+              availableToAdd.map((field) => (
+                <SelectItem key={field.id} value={field.name}>
+                  {getFieldDisplayName(field)} ({field.type})
+                </SelectItem>
+              ))
+            )}
           </SelectContent>
         </Select>
       )}

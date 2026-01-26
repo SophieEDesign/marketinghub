@@ -87,6 +87,7 @@ function getDefaultConfigForType(blockType: BlockType): BlockConfig {
     link_preview: { link_url: '' },
     filter: { target_blocks: 'all', allowed_fields: [], filters: [] },
     field: { field_id: '' },
+    field_section: { group_name: '' },
     calendar: { table_id: '', view_type: 'calendar' },
     multi_calendar: { sources: [] },
     kanban: { table_id: '', view_type: 'kanban' },

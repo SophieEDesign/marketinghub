@@ -222,6 +222,19 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       field_id: '',
     },
   },
+  field_section: {
+    type: 'field_section',
+    label: 'Field Section',
+    icon: 'FileText',
+    defaultWidth: 6,
+    defaultHeight: 6,
+    minWidth: 4,
+    minHeight: 4,
+    defaultConfig: {
+      title: '',
+      group_name: '',
+    },
+  },
   calendar: {
     type: 'calendar',
     label: 'Calendar',

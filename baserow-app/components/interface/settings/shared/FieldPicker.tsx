@@ -30,7 +30,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { GripVertical, X, Plus } from "lucide-react"
+import { GripVertical, X, Plus, ChevronDown, ChevronRight } from "lucide-react"
 import type { TableField } from "@/types/database"
 import { getFieldDisplayName } from "@/lib/fields/display"
 import { sectionAndSortFields } from "@/lib/fields/sectioning"

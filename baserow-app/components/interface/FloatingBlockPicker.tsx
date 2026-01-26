@@ -25,6 +25,7 @@ const iconMap: Record<BlockType, React.ElementType> = {
   link_preview: ExternalLink,
   filter: Filter,
   field: Square,
+  field_section: Square,
   calendar: Calendar,
   multi_calendar: Calendar,
   kanban: Columns,
