@@ -120,6 +120,7 @@ export default function FieldPicker({
   const [pasteText, setPasteText] = useState("")
   const [pasteSummary, setPasteSummary] = useState<{ added: number; missing: number } | null>(null)
   const [addFieldValue, setAddFieldValue] = useState<string>("")
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
 
   // Filter fields if filterFields function provided
   const availableFields = useMemo(() => {
@@ -133,10 +134,37 @@ export default function FieldPicker({
     return filtered
   }, [fields, filterFields, mode, selectedFields])
 
-  // Section fields by group_name for dropdown and drag modes
+  // Section fields by group_name for dropdown, drag, and checkbox modes
   const sectionedFields = useMemo(() => {
     return sectionAndSortFields(availableFields)
   }, [availableFields])
+
+  // Toggle section collapse (for checkbox mode)
+  const toggleSection = (sectionName: string) => {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev)
+      if (next.has(sectionName)) {
+        next.delete(sectionName)
+      } else {
+        next.add(sectionName)
+      }
+      return next
+    })
+  }
+
+  // Handle adding all fields from a section (for checkbox mode)
+  const handleAddAllFromSectionCheckbox = (sectionFields: TableField[]) => {
+    const currentFields = selectedFields || []
+    const newFields = sectionFields
+      .filter((field) => {
+        return !currentFields.includes(field.name) && !currentFields.includes(field.id)
+      })
+      .map((field) => field.name)
+    
+    if (newFields.length > 0) {
+      onChange([...currentFields, ...newFields])
+    }
+  }
 
   // Get selected field objects
   const selectedFieldObjects = useMemo(() => {
@@ -319,38 +347,85 @@ export default function FieldPicker({
         )}
         {description && <p className="text-xs text-gray-500">{description}</p>}
         <div className="space-y-2 max-h-48 overflow-y-auto border rounded p-2">
-          {fields.length === 0 ? (
+          {sectionedFields.length === 0 ? (
             <div className="text-sm text-gray-500 text-center py-2">No fields available</div>
           ) : (
-            fields.map((field) => {
-              const isSelected =
-                selectedFields.includes(field.name) || selectedFields.includes(field.id)
+            sectionedFields.map(([sectionName, sectionFields]) => {
+              const isCollapsed = collapsedSections.has(sectionName)
+              
               return (
-                <label
-                  key={field.id || field.name}
-                  className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded transition-colors"
-                >
-                  <Checkbox
-                    checked={isSelected}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        if (!selectedFields.includes(field.name) && !selectedFields.includes(field.id)) {
-                          onChange([...selectedFields, field.name])
-                        }
-                      } else {
-                        onChange(
-                          selectedFields.filter(
-                            (f: string) => f !== field.name && f !== field.id
-                          )
+                <div key={sectionName} className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => toggleSection(sectionName)}
+                    className="w-full flex items-center justify-between text-left py-1 px-2 rounded-md hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
+                    aria-expanded={!isCollapsed}
+                    aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${sectionName} section`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-gray-700">{sectionName}</span>
+                      <span className="text-xs text-gray-500">({sectionFields.length})</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {sectionFields.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleAddAllFromSectionCheckbox(sectionFields)
+                          }}
+                          className="text-xs text-blue-600 hover:text-blue-700 underline flex items-center gap-1"
+                          title={`Add all ${sectionFields.length} fields from ${sectionName}`}
+                        >
+                          <Plus className="h-3 w-3" />
+                          Add All
+                        </button>
+                      )}
+                      <span className="text-gray-400">
+                        {isCollapsed ? (
+                          <ChevronRight className="h-3 w-3" />
+                        ) : (
+                          <ChevronDown className="h-3 w-3" />
+                        )}
+                      </span>
+                    </div>
+                  </button>
+                  {!isCollapsed && (
+                    <div className="space-y-1 pl-4">
+                      {sectionFields.map((field) => {
+                        const isSelected =
+                          selectedFields.includes(field.name) || selectedFields.includes(field.id)
+                        return (
+                          <label
+                            key={field.id || field.name}
+                            className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded transition-colors"
+                          >
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  if (!selectedFields.includes(field.name) && !selectedFields.includes(field.id)) {
+                                    onChange([...selectedFields, field.name])
+                                  }
+                                } else {
+                                  onChange(
+                                    selectedFields.filter(
+                                      (f: string) => f !== field.name && f !== field.id
+                                    )
+                                  )
+                                }
+                              }}
+                            />
+                            <span className="text-sm flex-1">{getFieldDisplayName(field)}</span>
+                            <span className="text-xs text-gray-400 capitalize">
+                              {(field.type || "").replace("_", " ")}
+                            </span>
+                          </label>
                         )
-                      }
-                    }}
-                  />
-                  <span className="text-sm flex-1">{getFieldDisplayName(field)}</span>
-                  <span className="text-xs text-gray-400 capitalize">
-                    {(field.type || "").replace("_", " ")}
-                  </span>
-                </label>
+                      })}
+                    </div>
+                  )}
+                </div>
               )
             })
           )}
