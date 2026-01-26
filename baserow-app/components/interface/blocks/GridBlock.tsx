@@ -878,7 +878,7 @@ export default function GridBlock({
             hideEmptyState={hideEmptyState}
             blockLevelSettings={blockLevelSettings}
             onHeightChange={isGrouped ? onHeightChange : undefined}
-            rowHeight={rowHeight}
+            rowHeightPixels={rowHeight}
           />
         )
     }
