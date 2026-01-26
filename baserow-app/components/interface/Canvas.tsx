@@ -451,15 +451,17 @@ export default function Canvas({
     top?: { block: Layout; distance: number; targetY: number }
     bottom?: { block: Layout; distance: number; targetY: number }
   } => {
-    // Calculate adaptive snap threshold based on grid margin
-    // Default to 2-3 grid units, but adjust based on margin to ensure proper snapping
+    // Calculate adaptive snap threshold - keep it small to prevent jumping
+    // Only snap when blocks are very close (within ~1 grid unit)
     const margin = layoutSettings?.margin || [10, 10]
     const rowHeight = layoutSettings?.rowHeight || 30
-    // Snap threshold should allow snapping when blocks are within margin distance
-    // Convert margin from pixels to grid units: margin / rowHeight
-    // Use the larger margin dimension and multiply by 1.5 to account for visual proximity
+    // Convert margin from pixels to grid units
     const marginInGridUnits = Math.max(margin[0], margin[1]) / rowHeight
-    const calculatedThreshold = snapThreshold ?? Math.max(2, Math.ceil(marginInGridUnits * 1.5) || 3)
+    // Use a small threshold (1-1.5 grid units) to only snap when blocks are truly close
+    // This prevents jumping while still allowing blocks to snap together
+    // The margin is handled by react-grid-layout as CSS, so blocks can be adjacent in grid coords
+    const baseThreshold = Math.ceil(marginInGridUnits * 1.5)
+    const calculatedThreshold = snapThreshold ?? Math.max(1, Math.min(2, baseThreshold))
     
     const draggedX = draggedBlock.x || 0
     const draggedY = draggedBlock.y || 0
@@ -491,22 +493,24 @@ export default function Canvas({
       
       if (yOverlap) {
         // Check left edge snap (dragged block to the right of other block)
+        // Distance is the gap between the dragged block's left edge and the other block's right edge
         const distanceToLeft = Math.abs(draggedX - otherRight)
         if (distanceToLeft <= calculatedThreshold && (!snapTargets.left || distanceToLeft < snapTargets.left.distance)) {
           snapTargets.left = {
             block: otherBlock,
             distance: distanceToLeft,
-            targetX: otherRight, // Snap to right edge of other block
+            targetX: otherRight, // Snap to right edge of other block (close the gap)
           }
         }
         
         // Check right edge snap (dragged block to the left of other block)
+        // Distance is the gap between the dragged block's right edge and the other block's left edge
         const distanceToRight = Math.abs(draggedRight - otherX)
         if (distanceToRight <= calculatedThreshold && (!snapTargets.right || distanceToRight < snapTargets.right.distance)) {
           snapTargets.right = {
             block: otherBlock,
             distance: distanceToRight,
-            targetX: otherX - draggedW, // Snap to left edge of other block (position dragged block's left edge)
+            targetX: otherX - draggedW, // Snap to left edge of other block (close the gap)
           }
         }
       }
@@ -517,22 +521,26 @@ export default function Canvas({
       
       if (xOverlap) {
         // Check top edge snap (dragged block below other block)
+        // Distance is the gap between the dragged block's top edge and the other block's bottom edge
         const distanceToTop = Math.abs(draggedY - otherBottom)
-        if (distanceToTop <= calculatedThreshold && (!snapTargets.top || distanceToTop < snapTargets.top.distance)) {
+        // Only snap if very close (within threshold) and not already overlapping
+        if (distanceToTop > 0 && distanceToTop <= calculatedThreshold && (!snapTargets.top || distanceToTop < snapTargets.top.distance)) {
           snapTargets.top = {
             block: otherBlock,
             distance: distanceToTop,
-            targetY: otherBottom, // Snap to bottom edge of other block
+            targetY: otherBottom, // Snap directly adjacent - no gap in grid coordinates
           }
         }
         
         // Check bottom edge snap (dragged block above other block)
+        // Distance is the gap between the dragged block's bottom edge and the other block's top edge
         const distanceToBottom = Math.abs(draggedBottom - otherY)
-        if (distanceToBottom <= calculatedThreshold && (!snapTargets.bottom || distanceToBottom < snapTargets.bottom.distance)) {
+        // Only snap if very close (within threshold) and not already overlapping
+        if (distanceToBottom > 0 && distanceToBottom <= calculatedThreshold && (!snapTargets.bottom || distanceToBottom < snapTargets.bottom.distance)) {
           snapTargets.bottom = {
             block: otherBlock,
             distance: distanceToBottom,
-            targetY: otherY - draggedH, // Snap to top edge of other block (position dragged block's top edge)
+            targetY: otherY - draggedH, // Snap directly adjacent - no gap in grid coordinates
           }
         }
       }

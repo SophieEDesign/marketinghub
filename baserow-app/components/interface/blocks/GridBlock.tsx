@@ -28,6 +28,7 @@ import { VIEWS_ENABLED } from "@/lib/featureFlags"
 import { normalizeUuid } from "@/lib/utils/ids"
 import { isAbortError } from "@/lib/api/error-handling"
 import { startOfWeek, endOfWeek, startOfDay, addWeeks, startOfMonth, endOfMonth, addMonths } from "date-fns"
+import type { GroupRule } from "@/lib/grouping/types"
 
 interface GridBlockProps {
   block: PageBlock
@@ -803,14 +804,18 @@ export default function GridBlock({
         const allowOpenRecord = permissions.allowOpenRecord ?? true
 
         // Grouping (optional) for grid/table view:
-        // Allow block config to override view-level grouping (views.config.groupBy).
+        // Support both nested groups (group_by_rules) and legacy single field (group_by_field/group_by)
+        const groupByRulesFromConfig = (config as any).group_by_rules as GroupRule[] | undefined
         const groupByFromConfigRaw = (config as any).group_by_field || (config as any).group_by
         const groupByFromConfigResolved = (() => {
           if (!groupByFromConfigRaw || typeof groupByFromConfigRaw !== 'string') return undefined
           const match = safeTableFields.find((f) => f.name === groupByFromConfigRaw || f.id === groupByFromConfigRaw)
           return match?.name || groupByFromConfigRaw
         })()
-        const effectiveGroupBy = groupByFromConfigResolved || groupBy
+        // If group_by_rules exists, use first rule's field for backward compatibility
+        const effectiveGroupBy = groupByRulesFromConfig && groupByRulesFromConfig.length > 0 && groupByRulesFromConfig[0].type === 'field'
+          ? groupByRulesFromConfig[0].field
+          : groupByFromConfigResolved || groupBy
 
         // Grid group default collapse behavior (default: collapsed/closed)
         const defaultGroupsCollapsed =
@@ -838,7 +843,7 @@ export default function GridBlock({
         const blockLevelSettings = {
           filters: blockBaseFilters.length > 0, // Filters from block config
           sorts: sortsConfig.length > 0, // Sorts from block config
-          groupBy: !!effectiveGroupBy && (!!config.group_by_field || !!config.group_by), // GroupBy from block config
+          groupBy: !!effectiveGroupBy && (!!config.group_by_field || !!config.group_by || !!(config as any).group_by_rules), // GroupBy from block config (including nested groups)
         }
 
         // Only pass onHeightChange when grouping is active

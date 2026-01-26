@@ -56,6 +56,7 @@ interface GridViewWrapperProps {
     direction: string
   }>
   initialGroupBy?: string
+  initialGroupByRules?: GroupRule[] // Nested grouping rules from block config
   initialTableFields?: TableField[]
   isEditing?: boolean // When false, hide builder controls (add field, etc.)
   onRecordClick?: (recordId: string) => void // Emit recordId on row click
@@ -103,6 +104,7 @@ export default function GridViewWrapper({
   filterTree = null,
   initialSorts,
   initialGroupBy,
+  initialGroupByRules,
   initialTableFields = [],
   isEditing = false,
   onRecordClick,
@@ -295,6 +297,17 @@ export default function GridViewWrapper({
           return
         }
 
+        // Priority: 1) initialGroupByRules (block config nested groups), 2) database group_by_rules, 3) initialGroupBy (block config single field), 4) database group_by_field
+        if (initialGroupByRules && Array.isArray(initialGroupByRules) && initialGroupByRules.length > 0) {
+          // Block config nested groups take highest priority
+          setGroupByRules(initialGroupByRules)
+          const firstRule = initialGroupByRules[0]
+          if (firstRule.type === 'field') {
+            setGroupBy(firstRule.field)
+          }
+          return
+        }
+
         // If we have group_by_rules in the database, use those (nested groups take precedence)
         if (settings?.group_by_rules && Array.isArray(settings.group_by_rules) && settings.group_by_rules.length > 0) {
           setGroupByRules(settings.group_by_rules as GroupRule[])
@@ -362,7 +375,7 @@ export default function GridViewWrapper({
     }
 
     loadGroupRules()
-  }, [viewUuid, initialGroupBy])
+  }, [viewUuid, initialGroupBy, initialGroupByRules])
 
   async function handleFilterCreate(filter: Omit<Filter, "id">) {
     try {

@@ -22,6 +22,8 @@ import CardFieldsSelector from "./shared/CardFieldsSelector"
 import ModalFieldsSelector from "./shared/ModalFieldsSelector"
 import DateFieldSelector from "./shared/DateFieldSelector"
 import GroupBySelector from "./shared/GroupBySelector"
+import NestedGroupBySelector from "./shared/NestedGroupBySelector"
+import type { GroupRule } from "@/lib/grouping/types"
 import SortSelector from "./shared/SortSelector"
 import FieldPicker from "./shared/FieldPicker"
 import ModalLayoutEditor from "./ModalLayoutEditor"
@@ -303,20 +305,31 @@ export default function GridDataSettings({
       {/* Grouping (Optional) - Table + Gallery */}
       {(currentViewType === 'grid' || currentViewType === 'gallery') && config.table_id && fields.length > 0 && (
         <>
-          <GroupBySelector
+          <NestedGroupBySelector
             value={(config as any).group_by_field || (config as any).group_by}
+            groupByRules={(config as any).group_by_rules}
             onChange={(value) => {
               onUpdate({
                 group_by_field: value,
                 group_by: value,
+                // Clear group_by_rules if using legacy single field
+                ...(value ? {} : { group_by_rules: null }),
+              } as any)
+            }}
+            onRulesChange={(rules) => {
+              onUpdate({
+                group_by_rules: rules,
+                // For backward compatibility, also set group_by_field to first rule's field
+                group_by_field: rules && rules.length > 0 && rules[0].type === 'field' ? rules[0].field : null,
+                group_by: rules && rules.length > 0 && rules[0].type === 'field' ? rules[0].field : null,
               } as any)
             }}
             fields={fields}
             filterGroupableFields={true}
             description={
               currentViewType === 'gallery'
-                ? "Group cards into collapsible sections by the selected field."
-                : "Group rows into collapsible sections by the selected field."
+                ? "Add up to 2 grouping levels to group cards into nested collapsible sections (like Airtable)."
+                : "Add up to 2 grouping levels to group rows into nested collapsible sections (like Airtable)."
             }
           />
           
