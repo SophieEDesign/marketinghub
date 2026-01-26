@@ -240,6 +240,24 @@ export interface BlockConfig {
   list_meta_fields?: string[]
   // List view grouping behavior (choice fields)
   list_choice_groups_default_collapsed?: boolean
+  // Modal layout configuration
+  modal_layout?: {
+    blocks: Array<{
+      id: string
+      type: 'field' | 'text' | 'divider' | 'image'
+      fieldName?: string // For field blocks
+      x: number
+      y: number
+      w: number
+      h: number
+      config?: Record<string, any>
+    }>
+    layoutSettings?: {
+      cols?: number
+      rowHeight?: number
+      margin?: [number, number]
+    }
+  }
   [key: string]: any
 }
 

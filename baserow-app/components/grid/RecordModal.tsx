@@ -16,6 +16,9 @@ import { useUserRole } from "@/lib/hooks/useUserRole"
 import { Trash2 } from "lucide-react"
 import { isAbortError } from "@/lib/api/error-handling"
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
+import ModalCanvas from "@/components/interface/ModalCanvas"
+import type { BlockConfig } from "@/lib/interface/types"
+import { useMemo } from "react"
 
 interface RecordModalProps {
   isOpen: boolean
@@ -25,6 +28,7 @@ interface RecordModalProps {
   recordId: string
   tableName: string
   modalFields?: string[] // Fields to show in modal (if empty, show all)
+  modalLayout?: BlockConfig['modal_layout'] // Custom modal layout
 }
 
 export default function RecordModal({
@@ -35,6 +39,7 @@ export default function RecordModal({
   recordId,
   tableName,
   modalFields,
+  modalLayout,
 }: RecordModalProps) {
   const [record, setRecord] = useState<Record<string, any> | null>(null)
   const [fields, setFields] = useState<TableField[]>([])
@@ -265,16 +270,48 @@ export default function RecordModal({
             <div className="text-center py-8 text-gray-500">Loading...</div>
           ) : record ? (
             <>
-              <RecordFields
-                fields={fields}
-                formData={record}
-                onFieldChange={handleFieldChange}
-                fieldGroups={{}}
-                tableId={tableId}
-                recordId={recordId}
-                tableName={tableName}
-                isFieldEditable={() => true}
-              />
+              {/* Use custom layout if available, otherwise fall back to simple field list */}
+              {modalLayout?.blocks && modalLayout.blocks.length > 0 ? (
+                <div className="min-h-[400px]">
+                  <ModalCanvas
+                    blocks={useMemo(() => {
+                      return modalLayout.blocks.map(block => ({
+                        id: block.id,
+                        type: block.type,
+                        x: block.x,
+                        y: block.y,
+                        w: block.w,
+                        h: block.h,
+                        config: {
+                          ...block.config,
+                          field_id: block.type === 'field' 
+                            ? fields.find(f => f.name === block.fieldName || f.id === block.fieldName)?.id
+                            : undefined,
+                          field_name: block.fieldName,
+                        },
+                      })) as any[]
+                    }, [modalLayout.blocks, fields])}
+                    tableId={tableId}
+                    recordId={recordId}
+                    tableName={tableName}
+                    tableFields={fields}
+                    pageEditable={userRole === 'admin'}
+                    editableFieldNames={fields.map(f => f.name)}
+                    onFieldChange={handleFieldChange}
+                  />
+                </div>
+              ) : (
+                <RecordFields
+                  fields={fields}
+                  formData={record}
+                  onFieldChange={handleFieldChange}
+                  fieldGroups={{}}
+                  tableId={tableId}
+                  recordId={recordId}
+                  tableName={tableName}
+                  isFieldEditable={() => true}
+                />
+              )}
 
               {/* Footer actions */}
               <div className="mt-6 flex items-center justify-end gap-2">

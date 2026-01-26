@@ -23,6 +23,8 @@ import DateFieldSelector from "./shared/DateFieldSelector"
 import GroupBySelector from "./shared/GroupBySelector"
 import SortSelector from "./shared/SortSelector"
 import FieldPicker from "./shared/FieldPicker"
+import ModalLayoutEditor from "./ModalLayoutEditor"
+import { useState } from "react"
 
 interface GridDataSettingsProps {
   config: BlockConfig
@@ -88,6 +90,8 @@ export default function GridDataSettings({
   onUpdate,
   onTableChange,
 }: GridDataSettingsProps) {
+  const [modalLayoutEditorOpen, setModalLayoutEditorOpen] = useState(false)
+
   // Removed SQL view loading - users select tables, not SQL views
   // SQL views are internal and must never be selected by users
 
@@ -222,13 +226,52 @@ export default function GridDataSettings({
 
       {/* Fields to Show in Modal */}
       {config.table_id && fields.length > 0 && (
-        <div className="pt-4 border-t border-gray-200">
+        <div className="pt-4 border-t border-gray-200 space-y-4">
           <ModalFieldsSelector
             value={Array.isArray((config as any).modal_fields) ? (config as any).modal_fields : []}
             onChange={(fieldNames) => onUpdate({ modal_fields: fieldNames } as any)}
             fields={fields}
           />
+          
+          {/* Modal Layout Editor */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Modal Layout</Label>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Customize the layout of fields in the record modal. Drag and resize fields to arrange them.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setModalLayoutEditorOpen(true)}
+              >
+                Edit Layout
+              </Button>
+            </div>
+            {config.modal_layout?.blocks && config.modal_layout.blocks.length > 0 && (
+              <p className="text-xs text-gray-500">
+                Custom layout with {config.modal_layout.blocks.length} field{config.modal_layout.blocks.length !== 1 ? 's' : ''}
+              </p>
+            )}
+          </div>
         </div>
+      )}
+
+      {/* Modal Layout Editor Dialog */}
+      {config.table_id && (
+        <ModalLayoutEditor
+          open={modalLayoutEditorOpen}
+          onOpenChange={setModalLayoutEditorOpen}
+          config={config}
+          fields={fields}
+          tableId={config.table_id}
+          onSave={(modalLayout) => {
+            onUpdate({ modal_layout: modalLayout })
+          }}
+        />
       )}
 
       {/* Filters (optional) - For Table, Calendar, Kanban, Timeline, and Gallery views */}

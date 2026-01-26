@@ -387,6 +387,61 @@ export default function FieldEditor({
     }
   }, [field.type, toast])
 
+  // Handle create new record - opens RecordModal
+  // NOTE: These hooks must be called unconditionally (Rules of Hooks)
+  const handleCreateRecord = useCallback(async (tableId: string): Promise<string | null> => {
+    return new Promise((resolve) => {
+      const supabase = createClient()
+      
+      // Fetch table fields for the modal
+      supabase
+        .from("table_fields")
+        .select("*")
+        .eq("table_id", tableId)
+        .order("position", { ascending: true })
+        .then(({ data: fields, error }) => {
+          if (error) {
+            console.error("Error loading table fields:", error)
+            toast({
+              title: "Failed to load fields",
+              description: error.message || "Please try again",
+              variant: "destructive",
+            })
+            resolve(null)
+            return
+          }
+
+          // Store the resolve function and open modal
+          setCreateRecordResolve(() => resolve)
+          setCreateRecordTableId(tableId)
+          setCreateRecordTableFields(fields || [])
+          setCreateRecordModalOpen(true)
+        })
+    })
+  }, [toast])
+
+  // Handle modal save - called when RecordModal saves successfully
+  const handleModalSave = useCallback((createdRecordId?: string | null) => {
+    if (createRecordResolve) {
+      createRecordResolve(createdRecordId || null)
+      setCreateRecordResolve(null)
+    }
+    setCreateRecordModalOpen(false)
+    setCreateRecordTableId(null)
+    setCreateRecordTableFields([])
+  }, [createRecordResolve])
+
+  // Handle modal close - called when RecordModal is closed without saving
+  const handleModalClose = useCallback(() => {
+    if (createRecordResolve) {
+      createRecordResolve(null)
+      setCreateRecordResolve(null)
+    }
+    setCreateRecordModalOpen(false)
+    setCreateRecordTableId(null)
+    setCreateRecordTableFields([])
+  }, [createRecordResolve])
+
   // Attachment fields (upload + preview + delete)
   if (field.type === "attachment") {
     return (
@@ -441,60 +496,6 @@ export default function FieldEditor({
     }
 
     // LINKED FIELDS (editable) - Show as editable with clear affordances
-    // Handle create new record - opens RecordModal
-    const handleCreateRecord = useCallback(async (tableId: string): Promise<string | null> => {
-      return new Promise((resolve) => {
-        const supabase = createClient()
-        
-        // Fetch table fields for the modal
-        supabase
-          .from("table_fields")
-          .select("*")
-          .eq("table_id", tableId)
-          .order("position", { ascending: true })
-          .then(({ data: fields, error }) => {
-            if (error) {
-              console.error("Error loading table fields:", error)
-              toast({
-                title: "Failed to load fields",
-                description: error.message || "Please try again",
-                variant: "destructive",
-              })
-              resolve(null)
-              return
-            }
-
-            // Store the resolve function and open modal
-            setCreateRecordResolve(() => resolve)
-            setCreateRecordTableId(tableId)
-            setCreateRecordTableFields(fields || [])
-            setCreateRecordModalOpen(true)
-          })
-      })
-    }, [toast])
-
-    // Handle modal save - called when RecordModal saves successfully
-    const handleModalSave = useCallback((createdRecordId?: string | null) => {
-      if (createRecordResolve) {
-        createRecordResolve(createdRecordId || null)
-        setCreateRecordResolve(null)
-      }
-      setCreateRecordModalOpen(false)
-      setCreateRecordTableId(null)
-      setCreateRecordTableFields([])
-    }, [createRecordResolve])
-
-    // Handle modal close - called when RecordModal is closed without saving
-    const handleModalClose = useCallback(() => {
-      if (createRecordResolve) {
-        createRecordResolve(null)
-        setCreateRecordResolve(null)
-      }
-      setCreateRecordModalOpen(false)
-      setCreateRecordTableId(null)
-      setCreateRecordTableFields([])
-    }, [createRecordResolve])
-
     return (
       <>
         <div className="space-y-2.5" onPaste={handlePaste}>

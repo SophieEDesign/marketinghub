@@ -653,16 +653,19 @@ export async function syncLinkedFieldBidirectional(
   const normalizeToArray = (val: string | string[] | null): string[] => {
     if (val === null || val === undefined) return []
     if (Array.isArray(val)) return val.filter(isUuid)
-    if (isUuid(val)) return [val]
-    // Handle stringified arrays (e.g., "["uuid"]" from database)
-    if (typeof val === 'string' && val.trim().startsWith('[') && val.trim().endsWith(']')) {
-      try {
-        const parsed = JSON.parse(val)
-        if (Array.isArray(parsed)) {
-          return parsed.filter(isUuid)
+    if (typeof val === 'string') {
+      if (isUuid(val)) return [val]
+      // Handle stringified arrays (e.g., "["uuid"]" from database)
+      const trimmed = val.trim()
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        try {
+          const parsed = JSON.parse(val)
+          if (Array.isArray(parsed)) {
+            return parsed.filter(isUuid)
+          }
+        } catch {
+          // Not valid JSON, fall through
         }
-      } catch {
-        // Not valid JSON, fall through
       }
     }
     return []

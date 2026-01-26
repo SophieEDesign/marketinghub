@@ -1,12 +1,13 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { TableField } from "@/types/fields"
 import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/LookupFieldPicker"
 import { getPrimaryFieldName } from "@/lib/fields/primary"
 import { toPostgrestColumn } from "@/lib/supabase/postgrest"
+import RecordModal from "@/components/calendar/RecordModal"
 
 type LinkedValue =
   | string

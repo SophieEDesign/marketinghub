@@ -15,6 +15,9 @@ import FieldEditor from '@/components/fields/FieldEditor'
 import { useToast } from '@/components/ui/use-toast'
 import { useUserRole } from '@/lib/hooks/useUserRole'
 import { isAbortError } from '@/lib/api/error-handling'
+import ModalCanvas from '@/components/interface/ModalCanvas'
+import type { BlockConfig } from '@/lib/interface/types'
+import { useMemo } from 'react'
 
 export interface RecordModalProps {
   open: boolean
@@ -27,6 +30,7 @@ export interface RecordModalProps {
   onSave?: (createdRecordId?: string | null) => void // Callback with created record ID for new records
   onDeleted?: () => void | Promise<void>
   supabaseTableName?: string | null // Optional: if provided, skips table info fetch for faster loading
+  modalLayout?: BlockConfig['modal_layout'] // Custom modal layout
 }
 
 export default function RecordModal({
@@ -40,6 +44,7 @@ export default function RecordModal({
   onSave,
   onDeleted,
   supabaseTableName: supabaseTableNameProp,
+  modalLayout,
 }: RecordModalProps) {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -273,34 +278,66 @@ export default function RecordModal({
           </div>
         ) : (
           <div className="space-y-4 py-4">
-            {Array.isArray(tableFields) && tableFields
-              .filter((field) => {
-                // Always exclude system fields
-                if (!field || field.name === 'id' || field.name === 'created_at' || field.name === 'updated_at') {
-                  return false
-                }
-                // If modalFields is specified and not empty, only show those fields
-                if (modalFields.length > 0) {
-                  return modalFields.includes(field.name)
-                }
-                // Otherwise show all fields
-                return true
-              })
-              .map((field) => {
-                const value = formData[field.name]
+            {/* Use custom layout if available, otherwise fall back to simple field list */}
+            {modalLayout?.blocks && modalLayout.blocks.length > 0 ? (
+              <div className="min-h-[400px]">
+                <ModalCanvas
+                  blocks={useMemo(() => {
+                    return modalLayout.blocks.map(block => ({
+                      id: block.id,
+                      type: block.type,
+                      x: block.x,
+                      y: block.y,
+                      w: block.w,
+                      h: block.h,
+                      config: {
+                        ...block.config,
+                        field_id: block.type === 'field' 
+                          ? tableFields.find(f => f.name === block.fieldName || f.id === block.fieldName)?.id
+                          : undefined,
+                        field_name: block.fieldName,
+                      },
+                    })) as any[]
+                  }, [modalLayout.blocks, tableFields])}
+                  tableId={tableId}
+                  recordId={recordId}
+                  tableName={effectiveTableName || ''}
+                  tableFields={tableFields}
+                  pageEditable={userRole === 'admin'}
+                  editableFieldNames={tableFields.map(f => f.name)}
+                  onFieldChange={handleFieldChange}
+                />
+              </div>
+            ) : (
+              Array.isArray(tableFields) && tableFields
+                .filter((field) => {
+                  // Always exclude system fields
+                  if (!field || field.name === 'id' || field.name === 'created_at' || field.name === 'updated_at') {
+                    return false
+                  }
+                  // If modalFields is specified and not empty, only show those fields
+                  if (modalFields.length > 0) {
+                    return modalFields.includes(field.name)
+                  }
+                  // Otherwise show all fields
+                  return true
+                })
+                .map((field) => {
+                  const value = formData[field.name]
 
-                return (
-                  <FieldEditor
-                    key={field.id}
-                    field={field}
-                    value={value}
-                    onChange={(newValue) => handleFieldChange(field.name, newValue)}
-                    required={field.required || false}
-                    recordId={recordId || undefined}
-                    tableName={effectiveTableName || undefined}
-                  />
-                )
-              })}
+                  return (
+                    <FieldEditor
+                      key={field.id}
+                      field={field}
+                      value={value}
+                      onChange={(newValue) => handleFieldChange(field.name, newValue)}
+                      required={field.required || false}
+                      recordId={recordId || undefined}
+                      tableName={effectiveTableName || undefined}
+                    />
+                  )
+                })
+            )}
           </div>
         )}
 
