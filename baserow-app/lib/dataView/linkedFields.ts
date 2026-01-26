@@ -696,7 +696,7 @@ export async function syncLinkedFieldBidirectional(
             continue
           }
 
-          const currentValue = sourceRecord[sourceFieldName_final]
+          const currentValue = (sourceRecord as Record<string, any>)[sourceFieldName_final]
           const currentArray = normalizeToArray(currentValue)
 
           // Add sourceRecordId (from target table) if not already present
@@ -731,7 +731,7 @@ export async function syncLinkedFieldBidirectional(
             continue
           }
 
-          const currentValue = sourceRecord[sourceFieldName_final]
+          const currentValue = (sourceRecord as Record<string, any>)[sourceFieldName_final]
           const currentArray = normalizeToArray(currentValue)
 
           // Remove sourceRecordId (from target table) if present
@@ -805,7 +805,7 @@ export async function syncLinkedFieldBidirectional(
             continue
           }
 
-          const currentValue = targetRecord[reciprocalFieldName]
+          const currentValue = (targetRecord as Record<string, any>)[reciprocalFieldName]
           const currentArray = normalizeToArray(currentValue)
 
           // Add sourceRecordId if not already present
@@ -840,7 +840,7 @@ export async function syncLinkedFieldBidirectional(
             continue
           }
 
-          const currentValue = targetRecord[reciprocalFieldName]
+          const currentValue = (targetRecord as Record<string, any>)[reciprocalFieldName]
           const currentArray = normalizeToArray(currentValue)
 
           // Remove sourceRecordId if present

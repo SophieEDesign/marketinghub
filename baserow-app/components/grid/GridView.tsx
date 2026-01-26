@@ -112,8 +112,6 @@ interface GridViewProps {
   onGroupByChange?: (fieldName: string | null) => Promise<void>
   /** Callback when block content height changes (for grouped blocks) */
   onHeightChange?: (height: number) => void
-  /** Row height in pixels (for height calculation) */
-  rowHeight?: number
 }
 
 const ITEMS_PER_PAGE = 100
@@ -553,7 +551,6 @@ export default function GridView({
   onFilterCreate,
   onGroupByChange,
   onHeightChange,
-  rowHeight = 30,
 }: GridViewProps) {
   const { openRecord } = useRecordPanel()
   const isMobile = useIsMobile()
@@ -2699,7 +2696,7 @@ export default function GridView({
       const pixelHeight = contentRef.current.scrollHeight || contentRef.current.clientHeight || 0
       
       // Convert to grid units (round up to ensure content fits)
-      const heightInGridUnits = Math.ceil(pixelHeight / rowHeight)
+      const heightInGridUnits = Math.ceil(pixelHeight / rowHeightPixels)
       
       // Minimum height of 2 grid units to prevent blocks from being too small
       const finalHeight = Math.max(heightInGridUnits, 2)
@@ -2708,7 +2705,7 @@ export default function GridView({
     }, 100) // Small debounce to allow DOM to update
 
     return () => clearTimeout(timeoutId)
-  }, [collapsedGroups, effectiveGroupRules.length, groupBy, onHeightChange, rowHeight])
+  }, [collapsedGroups, effectiveGroupRules.length, groupBy, onHeightChange, rowHeightPixels])
 
   // CRITICAL: Defensive guards - ensure we have required data before rendering
   // These checks happen AFTER all hooks are called (React rules compliance)

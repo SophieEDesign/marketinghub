@@ -861,7 +861,6 @@ export default function GridViewWrapper({
           onFilterCreate={handleFilterCreate}
           onGroupByChange={handleGroupByChange}
           onHeightChange={onHeightChange}
-          rowHeight={rowHeight}
         />
       </div>
       <FieldBuilderDrawer
