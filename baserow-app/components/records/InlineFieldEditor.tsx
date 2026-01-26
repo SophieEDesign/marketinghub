@@ -143,6 +143,30 @@ export default function InlineFieldEditor({
   const isLookupField = field.type === "lookup"
   const isLinkedField = field.type === "link_to_table"
 
+  // Handle modal save - called when RecordModal saves successfully
+  // Must be at top level (before conditional returns) to satisfy React hooks rules
+  const handleModalSave = useCallback((createdRecordId?: string | null) => {
+    if (createRecordResolve) {
+      createRecordResolve(createdRecordId || null)
+      setCreateRecordResolve(null)
+    }
+    setCreateRecordModalOpen(false)
+    setCreateRecordTableId(null)
+    setCreateRecordTableFields([])
+  }, [createRecordResolve])
+
+  // Handle modal close - called when RecordModal is closed without saving
+  // Must be at top level (before conditional returns) to satisfy React hooks rules
+  const handleModalClose = useCallback(() => {
+    if (createRecordResolve) {
+      createRecordResolve(null)
+      setCreateRecordResolve(null)
+    }
+    setCreateRecordModalOpen(false)
+    setCreateRecordTableId(null)
+    setCreateRecordTableFields([])
+  }, [createRecordResolve])
+
   // Linked records and lookup fields - use LookupFieldPicker
   if (field.type === "link_to_table" || field.type === "lookup") {
     const linkedTableId = field.type === "link_to_table" 
@@ -189,28 +213,6 @@ export default function InlineFieldEditor({
           })
       })
     }
-
-    // Handle modal save - called when RecordModal saves successfully
-    const handleModalSave = useCallback((createdRecordId?: string | null) => {
-      if (createRecordResolve) {
-        createRecordResolve(createdRecordId || null)
-        setCreateRecordResolve(null)
-      }
-      setCreateRecordModalOpen(false)
-      setCreateRecordTableId(null)
-      setCreateRecordTableFields([])
-    }, [createRecordResolve])
-
-    // Handle modal close - called when RecordModal is closed without saving
-    const handleModalClose = useCallback(() => {
-      if (createRecordResolve) {
-        createRecordResolve(null)
-        setCreateRecordResolve(null)
-      }
-      setCreateRecordModalOpen(false)
-      setCreateRecordTableId(null)
-      setCreateRecordTableFields([])
-    }, [createRecordResolve])
 
     // LOOKUP FIELDS (derived, read-only) - Show as informational pills
     if (isLookupField) {

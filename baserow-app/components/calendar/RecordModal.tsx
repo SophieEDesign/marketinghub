@@ -253,6 +253,28 @@ export default function RecordModal({
     setFormData((prev) => ({ ...prev, [fieldName]: value }))
   }
 
+  // Memoize blocks for ModalCanvas - must be at top level (before early return)
+  const modalBlocks = useMemo(() => {
+    if (!modalLayout?.blocks || modalLayout.blocks.length === 0) {
+      return []
+    }
+    return modalLayout.blocks.map(block => ({
+      id: block.id,
+      type: block.type,
+      x: block.x,
+      y: block.y,
+      w: block.w,
+      h: block.h,
+      config: {
+        ...block.config,
+        field_id: block.type === 'field' 
+          ? tableFields.find(f => f.name === block.fieldName || f.id === block.fieldName)?.id
+          : undefined,
+        field_name: block.fieldName,
+      },
+    })) as any[]
+  }, [modalLayout?.blocks, tableFields])
+
   if (!open) return null
 
   return (
@@ -282,23 +304,7 @@ export default function RecordModal({
             {modalLayout?.blocks && modalLayout.blocks.length > 0 ? (
               <div className="min-h-[400px]">
                 <ModalCanvas
-                  blocks={useMemo(() => {
-                    return modalLayout.blocks.map(block => ({
-                      id: block.id,
-                      type: block.type,
-                      x: block.x,
-                      y: block.y,
-                      w: block.w,
-                      h: block.h,
-                      config: {
-                        ...block.config,
-                        field_id: block.type === 'field' 
-                          ? tableFields.find(f => f.name === block.fieldName || f.id === block.fieldName)?.id
-                          : undefined,
-                        field_name: block.fieldName,
-                      },
-                    })) as any[]
-                  }, [modalLayout.blocks, tableFields])}
+                  blocks={modalBlocks}
                   tableId={tableId}
                   recordId={recordId}
                   tableName={effectiveTableName || ''}
