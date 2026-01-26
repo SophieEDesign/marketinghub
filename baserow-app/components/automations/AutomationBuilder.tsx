@@ -1,12 +1,15 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
-import { Save, Play, Trash2, Plus, X, GripVertical, AlertCircle, Sparkles, RefreshCw, Trash, Clock, Webhook, Filter, Edit, FilePlus, Mail, Code, Timer, MessageSquare, Square, Layout, List, Variable } from "lucide-react"
+import { Save, Play, Trash2, Plus, X, GripVertical, AlertCircle, Sparkles, RefreshCw, Trash, Clock, Webhook, Filter, Edit, FilePlus, Mail, Code, Timer, MessageSquare, Square, Layout, List, Variable, Eye } from "lucide-react"
 import type { Automation, TableField } from "@/types/database"
 import type { TriggerType, ActionType, ActionConfig, TriggerConfig } from "@/lib/automations/types"
 import AutomationConditionBuilder from "./AutomationConditionBuilder"
 import VisualWorkflowBuilder from "./VisualWorkflowBuilder"
 import VariablePicker from "./VariablePicker"
+import ScheduleBuilder from "./ScheduleBuilder"
+import AutomationTestMode from "./AutomationTestMode"
+import WebhookManager from "./WebhookManager"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import { filterTreeToFormula } from "@/lib/automations/condition-formula"
 import FormulaEditor from "@/components/fields/FormulaEditor"
@@ -307,106 +310,45 @@ export default function AutomationBuilder({
 
       case 'schedule':
         return (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Interval</label>
-              <select
-                value={triggerConfig.interval || 'day'}
-                onChange={(e) => setTriggerConfig({ ...triggerConfig, interval: e.target.value as any })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-              >
-                <option value="minute">Every minute(s)</option>
-                <option value="hour">Every hour(s)</option>
-                <option value="day">Every day</option>
-                <option value="week">Every week</option>
-                <option value="month">Every month</option>
-              </select>
-            </div>
-
-            {triggerConfig.interval && ['minute', 'hour'].includes(triggerConfig.interval) && (
-              <div>
-                <label className="block text-sm font-medium mb-1">Interval Value</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={triggerConfig.interval_value || 1}
-                  onChange={(e) => setTriggerConfig({ ...triggerConfig, interval_value: parseInt(e.target.value) || 1 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                />
-              </div>
-            )}
-
-            {triggerConfig.interval === 'day' && (
-              <div>
-                <label className="block text-sm font-medium mb-1">Time (HH:MM)</label>
-                <input
-                  type="time"
-                  value={triggerConfig.time || '00:00'}
-                  onChange={(e) => setTriggerConfig({ ...triggerConfig, time: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                />
-              </div>
-            )}
-
-            {triggerConfig.interval === 'week' && (
-              <div>
-                <label className="block text-sm font-medium mb-1">Day of Week</label>
-                <select
-                  value={triggerConfig.day_of_week || 0}
-                  onChange={(e) => setTriggerConfig({ ...triggerConfig, day_of_week: parseInt(e.target.value) })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                >
-                  <option value="0">Sunday</option>
-                  <option value="1">Monday</option>
-                  <option value="2">Tuesday</option>
-                  <option value="3">Wednesday</option>
-                  <option value="4">Thursday</option>
-                  <option value="5">Friday</option>
-                  <option value="6">Saturday</option>
-                </select>
-              </div>
-            )}
-
-            {triggerConfig.interval === 'month' && (
-              <div>
-                <label className="block text-sm font-medium mb-1">Day of Month</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="31"
-                  value={triggerConfig.day_of_month || 1}
-                  onChange={(e) => setTriggerConfig({ ...triggerConfig, day_of_month: parseInt(e.target.value) || 1 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                />
-              </div>
-            )}
-          </div>
+          <ScheduleBuilder
+            config={triggerConfig}
+            onChange={(newConfig) => setTriggerConfig(newConfig)}
+          />
         )
 
       case 'webhook':
         return (
-          <div className="space-y-2">
-            <label className="block text-sm font-medium">Webhook ID</label>
-            <input
-              type="text"
-              value={triggerConfig.webhook_id || ''}
-              onChange={(e) => setTriggerConfig({ ...triggerConfig, webhook_id: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-              placeholder="Generate or enter webhook ID"
-            />
-            <p className="text-xs text-gray-500">
-              Webhook URL: /api/hooks/{triggerConfig.webhook_id || '[id]'}
-            </p>
-            {!triggerConfig.webhook_id && (
-              <button
-                onClick={() => {
-                  const id = `wh_${Date.now()}`
-                  setTriggerConfig({ ...triggerConfig, webhook_id: id })
-                }}
-                className="text-sm text-blue-600 hover:text-blue-700"
-              >
-                Generate Webhook ID
-              </button>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Webhook ID</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={triggerConfig.webhook_id || ''}
+                  onChange={(e) => setTriggerConfig({ ...triggerConfig, webhook_id: e.target.value })}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  placeholder="Generate or enter webhook ID"
+                />
+                {!triggerConfig.webhook_id && (
+                  <button
+                    onClick={() => {
+                      const id = `wh_${Date.now()}`
+                      setTriggerConfig({ ...triggerConfig, webhook_id: id })
+                    }}
+                    className="px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    Generate
+                  </button>
+                )}
+              </div>
+            </div>
+            {triggerConfig.webhook_id && automation && (
+              <div className="border-t pt-4">
+                <WebhookManager
+                  webhookId={triggerConfig.webhook_id}
+                  automationId={automation.id}
+                />
+              </div>
             )}
           </div>
         )
@@ -467,6 +409,14 @@ export default function AutomationBuilder({
             )}
           </div>
           <button
+            onClick={() => setPreviewingAction(index)}
+            className="px-2 py-1 text-sm text-gray-600 hover:bg-gray-50 rounded flex items-center gap-1"
+            title="Preview action"
+          >
+            <Eye className="h-3 w-3" />
+            Preview
+          </button>
+          <button
             onClick={() => setEditingActionIndex(index)}
             className="px-2 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded"
           >
@@ -495,6 +445,25 @@ export default function AutomationBuilder({
         </div>
 
         <div className="space-y-3">
+          {previewingAction === index && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-3">
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Eye className="h-4 w-4 text-blue-600" />
+                  <span className="font-semibold text-sm text-blue-900">Action Preview</span>
+                </div>
+                <button
+                  onClick={() => setPreviewingAction(null)}
+                  className="text-blue-600 hover:text-blue-700"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="text-sm text-blue-800 space-y-1">
+                {renderActionPreview(action)}
+              </div>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium mb-1">What should this action do?</label>
             <Select
@@ -559,6 +528,103 @@ export default function AutomationBuilder({
         </div>
       </div>
     )
+  }
+
+  function renderActionPreview(action: ActionConfig): React.ReactNode {
+    switch (action.type) {
+      case 'update_record':
+        return (
+          <>
+            <div><strong>Will update:</strong> Record in table {action.table_id || 'selected table'}</div>
+            {action.record_id && (
+              <div><strong>Record ID:</strong> {action.record_id}</div>
+            )}
+            {action.field_update_mappings && action.field_update_mappings.length > 0 && (
+              <div>
+                <strong>Fields to update:</strong>
+                <ul className="list-disc list-inside mt-1 ml-2">
+                  {action.field_update_mappings.map((m, i) => (
+                    <li key={i}>{m.field}: {String(m.value).substring(0, 50)}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
+        )
+      case 'create_record':
+        return (
+          <>
+            <div><strong>Will create:</strong> New record in table {action.table_id || 'selected table'}</div>
+            {action.field_update_mappings && action.field_update_mappings.length > 0 && (
+              <div>
+                <strong>Initial values:</strong>
+                <ul className="list-disc list-inside mt-1 ml-2">
+                  {action.field_update_mappings.map((m, i) => (
+                    <li key={i}>{m.field}: {String(m.value).substring(0, 50)}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
+        )
+      case 'delete_record':
+        return (
+          <>
+            <div><strong>Will delete:</strong> Record {action.record_id || '{{record_id}}'}</div>
+            <div><strong>From table:</strong> {action.table_id || 'selected table'}</div>
+          </>
+        )
+      case 'send_email':
+        return (
+          <>
+            <div><strong>To:</strong> {action.to || 'Not set'}</div>
+            <div><strong>Subject:</strong> {action.subject || 'Not set'}</div>
+            {action.email_body && (
+              <div>
+                <strong>Body preview:</strong>
+                <div className="mt-1 p-2 bg-white border border-blue-300 rounded text-xs max-h-32 overflow-y-auto">
+                  {action.email_body.substring(0, 200)}
+                  {action.email_body.length > 200 && '...'}
+                </div>
+              </div>
+            )}
+          </>
+        )
+      case 'call_webhook':
+        return (
+          <>
+            <div><strong>URL:</strong> {action.url || 'Not set'}</div>
+            <div><strong>Method:</strong> {action.method || 'POST'}</div>
+            {action.webhook_body && (
+              <div>
+                <strong>Payload:</strong>
+                <pre className="mt-1 p-2 bg-white border border-blue-300 rounded text-xs max-h-32 overflow-y-auto">
+                  {JSON.stringify(action.webhook_body, null, 2).substring(0, 200)}
+                </pre>
+              </div>
+            )}
+          </>
+        )
+      case 'delay':
+        return (
+          <>
+            <div><strong>Will wait:</strong> {
+              action.delay_type === 'until' && action.until_datetime
+                ? `Until ${new Date(action.until_datetime).toLocaleString()}`
+                : `${action.delay_value || 0} ${action.delay_type || 'seconds'}`
+            }</div>
+          </>
+        )
+      case 'log_message':
+        return (
+          <>
+            <div><strong>Will log:</strong> {action.message || 'Not set'}</div>
+            <div><strong>Level:</strong> {action.level || 'info'}</div>
+          </>
+        )
+      default:
+        return <div>Preview not available for this action type</div>
+    }
   }
 
   function renderActionConfig(action: ActionConfig, index: number) {
@@ -1115,15 +1181,13 @@ export default function AutomationBuilder({
           </button>
         )}
         <div className="flex gap-2 ml-auto">
-          {onTest && (
-            <button
-              onClick={onTest}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-md transition-colors flex items-center gap-2"
-            >
-              <Play className="h-4 w-4" />
-              Test Run
-            </button>
-          )}
+          <button
+            onClick={() => setShowTestMode(true)}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-md transition-colors flex items-center gap-2"
+          >
+            <Play className="h-4 w-4" />
+            Test Automation
+          </button>
           <button
             onClick={handleSave}
             disabled={loading || !name.trim()}
@@ -1135,6 +1199,14 @@ export default function AutomationBuilder({
         </div>
       </div>
         </>
+      )}
+
+      {/* Test Mode Modal */}
+      {showTestMode && automation && (
+        <AutomationTestMode
+          automation={automation}
+          onClose={() => setShowTestMode(false)}
+        />
       )}
     </div>
   )

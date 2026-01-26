@@ -97,9 +97,13 @@ export default function GridBlock({
   const [calendarDateFrom, setCalendarDateFrom] = useState<Date | undefined>(undefined)
   const [calendarDateTo, setCalendarDateTo] = useState<Date | undefined>(undefined)
   
+  // Track if date range has been initialized to prevent re-initialization when user clears it
+  const dateRangeInitializedRef = useRef(false)
+  
   // Initialize calendar date range based on config or default to "this week"
+  // Only initialize once - don't re-initialize when user clears the range
   useEffect(() => {
-    if (viewType === 'calendar' && calendarDateFrom === undefined && calendarDateTo === undefined) {
+    if (viewType === 'calendar' && !dateRangeInitializedRef.current && calendarDateFrom === undefined && calendarDateTo === undefined) {
       const preset = config?.default_date_range_preset || 'thisWeek'
       const today = startOfDay(new Date())
       let from: Date | undefined
@@ -130,16 +134,23 @@ export default function GridBlock({
           break
         case 'none':
         default:
-          // Don't set default dates
+          // Don't set default dates, but mark as initialized so we don't try again
+          dateRangeInitializedRef.current = true
           return
       }
       
       if (from && to) {
         setCalendarDateFrom(from)
         setCalendarDateTo(to)
+        dateRangeInitializedRef.current = true
       }
     }
   }, [viewType, calendarDateFrom, calendarDateTo, config?.default_date_range_preset])
+  
+  // Reset initialization flag when view type changes
+  useEffect(() => {
+    dateRangeInitializedRef.current = false
+  }, [viewType])
   // Bump to force views to refetch after record creation.
   const [refreshKey, setRefreshKey] = useState(0)
 
