@@ -878,6 +878,8 @@ export default function GridBlock({
             hideEmptyState={hideEmptyState}
             blockLevelSettings={blockLevelSettings}
             onHeightChange={isGrouped ? onHeightChange : undefined}
+            autofitEnabled={isGrouped}
+            isManuallyResizing={false}
             rowHeightPixels={rowHeight}
           />
         )

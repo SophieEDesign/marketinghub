@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
-import { Save, Eye, Edit2, Plus, Trash2, Settings, MoreVertical } from "lucide-react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
+import { useUndoRedo } from "@/hooks/useUndoRedo"
+import { Save, Eye, Edit2, Plus, Trash2, Settings, MoreVertical, Undo2, Redo2 } from "lucide-react"
 import { useBranding } from "@/contexts/BrandingContext"
 import { useBlockEditMode } from "@/contexts/EditModeContext"
 import { FilterStateProvider } from "@/lib/interface/filter-state"
@@ -215,6 +216,7 @@ export default function InterfaceBuilder({
   }) // No dependencies - runs on every render to catch async initialBlocks
 
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
+  const [selectedBlockIds, setSelectedBlockIds] = useState<Set<string>>(new Set())
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [pageSettingsOpen, setPageSettingsOpen] = useState(false)
@@ -226,6 +228,29 @@ export default function InterfaceBuilder({
   const latestLayoutRef = useRef<LayoutItem[] | null>(null)
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const componentIdRef = useRef(`interface-builder-${page.id}`)
+  
+  // Undo/Redo for layout changes
+  const initialLayoutState = useMemo(() => {
+    return blocks.map((block) => ({
+      i: block.id,
+      x: block.x || 0,
+      y: block.y || 0,
+      w: block.w || 4,
+      h: block.h || 4,
+    }))
+  }, [])
+  
+  const {
+    state: undoRedoLayoutState,
+    setState: setUndoRedoLayoutState,
+    undo: undoLayout,
+    redo: redoLayout,
+    canUndo,
+    canRedo,
+  } = useUndoRedo<LayoutItem[]>(initialLayoutState, {
+    maxHistory: 50,
+    debounceMs: 300,
+  })
 
   // Register mount time for editor safety guards
   useEffect(() => {
@@ -399,6 +424,9 @@ export default function InterfaceBuilder({
     (layout: LayoutItem[]) => {
       // Only save in edit mode - view mode never mutates layout
       if (!effectiveIsEditing) return
+      
+      // Add to undo/redo history
+      setUndoRedoLayoutState(layout, false)
 
       // Mark user interaction for editor safety guards
       markUserInteraction()
@@ -689,6 +717,7 @@ export default function InterfaceBuilder({
   )
 
   // Helper function to find next available position without overlapping
+  // Prioritizes filling gaps over expanding layout
   const findNextAvailablePosition = useCallback((newWidth: number, newHeight: number, existingBlocks: PageBlock[]): { x: number; y: number } => {
     const GRID_COLS = 12
     
@@ -718,9 +747,9 @@ export default function InterfaceBuilder({
       ? Math.max(...existingBlocks.map((b) => (b.y ?? 0) + (b.h ?? 4)))
       : 0
 
-    // Try positions starting from top-left, moving right, then down
-    // Start from y=0 to fill gaps, but also check below existing blocks
-    for (let startY = 0; startY <= maxY + 1; startY++) {
+    // First pass: Try to fill gaps (positions within existing layout)
+    // This prioritizes compact layouts over expanding downward
+    for (let startY = 0; startY <= maxY; startY++) {
       for (let startX = 0; startX <= GRID_COLS - newWidth; startX++) {
         // Check if this position fits without overlapping
         let canFit = true
@@ -740,7 +769,8 @@ export default function InterfaceBuilder({
       }
     }
 
-    // Fallback: place below all existing blocks
+    // Second pass: If no gap found, place below all existing blocks
+    // This ensures new blocks are always placed somewhere valid
     return { x: 0, y: maxY }
   }, [])
 
@@ -1040,6 +1070,45 @@ export default function InterfaceBuilder({
 
   const selectedBlock = blocks.find((b) => b.id === selectedBlockId) || null
 
+  // Apply undo/redo layout changes
+  useEffect(() => {
+    if (undoRedoLayoutState && undoRedoLayoutState.length > 0 && latestLayoutRef.current) {
+      // Only apply if different from current layout
+      const currentHash = JSON.stringify(
+        latestLayoutRef.current.map(({ i, x, y, w, h }) => ({ i, x, y, w, h })).sort((a, b) => a.i.localeCompare(b.i))
+      )
+      const newHash = JSON.stringify(
+        undoRedoLayoutState.map(({ i, x, y, w, h }) => ({ i, x, y, w, h })).sort((a, b) => a.i.localeCompare(b.i))
+      )
+      
+      if (currentHash !== newHash) {
+        // Update blocks to match undo/redo state
+        setBlocks((prevBlocks) => {
+          return prevBlocks.map((block) => {
+            const layoutItem = undoRedoLayoutState.find((item) => item.i === block.id)
+            if (layoutItem) {
+              return {
+                ...block,
+                x: layoutItem.x,
+                y: layoutItem.y,
+                w: layoutItem.w,
+                h: layoutItem.h,
+              }
+            }
+            return block
+          })
+        })
+        
+        // Update latest layout ref
+        latestLayoutRef.current = undoRedoLayoutState
+        
+        // Mark as user interaction and save to database
+        layoutModifiedByUserRef.current = true
+        saveLayout(undoRedoLayoutState, true)
+      }
+    }
+  }, [undoRedoLayoutState, saveLayout])
+  
   // Keyboard shortcuts
   useEffect(() => {
     if (!effectiveIsEditing) return
@@ -1048,6 +1117,24 @@ export default function InterfaceBuilder({
       // Don't trigger shortcuts if user is typing in an input/textarea
       const target = e.target as HTMLElement
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        return
+      }
+
+      // Undo: Cmd/Ctrl + Z
+      if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) {
+        e.preventDefault()
+        if (canUndo) {
+          undoLayout()
+        }
+        return
+      }
+      
+      // Redo: Cmd/Ctrl + Shift + Z
+      if ((e.metaKey || e.ctrlKey) && e.key === "z" && e.shiftKey) {
+        e.preventDefault()
+        if (canRedo) {
+          redoLayout()
+        }
         return
       }
 
@@ -1072,7 +1159,7 @@ export default function InterfaceBuilder({
 
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [effectiveIsEditing, selectedBlockId, handleDeleteBlock, handleDuplicateBlock, handleExitEditMode])
+  }, [effectiveIsEditing, selectedBlockId, handleDeleteBlock, handleDuplicateBlock, handleExitEditMode, canUndo, canRedo, undoLayout, redoLayout, layoutModifiedByUserRef])
 
   return (
     <div className="flex h-full w-full bg-gray-50 min-w-0">
@@ -1130,6 +1217,37 @@ export default function InterfaceBuilder({
                   </button>
                 )}
                 <div className="flex items-center gap-2">
+                  {/* Undo/Redo buttons */}
+                  <div className="flex items-center gap-1 border-r border-gray-300 pr-2 mr-1">
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault()
+                        if (canUndo) {
+                          undoLayout()
+                        }
+                      }}
+                      disabled={!canUndo}
+                      className="p-1.5 rounded-md text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      title="Undo (Cmd+Z)"
+                      aria-label="Undo"
+                    >
+                      <Undo2 className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault()
+                        if (canRedo) {
+                          redoLayout()
+                        }
+                      }}
+                      disabled={!canRedo}
+                      className="p-1.5 rounded-md text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      title="Redo (Cmd+Shift+Z)"
+                      aria-label="Redo"
+                    >
+                      <Redo2 className="h-4 w-4" />
+                    </button>
+                  </div>
                   <SaveStatusIndicator status={saveStatus} />
                   <button
                     onClick={() => handleSave()}
@@ -1212,6 +1330,28 @@ export default function InterfaceBuilder({
               onLayoutChange={handleLayoutChange}
               onBlockUpdate={handleBlockUpdate}
               onBlockClick={setSelectedBlockId}
+              onBlockSelect={(blockId, addToSelection) => {
+                if (addToSelection) {
+                  setSelectedBlockIds(prev => {
+                    const next = new Set(prev)
+                    if (next.has(blockId)) {
+                      next.delete(blockId)
+                      // If removing the last selected, clear single selection too
+                      if (next.size === 0) {
+                        setSelectedBlockId(null)
+                      }
+                    } else {
+                      next.add(blockId)
+                      setSelectedBlockId(blockId) // Update primary selection
+                    }
+                    return next
+                  })
+                } else {
+                  setSelectedBlockIds(new Set([blockId]))
+                  setSelectedBlockId(blockId)
+                }
+              }}
+              selectedBlockIds={selectedBlockIds}
               onBlockSettingsClick={(blockId) => {
                 setSelectedBlockId(blockId)
                 setSettingsPanelOpen(true)

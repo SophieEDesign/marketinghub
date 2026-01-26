@@ -461,6 +461,7 @@ export default function ListView({
 
   // Measure content height when grouping changes (expand/collapse or enable/disable)
   // Only trigger on group state changes, not on data refresh, inline editing, etc.
+  // Enhanced with better measurement accuracy and max height cap
   useEffect(() => {
     if (!onHeightChange || !contentRef.current) return
     
@@ -471,14 +472,24 @@ export default function ListView({
     const timeoutId = setTimeout(() => {
       if (!contentRef.current) return
       
+      // Get computed styles to account for padding and margins
+      const computedStyle = window.getComputedStyle(contentRef.current)
+      const paddingTop = parseFloat(computedStyle.paddingTop) || 0
+      const paddingBottom = parseFloat(computedStyle.paddingBottom) || 0
+      const marginTop = parseFloat(computedStyle.marginTop) || 0
+      const marginBottom = parseFloat(computedStyle.marginBottom) || 0
+      
       // Measure the actual scroll height of the content
       const pixelHeight = contentRef.current.scrollHeight || contentRef.current.clientHeight || 0
       
-      // Convert to grid units (round up to ensure content fits)
-      const heightInGridUnits = Math.ceil(pixelHeight / rowHeight)
+      // Add padding and margins to total height
+      const totalPixelHeight = pixelHeight + paddingTop + paddingBottom + marginTop + marginBottom
       
-      // Minimum height of 2 grid units to prevent blocks from being too small
-      const finalHeight = Math.max(heightInGridUnits, 2)
+      // Convert to grid units (round up to ensure content fits)
+      const heightInGridUnits = Math.ceil(totalPixelHeight / rowHeight)
+      
+      // Apply min and max constraints (max: 50 grid units)
+      const finalHeight = Math.max(2, Math.min(heightInGridUnits, 50))
       
       onHeightChange(finalHeight)
     }, 100) // Small debounce to allow DOM to update

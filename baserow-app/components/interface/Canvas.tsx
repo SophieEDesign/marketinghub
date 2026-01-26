@@ -29,6 +29,8 @@ interface CanvasProps {
   onBlockMoveToBottom?: (blockId: string) => void
   onAddBlock?: (type: BlockType) => void | Promise<void>
   selectedBlockId?: string | null
+  selectedBlockIds?: Set<string> // Multi-select support
+  onBlockSelect?: (blockId: string, addToSelection?: boolean) => void
   layoutSettings?: {
     cols?: number
     rowHeight?: number
@@ -60,6 +62,8 @@ export default function Canvas({
   onBlockMoveToBottom,
   onAddBlock,
   selectedBlockId,
+  selectedBlockIds,
+  onBlockSelect,
   layoutSettings = { cols: 12, rowHeight: 30, margin: [10, 10] },
   primaryTableId,
   layoutTemplate,
@@ -140,6 +144,33 @@ export default function Canvas({
   const dragStartPositionRef = useRef<Map<string, { x: number; y: number }>>(new Map())
   const dragLastPositionRef = useRef<Map<string, { x: number; y: number }>>(new Map())
   const currentlyDraggingBlockIdRef = useRef<string | null>(null)
+  
+  // Track active snap targets for visual feedback during drag
+  const [activeSnapTargets, setActiveSnapTargets] = useState<{
+    vertical?: { x: number; blockId: string }
+    horizontal?: { y: number; blockId: string }
+    highlightedBlocks?: string[] // Block IDs to highlight
+  } | null>(null)
+  
+  // Track keyboard movement for visual feedback
+  const [keyboardMoveHighlight, setKeyboardMoveHighlight] = useState<string | null>(null)
+  
+  // Grid overlay toggle
+  const [showGridOverlay, setShowGridOverlay] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('canvas-grid-overlay') === 'true'
+    }
+    return false
+  })
+  
+  // Drag ghost/preview state
+  const [dragGhost, setDragGhost] = useState<{
+    blockId: string
+    x: number
+    y: number
+    w: number
+    h: number
+  } | null>(null)
   
   // Reset hydration state when page changes (Canvas remounts)
   // CRITICAL: This must run BEFORE the hydration effect to ensure refs are reset
@@ -413,13 +444,20 @@ export default function Canvas({
   const detectSnapTargets = useCallback((
     draggedBlock: Layout,
     allLayout: Layout[],
-    snapThreshold: number = 2 // Grid units (approximately 60px for default rowHeight, scales with grid)
+    snapThreshold?: number // Grid units - will be calculated if not provided
   ): {
     left?: { block: Layout; distance: number; targetX: number }
     right?: { block: Layout; distance: number; targetX: number }
     top?: { block: Layout; distance: number; targetY: number }
     bottom?: { block: Layout; distance: number; targetY: number }
   } => {
+    // Calculate adaptive snap threshold based on grid margin
+    // Default to 2 grid units, but adjust based on margin to ensure proper snapping
+    const margin = layoutSettings?.margin || [10, 10]
+    const rowHeight = layoutSettings?.rowHeight || 30
+    // Snap threshold should account for margin - blocks should snap when within margin distance
+    const calculatedThreshold = snapThreshold ?? Math.max(1, Math.ceil((margin[0] + margin[1]) / (2 * rowHeight)) || 2)
+    
     const draggedX = draggedBlock.x || 0
     const draggedY = draggedBlock.y || 0
     const draggedW = draggedBlock.w || 4
@@ -451,7 +489,7 @@ export default function Canvas({
       if (yOverlap) {
         // Check left edge snap (dragged block to the right of other block)
         const distanceToLeft = Math.abs(draggedX - otherRight)
-        if (distanceToLeft <= snapThreshold && (!snapTargets.left || distanceToLeft < snapTargets.left.distance)) {
+        if (distanceToLeft <= calculatedThreshold && (!snapTargets.left || distanceToLeft < snapTargets.left.distance)) {
           snapTargets.left = {
             block: otherBlock,
             distance: distanceToLeft,
@@ -461,7 +499,7 @@ export default function Canvas({
         
         // Check right edge snap (dragged block to the left of other block)
         const distanceToRight = Math.abs(draggedRight - otherX)
-        if (distanceToRight <= snapThreshold && (!snapTargets.right || distanceToRight < snapTargets.right.distance)) {
+        if (distanceToRight <= calculatedThreshold && (!snapTargets.right || distanceToRight < snapTargets.right.distance)) {
           snapTargets.right = {
             block: otherBlock,
             distance: distanceToRight,
@@ -477,7 +515,7 @@ export default function Canvas({
       if (xOverlap) {
         // Check top edge snap (dragged block below other block)
         const distanceToTop = Math.abs(draggedY - otherBottom)
-        if (distanceToTop <= snapThreshold && (!snapTargets.top || distanceToTop < snapTargets.top.distance)) {
+        if (distanceToTop <= calculatedThreshold && (!snapTargets.top || distanceToTop < snapTargets.top.distance)) {
           snapTargets.top = {
             block: otherBlock,
             distance: distanceToTop,
@@ -487,7 +525,7 @@ export default function Canvas({
         
         // Check bottom edge snap (dragged block above other block)
         const distanceToBottom = Math.abs(draggedBottom - otherY)
-        if (distanceToBottom <= snapThreshold && (!snapTargets.bottom || distanceToBottom < snapTargets.bottom.distance)) {
+        if (distanceToBottom <= calculatedThreshold && (!snapTargets.bottom || distanceToBottom < snapTargets.bottom.distance)) {
           snapTargets.bottom = {
             block: otherBlock,
             distance: distanceToBottom,
@@ -500,7 +538,7 @@ export default function Canvas({
     // Check if block is near the top of the canvas (y=0)
     // This allows snapping to the top even when there are no other blocks above
     const distanceToCanvasTop = draggedY
-    if (distanceToCanvasTop <= snapThreshold && (!snapTargets.top || distanceToCanvasTop < snapTargets.top.distance)) {
+    if (distanceToCanvasTop <= calculatedThreshold && (!snapTargets.top || distanceToCanvasTop < snapTargets.top.distance)) {
       snapTargets.top = {
         block: draggedBlock, // Use dragged block as placeholder (not used for actual block reference)
         distance: distanceToCanvasTop,
@@ -508,8 +546,21 @@ export default function Canvas({
       }
     }
     
+    // Check for corner snap (simultaneous X and Y snap)
+    // This happens when a block can snap to both horizontal and vertical edges
+    if (snapTargets.left || snapTargets.right) {
+      if (snapTargets.top || snapTargets.bottom) {
+        // Corner snap detected - mark it in the return value
+        // The caller can use this to apply both snaps simultaneously
+        return {
+          ...snapTargets,
+          corner: true,
+        } as typeof snapTargets & { corner?: boolean }
+      }
+    }
+    
     return snapTargets
-  }, [])
+  }, [layoutSettings?.margin, layoutSettings?.rowHeight])
   
   /**
    * Applies horizontal snap to a dragged block if valid snap targets exist
@@ -666,12 +717,92 @@ export default function Canvas({
    * If dragging primarily horizontally, prioritize horizontal snap
    * This respects user intent by matching snap direction to drag direction
    */
+  /**
+   * Applies corner snap (simultaneous X and Y snap) if both are available
+   */
+  const applyCornerSnap = useCallback((
+    draggedBlock: Layout,
+    allLayout: Layout[],
+    dragVector: { dx: number; dy: number } | null,
+    cols: number
+  ): Layout | null => {
+    const snapTargets = detectSnapTargets(draggedBlock, allLayout) as ReturnType<typeof detectSnapTargets> & { corner?: boolean }
+    
+    // Check if we have both horizontal and vertical snap targets (corner snap)
+    const hasHorizontal = !!(snapTargets.left || snapTargets.right)
+    const hasVertical = !!(snapTargets.top || snapTargets.bottom)
+    
+    if (!hasHorizontal || !hasVertical) return null
+    
+    // Determine best horizontal snap
+    let bestHorizontal: { targetX: number } | null = null
+    if (snapTargets.left && (!snapTargets.right || snapTargets.left.distance < snapTargets.right.distance)) {
+      bestHorizontal = { targetX: snapTargets.left.targetX }
+    } else if (snapTargets.right) {
+      bestHorizontal = { targetX: snapTargets.right.targetX }
+    }
+    
+    // Determine best vertical snap
+    let bestVertical: { targetY: number } | null = null
+    if (snapTargets.top && (!snapTargets.bottom || snapTargets.top.distance < snapTargets.bottom.distance)) {
+      bestVertical = { targetY: snapTargets.top.targetY }
+    } else if (snapTargets.bottom) {
+      bestVertical = { targetY: snapTargets.bottom.targetY }
+    }
+    
+    if (!bestHorizontal || !bestVertical) return null
+    
+    const snappedX = Math.max(0, Math.min(bestHorizontal.targetX, cols - (draggedBlock.w || 4)))
+    const snappedY = Math.max(0, bestVertical.targetY)
+    
+    // Check for overlap
+    const draggedW = draggedBlock.w || 4
+    const draggedH = draggedBlock.h || 4
+    
+    let wouldOverlap = false
+    allLayout.forEach(otherBlock => {
+      if (otherBlock.i === draggedBlock.i) return
+      
+      const otherX = otherBlock.x || 0
+      const otherY = otherBlock.y || 0
+      const otherW = otherBlock.w || 4
+      const otherH = otherBlock.h || 4
+      
+      const xOverlap = (snappedX + draggedW > otherX) && (snappedX < otherX + otherW)
+      const yOverlap = (snappedY + draggedH > otherY) && (snappedY < otherY + otherH)
+      
+      if (xOverlap && yOverlap) {
+        wouldOverlap = true
+      }
+    })
+    
+    if (wouldOverlap) return null
+    
+    return {
+      ...draggedBlock,
+      x: snappedX,
+      y: snappedY,
+    }
+  }, [detectSnapTargets])
+  
   const applySmartSnap = useCallback((
     draggedBlock: Layout,
     allLayout: Layout[],
     dragVector: { dx: number; dy: number } | null,
     cols: number
   ): Layout => {
+    // First, try corner snap (simultaneous X and Y)
+    const cornerSnapped = applyCornerSnap(draggedBlock, allLayout, dragVector, cols)
+    if (cornerSnapped) {
+      debugLog('LAYOUT', `[Canvas] Applied corner snap to block ${draggedBlock.i}`, {
+        originalX: draggedBlock.x,
+        originalY: draggedBlock.y,
+        snappedX: cornerSnapped.x,
+        snappedY: cornerSnapped.y,
+      })
+      return cornerSnapped
+    }
+    
     // Determine primary drag direction
     const isVerticalDrag = dragVector && Math.abs(dragVector.dy) > Math.abs(dragVector.dx)
     const isHorizontalDrag = dragVector && Math.abs(dragVector.dx) > Math.abs(dragVector.dy)
@@ -725,7 +856,7 @@ export default function Canvas({
     // No snap available - return original position
     // Vertical compaction will be applied separately if needed
     return draggedBlock
-  }, [applyHorizontalSnap, applyVerticalSnap])
+  }, [applyHorizontalSnap, applyVerticalSnap, applyCornerSnap])
   
   /**
    * Pushes blocks below a growing block down to prevent overlap
@@ -816,6 +947,77 @@ export default function Canvas({
       }
       return block
     })
+  }, [])
+  
+  /**
+   * Detects gaps in the layout (empty spaces between blocks)
+   * Returns array of gap positions that could be filled
+   */
+  const detectGaps = useCallback((currentLayout: Layout[], cols: number): Array<{ x: number; y: number; w: number; h: number }> => {
+    const gaps: Array<{ x: number; y: number; w: number; h: number }> = []
+    const maxY = currentLayout.length > 0 
+      ? Math.max(...currentLayout.map(l => (l.y || 0) + (l.h || 4)))
+      : 0
+    
+    // Create a map of occupied cells
+    const occupied = new Map<string, string>()
+    currentLayout.forEach(item => {
+      const x = item.x || 0
+      const y = item.y || 0
+      const w = item.w || 4
+      const h = item.h || 4
+      
+      for (let cellX = x; cellX < x + w && cellX < cols; cellX++) {
+        for (let cellY = y; cellY < y + h; cellY++) {
+          occupied.set(`${cellX},${cellY}`, item.i)
+        }
+      }
+    })
+    
+    // Scan for gaps (unoccupied cells)
+    for (let y = 0; y <= maxY; y++) {
+      for (let x = 0; x < cols; x++) {
+        const key = `${x},${y}`
+        if (!occupied.has(key)) {
+          // Found a gap - find its extent
+          let gapW = 1
+          let gapH = 1
+          
+          // Find width (how many consecutive empty cells to the right)
+          while (x + gapW < cols && !occupied.has(`${x + gapW},${y}`)) {
+            gapW++
+          }
+          
+          // Find height (how many consecutive empty rows)
+          let canExtendDown = true
+          while (canExtendDown) {
+            let rowEmpty = true
+            for (let checkX = x; checkX < x + gapW; checkX++) {
+              if (occupied.has(`${checkX},${y + gapH}`)) {
+                rowEmpty = false
+                break
+              }
+            }
+            if (rowEmpty && y + gapH <= maxY) {
+              gapH++
+            } else {
+              canExtendDown = false
+            }
+          }
+          
+          // Mark this gap area as processed
+          for (let markX = x; markX < x + gapW; markX++) {
+            for (let markY = y; markY < y + gapH; markY++) {
+              occupied.set(`${markX},${markY}`, 'gap')
+            }
+          }
+          
+          gaps.push({ x, y, w: gapW, h: gapH })
+        }
+      }
+    }
+    
+    return gaps
   }, [])
   
   /**
@@ -1252,6 +1454,138 @@ export default function Canvas({
       }
     }
   }, [])
+  
+  // Grid overlay toggle keyboard shortcut (Cmd+G)
+  useEffect(() => {
+    if (!isEditing) return
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is typing in an input/textarea
+      const target = e.target as HTMLElement
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        return
+      }
+      
+      // Toggle grid overlay: Cmd+G
+      if ((e.metaKey || e.ctrlKey) && e.key === 'g') {
+        e.preventDefault()
+        setShowGridOverlay(prev => {
+          const newValue = !prev
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('canvas-grid-overlay', String(newValue))
+          }
+          return newValue
+        })
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isEditing])
+  
+  // Arrow key navigation for selected block
+  useEffect(() => {
+    if (!isEditing || !selectedBlockId) return
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is typing in an input/textarea
+      const target = e.target as HTMLElement
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        return
+      }
+      
+      // Only handle arrow keys
+      if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        return
+      }
+      
+      // Prevent default scrolling
+      e.preventDefault()
+      
+      const selectedBlock = layout.find(l => l.i === selectedBlockId)
+      if (!selectedBlock) return
+      
+      const cols = layoutSettings?.cols || 12
+      const moveDistance = e.shiftKey ? 5 : 1 // Shift+Arrow moves 5 units
+      
+      let newX = selectedBlock.x || 0
+      let newY = selectedBlock.y || 0
+      
+      switch (e.key) {
+        case 'ArrowUp':
+          newY = Math.max(0, newY - moveDistance)
+          break
+        case 'ArrowDown':
+          newY = newY + moveDistance
+          break
+        case 'ArrowLeft':
+          newX = Math.max(0, newX - moveDistance)
+          break
+        case 'ArrowRight':
+          newX = Math.min(cols - (selectedBlock.w || 4), newX + moveDistance)
+          break
+      }
+      
+      // Check for overlap
+      const wouldOverlap = layout.some(otherBlock => {
+        if (otherBlock.i === selectedBlockId) return false
+        
+        const otherX = otherBlock.x || 0
+        const otherY = otherBlock.y || 0
+        const otherW = otherBlock.w || 4
+        const otherH = otherBlock.h || 4
+        const blockW = selectedBlock.w || 4
+        const blockH = selectedBlock.h || 4
+        
+        const xOverlap = (newX + blockW > otherX) && (newX < otherX + otherW)
+        const yOverlap = (newY + blockH > otherY) && (newY < otherY + otherH)
+        
+        return xOverlap && yOverlap
+      })
+      
+      if (wouldOverlap) return
+      
+      // Apply snap if near other blocks
+      const movedBlock: Layout = {
+        ...selectedBlock,
+        x: newX,
+        y: newY,
+      }
+      
+      const dragVector = {
+        dx: newX - (selectedBlock.x || 0),
+        dy: newY - (selectedBlock.y || 0),
+      }
+      
+      const snappedBlock = applySmartSnap(movedBlock, layout, dragVector, cols)
+      
+      // Update layout
+      const newLayout = layout.map(item => 
+        item.i === selectedBlockId ? snappedBlock : item
+      )
+      
+      setLayout(newLayout)
+      
+      // Show visual feedback
+      setKeyboardMoveHighlight(selectedBlockId)
+      setTimeout(() => setKeyboardMoveHighlight(null), 200)
+      
+      // Notify parent
+      if (onLayoutChange) {
+        const layoutItems: LayoutItem[] = newLayout.map((item) => ({
+          i: item.i,
+          x: item.x || 0,
+          y: item.y || 0,
+          w: item.w || 4,
+          h: item.h || 4,
+        }))
+        onLayoutChange(layoutItems)
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isEditing, selectedBlockId, layout, layoutSettings?.cols, applySmartSnap, onLayoutChange])
 
   // CRITICAL: Grid configuration must be IDENTICAL for edit and public view
   // isEditing ONLY controls interactivity (isDraggable, isResizable)
@@ -1282,6 +1616,33 @@ export default function Canvas({
       useCSSTransforms: true,
     }
   }, [layoutSettings?.cols, layoutSettings?.rowHeight, layoutSettings?.margin])
+  
+  // Add CSS for smooth block animations
+  useEffect(() => {
+    if (!isEditing) return
+    
+    const style = document.createElement('style')
+    style.textContent = `
+      .react-grid-item {
+        transition: transform 200ms ease, width 200ms ease, height 200ms ease !important;
+      }
+      .react-grid-item.cssTransforms {
+        transition: transform 200ms ease !important;
+      }
+      .react-grid-item.resizing {
+        transition: none !important;
+      }
+      .react-grid-item.dragging {
+        transition: none !important;
+        z-index: 1000 !important;
+      }
+    `
+    document.head.appendChild(style)
+    
+    return () => {
+      document.head.removeChild(style)
+    }
+  }, [isEditing])
   // CRITICAL: isEditing, pageId, layout, blocks.length, isViewer, mode are NOT in dependencies
   // Grid config must be identical regardless of edit mode
 
@@ -1363,7 +1724,174 @@ export default function Canvas({
       {/* CRITICAL: Parent stack uses normal document flow - reflows immediately when child heights change */}
       {/* No cached heights, no min-height persistence, no delayed updates */}
       {/* Add padding-bottom to ensure bottom blocks aren't cut off by taskbar */}
-      <div ref={containerRef} className="w-full h-full min-w-0" style={{ paddingBottom: isEditing ? '80px' : '80px' }}>
+      <div ref={containerRef} className="w-full h-full min-w-0 relative" style={{ paddingBottom: isEditing ? '80px' : '80px' }}>
+        {/* Grid overlay */}
+        {isEditing && showGridOverlay && containerRef.current && (() => {
+          const cols = layoutSettings?.cols || 12
+          const rowHeight = layoutSettings?.rowHeight || 30
+          const margin = layoutSettings?.margin || [10, 10]
+          const containerWidth = containerRef.current?.offsetWidth || 0
+          const colWidth = (containerWidth - (margin[0] * (cols + 1))) / cols
+          const maxRows = 50 // Show grid for first 50 rows
+          
+          return (
+            <div className="absolute inset-0 pointer-events-none z-10 opacity-20">
+              {/* Vertical grid lines */}
+              {Array.from({ length: cols + 1 }).map((_, i) => {
+                const xPosition = i * colWidth + i * margin[0] + margin[0]
+                return (
+                  <div
+                    key={`v-${i}`}
+                    className="absolute top-0 bottom-0 w-px bg-gray-400"
+                    style={{ left: `${xPosition}px` }}
+                  />
+                )
+              })}
+              {/* Horizontal grid lines */}
+              {Array.from({ length: maxRows + 1 }).map((_, i) => {
+                const yPosition = i * rowHeight + i * margin[1] + margin[1]
+                return (
+                  <div
+                    key={`h-${i}`}
+                    className="absolute left-0 right-0 h-px bg-gray-400"
+                    style={{ top: `${yPosition}px` }}
+                  />
+                )
+              })}
+            </div>
+          )
+        })()}
+        
+        {/* Drag ghost/preview */}
+        {isEditing && dragGhost && containerRef.current && (() => {
+          const cols = layoutSettings?.cols || 12
+          const rowHeight = layoutSettings?.rowHeight || 30
+          const margin = layoutSettings?.margin || [10, 10]
+          const containerWidth = containerRef.current?.offsetWidth || 0
+          const colWidth = (containerWidth - (margin[0] * (cols + 1))) / cols
+          
+          const xPosition = dragGhost.x * colWidth + dragGhost.x * margin[0] + margin[0]
+          const yPosition = dragGhost.y * rowHeight + dragGhost.y * margin[1] + margin[1]
+          const width = dragGhost.w * colWidth + (dragGhost.w - 1) * margin[0]
+          const height = dragGhost.h * rowHeight + (dragGhost.h - 1) * margin[1]
+          
+          return (
+            <div
+              className="absolute pointer-events-none z-40 border-2 border-blue-400 bg-blue-50/30 rounded-lg transition-all duration-150"
+              style={{
+                left: `${xPosition}px`,
+                top: `${yPosition}px`,
+                width: `${width}px`,
+                height: `${height}px`,
+              }}
+            />
+          )
+        })()}
+        
+        {/* Alignment helpers - show alignment guides for all blocks when dragging */}
+        {isEditing && activeSnapTargets && containerRef.current && (() => {
+          const draggedBlockId = currentlyDraggingBlockIdRef.current
+          if (!draggedBlockId) return null
+          
+          const draggedBlock = layout.find(l => l.i === draggedBlockId)
+          if (!draggedBlock) return null
+          
+          const cols = layoutSettings?.cols || 12
+          const rowHeight = layoutSettings?.rowHeight || 30
+          const margin = layoutSettings?.margin || [10, 10]
+          const containerWidth = containerRef.current?.offsetWidth || 0
+          const colWidth = (containerWidth - (margin[0] * (cols + 1))) / cols
+          
+          // Find blocks that align with the dragged block
+          const alignedBlocks: Array<{ blockId: string; x?: number; y?: number; type: 'vertical' | 'horizontal' }> = []
+          
+          layout.forEach(otherBlock => {
+            if (otherBlock.i === draggedBlockId) return
+            
+            const draggedX = draggedBlock.x || 0
+            const draggedY = draggedBlock.y || 0
+            const otherX = otherBlock.x || 0
+            const otherY = otherBlock.y || 0
+            
+            // Check vertical alignment (same X or aligned edges)
+            if (Math.abs(draggedX - otherX) < 0.5 || 
+                Math.abs((draggedX + (draggedBlock.w || 4)) - (otherX + (otherBlock.w || 4))) < 0.5) {
+              alignedBlocks.push({ blockId: otherBlock.i, x: otherX, type: 'vertical' })
+            }
+            
+            // Check horizontal alignment (same Y or aligned edges)
+            if (Math.abs(draggedY - otherY) < 0.5 ||
+                Math.abs((draggedY + (draggedBlock.h || 4)) - (otherY + (otherBlock.h || 4))) < 0.5) {
+              alignedBlocks.push({ blockId: otherBlock.i, y: otherY, type: 'horizontal' })
+            }
+          })
+          
+          return (
+            <div className="absolute inset-0 pointer-events-none z-40">
+              {alignedBlocks.map((aligned, idx) => {
+                if (aligned.type === 'vertical' && aligned.x !== undefined) {
+                  const xPosition = aligned.x * colWidth + aligned.x * margin[0] + margin[0]
+                  return (
+                    <div
+                      key={`align-v-${aligned.blockId}-${idx}`}
+                      className="absolute top-0 bottom-0 w-px bg-green-400 opacity-40"
+                      style={{
+                        left: `${xPosition}px`,
+                      }}
+                    />
+                  )
+                } else if (aligned.type === 'horizontal' && aligned.y !== undefined) {
+                  const yPosition = aligned.y * rowHeight + aligned.y * margin[1] + margin[1]
+                  return (
+                    <div
+                      key={`align-h-${aligned.blockId}-${idx}`}
+                      className="absolute left-0 right-0 h-px bg-green-400 opacity-40"
+                      style={{
+                        top: `${yPosition}px`,
+                      }}
+                    />
+                  )
+                }
+                return null
+              })}
+            </div>
+          )
+        })()}
+        
+        {/* Guide lines overlay for snap feedback during drag */}
+        {isEditing && activeSnapTargets && containerRef.current && (
+          <div className="absolute inset-0 pointer-events-none z-50">
+            {activeSnapTargets.vertical && (() => {
+              const cols = layoutSettings?.cols || 12
+              const margin = layoutSettings?.margin || [10, 10]
+              const containerWidth = containerRef.current?.offsetWidth || 0
+              const colWidth = (containerWidth - (margin[0] * (cols + 1))) / cols
+              const xPosition = (activeSnapTargets.vertical.x || 0) * colWidth + (activeSnapTargets.vertical.x || 0) * margin[0] + margin[0]
+              return (
+                <div
+                  className="absolute top-0 bottom-0 w-0.5 bg-blue-500 opacity-60 transition-opacity duration-150"
+                  style={{
+                    left: `${xPosition}px`,
+                    transform: 'translateX(-50%)',
+                  }}
+                />
+              )
+            })()}
+            {activeSnapTargets.horizontal && (() => {
+              const rowHeight = layoutSettings?.rowHeight || 30
+              const margin = layoutSettings?.margin || [10, 10]
+              const yPosition = (activeSnapTargets.horizontal.y || 0) * rowHeight + (activeSnapTargets.horizontal.y || 0) * margin[1] + margin[1]
+              return (
+                <div
+                  className="absolute left-0 right-0 h-0.5 bg-blue-500 opacity-60 transition-opacity duration-150"
+                  style={{
+                    top: `${yPosition}px`,
+                  }}
+                />
+              )
+            })()}
+          </div>
+        )}
         <ResponsiveGridLayout
           className="layout" // CRITICAL: No conditional classes - identical in edit and public
           layouts={{ lg: layout }}
@@ -1422,6 +1950,16 @@ export default function Canvas({
               x: oldItem.x || 0,
               y: oldItem.y || 0,
             })
+            
+            // Show drag ghost
+            setDragGhost({
+              blockId,
+              x: oldItem.x || 0,
+              y: oldItem.y || 0,
+              w: oldItem.w || 4,
+              h: oldItem.h || 4,
+            })
+            
             debugLog('LAYOUT', `[Canvas] Drag started for block ${blockId}`, {
               startX: oldItem.x,
               startY: oldItem.y,
@@ -1434,6 +1972,116 @@ export default function Canvas({
               x: newItem.x || 0,
               y: newItem.y || 0,
             })
+            
+            // Update drag ghost position
+            if (dragGhost && dragGhost.blockId === blockId) {
+              setDragGhost({
+                ...dragGhost,
+                x: newItem.x || 0,
+                y: newItem.y || 0,
+              })
+            }
+            
+            // Real-time snap preview during drag
+            if (isEditing) {
+              const dragStart = dragStartPositionRef.current.get(blockId)
+              const dragLast = dragLastPositionRef.current.get(blockId)
+              
+              let dragVector: { dx: number; dy: number } | null = null
+              if (dragStart && dragLast) {
+                dragVector = {
+                  dx: dragLast.x - dragStart.x,
+                  dy: dragLast.y - dragStart.y,
+                }
+              }
+              
+              // Apply smart snap for preview (don't modify layout, just show visual feedback)
+              const cols = layoutSettings?.cols || 12
+              const snapTargets = detectSnapTargets(newItem, layout)
+              
+              // Determine which snap targets to show based on drag direction
+              const isVerticalDrag = dragVector && Math.abs(dragVector.dy) > Math.abs(dragVector.dx)
+              const isHorizontalDrag = dragVector && Math.abs(dragVector.dx) > Math.abs(dragVector.dy)
+              
+              let guideLine: { 
+                vertical?: { x: number; blockId: string }
+                horizontal?: { y: number; blockId: string }
+                highlightedBlocks?: string[]
+              } | null = null
+              const highlightedBlocks: string[] = []
+              
+              if (isVerticalDrag) {
+                // Prefer vertical snap
+                if (snapTargets.top && (!snapTargets.bottom || snapTargets.top.distance < snapTargets.bottom.distance)) {
+                  guideLine = {
+                    horizontal: {
+                      y: snapTargets.top.targetY,
+                      blockId: snapTargets.top.block.i,
+                    },
+                    highlightedBlocks: [snapTargets.top.block.i],
+                  }
+                } else if (snapTargets.bottom) {
+                  guideLine = {
+                    horizontal: {
+                      y: snapTargets.bottom.targetY,
+                      blockId: snapTargets.bottom.block.i,
+                    },
+                    highlightedBlocks: [snapTargets.bottom.block.i],
+                  }
+                }
+              } else if (isHorizontalDrag) {
+                // Prefer horizontal snap
+                if (snapTargets.left && (!snapTargets.right || snapTargets.left.distance < snapTargets.right.distance)) {
+                  guideLine = {
+                    vertical: {
+                      x: snapTargets.left.targetX,
+                      blockId: snapTargets.left.block.i,
+                    },
+                    highlightedBlocks: [snapTargets.left.block.i],
+                  }
+                } else if (snapTargets.right) {
+                  guideLine = {
+                    vertical: {
+                      x: snapTargets.right.targetX,
+                      blockId: snapTargets.right.block.i,
+                    },
+                    highlightedBlocks: [snapTargets.right.block.i],
+                  }
+                }
+              } else {
+                // No clear direction - show closest snap
+                let bestSnap: { type: 'vertical' | 'horizontal'; x?: number; y?: number; blockId: string; distance: number } | null = null
+                
+                if (snapTargets.left && (!bestSnap || snapTargets.left.distance < bestSnap.distance)) {
+                  bestSnap = { type: 'vertical', x: snapTargets.left.targetX, blockId: snapTargets.left.block.i, distance: snapTargets.left.distance }
+                }
+                if (snapTargets.right && (!bestSnap || snapTargets.right.distance < bestSnap.distance)) {
+                  bestSnap = { type: 'vertical', x: snapTargets.right.targetX, blockId: snapTargets.right.block.i, distance: snapTargets.right.distance }
+                }
+                if (snapTargets.top && (!bestSnap || snapTargets.top.distance < bestSnap.distance)) {
+                  bestSnap = { type: 'horizontal', y: snapTargets.top.targetY, blockId: snapTargets.top.block.i, distance: snapTargets.top.distance }
+                }
+                if (snapTargets.bottom && (!bestSnap || snapTargets.bottom.distance < bestSnap.distance)) {
+                  bestSnap = { type: 'horizontal', y: snapTargets.bottom.targetY, blockId: snapTargets.bottom.block.i, distance: snapTargets.bottom.distance }
+                }
+                
+                if (bestSnap) {
+                  if (bestSnap.type === 'vertical') {
+                    guideLine = { 
+                      vertical: { x: bestSnap.x!, blockId: bestSnap.blockId },
+                      highlightedBlocks: [bestSnap.blockId],
+                    }
+                  } else {
+                    guideLine = { 
+                      horizontal: { y: bestSnap.y!, blockId: bestSnap.blockId },
+                      highlightedBlocks: [bestSnap.blockId],
+                    }
+                  }
+                }
+              }
+              
+              setActiveSnapTargets(guideLine)
+            }
           }}
           onDragStop={(layout, oldItem, newItem, placeholder, e, element) => {
             // Update final position for drag vector calculation
@@ -1448,6 +2096,10 @@ export default function Canvas({
               endX: newItem.x,
               endY: newItem.y,
             })
+            
+            // Clear snap guide lines and drag ghost
+            setActiveSnapTargets(null)
+            setDragGhost(null)
             
             // Use the same timeout mechanism as resize to ensure layout is stable
             // The handleLayoutChange will be called and will apply snap/compaction after timeout
@@ -1464,11 +2116,19 @@ export default function Canvas({
             return (
               <div
                 key={block.id}
-                className={`relative ${
+                className={`relative transition-all duration-200 ${
                   isEditing
-                    ? `group bg-white border-2 border-dashed border-gray-200 hover:border-gray-300 rounded-lg ${
+                    ? `group bg-white border-2 border-dashed border-gray-200 hover:border-gray-300 rounded-lg shadow-sm hover:shadow-md ${
                         selectedBlockId === block.id
-                          ? "ring-2 ring-blue-500 border-blue-500"
+                          ? "ring-2 ring-blue-500 border-blue-500 shadow-lg"
+                          : ""
+                      } ${
+                        activeSnapTargets?.highlightedBlocks?.includes(block.id)
+                          ? "ring-2 ring-blue-400 border-blue-400 shadow-md"
+                          : ""
+                      } ${
+                        keyboardMoveHighlight === block.id
+                          ? "ring-2 ring-green-400 border-green-400 shadow-lg animate-pulse"
                           : ""
                       }`
                     : "bg-transparent border-0 shadow-none"
@@ -1495,7 +2155,13 @@ export default function Canvas({
                     // Only select block if not clicking editor content
                     // This prevents settings panel from opening when clicking inside text blocks
                     if (!isEditorContent) {
-                      onBlockClick?.(block.id)
+                      // Support multi-select with Cmd/Ctrl or Shift
+                      if (onBlockSelect) {
+                        const addToSelection = e.metaKey || e.ctrlKey || e.shiftKey
+                        onBlockSelect(block.id, addToSelection)
+                      } else {
+                        onBlockClick?.(block.id)
+                      }
                     }
                   }
                 }}
@@ -1505,15 +2171,15 @@ export default function Canvas({
               <>
                 {/* Drag Handle - Only visible on hover, hidden when block is editing (via CSS) */}
                 <div
-                  className={`absolute top-2 left-2 z-20 drag-handle transition-opacity ${
-                    selectedBlockId === block.id ? "opacity-100" : "opacity-30 group-hover:opacity-100"
+                  className={`absolute top-2 left-2 z-20 drag-handle transition-all duration-200 ${
+                    (selectedBlockId === block.id || (selectedBlockIds && selectedBlockIds.has(block.id))) ? "opacity-100 scale-100" : "opacity-30 group-hover:opacity-100 scale-95 group-hover:scale-100"
                   }`}
                 >
                   <button
                     type="button"
-                    className="cursor-grab active:cursor-grabbing p-2 bg-white/95 backdrop-blur border border-gray-300 rounded-md shadow-sm hover:bg-white hover:border-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 touch-none"
-                    title="Drag to move"
-                    aria-label="Drag to move"
+                    className="cursor-grab active:cursor-grabbing p-2 bg-white/95 backdrop-blur-sm border border-gray-300 rounded-md shadow-sm hover:bg-white hover:border-blue-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 touch-none transition-all duration-150 min-w-[32px] min-h-[32px] flex items-center justify-center"
+                    title="Drag to move (or use arrow keys)"
+                    aria-label="Drag to move block"
                     onMouseDown={(e) => {
                       // Prevent dragging if TextBlock is editing
                       const blockContent = e.currentTarget
@@ -1527,7 +2193,7 @@ export default function Canvas({
                     }}
                   >
                     {/* 6-dot grip icon (reads as "drag handle" vs menu) */}
-                    <svg className="h-4 w-4 text-gray-700" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <svg className="h-4 w-4 text-gray-700 group-hover:text-blue-600 transition-colors" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                       <circle cx="7" cy="6" r="1.2" />
                       <circle cx="13" cy="6" r="1.2" />
                       <circle cx="7" cy="10" r="1.2" />
@@ -1539,7 +2205,9 @@ export default function Canvas({
                 </div>
 
                 {/* Block Toolbar - Only visible on hover */}
-                <div className="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                <div className={`absolute top-2 right-2 z-20 flex items-center gap-1.5 transition-all duration-200 ${
+                  (selectedBlockId === block.id || (selectedBlockIds && selectedBlockIds.has(block.id))) ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                }`}>
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
@@ -1547,12 +2215,13 @@ export default function Canvas({
                       onBlockClick?.(block.id)
                       onBlockSettingsClick?.(block.id)
                     }}
-                    className={`p-1.5 rounded-md shadow-sm transition-all ${
-                      selectedBlockId === block.id
-                        ? "bg-blue-600 text-white opacity-100"
-                        : "bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"
+                    className={`p-1.5 rounded-md shadow-sm transition-all duration-150 ${
+                      (selectedBlockId === block.id || (selectedBlockIds && selectedBlockIds.has(block.id)))
+                        ? "bg-blue-600 text-white hover:bg-blue-700"
+                        : "bg-white text-gray-600 border border-gray-300 hover:bg-gray-50 hover:border-gray-400"
                     }`}
                     title="Configure block"
+                    aria-label="Configure block"
                   >
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -1568,8 +2237,9 @@ export default function Canvas({
                             e.preventDefault()
                             onBlockDuplicate(block.id)
                           }}
-                          className="p-1.5 rounded-md shadow-sm bg-white text-gray-600 border border-gray-300 hover:bg-gray-50 transition-all"
+                          className="p-1.5 rounded-md shadow-sm bg-white text-gray-600 border border-gray-300 hover:bg-gray-50 hover:border-gray-400 transition-all duration-150"
                           title="Duplicate block (Cmd+D)"
+                          aria-label="Duplicate block"
                         >
                           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -1582,8 +2252,9 @@ export default function Canvas({
                           e.preventDefault()
                           onBlockDelete(block.id)
                         }}
-                        className="p-1.5 rounded-md shadow-sm bg-white text-red-600 border border-red-300 hover:bg-red-50 transition-all"
+                        className="p-1.5 rounded-md shadow-sm bg-white text-red-600 border border-red-300 hover:bg-red-50 hover:border-red-400 transition-all duration-150"
                         title="Delete block (Del)"
+                        aria-label="Delete block"
                       >
                         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -1604,17 +2275,30 @@ export default function Canvas({
                 View Only
               </div>
             )}
+            
+            {/* Autofit Indicator - Show when autofit is explicitly enabled */}
+            {isEditing && (block.config as any)?.autofit_enabled === true && (
+              <div className="absolute top-10 left-2 z-10 flex items-center gap-1 px-2 py-1 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700 opacity-0 group-hover:opacity-100 transition-opacity">
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                </svg>
+                Auto-fit
+              </div>
+            )}
 
             {/* Block Content */}
             {/* CRITICAL: No min-height - height must be DERIVED from content */}
             {/* min-h-0 allows flex children to shrink below content size */}
             <div 
-              className={`h-full w-full min-h-0 overflow-hidden rounded-lg ${block.config?.locked ? 'pointer-events-none opacity-75' : ''}`}
+              className={`h-full w-full min-h-0 overflow-hidden rounded-lg transition-all duration-300 ease-in-out ${block.config?.locked ? 'pointer-events-none opacity-75' : ''}`}
               data-block-id={block.id}
               style={{
                 // CRITICAL: Do NOT set minHeight - height must be DERIVED from content
                 // minHeight causes gaps when blocks collapse - it persists after collapse
                 // Height must come from content and current expansion state only
+                // Use transform for smooth animations
+                willChange: keyboardMoveHighlight === block.id ? 'transform' : 'auto',
+                transitionProperty: 'height, transform, opacity',
               }}
             >
               <BlockAppearanceWrapper 
@@ -1641,7 +2325,12 @@ export default function Canvas({
                     hideEditButton={topTwoFieldBlockIds.has(block.id)}
                     allBlocks={blocks}
                     onHeightChange={(height) => {
-                      // Update block height in layout when grouping changes
+                      // Don't update if manually resizing
+                      if (currentlyResizingBlockIdRef.current === block.id) {
+                        return
+                      }
+                      
+                      // Update block height in layout when content changes
                       const currentLayoutItem = layout.find(l => l.i === block.id)
                       if (currentLayoutItem && currentLayoutItem.h !== height) {
                         const newLayout = layout.map(l => 

@@ -6,11 +6,17 @@ interface UseBlockContentHeightOptions {
   /** Row height in pixels (from layoutSettings.rowHeight) */
   rowHeight: number
   /** Whether grouping is currently active */
-  isGrouped: boolean
+  isGrouped?: boolean
+  /** Whether autofit is enabled (default: true if isGrouped, false otherwise) */
+  autofitEnabled?: boolean
+  /** Maximum height in grid units (default: 50) */
+  maxHeight?: number
   /** Callback when height changes (in grid units) */
   onHeightChange?: (height: number) => void
   /** Debounce delay in milliseconds (default: 100) */
   debounceMs?: number
+  /** Whether manual resize is in progress (disables autofit) */
+  isManuallyResizing?: boolean
 }
 
 /**
@@ -55,9 +61,10 @@ export function useBlockContentHeight(
   }, [ref, isGrouped, rowHeight, onHeightChange, height])
 
   useEffect(() => {
-    if (!isGrouped) {
-      // Clear height when grouping is disabled
+    if (!shouldAutofit || isManuallyResizing) {
+      // Clear height when autofit is disabled
       setHeight(0)
+      previousHeightRef.current = 0
       return
     }
 
@@ -78,18 +85,66 @@ export function useBlockContentHeight(
 
       observerRef.current.observe(ref.current)
     }
+    
+    // Watch for images loading (they can change content height)
+    if (ref.current) {
+      const images = ref.current.querySelectorAll('img')
+      images.forEach(img => {
+        if (!img.complete) {
+          const onLoad = () => {
+            measureHeight()
+            imageLoadListenersRef.current.delete(onLoad)
+          }
+          img.addEventListener('load', onLoad)
+          imageLoadListenersRef.current.add(onLoad)
+        }
+      })
+    }
+    
+    // Set up MutationObserver for DOM changes
+    let mutationObserver: MutationObserver | null = null
+    if (typeof MutationObserver !== 'undefined' && ref.current) {
+      mutationObserver = new MutationObserver(() => {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current)
+        }
+        timeoutRef.current = setTimeout(() => {
+          measureHeight()
+        }, debounceMs)
+      })
+      
+      mutationObserver.observe(ref.current, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['style', 'class'],
+      })
+    }
 
     return () => {
       if (observerRef.current) {
         observerRef.current.disconnect()
         observerRef.current = null
       }
+      if (mutationObserver) {
+        mutationObserver.disconnect()
+        mutationObserver = null
+      }
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current)
         timeoutRef.current = null
       }
+      // Clean up image load listeners
+      imageLoadListenersRef.current.forEach(listener => {
+        // Remove listeners if elements still exist
+        const images = ref.current?.querySelectorAll('img')
+        images?.forEach(img => {
+          img.removeEventListener('load', listener)
+        })
+      })
+      imageLoadListenersRef.current.clear()
     }
-  }, [isGrouped, measureHeight, debounceMs, ref])
+  }, [shouldAutofit, isManuallyResizing, measureHeight, debounceMs, ref])
 
   return height
 }

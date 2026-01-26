@@ -262,6 +262,13 @@ export default function ListBlock({
     setRefreshKey((k) => k + 1)
   }, [canCreateRecord, isLoading, showAddRecord, table, tableId, toast])
 
+  // Prepare initial data for new record (prefill from filters)
+  // Must be declared before any early returns to satisfy React Hooks rules
+  const createInitialData = useMemo(() => {
+    const defaultsFromFilters = deriveDefaultValuesFromFilters(allFilters, safeTableFields)
+    return Object.keys(defaultsFromFilters).length > 0 ? defaultsFromFilters : undefined
+  }, [allFilters, safeTableFields])
+
   if (!tableId) {
     return (
       <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
@@ -323,12 +330,6 @@ export default function ListBlock({
 
   // Get modal fields from config
   const modalFields = (config as any)?.modal_fields as string[] | undefined
-
-  // Prepare initial data for new record (prefill from filters)
-  const createInitialData = useMemo(() => {
-    const defaultsFromFilters = deriveDefaultValuesFromFilters(allFilters, safeTableFields)
-    return Object.keys(defaultsFromFilters).length > 0 ? defaultsFromFilters : undefined
-  }, [allFilters, safeTableFields])
 
   return (
     <div className="h-full w-full overflow-auto" style={blockStyle}>
