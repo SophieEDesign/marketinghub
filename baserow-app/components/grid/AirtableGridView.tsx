@@ -1385,7 +1385,14 @@ export default function AirtableGridView({
     const handleKeyDown = async (e: KeyboardEvent) => {
       // Only handle if grid is focused or no input is focused
       const activeElement = document.activeElement
-      const isInputFocused = activeElement?.tagName === 'INPUT' || activeElement?.tagName === 'TEXTAREA'
+      // Check if we're in an input, textarea, or contenteditable element
+      const isInputFocused = 
+        activeElement?.tagName === 'INPUT' || 
+        activeElement?.tagName === 'TEXTAREA' ||
+        (activeElement instanceof HTMLElement && activeElement.isContentEditable) ||
+        activeElement?.closest?.('[contenteditable="true"]') ||
+        activeElement?.closest?.('input') ||
+        activeElement?.closest?.('textarea')
       
       // Copy: Ctrl/Cmd + C
       if ((e.ctrlKey || e.metaKey) && e.key === 'c' && !e.shiftKey && !isInputFocused) {

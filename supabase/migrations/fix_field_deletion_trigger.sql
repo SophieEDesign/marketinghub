@@ -1,13 +1,14 @@
--- Allow deleting system audit field metadata during full table deletion
+-- Fix field deletion trigger to properly allow deletion of non-system fields
 --
--- Background:
--- `public.table_fields` has a trigger that prevents deleting system audit fields
--- (created_at, created_by, updated_at, updated_by). That is correct for normal field
--- operations, but it breaks `DELETE FROM public.tables` because the FK cascade
--- tries to delete those `table_fields` rows.
+-- Issue:
+-- The trigger function `prevent_system_field_mutations()` was returning `NEW` 
+-- for all operations, including DELETE. For DELETE operations, PostgreSQL 
+-- triggers must return `OLD` to allow deletion or `NULL` to prevent it.
+-- Returning `NEW` is invalid for DELETE and was silently preventing field deletions.
 --
 -- Fix:
--- Allow DELETE when the session sets `app.allow_system_field_delete = on`.
+-- Update the trigger function to explicitly return `OLD` for DELETE operations
+-- on non-system fields, allowing them to be deleted properly.
 
 CREATE OR REPLACE FUNCTION public.prevent_system_field_mutations()
 RETURNS trigger
@@ -58,9 +59,10 @@ BEGIN
 END;
 $$;
 
+-- The trigger itself doesn't need to be recreated, just the function
+-- But we'll ensure it exists with the correct configuration
 DROP TRIGGER IF EXISTS trigger_prevent_system_field_mutations ON public.table_fields;
 CREATE TRIGGER trigger_prevent_system_field_mutations
   BEFORE UPDATE OR DELETE ON public.table_fields
   FOR EACH ROW
   EXECUTE FUNCTION public.prevent_system_field_mutations();
-

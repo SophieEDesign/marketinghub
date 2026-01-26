@@ -2055,29 +2055,41 @@ export default function Canvas({
                 if (snapTargets.left) {
                   if (bestSnap === null) {
                     bestSnap = { type: 'vertical', x: snapTargets.left.targetX, blockId: snapTargets.left.block.i, distance: snapTargets.left.distance }
-                  } else if (bestSnap !== null && snapTargets.left.distance < bestSnap.distance) {
-                    bestSnap = { type: 'vertical', x: snapTargets.left.targetX, blockId: snapTargets.left.block.i, distance: snapTargets.left.distance }
+                  } else {
+                    const currentDistance = bestSnap.distance
+                    if (snapTargets.left.distance < currentDistance) {
+                      bestSnap = { type: 'vertical', x: snapTargets.left.targetX, blockId: snapTargets.left.block.i, distance: snapTargets.left.distance }
+                    }
                   }
                 }
                 if (snapTargets.right) {
                   if (bestSnap === null) {
                     bestSnap = { type: 'vertical', x: snapTargets.right.targetX, blockId: snapTargets.right.block.i, distance: snapTargets.right.distance }
-                  } else if (bestSnap !== null && snapTargets.right.distance < bestSnap.distance) {
-                    bestSnap = { type: 'vertical', x: snapTargets.right.targetX, blockId: snapTargets.right.block.i, distance: snapTargets.right.distance }
+                  } else {
+                    const currentDistance = bestSnap.distance
+                    if (snapTargets.right.distance < currentDistance) {
+                      bestSnap = { type: 'vertical', x: snapTargets.right.targetX, blockId: snapTargets.right.block.i, distance: snapTargets.right.distance }
+                    }
                   }
                 }
                 if (snapTargets.top) {
                   if (bestSnap === null) {
                     bestSnap = { type: 'horizontal', y: snapTargets.top.targetY, blockId: snapTargets.top.block.i, distance: snapTargets.top.distance }
-                  } else if (bestSnap !== null && snapTargets.top.distance < bestSnap.distance) {
-                    bestSnap = { type: 'horizontal', y: snapTargets.top.targetY, blockId: snapTargets.top.block.i, distance: snapTargets.top.distance }
+                  } else {
+                    const currentDistance = bestSnap.distance
+                    if (snapTargets.top.distance < currentDistance) {
+                      bestSnap = { type: 'horizontal', y: snapTargets.top.targetY, blockId: snapTargets.top.block.i, distance: snapTargets.top.distance }
+                    }
                   }
                 }
                 if (snapTargets.bottom) {
                   if (bestSnap === null) {
                     bestSnap = { type: 'horizontal', y: snapTargets.bottom.targetY, blockId: snapTargets.bottom.block.i, distance: snapTargets.bottom.distance }
-                  } else if (bestSnap !== null && snapTargets.bottom.distance < bestSnap.distance) {
-                    bestSnap = { type: 'horizontal', y: snapTargets.bottom.targetY, blockId: snapTargets.bottom.block.i, distance: snapTargets.bottom.distance }
+                  } else {
+                    const currentDistance = bestSnap.distance
+                    if (snapTargets.bottom.distance < currentDistance) {
+                      bestSnap = { type: 'horizontal', y: snapTargets.bottom.targetY, blockId: snapTargets.bottom.block.i, distance: snapTargets.bottom.distance }
+                    }
                   }
                 }
                 
