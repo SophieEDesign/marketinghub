@@ -133,6 +133,11 @@ export default function FieldPicker({
     return filtered
   }, [fields, filterFields, mode, selectedFields])
 
+  // Section fields by group_name for dropdown and drag modes
+  const sectionedFields = useMemo(() => {
+    return sectionAndSortFields(availableFields)
+  }, [availableFields])
+
   // Get selected field objects
   const selectedFieldObjects = useMemo(() => {
     return selectedFields
@@ -372,8 +377,8 @@ export default function FieldPicker({
             <SelectValue placeholder="Select a field..." />
           </SelectTrigger>
           <SelectContent>
-            {sectionedFields ? (
-              sectionedFields.map(([sectionName, sectionFields], sectionIndex) => (
+            {sectionedFields && sectionedFields.length > 0 ? (
+              sectionedFields.map(([sectionName, sectionFields]: [string, TableField[]], sectionIndex: number) => (
                 <SelectGroup key={sectionName}>
                   <div className="flex items-center justify-between px-2 py-1.5">
                     <SelectLabel className="text-xs font-semibold text-gray-700">
@@ -394,7 +399,7 @@ export default function FieldPicker({
                       </button>
                     )}
                   </div>
-                  {sectionFields.map((field) => (
+                  {sectionFields.map((field: TableField) => (
                     <SelectItem key={field.id} value={field.name}>
                       {getFieldDisplayName(field)}
                     </SelectItem>
@@ -434,8 +439,8 @@ export default function FieldPicker({
                   <SelectValue placeholder="Add field" />
                 </SelectTrigger>
                 <SelectContent>
-                  {sectionedFields ? (
-                    sectionedFields.map(([sectionName, sectionFields], sectionIndex) => (
+                  {sectionedFields && sectionedFields.length > 0 ? (
+                    sectionedFields.map(([sectionName, sectionFields]: [string, TableField[]], sectionIndex: number) => (
                       <SelectGroup key={sectionName}>
                         <div className="flex items-center justify-between px-2 py-1.5">
                           <SelectLabel className="text-xs font-semibold text-gray-700">
@@ -456,7 +461,7 @@ export default function FieldPicker({
                             </button>
                           )}
                         </div>
-                        {sectionFields.map((field) => (
+                        {sectionFields.map((field: TableField) => (
                           <SelectItem key={field.id} value={field.name}>
                             {getFieldDisplayName(field)}
                           </SelectItem>

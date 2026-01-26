@@ -13,6 +13,7 @@ export type BlockType =
   | 'link_preview'
   | 'filter'
   | 'field'
+  | 'field_section'
   | 'calendar'
   | 'multi_calendar'
   | 'kanban'
