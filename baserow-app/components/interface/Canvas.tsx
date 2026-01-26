@@ -2052,17 +2052,25 @@ export default function Canvas({
                 // No clear direction - show closest snap
                 let bestSnap: { type: 'vertical' | 'horizontal'; x?: number; y?: number; blockId: string; distance: number } | null = null
                 
-                if (snapTargets.left && (!bestSnap || snapTargets.left.distance < bestSnap.distance)) {
-                  bestSnap = { type: 'vertical', x: snapTargets.left.targetX, blockId: snapTargets.left.block.i, distance: snapTargets.left.distance }
+                if (snapTargets.left) {
+                  if (!bestSnap || snapTargets.left.distance < bestSnap.distance) {
+                    bestSnap = { type: 'vertical', x: snapTargets.left.targetX, blockId: snapTargets.left.block.i, distance: snapTargets.left.distance }
+                  }
                 }
-                if (snapTargets.right && (!bestSnap || snapTargets.right.distance < bestSnap.distance)) {
-                  bestSnap = { type: 'vertical', x: snapTargets.right.targetX, blockId: snapTargets.right.block.i, distance: snapTargets.right.distance }
+                if (snapTargets.right) {
+                  if (!bestSnap || snapTargets.right.distance < bestSnap.distance) {
+                    bestSnap = { type: 'vertical', x: snapTargets.right.targetX, blockId: snapTargets.right.block.i, distance: snapTargets.right.distance }
+                  }
                 }
-                if (snapTargets.top && (!bestSnap || snapTargets.top.distance < bestSnap.distance)) {
-                  bestSnap = { type: 'horizontal', y: snapTargets.top.targetY, blockId: snapTargets.top.block.i, distance: snapTargets.top.distance }
+                if (snapTargets.top) {
+                  if (!bestSnap || snapTargets.top.distance < bestSnap.distance) {
+                    bestSnap = { type: 'horizontal', y: snapTargets.top.targetY, blockId: snapTargets.top.block.i, distance: snapTargets.top.distance }
+                  }
                 }
-                if (snapTargets.bottom && (!bestSnap || snapTargets.bottom.distance < bestSnap.distance)) {
-                  bestSnap = { type: 'horizontal', y: snapTargets.bottom.targetY, blockId: snapTargets.bottom.block.i, distance: snapTargets.bottom.distance }
+                if (snapTargets.bottom) {
+                  if (!bestSnap || snapTargets.bottom.distance < bestSnap.distance) {
+                    bestSnap = { type: 'horizontal', y: snapTargets.bottom.targetY, blockId: snapTargets.bottom.block.i, distance: snapTargets.bottom.distance }
+                  }
                 }
                 
                 if (bestSnap) {

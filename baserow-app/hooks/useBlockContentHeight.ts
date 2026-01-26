@@ -31,10 +31,12 @@ export function useBlockContentHeight(
   ref: React.RefObject<HTMLElement>,
   options: UseBlockContentHeightOptions
 ): number {
-  const { rowHeight, isGrouped, onHeightChange, debounceMs = 100 } = options
+  const { rowHeight, isGrouped, onHeightChange, debounceMs = 100, autofitEnabled, isManuallyResizing } = options
   const [height, setHeight] = useState<number>(0)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const observerRef = useRef<ResizeObserver | null>(null)
+  const previousHeightRef = useRef<number>(0)
+  const imageLoadListenersRef = useRef<Set<(event: Event) => void>>(new Set())
 
   const measureHeight = useCallback(() => {
     if (!ref.current || !isGrouped) {
@@ -59,6 +61,8 @@ export function useBlockContentHeight(
       onHeightChange(finalHeight)
     }
   }, [ref, isGrouped, rowHeight, onHeightChange, height])
+
+  const shouldAutofit = autofitEnabled ?? (isGrouped ?? false)
 
   useEffect(() => {
     if (!shouldAutofit || isManuallyResizing) {
@@ -135,7 +139,7 @@ export function useBlockContentHeight(
         timeoutRef.current = null
       }
       // Clean up image load listeners
-      imageLoadListenersRef.current.forEach(listener => {
+      imageLoadListenersRef.current.forEach((listener: (event: Event) => void) => {
         // Remove listeners if elements still exist
         const images = ref.current?.querySelectorAll('img')
         images?.forEach(img => {
