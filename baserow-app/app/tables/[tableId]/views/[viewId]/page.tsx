@@ -96,8 +96,9 @@ export default async function ViewPage({
         .eq("view_id", viewId),
       supabase
         .from("view_sorts")
-        .select("id, field_name, direction")
-        .eq("view_id", viewId),
+        .select("id, field_name, direction, order_index")
+        .eq("view_id", viewId)
+        .order("order_index", { ascending: true }),
       supabase
         .from("grid_view_settings")
         .select("group_by_field")

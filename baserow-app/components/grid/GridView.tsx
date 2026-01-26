@@ -751,6 +751,7 @@ export default function GridView({
   type ViewSortType = {
     field_name: string
     direction: string
+    order_index?: number
   }
   const safeViewSorts = asArray<ViewSortType>(viewSorts)
 
@@ -1521,15 +1522,17 @@ export default function GridView({
 
       // Check if we need client-side sorting (for single_select by order, multi_select by first value)
       const needsClientSideSort = safeViewSorts.length > 0 && shouldUseClientSideSorting(
-        safeViewSorts.map(s => ({ field_name: s.field_name, direction: s.direction as 'asc' | 'desc' })),
+        safeViewSorts.map(s => ({ field_name: s.field_name, direction: s.direction as 'asc' | 'desc', order_index: s.order_index })),
         safeTableFields
       )
 
       // Apply sorting at query level (for fields that don't need client-side sorting)
       if (safeViewSorts.length > 0 && !needsClientSideSort) {
+        // Sort sorts by order_index to ensure correct order (database should already be sorted, but be safe)
+        const sortedSorts = [...safeViewSorts].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
         // Apply multiple sorts if needed
-        for (let i = 0; i < safeViewSorts.length; i++) {
-          const sort = safeViewSorts[i]
+        for (let i = 0; i < sortedSorts.length; i++) {
+          const sort = sortedSorts[i]
           const orderColumn = toPostgrestColumn(sort.field_name)
           if (!orderColumn) {
             debugWarn('LAYOUT', 'Skipping sort on invalid column:', sort.field_name)
@@ -1752,8 +1755,10 @@ export default function GridView({
             )
 
           if (filteredRetrySorts.length > 0 && !retryNeedsClientSideSort) {
-            for (let i = 0; i < filteredRetrySorts.length; i++) {
-              const sort = filteredRetrySorts[i]
+            // Sort sorts by order_index to ensure correct order
+            const sortedRetrySorts = [...filteredRetrySorts].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+            for (let i = 0; i < sortedRetrySorts.length; i++) {
+              const sort = sortedRetrySorts[i]
               const orderColumn = toPostgrestColumn(sort.field_name)
               if (!orderColumn) {
                 debugWarn('LAYOUT', 'Skipping sort on invalid column:', sort.field_name)
@@ -1784,7 +1789,7 @@ export default function GridView({
             if (retryNeedsClientSideSort && filteredRetrySorts.length > 0) {
               dataArray = sortRowsByFieldType(
                 dataArray,
-                filteredRetrySorts.map(s => ({ field_name: s.field_name, direction: s.direction as 'asc' | 'desc' })),
+                filteredRetrySorts.map(s => ({ field_name: s.field_name, direction: s.direction as 'asc' | 'desc', order_index: s.order_index })),
                 safeTableFields
               ).slice(0, ITEMS_PER_PAGE)
             }
@@ -1966,7 +1971,7 @@ export default function GridView({
         if (needsClientSideSort && safeViewSorts.length > 0) {
           computedRows = sortRowsByFieldType(
             computedRows,
-            safeViewSorts.map(s => ({ field_name: s.field_name, direction: s.direction as 'asc' | 'desc' })),
+            safeViewSorts.map(s => ({ field_name: s.field_name, direction: s.direction as 'asc' | 'desc', order_index: s.order_index })),
             safeTableFields
           )
           // Limit after sorting

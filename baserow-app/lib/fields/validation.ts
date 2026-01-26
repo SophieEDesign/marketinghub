@@ -87,8 +87,10 @@ export function validateFieldOptions(
 
     case 'lookup':
       if (!options.lookup_table_id || !options.lookup_field_id) {
-        return { valid: false, error: 'Lookup field must specify lookup table and field' }
+        return { valid: false, error: 'Lookup field must specify lookup table and linked field' }
       }
+      // Note: Full validation (checking that lookup_field_id is a valid linked field) 
+      // is done server-side in the API route where we have access to table fields
       break
 
     case 'formula':

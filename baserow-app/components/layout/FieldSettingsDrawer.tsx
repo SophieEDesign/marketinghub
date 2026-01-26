@@ -689,8 +689,15 @@ export default function FieldSettingsDrawer({
               const normalized = normalizeSelectOptionsForUi(type, opts)
               opts = normalized.repairedFieldOptions || opts
               const { selectOptions } = normalizeSelectOptionsForUi(type, opts)
-              // Persist without blank/whitespace-only options.
-              const trimmed = selectOptions.map((o) => ({ ...o, label: String(o.label ?? '').trim() }))
+              // Preserve sort_index when trimming labels - this maintains drag-and-drop order
+              const trimmed = selectOptions
+                .map((o) => ({ 
+                  ...o, 
+                  label: String(o.label ?? '').trim(),
+                  // Preserve sort_index to maintain manual drag-and-drop order
+                  sort_index: typeof o.sort_index === 'number' ? o.sort_index : 0
+                }))
+                .sort((a, b) => a.sort_index - b.sort_index) // Sort by preserved sort_index
               opts = syncSelectOptionsPayload(opts, trimmed, { dropEmpty: true })
             }
             
@@ -1400,17 +1407,13 @@ export default function FieldSettingsDrawer({
                     )}
                   </SelectContent>
                 </Select>
-                {options.lookup_table_id && options.lookup_field_id && (() => {
-                  const lookupField = lookupTableFields.find(f => f.id === options.lookup_field_id)
-                  const linkField = tableFields.find(f => 
-                    f.type === 'link_to_table' && 
-                    f.options?.linked_table_id === options.lookup_table_id
-                  )
+                {options.lookup_table_id && (() => {
+                  const linkField = tableFields.find(f => f.id === options.lookup_field_id)
                   return (
                     <p className="text-xs text-muted-foreground">
                       {linkField 
-                        ? `This field shows information pulled from records in the "${getFieldDisplayName(linkField)}" field.`
-                        : `This field shows information pulled from records in the linked table.`}
+                        ? `This lookup field will pull data from records linked via the "${getFieldDisplayName(linkField)}" field.`
+                        : `Select a linked field above to establish the relationship for this lookup.`}
                     </p>
                   )
                 })()}
@@ -1418,7 +1421,7 @@ export default function FieldSettingsDrawer({
               {options.lookup_table_id && (
                 <>
                   <div className="space-y-2">
-                    <Label htmlFor="lookup-field">Lookup Field</Label>
+                    <Label htmlFor="lookup-field">Linked Field</Label>
                     <Select
                       value={options.lookup_field_id || undefined}
                       onValueChange={(fieldId) =>
@@ -1426,20 +1429,37 @@ export default function FieldSettingsDrawer({
                       }
                     >
                       <SelectTrigger id="lookup-field">
-                        <SelectValue placeholder="Select a field" />
+                        <SelectValue placeholder="Select a linked field" />
                       </SelectTrigger>
                       <SelectContent>
-                        {loadingLookupFields ? (
-                          <SelectItem value="__loading__" disabled>Loading fields...</SelectItem>
-                        ) : (
-                          lookupTableFields.map((field) => (
+                        {(() => {
+                          // Filter to only show link_to_table fields from current table that link to the lookup table
+                          const validLinkedFields = tableFields.filter(
+                            (f) =>
+                              f.type === 'link_to_table' &&
+                              f.options?.linked_table_id === options.lookup_table_id &&
+                              f.id !== field?.id // Don't show the lookup field itself
+                          )
+
+                          if (validLinkedFields.length === 0) {
+                            return (
+                              <SelectItem value="__no_fields__" disabled>
+                                No linked fields found. Create a link field to this table first.
+                              </SelectItem>
+                            )
+                          }
+
+                          return validLinkedFields.map((field) => (
                             <SelectItem key={field.id} value={field.id}>
-                              {getFieldDisplayName(field)} ({field.type})
+                              {getFieldDisplayName(field)}
                             </SelectItem>
                           ))
-                        )}
+                        })()}
                       </SelectContent>
                     </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Select a linked field in this table that connects to the lookup table. This establishes the relationship used to determine which records to look up.
+                    </p>
                   </div>
                   
                   {/* Display Configuration */}

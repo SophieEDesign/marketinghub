@@ -206,7 +206,8 @@ export interface LinkedField extends TableField {
  * - Stores no values (computed at runtime)
  * - Always read-only
  * - Cannot be pasted into or directly edited
- * - Depends on exactly one linked field (via lookup_field_id)
+ * - Depends on exactly one linked field (link_to_table) in the current table (via lookup_field_id)
+ * - The linked field must connect to the lookup_table_id
  * - Recomputes automatically when linked data changes
  * 
  * Value format:
@@ -217,7 +218,7 @@ export interface LookupField extends TableField {
   type: 'lookup'
   options: FieldOptions & {
     lookup_table_id: string // Required: table to lookup from
-    lookup_field_id: string // Required: linked field ID that this lookup depends on
+    lookup_field_id: string // Required: linked field ID (link_to_table) in the current table that links to lookup_table_id
     lookup_result_field_id: string // Required: field in lookup table to display
   }
 }

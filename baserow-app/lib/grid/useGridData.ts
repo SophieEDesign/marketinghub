@@ -8,6 +8,20 @@ import { isAbortError } from '@/lib/api/error-handling'
 import { useToast } from '@/components/ui/use-toast'
 import { syncLinkedFieldBidirectional } from '@/lib/dataView/linkedFields'
 
+// Helper functions for SQL quoting (inline to avoid circular dependencies)
+function quoteIdent(ident: string): string {
+  return `"${String(ident ?? '').replace(/"/g, '""')}"`
+}
+
+function quoteMaybeQualifiedName(name: string): string {
+  const raw = String(name ?? '')
+  const parts = raw.split('.')
+  if (parts.length === 2 && parts[0] && parts[1]) {
+    return `${quoteIdent(parts[0])}.${quoteIdent(parts[1])}`
+  }
+  return quoteIdent(raw)
+}
+
 export interface GridRow {
   id: string
   [key: string]: unknown
@@ -698,17 +712,57 @@ export function useGridData({
         // Compatibility rescue:
         // Some existing tables have link_to_table columns physically created as `uuid` even though
         // the field is configured as multi-link (and the UI returns an array). In that case Postgres
-        // throws 22P02 "invalid input syntax for type uuid". If the user only selected one value,
-        // we can safely retry with the first element so inline edit doesn't hard-fail.
+        // throws 22P02 "invalid input syntax for type uuid". 
         if (
           updateError?.code === '22P02' &&
           Array.isArray(finalSavedValue) &&
           String(updateError?.message || '').toLowerCase().includes('invalid input syntax for type uuid')
         ) {
-          if (finalSavedValue.length <= 1) {
+          // Check if field is configured as multi-link
+          const field = safeFields.find(f => f && typeof f === 'object' && f.name === fieldName)
+          const isMultiLink = field && field.type === 'link_to_table' && (
+            (field.options as any)?.relationship_type === 'one-to-many' ||
+            (field.options as any)?.relationship_type === 'many-to-many' ||
+            (typeof (field.options as any)?.max_selections === 'number' && (field.options as any).max_selections > 1)
+          )
+
+          if (finalSavedValue.length <= 1 && !isMultiLink) {
+            // Single value and field is not configured as multi-link - just use the first element
             finalSavedValue = finalSavedValue[0] ?? null
             const retry = await doUpdate(finalSavedValue)
             updateError = retry.error
+          } else if (isMultiLink && tableId) {
+            // Field is configured as multi-link but column is uuid - auto-migrate to uuid[]
+            try {
+              const migrateSql = `ALTER TABLE ${quoteMaybeQualifiedName(tableName)} ALTER COLUMN ${quoteIdent(safeColumn)} TYPE uuid[] USING CASE WHEN ${quoteIdent(safeColumn)} IS NULL THEN ARRAY[]::uuid[] ELSE ARRAY[${quoteIdent(safeColumn)}] END;`
+              
+              const { error: migrateError } = await supabase.rpc('execute_sql_safe', { sql_text: migrateSql })
+              
+              if (migrateError) {
+                console.error('[useGridData] Failed to migrate column from uuid to uuid[]:', migrateError)
+                throw new Error(
+                  `This field is configured to allow multiple linked records, but the underlying column ` +
+                    `is a single uuid and could not be automatically migrated. Error: ${migrateError.message}`
+                )
+              }
+
+              // Wait a moment for PostgREST cache to refresh
+              await new Promise(resolve => setTimeout(resolve, 500))
+              
+              // Retry the update with the array value
+              const retry = await doUpdate(finalSavedValue)
+              updateError = retry.error
+              
+              if (!retry.error) {
+                console.log(`[useGridData] Successfully migrated column "${safeColumn}" from uuid to uuid[] and saved value`)
+              }
+            } catch (migrateErr: unknown) {
+              const migrateErrorMsg = migrateErr instanceof Error ? migrateErr.message : String(migrateErr)
+              throw new Error(
+                `This field is configured to allow multiple linked records, but the underlying column ` +
+                  `is a single uuid and could not be automatically migrated. ${migrateErrorMsg}`
+              )
+            }
           } else {
             throw new Error(
               `This field is configured to allow multiple linked records, but the underlying column ` +

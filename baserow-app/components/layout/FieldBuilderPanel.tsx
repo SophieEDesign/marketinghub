@@ -138,7 +138,7 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
 
   async function handleReorderFields(newOrder: TableField[]) {
     try {
-      // Update order_index for all fields
+      // Update order_index for all fields based on their position in the new order
       const updates = newOrder.map((field, index) => ({
         id: field.id,
         order_index: index,
@@ -152,17 +152,21 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
 
       if (!response.ok) {
         const data = await response.json()
+        console.error("Failed to reorder fields:", data.error || "Unknown error")
         alert(data.error || "Failed to reorder fields")
-        await loadFields() // Revert on error
+        // Revert to saved state on error
+        await loadFields()
         return
       }
 
-      setFields(newOrder)
+      // Success - fields are already updated in state, just refresh to ensure sync
+      await loadFields()
       onFieldsUpdated()
     } catch (error) {
       console.error("Error reordering fields:", error)
       alert("Failed to reorder fields")
-      await loadFields() // Revert on error
+      // Revert to saved state on error
+      await loadFields()
     }
   }
 
@@ -177,11 +181,15 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
     const { active, over } = event
 
     if (over && active.id !== over.id) {
+      // Find indices in the full fields array (not grouped)
       const oldIndex = fields.findIndex((f) => f.id === active.id)
       const newIndex = fields.findIndex((f) => f.id === over.id)
 
       if (oldIndex !== -1 && newIndex !== -1) {
         const newOrder = arrayMove(fields, oldIndex, newIndex)
+        // Immediately update local state for responsive UI
+        setFields(newOrder)
+        // Then persist to database
         handleReorderFields(newOrder)
       }
     }

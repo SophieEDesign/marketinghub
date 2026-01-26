@@ -257,10 +257,70 @@ export default function RecordFieldPanel({
           Array.isArray(finalSavedValue) &&
           String(error?.message || "").toLowerCase().includes('invalid input syntax for type uuid')
         ) {
-          if (finalSavedValue.length <= 1) {
+          // Check if field is configured as multi-link
+          const field = allFields.find((f) => f?.name === fieldName)
+          const isMultiLink = field && field.type === 'link_to_table' && (
+            (field.options as any)?.relationship_type === 'one-to-many' ||
+            (field.options as any)?.relationship_type === 'many-to-many' ||
+            (typeof (field.options as any)?.max_selections === 'number' && (field.options as any).max_selections > 1)
+          )
+
+          if (finalSavedValue.length <= 1 && !isMultiLink) {
+            // Single value and field is not configured as multi-link - just use the first element
             finalSavedValue = finalSavedValue[0] ?? null
             const retry = await doUpdate(finalSavedValue)
             error = retry.error
+          } else if (isMultiLink && tableId && table) {
+            // Field is configured as multi-link but column is uuid - auto-migrate to uuid[]
+            try {
+              // Helper functions for SQL quoting
+              const quoteIdent = (ident: string): string => {
+                return `"${String(ident ?? '').replace(/"/g, '""')}"`
+              }
+              const quoteMaybeQualifiedName = (name: string): string => {
+                const raw = String(name ?? '')
+                const parts = raw.split('.')
+                if (parts.length === 2 && parts[0] && parts[1]) {
+                  return `${quoteIdent(parts[0])}.${quoteIdent(parts[1])}`
+                }
+                return quoteIdent(raw)
+              }
+
+              const migrateSql = `ALTER TABLE ${quoteMaybeQualifiedName(table.supabase_table)} ALTER COLUMN ${quoteIdent(fieldName)} TYPE uuid[] USING CASE WHEN ${quoteIdent(fieldName)} IS NULL THEN ARRAY[]::uuid[] ELSE ARRAY[${quoteIdent(fieldName)}] END;`
+              
+              const { error: migrateError } = await supabase.rpc('execute_sql_safe', { sql_text: migrateSql })
+              
+              if (migrateError) {
+                console.error('[RecordFieldPanel] Failed to migrate column from uuid to uuid[]:', migrateError)
+                throw new Error(
+                  `This field is configured to allow multiple linked records, but the underlying column ` +
+                    `is a single uuid and could not be automatically migrated. Error: ${migrateError.message}`
+                )
+              }
+
+              // Wait a moment for PostgREST cache to refresh
+              await new Promise(resolve => setTimeout(resolve, 500))
+              
+              // Retry the update with the array value
+              const retry = await doUpdate(finalSavedValue)
+              error = retry.error
+              
+              if (!retry.error) {
+                console.log(`[RecordFieldPanel] Successfully migrated column "${fieldName}" from uuid to uuid[] and saved value`)
+              }
+            } catch (migrateErr: unknown) {
+              const migrateErrorMsg = migrateErr instanceof Error ? migrateErr.message : String(migrateErr)
+              throw new Error(
+                `This field is configured to allow multiple linked records, but the underlying column ` +
+                  `is a single uuid and could not be automatically migrated. ${migrateErrorMsg}`
+              )
+            }
+          } else {
+            throw new Error(
+              `This field is configured to allow multiple linked records, but the underlying column ` +
+                `is a single uuid. Please change the field to "One to One" (single) or migrate the ` +
+                `column to uuid[] before saving multiple values.`
+            )
           }
         }
 

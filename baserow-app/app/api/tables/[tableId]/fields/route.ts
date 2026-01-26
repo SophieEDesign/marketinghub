@@ -151,6 +151,39 @@ export async function POST(
         { status: 400 }
       )
     }
+
+    // Additional validation for lookup fields: lookup_field_id must be a linked field
+    if (type === 'lookup' && options?.lookup_field_id && options?.lookup_table_id) {
+      const { data: linkedField, error: linkedFieldError } = await supabase
+        .from('table_fields')
+        .select('id, type, options')
+        .eq('id', options.lookup_field_id)
+        .eq('table_id', tableId)
+        .single()
+
+      if (linkedFieldError || !linkedField) {
+        return NextResponse.json(
+          { error: 'Lookup field must reference a linked field (link_to_table) in the current table' },
+          { status: 400 }
+        )
+      }
+
+      if (linkedField.type !== 'link_to_table') {
+        return NextResponse.json(
+          { error: `Lookup field must reference a linked field, but field "${linkedField.id}" is of type "${linkedField.type}"` },
+          { status: 400 }
+        )
+      }
+
+      const linkedTableId = (linkedField.options as any)?.linked_table_id
+      if (linkedTableId !== options.lookup_table_id) {
+        return NextResponse.json(
+          { error: `Lookup field references a linked field that points to a different table. The linked field must connect to the lookup table.` },
+          { status: 400 }
+        )
+      }
+    }
+
     const position = existingFields.length
     // Set order_index to the max order_index + 1, or use position if no order_index exists
     const maxOrderIndex = existingFields.reduce((max, f) => {
@@ -721,6 +754,39 @@ export async function PATCH(
           { error: optionsValidation.error },
           { status: 400 }
         )
+      }
+
+      // Additional validation for lookup fields: lookup_field_id must be a linked field
+      const fieldType = (type || existingField.type) as FieldType
+      if (fieldType === 'lookup' && options.lookup_field_id && options.lookup_table_id) {
+        const { data: linkedField, error: linkedFieldError } = await supabase
+          .from('table_fields')
+          .select('id, type, options')
+          .eq('id', options.lookup_field_id)
+          .eq('table_id', tableId)
+          .single()
+
+        if (linkedFieldError || !linkedField) {
+          return NextResponse.json(
+            { error: 'Lookup field must reference a linked field (link_to_table) in the current table' },
+            { status: 400 }
+          )
+        }
+
+        if (linkedField.type !== 'link_to_table') {
+          return NextResponse.json(
+            { error: `Lookup field must reference a linked field, but field "${linkedField.id}" is of type "${linkedField.type}"` },
+            { status: 400 }
+          )
+        }
+
+        const linkedTableId = (linkedField.options as any)?.linked_table_id
+        if (linkedTableId !== options.lookup_table_id) {
+          return NextResponse.json(
+            { error: `Lookup field references a linked field that points to a different table. The linked field must connect to the lookup table.` },
+            { status: 400 }
+          )
+        }
       }
       updates.options = options
     }

@@ -654,6 +654,17 @@ export async function syncLinkedFieldBidirectional(
     if (val === null || val === undefined) return []
     if (Array.isArray(val)) return val.filter(isUuid)
     if (isUuid(val)) return [val]
+    // Handle stringified arrays (e.g., "["uuid"]" from database)
+    if (typeof val === 'string' && val.trim().startsWith('[') && val.trim().endsWith(']')) {
+      try {
+        const parsed = JSON.parse(val)
+        if (Array.isArray(parsed)) {
+          return parsed.filter(isUuid)
+        }
+      } catch {
+        // Not valid JSON, fall through
+      }
+    }
     return []
   }
 
@@ -703,13 +714,21 @@ export async function syncLinkedFieldBidirectional(
           if (!currentArray.includes(sourceRecordId)) {
             const updatedArray = [...currentArray, sourceRecordId]
 
+            // Ensure we're sending a proper array, not a stringified version
+            // Check if the column type supports arrays, if not we need to handle it differently
             const { error: updateError } = await supabase
               .from(sourceTableName_final)
               .update({ [sourceFieldName_final]: updatedArray })
               .eq('id', sourceRecordIdToUpdate)
 
             if (updateError) {
-              console.error(`[syncLinkedFieldBidirectional] Failed to update source field for record ${sourceRecordIdToUpdate}:`, updateError)
+              // If we get a type error, the column might be uuid instead of uuid[]
+              // In that case, we can't update it as an array - log and skip
+              if (updateError.code === '22P02' && String(updateError.message || '').toLowerCase().includes('invalid input syntax for type uuid')) {
+                console.warn(`[syncLinkedFieldBidirectional] Column ${sourceFieldName_final} is uuid (not uuid[]), cannot sync multi-link bidirectionally. Field needs to be migrated to uuid[] first.`)
+              } else {
+                console.error(`[syncLinkedFieldBidirectional] Failed to update source field for record ${sourceRecordIdToUpdate}:`, updateError)
+              }
             }
           }
         }
@@ -738,13 +757,19 @@ export async function syncLinkedFieldBidirectional(
           if (currentArray.includes(sourceRecordId)) {
             const updatedArray = currentArray.filter(id => id !== sourceRecordId)
 
+            // Ensure we're sending a proper array, not a stringified version
             const { error: updateError } = await supabase
               .from(sourceTableName_final)
               .update({ [sourceFieldName_final]: updatedArray.length > 0 ? updatedArray : null })
               .eq('id', sourceRecordIdToUpdate)
 
             if (updateError) {
-              console.error(`[syncLinkedFieldBidirectional] Failed to update source field for record ${sourceRecordIdToUpdate}:`, updateError)
+              // If we get a type error, the column might be uuid instead of uuid[]
+              if (updateError.code === '22P02' && String(updateError.message || '').toLowerCase().includes('invalid input syntax for type uuid')) {
+                console.warn(`[syncLinkedFieldBidirectional] Column ${sourceFieldName_final} is uuid (not uuid[]), cannot sync multi-link bidirectionally. Field needs to be migrated to uuid[] first.`)
+              } else {
+                console.error(`[syncLinkedFieldBidirectional] Failed to update source field for record ${sourceRecordIdToUpdate}:`, updateError)
+              }
             }
           }
         }
@@ -812,13 +837,19 @@ export async function syncLinkedFieldBidirectional(
           if (!currentArray.includes(sourceRecordId)) {
             const updatedArray = [...currentArray, sourceRecordId]
 
+            // Ensure we're sending a proper array, not a stringified version
             const { error: updateError } = await supabase
               .from(targetTableName)
               .update({ [reciprocalFieldName]: updatedArray })
               .eq('id', targetRecordId)
 
             if (updateError) {
-              console.error(`[syncLinkedFieldBidirectional] Failed to update reciprocal for record ${targetRecordId}:`, updateError)
+              // If we get a type error, the column might be uuid instead of uuid[]
+              if (updateError.code === '22P02' && String(updateError.message || '').toLowerCase().includes('invalid input syntax for type uuid')) {
+                console.warn(`[syncLinkedFieldBidirectional] Column ${reciprocalFieldName} is uuid (not uuid[]), cannot sync multi-link bidirectionally. Field needs to be migrated to uuid[] first.`)
+              } else {
+                console.error(`[syncLinkedFieldBidirectional] Failed to update reciprocal for record ${targetRecordId}:`, updateError)
+              }
             }
           }
         }
@@ -847,13 +878,19 @@ export async function syncLinkedFieldBidirectional(
           if (currentArray.includes(sourceRecordId)) {
             const updatedArray = currentArray.filter(id => id !== sourceRecordId)
 
+            // Ensure we're sending a proper array, not a stringified version
             const { error: updateError } = await supabase
               .from(targetTableName)
               .update({ [reciprocalFieldName]: updatedArray.length > 0 ? updatedArray : null })
               .eq('id', targetRecordId)
 
             if (updateError) {
-              console.error(`[syncLinkedFieldBidirectional] Failed to update reciprocal for record ${targetRecordId}:`, updateError)
+              // If we get a type error, the column might be uuid instead of uuid[]
+              if (updateError.code === '22P02' && String(updateError.message || '').toLowerCase().includes('invalid input syntax for type uuid')) {
+                console.warn(`[syncLinkedFieldBidirectional] Column ${reciprocalFieldName} is uuid (not uuid[]), cannot sync multi-link bidirectionally. Field needs to be migrated to uuid[] first.`)
+              } else {
+                console.error(`[syncLinkedFieldBidirectional] Failed to update reciprocal for record ${targetRecordId}:`, updateError)
+              }
             }
           }
         }
