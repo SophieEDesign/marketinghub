@@ -327,24 +327,24 @@ export default function GridViewWrapper({
           .maybeSingle()
 
         if (fallbackError && fallbackError.code !== 'PGRST116') {
-          console.error("Error loading group rules:", error)
+          console.error("Error loading group rules:", fallbackError)
           return
         }
 
-        if (data) {
+        if (fallbackData) {
           // Prefer group_by_rules if available, otherwise convert group_by_field
-          if (data.group_by_rules && Array.isArray(data.group_by_rules) && data.group_by_rules.length > 0) {
-            setGroupByRules(data.group_by_rules as GroupRule[])
+          if (fallbackData.group_by_rules && Array.isArray(fallbackData.group_by_rules) && fallbackData.group_by_rules.length > 0) {
+            setGroupByRules(fallbackData.group_by_rules as GroupRule[])
             // Also set groupBy for backward compatibility
-            const firstRule = data.group_by_rules[0] as GroupRule
+            const firstRule = fallbackData.group_by_rules[0] as GroupRule
             if (firstRule.type === 'field') {
               setGroupBy(firstRule.field)
             }
-          } else if (data.group_by_field) {
+          } else if (fallbackData.group_by_field) {
             // Convert legacy group_by_field to rules
-            const rules: GroupRule[] = [{ type: 'field', field: data.group_by_field }]
+            const rules: GroupRule[] = [{ type: 'field', field: fallbackData.group_by_field }]
             setGroupByRules(rules)
-            setGroupBy(data.group_by_field)
+            setGroupBy(fallbackData.group_by_field)
           } else {
             setGroupByRules(undefined)
             setGroupBy(undefined)

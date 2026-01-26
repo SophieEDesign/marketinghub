@@ -257,7 +257,7 @@ export default function NewAutomationClient() {
         <div className="mb-6">
           <Label htmlFor="table-select" className="mb-2 block">Table</Label>
           <Select
-            value={tableId}
+            value={tableId ?? undefined}
             onValueChange={(value) => setSelectedTableId(value)}
           >
             <SelectTrigger id="table-select" className="w-full max-w-md">
