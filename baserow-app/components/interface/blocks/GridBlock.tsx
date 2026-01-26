@@ -214,6 +214,7 @@ export default function GridBlock({
       id: s.id || '',
       field_name: s.field_name,
       direction: s.direction,
+      order_index: (s as any).order_index ?? 0,
     }))
   }, [viewMeta?.sorts])
 

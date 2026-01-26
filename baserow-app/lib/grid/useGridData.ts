@@ -709,6 +709,25 @@ export function useGridData({
 
         let { error: updateError } = await doUpdate(finalSavedValue)
 
+        // Compatibility rescue for uuid[] column type mismatch (code 42804):
+        // Some columns are physically uuid[] but the field is configured as single-link,
+        // so we normalize to a single UUID. When that happens, Postgres throws 42804.
+        if (
+          updateError?.code === '42804' &&
+          !Array.isArray(finalSavedValue) &&
+          String(updateError?.message || '').toLowerCase().includes('uuid[]') &&
+          String(updateError?.message || '').toLowerCase().includes('uuid')
+        ) {
+          // Column is uuid[] but we're trying to save a single UUID - wrap it in an array
+          const wrappedValue = finalSavedValue != null ? [finalSavedValue] : null
+          const retry = await doUpdate(wrappedValue)
+          updateError = retry.error
+          if (!retry.error) {
+            finalSavedValue = wrappedValue
+            console.log(`[useGridData] Auto-corrected: wrapped single UUID in array for uuid[] column "${safeColumn}"`)
+          }
+        }
+
         // Compatibility rescue:
         // Some existing tables have link_to_table columns physically created as `uuid` even though
         // the field is configured as multi-link (and the UI returns an array). In that case Postgres

@@ -162,6 +162,25 @@ export default function RecordModal({
 
       let { error } = await doUpdate(finalSavedValue)
 
+      // Compatibility rescue for uuid[] column type mismatch (code 42804):
+      // Some columns are physically uuid[] but the field is configured as single-link,
+      // so we normalize to a single UUID. When that happens, Postgres throws 42804.
+      if (
+        error?.code === '42804' &&
+        !Array.isArray(finalSavedValue) &&
+        String(error?.message || '').toLowerCase().includes('uuid[]') &&
+        String(error?.message || '').toLowerCase().includes('uuid')
+      ) {
+        // Column is uuid[] but we're trying to save a single UUID - wrap it in an array
+        const wrappedValue = finalSavedValue != null ? [finalSavedValue] : null
+        const retry = await doUpdate(wrappedValue)
+        error = retry.error
+        if (!retry.error) {
+          finalSavedValue = wrappedValue
+          console.log(`[RecordModal] Auto-corrected: wrapped single UUID in array for uuid[] column "${fieldName}"`)
+        }
+      }
+
       // See `useGridData.updateCell` for rationale (uuid vs uuid[] mismatch for linked fields)
       if (
         error?.code === "22P02" &&
