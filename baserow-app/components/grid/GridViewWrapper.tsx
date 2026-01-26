@@ -90,7 +90,7 @@ interface GridViewWrapperProps {
   /** Callback when block content height changes (for grouped blocks) */
   onHeightChange?: (height: number) => void
   /** Row height in pixels (for height calculation) */
-  rowHeight?: number
+  rowHeightPixels?: number
 }
 
 export default function GridViewWrapper({
@@ -114,7 +114,7 @@ export default function GridViewWrapper({
   blockLevelSettings = {},
   defaultGroupsCollapsed = true,
   onHeightChange,
-  rowHeight = 30,
+  rowHeightPixels = 30,
 }: GridViewWrapperProps) {
   // CRITICAL: Normalize all inputs at wrapper entry point
   const safeInitialFilters = asArray<Filter>(initialFilters)
