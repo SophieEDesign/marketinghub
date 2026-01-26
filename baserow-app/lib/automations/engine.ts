@@ -237,14 +237,14 @@ export async function executeAutomation(
                 // Add action logs
                 if (actionResult.logs) {
                   for (const log of actionResult.logs) {
-                    await logMessage(supabase, automation.id, runId, log.level, log.message, log.data)
+                    await logMessage(supabase, automation.id, runId, log.level, log.message)
                     logs.push({
                       id: '',
                       automation_id: automation.id,
                       run_id: runId,
                       level: log.level,
                       message: log.message,
-                      data: log.data,
+                      data: (log as any).data,
                       created_at: new Date().toISOString(),
                     })
                   }
