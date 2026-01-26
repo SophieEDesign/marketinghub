@@ -31,6 +31,9 @@ export default function PerformanceMonitor() {
     let slowFrameCount = 0
     let longTaskCount = 0
 
+    let lastWarningTime = 0
+    const WARNING_COOLDOWN = 5000 // Only warn once every 5 seconds
+
     // Monitor frame rate
     const checkFrameRate = () => {
       const now = performance.now()
@@ -41,7 +44,9 @@ export default function PerformanceMonitor() {
       // Frame should be ~16ms for 60fps, >50ms is slow
       if (frameTime > 50) {
         slowFrameCount++
-        if (slowFrameCount > 5) {
+        // Only warn if we've accumulated enough slow frames AND enough time has passed since last warning
+        if (slowFrameCount > 5 && (now - lastWarningTime) > WARNING_COOLDOWN) {
+          lastWarningTime = now
           setBlocked(true)
           console.warn("⚠️ UI BLOCKED - Multiple slow frames detected!", {
             frameTime,
@@ -54,7 +59,8 @@ export default function PerformanceMonitor() {
         setBlocked(false)
       }
 
-      if (frameCount % 60 === 0) {
+      // Update stats less frequently (every 120 frames = ~2 seconds) to reduce overhead
+      if (frameCount % 120 === 0) {
         const avgFrameTime = totalFrameTime / frameCount
         setStats(prev => ({
           longTasks: prev.longTasks, // Preserve longTasks from observer updates
@@ -115,13 +121,12 @@ export default function PerformanceMonitor() {
     }
   }, []) // Empty dependency array - effect should only run once on mount
 
-  // Log performance warnings
+  // Log performance warnings (only when blocked state changes, not continuously)
   useEffect(() => {
     if (blocked) {
-      console.warn("🚨 PERFORMANCE ISSUE: UI is blocked!", {
-        message: "Navigation clicks may not work. Try refreshing the page.",
-        stats,
-      })
+      // Only log once when blocked state becomes true
+      // The warning is already logged in checkFrameRate, so we don't need to duplicate it here
+      // This prevents duplicate warnings
     }
   }, [blocked, stats])
 

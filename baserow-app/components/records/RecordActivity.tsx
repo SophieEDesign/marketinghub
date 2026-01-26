@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { ChevronDown, ChevronRight, Clock } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { formatUserDisplayName } from "@/lib/users/userDisplay"
 
 interface RecordActivityProps {
   record: Record<string, any>
@@ -33,17 +34,6 @@ export default function RecordActivity({ record, tableId }: RecordActivityProps)
     }
   }
 
-  function formatUserDisplayName(emailOrNull: string | null) {
-    if (!emailOrNull) return "Unknown"
-    const email = String(emailOrNull)
-    const local = email.split("@")[0] || email
-    const parts = local
-      .replace(/[._-]+/g, " ")
-      .split(" ")
-      .filter(Boolean)
-      .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
-    return parts.join(" ") || email
-  }
 
   async function loadActivityMetadata() {
     if (record.created_by || record.updated_by) {

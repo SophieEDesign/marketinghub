@@ -161,6 +161,17 @@ export default function GroupDialog({
     }
   }
 
+  // Debug: Log when dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      console.log('[GroupDialog] Dialog opened', { 
+        rules: rules.length, 
+        groupByRules: groupByRules?.length,
+        groupBy 
+      })
+    }
+  }, [isOpen, rules.length, groupByRules, groupBy])
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">

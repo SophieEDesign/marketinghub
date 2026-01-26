@@ -23,6 +23,7 @@ import { isAbortError } from "@/lib/api/error-handling"
 import type { LinkedField } from "@/types/fields"
 import { resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
 import { normalizeUuid } from "@/lib/utils/ids"
+import { isUserField, getUserDisplayNames } from "@/lib/users/userDisplay"
 
 // PostgREST expects unquoted identifiers in order clauses; see `lib/supabase/postgrest`.
 
@@ -94,6 +95,7 @@ export default function ListView({
   const [currentGroupBy, setCurrentGroupBy] = useState<string | undefined>(groupBy)
   const [currentFilters, setCurrentFilters] = useState<FilterConfig[]>(filters)
   const [groupValueLabelMaps, setGroupValueLabelMaps] = useState<Record<string, Record<string, string>>>({})
+  const [userDisplayNames, setUserDisplayNames] = useState<Map<string, string>>(new Map())
 
   // Create flow: open modal first; only insert on Save inside modal.
   const [createModalOpen, setCreateModalOpen] = useState(false)
@@ -268,6 +270,27 @@ export default function ListView({
         // Success - reset failure count
         consecutiveFailuresRef.current = 0
         setRows(data || [])
+        
+        // Fetch user display names for user fields in loaded rows
+        if (data && data.length > 0) {
+          const userIds = new Set<string>()
+          tableFields.forEach((field) => {
+            if (isUserField(field.name)) {
+              data.forEach((row) => {
+                const userId = row[field.name]
+                if (userId && typeof userId === "string") {
+                  userIds.add(userId)
+                }
+              })
+            }
+          })
+          
+          if (userIds.size > 0) {
+            getUserDisplayNames(Array.from(userIds)).then(setUserDisplayNames).catch(() => {
+              // Fail gracefully
+            })
+          }
+        }
       }
     } catch (error) {
       if (isAbortError(error)) {
@@ -518,6 +541,15 @@ export default function ListView({
       return '—'
     }
 
+    // Check if this is a user field and we have a display name cached
+    if (isUserField(field.name) && typeof value === "string") {
+      const displayName = userDisplayNames.get(value)
+      if (displayName) {
+        return displayName
+      }
+      // Fall through to default if name not loaded yet
+    }
+
     switch (field.type) {
       case 'date':
         return formatDateUK(value)
@@ -541,7 +573,7 @@ export default function ListView({
       default:
         return String(value)
     }
-  }, [])
+  }, [userDisplayNames])
 
   // Helper to get pill color
   const getPillColor = useCallback((field: TableField, value: any): string | null => {

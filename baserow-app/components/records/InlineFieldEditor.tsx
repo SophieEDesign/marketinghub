@@ -10,6 +10,7 @@ import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/L
 import RichTextEditor from "@/components/fields/RichTextEditor"
 import AttachmentPreview, { type Attachment } from "@/components/attachments/AttachmentPreview"
 import InlineSelectDropdown from "@/components/fields/InlineSelectDropdown"
+import { isUserField, getUserDisplayName } from "@/lib/users/userDisplay"
 
 import {
   resolveChoiceColor,
@@ -53,10 +54,22 @@ export default function InlineFieldEditor({
 }: InlineFieldEditorProps) {
   const { toast } = useToast()
   const [localValue, setLocalValue] = useState(value)
+  const [userDisplayName, setUserDisplayName] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(null)
   const showLabel = propShowLabel
   const labelClassName = propLabelClassName || "block text-sm font-medium text-gray-700"
   const containerClassName = showLabel ? "space-y-1.5" : ""
+  
+  // Check if this is a user field and fetch display name
+  const isUserFieldType = isUserField(field.name)
+  
+  useEffect(() => {
+    if (isUserFieldType && value && typeof value === "string") {
+      getUserDisplayName(value).then(setUserDisplayName).catch(() => setUserDisplayName(null))
+    } else {
+      setUserDisplayName(null)
+    }
+  }, [isUserFieldType, value])
   const displayBoxClassName = showLabel
     ? "px-3 py-2 border border-gray-200 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer text-sm text-gray-900"
     : "-mx-2 px-2 py-1.5 rounded-md text-sm text-gray-900 hover:bg-gray-50 hover:ring-1 hover:ring-gray-200 transition-colors cursor-pointer"
@@ -709,7 +722,13 @@ export default function InlineFieldEditor({
       )}
       {isReadOnly ? (
         <div className={readOnlyBoxClassName}>
-          {value !== null && value !== undefined ? String(value) : "—"}
+          {isUserFieldType && userDisplayName ? (
+            userDisplayName
+          ) : value !== null && value !== undefined ? (
+            String(value)
+          ) : (
+            "—"
+          )}
           {field.type === "formula" && field.options?.formula && (
             <div className="text-xs text-gray-500 mt-1 font-mono">
               = {field.options.formula}
@@ -721,7 +740,9 @@ export default function InlineFieldEditor({
           onClick={onEditStart}
           className={`${displayBoxClassName} ${showLabel ? "min-h-[36px] flex items-center" : ""}`}
         >
-          {value !== null && value !== undefined ? (
+          {isUserFieldType && userDisplayName ? (
+            userDisplayName
+          ) : value !== null && value !== undefined ? (
             String(value)
           ) : (
             <span className="text-gray-400">Click to edit...</span>

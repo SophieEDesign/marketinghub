@@ -116,16 +116,35 @@ export default function AutomationCard({ automation }: AutomationCardProps) {
             <p className="text-sm text-gray-600 mb-3 line-clamp-2">{automation.description}</p>
           )}
           
-          <div className="flex items-center gap-4 text-xs text-gray-500 mb-2">
-            <span className="flex items-center gap-1">
-              <span className="font-medium">Trigger:</span>
-              {getTriggerLabel(automation.trigger_type)}
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="font-medium">Actions:</span>
-              {(automation.actions || []).length}
-            </span>
-          </div>
+                    <div className="flex items-center gap-4 text-xs text-gray-500 mb-2 flex-wrap">
+                      <span className="flex items-center gap-1">
+                        <span className="font-medium">Trigger:</span>
+                        {getTriggerLabel(automation.trigger_type)}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="font-medium">Actions:</span>
+                        {(automation.actions || []).length}
+                      </span>
+                      {automation.category && (
+                        <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs">
+                          {automation.category}
+                        </span>
+                      )}
+                      {automation.tags && automation.tags.length > 0 && (
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {automation.tags.slice(0, 3).map((tag, i) => (
+                            <span key={i} className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
+                              {tag}
+                            </span>
+                          ))}
+                          {automation.tags.length > 3 && (
+                            <span className="text-gray-500 text-xs">
+                              +{automation.tags.length - 3} more
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
 
           {!loading && (
             <div className="flex items-center gap-4 text-xs text-gray-500">

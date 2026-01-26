@@ -9,6 +9,7 @@ import {
   ContextMenuTrigger,
 } from '@/components/context-menu/ContextMenu'
 import { Copy, Edit } from 'lucide-react'
+import { isUserField, getUserDisplayName } from '@/lib/users/userDisplay'
 
 interface TextCellProps {
   // CellFactory passes `any` at runtime; be defensive here.
@@ -47,8 +48,20 @@ export default function TextCell({
 
   const [editValue, setEditValue] = useState(toDisplayString(value))
   const [saving, setSaving] = useState(false)
+  const [userDisplayName, setUserDisplayName] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const cellRef = useRef<HTMLDivElement>(null)
+  
+  // Check if this is a user field and fetch display name
+  const isUserFieldType = isUserField(fieldName)
+  
+  useEffect(() => {
+    if (isUserFieldType && value && typeof value === "string") {
+      getUserDisplayName(value).then(setUserDisplayName).catch(() => setUserDisplayName(null))
+    } else {
+      setUserDisplayName(null)
+    }
+  }, [isUserFieldType, value])
 
   useEffect(() => {
     setEditValue(toDisplayString(value))
@@ -182,7 +195,8 @@ export default function TextCell({
   }
 
   // IMPORTANT: don't treat 0/false as empty (previously: `value || placeholder`)
-  const rawText = toDisplayString(value)
+  // For user fields, use the display name if available
+  const rawText = isUserFieldType && userDisplayName ? userDisplayName : toDisplayString(value)
   const isEmpty = rawText.trim().length === 0
   const displayValue = isEmpty ? placeholder : rawText
   const isPlaceholder = isEmpty

@@ -175,6 +175,8 @@ export default function AutomationBuilder({
       setTriggerConfig(automation.trigger_config || {})
       setActions((automation.actions as ActionConfig[]) || [])
       setEnabled(automation.enabled ?? true)
+      setCategory(automation.category || "")
+      setTags(automation.tags || [])
       
       // Handle conditions: support both old formula format and new filter JSON format
       const conditions = automation.conditions?.[0]
@@ -226,6 +228,8 @@ export default function AutomationBuilder({
         actions,
         enabled,
         conditions,
+        category: category || undefined,
+        tags: tags.length > 0 ? tags : undefined,
       })
     } catch (err: any) {
       setError(err.message || "Failed to save automation")
@@ -1066,6 +1070,79 @@ export default function AutomationBuilder({
             Enabled
           </label>
         </div>
+
+        {/* Category */}
+        <div>
+          <label className="block text-sm font-medium mb-1">Category (optional)</label>
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">No category</option>
+            <option value="Notifications">Notifications</option>
+            <option value="Data Sync">Data Sync</option>
+            <option value="Maintenance">Maintenance</option>
+            <option value="Workflow">Workflow</option>
+            <option value="Integrations">Integrations</option>
+            <option value="Cleanup">Cleanup</option>
+            <option value="Other">Other</option>
+          </select>
+          <p className="text-xs text-gray-500 mt-1">Organize automations by category</p>
+        </div>
+
+        {/* Tags */}
+        <div>
+          <label className="block text-sm font-medium mb-1">Tags (optional)</label>
+          <div className="flex flex-wrap gap-2 mb-2">
+            {tags.map((tag, index) => (
+              <span
+                key={index}
+                className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-md text-xs"
+              >
+                {tag}
+                <button
+                  type="button"
+                  onClick={() => setTags(tags.filter((_, i) => i !== index))}
+                  className="hover:text-blue-900"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Add a tag..."
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                  e.preventDefault()
+                  const newTag = e.currentTarget.value.trim()
+                  if (!tags.includes(newTag)) {
+                    setTags([...tags, newTag])
+                  }
+                  e.currentTarget.value = ''
+                }
+              }}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              type="button"
+              onClick={(e) => {
+                const input = e.currentTarget.previousElementSibling as HTMLInputElement
+                if (input.value.trim() && !tags.includes(input.value.trim())) {
+                  setTags([...tags, input.value.trim()])
+                  input.value = ''
+                }
+              }}
+              className="px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors text-sm"
+            >
+              Add
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mt-1">Press Enter or click Add to add tags</p>
+        </div>
       </div>
 
       {/* Trigger */}
@@ -1121,10 +1198,9 @@ export default function AutomationBuilder({
           </Select>
           {(() => {
             const selected = TRIGGER_TYPES.find(tt => tt.value === triggerType)
-            if (!selected) return null
-            return (
+            return selected ? (
               <p className="text-xs text-gray-500 mt-1.5">{selected.description}</p>
-            )
+            ) : null
           })()}
         </div>
 

@@ -271,41 +271,36 @@ export default function GridViewWrapper({
   }, [initialGroupBy])
 
   // Load group_by_rules from grid_view_settings
-  // CRITICAL: Respect initialGroupBy from block config - if it's null/undefined, don't restore from grid_view_settings
-  // This prevents grouping from being restored when it's removed from block config (core data)
+  // Priority: 1) grid_view_settings.group_by_rules (nested groups), 2) initialGroupBy (block config), 3) grid_view_settings.group_by_field (legacy)
   useEffect(() => {
     if (!viewUuid) return
 
     async function loadGroupRules() {
       try {
-        // If initialGroupBy is explicitly null or undefined, clear grid_view_settings to prevent restoration
-        // This happens when grouping is removed from block config
-        if (initialGroupBy === null || initialGroupBy === undefined) {
-          // Check if grid_view_settings has grouping that needs to be cleared
-          const { data: existing } = await supabase
-            .from("grid_view_settings")
-            .select("id, group_by_rules, group_by_field")
-            .eq("view_id", viewUuid)
-            .maybeSingle()
-          
-          if (existing && (existing.group_by_rules || existing.group_by_field)) {
-            // Clear grouping from grid_view_settings to prevent it from being restored
-            await supabase
-              .from("grid_view_settings")
-              .update({
-                group_by_rules: null,
-                group_by_field: null,
-              })
-              .eq("view_id", viewUuid)
-          }
-          // Ensure state is cleared
-          setGroupByRules(undefined)
-          setGroupBy(undefined)
+        // First, try to load from grid_view_settings (this includes nested groups)
+        const { data: settings, error } = await supabase
+          .from("grid_view_settings")
+          .select("group_by_rules, group_by_field")
+          .eq("view_id", viewUuid)
+          .maybeSingle()
+
+        if (error && error.code !== 'PGRST116') {
+          console.error("Error loading group rules:", error)
           return
         }
 
-        // initialGroupBy has a value - use it instead of loading from grid_view_settings
-        // This ensures block config takes precedence over view settings
+        // If we have group_by_rules in the database, use those (nested groups take precedence)
+        if (settings?.group_by_rules && Array.isArray(settings.group_by_rules) && settings.group_by_rules.length > 0) {
+          setGroupByRules(settings.group_by_rules as GroupRule[])
+          // Also set groupBy for backward compatibility
+          const firstRule = settings.group_by_rules[0] as GroupRule
+          if (firstRule.type === 'field') {
+            setGroupBy(firstRule.field)
+          }
+          return
+        }
+
+        // If no nested groups, check for initialGroupBy from block config
         if (initialGroupBy) {
           // Convert initialGroupBy to rules format
           const rules: GroupRule[] = [{ type: 'field', field: initialGroupBy }]
@@ -314,9 +309,17 @@ export default function GridViewWrapper({
           return
         }
 
-        // Only load from grid_view_settings if initialGroupBy is not provided at all
-        // (This would be a view context, not a block context)
-        // Note: In practice, initialGroupBy is always provided from GridBlock, so this is a fallback
+        // Fallback to legacy group_by_field from database
+        if (settings?.group_by_field) {
+          const rules: GroupRule[] = [{ type: 'field', field: settings.group_by_field }]
+          setGroupByRules(rules)
+          setGroupBy(settings.group_by_field)
+          return
+        }
+
+        // No grouping found
+        setGroupByRules(undefined)
+        setGroupBy(undefined)
         const { data, error } = await supabase
           .from("grid_view_settings")
           .select("group_by_rules, group_by_field")

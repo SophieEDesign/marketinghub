@@ -121,6 +121,8 @@ export interface Automation {
   actions?: any[]
   conditions?: any[]
   enabled: boolean
+  category?: string
+  tags?: string[]
 }
 
 export interface AutomationRun {

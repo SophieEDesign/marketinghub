@@ -264,7 +264,7 @@ export default function AutomationTestMode({ automation, onClose }: AutomationTe
           {steps.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <Play className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-              <p>Click "Run Test" to start testing this automation</p>
+              <p>Click &quot;Run Test&quot; to start testing this automation</p>
             </div>
           ) : (
             <div className="space-y-3">

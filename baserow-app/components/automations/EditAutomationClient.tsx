@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import AutomationBuilder from "./AutomationBuilder"
 import AutomationRunHistory from "./AutomationRunHistory"
+import AutomationHealthDashboard from "./AutomationHealthDashboard"
 import type { Automation, TableField } from "@/types/database"
-import { Settings, History } from "lucide-react"
+import { Settings, History, Activity } from "lucide-react"
 
 interface EditAutomationClientProps {
   automationId: string
@@ -163,6 +164,17 @@ export default function EditAutomationClient({ automationId }: EditAutomationCli
             <History className="h-4 w-4" />
             Run History
           </button>
+          <button
+            onClick={() => setActiveTab('health')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
+              activeTab === 'health'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Activity className="h-4 w-4" />
+            Health
+          </button>
         </nav>
       </div>
 
@@ -176,10 +188,14 @@ export default function EditAutomationClient({ automationId }: EditAutomationCli
           onTest={handleTest}
           onDelete={handleDelete}
         />
-      ) : (
+      ) : activeTab === 'history' ? (
         <div>
           <h2 className="text-xl font-semibold mb-4">Execution History</h2>
           <AutomationRunHistory automationId={automationId} />
+        </div>
+      ) : (
+        <div>
+          <AutomationHealthDashboard automations={automation ? [automation] : []} />
         </div>
       )}
     </div>

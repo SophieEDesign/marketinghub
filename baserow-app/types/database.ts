@@ -131,6 +131,8 @@ export interface Automation {
   actions?: any[]
   conditions?: any[]
   enabled: boolean
+  category?: string
+  tags?: string[]
   created_at?: string
   updated_at?: string
   created_by?: string

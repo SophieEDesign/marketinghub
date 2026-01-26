@@ -16,6 +16,7 @@ import { getVersionsClient, restoreVersionClient } from "@/lib/versioning/versio
 import { formatDateTimeUK } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import type { EntityType, EntityVersion } from "@/lib/versioning/versioning"
+import { getUserDisplayNames } from "@/lib/users/userDisplay"
 
 interface VersionHistoryPanelProps {
   open: boolean
@@ -37,6 +38,7 @@ export default function VersionHistoryPanel({
   const [loading, setLoading] = useState(false)
   const [restoring, setRestoring] = useState<string | null>(null)
   const [previewVersion, setPreviewVersion] = useState<EntityVersion | null>(null)
+  const [userDisplayNames, setUserDisplayNames] = useState<Map<string, string>>(new Map())
 
   useEffect(() => {
     if (open && entityId) {
@@ -160,7 +162,7 @@ export default function VersionHistoryPanel({
                         {version.created_by && (
                           <div className="flex items-center gap-1">
                             <User className="h-3 w-3" />
-                            User
+                            {userDisplayNames.get(version.created_by) || "Unknown"}
                           </div>
                         )}
                       </div>

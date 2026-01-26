@@ -4,6 +4,7 @@ import "./globals.css"
 import { Toaster } from "@/components/ui/toaster"
 import CommandPaletteProvider from "@/components/command-palette/CommandPaletteProvider"
 import DynamicTitle from "@/components/layout/DynamicTitle"
+import ConsoleErrorFilter from "@/components/layout/ConsoleErrorFilter"
 import DiagnosticsInitializer from "@/components/layout/DiagnosticsInitializer"
 import InteractionFailsafe from "@/components/layout/InteractionFailsafe"
 import NavigationDiagnostics from "@/components/layout/NavigationDiagnostics"
@@ -76,6 +77,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <SWRProvider>
+          <ConsoleErrorFilter />
           <DiagnosticsInitializer />
           <InteractionFailsafe />
           <PerformanceMonitor />

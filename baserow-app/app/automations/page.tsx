@@ -3,9 +3,10 @@ import { createClient } from "@/lib/supabase/server"
 import { isAdmin } from "@/lib/roles"
 import Link from "next/link"
 import WorkspaceShellWrapper from "@/components/layout/WorkspaceShellWrapper"
-import { Plus } from "lucide-react"
+import { Plus, Activity } from "lucide-react"
 import type { Automation } from "@/types/database"
-import AutomationCard from "@/components/automations/AutomationCard"
+import AutomationsListClient from "@/components/automations/AutomationsListClient"
+import AutomationHealthDashboard from "@/components/automations/AutomationHealthDashboard"
 
 export default async function AutomationsPage() {
   // Security: Only admins can access automations
@@ -74,11 +75,19 @@ export default async function AutomationsPage() {
             </Link>
           </div>
         ) : (
-          <div className="grid gap-4">
-            {automationList.map((automation) => (
-              <AutomationCard key={automation.id} automation={automation} />
-            ))}
-          </div>
+          <>
+            {/* Health Dashboard Summary */}
+            {automationList.length > 0 && (
+              <div className="border-b border-gray-200 pb-6">
+                <AutomationHealthDashboard automations={automationList} />
+              </div>
+            )}
+            
+            {/* Automation List */}
+            <div className={automationList.length > 0 ? "pt-6" : ""}>
+              <AutomationsListClient automations={automationList} />
+            </div>
+          </>
         )}
       </div>
     </WorkspaceShellWrapper>

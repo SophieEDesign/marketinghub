@@ -70,13 +70,37 @@ export default function NavigationDiagnostics() {
   useEffect(() => {
     if (!enabled) return
 
+    // Helper function to check for actual issues
+    const checkForIssues = (): boolean => {
+      // Check for blocking overlays
+      const overlays = document.querySelectorAll('[class*="fixed"][class*="inset"]')
+      const blockingOverlays = Array.from(overlays).filter(el => {
+        const style = window.getComputedStyle(el)
+        const zIndex = parseInt(style.zIndex)
+        return !isNaN(zIndex) && zIndex >= 40 && style.pointerEvents !== "none"
+      })
+
+      // Check body/html for locked styles
+      const body = document.body
+      const bodyStyle = window.getComputedStyle(body)
+      const isBodyLocked = bodyStyle.pointerEvents === "none" || bodyStyle.userSelect === "none"
+
+      // Check for open dialogs
+      const dialogs = document.querySelectorAll('[role="dialog"]')
+      const openDialogs = Array.from(dialogs).filter(el => {
+        const style = window.getComputedStyle(el)
+        return style.display !== "none" && style.visibility !== "hidden"
+      })
+
+      return blockingOverlays.length > 0 || isBodyLocked || openDialogs.length > 0
+    }
+
     // Run diagnostics on pathname change
+    // Only show detailed diagnostics if there's an issue, otherwise just a summary
     const runDiagnostics = () => {
-      console.group("🔍 Navigation Diagnostics")
-      
-      // 0. Verify sidebar exists and has data attribute
       const sidebarCheck = document.querySelector('[data-sidebar]')
       if (!sidebarCheck) {
+        console.group("🔍 Navigation Diagnostics - ISSUES DETECTED")
         console.error("❌ CRITICAL: Sidebar not found! Looking for [data-sidebar] attribute")
         // Try to find sidebar by other means
         const possibleSidebars = document.querySelectorAll('[class*="sidebar"], [class*="Sidebar"], aside')
@@ -87,7 +111,15 @@ export default function NavigationDiagnostics() {
           hasDataSidebar: el.hasAttribute('data-sidebar'),
         })))
       } else {
-        console.log("✅ Sidebar found with [data-sidebar] attribute")
+        // Only show full diagnostics if there are actual issues
+        const hasIssues = checkForIssues()
+        if (hasIssues) {
+          console.group("🔍 Navigation Diagnostics - ISSUES DETECTED")
+        } else {
+          // Just log a simple summary when everything is OK
+          console.log("✅ Navigation Diagnostics: All checks passed")
+          return // Exit early if no issues
+        }
       }
       
       // 1. Check for blocking overlays
@@ -218,15 +250,18 @@ export default function NavigationDiagnostics() {
         console.log("🧪 No test link found in sidebar")
       }
 
-      // 9. Performance check - detect if UI is blocked
+      // 9. Performance check - detect if UI is blocked (only log if slow)
       const perfStart = performance.now()
       requestAnimationFrame(() => {
         const perfElapsed = performance.now() - perfStart
-        console.log("⚡ Performance:", {
-          rafLatency: perfElapsed,
-          status: perfElapsed > 16 ? "SLOW" : "OK",
-          warning: perfElapsed > 100 ? "UI thread may be blocked!" : null,
-        })
+        // Only log if there's an actual performance issue
+        if (perfElapsed > 100) {
+          console.warn("⚡ Performance issue detected:", {
+            rafLatency: perfElapsed,
+            status: "SLOW",
+            warning: "UI thread may be blocked!",
+          })
+        }
       })
 
       // 10. Check for long-running operations
@@ -254,7 +289,7 @@ export default function NavigationDiagnostics() {
       console.groupEnd()
     }
 
-    // Run immediately and after a delay
+    // Run immediately and after a delay (but only show details if issues found)
     runDiagnostics()
     const timeout = setTimeout(runDiagnostics, 1000)
 
@@ -382,12 +417,15 @@ export default function NavigationDiagnostics() {
   }, [enabled, pathname])
 
   // Performance monitoring - detect if UI is frozen/blocked
+  // Only log when issues are detected, not continuously
   useEffect(() => {
     if (!enabled || !mounted) return
 
     let lastCheck = performance.now()
     let frameCount = 0
     let blockedFrames = 0
+    let lastWarningTime = 0
+    const WARNING_COOLDOWN = 5000 // Only warn once every 5 seconds
 
     const checkPerformance = () => {
       const now = performance.now()
@@ -396,7 +434,9 @@ export default function NavigationDiagnostics() {
       // If frame took > 100ms, UI is likely blocked
       if (elapsed > 100) {
         blockedFrames++
-        if (blockedFrames > 3) {
+        // Only warn if we've accumulated enough blocked frames AND enough time has passed since last warning
+        if (blockedFrames > 3 && (now - lastWarningTime) > WARNING_COOLDOWN) {
+          lastWarningTime = now
           console.warn("⚠️ UI BLOCKED - Performance issue detected!", {
             blockedFrames,
             averageFrameTime: elapsed,
@@ -410,14 +450,8 @@ export default function NavigationDiagnostics() {
       frameCount++
       lastCheck = now
       
-      // Log performance every 60 frames (~1 second at 60fps)
-      if (frameCount % 60 === 0) {
-        console.log("⚡ Performance check:", {
-          frameTime: elapsed,
-          blockedFrames,
-          status: blockedFrames > 0 ? "BLOCKED" : "OK",
-        })
-      }
+      // Only log performance status when there's an issue, not every second
+      // This reduces console noise significantly
     }
 
     let rafId: number
