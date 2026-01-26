@@ -38,8 +38,12 @@ export default function LongTextCell({
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    setEditValue(value || '')
-  }, [value])
+    // Only update editValue from prop when NOT editing
+    // This prevents the input from resetting while the user is typing
+    if (!editing) {
+      setEditValue(value || '')
+    }
+  }, [value, editing])
 
   const handleSave = async () => {
     if (saving) return

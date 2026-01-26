@@ -64,8 +64,12 @@ export default function TextCell({
   }, [isUserFieldType, value])
 
   useEffect(() => {
-    setEditValue(toDisplayString(value))
-  }, [value])
+    // Only update editValue from prop when NOT editing
+    // This prevents the input from resetting while the user is typing
+    if (!editing) {
+      setEditValue(toDisplayString(value))
+    }
+  }, [value, editing])
 
   useEffect(() => {
     if (editing && inputRef.current) {

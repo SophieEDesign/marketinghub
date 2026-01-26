@@ -1274,8 +1274,6 @@ export default function AutomationBuilder({
           </button>
         </div>
       </div>
-        </>
-      )}
 
       {/* Test Mode Modal */}
       {showTestMode && automation && (

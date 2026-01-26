@@ -27,8 +27,12 @@ export default function NumberCell({
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    setEditValue(value?.toString() || '')
-  }, [value])
+    // Only update editValue from prop when NOT editing
+    // This prevents the input from resetting while the user is typing
+    if (!editing) {
+      setEditValue(value?.toString() || '')
+    }
+  }, [value, editing])
 
   useEffect(() => {
     if (editing && inputRef.current) {

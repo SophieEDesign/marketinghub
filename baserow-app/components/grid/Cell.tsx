@@ -30,8 +30,12 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null)
 
   useEffect(() => {
-    setEditValue(value ?? "")
-  }, [value])
+    // Only update editValue from prop when NOT editing
+    // This prevents the input from resetting while the user is typing
+    if (!editing) {
+      setEditValue(value ?? "")
+    }
+  }, [value, editing])
 
   useEffect(() => {
     if (editing && inputRef.current) {

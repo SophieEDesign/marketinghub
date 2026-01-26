@@ -81,8 +81,12 @@ export default function InlineFieldEditor({
     : "w-full px-2 py-1.5 rounded-md ring-1 ring-gray-200 focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm"
 
   useEffect(() => {
-    setLocalValue(value)
-  }, [value])
+    // Only update localValue from prop when NOT editing
+    // This prevents the input from resetting while the user is typing
+    if (!isEditing) {
+      setLocalValue(value)
+    }
+  }, [value, isEditing])
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
