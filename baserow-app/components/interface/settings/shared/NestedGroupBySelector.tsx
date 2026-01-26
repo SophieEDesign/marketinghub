@@ -64,7 +64,7 @@ export default function NestedGroupBySelector({
 
   // Get date fields for date grouping
   const dateFields = fields.filter(
-    (f) => f.type === "date" || f.type === "datetime"
+    (f) => f.type === "date"
   )
 
   function addRule() {
