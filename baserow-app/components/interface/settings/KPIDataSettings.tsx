@@ -239,7 +239,9 @@ export default function KPIDataSettings({
           <BlockFilterEditor
             filters={config.filters || []}
             tableFields={fields}
+            config={config}
             onChange={(filters) => onUpdate({ filters })}
+            onConfigUpdate={(updates) => onUpdate(updates)}
           />
         </div>
       )}

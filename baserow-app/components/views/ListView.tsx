@@ -50,6 +50,7 @@ interface ListViewProps {
   imageField?: string // Optional: field name for image/attachment
   pillFields?: string[] // Optional: select/multi-select fields to show as pills
   metaFields?: string[] // Optional: date, number, etc. for metadata
+  modalFields?: string[] // Optional: fields to show in record modal (empty = show all)
   // Callbacks for block config updates (when not using views)
   onGroupByChange?: (fieldName: string | null) => void
   onFiltersChange?: (filters: FilterConfig[]) => void
@@ -80,6 +81,7 @@ export default function ListView({
   imageField,
   pillFields = [],
   metaFields = [],
+  modalFields,
   onGroupByChange,
   onFiltersChange,
   reloadKey,
@@ -687,12 +689,14 @@ export default function ListView({
       tableId={tableId}
       recordId={null}
       tableFields={Array.isArray(tableFields) ? tableFields : []}
+      modalFields={modalFields}
       initialData={createInitialData || undefined}
       onSave={async () => {
         await loadRows()
         setCreateModalOpen(false)
         setCreateInitialData(null)
       }}
+      supabaseTableName={supabaseTableName}
     />
   )
 

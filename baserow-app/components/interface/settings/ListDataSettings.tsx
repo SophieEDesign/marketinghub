@@ -18,6 +18,7 @@ import BlockFilterEditor from "./BlockFilterEditor"
 import TableSelector from "./shared/TableSelector"
 import GroupBySelector from "./shared/GroupBySelector"
 import SortSelector from "./shared/SortSelector"
+import ModalFieldsSelector from "./shared/ModalFieldsSelector"
 
 interface ListDataSettingsProps {
   config: BlockConfig
@@ -450,7 +451,22 @@ export default function ListDataSettings({
           <BlockFilterEditor
             filters={blockFilters}
             tableFields={fields}
+            config={config}
             onChange={(filters) => onUpdate({ filters })}
+            onConfigUpdate={(updates) => onUpdate(updates)}
+          />
+        </div>
+      )}
+
+      {/* Modal Fields (Optional) */}
+      {config.table_id && fields.length > 0 && (
+        <div className="space-y-2 border-t pt-4">
+          <ModalFieldsSelector
+            value={(config as any).modal_fields || []}
+            onChange={(fieldNames) => onUpdate({ modal_fields: fieldNames } as any)}
+            fields={fields}
+            label="Fields to Show in Record Modal"
+            description="Choose which fields appear when creating or editing a record. Leave empty to show all fields."
           />
         </div>
       )}

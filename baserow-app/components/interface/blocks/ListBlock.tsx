@@ -18,7 +18,7 @@ import type { TableField } from "@/types/fields"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import QuickFilterBar from "@/components/filters/QuickFilterBar"
-import CreateRecordModal from "@/components/records/CreateRecordModal"
+import RecordModal from "@/components/calendar/RecordModal"
 import { useToast } from "@/components/ui/use-toast"
 import { VIEWS_ENABLED } from "@/lib/featureFlags"
 
@@ -76,7 +76,6 @@ export default function ListBlock({
   }, [viewFiltersWithUserOverrides, filters])
 
   const [loading, setLoading] = useState(true)
-  const [creating, setCreating] = useState(false)
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [table, setTable] = useState<{ id: string; supabase_table: string; name?: string | null } | null>(null)
@@ -250,62 +249,18 @@ export default function ListBlock({
 
   const handleOpenCreateModal = () => {
     if (!showAddRecord || !canCreateRecord || isLoading || !table || !tableId) return
-    if (creating) return
     setCreateModalOpen(true)
   }
 
-  const handleCreateRecord = useCallback(
-    async (primaryValue: string) => {
-      if (!showAddRecord || !canCreateRecord || isLoading || !table || !tableId) return
-      if (creating) return
-
-      setCreating(true)
-      try {
-        const supabase = createClient()
-        const newData: Record<string, any> = {}
-
-        const defaultsFromFilters = deriveDefaultValuesFromFilters(allFilters, safeTableFields)
-        if (Object.keys(defaultsFromFilters).length > 0) {
-          Object.assign(newData, defaultsFromFilters)
-        }
-
-        if (canPrefillTitle && titleFieldObj?.name && primaryValue) {
-          newData[titleFieldObj.name] = primaryValue
-        }
-
-        const { data, error } = await supabase
-          .from(table.supabase_table)
-          .insert([newData])
-          .select()
-          .single()
-
-        if (error) throw error
-
-        const createdId = (data as any)?.id || (data as any)?.record_id
-        if (!createdId) return
-
-        toast({ title: "Record created" })
-        // Contract: creating a record must NOT auto-open it.
-        // User can open via the dedicated chevron (or optional double-click) in the list.
-        setCreateModalOpen(false)
-        setRefreshKey((k) => k + 1)
-      } finally {
-        setCreating(false)
-      }
-    },
-    [
-      canCreateRecord,
-      canPrefillTitle,
-      creating,
-      isLoading,
-      onRecordClick,
-      showAddRecord,
-      table,
-      tableId,
-      titleFieldObj?.name,
-      toast,
-    ]
-  )
+  const handleCreateRecordSave = useCallback(async () => {
+    if (!showAddRecord || !canCreateRecord || isLoading || !table || !tableId) return
+    
+    toast({ title: "Record created" })
+    // Contract: creating a record must NOT auto-open it.
+    // User can open via the dedicated chevron (or optional double-click) in the list.
+    setCreateModalOpen(false)
+    setRefreshKey((k) => k + 1)
+  }, [canCreateRecord, isLoading, showAddRecord, table, tableId, toast])
 
   if (!tableId) {
     return (
@@ -366,19 +321,30 @@ export default function ListBlock({
     )
   }
 
+  // Get modal fields from config
+  const modalFields = (config as any)?.modal_fields as string[] | undefined
+
+  // Prepare initial data for new record (prefill from filters)
+  const createInitialData = useMemo(() => {
+    const defaultsFromFilters = deriveDefaultValuesFromFilters(allFilters, safeTableFields)
+    return Object.keys(defaultsFromFilters).length > 0 ? defaultsFromFilters : undefined
+  }, [allFilters, safeTableFields])
+
   return (
     <div className="h-full w-full overflow-auto" style={blockStyle}>
-      <CreateRecordModal
-        open={createModalOpen}
-        onOpenChange={setCreateModalOpen}
-        tableName={table?.name || undefined}
-        primaryFieldLabel={canPrefillTitle ? (titleFieldObj?.name || null) : null}
-        primaryFieldPlaceholder={
-          canPrefillTitle && titleFieldObj?.name ? `Enter ${titleFieldObj.name}` : undefined
-        }
-        isSaving={creating}
-        onCreate={handleCreateRecord}
-      />
+      {table && tableId && (
+        <RecordModal
+          open={createModalOpen}
+          onClose={() => setCreateModalOpen(false)}
+          tableId={table.id}
+          recordId={null}
+          tableFields={safeTableFields}
+          modalFields={modalFields}
+          initialData={createInitialData}
+          onSave={handleCreateRecordSave}
+          supabaseTableName={table.supabase_table}
+        />
+      )}
       {(((appearance.showTitle ?? (appearance as any).show_title) !== false && (appearance.title || (isEditing ? config.title : table?.name))) || showAddRecord) && (
         <div
           className="mb-4 pb-2 border-b flex items-center justify-between gap-3"
@@ -398,7 +364,7 @@ export default function ListBlock({
               size="sm"
               variant="outline"
               onClick={handleOpenCreateModal}
-              disabled={!canCreateRecord || isLoading || !table || !tableId || creating}
+              disabled={!canCreateRecord || isLoading || !table || !tableId}
               title={!canCreateRecord ? 'Adding records is disabled for this block' : 'Add a new record'}
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -436,6 +402,7 @@ export default function ListBlock({
         imageField={imageField}
         pillFields={pillFields}
         metaFields={metaFields}
+        modalFields={modalFields}
         reloadKey={refreshKey}
         onHeightChange={groupBy ? onHeightChange : undefined}
         rowHeight={rowHeight}

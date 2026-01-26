@@ -226,7 +226,9 @@ export default function ChartDataSettings({
           <BlockFilterEditor
             filters={config.filters || []}
             tableFields={fields}
+            config={config}
             onChange={(filters) => onUpdate({ filters })}
+            onConfigUpdate={(updates) => onUpdate(updates)}
           />
         </div>
       )}
