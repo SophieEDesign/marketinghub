@@ -77,7 +77,7 @@ export async function getUserDisplayName(userId: string | null | undefined): Pro
   
   const userMap = await fetchUserEmails([userId])
   const email = userMap.get(userId)
-  return formatUserDisplayName(email)
+  return formatUserDisplayName(email ?? null)
 }
 
 /**
@@ -93,7 +93,7 @@ export async function getUserDisplayNames(userIds: string[]): Promise<Map<string
   
   userIds.forEach((userId) => {
     const email = userMap.get(userId)
-    displayNames.set(userId, formatUserDisplayName(email))
+    displayNames.set(userId, formatUserDisplayName(email ?? null))
   })
 
   return displayNames

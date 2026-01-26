@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Filter, X } from "lucide-react"
 import type { Automation } from "@/types/database"
 

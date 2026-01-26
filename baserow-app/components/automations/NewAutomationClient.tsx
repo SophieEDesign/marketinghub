@@ -221,18 +221,6 @@ export default function NewAutomationClient() {
     )
   }
 
-  function handleTemplateSelect(template: AutomationTemplate) {
-    setTemplateAutomation({
-      name: template.name,
-      description: template.description,
-      trigger_type: template.triggerType,
-      trigger_config: template.triggerConfig,
-      actions: template.actions,
-      conditions: template.conditions,
-    })
-    setShowTemplates(false)
-  }
-
   return (
     <div className="max-w-4xl mx-auto p-6">
       {showTemplates && (
@@ -288,7 +276,7 @@ export default function NewAutomationClient() {
       {(tableId || templateAutomation) && (
         <AutomationBuilder
           automation={templateAutomation as Automation}
-          tableId={tableId || urlTableId || ''}
+          tableId={(tableId || urlTableId || '') as string}
           tableFields={tableFields}
           onSave={handleSave}
         />

@@ -18,7 +18,7 @@ export default function EditAutomationClient({ automationId }: EditAutomationCli
   const [automation, setAutomation] = useState<Automation | null>(null)
   const [tableFields, setTableFields] = useState<TableField[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'edit' | 'history'>('edit')
+  const [activeTab, setActiveTab] = useState<'edit' | 'history' | 'health'>('edit')
 
   useEffect(() => {
     loadData()

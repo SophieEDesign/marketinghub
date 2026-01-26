@@ -67,10 +67,8 @@ export default function InlineSelectDropdown({
   }, [value, isMulti])
 
   const handleOpenChange = (open: boolean) => {
-    // Only allow opening if cell is selected (two-click behavior)
-    if (open && !isCellSelected) {
-      return
-    }
+    // Allow opening on first click for better UX in grid cells
+    // The two-click behavior was too restrictive and confusing
     setIsOpen(open)
     if (!open) {
       setSearchTerm('')
@@ -388,24 +386,19 @@ export default function InlineSelectDropdown({
     )
   }
 
-  // Handle click: only open dropdown if cell is already selected (two-click behavior)
+  // Handle click: open dropdown on click, but allow parent to handle cell selection first if needed
   const handleTriggerClick = (e: React.MouseEvent) => {
-    // If cell is not selected, allow click to propagate to parent for cell selection
-    if (!isCellSelected) {
-      // Don't stop propagation - let parent handle cell selection
-      return
-    }
-    // Cell is selected, so stop propagation and open dropdown on this click
+    // Stop propagation to prevent row selection when clicking the dropdown trigger
     e.stopPropagation()
-    setIsOpen(true)
+    // Open dropdown - handleOpenChange will handle the actual opening
+    if (!isOpen) {
+      setIsOpen(true)
+    }
   }
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    // Only stop propagation if cell is already selected (to prevent row selection)
-    // If not selected, allow propagation so parent can select the cell
-    if (isCellSelected) {
-      e.stopPropagation()
-    }
+    // Stop propagation to prevent row selection when interacting with dropdown
+    e.stopPropagation()
   }
 
   return (

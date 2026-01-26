@@ -166,6 +166,11 @@ export default function AutomationBuilder({
   const [error, setError] = useState<string | null>(null)
   const [editingActionIndex, setEditingActionIndex] = useState<number | null>(null)
   const [viewMode, setViewMode] = useState<'form' | 'visual'>('visual')
+  const [category, setCategory] = useState<string>("")
+  const [tags, setTags] = useState<string[]>([])
+  const [previewingAction, setPreviewingAction] = useState<number | null>(null)
+  const [variablePickerOpen, setVariablePickerOpen] = useState<{ actionIndex: number; mappingIndex: number; inputRef: HTMLInputElement | null } | null>(null)
+  const [showTestMode, setShowTestMode] = useState(false)
 
   useEffect(() => {
     if (automation) {

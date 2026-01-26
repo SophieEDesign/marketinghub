@@ -320,13 +320,13 @@ export default function GridViewWrapper({
         // No grouping found
         setGroupByRules(undefined)
         setGroupBy(undefined)
-        const { data, error } = await supabase
+        const { data: fallbackData, error: fallbackError } = await supabase
           .from("grid_view_settings")
           .select("group_by_rules, group_by_field")
           .eq("view_id", viewUuid)
           .maybeSingle()
 
-        if (error && error.code !== 'PGRST116') {
+        if (fallbackError && fallbackError.code !== 'PGRST116') {
           console.error("Error loading group rules:", error)
           return
         }

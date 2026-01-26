@@ -1,4 +1,5 @@
-import type { Automation, TriggerType, ActionConfig } from "@/types/database"
+import type { Automation } from "@/types/database"
+import type { TriggerType, ActionConfig } from "./types"
 
 export interface AutomationTemplate {
   id: string

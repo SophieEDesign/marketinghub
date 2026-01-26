@@ -140,11 +140,18 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
   // Handle select fields
   if (fieldType === "single_select" && fieldOptions?.choices) {
     if (editing) {
+      const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const newValue = e.target.value
+        setEditValue(newValue)
+        // For select dropdowns, save immediately when a choice is made
+        // This provides better UX than waiting for blur
+        handleSave()
+      }
+      
       return (
         <select
           value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onBlur={handleSave}
+          onChange={handleSelectChange}
           onKeyDown={handleKeyDown}
           className="w-full h-8 px-2 text-sm border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
           autoFocus

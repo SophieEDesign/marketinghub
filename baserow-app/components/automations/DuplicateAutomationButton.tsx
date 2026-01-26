@@ -32,7 +32,6 @@ export default function DuplicateAutomationButton({ automation }: DuplicateAutom
             description: automation.description || '',
             trigger_type: automation.trigger_type,
             trigger_config: automation.trigger_config || {},
-            trigger: automation.trigger || {},
             actions: automation.actions || [],
             conditions: automation.conditions || [],
             enabled: false, // Disable by default for safety

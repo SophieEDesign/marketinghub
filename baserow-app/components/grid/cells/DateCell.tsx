@@ -45,17 +45,21 @@ export default function DateCell({
   }, [])
 
   useEffect(() => {
+    // Only update editValue from prop when NOT editing
+    // This prevents the input from resetting while the user is typing
     if (!isMountedRef.current) return
-    if (value) {
-      try {
-        setEditValue(format(parseISO(value), 'yyyy-MM-dd'))
-      } catch {
-        if (isMountedRef.current) setEditValue('')
+    if (!editing) {
+      if (value) {
+        try {
+          setEditValue(format(parseISO(value), 'yyyy-MM-dd'))
+        } catch {
+          if (isMountedRef.current) setEditValue('')
+        }
+      } else {
+        setEditValue('')
       }
-    } else {
-      setEditValue('')
     }
-  }, [value])
+  }, [value, editing])
 
   useEffect(() => {
     if (editing && inputRef.current) {
