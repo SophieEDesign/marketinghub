@@ -893,7 +893,9 @@ export default function MultiCalendarView({
             onDateFromChange={setDateFrom}
             onDateToChange={setDateTo}
             disabled={false}
-            defaultPreset={((blockConfig as any)?.default_date_range_preset || 'thisWeek') as 'today' | 'thisWeek' | 'thisMonth' | 'nextWeek' | 'nextMonth' | 'custom'}
+            defaultPreset={(blockConfig as any)?.default_date_range_preset && (blockConfig as any).default_date_range_preset !== 'none'
+              ? ((blockConfig as any).default_date_range_preset as 'today' | 'thisWeek' | 'thisMonth' | 'nextWeek' | 'nextMonth' | 'custom')
+              : null}
           />
         </div>
       )}

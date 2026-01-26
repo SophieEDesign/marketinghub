@@ -13,7 +13,7 @@ export interface CalendarDateRangeControlsProps {
   onDateFromChange: (date?: Date) => void
   onDateToChange: (date?: Date) => void
   disabled?: boolean
-  defaultPreset?: DateRangePreset // Preset to reset to when "Clear range" is clicked
+  defaultPreset?: DateRangePreset | null // Preset to reset to when "Clear range" is clicked (null means clear completely)
 }
 
 type DateRangePreset = 'today' | 'thisWeek' | 'thisMonth' | 'nextWeek' | 'nextMonth' | 'custom'
@@ -57,7 +57,7 @@ export default function CalendarDateRangeControls({
   onDateFromChange,
   onDateToChange,
   disabled = false,
-  defaultPreset = 'thisWeek',
+  defaultPreset = null, // null means no default - clear completely
 }: CalendarDateRangeControlsProps) {
   // Determine current preset based on selected dates
   const getCurrentPreset = (): DateRangePreset => {
@@ -257,16 +257,18 @@ export default function CalendarDateRangeControls({
             disabled={disabled}
             className="text-xs"
             onClick={() => {
-              // Reset to default preset instead of clearing completely
-              const range = getDateRangeForPreset(defaultPreset)
-              if (range) {
-                onDateFromChange(range.from)
-                onDateToChange(range.to)
-              } else {
-                // Fallback: clear if preset is 'custom' or invalid
-                onDateFromChange(undefined)
-                onDateToChange(undefined)
+              // If defaultPreset is set, reset to it; otherwise clear completely
+              if (defaultPreset && defaultPreset !== 'custom') {
+                const range = getDateRangeForPreset(defaultPreset)
+                if (range) {
+                  onDateFromChange(range.from)
+                  onDateToChange(range.to)
+                  return
+                }
               }
+              // No default preset configured - clear completely
+              onDateFromChange(undefined)
+              onDateToChange(undefined)
             }}
           >
             Clear range

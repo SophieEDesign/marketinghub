@@ -6,6 +6,7 @@ import { applyFiltersToQuery, type FilterConfig } from '@/lib/interface/filters'
 import { buildSelectClause, toPostgrestColumn } from '@/lib/supabase/postgrest'
 import { isAbortError } from '@/lib/api/error-handling'
 import { useToast } from '@/components/ui/use-toast'
+import { syncLinkedFieldBidirectional } from '@/lib/dataView/linkedFields'
 
 export interface GridRow {
   id: string
@@ -680,6 +681,10 @@ export function useGridData({
           }
         }
 
+        // Get old value for bidirectional sync
+        const currentRow = rows.find(r => r.id === rowId)
+        const oldValue = currentRow ? (currentRow[fieldName] as string | string[] | null) : null
+
         const normalizedValue = normalizeUpdateValue(fieldName, value)
 
         let finalSavedValue: unknown = normalizedValue
@@ -736,6 +741,27 @@ export function useGridData({
           }
 
           throw new Error(`Failed to update "${safeColumn}" on "${tableName}": ${formatPostgrestError(updateError)}`)
+        }
+
+        // Sync bidirectional linked fields
+        if (tableId) {
+          const field = safeFields.find(f => f && typeof f === 'object' && f.name === fieldName)
+          if (field && field.type === 'link_to_table') {
+            try {
+              await syncLinkedFieldBidirectional(
+                tableId,
+                tableName,
+                fieldName,
+                rowId,
+                finalSavedValue as string | string[] | null,
+                oldValue,
+                false
+              )
+            } catch (syncError) {
+              // Log sync error but don't fail the update
+              console.error('[useGridData] Bidirectional sync failed:', syncError)
+            }
+          }
         }
 
         // Optimistically update local state

@@ -100,11 +100,19 @@ export default function GridBlock({
   // Track if date range has been initialized to prevent re-initialization when user clears it
   const dateRangeInitializedRef = useRef(false)
   
-  // Initialize calendar date range based on config or default to "this week"
+  // Initialize calendar date range based on config (only if preset is explicitly set)
   // Only initialize once - don't re-initialize when user clears the range
   useEffect(() => {
     if (viewType === 'calendar' && !dateRangeInitializedRef.current && calendarDateFrom === undefined && calendarDateTo === undefined) {
-      const preset = config?.default_date_range_preset || 'thisWeek'
+      const preset = config?.default_date_range_preset
+      
+      // Only initialize if a preset is explicitly configured (not 'none' and not undefined)
+      if (!preset || preset === 'none') {
+        // No preset configured - mark as initialized but don't set dates
+        dateRangeInitializedRef.current = true
+        return
+      }
+      
       const today = startOfDay(new Date())
       let from: Date | undefined
       let to: Date | undefined
@@ -132,9 +140,8 @@ export default function GridBlock({
           from = nextMonthStart
           to = endOfMonth(nextMonthStart)
           break
-        case 'none':
         default:
-          // Don't set default dates, but mark as initialized so we don't try again
+          // Unknown preset - mark as initialized but don't set dates
           dateRangeInitializedRef.current = true
           return
       }
@@ -945,7 +952,9 @@ export default function GridBlock({
                 onDateFromChange={setCalendarDateFrom}
                 onDateToChange={setCalendarDateTo}
                 disabled={false}
-                defaultPreset={(config?.default_date_range_preset || 'thisWeek') as 'today' | 'thisWeek' | 'thisMonth' | 'nextWeek' | 'nextMonth' | 'custom'}
+                defaultPreset={config?.default_date_range_preset && config.default_date_range_preset !== 'none' 
+                  ? (config.default_date_range_preset as 'today' | 'thisWeek' | 'thisMonth' | 'nextWeek' | 'nextMonth' | 'custom')
+                  : null}
               />
             )}
           </div>

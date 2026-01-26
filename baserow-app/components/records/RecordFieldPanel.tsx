@@ -20,6 +20,7 @@ import InlineFieldEditor from "./InlineFieldEditor"
 import type { TableField } from "@/types/fields"
 import { getFieldDisplayName } from "@/lib/fields/display"
 import { isAbortError } from "@/lib/api/error-handling"
+import { syncLinkedFieldBidirectional } from "@/lib/dataView/linkedFields"
 
 interface FieldConfig {
   field: string // Field name or ID
@@ -226,6 +227,10 @@ export default function RecordFieldPanel({
 
       try {
         const supabase = createClient()
+        
+        // Get old value for bidirectional sync
+        const oldValue = recordData[fieldName] as string | string[] | null
+        
         const normalizedValue = normalizeUpdateValue(fieldName, value)
         
         // Get table info
@@ -261,6 +266,25 @@ export default function RecordFieldPanel({
 
         if (error) throw error
 
+        // Sync bidirectional linked fields
+        const field = allFields.find((f) => f?.name === fieldName)
+        if (field && field.type === 'link_to_table') {
+          try {
+            await syncLinkedFieldBidirectional(
+              tableId,
+              table.supabase_table,
+              fieldName,
+              recordId,
+              finalSavedValue as string | string[] | null,
+              oldValue,
+              false
+            )
+          } catch (syncError) {
+            // Log sync error but don't fail the update
+            console.error('[RecordFieldPanel] Bidirectional sync failed:', syncError)
+          }
+        }
+
         // Update local state
         setRecordData((prev) => ({ ...prev, [fieldName]: finalSavedValue }))
 
@@ -275,7 +299,7 @@ export default function RecordFieldPanel({
         })
       }
     },
-    [recordId, tableId, onFieldChange, toast]
+    [recordId, tableId, onFieldChange, toast, recordData, allFields]
   )
 
   // Handle linked record click
