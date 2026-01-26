@@ -1390,9 +1390,9 @@ export default function AirtableGridView({
         activeElement?.tagName === 'INPUT' || 
         activeElement?.tagName === 'TEXTAREA' ||
         (activeElement instanceof HTMLElement && activeElement.isContentEditable) ||
-        activeElement?.closest?.('[contenteditable="true"]') ||
-        activeElement?.closest?.('input') ||
-        activeElement?.closest?.('textarea')
+        (activeElement instanceof HTMLElement && activeElement.closest('[contenteditable="true"]')) ||
+        (activeElement instanceof HTMLElement && activeElement.closest('input')) ||
+        (activeElement instanceof HTMLElement && activeElement.closest('textarea'))
       
       // Copy: Ctrl/Cmd + C
       if ((e.ctrlKey || e.metaKey) && e.key === 'c' && !e.shiftKey && !isInputFocused) {
