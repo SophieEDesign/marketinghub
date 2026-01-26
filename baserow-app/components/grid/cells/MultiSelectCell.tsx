@@ -71,7 +71,7 @@ export default function MultiSelectCell({
         fieldId={fieldId}
         tableId={tableId}
         editable={editable}
-        canEditOptions={false} // Disable option editing in cells - only in header/settings
+        canEditOptions={true} // Allow option editing in cells
         onValueChange={async (newValue) => {
           try {
             await onSave((newValue as string[]) || [])
@@ -89,7 +89,7 @@ export default function MultiSelectCell({
         onFieldOptionsUpdate={onFieldOptionsUpdate}
         placeholder={placeholder}
         isCellSelected={isSelected}
-        allowOptionEditing={false} // Disable option editing UI in cells
+        allowOptionEditing={true} // Allow option editing UI in cells
       />
       {isSelected && editable && (
         <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
