@@ -1618,13 +1618,18 @@ export default function Canvas({
   }, [layoutSettings?.cols, layoutSettings?.rowHeight, layoutSettings?.margin])
   
   // Add CSS for smooth block animations
+  // CRITICAL: Height transitions are disabled - they delay reflow on collapse
+  // Only animate transform (position) and width, never height
+  // Airtable prioritises correctness over animation
   useEffect(() => {
     if (!isEditing) return
     
     const style = document.createElement('style')
     style.textContent = `
       .react-grid-item {
-        transition: transform 200ms ease, width 200ms ease, height 200ms ease !important;
+        /* CRITICAL: Do NOT transition height - it delays reflow on collapse */
+        /* Height changes must be immediate for proper layout reflow */
+        transition: transform 200ms ease, width 200ms ease !important;
       }
       .react-grid-item.cssTransforms {
         transition: transform 200ms ease !important;
@@ -2366,11 +2371,54 @@ export default function Canvas({
                       // Height must be DERIVED from content, not remembered
                       const currentLayoutItem = layout.find(l => l.i === block.id)
                       if (currentLayoutItem && currentLayoutItem.h !== height) {
-                        const newLayout = layout.map(l => 
-                          l.i === block.id ? { ...l, h: height } : l
-                        )
+                        const oldHeight = currentLayoutItem.h
+                        const heightDelta = height - oldHeight
+                        
+                        // CRITICAL: Immediately reflow blocks below when height changes
+                        // With compactType: null, we must manually adjust Y positions
+                        // This ensures content below moves up immediately on collapse
+                        // Height changes must be synchronous - no useEffect delay
+                        const blockY = currentLayoutItem.y || 0
+                        const blockX = currentLayoutItem.x || 0
+                        const blockW = currentLayoutItem.w || 4
+                        const blockBottomY = blockY + oldHeight // Use old height to determine what's below
+                        
+                        const newLayout = layout.map(l => {
+                          if (l.i === block.id) {
+                            // Update the changed block's height
+                            return { ...l, h: height }
+                          }
+                          
+                          // CRITICAL: Move blocks below this block up/down by the height delta
+                          // Only adjust blocks that are positioned below this block (same column or overlapping)
+                          const itemY = l.y || 0
+                          const itemX = l.x || 0
+                          const itemW = l.w || 4
+                          
+                          // Check if this item is below the changed block
+                          // Items are "below" if their Y position is >= the block's bottom edge
+                          const isBelow = itemY >= blockBottomY
+                          
+                          // Also check if blocks overlap horizontally (same column or adjacent)
+                          const blocksOverlapHorizontally = !(
+                            (itemX + itemW <= blockX) || 
+                            (itemX >= blockX + blockW)
+                          )
+                          
+                          if (isBelow && blocksOverlapHorizontally) {
+                            // Move this block up/down by the height delta
+                            // Negative delta (shrink) moves blocks up, positive (grow) moves down
+                            return { ...l, y: itemY + heightDelta }
+                          }
+                          
+                          return l
+                        })
+                        
+                        // CRITICAL: Update layout state synchronously - no useEffect delay
                         setLayout(newLayout)
-                        // Persist to parent via onLayoutChange immediately
+                        
+                        // CRITICAL: Persist to parent via onLayoutChange immediately
+                        // Call synchronously with the new layout we just computed
                         if (onLayoutChange) {
                           const layoutItems: LayoutItem[] = newLayout.map((item) => ({
                             i: item.i,

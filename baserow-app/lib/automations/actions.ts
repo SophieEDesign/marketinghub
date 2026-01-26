@@ -317,12 +317,22 @@ async function executeSendEmail(
 ): Promise<ActionResult> {
   // For now, just log - email sending would require an email service
   const to = replaceVariablesInObject(action.to || '', context)
+  const cc = replaceVariablesInObject(action.cc || '', context)
+  const bcc = replaceVariablesInObject(action.bcc || '', context)
+  const fromName = replaceVariablesInObject(action.from_name || '', context)
+  const replyTo = replaceVariablesInObject(action.reply_to || '', context)
   const subject = replaceVariablesInObject(action.subject || '', context)
   const body = replaceVariablesInObject(action.email_body || '', context)
 
+  const emailDetails: Record<string, any> = { to, subject, body }
+  if (cc) emailDetails.cc = cc
+  if (bcc) emailDetails.bcc = bcc
+  if (fromName) emailDetails.from_name = fromName
+  if (replyTo) emailDetails.reply_to = replyTo
+
   return {
     success: true,
-    data: { to, subject, body },
+    data: emailDetails,
     logs: [{
       level: 'info',
       message: `Email would be sent to ${to}: ${subject}`,

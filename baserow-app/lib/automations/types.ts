@@ -20,6 +20,8 @@ export type ActionType =
 export type AutomationRunStatus = 'running' | 'completed' | 'failed' | 'stopped'
 export type LogLevel = 'info' | 'warning' | 'error'
 
+import type { FilterTree } from '@/lib/filters/canonical-model'
+
 export interface TriggerConfig {
   // For row_created, row_updated, row_deleted
   table_id?: string
@@ -57,6 +59,10 @@ export interface ActionConfig {
   
   // For send_email
   to?: string
+  cc?: string
+  bcc?: string
+  from_name?: string
+  reply_to?: string
   subject?: string
   email_body?: string
   
@@ -106,4 +112,20 @@ export interface AutomationLog {
   message: string
   data?: Record<string, any>
   created_at: string
+}
+
+/**
+ * ActionGroup: A group of actions that run conditionally
+ * 
+ * Actions are grouped into conditional blocks (If/Otherwise if).
+ * The first group with a matching condition will execute, then execution stops.
+ * If a group has no condition (null), it always runs (acts as "else").
+ */
+export interface ActionGroup {
+  id: string // Unique ID for the group
+  condition?: FilterTree | null // Condition for this group (null for "always run")
+  name?: string // Custom name for the group (auto-generated from condition if not provided)
+  description?: string // Description of when this group runs
+  actions: ActionConfig[] // Actions within this group
+  order: number // Order of execution (0 = first, 1 = second, etc.)
 }

@@ -6,11 +6,14 @@ import type { Automation, TableField } from "@/types/database"
 import type { TriggerType, ActionType, ActionConfig, TriggerConfig } from "@/lib/automations/types"
 import AutomationConditionBuilder from "./AutomationConditionBuilder"
 import VisualWorkflowBuilder from "./VisualWorkflowBuilder"
+import ConditionalWorkflowBuilder from "./ConditionalWorkflowBuilder"
+import AutomationPropertiesSidebar from "./AutomationPropertiesSidebar"
 import VariablePicker from "./VariablePicker"
 import ScheduleBuilder from "./ScheduleBuilder"
 import AutomationTestMode from "./AutomationTestMode"
 import WebhookManager from "./WebhookManager"
 import type { FilterTree } from "@/lib/filters/canonical-model"
+import type { ActionGroup } from "@/lib/automations/types"
 import { filterTreeToFormula } from "@/lib/automations/condition-formula"
 import FormulaEditor from "@/components/fields/FormulaEditor"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -159,18 +162,21 @@ export default function AutomationBuilder({
   const [description, setDescription] = useState("")
   const [triggerType, setTriggerType] = useState<TriggerType>("row_created")
   const [triggerConfig, setTriggerConfig] = useState<TriggerConfig>({})
-  const [actions, setActions] = useState<ActionConfig[]>([])
+  const [actionGroups, setActionGroups] = useState<ActionGroup[]>([])
   const [enabled, setEnabled] = useState(true)
   const [conditionFilterTree, setConditionFilterTree] = useState<FilterTree>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [editingActionIndex, setEditingActionIndex] = useState<number | null>(null)
-  const [viewMode, setViewMode] = useState<'form' | 'visual'>('visual')
+  const [selectedItem, setSelectedItem] = useState<{ type: 'trigger' | 'action' | 'group', id: string | number } | null>(null)
   const [category, setCategory] = useState<string>("")
   const [tags, setTags] = useState<string[]>([])
-  const [previewingAction, setPreviewingAction] = useState<number | null>(null)
-  const [variablePickerOpen, setVariablePickerOpen] = useState<{ actionIndex: number; mappingIndex: number; inputRef: HTMLInputElement | null } | null>(null)
   const [showTestMode, setShowTestMode] = useState(false)
+  const [editingConditionGroupIndex, setEditingConditionGroupIndex] = useState<number | null>(null)
+
+  // Helper to generate unique IDs
+  function generateId(): string {
+    return `group-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  }
 
   useEffect(() => {
     if (automation) {
@@ -178,28 +184,41 @@ export default function AutomationBuilder({
       setDescription(automation.description || "")
       setTriggerType((automation.trigger_type as TriggerType) || "row_created")
       setTriggerConfig(automation.trigger_config || {})
-      setActions((automation.actions as ActionConfig[]) || [])
       setEnabled(automation.enabled ?? true)
       setCategory(automation.category || "")
       setTags(automation.tags || [])
       
-      // Handle conditions: support both old formula format and new filter JSON format
-      const conditions = automation.conditions?.[0]
-      if (conditions) {
-        if (conditions.filter_tree) {
-          // New format: filter tree JSON
-          setConditionFilterTree(conditions.filter_tree as FilterTree)
-        } else if (conditions.formula) {
-          // Old format: formula string - convert to empty filter tree
-          // (We can't parse formulas back to filter tree easily, so start fresh)
-          // Users can rebuild conditions using the new UI
-          setConditionFilterTree(null)
+      // Convert actions to actionGroups (migration logic)
+      if (automation.actions && Array.isArray(automation.actions) && automation.actions.length > 0) {
+        // Check if already in new format (actionGroups)
+        if (automation.actions[0] && 'actions' in automation.actions[0] && Array.isArray(automation.actions[0].actions)) {
+          // Already in new format
+          setActionGroups(automation.actions as ActionGroup[])
         } else {
-          setConditionFilterTree(null)
+          // Old format: flat actions array - convert to single "always run" group
+          // Also check if there's a global condition
+          const conditions = automation.conditions?.[0]
+          let groupCondition: FilterTree = null
+          if (conditions) {
+            if (conditions.filter_tree) {
+              groupCondition = conditions.filter_tree as FilterTree
+            }
+          }
+          
+          setActionGroups([{
+            id: generateId(),
+            condition: groupCondition,
+            actions: automation.actions as ActionConfig[],
+            order: 0,
+          }])
         }
       } else {
-        setConditionFilterTree(null)
+        // No actions - start with empty groups
+        setActionGroups([])
       }
+      
+      // Handle legacy global conditions (now moved to first group)
+      // This is handled above in the migration logic
     }
   }, [automation])
 
@@ -219,20 +238,17 @@ export default function AutomationBuilder({
     setError(null)
 
     try {
-      // Save both filter_tree (new format) and formula (for backward compatibility)
-      const conditions = conditionFilterTree ? [{
-        filter_tree: conditionFilterTree,
-        formula: conditionFormula, // Generated formula for backward compatibility
-      }] : undefined
-
+      // Save actionGroups as actions (they're compatible)
+      // For backward compatibility, if there's a single group with no condition,
+      // we could also save as flat array, but we'll use groups format for now
       await onSave({
         name: name.trim(),
         description: description.trim() || undefined,
         trigger_type: triggerType,
         trigger_config: triggerConfig,
-        actions,
+        actions: actionGroups as any, // Save as actionGroups
         enabled,
-        conditions,
+        conditions: undefined, // Conditions are now in actionGroups
         category: category || undefined,
         tags: tags.length > 0 ? tags : undefined,
       })
@@ -243,26 +259,61 @@ export default function AutomationBuilder({
     }
   }
 
-  function addAction() {
+  function addActionGroup() {
+    const newGroup: ActionGroup = {
+      id: generateId(),
+      condition: null, // Always run by default
+      actions: [],
+      order: actionGroups.length,
+    }
+    setActionGroups([...actionGroups, newGroup])
+    setSelectedItem({ type: 'group', id: newGroup.id })
+  }
+
+  function addAction(groupIndex: number) {
     const newAction: ActionConfig = {
       type: 'log_message',
       message: 'Action executed',
     }
-    setActions([...actions, newAction])
-    setEditingActionIndex(actions.length)
-  }
-
-  function updateAction(index: number, updates: Partial<ActionConfig>) {
-    const newActions = [...actions]
-    newActions[index] = { ...newActions[index], ...updates }
-    setActions(newActions)
-  }
-
-  function deleteAction(index: number) {
-    setActions(actions.filter((_, i) => i !== index))
-    if (editingActionIndex === index) {
-      setEditingActionIndex(null)
+    const newGroups = [...actionGroups]
+    newGroups[groupIndex] = {
+      ...newGroups[groupIndex],
+      actions: [...newGroups[groupIndex].actions, newAction],
     }
+    setActionGroups(newGroups)
+    setSelectedItem({ type: 'action', id: `${newGroups[groupIndex].id}-${newGroups[groupIndex].actions.length - 1}` })
+  }
+
+  function updateAction(groupIndex: number, actionIndex: number, updates: Partial<ActionConfig>) {
+    const newGroups = [...actionGroups]
+    newGroups[groupIndex] = {
+      ...newGroups[groupIndex],
+      actions: newGroups[groupIndex].actions.map((action, idx) => 
+        idx === actionIndex ? { ...action, ...updates } : action
+      ),
+    }
+    setActionGroups(newGroups)
+  }
+
+  function deleteAction(groupIndex: number, actionIndex: number) {
+    const newGroups = [...actionGroups]
+    newGroups[groupIndex] = {
+      ...newGroups[groupIndex],
+      actions: newGroups[groupIndex].actions.filter((_, i) => i !== actionIndex),
+    }
+    setActionGroups(newGroups)
+    setSelectedItem(null)
+  }
+
+  function updateGroup(groupIndex: number, updates: Partial<ActionGroup>) {
+    const newGroups = [...actionGroups]
+    newGroups[groupIndex] = { ...newGroups[groupIndex], ...updates }
+    setActionGroups(newGroups)
+  }
+
+  function deleteGroup(groupIndex: number) {
+    setActionGroups(actionGroups.filter((_, i) => i !== groupIndex))
+    setSelectedItem(null)
   }
 
   function renderTriggerConfig() {
@@ -1026,9 +1077,9 @@ export default function AutomationBuilder({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col h-full">
       {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-md text-sm">
+        <div className="p-4 bg-red-50 border border-red-200 rounded-md text-sm m-4">
           <div className="flex items-start gap-2 text-red-700">
             <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
@@ -1039,8 +1090,70 @@ export default function AutomationBuilder({
         </div>
       )}
 
-      {/* Basic Info */}
-      <div className="space-y-4">
+      {/* Header with Save/Test buttons */}
+      <div className="border-b border-gray-200 p-4 flex items-center justify-between bg-white">
+        <div>
+          <h2 className="text-xl font-semibold">{name || 'New Automation'}</h2>
+          {description && <p className="text-sm text-gray-500 mt-1">{description}</p>}
+        </div>
+        <div className="flex items-center gap-2">
+          {onTest && (
+            <button
+              onClick={() => setShowTestMode(true)}
+              className="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-md flex items-center gap-2"
+            >
+              <Play className="h-4 w-4" />
+              Test automation
+            </button>
+          )}
+          <button
+            onClick={handleSave}
+            disabled={loading}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md flex items-center gap-2 disabled:opacity-50"
+          >
+            <Save className="h-4 w-4" />
+            {loading ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+      </div>
+
+      {/* Two-Panel Layout */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Panel: Workflow */}
+        <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
+          <ConditionalWorkflowBuilder
+            triggerType={triggerType}
+            triggerConfig={triggerConfig}
+            actionGroups={actionGroups}
+            selectedItem={selectedItem}
+            tableFields={tableFields}
+            onSelectTrigger={() => setSelectedItem({ type: 'trigger', id: 'trigger' })}
+            onSelectGroup={(groupIndex) => setSelectedItem({ type: 'group', id: actionGroups[groupIndex].id })}
+            onSelectAction={(groupIndex, actionIndex) => 
+              setSelectedItem({ type: 'action', id: `${actionGroups[groupIndex].id}-${actionIndex}` })
+            }
+            onAddGroup={addActionGroup}
+            onAddAction={addAction}
+            onEditCondition={(groupIndex) => setEditingConditionGroupIndex(groupIndex)}
+          />
+        </div>
+
+        {/* Right Panel: Properties Sidebar */}
+        <AutomationPropertiesSidebar
+          selectedItem={selectedItem}
+          triggerType={triggerType}
+          triggerConfig={triggerConfig}
+          actionGroups={actionGroups}
+          tableFields={tableFields}
+          onUpdateTrigger={setTriggerConfig}
+          onUpdateAction={updateAction}
+          onUpdateGroup={updateGroup}
+          onClose={() => setSelectedItem(null)}
+        />
+      </div>
+
+      {/* Basic Info Modal/Sidebar - could be moved to properties or a separate settings panel */}
+      <div className="hidden space-y-4">
         <div>
           <label className="block text-sm font-medium mb-1">Automation Name *</label>
           <input

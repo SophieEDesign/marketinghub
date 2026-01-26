@@ -173,20 +173,122 @@ export async function executeAutomation(
       }
     }
 
-    // Execute actions
-    const actions = (automation.actions || []) as ActionConfig[]
+    // Execute actions - support both actionGroups (new format) and flat actions (old format)
+    const actionsOrGroups = automation.actions || []
     
-    for (let i = 0; i < actions.length; i++) {
-      const action = actions[i]
+    // Check if it's the new format (actionGroups)
+    const isActionGroups = Array.isArray(actionsOrGroups) && 
+                          actionsOrGroups.length > 0 && 
+                          actionsOrGroups[0] && 
+                          'actions' in actionsOrGroups[0] && 
+                          Array.isArray(actionsOrGroups[0].actions)
+    
+    if (isActionGroups) {
+      // New format: actionGroups with If/Otherwise if logic
+      const actionGroups = actionsOrGroups as any[] // ActionGroup[]
+      
+      for (let groupIndex = 0; groupIndex < actionGroups.length; groupIndex++) {
+        const group = actionGroups[groupIndex]
+        
+        // Evaluate group condition
+        let shouldRun = true
+        if (group.condition) {
+          // Get table fields for condition evaluation
+          let tableFields: TableField[] = []
+          if (context.table_id) {
+            const { data: fields } = await supabase
+              .from('table_fields')
+              .select('*')
+              .eq('table_id', context.table_id)
+            
+            tableFields = (fields || []) as TableField[]
+          }
+          
+          const record = context.trigger_data || {}
+          shouldRun = await evaluateConditions(
+            group.condition as any,
+            record,
+            tableFields
+          )
+        }
+        
+        if (shouldRun) {
+          // Execute all actions in this group
+          await logMessage(supabase, automation.id, runId, 'info', `Executing action group ${groupIndex + 1} (${group.actions?.length || 0} actions)`)
+          
+          const groupActions = group.actions || []
+          for (let actionIndex = 0; actionIndex < groupActions.length; actionIndex++) {
+            const action = groupActions[actionIndex]
+            
+            await logMessage(supabase, automation.id, runId, 'info', `Executing action ${actionIndex + 1} in group ${groupIndex + 1}: ${action.type}`)
+            
+            try {
+              const actionResult = await executeAction(action, context)
+              
+              if (actionResult.success) {
+                // Merge action result into context for next actions
+                if (actionResult.data) {
+                  context.variables = {
+                    ...context.variables,
+                    [`action_${groupIndex}_${actionIndex}_result`]: actionResult.data,
+                  }
+                }
+                
+                // Add action logs
+                if (actionResult.logs) {
+                  for (const log of actionResult.logs) {
+                    await logMessage(supabase, automation.id, runId, log.level, log.message, log.data)
+                    logs.push({
+                      id: '',
+                      automation_id: automation.id,
+                      run_id: runId,
+                      level: log.level,
+                      message: log.message,
+                      data: log.data,
+                      created_at: new Date().toISOString(),
+                    })
+                  }
+                }
+              } else {
+                throw new Error(actionResult.error || 'Action failed')
+              }
+            } catch (actionError: any) {
+              const errorMessage = actionError.message || 'Unknown error executing action'
+              await logMessage(supabase, automation.id, runId, 'error', `Action failed: ${errorMessage}`)
+              logs.push({
+                id: '',
+                automation_id: automation.id,
+                run_id: runId,
+                level: 'error',
+                message: `Action failed: ${errorMessage}`,
+                created_at: new Date().toISOString(),
+              })
+              
+              // Continue with next action (don't stop on single action failure)
+            }
+          }
+          
+          // First matching group wins - break after executing this group
+          break
+        } else {
+          await logMessage(supabase, automation.id, runId, 'info', `Action group ${groupIndex + 1} condition not met, skipping`)
+        }
+      }
+    } else {
+      // Old format: flat actions array
+      const actions = actionsOrGroups as ActionConfig[]
+      
+      for (let i = 0; i < actions.length; i++) {
+        const action = actions[i]
 
-      // Log action start
-      await logMessage(supabase, automation.id, runId, 'info', `Executing action ${i + 1}: ${action.type}`)
-      logs.push({
-        id: '',
-        automation_id: automation.id,
-        run_id: runId,
-        level: 'info',
-        message: `Executing action ${i + 1}: ${action.type}`,
+        // Log action start
+        await logMessage(supabase, automation.id, runId, 'info', `Executing action ${i + 1}: ${action.type}`)
+        logs.push({
+          id: '',
+          automation_id: automation.id,
+          run_id: runId,
+          level: 'info',
+          message: `Executing action ${i + 1}: ${action.type}`,
         created_at: new Date().toISOString(),
       })
 

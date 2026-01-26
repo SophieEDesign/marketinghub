@@ -381,7 +381,10 @@ export default function InterfaceBuilder({
           // CRITICAL: Do NOT reload blocks after save
           // Blocks are already correct locally - reloading causes flicker/resets
           // Only reload on explicit refresh, page change, or data change
-          console.log('🔥 saveLayout COMPLETE – not reloading (blocks already correct)')
+          // Only log in dev mode to reduce console noise
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🔥 saveLayout COMPLETE – not reloading (blocks already correct)')
+          }
           
           // Show success feedback briefly, then reset to idle
           setTimeout(() => setSaveStatus("idle"), 2000)
