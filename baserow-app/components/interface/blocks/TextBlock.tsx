@@ -473,9 +473,13 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   }, [])
 
   // Apply appearance settings (declare before useEffect that uses them)
+  // CRITICAL: Extract primitive values to prevent infinite loops in useEffect dependencies
+  // The appearance object is recreated on every render, so we must extract values
   const appearance = config?.appearance || {}
   const textAlign = appearance.text_align || 'left'
   const textSize = appearance.text_size || 'md'
+  const textColor = appearance.text_color || ''
+  const fontWeight = appearance.font_weight || ''
   const blockStyle: React.CSSProperties = {
     backgroundColor: appearance.background_color,
     borderColor: appearance.border_color,
@@ -487,6 +491,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
 
   // Update editor editable state and appearance when isEditing or appearance changes
   // CRITICAL: Editor editable state must respect both isEditing prop AND viewer mode
+  // CRITICAL: Use primitive values in dependencies, not object properties, to prevent infinite loops
   useEffect(() => {
     if (!editor) return
     
@@ -522,21 +527,21 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       }
       
       // Apply text color directly to editor element
-      if (appearance.text_color) {
-        editorElement.style.color = appearance.text_color
+      if (textColor) {
+        editorElement.style.color = textColor
       } else {
         editorElement.style.color = ''
       }
       
       // Apply font weight
-      if (appearance.font_weight) {
+      if (fontWeight) {
         const fontWeightMap: Record<string, string> = {
           'normal': '400',
           'medium': '500',
           'semibold': '600',
           'bold': '700'
         }
-        editorElement.style.fontWeight = fontWeightMap[appearance.font_weight] || '400'
+        editorElement.style.fontWeight = fontWeightMap[fontWeight] || '400'
       } else {
         editorElement.style.fontWeight = ''
       }
@@ -552,7 +557,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         editorElement.style.textAlign = 'left'
       }
     }
-  }, [editor, readOnly, appearance.text_color, appearance.font_weight, textAlign, block.id, isEditing, isViewer])
+  }, [editor, readOnly, textColor, fontWeight, textAlign, block.id, isEditing, isViewer])
 
   // Toolbar component
   // CRITICAL: Only check for editor existence - visibility controlled by isEditing prop
