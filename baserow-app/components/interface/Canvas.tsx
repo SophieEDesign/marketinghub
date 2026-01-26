@@ -2056,7 +2056,7 @@ export default function Canvas({
                   if (bestSnap === null) {
                     bestSnap = { type: 'vertical', x: snapTargets.left.targetX, blockId: snapTargets.left.block.i, distance: snapTargets.left.distance }
                   } else {
-                    const currentDistance = bestSnap!.distance
+                    const currentDistance = (bestSnap as { type: 'vertical' | 'horizontal'; x?: number; y?: number; blockId: string; distance: number }).distance
                     if (snapTargets.left.distance < currentDistance) {
                       bestSnap = { type: 'vertical', x: snapTargets.left.targetX, blockId: snapTargets.left.block.i, distance: snapTargets.left.distance }
                     }
@@ -2066,7 +2066,7 @@ export default function Canvas({
                   if (bestSnap === null) {
                     bestSnap = { type: 'vertical', x: snapTargets.right.targetX, blockId: snapTargets.right.block.i, distance: snapTargets.right.distance }
                   } else {
-                    const currentDistance = bestSnap!.distance
+                    const currentDistance = (bestSnap as { type: 'vertical' | 'horizontal'; x?: number; y?: number; blockId: string; distance: number }).distance
                     if (snapTargets.right.distance < currentDistance) {
                       bestSnap = { type: 'vertical', x: snapTargets.right.targetX, blockId: snapTargets.right.block.i, distance: snapTargets.right.distance }
                     }
@@ -2076,7 +2076,7 @@ export default function Canvas({
                   if (bestSnap === null) {
                     bestSnap = { type: 'horizontal', y: snapTargets.top.targetY, blockId: snapTargets.top.block.i, distance: snapTargets.top.distance }
                   } else {
-                    const currentDistance = bestSnap!.distance
+                    const currentDistance = (bestSnap as { type: 'vertical' | 'horizontal'; x?: number; y?: number; blockId: string; distance: number }).distance
                     if (snapTargets.top.distance < currentDistance) {
                       bestSnap = { type: 'horizontal', y: snapTargets.top.targetY, blockId: snapTargets.top.block.i, distance: snapTargets.top.distance }
                     }
@@ -2086,7 +2086,7 @@ export default function Canvas({
                   if (bestSnap === null) {
                     bestSnap = { type: 'horizontal', y: snapTargets.bottom.targetY, blockId: snapTargets.bottom.block.i, distance: snapTargets.bottom.distance }
                   } else {
-                    const currentDistance = bestSnap!.distance
+                    const currentDistance = (bestSnap as { type: 'vertical' | 'horizontal'; x?: number; y?: number; blockId: string; distance: number }).distance
                     if (snapTargets.bottom.distance < currentDistance) {
                       bestSnap = { type: 'horizontal', y: snapTargets.bottom.targetY, blockId: snapTargets.bottom.block.i, distance: snapTargets.bottom.distance }
                     }
