@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Plus, Type, Image, FileText, BarChart3, Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/components/ui/use-toast"
@@ -19,8 +19,13 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectGroup,
+  SelectLabel,
+  SelectSeparator,
 } from "@/components/ui/select"
 import type { TableField } from "@/types/fields"
+import { sectionAndSortFields } from "@/lib/fields/sectioning"
+import { getFieldDisplayName } from "@/lib/fields/display"
 import type { InterfacePage } from "@/lib/interface/page-types-only"
 import type { BlockType, PageBlock } from "@/lib/interface/types"
 
@@ -37,6 +42,7 @@ export default function RecordPanelEditor({ page, isOpen, onClose, onSave }: Rec
   const [blocks, setBlocks] = useState<PageBlock[]>([])
   const [loading, setLoading] = useState(false)
   const [selectedField, setSelectedField] = useState<string>("")
+  const [selectedSection, setSelectedSection] = useState<string>("")
   const [selectedBlockType, setSelectedBlockType] = useState<BlockType>("text")
 
   // Load fields and blocks
@@ -87,8 +93,9 @@ export default function RecordPanelEditor({ page, isOpen, onClose, onSave }: Rec
     }
   }
 
-  async function handleAddFieldBlock() {
-    if (!selectedField) return
+  async function handleAddFieldBlock(fieldName?: string) {
+    const fieldToAdd = fieldName || selectedField
+    if (!fieldToAdd) return
 
     setLoading(true)
     try {
@@ -108,8 +115,8 @@ export default function RecordPanelEditor({ page, isOpen, onClose, onSave }: Rec
           w: 12,
           h: 2,
           config: {
-            field_name: selectedField,
-            content: `{{${selectedField}}}`,
+            field_name: fieldToAdd,
+            content: `{{${fieldToAdd}}}`,
           },
         }),
       })
@@ -131,6 +138,121 @@ export default function RecordPanelEditor({ page, isOpen, onClose, onSave }: Rec
       console.error('Error adding field block:', error)
       toast({
         title: "Failed to add field block",
+        description: error.message,
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleAddAllFromSection(sectionFields: TableField[]) {
+    if (sectionFields.length === 0) return
+    
+    setLoading(true)
+    try {
+      // Get current max Y position
+      let currentY = blocks.length > 0 
+        ? Math.max(...blocks.map(b => b.y + b.h))
+        : 0
+
+      // Add all fields from section sequentially
+      for (const field of sectionFields) {
+        // Skip if already used
+        if (usedFieldNames.has(field.name)) continue
+
+        const res = await fetch(`/api/pages/${page.id}/blocks`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'text',
+            x: 0,
+            y: currentY,
+            w: 12,
+            h: 2,
+            config: {
+              field_name: field.name,
+              content: `{{${field.name}}}`,
+            },
+          }),
+        })
+
+        if (res.ok) {
+          currentY += 2 // Move next block down
+        }
+      }
+
+      toast({
+        title: "Field blocks added",
+        description: `Added ${sectionFields.length} field block(s). You can now edit and position them in edit mode.`,
+      })
+      
+      setSelectedField("")
+      loadBlocks() // Reload to show new blocks
+      onSave() // Notify parent to refresh
+    } catch (error: any) {
+      console.error('Error adding field blocks:', error)
+      toast({
+        title: "Failed to add field blocks",
+        description: error.message,
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleAddFieldSectionBlock() {
+    if (!selectedSection) return
+
+    setLoading(true)
+    try {
+      // Get current max Y position to place new block below existing ones
+      const maxY = blocks.length > 0 
+        ? Math.max(...blocks.map(b => b.y + b.h))
+        : 0
+
+      // Estimate height based on number of fields in section
+      const sectionFields = fields.filter(
+        (f) => (f.group_name || "General") === selectedSection
+      )
+      const estimatedHeight = Math.max(4, sectionFields.length * 2 + 2)
+
+      // Create a field_section block
+      const res = await fetch(`/api/pages/${page.id}/blocks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'field_section',
+          x: 0,
+          y: maxY,
+          w: 12,
+          h: estimatedHeight,
+          config: {
+            group_name: selectedSection,
+            collapsed: false,
+            show_labels: true,
+          },
+        }),
+      })
+
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.error || 'Failed to add field section block')
+      }
+
+      toast({
+        title: "Field section block added",
+        description: "You can now edit and position it in edit mode.",
+      })
+      
+      setSelectedSection("")
+      loadBlocks() // Reload to show new block
+      onSave() // Notify parent to refresh
+    } catch (error: any) {
+      console.error('Error adding field section block:', error)
+      toast({
+        title: "Failed to add field section block",
         description: error.message,
         variant: "destructive",
       })
@@ -233,6 +355,23 @@ export default function RecordPanelEditor({ page, isOpen, onClose, onSave }: Rec
       .map(b => b.config.field_name)
   )
   const availableFields = fields.filter(f => !usedFieldNames.has(f.name))
+  
+  // Section available fields
+  const sectionedFields = sectionAndSortFields(availableFields)
+  
+  // Get unique section names from all fields (for field section block)
+  const sectionNames = useMemo(() => {
+    const sections = new Set<string>()
+    fields.forEach((field) => {
+      const sectionName = field.group_name || "General"
+      sections.add(sectionName)
+    })
+    return Array.from(sections).sort((a, b) => {
+      if (a === "General") return -1
+      if (b === "General") return 1
+      return a.localeCompare(b)
+    })
+  }, [fields])
 
   const blockTypes: { value: BlockType; label: string; icon: any }[] = [
     { value: 'text', label: 'Text', icon: Type },
@@ -261,19 +400,52 @@ export default function RecordPanelEditor({ page, isOpen, onClose, onSave }: Rec
               <div className="flex gap-2">
                 {availableFields.length > 0 ? (
                   <>
-                    <Select value={selectedField} onValueChange={setSelectedField}>
+                    <Select 
+                      value={selectedField} 
+                      onValueChange={(value) => {
+                        if (value && !value.startsWith("__section__")) {
+                          setSelectedField(value)
+                        }
+                      }}
+                    >
                       <SelectTrigger className="flex-1">
                         <SelectValue placeholder="Select a field" />
                       </SelectTrigger>
                       <SelectContent>
-                        {availableFields.map((field) => (
-                          <SelectItem key={field.id} value={field.name}>
-                            {field.name} ({field.type})
-                          </SelectItem>
+                        {sectionedFields.map(([sectionName, sectionFields], sectionIndex) => (
+                          <SelectGroup key={sectionName}>
+                            <div className="flex items-center justify-between px-2 py-1.5">
+                              <SelectLabel className="text-xs font-semibold text-gray-700">
+                                {sectionName}
+                              </SelectLabel>
+                              {sectionFields.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleAddAllFromSection(sectionFields)
+                                  }}
+                                  className="text-xs text-blue-600 hover:text-blue-700 underline flex items-center gap-1"
+                                  title={`Add all ${sectionFields.length} fields from ${sectionName}`}
+                                >
+                                  <Plus className="h-3 w-3" />
+                                  Add All
+                                </button>
+                              )}
+                            </div>
+                            {sectionFields.map((field) => (
+                              <SelectItem key={field.id} value={field.name}>
+                                {getFieldDisplayName(field)} ({field.type})
+                              </SelectItem>
+                            ))}
+                            {sectionIndex < sectionedFields.length - 1 && (
+                              <SelectSeparator />
+                            )}
+                          </SelectGroup>
                         ))}
                       </SelectContent>
                     </Select>
-                    <Button onClick={handleAddFieldBlock} disabled={!selectedField || loading}>
+                    <Button onClick={() => handleAddFieldBlock()} disabled={!selectedField || loading}>
                       <Plus className="h-4 w-4 mr-2" />
                       Add
                     </Button>
@@ -283,6 +455,39 @@ export default function RecordPanelEditor({ page, isOpen, onClose, onSave }: Rec
                     No available fields (all fields are already used)
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Add Field Section Block */}
+          {page.base_table && sectionNames.length > 0 && (
+            <div className="space-y-2">
+              <Label>Add Field Section Block</Label>
+              <div className="text-sm text-gray-500 mb-2">
+                Display all fields from a section in one block
+              </div>
+              <div className="flex gap-2">
+                <Select value={selectedSection} onValueChange={setSelectedSection}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Select a section" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sectionNames.map((sectionName) => {
+                      const sectionFieldCount = fields.filter(
+                        (f) => (f.group_name || "General") === sectionName
+                      ).length
+                      return (
+                        <SelectItem key={sectionName} value={sectionName}>
+                          {sectionName} ({sectionFieldCount} {sectionFieldCount === 1 ? 'field' : 'fields'})
+                        </SelectItem>
+                      )
+                    })}
+                  </SelectContent>
+                </Select>
+                <Button onClick={handleAddFieldSectionBlock} disabled={!selectedSection || loading}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add
+                </Button>
               </div>
             </div>
           )}

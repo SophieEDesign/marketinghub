@@ -452,11 +452,14 @@ export default function Canvas({
     bottom?: { block: Layout; distance: number; targetY: number }
   } => {
     // Calculate adaptive snap threshold based on grid margin
-    // Default to 2 grid units, but adjust based on margin to ensure proper snapping
+    // Default to 2-3 grid units, but adjust based on margin to ensure proper snapping
     const margin = layoutSettings?.margin || [10, 10]
     const rowHeight = layoutSettings?.rowHeight || 30
-    // Snap threshold should account for margin - blocks should snap when within margin distance
-    const calculatedThreshold = snapThreshold ?? Math.max(1, Math.ceil((margin[0] + margin[1]) / (2 * rowHeight)) || 2)
+    // Snap threshold should allow snapping when blocks are within margin distance
+    // Convert margin from pixels to grid units: margin / rowHeight
+    // Use the larger margin dimension and multiply by 1.5 to account for visual proximity
+    const marginInGridUnits = Math.max(margin[0], margin[1]) / rowHeight
+    const calculatedThreshold = snapThreshold ?? Math.max(2, Math.ceil(marginInGridUnits * 1.5) || 3)
     
     const draggedX = draggedBlock.x || 0
     const draggedY = draggedBlock.y || 0
@@ -1251,10 +1254,18 @@ export default function Canvas({
               // Apply smart snap (horizontal > vertical > none)
               const snappedBlock = applySmartSnap(draggedBlock, snappedLayout, dragVector, cols)
               
-              // Update the layout with snapped position
-              snappedLayout = snappedLayout.map(item => 
-                item.i === draggedBlockId ? snappedBlock : item
-              )
+              // Only update layout if snap actually changed the position
+              // This prevents unnecessary layout updates that might trigger sync
+              const positionChanged = 
+                Math.abs((snappedBlock.x || 0) - (draggedBlock.x || 0)) > 0.01 ||
+                Math.abs((snappedBlock.y || 0) - (draggedBlock.y || 0)) > 0.01
+              
+              if (positionChanged) {
+                // Update the layout with snapped position
+                snappedLayout = snappedLayout.map(item => 
+                  item.i === draggedBlockId ? snappedBlock : item
+                )
+              }
               
               // Clear drag tracking
               dragStartPositionRef.current.delete(draggedBlockId)
@@ -1286,12 +1297,15 @@ export default function Canvas({
           }
           
           // Check if layout changed (either from snapping, push down, or compaction)
-          const layoutChanged = finalLayout.some((item, index) => {
+          // CRITICAL: Include width/height changes (for resize-only changes)
+          const layoutChanged = finalLayout.some((item) => {
             const original = currentLayout.find(l => l.i === item.i)
             if (!original) return true
             return (
               Math.abs((item.x || 0) - (original.x || 0)) > 0.01 ||
-              Math.abs((item.y || 0) - (original.y || 0)) > 0.01
+              Math.abs((item.y || 0) - (original.y || 0)) > 0.01 ||
+              Math.abs((item.w || 4) - (original.w || 4)) > 0.01 ||
+              Math.abs((item.h || 4) - (original.h || 4)) > 0.01
             )
           })
           
@@ -1304,7 +1318,8 @@ export default function Canvas({
               resizedBlockId,
             })
             
-            // Update position tracking ref
+            // CRITICAL: Update position tracking ref BEFORE clearing blocksUpdatedFromUserRef
+            // This prevents sync effect from detecting false differences
             finalLayout.forEach(layoutItem => {
               previousBlockPositionsRef.current.set(layoutItem.i, {
                 x: layoutItem.x || 0,
@@ -1341,11 +1356,12 @@ export default function Canvas({
         blockHeightsBeforeResizeRef.current.clear() // Clear ALL cached heights
         currentlyResizingBlockIdRef.current = null
         
-        // Reset user update flag after a delay to allow blocks to update
-        // This gives InterfaceBuilder time to update blocks to match layout
+        // CRITICAL: Reset user update flag after save completes (500ms debounce + 100ms buffer)
+        // This ensures sync effect doesn't run until save completes and blocks prop is updated
+        // Extended from 100ms to 600ms to match InterfaceBuilder's save debounce timing
         setTimeout(() => {
           blocksUpdatedFromUserRef.current = false
-        }, 100)
+        }, 600)
         resizeTimeoutRef.current = null
       }, 300)
     },

@@ -30,9 +30,11 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { GripVertical, X } from "lucide-react"
+import { GripVertical, X, Plus } from "lucide-react"
 import type { TableField } from "@/types/database"
 import { getFieldDisplayName } from "@/lib/fields/display"
+import { sectionAndSortFields } from "@/lib/fields/sectioning"
+import { SelectGroup, SelectLabel, SelectSeparator } from "@/components/ui/select"
 
 export type FieldPickerMode = "checkbox" | "dropdown" | "drag" | "full"
 
@@ -172,6 +174,27 @@ export default function FieldPicker({
       if (maxFields && currentFields.length >= maxFields) return
       onChange([...currentFields, field.name])
       setAddFieldValue("")
+    }
+  }
+
+  // Handle adding all fields from a section
+  const handleAddAllFromSection = (sectionFields: TableField[]) => {
+    const currentFields = selectedFields || []
+    const newFields = sectionFields
+      .filter((field) => {
+        return !currentFields.includes(field.name) && !currentFields.includes(field.id)
+      })
+      .map((field) => field.name)
+    
+    if (newFields.length > 0) {
+      if (maxFields) {
+        const remaining = maxFields - currentFields.length
+        if (remaining > 0) {
+          onChange([...currentFields, ...newFields.slice(0, remaining)])
+        }
+      } else {
+        onChange([...currentFields, ...newFields])
+      }
     }
   }
 
@@ -340,7 +363,7 @@ export default function FieldPicker({
         <Select
           value={addFieldValue}
           onValueChange={(value) => {
-            if (value) {
+            if (value && !value.startsWith("__section__")) {
               handleAddField(value)
             }
           }}
@@ -349,11 +372,45 @@ export default function FieldPicker({
             <SelectValue placeholder="Select a field..." />
           </SelectTrigger>
           <SelectContent>
-            {availableFields.map((field) => (
-              <SelectItem key={field.id} value={field.name}>
-                {getFieldDisplayName(field)}
-              </SelectItem>
-            ))}
+            {sectionedFields ? (
+              sectionedFields.map(([sectionName, sectionFields], sectionIndex) => (
+                <SelectGroup key={sectionName}>
+                  <div className="flex items-center justify-between px-2 py-1.5">
+                    <SelectLabel className="text-xs font-semibold text-gray-700">
+                      {sectionName}
+                    </SelectLabel>
+                    {sectionFields.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleAddAllFromSection(sectionFields)
+                        }}
+                        className="text-xs text-blue-600 hover:text-blue-700 underline flex items-center gap-1"
+                        title={`Add all ${sectionFields.length} fields from ${sectionName}`}
+                      >
+                        <Plus className="h-3 w-3" />
+                        Add All
+                      </button>
+                    )}
+                  </div>
+                  {sectionFields.map((field) => (
+                    <SelectItem key={field.id} value={field.name}>
+                      {getFieldDisplayName(field)}
+                    </SelectItem>
+                  ))}
+                  {sectionIndex < sectionedFields.length - 1 && (
+                    <SelectSeparator />
+                  )}
+                </SelectGroup>
+              ))
+            ) : (
+              availableFields.map((field) => (
+                <SelectItem key={field.id} value={field.name}>
+                  {getFieldDisplayName(field)}
+                </SelectItem>
+              ))
+            )}
           </SelectContent>
         </Select>
       </div>
@@ -368,16 +425,54 @@ export default function FieldPicker({
           <div className="flex items-center justify-between">
             <Label>{label}</Label>
             {availableFields.length > 0 && (
-              <Select value={addFieldValue} onValueChange={handleAddField}>
+              <Select value={addFieldValue} onValueChange={(value) => {
+                if (value && !value.startsWith("__section__")) {
+                  handleAddField(value)
+                }
+              }}>
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="Add field" />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableFields.map((field) => (
-                    <SelectItem key={field.id} value={field.name}>
-                      {getFieldDisplayName(field)}
-                    </SelectItem>
-                  ))}
+                  {sectionedFields ? (
+                    sectionedFields.map(([sectionName, sectionFields], sectionIndex) => (
+                      <SelectGroup key={sectionName}>
+                        <div className="flex items-center justify-between px-2 py-1.5">
+                          <SelectLabel className="text-xs font-semibold text-gray-700">
+                            {sectionName}
+                          </SelectLabel>
+                          {sectionFields.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleAddAllFromSection(sectionFields)
+                              }}
+                              className="text-xs text-blue-600 hover:text-blue-700 underline flex items-center gap-1"
+                              title={`Add all ${sectionFields.length} fields from ${sectionName}`}
+                            >
+                              <Plus className="h-3 w-3" />
+                              Add All
+                            </button>
+                          )}
+                        </div>
+                        {sectionFields.map((field) => (
+                          <SelectItem key={field.id} value={field.name}>
+                            {getFieldDisplayName(field)}
+                          </SelectItem>
+                        ))}
+                        {sectionIndex < sectionedFields.length - 1 && (
+                          <SelectSeparator />
+                        )}
+                      </SelectGroup>
+                    ))
+                  ) : (
+                    availableFields.map((field) => (
+                      <SelectItem key={field.id} value={field.name}>
+                        {getFieldDisplayName(field)}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             )}

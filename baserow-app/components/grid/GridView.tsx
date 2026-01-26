@@ -33,7 +33,19 @@ import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig 
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import { asArray } from "@/lib/utils/asArray"
 import { sortRowsByFieldType, shouldUseClientSideSorting } from "@/lib/sorting/fieldTypeAwareSort"
-import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
+import { resolveChoiceColor, normalizeHexColor, resolveFieldColor } from '@/lib/field-colors'
+
+// Helper to convert hex color to RGB
+function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+  return result
+    ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16),
+      }
+    : null
+}
 import { getRowHeightPixels } from "@/lib/grid/row-height-utils"
 import { useIsMobile } from "@/hooks/useResponsive"
 import { createClient } from "@/lib/supabase/client"
@@ -3171,8 +3183,59 @@ export default function GridView({
                           ? 'Year'
                           : 'Month'
                         : node.rule.field
+                    
+                    // Get group-by field for color support
+                    const groupByField = node.rule.type === 'field' 
+                      ? safeTableFields.find(f => f && (f.name === node.rule.field || f.id === node.rule.field))
+                      : null
+                    
+                    // Get color for section header if group-by field is single_select
+                    let sectionColor: string | null = null
+                    let sectionTextColor: string | undefined = undefined
+                    if (groupByField && groupByField.type === 'single_select' && node.label) {
+                      const colorValue = resolveFieldColor(
+                        'single_select',
+                        node.label,
+                        groupByField.options
+                      )
+                      if (colorValue) {
+                        sectionColor = colorValue
+                        // Calculate darker text color (use a darker shade of the same color)
+                        // Simple approach: reduce lightness by 30-40%
+                        const rgb = hexToRgb(colorValue)
+                        if (rgb) {
+                          const darker = {
+                            r: Math.max(0, rgb.r - 40),
+                            g: Math.max(0, rgb.g - 40),
+                            b: Math.max(0, rgb.b - 40),
+                          }
+                          sectionTextColor = `rgb(${darker.r}, ${darker.g}, ${darker.b})`
+                        }
+                      }
+                    }
+                    
+                    // Section header background: color at 8-12% opacity, or neutral gray
+                    const headerBgColor = sectionColor 
+                      ? `rgba(${hexToRgb(sectionColor)?.r || 0}, ${hexToRgb(sectionColor)?.g || 0}, ${hexToRgb(sectionColor)?.b || 0}, 0.1)`
+                      : undefined
+                    
                     return (
-                      <tr key={`group-${node.pathKey}`} className="bg-gray-50 border-b border-gray-200">
+                      <tr 
+                        key={`section-${node.pathKey}`} 
+                        className="border-b border-gray-200"
+                        style={{ 
+                          backgroundColor: headerBgColor || '#f9fafb',
+                        }}
+                        data-section-header="true"
+                        tabIndex={-1}
+                        onKeyDown={(e) => {
+                          // Skip section headers in keyboard navigation
+                          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                            e.preventDefault()
+                            e.stopPropagation()
+                          }
+                        }}
+                      >
                         <td
                           colSpan={
                             1 + // Checkbox column
@@ -3183,9 +3246,17 @@ export default function GridView({
                           className="px-4 py-2"
                         >
                           <button
-                            onClick={() => toggleGroup(node.pathKey)}
-                            className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 w-full text-left"
-                            style={{ paddingLeft: 8 + (it.level || 0) * 16 }}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleGroup(node.pathKey)
+                            }}
+                            className="flex items-center gap-2 text-sm font-semibold w-full text-left hover:opacity-80 transition-opacity"
+                            style={{ 
+                              paddingLeft: 8 + (it.level || 0) * 16,
+                              color: sectionTextColor || '#374151',
+                            }}
+                            aria-label={`${isCollapsed ? "Expand" : "Collapse"} section ${ruleLabel}: ${node.label}`}
                           >
                             {isCollapsed ? (
                               <ChevronRight className="h-4 w-4" />
@@ -3195,8 +3266,8 @@ export default function GridView({
                             <span className="font-semibold">
                               {ruleLabel}: {node.label}
                             </span>
-                            <span className="text-gray-500 ml-2">
-                              ({node.size} {node.size === 1 ? "row" : "rows"})
+                            <span className="font-normal ml-2 opacity-70">
+                              ({node.size})
                             </span>
                           </button>
                         </td>

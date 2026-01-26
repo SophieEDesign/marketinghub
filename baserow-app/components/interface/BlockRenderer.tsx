@@ -18,6 +18,7 @@ import ActionBlock from "./blocks/ActionBlock"
 import LinkPreviewBlock from "./blocks/LinkPreviewBlock"
 import FilterBlock from "./blocks/FilterBlock"
 import FieldBlock from "./blocks/FieldBlock"
+import FieldSectionBlock from "./blocks/FieldSectionBlock"
 import CalendarBlock from "./blocks/CalendarBlock"
 import KanbanBlock from "./blocks/KanbanBlock"
 
@@ -258,6 +259,11 @@ export default function BlockRenderer({
           config: fieldBlockConfig,
         }
         return <FieldBlock block={fieldBlockWithConfig} isEditing={canEdit} pageTableId={pageTableId} recordId={recordId} hideEditButton={hideEditButton} />
+
+      case "field_section":
+        // Field section block displays all fields from a section (group_name)
+        // Respect page-level editability similar to field blocks
+        return <FieldSectionBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} recordId={recordId} hideEditButton={hideEditButton} />
 
       case "text":
         // Lazy-load TextBlock to improve initial page load performance

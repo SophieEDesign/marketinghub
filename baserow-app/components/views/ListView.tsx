@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
-import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
+import { resolveChoiceColor, normalizeHexColor, getTextColorForBackground, SEMANTIC_COLORS } from '@/lib/field-colors'
 import { formatDateUK } from "@/lib/utils"
 import type { TableField } from "@/types/fields"
 import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
@@ -623,7 +623,7 @@ export default function ListView({
     }
   }, [userDisplayNames])
 
-  // Helper to get pill color
+  // Helper to get pill color for select fields
   const getPillColor = useCallback((field: TableField, value: any): string | null => {
     if (field.type !== 'single_select' && field.type !== 'multi_select') {
       return null
@@ -638,6 +638,19 @@ export default function ListView({
         field.type === 'single_select'
       )
     )
+  }, [])
+
+  // Helper to generate a color for any group value (hash-based)
+  const getGroupColor = useCallback((value: any): string => {
+    const normalizedValue = String(value || '').trim()
+    if (!normalizedValue) return '#9CA3AF' // Gray for empty values
+    
+    // Use hash-based color selection from SEMANTIC_COLORS
+    let hash = 0
+    for (let i = 0; i < normalizedValue.length; i++) {
+      hash = normalizedValue.charCodeAt(i) + ((hash << 5) - hash)
+    }
+    return SEMANTIC_COLORS[Math.abs(hash) % SEMANTIC_COLORS.length]
   }, [])
 
   const handleAddRecordToGroup = useCallback(async (groupKey: string) => {
@@ -941,15 +954,26 @@ export default function ListView({
                     : 'Month'
                   : node.rule.field
 
-              // Group color (only for select-type field group nodes)
+              // Group color - generate for ALL groups
               let groupColor: string | null = null
               if (node.rule.type === 'field') {
                 const groupField = tableFields.find((f) => f.name === node.rule.field || f.id === node.rule.field)
                 if (groupField && (groupField.type === 'single_select' || groupField.type === 'multi_select')) {
+                  // Use field-specific color for select fields
                   groupColor = getPillColor(groupField, node.key)
+                } else {
+                  // Generate hash-based color for all other field types
+                  groupColor = getGroupColor(node.key)
                 }
+              } else {
+                // For date-based grouping, generate color from the date value
+                groupColor = getGroupColor(node.key)
               }
 
+              // Determine text color for contrast
+              const textColorClass = groupColor ? getTextColorForBackground(groupColor) : 'text-gray-900'
+              const textColorStyle = groupColor ? {} : { color: undefined }
+              
               return (
                 <div key={node.pathKey} className="border-b border-gray-200 last:border-b-0">
                   <div 
@@ -985,21 +1009,21 @@ export default function ListView({
                       style={{ paddingLeft: 8 + (it.level || 0) * 16 }}
                     >
                       {isCollapsed ? (
-                        <ChevronRight className="h-4 w-4 text-gray-500" />
+                        <ChevronRight className={`h-4 w-4 ${textColorClass}`} style={{ opacity: 0.7 }} />
                       ) : (
-                        <ChevronDown className="h-4 w-4 text-gray-500" />
+                        <ChevronDown className={`h-4 w-4 ${textColorClass}`} style={{ opacity: 0.7 }} />
                       )}
                       <span
-                        className="inline-flex items-center px-2 py-0.5 rounded-full text-sm font-medium"
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-sm font-medium ${textColorClass}`}
                         style={{
                           backgroundColor: groupColor ? `${groupColor}CC` : undefined,
-                          color: groupColor || undefined,
                           border: groupColor ? `1px solid ${groupColor}FF` : undefined,
+                          ...textColorStyle,
                         }}
                       >
                         {ruleLabel}: {node.label}
                       </span>
-                      <span className="text-sm text-gray-500 ml-2">{node.size}</span>
+                      <span className={`text-sm ml-2 ${textColorClass}`} style={{ opacity: 0.8 }}>{node.size}</span>
                     </button>
                     <Button
                       variant="ghost"

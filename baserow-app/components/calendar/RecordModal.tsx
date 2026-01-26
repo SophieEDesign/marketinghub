@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect, useCallback } from 'react'
-import { ArrowLeft, Save, Trash2 } from 'lucide-react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { ArrowLeft, Save, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Dialog,
@@ -17,7 +17,7 @@ import { useUserRole } from '@/lib/hooks/useUserRole'
 import { isAbortError } from '@/lib/api/error-handling'
 import ModalCanvas from '@/components/interface/ModalCanvas'
 import type { BlockConfig } from '@/lib/interface/types'
-import { useMemo } from 'react'
+import { sectionAndSortFields } from '@/lib/fields/sectioning'
 
 export interface RecordModalProps {
   open: boolean
@@ -31,7 +31,13 @@ export interface RecordModalProps {
   onDeleted?: () => void | Promise<void>
   supabaseTableName?: string | null // Optional: if provided, skips table info fetch for faster loading
   modalLayout?: BlockConfig['modal_layout'] // Custom modal layout
+  showFieldSections?: boolean // Optional: show fields grouped by sections (default: false)
 }
+
+const DEFAULT_SECTION_NAME = "General"
+
+// Get localStorage key for collapsed sections state
+const getCollapsedSectionsKey = (tableId: string) => `record-modal-collapsed-sections-${tableId}`
 
 export default function RecordModal({
   open,
@@ -45,6 +51,7 @@ export default function RecordModal({
   onDeleted,
   supabaseTableName: supabaseTableNameProp,
   modalLayout,
+  showFieldSections = false,
 }: RecordModalProps) {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -53,6 +60,45 @@ export default function RecordModal({
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(supabaseTableNameProp || null)
   const { toast } = useToast()
   const { role: userRole } = useUserRole()
+
+  // Load collapsed sections state from localStorage
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set()
+    try {
+      const stored = localStorage.getItem(getCollapsedSectionsKey(tableId))
+      if (stored) {
+        return new Set(JSON.parse(stored))
+      }
+    } catch (error) {
+      console.warn("Failed to load collapsed sections from localStorage:", error)
+    }
+    return new Set()
+  })
+
+  // Persist collapsed sections state to localStorage
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      localStorage.setItem(
+        getCollapsedSectionsKey(tableId),
+        JSON.stringify(Array.from(collapsedSections))
+      )
+    } catch (error) {
+      console.warn("Failed to save collapsed sections to localStorage:", error)
+    }
+  }, [collapsedSections, tableId])
+
+  const toggleSection = (sectionName: string) => {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev)
+      if (next.has(sectionName)) {
+        next.delete(sectionName)
+      } else {
+        next.add(sectionName)
+      }
+      return next
+    })
+  }
 
   // Use prop directly if available, otherwise use state
   const effectiveTableName = supabaseTableNameProp || supabaseTableName
@@ -275,6 +321,28 @@ export default function RecordModal({
     })) as any[]
   }, [modalLayout?.blocks, tableFields])
 
+  // Filter and section fields for simple list mode
+  const filteredFields = useMemo(() => {
+    return tableFields.filter((field) => {
+      // Always exclude system fields
+      if (!field || field.name === 'id' || field.name === 'created_at' || field.name === 'updated_at') {
+        return false
+      }
+      // If modalFields is specified and not empty, only show those fields
+      if (modalFields.length > 0) {
+        return modalFields.includes(field.name)
+      }
+      // Otherwise show all fields
+      return true
+    })
+  }, [tableFields, modalFields])
+
+  // Section fields if showFieldSections is enabled
+  const sectionedFields = useMemo(() => {
+    if (!showFieldSections) return null
+    return sectionAndSortFields(filteredFields)
+  }, [filteredFields, showFieldSections])
+
   if (!open) return null
 
   return (
@@ -314,35 +382,65 @@ export default function RecordModal({
                   onFieldChange={handleFieldChange}
                 />
               </div>
+            ) : showFieldSections && sectionedFields ? (
+              // Render with sections
+              sectionedFields.map(([sectionName, sectionFields]) => {
+                const isCollapsed = collapsedSections.has(sectionName)
+                return (
+                  <div key={sectionName} className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => toggleSection(sectionName)}
+                      className="w-full flex items-center justify-between text-left py-1 -mx-1 px-1 rounded-md hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
+                      aria-expanded={!isCollapsed}
+                      aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${sectionName} section`}
+                    >
+                      <span className="text-sm font-semibold text-gray-900">{sectionName}</span>
+                      <span className="text-gray-400">
+                        {isCollapsed ? (
+                          <ChevronRight className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
+                      </span>
+                    </button>
+                    {!isCollapsed && (
+                      <div className="space-y-4 pl-4">
+                        {sectionFields.map((field) => {
+                          const value = formData[field.name]
+                          return (
+                            <FieldEditor
+                              key={field.id}
+                              field={field}
+                              value={value}
+                              onChange={(newValue) => handleFieldChange(field.name, newValue)}
+                              required={field.required || false}
+                              recordId={recordId || undefined}
+                              tableName={effectiveTableName || undefined}
+                            />
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )
+              })
             ) : (
-              Array.isArray(tableFields) && tableFields
-                .filter((field) => {
-                  // Always exclude system fields
-                  if (!field || field.name === 'id' || field.name === 'created_at' || field.name === 'updated_at') {
-                    return false
-                  }
-                  // If modalFields is specified and not empty, only show those fields
-                  if (modalFields.length > 0) {
-                    return modalFields.includes(field.name)
-                  }
-                  // Otherwise show all fields
-                  return true
-                })
-                .map((field) => {
-                  const value = formData[field.name]
-
-                  return (
-                    <FieldEditor
-                      key={field.id}
-                      field={field}
-                      value={value}
-                      onChange={(newValue) => handleFieldChange(field.name, newValue)}
-                      required={field.required || false}
-                      recordId={recordId || undefined}
-                      tableName={effectiveTableName || undefined}
-                    />
-                  )
-                })
+              // Render flat list (default behavior)
+              filteredFields.map((field) => {
+                const value = formData[field.name]
+                return (
+                  <FieldEditor
+                    key={field.id}
+                    field={field}
+                    value={value}
+                    onChange={(newValue) => handleFieldChange(field.name, newValue)}
+                    required={field.required || false}
+                    recordId={recordId || undefined}
+                    tableName={effectiveTableName || undefined}
+                  />
+                )
+              })
             )}
           </div>
         )}

@@ -1,12 +1,13 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { X, Save, Trash2 } from "lucide-react"
+import { useEffect, useState, useMemo } from "react"
+import { X, Save, Trash2, ChevronDown, ChevronRight } from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
 
 import type { TableField } from "@/types/fields"
 import FieldEditor from "@/components/fields/FieldEditor"
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
+import { sectionAndSortFields } from "@/lib/fields/sectioning"
 
 interface RecordDrawerProps {
   isOpen: boolean
@@ -17,7 +18,10 @@ interface RecordDrawerProps {
   tableFields?: TableField[]
   onSave?: () => void
   onDelete?: () => void
+  showFieldSections?: boolean // Optional: show fields grouped by sections (default: false)
 }
+
+const getCollapsedSectionsKey = (tableName: string) => `record-drawer-collapsed-sections-${tableName}`
 
 export default function RecordDrawer({
   isOpen,
@@ -28,6 +32,7 @@ export default function RecordDrawer({
   tableFields = [],
   onSave,
   onDelete,
+  showFieldSections = false,
 }: RecordDrawerProps) {
   const [record, setRecord] = useState<Record<string, any> | null>(null)
   const [loading, setLoading] = useState(false)
@@ -35,6 +40,45 @@ export default function RecordDrawer({
   const [deleting, setDeleting] = useState(false)
   const [formData, setFormData] = useState<Record<string, any>>({})
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+  // Load collapsed sections state from localStorage
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set()
+    try {
+      const stored = localStorage.getItem(getCollapsedSectionsKey(tableName))
+      if (stored) {
+        return new Set(JSON.parse(stored))
+      }
+    } catch (error) {
+      console.warn("Failed to load collapsed sections from localStorage:", error)
+    }
+    return new Set()
+  })
+
+  // Persist collapsed sections state to localStorage
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      localStorage.setItem(
+        getCollapsedSectionsKey(tableName),
+        JSON.stringify(Array.from(collapsedSections))
+      )
+    } catch (error) {
+      console.warn("Failed to save collapsed sections to localStorage:", error)
+    }
+  }, [collapsedSections, tableName])
+
+  const toggleSection = (sectionName: string) => {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev)
+      if (next.has(sectionName)) {
+        next.delete(sectionName)
+      } else {
+        next.add(sectionName)
+      }
+      return next
+    })
+  }
 
   useEffect(() => {
     if (isOpen && rowId && tableName) {
@@ -147,6 +191,32 @@ export default function RecordDrawer({
     }))
   }
 
+  // Get fields to display
+  const fieldsToDisplay = useMemo(() => {
+    if (fieldNames.length > 0) {
+      // Use provided field names
+      return fieldNames
+        .map((name) => tableFields.find((f) => f.name === name))
+        .filter((f): f is TableField => f !== undefined)
+    } else if (record) {
+      // Show all fields from record (excluding system fields)
+      return tableFields.filter(
+        (f) =>
+          f.name !== "id" &&
+          f.name !== "created_at" &&
+          f.name !== "updated_at" &&
+          record.hasOwnProperty(f.name)
+      )
+    }
+    return []
+  }, [fieldNames, tableFields, record])
+
+  // Section fields if showFieldSections is enabled
+  const sectionedFields = useMemo(() => {
+    if (!showFieldSections || fieldsToDisplay.length === 0) return null
+    return sectionAndSortFields(fieldsToDisplay)
+  }, [fieldsToDisplay, showFieldSections])
+
   if (!isOpen) return null
 
   return (
@@ -180,86 +250,63 @@ export default function RecordDrawer({
             <div className="text-center py-8 text-gray-500">Loading...</div>
           ) : record ? (
             <div className="space-y-4">
-              {fieldNames.length > 0 ? (
-                fieldNames.map((fieldName) => {
-                  const value = formData[fieldName]
-                  const tableField = tableFields.find(f => f.name === fieldName)
-
-                  // If we have field metadata, use FieldEditor
-                  if (tableField) {
-                    return (
-                      <FieldEditor
-                        key={fieldName}
-                        field={tableField}
-                        value={value}
-                        onChange={(newValue) => handleFieldChange(fieldName, newValue)}
-                        required={tableField.required || false}
-                        recordId={rowId || undefined}
-                        tableName={tableName}
-                      />
-                    )
-                  }
-
-                  // Fallback for fields without metadata - show as read-only
+              {showFieldSections && sectionedFields ? (
+                // Render with sections
+                sectionedFields.map(([sectionName, sectionFields]) => {
+                  const isCollapsed = collapsedSections.has(sectionName)
                   return (
-                    <div key={fieldName} className="space-y-2">
-                      <label className="block text-sm font-medium text-gray-700">
-                        {fieldName}
-                      </label>
-                      <div className="px-3 py-2 bg-gray-50 rounded-md text-sm text-gray-600">
-                        {value !== null && value !== undefined ? String(value) : "—"}
-                      </div>
+                    <div key={sectionName} className="space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleSection(sectionName)}
+                        className="w-full flex items-center justify-between text-left py-1 -mx-1 px-1 rounded-md hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
+                        aria-expanded={!isCollapsed}
+                        aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${sectionName} section`}
+                      >
+                        <span className="text-sm font-semibold text-gray-900">{sectionName}</span>
+                        <span className="text-gray-400">
+                          {isCollapsed ? (
+                            <ChevronRight className="h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4" />
+                          )}
+                        </span>
+                      </button>
+                      {!isCollapsed && (
+                        <div className="space-y-4 pl-4">
+                          {sectionFields.map((field) => {
+                            const value = formData[field.name]
+                            return (
+                              <FieldEditor
+                                key={field.id}
+                                field={field}
+                                value={value}
+                                onChange={(newValue) => handleFieldChange(field.name, newValue)}
+                                required={field.required || false}
+                                recordId={rowId || undefined}
+                                tableName={tableName}
+                              />
+                            )
+                          })}
+                        </div>
+                      )}
                     </div>
                   )
                 })
               ) : (
-                // If no field names provided, show all fields from record
-                Object.keys(record).map((key) => {
-                  if (key === "id" || key === "created_at" || key === "updated_at") {
-                    return (
-                      <div key={key} className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                          {key}
-                        </label>
-                        <div className="px-3 py-2 bg-gray-50 rounded-md text-sm text-gray-600">
-                          {String(record[key] || "")}
-                        </div>
-                      </div>
-                    )
-                  }
-
-                  const value = formData[key]
-                  const tableField = tableFields.find(f => f.name === key)
-
-                  // If we have field metadata, use FieldEditor
-                  if (tableField) {
-                    return (
-                      <FieldEditor
-                        key={key}
-                        field={tableField}
-                        value={value}
-                        onChange={(newValue) => handleFieldChange(key, newValue)}
-                        required={tableField.required || false}
-                        recordId={rowId || undefined}
-                        tableName={tableName}
-                      />
-                    )
-                  }
-
-                  // Fallback for fields without metadata
+                // Render flat list (default behavior)
+                fieldsToDisplay.map((field) => {
+                  const value = formData[field.name]
                   return (
-                    <div key={key} className="space-y-2">
-                      <label className="block text-sm font-medium text-gray-700">
-                        {key}
-                      </label>
-                      <input
-                        type="text"
-                        value={value ?? ""}
-                        onChange={(e) => handleFieldChange(key, e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder={`Enter ${key}...`}
-                      />
-                    </div>
+                    <FieldEditor
+                      key={field.id}
+                      field={field}
+                      value={value}
+                      onChange={(newValue) => handleFieldChange(field.name, newValue)}
+                      required={field.required || false}
+                      recordId={rowId || undefined}
+                      tableName={tableName}
+                    />
                   )
                 })
               )}
