@@ -165,10 +165,10 @@ export function evaluateHighlightRules(
 
 /**
  * Get CSS style object from a highlight rule
- * Returns React.CSSProperties with background and text colors
+ * Returns CSS style object with background and text colors
  */
-export function getFormattingStyle(rule: HighlightRule): React.CSSProperties {
-  const style: React.CSSProperties = {}
+export function getFormattingStyle(rule: HighlightRule): { backgroundColor?: string; color?: string } {
+  const style: { backgroundColor?: string; color?: string } = {}
   
   if (rule.background_color) {
     style.backgroundColor = rule.background_color

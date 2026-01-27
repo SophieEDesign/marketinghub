@@ -116,6 +116,10 @@ export default function ListBlock({
   // Get groupBy from block config (not view config)
   const groupBy = config?.group_by
   
+  // Grouping (optional) for list view:
+  // Support both nested groups (group_by_rules) and legacy single field (group_by_field/group_by)
+  const groupByRulesFromConfig = (config as any).group_by_rules as GroupRule[] | undefined
+  
   // List group default collapse behavior (List view specific)
   // Default: collapsed/closed unless explicitly set to false.
   // Back-compat: `list_choice_groups_default_collapsed` (older key name).
@@ -418,6 +422,7 @@ export default function ListBlock({
       )}
 
       <ListView
+        highlightRules={config.highlight_rules}
         tableId={table.id}
         viewId={viewId || undefined}
         supabaseTableName={table.supabase_table}

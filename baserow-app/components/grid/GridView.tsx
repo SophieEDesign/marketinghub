@@ -3279,12 +3279,36 @@ export default function GridView({
                       ? `rgba(${hexToRgb(sectionColor)?.r || 0}, ${hexToRgb(sectionColor)?.g || 0}, ${hexToRgb(sectionColor)?.b || 0}, 0.1)`
                       : undefined
                     
+                    // Evaluate conditional formatting rules for group headers
+                    // Create a mock row with the group value for evaluation
+                    const groupMockRow: Record<string, any> = {}
+                    if (groupByField && node.label) {
+                      groupMockRow[groupByField.name] = node.label
+                    }
+                    const groupMatchingRule = highlightRules && highlightRules.length > 0 && groupMockRow
+                      ? evaluateHighlightRules(
+                          highlightRules.filter(r => r.scope === 'group'),
+                          groupMockRow,
+                          safeTableFields
+                        )
+                      : null
+                    
+                    // Get formatting style for group-level rules
+                    const groupFormattingStyle = groupMatchingRule
+                      ? getFormattingStyle(groupMatchingRule)
+                      : {}
+                    
+                    // Combine group color with conditional formatting (conditional formatting takes precedence)
+                    const finalHeaderBgColor = groupFormattingStyle.backgroundColor || headerBgColor || '#f9fafb'
+                    const finalHeaderTextColor = groupFormattingStyle.color || sectionTextColor || '#374151'
+                    
                     return (
                       <tr 
                         key={`section-${node.pathKey}`} 
                         className="border-b border-gray-200"
                         style={{ 
-                          backgroundColor: headerBgColor || '#f9fafb',
+                          backgroundColor: finalHeaderBgColor,
+                          color: finalHeaderTextColor,
                         }}
                         data-section-header="true"
                         tabIndex={-1}

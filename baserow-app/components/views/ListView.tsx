@@ -60,6 +60,8 @@ interface ListViewProps {
   onHeightChange?: (height: number) => void
   /** Row height in pixels (for height calculation) */
   rowHeight?: number
+  /** Conditional formatting rules */
+  highlightRules?: HighlightRule[]
 }
 
 export default function ListView({
@@ -87,6 +89,7 @@ export default function ListView({
   reloadKey,
   onHeightChange,
   rowHeight = 30,
+  highlightRules = [],
 }: ListViewProps) {
   const { openRecord } = useRecordPanel()
   const isMobile = useIsMobile()
@@ -757,6 +760,16 @@ export default function ListView({
       })
       .filter(Boolean) as Array<{ key: string; label: string; text: string }>
 
+    // Evaluate conditional formatting rules
+    const matchingRule = highlightRules && highlightRules.length > 0
+      ? evaluateHighlightRules(highlightRules, row, tableFields)
+      : null
+    
+    // Get formatting style for row-level rules
+    const rowFormattingStyle = matchingRule && matchingRule.scope !== 'cell'
+      ? getFormattingStyle(matchingRule)
+      : {}
+
     return (
       <div
         key={recordId}
@@ -767,6 +780,7 @@ export default function ListView({
             ? "border-blue-200 ring-2 ring-blue-100"
             : "border-gray-200 hover:border-gray-300 hover:shadow-md active:shadow-sm"
         }`}
+        style={rowFormattingStyle}
       >
         <div className={`flex items-start gap-4 ${isMobile ? 'p-3' : 'p-4'}`}>
           {/* Thumbnail (always reserved, matches card style) */}
@@ -900,6 +914,7 @@ export default function ListView({
     selectedRecordId,
     formatFieldValue,
     getPillColor,
+    highlightRules,
   ])
 
   if (loading) {

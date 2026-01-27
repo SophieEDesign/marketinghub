@@ -32,6 +32,8 @@ interface KanbanViewProps {
   reloadKey?: number
   /** Callback to open block settings (for configuration) */
   onOpenSettings?: () => void
+  /** Conditional formatting rules */
+  highlightRules?: HighlightRule[]
 }
 
 export default function KanbanView({ 
@@ -49,6 +51,7 @@ export default function KanbanView({
   onRecordClick,
   reloadKey,
   onOpenSettings,
+  highlightRules = [],
 }: KanbanViewProps) {
   // All hooks must be at the top level, before any conditional returns
   const { openRecord } = useRecordPanel()
@@ -365,13 +368,23 @@ export default function KanbanView({
                 const cardImage = getCardImage(row)
                 const borderColor = cardColor ? { borderLeftColor: cardColor, borderLeftWidth: '4px' } : {}
                 
+                // Evaluate conditional formatting rules
+                const matchingRule = highlightRules && highlightRules.length > 0
+                  ? evaluateHighlightRules(highlightRules, row.data || {}, tableFields as TableField[])
+                  : null
+                
+                // Get formatting style for row-level rules
+                const rowFormattingStyle = matchingRule && matchingRule.scope !== 'cell'
+                  ? getFormattingStyle(matchingRule)
+                  : {}
+                
                 return (
                 <Card 
                   key={row.id} 
                   className={`hover:shadow-md transition-shadow bg-white border-gray-200 rounded-lg cursor-default ${
                     selectedCardId === String(row.id) ? "ring-1 ring-blue-400/40 bg-blue-50/30" : ""
                   }`}
-                  style={borderColor}
+                  style={{ ...borderColor, ...rowFormattingStyle }}
                   onClick={() => setSelectedCardId(String(row.id))}
                   onDoubleClick={() => handleOpenRecord(String(row.id))}
                 >

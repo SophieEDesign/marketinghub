@@ -17,6 +17,8 @@ import type { GroupedNode } from "@/lib/grouping/types"
 import { resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
 import { Button } from "@/components/ui/button"
 import EmptyState from "@/components/empty-states/EmptyState"
+import type { HighlightRule } from "@/lib/interface/types"
+import { evaluateHighlightRules, getFormattingStyle } from "@/lib/conditional-formatting/evaluator"
 
 interface GalleryViewProps {
   tableId: string
@@ -43,6 +45,8 @@ interface GalleryViewProps {
   onHeightChange?: (height: number) => void
   /** Row height in pixels (for height calculation) */
   rowHeight?: number
+  /** Conditional formatting rules */
+  highlightRules?: HighlightRule[]
 }
 
 export default function GalleryView({
@@ -63,6 +67,7 @@ export default function GalleryView({
   onOpenSettings,
   onHeightChange,
   rowHeight = 30,
+  highlightRules = [],
 }: GalleryViewProps) {
   const { openRecord } = useRecordPanel()
   const [rows, setRows] = useState<TableRow[]>([])
@@ -481,13 +486,23 @@ export default function GalleryView({
       ) as TableField | undefined
       const titleValue = titleFieldObj ? row.data?.[titleFieldObj.name] : row.data?.[titleField]
 
+      // Evaluate conditional formatting rules
+      const matchingRule = highlightRules && highlightRules.length > 0
+        ? evaluateHighlightRules(highlightRules, row.data || {}, tableFields as TableField[])
+        : null
+      
+      // Get formatting style for row-level rules
+      const rowFormattingStyle = matchingRule && matchingRule.scope !== 'cell'
+        ? getFormattingStyle(matchingRule)
+        : {}
+
       return (
         <Card
           key={reactKey}
           className={`hover:shadow-md transition-shadow bg-white border-gray-200 rounded-lg overflow-hidden cursor-default ${
             selectedCardId === String(row.id) ? "ring-1 ring-blue-400/40 bg-blue-50/30" : ""
           }`}
-          style={borderColor}
+          style={{ ...borderColor, ...rowFormattingStyle }}
           onClick={() => setSelectedCardId(String(row.id))}
           onDoubleClick={() => handleOpenRecord(String(row.id))}
         >
@@ -592,6 +607,8 @@ export default function GalleryView({
       secondaryFields,
       selectedCardId,
       supabaseTableName,
+      highlightRules,
+      tableFields,
       tableFields,
       titleField,
     ]

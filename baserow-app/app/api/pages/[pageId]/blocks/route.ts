@@ -397,8 +397,23 @@ export async function POST(
       )
     }
 
+    // Get block defaults and apply inheritance
+    const { createBlockWithDefaults, inheritBlockSettings } = await import('@/lib/core-data/block-defaults')
+    
+    // Start with defaults
+    let blockConfig = createBlockWithDefaults(type as BlockType, config || {})
+    
+    // If table_id is provided, inherit settings from fields and sections
+    if (blockConfig.table_id) {
+      blockConfig = await inheritBlockSettings(
+        type as BlockType,
+        blockConfig.table_id,
+        blockConfig
+      )
+    }
+    
     // Validate and normalize config before creating block
-    const normalizedConfig = normalizeBlockConfig(type as BlockType, config || {})
+    const normalizedConfig = normalizeBlockConfig(type as BlockType, blockConfig)
     
     const block = await createBlock(
       pageId,

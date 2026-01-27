@@ -11,6 +11,24 @@ export interface BlockDefinition {
   maxWidth?: number
   maxHeight?: number
   defaultConfig: BlockConfig
+  /**
+   * Standard settings that apply to this block type.
+   * Used to determine which settings should be auto-applied on block creation.
+   */
+  applicableSettings?: {
+    fields?: boolean
+    filters?: boolean
+    sorts?: boolean
+    grouping?: boolean
+    appearance?: boolean
+    permissions?: boolean
+    conditionalFormatting?: boolean
+  }
+  /**
+   * Settings that this block type cannot use.
+   * Used to prevent invalid configurations.
+   */
+  excludedSettings?: string[]
 }
 
 export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
@@ -97,6 +115,17 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       // (If users want a heading, they can add it as content, or set appearance.title explicitly.)
       title: '',
       text_content: '',
+      // Note: 'content' is also supported for backward compatibility
+      content: '',
+    },
+    applicableSettings: {
+      fields: false,
+      filters: false,
+      sorts: false,
+      grouping: false,
+      appearance: true,
+      permissions: false,
+      conditionalFormatting: false,
     },
   },
   image: {
@@ -187,6 +216,17 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
     defaultConfig: {
       title: 'Link Preview',
       url: '',
+      // Note: 'link_url' is also supported for backward compatibility
+      link_url: '',
+    },
+    applicableSettings: {
+      fields: false,
+      filters: false,
+      sorts: false,
+      grouping: false,
+      appearance: true,
+      permissions: false,
+      conditionalFormatting: false,
     },
   },
   filter: {
@@ -314,6 +354,16 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
     defaultConfig: {
       title: 'List View',
       table_id: '',
+      view_type: 'grid', // Default view type for list blocks
+    },
+    applicableSettings: {
+      fields: true,
+      filters: true,
+      sorts: true,
+      grouping: true,
+      appearance: true,
+      permissions: true,
+      conditionalFormatting: false,
     },
   },
   horizontal_grouped: {

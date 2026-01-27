@@ -681,6 +681,7 @@ export default function GridBlock({
             onDateFromChange={setCalendarDateFrom}
             onDateToChange={setCalendarDateTo}
             showDateRangeControls={false}
+            highlightRules={config.highlight_rules}
           />
         )
       }
@@ -722,6 +723,7 @@ export default function GridBlock({
         
         return (
           <KanbanView
+            highlightRules={config.highlight_rules}
             tableId={tableId}
             viewId={viewUuid || ''}
             groupingFieldId={groupByFieldId}
@@ -790,6 +792,7 @@ export default function GridBlock({
             // Appearance settings
             wrapTitle={appearance.timeline_wrap_title || appearance.card_wrap_title}
             rowSize={appearance.row_height as 'compact' | 'medium' | 'comfortable' || 'medium'}
+            highlightRules={config.highlight_rules}
           />
         )
       }
@@ -830,6 +833,7 @@ export default function GridBlock({
             imageField={appearance.image_field}
             fitImageSize={appearance.fit_image_size}
             reloadKey={refreshKey}
+            highlightRules={config.highlight_rules}
           />
         )
       }
@@ -916,6 +920,7 @@ export default function GridBlock({
               enable_record_open: appearance.enable_record_open,
               record_open_style: appearance.record_open_style,
             }}
+            highlightRules={config.highlight_rules}
             permissions={{
               mode: permissions.mode || 'edit',
               allowInlineCreate: isViewOnly ? false : allowInlineCreate,

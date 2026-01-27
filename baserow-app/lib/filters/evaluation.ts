@@ -53,7 +53,7 @@ function resolveRelativeDateToDateOnlyLocal(value: RelativeDateValue): string {
   return toDateOnlyLocal(result)
 }
 
-function resolveDateOnlyDynamicValue(value: unknown): unknown {
+export function resolveDateOnlyDynamicValue(value: unknown): unknown {
   if (value === '__TODAY__') {
     return toDateOnlyLocal(new Date())
   }
@@ -63,11 +63,11 @@ function resolveDateOnlyDynamicValue(value: unknown): unknown {
   return value
 }
 
-function isDateOnlyString(value: unknown): value is string {
+export function isDateOnlyString(value: unknown): value is string {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
 }
 
-function getLocalDayBoundsFromDateOnly(dateOnly: string): { startIso: string; nextDayStartIso: string } | null {
+export function getLocalDayBoundsFromDateOnly(dateOnly: string): { startIso: string; nextDayStartIso: string } | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateOnly)
   if (!match) return null
   const year = Number(match[1])
@@ -101,7 +101,7 @@ function getUtcDayBoundsFromDateOnly(dateOnly: string): { startIso: string; next
   return { startIso: start.toISOString(), nextDayStartIso: nextDayStart.toISOString() }
 }
 
-function toDateOnlyLocal(d: Date): string {
+export function toDateOnlyLocal(d: Date): string {
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')

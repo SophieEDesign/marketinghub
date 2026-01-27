@@ -93,6 +93,8 @@ interface GridViewWrapperProps {
   onHeightChange?: (height: number) => void
   /** Row height in pixels (for height calculation) */
   rowHeightPixels?: number
+  /** Conditional formatting rules */
+  highlightRules?: HighlightRule[]
 }
 
 export default function GridViewWrapper({
@@ -119,6 +121,7 @@ export default function GridViewWrapper({
   defaultGroupsCollapsed = true,
   onHeightChange,
   rowHeightPixels = 30,
+  highlightRules = [],
 }: GridViewWrapperProps) {
   // CRITICAL: Normalize all inputs at wrapper entry point
   const safeInitialFilters = asArray<Filter>(initialFilters)
@@ -877,6 +880,7 @@ export default function GridViewWrapper({
           onFilterCreate={handleFilterCreate}
           onGroupByChange={handleGroupByChange}
           onHeightChange={onHeightChange}
+          highlightRules={highlightRules}
         />
       </div>
       <FieldBuilderDrawer

@@ -53,6 +53,8 @@ interface TimelineViewProps {
   rowSize?: 'compact' | 'medium' | 'comfortable' // Row size setting
   /** Bump to force a refetch (e.g. after external record creation). */
   reloadKey?: number
+  /** Conditional formatting rules */
+  highlightRules?: HighlightRule[]
 }
 
 type ZoomLevel = "day" | "week" | "month" | "quarter" | "year"
@@ -92,6 +94,7 @@ export default function TimelineView({
   wrapTitle: wrapTitleProp,
   rowSize = 'medium',
   reloadKey,
+  highlightRules = [],
 }: TimelineViewProps) {
   const supabase = useMemo(() => createClient(), [])
   const viewUuid = useMemo(() => normalizeUuid(viewId), [viewId])
@@ -1710,6 +1713,16 @@ export default function TimelineView({
                 const isDragging = draggingEvent === event.id
                 const isResizing = resizingEvent?.id === event.id
                 
+                // Evaluate conditional formatting rules for timeline events
+                const matchingRule = highlightRules && highlightRules.length > 0
+                  ? evaluateHighlightRules(highlightRules, event.rowData, tableFields)
+                  : null
+                
+                // Get formatting style for row-level rules
+                const rowFormattingStyle = matchingRule && matchingRule.scope !== 'cell'
+                  ? getFormattingStyle(matchingRule)
+                  : {}
+                
                 return (
                   <div
                     key={event.id}
@@ -1731,6 +1744,7 @@ export default function TimelineView({
                         backgroundColor: event.color ? `${event.color}15` : "white",
                         outline: selectedEventId === event.rowId ? '2px solid rgba(96, 165, 250, 0.4)' : 'none',
                         outlineOffset: selectedEventId === event.rowId ? '2px' : '0',
+                        ...rowFormattingStyle,
                       }}
                       onMouseDown={(e) => handleDragStart(event, e)}
                       onClick={(e) => handleEventSelect(event, e)}

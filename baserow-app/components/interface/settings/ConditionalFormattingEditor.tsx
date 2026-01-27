@@ -22,6 +22,7 @@ import {
 import { Plus, Trash2, Edit2, X } from "lucide-react"
 import type { HighlightRule } from "@/lib/interface/types"
 import type { TableField } from "@/types/fields"
+import type { FilterOperator } from "@/lib/filters/canonical-model"
 import FilterValueInput from "@/components/filters/FilterValueInput"
 import { getManualChoiceLabels } from "@/lib/fields/select-options"
 
@@ -69,6 +70,13 @@ function operatorNeedsValue(operator: HighlightRule['operator']): boolean {
   return !['is_empty', 'is_not_empty', 'date_today', 'date_overdue'].includes(operator)
 }
 
+/**
+ * Check if operator is a date operator that uses today
+ */
+function isDateTodayOperator(operator: HighlightRule['operator']): boolean {
+  return operator === 'date_today' || operator === 'date_overdue'
+}
+
 export default function ConditionalFormattingEditor({
   rules = [],
   fields,
@@ -94,7 +102,7 @@ export default function ConditionalFormattingEditor({
   
   // Ensure current operator is valid for selected field
   if (selectedField && !availableOperators.includes(currentRule.operator)) {
-    setCurrentRule({ ...currentRule, operator: availableOperators[0] })
+    setCurrentRule({ ...currentRule, operator: availableOperators[0] as HighlightRule['operator'] })
   }
   
   function handleAddRule() {
@@ -135,9 +143,10 @@ export default function ConditionalFormattingEditor({
   }
   
   // Convert HighlightRule operator to FilterOperator for FilterValueInput
-  const filterOperator = currentRule.operator === 'date_before' ? 'date_before' :
+  const filterOperator: FilterOperator = currentRule.operator === 'date_before' ? 'date_before' :
     currentRule.operator === 'date_after' ? 'date_after' :
     currentRule.operator === 'date_today' ? 'date_today' :
+    currentRule.operator === 'date_overdue' ? 'date_before' : // Overdue = before today
     currentRule.operator === 'is_empty' ? 'is_empty' :
     currentRule.operator === 'is_not_empty' ? 'is_not_empty' :
     currentRule.operator === 'contains' ? 'contains' :
@@ -168,7 +177,7 @@ export default function ConditionalFormattingEditor({
       
       {rules.length === 0 ? (
         <div className="text-sm text-gray-500 py-4 text-center border border-dashed rounded-md">
-          No formatting rules. Click "Add Rule" to create one.
+          No formatting rules. Click &quot;Add Rule&quot; to create one.
         </div>
       ) : (
         <div className="space-y-2">
@@ -313,7 +322,7 @@ export default function ConditionalFormattingEditor({
             )}
             
             {/* Value Input */}
-            {selectedField && operatorNeedsValue(currentRule.operator) && (
+            {selectedField && operatorNeedsValue(currentRule.operator) && !isDateTodayOperator(currentRule.operator) && (
               <div className="space-y-2">
                 <Label>Value</Label>
                 <FilterValueInput
@@ -324,6 +333,15 @@ export default function ConditionalFormattingEditor({
                     setCurrentRule({ ...currentRule, value })
                   }}
                 />
+              </div>
+            )}
+            
+            {/* Info for date operators that don't need values */}
+            {selectedField && isDateTodayOperator(currentRule.operator) && (
+              <div className="text-xs text-gray-500 p-2 bg-gray-50 rounded">
+                {currentRule.operator === 'date_overdue' 
+                  ? 'This rule will match any date that is before today (overdue).'
+                  : 'This rule will match any date that is today.'}
               </div>
             )}
             

@@ -785,6 +785,10 @@ export default function InterfaceBuilder({
       const position = findNextAvailablePosition(def.defaultWidth, def.defaultHeight, blocks)
 
       try {
+        // Use createBlockWithDefaults to get proper defaults
+        const { createBlockWithDefaults } = await import('@/lib/core-data/block-defaults')
+        const defaultConfig = createBlockWithDefaults(type)
+        
         const response = await fetch(`/api/pages/${page.id}/blocks`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -794,7 +798,7 @@ export default function InterfaceBuilder({
             y: position.y,
             w: def.defaultWidth,
             h: def.defaultHeight,
-            config: def.defaultConfig,
+            config: defaultConfig, // Use standardized defaults
           }),
         })
 

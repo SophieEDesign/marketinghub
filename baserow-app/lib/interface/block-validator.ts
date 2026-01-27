@@ -70,35 +70,22 @@ export function normalizeBlockConfig(
 
 /**
  * Get default config for a block type
+ * 
+ * Uses BLOCK_REGISTRY as the single source of truth for block defaults.
+ * This ensures consistency between block creation and validation fallbacks.
  */
 function getDefaultConfigForType(blockType: BlockType): BlockConfig {
-  const defaults: Record<BlockType, BlockConfig> = {
-    grid: { table_id: '' },
-    form: { table_id: '' },
-    record: { table_id: '', record_id: '' },
-    chart: { table_id: '', chart_type: 'bar' },
-    kpi: { table_id: '', kpi_aggregate: 'count' },
-    text: { content: '' },
-    image: { image_url: '' },
-    gallery: { table_id: '', view_type: 'gallery' },
-    divider: {},
-    button: { button_label: '' },
-    action: { action_type: 'navigate', label: '' },
-    link_preview: { link_url: '' },
-    filter: { target_blocks: 'all', allowed_fields: [], filters: [] },
-    field: { field_id: '' },
-    field_section: { group_name: '' },
-    calendar: { table_id: '', view_type: 'calendar' },
-    multi_calendar: { sources: [] },
-    kanban: { table_id: '', view_type: 'kanban' },
-    timeline: { table_id: '', view_type: 'timeline' },
-    multi_timeline: { sources: [] },
-    list: { table_id: '', view_type: 'grid' },
-    number: { table_id: '', field_id: '' },
-    horizontal_grouped: { table_id: '', group_by_field: '' },
+  // Import registry to use as single source of truth
+  const { BLOCK_REGISTRY } = require('./registry')
+  const definition = BLOCK_REGISTRY[blockType]
+  
+  if (definition && definition.defaultConfig) {
+    // Return a deep copy to avoid mutations
+    return JSON.parse(JSON.stringify(definition.defaultConfig))
   }
-
-  return defaults[blockType] || {}
+  
+  // Fallback for unknown block types
+  return {}
 }
 
 /**

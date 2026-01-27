@@ -30,6 +30,8 @@ import TimelineFieldValue from "@/components/views/TimelineFieldValue"
 import { isAbortError } from "@/lib/api/error-handling"
 import { resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
 import { normalizeUuid } from "@/lib/utils/ids"
+import type { HighlightRule } from "@/lib/interface/types"
+import { evaluateHighlightRules, getFormattingStyle } from "@/lib/conditional-formatting/evaluator"
 
 interface CalendarViewProps {
   tableId: string
@@ -54,6 +56,8 @@ interface CalendarViewProps {
   onDateToChange?: (date?: Date) => void
   /** If false, CalendarView will not render the date range controls (caller can render them elsewhere). */
   showDateRangeControls?: boolean
+  /** Conditional formatting rules */
+  highlightRules?: HighlightRule[]
 }
 
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -88,6 +92,7 @@ export default function CalendarView({
   onDateFromChange,
   onDateToChange,
   showDateRangeControls = true,
+  highlightRules = [],
 }: CalendarViewProps) {
   const viewUuid = useMemo(() => normalizeUuid(viewId), [viewId])
   // Ensure fieldIds is always an array (defensive check for any edge cases)
@@ -187,7 +192,7 @@ export default function CalendarView({
     if (!rowData) return null
     const raw = rowData[fieldName]
     if (raw === null || raw === undefined || raw === '') return null
-    const field = loadedTableFields.find(f => f.name === fieldName || f.id === fieldName)
+    const field = loadedTableFields.find((f: TableField) => f.name === fieldName || f.id === fieldName)
 
     // Multi-select might be stored as array
     if (Array.isArray(raw)) {
@@ -302,7 +307,7 @@ export default function CalendarView({
       // If tableFields prop is provided and not empty, use it
       if (tableFields && tableFields.length > 0) {
         // Ensure fields are in correct format (TableField[])
-        const formattedFields: TableField[] = tableFields.map((f) => {
+        const formattedFields: TableField[] = tableFields.map((f: any) => {
           // Handle both TableField and legacy format with field_id/field_name
           const fieldId = 'id' in f ? f.id : ('field_id' in f ? (f as any).field_id : '')
           const fieldName = 'name' in f ? f.name : ('field_name' in f ? (f as any).field_name : '')
@@ -342,7 +347,7 @@ export default function CalendarView({
     const pageDateField = blockConfig?.start_date_field || blockConfig?.from_date_field || blockConfig?.date_field || blockConfig?.calendar_date_field
     if (pageDateField) {
       // Validate it exists in table fields and is a date field
-      const field = loadedTableFields.find(f => 
+      const field = loadedTableFields.find((f: TableField) => 
         (f.name === pageDateField || f.id === pageDateField) && f.type === 'date'
       )
       if (field) {
@@ -353,7 +358,7 @@ export default function CalendarView({
     
     // 2. Check view config
     if (viewConfig?.calendar_date_field) {
-      const field = loadedTableFields.find(f => 
+      const field = loadedTableFields.find((f: TableField) => 
         (f.name === viewConfig.calendar_date_field || f.id === viewConfig.calendar_date_field) && f.type === 'date'
       )
       if (field) {
@@ -362,7 +367,7 @@ export default function CalendarView({
       }
     }
     if (viewConfig?.calendar_start_field) {
-      const field = loadedTableFields.find(f => 
+      const field = loadedTableFields.find((f: TableField) => 
         (f.name === viewConfig.calendar_start_field || f.id === viewConfig.calendar_start_field) && f.type === 'date'
       )
       if (field) {
@@ -373,7 +378,7 @@ export default function CalendarView({
     
     // 3. Fallback to dateFieldId prop
     if (dateFieldId) {
-      const field = loadedTableFields.find(f => 
+      const field = loadedTableFields.find((f: TableField) => 
         (f.name === dateFieldId || f.id === dateFieldId) && f.type === 'date'
       )
       if (field) {
@@ -490,7 +495,7 @@ export default function CalendarView({
 
   // Memoize loadedTableFields key to prevent unnecessary re-renders
   const loadedTableFieldsKey = useMemo(() => {
-    return JSON.stringify(loadedTableFields.map(f => ({ id: f.id, name: f.name, type: f.type })))
+    return JSON.stringify(loadedTableFields.map((f: TableField) => ({ id: f.id, name: f.name, type: f.type })))
   }, [loadedTableFields])
 
   // CRITICAL: Track previous combined key to prevent infinite loops
@@ -634,7 +639,7 @@ export default function CalendarView({
         .order("position", { ascending: true })
 
       if (fields) {
-        setLoadedTableFields(fields.map((f) => ({ 
+        setLoadedTableFields(fields.map((f: any) => ({ 
           id: f.id,
           table_id: f.table_id,
           name: f.name, 
@@ -685,7 +690,7 @@ export default function CalendarView({
         .select("*")
 
       // Apply filters using shared filter system (includes date range filters)
-      const normalizedFields = loadedTableFields.map(f => ({ name: f.name || f.id, type: f.type }))
+      const normalizedFields = loadedTableFields.map((f: TableField) => ({ name: f.name || f.id, type: f.type }))
       // Apply filter block tree first (supports groups/OR), then apply remaining flat filters (AND).
       if (filterTree) {
         query = applyFiltersToQuery(query, filterTree, normalizedFields)
@@ -783,7 +788,7 @@ export default function CalendarView({
       const resolveFieldObj = (raw: string) => {
         const trimmed = String(raw || "").trim()
         if (!trimmed) return null
-        return loadedTableFields.find((f) => f.name === trimmed || f.id === trimmed) || null
+        return loadedTableFields.find((f: TableField) => f.name === trimmed || f.id === trimmed) || null
       }
 
       // Calendar cards are driven by `fieldIds` (fields to show in cards/table).
@@ -794,7 +799,7 @@ export default function CalendarView({
       }
 
       if (idsToResolve.size === 0) {
-        setLinkedValueLabelMaps((prev) => (Object.keys(prev).length === 0 ? prev : {}))
+        setLinkedValueLabelMaps((prev: Record<string, Record<string, string>>) => (Object.keys(prev).length === 0 ? prev : {}))
         return
       }
 
@@ -815,7 +820,7 @@ export default function CalendarView({
       }
 
       if (!cancelled) {
-        setLinkedValueLabelMaps((prev) => (areLinkedValueMapsEqual(prev, next) ? prev : next))
+        setLinkedValueLabelMaps((prev: Record<string, Record<string, string>>) => (areLinkedValueMapsEqual(prev, next) ? prev : next))
       }
     }
 
@@ -830,7 +835,7 @@ export default function CalendarView({
   const dateField = useMemo(() => {
     if (!resolvedDateFieldId || !loadedTableFields.length) return null
     // Try to find by name first, then by id
-    return loadedTableFields.find(f => 
+    return loadedTableFields.find((f: TableField) => 
       f.name === resolvedDateFieldId || 
       f.id === resolvedDateFieldId
     )
@@ -845,7 +850,7 @@ export default function CalendarView({
   // Get start and end fields from view config
   const startField = useMemo(() => {
     if (!viewConfig?.calendar_start_field || !loadedTableFields.length) return null
-    return loadedTableFields.find(f => 
+    return loadedTableFields.find((f: TableField) => 
       f.name === viewConfig.calendar_start_field || 
       f.id === viewConfig.calendar_start_field
     )
@@ -853,7 +858,7 @@ export default function CalendarView({
 
   const endField = useMemo(() => {
     if (!viewConfig?.calendar_end_field || !loadedTableFields.length) return null
-    return loadedTableFields.find(f => 
+    return loadedTableFields.find((f: TableField) => 
       f.name === viewConfig.calendar_end_field || 
       f.id === viewConfig.calendar_end_field
     )
@@ -869,14 +874,14 @@ export default function CalendarView({
 
     const resolvedFromField = blockFromField
       ? loadedTableFields.find(
-          (f) => (f.name === blockFromField || f.id === blockFromField) && f.type === "date"
+          (f: TableField) => (f.name === blockFromField || f.id === blockFromField) && f.type === "date"
         )
       : null
 
     const viewStartField = viewConfig?.calendar_start_field
     const resolvedViewStartField = viewStartField
       ? loadedTableFields.find(
-          (f) => (f.name === viewStartField || f.id === viewStartField) && f.type === "date"
+          (f: TableField) => (f.name === viewStartField || f.id === viewStartField) && f.type === "date"
         )
       : null
 
@@ -897,14 +902,14 @@ export default function CalendarView({
 
     const resolvedToField = blockToField
       ? loadedTableFields.find(
-          (f) => (f.name === blockToField || f.id === blockToField) && f.type === "date"
+          (f: TableField) => (f.name === blockToField || f.id === blockToField) && f.type === "date"
         )
       : null
 
     const viewEndField = viewConfig?.calendar_end_field
     const resolvedViewEndField = viewEndField
       ? loadedTableFields.find(
-          (f) => (f.name === viewEndField || f.id === viewEndField) && f.type === "date"
+          (f: TableField) => (f.name === viewEndField || f.id === viewEndField) && f.type === "date"
         )
       : null
 
@@ -952,7 +957,7 @@ export default function CalendarView({
 
     // Prefer original values from our row state, fallback to FullCalendar's oldEvent.
     // Use ref to get latest rows without causing callback recreation
-    const currentRow = rowsRef.current.find((r) => r.id === rowId)
+    const currentRow = rowsRef.current.find((r: TableRow) => r.id === rowId)
     const currentRowData = currentRow?.data || (info.event.extendedProps as any)?.rowData
 
     const oldFromRaw = currentRowData?.[fromFieldName]
@@ -974,8 +979,8 @@ export default function CalendarView({
     }
 
     // Optimistic UI update (so the event stays put even if we don't reload immediately).
-    setRows((prev) =>
-      prev.map((r) =>
+    setRows((prev: TableRow[]) =>
+      prev.map((r: TableRow) =>
         r.id === rowId
           ? {
               ...r,
@@ -1071,13 +1076,13 @@ export default function CalendarView({
       // Check for date_from, from_date_field, start_date_field, calendar_start_field
       const blockFromField = blockConfig?.date_from || blockConfig?.from_date_field || blockConfig?.start_date_field || blockConfig?.calendar_start_field
       const resolvedFromField = blockFromField 
-        ? loadedTableFields.find(f => (f.name === blockFromField || f.id === blockFromField) && f.type === 'date')
+        ? loadedTableFields.find((f: TableField) => (f.name === blockFromField || f.id === blockFromField) && f.type === 'date')
         : null
       
       // Auto-detect date_from field if not configured (look for fields named "date_from", "from_date", "start_date", etc.)
-      let autoDetectedFromField = null
+      let autoDetectedFromField: TableField | null = null
       if (!resolvedFromField && !startField && !viewConfig?.calendar_start_field) {
-        autoDetectedFromField = loadedTableFields.find(f => 
+        autoDetectedFromField = loadedTableFields.find((f: TableField) => 
           f.type === 'date' && (
             f.name.toLowerCase() === 'date_from' || 
             f.name.toLowerCase() === 'from_date' ||
@@ -1094,13 +1099,13 @@ export default function CalendarView({
       // Check for date_to, to_date_field, end_date_field, calendar_end_field
       const blockToField = blockConfig?.date_to || blockConfig?.to_date_field || blockConfig?.end_date_field || blockConfig?.calendar_end_field
       const resolvedToField = blockToField
-        ? loadedTableFields.find(f => (f.name === blockToField || f.id === blockToField) && f.type === 'date')
+        ? loadedTableFields.find((f: TableField) => (f.name === blockToField || f.id === blockToField) && f.type === 'date')
         : null
       
       // Auto-detect date_to field if not configured (look for fields named "date_to", "to_date", "end_date", etc.)
-      let autoDetectedToField = null
+      let autoDetectedToField: TableField | null = null
       if (!resolvedToField && !endField && !viewConfig?.calendar_end_field) {
-        autoDetectedToField = loadedTableFields.find(f => 
+        autoDetectedToField = loadedTableFields.find((f: TableField) => 
           f.type === 'date' && (
             f.name.toLowerCase() === 'date_to' || 
             f.name.toLowerCase() === 'to_date' ||
@@ -1113,7 +1118,7 @@ export default function CalendarView({
       
       const actualToFieldName = resolvedToField?.name || endField?.name || viewConfig?.calendar_end_field || autoDetectedToField?.name || null
       
-      if (process.env.NODE_ENV === 'development' && filteredRows.length > 0) {
+      if (typeof process !== 'undefined' && process.env.NODE_ENV === 'development' && filteredRows.length > 0) {
         debugLog('CALENDAR', 'Calendar: Date field resolution', {
           actualFieldName,
           actualFromFieldName,
@@ -1124,7 +1129,7 @@ export default function CalendarView({
       }
       
       // CRITICAL: Log sample row data to debug date field extraction
-      if (process.env.NODE_ENV === 'development' && filteredRows.length > 0) {
+      if (typeof process !== 'undefined' && process.env.NODE_ENV === 'development' && filteredRows.length > 0) {
         const sampleRow = filteredRows[0]
         debugLog('CALENDAR', 'Calendar: Sample row data for event mapping', {
           rowId: sampleRow.id,
@@ -1140,7 +1145,7 @@ export default function CalendarView({
       }
       
       const events = filteredRows
-        .filter((row) => {
+        .filter((row: TableRow) => {
           if (!row || !row.data) {
             debugWarn('CALENDAR', 'Calendar: Row missing or has no data', { rowId: row?.id })
             return false
@@ -1218,8 +1223,8 @@ export default function CalendarView({
           }
         })
         // Ensure we have an array before mapping
-        .filter((row): row is TableRow => row !== null && row !== undefined)
-        .map((row) => {
+        .filter((row: TableRow): row is TableRow => row !== null && row !== undefined)
+        .map((row: TableRow) => {
           // Get date values - use date_from (default) and date_to (if available for range)
           let fromDateValue: unknown = null
           let toDateValue: unknown = null
@@ -1272,8 +1277,8 @@ export default function CalendarView({
           // Use visible fields (fieldIds) to determine title - prefer first text field
           // Also check for primary field (name field) or first non-date field
           const visibleFieldsForTitle = (Array.isArray(fieldIds) ? fieldIds : [])
-            .filter((fid) => {
-              const field = loadedTableFields.find(f => f.name === fid || f.id === fid)
+            .filter((fid: string) => {
+              const field = loadedTableFields.find((f: TableField) => f.name === fid || f.id === fid)
               // Exclude date fields from title
               return field && 
                 field.type !== 'date' && 
@@ -1284,19 +1289,19 @@ export default function CalendarView({
             })
           
           // Find primary field (name field) or first text field for title
-          const primaryField = loadedTableFields.find(f => 
+          const primaryField = loadedTableFields.find((f: TableField) => 
             f.type === 'text' && (f.name.toLowerCase() === 'name' || f.name.toLowerCase() === 'title')
           )
           
           const titleFieldId = primaryField 
             ? (primaryField.name || primaryField.id)
-            : visibleFieldsForTitle.find((fid) => {
-                const field = loadedTableFields.find(f => f.name === fid || f.id === fid)
+            : visibleFieldsForTitle.find((fid: string) => {
+                const field = loadedTableFields.find((f: TableField) => f.name === fid || f.id === fid)
                 return field && (field.type === 'text' || field.type === 'long_text')
               }) || visibleFieldsForTitle[0]
           
           // Find the actual field name for title
-          const titleFieldObj = loadedTableFields.find(f => 
+          const titleFieldObj = loadedTableFields.find((f: TableField) => 
             (f.name === titleFieldId || f.id === titleFieldId) || 
             (primaryField && (f.name === primaryField.name || f.id === primaryField.id))
           ) || (primaryField ? primaryField : null)
@@ -1330,7 +1335,7 @@ export default function CalendarView({
           
           if (colorFieldToUse) {
             // Find the color field object
-            const colorFieldObj = loadedTableFields.find(f => 
+            const colorFieldObj = loadedTableFields.find((f: TableField) => 
               (f.name === colorFieldToUse || f.id === colorFieldToUse) && 
               (f.type === 'single_select' || f.type === 'multi_select')
             )
@@ -1368,23 +1373,37 @@ export default function CalendarView({
             }
           }
 
+          // Evaluate conditional formatting rules for calendar events
+          const matchingRule = highlightRules && highlightRules.length > 0
+            ? evaluateHighlightRules(highlightRules, row.data, loadedTableFields)
+            : null
+          
+          // Get formatting style for row-level rules
+          const rowFormattingStyle = matchingRule && matchingRule.scope !== 'cell'
+            ? getFormattingStyle(matchingRule)
+            : {}
+          
+          // Use conditional formatting colors if available, otherwise use colorField colors
+          const finalBackgroundColor = rowFormattingStyle.backgroundColor || eventColor
+          const finalTextColor = rowFormattingStyle.color || (eventColor ? (() => {
+            // Calculate text color based on background luminance
+            if (!eventColor.startsWith('#')) return '#000000'
+            const r = parseInt(eventColor.slice(1, 3), 16)
+            const g = parseInt(eventColor.slice(3, 5), 16)
+            const b = parseInt(eventColor.slice(5, 7), 16)
+            const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+            return luminance > 0.5 ? '#000000' : '#ffffff'
+          })() : undefined)
+
           return {
             id: row.id,
             title: title || "Untitled",
             allDay: true,
             start: parsedStartDay,
             end: parsedEndExclusive,
-            backgroundColor: eventColor,
-            borderColor: eventColor,
-            textColor: eventColor ? (() => {
-              // Calculate text color based on background luminance
-              if (!eventColor.startsWith('#')) return '#000000'
-              const r = parseInt(eventColor.slice(1, 3), 16)
-              const g = parseInt(eventColor.slice(3, 5), 16)
-              const b = parseInt(eventColor.slice(5, 7), 16)
-              const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-              return luminance > 0.5 ? '#000000' : '#ffffff'
-            })() : undefined,
+            backgroundColor: finalBackgroundColor,
+            borderColor: finalBackgroundColor,
+            textColor: finalTextColor,
             extendedProps: {
               rowId: row.id,
               rowData: row.data,
@@ -1408,11 +1427,11 @@ export default function CalendarView({
                 ])
 
                 const resolvedNamesRaw = (Array.isArray(fieldIds) ? fieldIds : [])
-                  .map((fid) => {
-                    const f = loadedTableFields.find((x) => x.name === fid || x.id === fid)
+                  .map((fid: string) => {
+                    const f = loadedTableFields.find((x: TableField) => x.name === fid || x.id === fid)
                     return f?.name || fid
                   })
-                  .filter((name) => name && !exclude.has(name))
+                  .filter((name: string) => name && !exclude.has(name))
 
                 // De-dupe while preserving order (fieldIds may include both id and name forms).
                 const resolvedNames: string[] = []
@@ -1424,8 +1443,8 @@ export default function CalendarView({
                 }
 
                 const items = resolvedNames
-                  .map((name) => {
-                    const field = loadedTableFields.find((f) => f.name === name)
+                  .map((name: string) => {
+                    const field = loadedTableFields.find((f: TableField) => f.name === name)
                     if (!field) return null
                     // Skip non-card-friendly types
                     if (field.type === 'date' || field.type === 'attachment') return null
@@ -1614,7 +1633,7 @@ export default function CalendarView({
               src={image}
               alt=""
               className={`w-full h-full ${fitImageSize ? "object-contain" : "object-cover"}`}
-              onError={(e) => {
+              onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                 ;(e.target as HTMLImageElement).style.display = "none"
               }}
             />
@@ -1634,7 +1653,8 @@ export default function CalendarView({
                 String(eventInfo.event.title || "Untitled")
               )}
             </div>
-            {cardFields.slice(0, 2).map((f: { field: TableField; value: unknown }, idx: number) => (
+            {cardFields.slice(0, 2).map((f: { field: TableField; value: unknown }, idx: number) => {
+              return (
               <div key={`${eventInfo.event.id}-cf-${idx}`} className="truncate text-[10px] opacity-90">
                 {f?.field ? (
                   <TimelineFieldValue
@@ -1647,7 +1667,8 @@ export default function CalendarView({
                   String(f?.value || "")
                 )}
               </div>
-            ))}
+            )
+            })}
           </div>
         </div>
       </div>
@@ -1664,7 +1685,7 @@ export default function CalendarView({
       // DEBUG_CALENDAR: Always log event clicks in development (prove click wiring works)
       // Standardise on localStorage.getItem("DEBUG_CALENDAR") === "1"
       const debugEnabled = typeof window !== "undefined" && localStorage.getItem("DEBUG_CALENDAR") === "1"
-      if (debugEnabled || process.env.NODE_ENV === "development") {
+      if (debugEnabled || (typeof process !== 'undefined' && process.env.NODE_ENV === "development")) {
         debugLog('CALENDAR', "[Calendar] Event clicked", {
           recordId,
           eventId: info.event.id,
@@ -1789,7 +1810,7 @@ export default function CalendarView({
   // CRITICAL: This check must happen AFTER rows are loaded and events are generated
   if (!loading && rows.length > 0 && calendarEvents.length === 0) {
     // Log diagnostic info in development
-    if (process.env.NODE_ENV === 'development') {
+    if (typeof process !== 'undefined' && process.env.NODE_ENV === 'development') {
       const sampleRow = rows[0]
       debugWarn('CALENDAR', 'Calendar: Rows exist but no events generated', {
         rowCount: rows.length,
