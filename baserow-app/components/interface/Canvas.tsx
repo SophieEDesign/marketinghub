@@ -500,9 +500,11 @@ export default function Canvas({
           w = layout.w
           
           // PHASE 2.2: Stop hydrating height from database for auto-sized blocks
-          // BUT: Respect manually set heights (if user resized, database will have a value)
-          // Only skip height if database height is null (never manually set)
+          // Use heightMode policy: 'auto' blocks don't hydrate height, 'fixed' blocks do
           const config = block.config as any
+          const heightMode = config?.heightMode || 'auto' // Default to auto
+          
+          // Legacy check: blocks with grouping are also auto-sized (for backward compatibility)
           const hasGrouping = 
             (block.type === 'grid' || block.type === 'list') &&
             (config?.group_by || config?.group_by_field || config?.group_by_rules)
@@ -510,20 +512,21 @@ export default function Canvas({
           const dbHeight = layout.h
           const isHeightNull = dbHeight === null || dbHeight === undefined
           
-          if (hasGrouping && isHeightNull) {
-            // Auto-sized block with no manual height - ignore h from database, let content re-measure
+          if (heightMode === 'auto' || (hasGrouping && isHeightNull)) {
+            // Auto-sized block - ignore h from database, let content re-measure
             // Use a default height that will be replaced by content measurement
             h = 4 // Default, will be updated by onHeightChange
-            console.log('[HeightHydration] SKIPPED for auto-sized block (no manual height)', {
+            console.log('[HeightHydration] SKIPPED for auto-sized block', {
               blockId: block.id,
               blockType: block.type,
-              hasGrouping: true,
+              heightMode,
+              hasGrouping,
               dbHeight: block.h,
               appliedHeight: h,
-              reason: 'content-driven block, height never manually set',
+              reason: heightMode === 'auto' ? 'heightMode=auto' : 'content-driven block, height never manually set',
             })
           } else {
-            // Use height from database (either non-auto-sized block, or auto-sized with manual height)
+            // Fixed height block - use height from database
             h = layout.h
             // PHASE 1.2: Log height mutation in layout hydration
             console.log('[HeightMutation] layoutHydration', {
@@ -531,8 +534,8 @@ export default function Canvas({
               height: h,
               source: 'layoutHydration',
               fromDB: block.h,
+              heightMode,
               isAutoSized: hasGrouping,
-              hasManualHeight: hasGrouping && !isHeightNull,
             })
           }
           
@@ -1281,17 +1284,29 @@ export default function Canvas({
     return compacted
   }, [])
 
+  // Helper to get heightMode from block config (defaults to 'auto')
+  const getHeightMode = useCallback((blockId: string): 'auto' | 'fixed' => {
+    const block = blocks.find(b => b.id === blockId)
+    if (!block) return 'auto'
+    const config = block.config as any
+    return config?.heightMode === 'fixed' ? 'fixed' : 'auto'
+  }, [blocks])
+
   // PHASE 1.2 & 2.1: onHeightChange handler with logging and guards
   const handleHeightChange = useCallback((blockId: string, newHeightPx: number) => {
     // CRITICAL: Convert pixels to grid units (React Grid Layout uses grid units, not pixels)
     // Views may send pixels or incorrectly-converted grid units - always convert properly here
     const gridH = toGridH(newHeightPx)
     
+    // Get height mode for this block
+    const heightMode = getHeightMode(blockId)
+    
     // PHASE 1.2: Log height change from content
     console.log('[HeightChange]', {
       blockId,
       newHeightPx,
       gridH,
+      heightMode,
       source: 'content',
       currentlyResizing: currentlyResizingBlockIdRef.current,
       currentlyDragging: currentlyDraggingBlockIdRef.current,
@@ -1369,20 +1384,30 @@ export default function Canvas({
         }
       })
 
-      // CRITICAL: Save content-driven height changes to database
-      // This ensures the height persists and sync effect doesn't overwrite it
+      // CRITICAL: Update layout locally for reflow (always)
+      // For auto blocks: height changes reflow the layout but don't persist h to database
+      // For fixed blocks: height changes persist to database
+      // Note: We always send h in layoutItems, but the sync effect will respect heightMode
+      // and skip hydrating h for auto blocks, so they remain content-driven
       const layoutItems: LayoutItem[] = finalLayout.map((item) => ({
         i: item.i,
         x: item.x || 0,
         y: item.y || 0,
         w: item.w || 4,
-        h: item.h || 4,
+        h: item.h || 4, // Always include h for layout sync, but hydration respects heightMode
       }))
+      
       notifyLayoutChange(layoutItems)
+      
+      console.log('[HeightChange] Layout updated', {
+        blockId,
+        heightMode,
+        note: heightMode === 'auto' ? 'Height will not persist (content-driven)' : 'Height will persist (fixed)',
+      })
 
       return finalLayout
     })
-  }, [blocks, pushBlocksDown, compactLayoutVertically, notifyLayoutChange, toGridH])
+  }, [blocks, pushBlocksDown, compactLayoutVertically, notifyLayoutChange, toGridH, getHeightMode])
 
   const handleLayoutChange = useCallback(
     (newLayout: Layout[]) => {
@@ -2255,12 +2280,26 @@ export default function Canvas({
           onResizeStop={(layout, oldItem, newItem, placeholder, e, element) => {
             // CRITICAL: Immediately clear ALL resize state when resize ends
             // This ensures no cached heights remain after manual resize completes
-            // Height must be DERIVED from content, not remembered
             const blockId = oldItem.i
             const previousHeight = blockHeightsBeforeResizeRef.current.get(blockId)
             const newHeight = newItem.h || 4
             
             debugLog('LAYOUT', `[Canvas] Resize stopped for block ${blockId}, height: ${previousHeight} → ${newHeight}`)
+            
+            // CRITICAL: When user manually resizes, set heightMode to 'fixed' and persist the height
+            // This locks in the manual height and prevents content from overriding it
+            const block = blocks.find(b => b.id === blockId)
+            if (block && onBlockUpdate) {
+              const config = block.config as any
+              // Only set to fixed if not already fixed (avoid unnecessary updates)
+              if (config?.heightMode !== 'fixed') {
+                onBlockUpdate(blockId, {
+                  ...config,
+                  heightMode: 'fixed',
+                } as any)
+                console.log('[HeightMode] Set to fixed after manual resize', { blockId })
+              }
+            }
             
             // CRITICAL: Clear cached height immediately - do NOT persist after resize
             // Old heights must never be cached after collapse
