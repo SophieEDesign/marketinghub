@@ -244,6 +244,10 @@ function buildNodesAtLevel<TItem extends Record<string, any>>(
     return []
   }
   
+  // For nested groups, ensure we have a valid field name (not an ID) to access data
+  // The normalizeGroupRuleFieldName should have converted IDs to names, but double-check
+  const fieldNameForData = field ? field.name : rule.field
+  
   // Debug logging for nested groups
   if (ruleIndex > 0 && items.length > 0) {
     console.log(`[GroupTree] Building level ${ruleIndex + 1} groups:`, {
@@ -258,12 +262,12 @@ function buildNodesAtLevel<TItem extends Record<string, any>>(
   const buckets = new Map<string, { key: GroupKey; items: TItem[] }>()
 
   for (const item of items) {
-    // Access the field value using the normalized field name
-    const raw = (item as any)?.[rule.field]
+    // Access the field value using the field name (not ID) to match data structure
+    const raw = (item as any)?.[fieldNameForData]
     
     // Debug: Log if field is missing in data (only for nested levels to avoid spam)
     if (ruleIndex > 0 && raw === undefined && items.length > 0 && items.indexOf(item) === 0) {
-      console.log(`[GroupTree] Field "${rule.field}" not found in item data at level ${ruleIndex + 1}. Available keys:`, Object.keys(item || {}))
+      console.log(`[GroupTree] Field "${fieldNameForData}" (from rule field "${rule.field}") not found in item data at level ${ruleIndex + 1}. Available keys:`, Object.keys(item || {}))
     }
     
     const groupKeys = getGroupKeysForValue(ctx, rule, field, raw)
@@ -380,13 +384,21 @@ export function flattenGroupTree<TItem extends Record<string, any>>(
     out.push({ type: 'group', node, level })
     if (collapsed.has(node.pathKey)) return
 
-    if (Array.isArray(node.children) && node.children.length > 0) {
-      for (const child of node.children) walk(child, level + 1)
+    // Check if node has children (nested groups)
+    const hasChildren = Array.isArray(node.children) && node.children.length > 0
+    if (hasChildren) {
+      // Process all children recursively
+      for (const child of node.children) {
+        walk(child, level + 1)
+      }
       return
     }
 
+    // If no children, this is a leaf node - process items
     const items = Array.isArray(node.items) ? node.items : []
-    for (const item of items) out.push({ type: 'item', item, level: level + 1, groupPathKey: node.pathKey })
+    for (const item of items) {
+      out.push({ type: 'item', item, level: level + 1, groupPathKey: node.pathKey })
+    }
   }
 
   for (const g of rootGroups) walk(g, 0)

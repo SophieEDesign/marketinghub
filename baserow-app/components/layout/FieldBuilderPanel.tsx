@@ -36,6 +36,9 @@ import type { TableField, FieldType, FieldOptions } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
 import FormulaEditor from "@/components/fields/FormulaEditor"
 import FieldSettingsDrawer from "./FieldSettingsDrawer"
+import { getTableSections, reorderSections, upsertSectionSettings, ensureSectionExists } from "@/lib/core-data/section-settings"
+import type { SectionSettings } from "@/lib/core-data/types"
+import { ChevronUp, ChevronDown } from "lucide-react"
 
 interface FieldBuilderPanelProps {
   tableId: string
@@ -55,10 +58,14 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
   const [editingField, setEditingField] = useState<TableField | null>(null)
   const [showNewField, setShowNewField] = useState(false)
   const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false)
+  const [sections, setSections] = useState<SectionSettings[]>([])
+  const [loadingSections, setLoadingSections] = useState(false)
+  const [reorderingSections, setReorderingSections] = useState(false)
 
   useEffect(() => {
     loadFields()
     loadTableSettings()
+    loadSections()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableId])
 
@@ -71,6 +78,78 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
       }
     } catch (error) {
       console.warn("Error loading table settings:", error)
+    }
+  }
+
+  async function loadSections() {
+    setLoadingSections(true)
+    try {
+      const loadedSections = await getTableSections(tableId)
+      setSections(loadedSections)
+    } catch (error) {
+      console.error("Error loading sections:", error)
+    } finally {
+      setLoadingSections(false)
+    }
+  }
+
+  async function handleReorderSections(sectionNameOrId: string, direction: 'up' | 'down') {
+    if (reorderingSections) return
+    
+    const currentIndex = allSections.findIndex(s => s.id === sectionNameOrId || s.name === sectionNameOrId)
+    if (currentIndex === -1) return
+    
+    const currentSection = allSections[currentIndex]
+    
+    // Don't allow reordering General section
+    if (currentSection.name === 'General') return
+    
+    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
+    if (newIndex < 0 || newIndex >= allSections.length) return
+    
+    // Don't allow moving past General section
+    if (allSections[newIndex].name === 'General') return
+    
+    setReorderingSections(true)
+    try {
+      const newSections = [...allSections]
+      const [moved] = newSections.splice(currentIndex, 1)
+      newSections.splice(newIndex, 0, moved)
+      
+      // Update order_index for all affected sections (excluding General)
+      const sectionsToReorder = newSections.filter(s => s.name !== 'General')
+      const sectionOrders: Array<{ sectionId: string; order_index: number }> = []
+      
+      for (let i = 0; i < sectionsToReorder.length; i++) {
+        const section = sectionsToReorder[i]
+        // If section doesn't have an ID, ensure it exists first
+        if (!section.id) {
+          const result = await ensureSectionExists(tableId, section.name)
+          section.id = result.id
+        }
+        sectionOrders.push({
+          sectionId: section.id,
+          order_index: i,
+        })
+      }
+      
+      if (sectionOrders.length > 0) {
+        const result = await reorderSections(tableId, sectionOrders)
+        if (!result.success) {
+          alert(result.error || 'Failed to reorder sections')
+          await loadSections() // Revert on error
+          return
+        }
+      }
+      
+      // Reload sections to get updated state
+      await loadSections()
+    } catch (error) {
+      console.error("Error reordering sections:", error)
+      alert("Failed to reorder sections")
+      await loadSections() // Revert on error
+    } finally {
+      setReorderingSections(false)
     }
   }
 
@@ -88,6 +167,8 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
           return a.name.localeCompare(b.name)
         })
         setFields(sortedFields)
+        // Reload sections after fields are loaded to check for ungrouped fields
+        await loadSections()
       }
     } catch (error) {
       console.error("Error loading fields:", error)
@@ -217,6 +298,11 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
 
   async function handleCreateField(fieldData: Partial<TableField>) {
     try {
+      // If field has a group_name, ensure the section exists
+      if (fieldData.group_name) {
+        await ensureSectionExists(tableId, fieldData.group_name)
+      }
+
       const response = await fetch(`/api/tables/${tableId}/fields`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -230,6 +316,7 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
       }
 
       await loadFields()
+      await loadSections() // Reload sections in case a new one was created
       onFieldsUpdated()
       setShowNewField(false)
     } catch (error) {
@@ -240,6 +327,11 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
 
   async function handleUpdateField(fieldId: string, updates: Partial<TableField>) {
     try {
+      // If field has a group_name, ensure the section exists
+      if (updates.group_name) {
+        await ensureSectionExists(tableId, updates.group_name)
+      }
+
       const response = await fetch(`/api/tables/${tableId}/fields`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -256,6 +348,7 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
       }
 
       await loadFields()
+      await loadSections() // Reload sections in case section was changed
       onFieldsUpdated()
       setEditingField(null)
     } catch (error) {
@@ -292,8 +385,133 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
     return <div className="text-center py-8 text-gray-500">Loading fields...</div>
   }
 
+  // Get all unique section names from fields (including those not in sections table yet)
+  const allSectionNames = useMemo(() => {
+    const sectionSet = new Set<string>()
+    fields.forEach(field => {
+      if (field.group_name) {
+        sectionSet.add(field.group_name)
+      }
+    })
+    return Array.from(sectionSet)
+  }, [fields])
+
+  // Merge sections from DB with sections from fields
+  const allSections = useMemo(() => {
+    const sectionMap = new Map<string, SectionSettings>()
+    
+    // Add General section if there are ungrouped fields
+    const hasUngroupedFields = fields.some(f => !f.group_name)
+    if (hasUngroupedFields) {
+      sectionMap.set('General', {
+        id: '',
+        table_id: tableId,
+        name: 'General',
+        display_name: 'General',
+        order_index: -1,
+        default_collapsed: false,
+        default_visible: true,
+        permissions: {},
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+    }
+    
+    // Add sections from database
+    sections.forEach(section => {
+      sectionMap.set(section.name, section)
+    })
+    
+    // Add sections from fields that aren't in DB yet
+    allSectionNames.forEach(name => {
+      if (!sectionMap.has(name)) {
+        sectionMap.set(name, {
+          id: '',
+          table_id: tableId,
+          name: name,
+          display_name: name,
+          order_index: sections.length,
+          default_collapsed: false,
+          default_visible: true,
+          permissions: {},
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+      }
+    })
+    
+    // Sort: General first, then by order_index, then by name
+    return Array.from(sectionMap.values()).sort((a, b) => {
+      if (a.name === 'General') return -1
+      if (b.name === 'General') return 1
+      if (a.order_index !== b.order_index) return a.order_index - b.order_index
+      return a.name.localeCompare(b.name)
+    })
+  }, [sections, allSectionNames, fields, tableId])
+
   return (
     <div className="space-y-4">
+      {/* Section Ordering */}
+      {allSections.length > 0 && (
+        <div className="space-y-2">
+          <Label className="text-sm font-semibold text-gray-900">Section Order</Label>
+          <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
+            {allSections.map((section, index) => {
+              const fieldCount = fields.filter(f => (f.group_name || 'General') === section.name).length
+              const isGeneral = section.name === 'General'
+              const canMoveUp = !isGeneral && index > (allSections[0]?.name === 'General' ? 1 : 0)
+              const canMoveDown = !isGeneral && index < allSections.length - 1
+              
+              return (
+                <div
+                  key={section.name}
+                  className="flex items-center justify-between p-2 bg-white rounded border border-gray-200"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-gray-600 w-8">
+                      {index + 1}
+                    </span>
+                    <span className="text-sm font-medium text-gray-900">
+                      {section.display_name || section.name}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      ({fieldCount} {fieldCount === 1 ? 'field' : 'fields'})
+                    </span>
+                  </div>
+                  {!isGeneral && (
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleReorderSections(section.name, 'up')}
+                        disabled={!canMoveUp || reorderingSections}
+                        className="h-7 w-7 p-0"
+                        title="Move up"
+                      >
+                        <ChevronUp className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleReorderSections(section.name, 'down')}
+                        disabled={!canMoveDown || reorderingSections}
+                        className="h-7 w-7 p-0"
+                        title="Move down"
+                      >
+                        <ChevronDown className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          <p className="text-xs text-gray-500">
+            Sections are ordered by their index. Fields will appear in this order in pickers and modals.
+          </p>
+        </div>
+      )}
+
       <div className="space-y-2">
         <Label className="text-sm font-semibold text-gray-900">Primary / Default Field</Label>
         <Select
@@ -339,6 +557,7 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
         <NewFieldForm
           tableId={tableId}
           tableFields={fields}
+          sections={allSections}
           onSave={handleCreateField}
           onCancel={() => setShowNewField(false)}
         />
@@ -415,8 +634,10 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
         }}
         tableId={tableId}
         tableFields={fields}
+        sections={allSections}
         onSave={async () => {
           await loadFields()
+          await loadSections()
           onFieldsUpdated()
         }}
       />
@@ -427,17 +648,20 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
 function NewFieldForm({
   tableId,
   tableFields,
+  sections = [],
   onSave,
   onCancel,
 }: {
   tableId: string
   tableFields: TableField[]
+  sections?: SectionSettings[]
   onSave: (fieldData: Partial<TableField>) => void
   onCancel: () => void
 }) {
   const [name, setName] = useState("")
   const [type, setType] = useState<FieldType>("text")
   const [required, setRequired] = useState(false)
+  const [groupName, setGroupName] = useState<string>("")
   const [options, setOptions] = useState<FieldOptions>({})
   const [error, setError] = useState<string | null>(null)
 
@@ -565,6 +789,7 @@ function NewFieldForm({
       label: name.trim(),
       type,
       required: isVirtual ? false : required,
+      group_name: groupName.trim() || null,
       options: cleanOptions,
     })
   }
@@ -860,6 +1085,30 @@ function NewFieldForm({
             ))}
           </SelectContent>
         </Select>
+      </div>
+
+      {/* Section Name */}
+      <div>
+        <Label className="text-xs font-medium text-gray-700">Section Name (Optional)</Label>
+        <Select
+          value={groupName}
+          onValueChange={(value) => setGroupName(value === "__none__" ? "" : value)}
+        >
+          <SelectTrigger className="mt-1 h-8 text-sm">
+            <SelectValue placeholder="Select a section" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">None (General)</SelectItem>
+            {sections.filter(s => s.name !== 'General').map((section) => (
+              <SelectItem key={section.name} value={section.name}>
+                {section.display_name || section.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-gray-500 mt-1">
+          Organize fields into sections. Fields with the same section name will be grouped together.
+        </p>
       </div>
 
       {renderTypeSpecificOptions()}

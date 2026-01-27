@@ -32,6 +32,7 @@ import FormulaEditor from '@/components/fields/FormulaEditor'
 import type { SelectOption } from '@/types/fields'
 import { normalizeSelectOptionsForUi } from '@/lib/fields/select-options'
 import Link from 'next/link'
+import { ensureSectionExists } from '@/lib/core-data/section-settings'
 import {
   Dialog,
   DialogContent,
@@ -40,6 +41,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import type { SectionSettings } from '@/lib/core-data/types'
 
 const DATE_FORMAT_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'yyyy-MM-dd', label: 'ISO' },
@@ -56,6 +58,7 @@ interface FieldSettingsDrawerProps {
   onOpenChange: (open: boolean) => void
   tableId: string
   tableFields: TableField[]
+  sections?: SectionSettings[]
   onSave: () => void
 }
 
@@ -65,6 +68,7 @@ export default function FieldSettingsDrawer({
   onOpenChange,
   tableId,
   tableFields,
+  sections = [],
   onSave,
 }: FieldSettingsDrawerProps) {
   const [name, setName] = useState('')
@@ -670,6 +674,11 @@ export default function FieldSettingsDrawer({
 
     setSaving(true)
     try {
+      // If field has a group_name, ensure the section exists
+      if (groupName.trim()) {
+        await ensureSectionExists(tableId, groupName.trim())
+      }
+
       const response = await fetch(`/api/tables/${tableId}/fields`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -865,12 +874,22 @@ export default function FieldSettingsDrawer({
           {/* Section Name */}
           <div className="space-y-2">
             <Label htmlFor="group-name">Section Name (Optional)</Label>
-            <Input
-              id="group-name"
-              value={groupName}
-              onChange={(e) => setGroupName(e.target.value)}
-              placeholder="e.g., Social Media Fields, Press Fields, Contact Details"
-            />
+            <Select
+              value={groupName || "__none__"}
+              onValueChange={(value) => setGroupName(value === "__none__" ? "" : value)}
+            >
+              <SelectTrigger id="group-name">
+                <SelectValue placeholder="Select a section" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">None (General)</SelectItem>
+                {sections.filter(s => s.name !== 'General').map((section) => (
+                  <SelectItem key={section.name} value={section.name}>
+                    {section.display_name || section.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <p className="text-xs text-muted-foreground">
               Organize fields into sections. Fields with the same section name will be grouped together in pickers, modals, and canvas.
             </p>

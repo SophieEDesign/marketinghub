@@ -259,6 +259,122 @@ export default function FieldBlock({
     setLoading(true)
     try {
       const supabase = createClient()
+      
+      // LOOKUP FIELDS: Compute value from linked field
+      if (field.type === 'lookup') {
+        const lookupFieldId = field.options?.lookup_field_id
+        const lookupTableId = field.options?.lookup_table_id
+        const lookupResultFieldId = field.options?.lookup_result_field_id
+        
+        if (!lookupFieldId || !lookupTableId || !lookupResultFieldId) {
+          console.warn("[FieldBlock] Lookup field missing required configuration")
+          setFieldValue(null)
+          return
+        }
+        
+        // Get the linked field definition to find its name
+        const { data: linkedFieldData } = await supabase
+          .from("table_fields")
+          .select("name")
+          .eq("id", lookupFieldId)
+          .eq("table_id", pageTableId)
+          .single()
+        
+        if (!linkedFieldData) {
+          console.warn("[FieldBlock] Linked field not found:", lookupFieldId)
+          setFieldValue(null)
+          return
+        }
+        
+        // Get the current record to read the linked field value
+        const { data: currentRecord, error: recordError } = await supabase
+          .from(tableName)
+          .select("*")
+          .eq("id", recordId)
+          .single()
+        
+        if (recordError || !currentRecord) {
+          console.error("[FieldBlock] Error loading current record:", recordError)
+          setFieldValue(null)
+          return
+        }
+        
+        // Get the linked record ID(s) from the linked field
+        const linkedFieldName = linkedFieldData.name
+        const linkedRecordIds = currentRecord[linkedFieldName]
+        
+        if (!linkedRecordIds) {
+          setFieldValue(null)
+          return
+        }
+        
+        // Normalize to array (single link is string, multi-link is array)
+        const ids = Array.isArray(linkedRecordIds) ? linkedRecordIds : [linkedRecordIds]
+        const validIds = ids.filter(id => id && typeof id === 'string')
+        
+        if (validIds.length === 0) {
+          setFieldValue(null)
+          return
+        }
+        
+        // Get lookup table info
+        const { data: lookupTable, error: tableError } = await supabase
+          .from("tables")
+          .select("supabase_table")
+          .eq("id", lookupTableId)
+          .single()
+        
+        if (tableError || !lookupTable) {
+          console.error("[FieldBlock] Lookup table not found:", tableError)
+          setFieldValue(null)
+          return
+        }
+        
+        // Get the lookup result field definition to find its name
+        const { data: resultFieldData } = await supabase
+          .from("table_fields")
+          .select("name")
+          .eq("id", lookupResultFieldId)
+          .eq("table_id", lookupTableId)
+          .single()
+        
+        if (!resultFieldData) {
+          console.warn("[FieldBlock] Lookup result field not found:", lookupResultFieldId)
+          setFieldValue(null)
+          return
+        }
+        
+        // Fetch the lookup result field value from linked records
+        const resultFieldName = resultFieldData.name
+        const { data: lookupRecords, error: lookupError } = await supabase
+          .from(lookupTable.supabase_table)
+          .select(`id, ${resultFieldName}`)
+          .in("id", validIds)
+        
+        if (lookupError || !lookupRecords) {
+          console.error("[FieldBlock] Error fetching lookup records:", lookupError)
+          setFieldValue(null)
+          return
+        }
+        
+        // Extract values from lookup records
+        // For single-link, return single value; for multi-link, return array
+        const values = lookupRecords.map((r: any) => r[resultFieldName]).filter((v: any) => v != null)
+        
+        if (values.length === 0) {
+          setFieldValue(null)
+        } else if (Array.isArray(linkedRecordIds)) {
+          // Multi-link: return array of values
+          setFieldValue(values)
+        } else {
+          // Single link: return first value
+          setFieldValue(values[0])
+        }
+        
+        return
+      }
+      
+      // REGULAR FIELDS: Read directly from table
       // IMPORTANT:
       // - Some "system" fields can exist in `table_fields` but not as physical columns
       //   on the dynamic data table. Selecting a missing column causes a PostgREST 400.

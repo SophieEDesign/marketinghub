@@ -544,8 +544,8 @@ export default function RecordReviewLeftColumn({
         <button
           type="button"
           onClick={() => toggleGroupCollapsed(node.pathKey)}
-          className="w-full flex items-center justify-between px-2 py-1 hover:bg-gray-50 rounded"
-          style={{ paddingLeft: 8 + level * 16 }}
+          className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 rounded"
+          style={{ paddingLeft: 12 + level * 16 }}
         >
           <div className="flex items-center gap-2 min-w-0">
             <Badge className={`text-xs font-medium ${textColor} border border-opacity-20`} style={{ backgroundColor: normalizedColor }}>
@@ -562,8 +562,8 @@ export default function RecordReviewLeftColumn({
       <button
         type="button"
         onClick={() => toggleGroupCollapsed(node.pathKey)}
-        className="w-full flex items-center justify-between px-2 py-1 hover:bg-gray-50 rounded"
-        style={{ paddingLeft: 8 + level * 16 }}
+        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 rounded"
+        style={{ paddingLeft: 12 + level * 16 }}
       >
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-xs font-semibold text-gray-700 truncate">
@@ -681,7 +681,7 @@ export default function RecordReviewLeftColumn({
         <button
           key={record.id}
           onClick={() => onRecordSelect(record.id)}
-          className={`w-full text-left px-3 py-2.5 hover:bg-gray-50 transition-colors flex gap-2 border-l-4 ${
+          className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex gap-3 border-l-4 ${
             isSelected ? "bg-blue-50 border-blue-500" : "border-transparent"
           }`}
           style={borderColorStyle}
@@ -714,14 +714,14 @@ export default function RecordReviewLeftColumn({
 
             {/* Subtitle */}
             {subtitleValue && (
-              <div className="mt-1 text-xs text-gray-600 truncate">
+              <div className="mt-1.5 text-xs text-gray-600 truncate">
                 {renderValue(subtitleField, subtitleValue)}
               </div>
             )}
 
             {/* Additional Field */}
             {additionalValue && (
-              <div className="mt-1 text-xs text-gray-500 truncate">
+              <div className="mt-1.5 text-xs text-gray-500 truncate">
                 {renderValue(additionalField, additionalValue)}
               </div>
             )}
@@ -742,15 +742,15 @@ export default function RecordReviewLeftColumn({
       <button
         key={record.id}
         onClick={() => onRecordSelect(record.id)}
-        className={`w-full text-left px-3 py-2.5 hover:bg-gray-50 transition-colors ${
+        className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors ${
           isSelected ? "bg-blue-50 border-l-4 border-blue-500" : ""
-        } ${compact ? "py-2" : ""}`}
+        } ${compact ? "py-2.5" : ""}`}
       >
         <div className={`font-medium text-gray-900 truncate ${compact ? "text-xs" : "text-sm"}`}>
           {String(displayValue || "Untitled")}
         </div>
         {showLabels && displayField && (
-          <div className="text-xs text-gray-500 mt-0.5">
+          <div className="text-xs text-gray-500 mt-1.5">
             {displayField.name}
           </div>
         )}
@@ -784,19 +784,19 @@ export default function RecordReviewLeftColumn({
   return (
     <div className="w-80 border-r border-gray-200 bg-white flex flex-col h-full">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">{tableName || "Records"}</h3>
+      <div className="p-5 border-b border-gray-200">
+        <h3 className="text-sm font-semibold text-gray-900 mb-4">{tableName || "Records"}</h3>
 
         {/* Search */}
         <div className="flex items-center gap-2">
           <div className="relative flex-1 min-w-0">
-            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               type="text"
               placeholder="Search records..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 h-8 text-sm"
+              className="pl-9 h-9 text-sm"
             />
           </div>
           {isRecordView && (
@@ -804,7 +804,7 @@ export default function RecordReviewLeftColumn({
               type="button"
               variant="outline"
               size="icon"
-              className="h-8 w-8 flex-shrink-0"
+              className="h-9 w-9 flex-shrink-0"
               onClick={handleOpenCreateModal}
               disabled={creating || !supabaseTableName}
               aria-label="Add record"
@@ -856,7 +856,7 @@ export default function RecordReviewLeftColumn({
                 } else {
                   // Render record row with indentation based on level
                   return (
-                    <div key={`record-${it.item?.id || idx}`}>
+                    <div key={`record-${it.item?.id || idx}`} className="border-b border-gray-50">
                       {renderRecordRow(it.item)}
                     </div>
                   )

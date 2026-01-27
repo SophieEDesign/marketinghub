@@ -225,6 +225,36 @@ export function validateSectionSettings(
 }
 
 /**
+ * Reorder sections
+ * 
+ * Updates the order_index for multiple sections at once.
+ */
+export async function reorderSections(
+  tableId: string,
+  sectionOrders: Array<{ sectionId: string; order_index: number }>
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = createClient()
+  
+  // Update each section's order_index
+  const updates = sectionOrders.map(({ sectionId, order_index }) =>
+    supabase
+      .from('field_sections')
+      .update({ order_index, updated_at: new Date().toISOString() })
+      .eq('id', sectionId)
+  )
+  
+  const results = await Promise.all(updates)
+  
+  const errors = results.filter(r => r.error)
+  if (errors.length > 0) {
+    console.error('Error reordering sections:', errors)
+    return { success: false, error: errors[0].error?.message || 'Failed to reorder sections' }
+  }
+  
+  return { success: true }
+}
+
+/**
  * Get default section name
  * 
  * Returns the default section name for fields without a group_name.

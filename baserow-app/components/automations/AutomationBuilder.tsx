@@ -17,6 +17,13 @@ import type { ActionGroup } from "@/lib/automations/types"
 import { filterTreeToFormula } from "@/lib/automations/condition-formula"
 import FormulaEditor from "@/components/fields/FormulaEditor"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 interface AutomationBuilderProps {
   automation?: Automation | null
@@ -172,6 +179,7 @@ export default function AutomationBuilder({
   const [tags, setTags] = useState<string[]>([])
   const [showTestMode, setShowTestMode] = useState(false)
   const [editingConditionGroupIndex, setEditingConditionGroupIndex] = useState<number | null>(null)
+  const [showActionTypePicker, setShowActionTypePicker] = useState<{ groupIndex: number; buttonRef: HTMLElement | null } | null>(null)
 
   // Helper to generate unique IDs
   function generateId(): string {
@@ -270,9 +278,9 @@ export default function AutomationBuilder({
     setSelectedItem({ type: 'group', id: newGroup.id })
   }
 
-  function addAction(groupIndex: number) {
+  function addAction(groupIndex: number, actionType?: ActionType) {
     const newAction: ActionConfig = {
-      type: 'log_message',
+      type: actionType || 'log_message',
       message: 'Action executed',
     }
     const newGroups = [...actionGroups]
@@ -282,6 +290,7 @@ export default function AutomationBuilder({
     }
     setActionGroups(newGroups)
     setSelectedItem({ type: 'action', id: `${newGroups[groupIndex].id}-${newGroups[groupIndex].actions.length - 1}` })
+    setShowActionTypePicker(null)
   }
 
   function updateAction(groupIndex: number, actionIndex: number, updates: Partial<ActionConfig>) {
@@ -474,11 +483,26 @@ export default function AutomationBuilder({
 
       {/* Header with Save/Test buttons */}
       <div className="border-b border-gray-200 p-4 flex items-center justify-between bg-white">
-        <div>
-          <h2 className="text-xl font-semibold">{name || 'New Automation'}</h2>
+        <div className="flex-1 min-w-0">
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="text-xl font-semibold bg-transparent border-none outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded px-2 py-1 -mx-2 -my-1 w-full max-w-md"
+            placeholder="Enter automation name"
+          />
           {description && <p className="text-sm text-gray-500 mt-1">{description}</p>}
         </div>
         <div className="flex items-center gap-2">
+          {onDelete && (
+            <button
+              onClick={onDelete}
+              className="px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors flex items-center gap-2"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </button>
+          )}
           {onTest && (
             <button
               onClick={() => setShowTestMode(true)}
@@ -490,8 +514,8 @@ export default function AutomationBuilder({
           )}
           <button
             onClick={handleSave}
-            disabled={loading}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md flex items-center gap-2 disabled:opacity-50"
+            disabled={loading || !name.trim()}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="h-4 w-4" />
             {loading ? 'Saving...' : 'Save'}
@@ -517,6 +541,8 @@ export default function AutomationBuilder({
             onAddGroup={addActionGroup}
             onAddAction={addAction}
             onEditCondition={(groupIndex) => setEditingConditionGroupIndex(groupIndex)}
+            onDeleteGroup={deleteGroup}
+            onShowActionTypePicker={(groupIndex) => setShowActionTypePicker({ groupIndex, buttonRef: null })}
           />
         </div>
 
@@ -534,220 +560,6 @@ export default function AutomationBuilder({
         />
       </div>
 
-      {/* Basic Info Modal/Sidebar - could be moved to properties or a separate settings panel */}
-      <div className="hidden space-y-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">Automation Name *</label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Enter automation name"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">Description</label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            rows={2}
-            placeholder="Optional description"
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="enabled"
-            checked={enabled}
-            onChange={(e) => setEnabled(e.target.checked)}
-            className="w-4 h-4"
-          />
-          <label htmlFor="enabled" className="text-sm">
-            Enabled
-          </label>
-        </div>
-
-        {/* Category */}
-        <div>
-          <label className="block text-sm font-medium mb-1">Category (optional)</label>
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">No category</option>
-            <option value="Notifications">Notifications</option>
-            <option value="Data Sync">Data Sync</option>
-            <option value="Maintenance">Maintenance</option>
-            <option value="Workflow">Workflow</option>
-            <option value="Integrations">Integrations</option>
-            <option value="Cleanup">Cleanup</option>
-            <option value="Other">Other</option>
-          </select>
-          <p className="text-xs text-gray-500 mt-1">Organize automations by category</p>
-        </div>
-
-        {/* Tags */}
-        <div>
-          <label className="block text-sm font-medium mb-1">Tags (optional)</label>
-          <div className="flex flex-wrap gap-2 mb-2">
-            {tags.map((tag, index) => (
-              <span
-                key={index}
-                className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-md text-xs"
-              >
-                {tag}
-                <button
-                  type="button"
-                  onClick={() => setTags(tags.filter((_, i) => i !== index))}
-                  className="hover:text-blue-900"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              placeholder="Add a tag..."
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                  e.preventDefault()
-                  const newTag = e.currentTarget.value.trim()
-                  if (!tags.includes(newTag)) {
-                    setTags([...tags, newTag])
-                  }
-                  e.currentTarget.value = ''
-                }
-              }}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <button
-              type="button"
-              onClick={(e) => {
-                const input = e.currentTarget.previousElementSibling as HTMLInputElement
-                if (input.value.trim() && !tags.includes(input.value.trim())) {
-                  setTags([...tags, input.value.trim()])
-                  input.value = ''
-                }
-              }}
-              className="px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors text-sm"
-            >
-              Add
-            </button>
-          </div>
-          <p className="text-xs text-gray-500 mt-1">Press Enter or click Add to add tags</p>
-        </div>
-      </div>
-
-      {/* Trigger */}
-      <div className="space-y-4 border-t pt-4">
-        <h3 className="text-lg font-semibold">Trigger</h3>
-        <div>
-          <label className="block text-sm font-medium mb-1">When should this automation run?</label>
-          <Select
-            value={triggerType}
-            onValueChange={(value) => {
-              const nextType = value as TriggerType
-              setTriggerType(nextType)
-              // Convenience: if user already built "Only run when..." conditions
-              // and selects the "When conditions match" trigger, seed the trigger formula.
-              if (nextType === 'condition' && conditionFormula.trim()) {
-                setTriggerConfig({ table_id: tableId, formula: conditionFormula })
-              } else {
-                setTriggerConfig({ table_id: tableId })
-              }
-            }}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue>
-                {(() => {
-                  const selected = TRIGGER_TYPES.find(tt => tt.value === triggerType)
-                  if (!selected) return "Select trigger type"
-                  const Icon = selected.icon
-                  return (
-                    <div className="flex items-center gap-2">
-                      <Icon className="h-4 w-4" />
-                      <span>{selected.label}</span>
-                    </div>
-                  )
-                })()}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {TRIGGER_TYPES.map(tt => {
-                const Icon = tt.icon
-                return (
-                  <SelectItem key={tt.value} value={tt.value}>
-                    <div className="flex items-start gap-2 py-1">
-                      <Icon className="h-4 w-4 mt-0.5 text-gray-500 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium">{tt.label}</div>
-                        <div className="text-xs text-gray-500 mt-0.5">{tt.description}</div>
-                      </div>
-                    </div>
-                  </SelectItem>
-                )
-              })}
-            </SelectContent>
-          </Select>
-          {(() => {
-            const selected = TRIGGER_TYPES.find(tt => tt.value === triggerType)
-            return selected ? (
-              <p className="text-xs text-gray-500 mt-1.5">{selected.description}</p>
-            ) : null
-          })()}
-        </div>
-
-        {renderTriggerConfig()}
-      </div>
-
-      {/* Conditions */}
-      <div className="space-y-4 border-t pt-4">
-        <h3 className="text-lg font-semibold">Only run when…</h3>
-        <AutomationConditionBuilder
-          filterTree={conditionFilterTree}
-          tableFields={tableFields}
-          onChange={setConditionFilterTree}
-        />
-      </div>
-
-      {/* Actions are now handled by ConditionalWorkflowBuilder in the left panel */}
-
-      {/* Footer */}
-      <div className="border-t pt-4 flex items-center justify-between gap-2">
-        {onDelete && (
-          <button
-            onClick={onDelete}
-            className="px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors flex items-center gap-2"
-          >
-            <Trash2 className="h-4 w-4" />
-            Delete
-          </button>
-        )}
-        <div className="flex gap-2 ml-auto">
-          <button
-            onClick={() => setShowTestMode(true)}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-md transition-colors flex items-center gap-2"
-          >
-            <Play className="h-4 w-4" />
-            Test Automation
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={loading || !name.trim()}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            <Save className="h-4 w-4" />
-            {loading ? "Saving..." : "Save Automation"}
-          </button>
-        </div>
-      </div>
 
       {/* Test Mode Modal */}
       {showTestMode && automation && (
@@ -756,6 +568,40 @@ export default function AutomationBuilder({
           onClose={() => setShowTestMode(false)}
         />
       )}
+
+      {/* Action Type Picker Dialog */}
+      <Dialog open={!!showActionTypePicker} onOpenChange={(open) => !open && setShowActionTypePicker(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Choose Action Type</DialogTitle>
+            <DialogDescription>
+              Select the type of action you want to add to this automation.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 gap-2 py-4">
+            {ACTION_TYPES.map((actionType) => {
+              const Icon = actionType.icon
+              return (
+                <button
+                  key={actionType.value}
+                  onClick={() => {
+                    if (showActionTypePicker) {
+                      addAction(showActionTypePicker.groupIndex, actionType.value)
+                    }
+                  }}
+                  className="flex items-start gap-3 p-3 text-left border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
+                >
+                  <Icon className="h-5 w-5 text-gray-500 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm">{actionType.label}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{actionType.description}</div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { CheckCircle2, Play, Plus, MoreVertical, Edit } from "lucide-react"
+import { CheckCircle2, Play, Plus, MoreVertical, Edit, Trash2 } from "lucide-react"
 import type { TriggerType, ActionType, ActionConfig, TriggerConfig, ActionGroup } from "@/lib/automations/types"
 import type { TableField } from "@/types/database"
 import { generateConditionSummary } from "@/lib/automations/condition-formula"
@@ -16,8 +16,10 @@ interface ConditionalWorkflowBuilderProps {
   onSelectGroup: (groupIndex: number) => void
   onSelectAction: (groupIndex: number, actionIndex: number) => void
   onAddGroup: () => void
-  onAddAction: (groupIndex: number) => void
+  onAddAction: (groupIndex: number, actionType?: ActionType) => void
   onEditCondition: (groupIndex: number) => void
+  onDeleteGroup: (groupIndex: number) => void
+  onShowActionTypePicker?: (groupIndex: number) => void
 }
 
 const TRIGGER_LABELS: Record<TriggerType, string> = {
@@ -65,6 +67,8 @@ export default function ConditionalWorkflowBuilder({
   onAddAction,
   onAddGroup,
   onEditCondition,
+  onDeleteGroup,
+  onShowActionTypePicker,
 }: ConditionalWorkflowBuilderProps) {
   
   function getConditionLabel(group: ActionGroup, index: number): { prefix: string; condition: string; values: string[] } {
@@ -209,15 +213,30 @@ export default function ConditionalWorkflowBuilder({
                             <div className="text-xs text-gray-500">{group.description}</div>
                           )}
                         </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            onEditCondition(groupIndex)
-                          }}
-                          className="flex-shrink-0 p-1 hover:bg-gray-100 rounded"
-                        >
-                          <Edit className="h-4 w-4 text-gray-400" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onEditCondition(groupIndex)
+                            }}
+                            className="flex-shrink-0 p-1 hover:bg-gray-100 rounded"
+                            title="Edit condition"
+                          >
+                            <Edit className="h-4 w-4 text-gray-400" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (confirm('Are you sure you want to delete this action group? All actions in this group will be removed.')) {
+                                onDeleteGroup(groupIndex)
+                              }
+                            }}
+                            className="flex-shrink-0 p-1 hover:bg-red-50 rounded"
+                            title="Delete action group"
+                          >
+                            <Trash2 className="h-4 w-4 text-gray-400 hover:text-red-600" />
+                          </button>
+                        </div>
                       </div>
 
                       {/* Actions in Group */}
@@ -255,7 +274,11 @@ export default function ConditionalWorkflowBuilder({
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
-                              onAddAction(groupIndex)
+                              if (onShowActionTypePicker) {
+                                onShowActionTypePicker(groupIndex)
+                              } else {
+                                onAddAction(groupIndex)
+                              }
                             }}
                             className="w-full p-2 border border-dashed border-gray-300 rounded text-sm text-gray-500 hover:border-blue-500 hover:text-blue-600 transition-colors"
                           >
@@ -269,7 +292,13 @@ export default function ConditionalWorkflowBuilder({
                     {group.actions.length > 0 && (
                       <div className="px-4 pb-3 ml-7">
                         <button
-                          onClick={() => onAddAction(groupIndex)}
+                          onClick={() => {
+                            if (onShowActionTypePicker) {
+                              onShowActionTypePicker(groupIndex)
+                            } else {
+                              onAddAction(groupIndex)
+                            }
+                          }}
                           className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
                         >
                           <Plus className="h-4 w-4" />
