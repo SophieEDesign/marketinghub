@@ -46,6 +46,7 @@ interface HorizontalGroupedViewProps {
   isEditing?: boolean // Whether canvas is in edit mode
   onBlockUpdate?: (blocks: PageBlock[]) => void | Promise<void> // Callback when blocks are updated
   storedLayout?: PageBlock[] | null // Stored layout from block config
+  highlightRules?: HighlightRule[] // Conditional formatting rules
 }
 
 export default function HorizontalGroupedView({
@@ -486,7 +487,7 @@ export default function HorizontalGroupedView({
               }
               const groupMatchingRule = highlightRules && highlightRules.length > 0 && Object.keys(groupMockRow).length > 0
                 ? evaluateHighlightRules(
-                    highlightRules.filter(r => r.scope === 'group'),
+                    highlightRules.filter((r: HighlightRule) => r.scope === 'group'),
                     groupMockRow,
                     tableFields
                   )
@@ -500,7 +501,8 @@ export default function HorizontalGroupedView({
               // Combine group color with conditional formatting (conditional formatting takes precedence)
               const finalTabBgColor = groupFormattingStyle.backgroundColor || (groupColor ? groupColor + '1A' : undefined)
               const finalTabTextColor = groupFormattingStyle.color || (groupColor ? groupColor : undefined)
-              const finalTabBorderColor = groupFormattingStyle.backgroundColor || (activeTab === group.key ? groupColor : 'transparent')
+              const borderColorValue = activeTab === group.key ? (groupColor ?? 'transparent') : 'transparent'
+              const finalTabBorderColor: string | undefined = groupFormattingStyle.backgroundColor || borderColorValue || undefined
               
               // Determine text color for contrast (only if no conditional formatting text color)
               const textColorClass = finalTabTextColor ? '' : (groupColor ? getTextColorForBackground(groupColor) : 'text-gray-900')
@@ -510,7 +512,7 @@ export default function HorizontalGroupedView({
                   key={group.key}
                   value={group.key}
                   className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
-                  style={finalTabBgColor || finalTabTextColor ? {
+                  style={finalTabBgColor || finalTabTextColor || finalTabBorderColor ? {
                     backgroundColor: finalTabBgColor,
                     borderBottomColor: finalTabBorderColor,
                     color: finalTabTextColor,

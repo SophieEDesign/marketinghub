@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Grid, Columns, Calendar, Image as ImageIcon, GitBranch } from "lucide-react"
+import { Grid, Columns, Calendar, Image as ImageIcon, GitBranch, List, X } from "lucide-react"
 import type { BlockConfig, ViewType } from "@/lib/interface/types"
 import type { Table, View, TableField } from "@/types/database"
 import type { FieldType } from "@/types/fields"
@@ -82,6 +82,13 @@ const VIEW_TYPE_OPTIONS: ViewTypeOption[] = [
     icon: ImageIcon,
     description: 'Card-based visual layout',
     requiredFields: ['attachment', 'url'] as FieldType[],
+  },
+  {
+    type: 'list',
+    label: 'List',
+    icon: List,
+    description: 'Record-centric, vertically stacked view',
+    requiredFields: [],
   },
 ]
 
@@ -213,7 +220,7 @@ export default function GridDataSettings({
           })}
         </div>
         <p className="text-xs text-gray-500">
-          Table, Calendar, Kanban, Timeline, and Gallery views are supported.
+          Table, Calendar, Kanban, Timeline, Gallery, and List views are supported.
         </p>
       </div>
 
@@ -277,8 +284,8 @@ export default function GridDataSettings({
         />
       )}
 
-      {/* Filters (optional) - For Table, Calendar, Kanban, Timeline, and Gallery views */}
-      {(currentViewType === 'grid' || currentViewType === 'calendar' || currentViewType === 'kanban' || currentViewType === 'timeline' || currentViewType === 'gallery') && config.table_id && fields.length > 0 && (
+      {/* Filters (optional) - For Table, Calendar, Kanban, Timeline, Gallery, and List views */}
+      {(currentViewType === 'grid' || currentViewType === 'calendar' || currentViewType === 'kanban' || currentViewType === 'timeline' || currentViewType === 'gallery' || currentViewType === 'list') && config.table_id && fields.length > 0 && (
         <div className="space-y-2 border-t pt-4">
           <BlockFilterEditor
             filters={config.filters || []}
@@ -584,6 +591,420 @@ export default function GridDataSettings({
             mode="full"
             label="Fields"
           />
+        </>
+      )}
+
+      {/* List-Specific Settings - Airtable Style */}
+      {currentViewType === 'list' && config.table_id && fields.length > 0 && (
+        <>
+          {/* Options Section - Airtable Style */}
+          <div className="space-y-3 pt-2 border-t border-gray-200">
+            <Label className="text-sm font-semibold">Options</Label>
+            
+            {/* List-specific field configuration */}
+            {(() => {
+              // List-specific field configuration
+              const titleField = config.list_title_field || config.title_field || ""
+              const subtitleFields = config.list_subtitle_fields || []
+              const imageField = config.list_image_field || config.image_field || ""
+              const pillFields = config.list_pill_fields || []
+              const metaFields = config.list_meta_fields || []
+              const choiceGroupsDefaultCollapsed =
+                (config as any)?.list_groups_default_collapsed ??
+                (config as any)?.list_choice_groups_default_collapsed ??
+                true
+
+              // Get available fields for selection
+              const textFields = fields.filter(f => f.type === 'text' || f.type === 'long_text')
+              const allFields = fields
+              const selectFields = fields.filter(f => f.type === 'single_select' || f.type === 'multi_select')
+              const attachmentFields = fields.filter(f => f.type === 'attachment')
+              const dateFields = fields.filter(f => f.type === 'date')
+              const numberFields = fields.filter(f => f.type === 'number' || f.type === 'percent' || f.type === 'currency')
+
+              const handleTitleFieldChange = (fieldName: string) => {
+                const value = fieldName === "__none__" ? null : fieldName
+                onUpdate({
+                  list_title_field: value as any,
+                  title_field: value as any, // Backward compatibility
+                })
+              }
+
+              const handleSubtitleFieldAdd = (fieldName: string) => {
+                if (fieldName && !subtitleFields.includes(fieldName) && subtitleFields.length < 3) {
+                  onUpdate({
+                    list_subtitle_fields: [...subtitleFields, fieldName],
+                  })
+                }
+              }
+
+              const handleSubtitleFieldRemove = (index: number) => {
+                onUpdate({
+                  list_subtitle_fields: subtitleFields.filter((_, i) => i !== index),
+                })
+              }
+
+              const handleImageFieldChange = (fieldName: string) => {
+                const value = fieldName === "__none__" ? null : fieldName
+                onUpdate({
+                  list_image_field: value as any,
+                  image_field: value as any, // Backward compatibility
+                })
+              }
+
+              const handlePillFieldAdd = (fieldName: string) => {
+                if (fieldName && !pillFields.includes(fieldName)) {
+                  onUpdate({
+                    list_pill_fields: [...pillFields, fieldName].filter(Boolean),
+                  })
+                }
+              }
+
+              const handlePillFieldRemove = (index: number) => {
+                onUpdate({
+                  list_pill_fields: pillFields.filter((_, i) => i !== index),
+                })
+              }
+
+              const handleMetaFieldAdd = (fieldName: string) => {
+                if (fieldName && !metaFields.includes(fieldName)) {
+                  onUpdate({
+                    list_meta_fields: [...metaFields, fieldName].filter(Boolean),
+                  })
+                }
+              }
+
+              const handleMetaFieldRemove = (index: number) => {
+                onUpdate({
+                  list_meta_fields: metaFields.filter((_, i) => i !== index),
+                })
+              }
+
+              const getAvailableSubtitleFields = () => {
+                return allFields.filter(f => f.name !== titleField)
+              }
+
+              const getAvailablePillFields = () => {
+                return selectFields.filter(f => !pillFields.includes(f.name))
+              }
+
+              const getAvailableMetaFields = () => {
+                return [...dateFields, ...numberFields].filter(f => !metaFields.includes(f.name))
+              }
+
+              return (
+                <>
+                  {/* Title Field (Required) */}
+                  <div className="space-y-2">
+                    <Label>
+                      Title Field <span className="text-red-500">*</span>
+                    </Label>
+                    <Select value={titleField || "__none__"} onValueChange={handleTitleFieldChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select title field" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">None</SelectItem>
+                        {textFields.map((field) => (
+                          <SelectItem key={field.id} value={field.name}>
+                            {field.name}
+                          </SelectItem>
+                        ))}
+                        {/* Fallback: show all fields if no text fields */}
+                        {textFields.length === 0 && allFields.map((field) => (
+                          <SelectItem key={field.id} value={field.name}>
+                            {field.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-gray-500">
+                      The primary field displayed as the list item title
+                    </p>
+                  </div>
+
+                  {/* Subtitle Fields (Optional, up to 3) */}
+                  <div className="space-y-2">
+                    <Label>Subtitle Fields (Optional, up to 3)</Label>
+                    {subtitleFields.map((fieldName, index) => {
+                      return (
+                        <div key={index} className="flex items-center gap-2">
+                          <Select
+                            value={fieldName || "__none__"}
+                            onValueChange={(newFieldName) => {
+                              const updated = [...subtitleFields]
+                              updated[index] = newFieldName === "__none__" ? "" : newFieldName
+                              onUpdate({ list_subtitle_fields: updated.filter(Boolean) })
+                            }}
+                          >
+                            <SelectTrigger className="flex-1">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">None</SelectItem>
+                              {getAvailableSubtitleFields().map((f) => (
+                                <SelectItem key={f.id} value={f.name}>
+                                  {f.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleSubtitleFieldRemove(index)}
+                            className="flex-shrink-0"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )
+                    })}
+                    {subtitleFields.length < 3 && (
+                      <Select
+                        value=""
+                        onValueChange={handleSubtitleFieldAdd}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Add subtitle field" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {getAvailableSubtitleFields().map((field) => (
+                            <SelectItem key={field.id} value={field.name}>
+                              {field.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    <p className="text-xs text-gray-500">
+                      Additional fields displayed below the title (1-3 fields)
+                    </p>
+                  </div>
+
+                  {/* Image Field (Optional) */}
+                  <div className="space-y-2">
+                    <Label>Image Field (Optional)</Label>
+                    <Select value={imageField || "__none__"} onValueChange={handleImageFieldChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select image field" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">None</SelectItem>
+                        {attachmentFields.map((field) => (
+                          <SelectItem key={field.id} value={field.name}>
+                            {field.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-gray-500">
+                      Field containing images/attachments to display as thumbnails
+                    </p>
+                  </div>
+
+                  {/* Pill Fields (Optional) */}
+                  <div className="space-y-2">
+                    <Label>Pill Fields (Optional)</Label>
+                    {pillFields.map((fieldName, index) => {
+                      return (
+                        <div key={index} className="flex items-center gap-2">
+                          <Select
+                            value={fieldName || "__none__"}
+                            onValueChange={(newFieldName) => {
+                              const updated = [...pillFields]
+                              updated[index] = newFieldName === "__none__" ? "" : newFieldName
+                              onUpdate({ list_pill_fields: updated.filter(Boolean) })
+                            }}
+                          >
+                            <SelectTrigger className="flex-1">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">None</SelectItem>
+                              {selectFields.map((f) => (
+                                <SelectItem key={f.id} value={f.name}>
+                                  {f.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handlePillFieldRemove(index)}
+                            className="flex-shrink-0"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )
+                    })}
+                    <Select
+                      value=""
+                      onValueChange={handlePillFieldAdd}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Add pill field" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {getAvailablePillFields().map((field) => (
+                          <SelectItem key={field.id} value={field.name}>
+                            {field.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-gray-500">
+                      Select/multi-select fields displayed as colored pills
+                    </p>
+                  </div>
+
+                  {/* Meta Fields (Optional) */}
+                  <div className="space-y-2">
+                    <Label>Meta Fields (Optional)</Label>
+                    {metaFields.map((fieldName, index) => {
+                      return (
+                        <div key={index} className="flex items-center gap-2">
+                          <Select
+                            value={fieldName || "__none__"}
+                            onValueChange={(newFieldName) => {
+                              const updated = [...metaFields]
+                              updated[index] = newFieldName === "__none__" ? "" : newFieldName
+                              onUpdate({ list_meta_fields: updated.filter(Boolean) })
+                            }}
+                          >
+                            <SelectTrigger className="flex-1">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">None</SelectItem>
+                              {[...dateFields, ...numberFields].map((f) => (
+                                <SelectItem key={f.id} value={f.name}>
+                                  {f.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleMetaFieldRemove(index)}
+                            className="flex-shrink-0"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )
+                    })}
+                    <Select
+                      value=""
+                      onValueChange={handleMetaFieldAdd}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Add meta field" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {getAvailableMetaFields().map((field) => (
+                          <SelectItem key={field.id} value={field.name}>
+                            {field.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-gray-500">
+                      Date or number fields displayed as metadata
+                    </p>
+                  </div>
+
+                  {/* Sort */}
+                  <SortSelector
+                    value={Array.isArray(config.sorts) ? config.sorts : undefined}
+                    onChange={(sorts) => onUpdate({ sorts: sorts as any })}
+                    fields={fields}
+                    allowMultiple={false}
+                    label="Sort"
+                  />
+                </>
+              )
+            })()}
+          </div>
+
+          {/* Grouping (Optional) - List */}
+          {config.table_id && fields.length > 0 && (
+            <>
+              <NestedGroupBySelector
+                value={(config as any).group_by_field || (config as any).group_by}
+                groupByRules={(config as any).group_by_rules}
+                onChange={(value) => {
+                  onUpdate({
+                    group_by_field: value,
+                    group_by: value,
+                    ...(value ? {} : { group_by_rules: null }),
+                  } as any)
+                }}
+                onRulesChange={(rules) => {
+                  onUpdate({
+                    group_by_rules: rules,
+                    group_by_field: rules && rules.length > 0 && rules[0].type === 'field' ? rules[0].field : null,
+                    group_by: rules && rules.length > 0 && rules[0].type === 'field' ? rules[0].field : null,
+                  } as any)
+                }}
+                fields={fields}
+                filterGroupableFields={true}
+                description="Add up to 2 grouping levels to group records into nested collapsible sections (like Airtable)."
+              />
+              
+              {/* Group Load Behavior */}
+              {((config as any).group_by_field || (config as any).group_by) && (config as any).group_by !== "__none__" && (
+                <div className="space-y-2">
+                  <Label>Groups on load</Label>
+                  <Select
+                    value={
+                      ((config as any)?.list_groups_default_collapsed ??
+                        (config as any)?.list_choice_groups_default_collapsed ??
+                        true)
+                        ? "closed"
+                        : "open"
+                    }
+                    onValueChange={(value) => {
+                      const closed = value === "closed"
+                      onUpdate({
+                        list_groups_default_collapsed: closed,
+                        list_choice_groups_default_collapsed: closed,
+                      } as any)
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="closed">Closed (collapsed)</SelectItem>
+                      <SelectItem value="open">Open (expanded)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500">
+                    Control whether grouped sections start expanded or collapsed when the list loads.
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Fields Section - Airtable Style */}
+          <div className="space-y-3 pt-2 border-t border-gray-200">
+            <Label className="text-sm font-semibold">Fields</Label>
+            <FieldPicker
+              selectedFields={Array.isArray(config.visible_fields) ? config.visible_fields : []}
+              onChange={(next) => onUpdate({ visible_fields: next })}
+              fields={fields}
+              mode="full"
+              label="Fields"
+            />
+          </div>
         </>
       )}
     </div>

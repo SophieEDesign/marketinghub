@@ -354,7 +354,7 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
     defaultConfig: {
       title: 'List View',
       table_id: '',
-      view_type: 'grid', // Default view type for list blocks
+      view_type: 'list', // List view type
     },
     applicableSettings: {
       fields: true,

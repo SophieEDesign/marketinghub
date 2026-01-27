@@ -138,13 +138,15 @@ export default function SettingsPanel({
         ;(blockConfig as any).sources = normalizeMultiSources((blockConfig as any).sources)
       }
 
-      // Ensure calendar/kanban/timeline/table blocks have the correct view_type
+      // Ensure calendar/kanban/timeline/list/table blocks have the correct view_type
       if (block.type === 'calendar' && !blockConfig.view_type) {
         blockConfig.view_type = 'calendar'
       } else if (block.type === 'kanban' && !blockConfig.view_type) {
         blockConfig.view_type = 'kanban'
       } else if (block.type === 'timeline' && !blockConfig.view_type) {
         blockConfig.view_type = 'timeline'
+      } else if (block.type === 'list' && !blockConfig.view_type) {
+        blockConfig.view_type = 'list'
       }
       // Ensure chart blocks have a default chart_type if not set
       if (block.type === 'chart' && !blockConfig.chart_type) {

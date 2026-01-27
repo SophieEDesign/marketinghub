@@ -40,7 +40,7 @@ export interface PageBlock {
   updated_at?: string
 }
 
-export type ViewType = 'grid' | 'kanban' | 'calendar' | 'gallery' | 'timeline' | 'form' | 'horizontal_grouped'
+export type ViewType = 'grid' | 'kanban' | 'calendar' | 'gallery' | 'timeline' | 'form' | 'horizontal_grouped' | 'list'
 
 export interface BlockConfig {
   title?: string

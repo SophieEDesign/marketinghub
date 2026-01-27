@@ -398,16 +398,25 @@ export default function BlockRenderer({
         )
 
       case "list":
-        // List block - wrapper around GridBlock with view_type='grid'
+        // List block - migrate to grid block with view_type='list' for backward compatibility
         // CRITICAL: key={block.id} ONLY - no index, no compound keys, no pageId
+        const listBlockAsGrid = {
+          ...safeBlock,
+          type: 'grid' as BlockType,
+          config: {
+            ...mergedConfig,
+            view_type: 'list',
+          },
+        }
         return (
           <LazyBlockWrapper enabled={!isEditing}>
-            <ListBlock
+            <GridBlock
               key={block.id}
-              block={safeBlock}
+              block={listBlockAsGrid}
               isEditing={canEdit}
               pageTableId={pageTableId}
               pageId={pageId}
+              recordId={recordId}
               filters={filters}
               filterTree={filterTree}
               onRecordClick={onRecordClick}

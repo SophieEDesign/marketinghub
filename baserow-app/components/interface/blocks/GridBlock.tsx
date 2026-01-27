@@ -8,6 +8,7 @@ import CalendarView from "@/components/views/CalendarView"
 import KanbanView from "@/components/views/KanbanView"
 import TimelineView from "@/components/views/TimelineView"
 import GalleryView from "@/components/views/GalleryView"
+import ListView from "@/components/views/ListView"
 import {
   mergeFilters,
   mergeViewDefaultFiltersWithUserQuickFilters,
@@ -834,6 +835,106 @@ export default function GridBlock({
             fitImageSize={appearance.fit_image_size}
             reloadKey={refreshKey}
             highlightRules={config.highlight_rules}
+          />
+        )
+      }
+      
+      case 'list': {
+        if (!tableId) {
+          return (
+            <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
+              <div className="text-center">
+                <p className="mb-2">{isEditing ? "List view requires a table connection." : "No table configured"}</p>
+                {isEditing && (
+                  <p className="text-xs text-gray-400">Configure a table in block settings.</p>
+                )}
+              </div>
+            </div>
+          )
+        }
+
+        if (!table) {
+          return (
+            <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
+              <div className="text-center">
+                <p className="mb-2">Loading table...</p>
+              </div>
+            </div>
+          )
+        }
+
+        // Get list-specific field configuration
+        const titleField = config.list_title_field || config.title_field || ""
+        const subtitleFields = config.list_subtitle_fields || []
+        const imageField = config.list_image_field || config.image_field || ""
+        const pillFields = config.list_pill_fields || []
+        const metaFields = config.list_meta_fields || []
+        
+        // Grouping (optional) for list view:
+        // Support both nested groups (group_by_rules) and legacy single field (group_by_field/group_by)
+        const groupByRulesFromConfig = (config as any).group_by_rules as GroupRule[] | undefined
+        const groupByFromConfigRaw = (config as any).group_by_field || (config as any).group_by
+        const groupByFromConfigResolved = (() => {
+          if (!groupByFromConfigRaw || typeof groupByFromConfigRaw !== 'string') return undefined
+          const match = safeTableFields.find((f) => f.name === groupByFromConfigRaw || f.id === groupByFromConfigRaw)
+          return match?.name || groupByFromConfigRaw
+        })()
+        // If group_by_rules exists, use first rule's field for backward compatibility
+        const effectiveGroupBy = groupByRulesFromConfig && groupByRulesFromConfig.length > 0 && groupByRulesFromConfig[0].type === 'field'
+          ? groupByRulesFromConfig[0].field
+          : groupByFromConfigResolved || groupBy
+
+        // List group default collapse behavior (default: collapsed/closed)
+        const defaultChoiceGroupsCollapsed =
+          (config as any)?.list_groups_default_collapsed ??
+          (config as any)?.list_choice_groups_default_collapsed ??
+          true
+
+        // Read block permissions
+        const permissions = config.permissions || {}
+        const isViewOnly = permissions.mode === 'view'
+        const allowInlineCreate = permissions.allowInlineCreate ?? true
+        const canCreateRecord = !isViewOnly && allowInlineCreate
+
+        // Convert sorts to ListView format
+        const activeSorts = sortsConfig.length > 0
+          ? sortsConfig.map((s: any) => ({
+              field_name: s.field || s.field_name || '',
+              direction: s.direction || 'asc',
+            }))
+          : viewSorts.map(s => ({
+              field_name: s.field_name,
+              direction: s.direction as 'asc' | 'desc',
+            }))
+
+        // Only pass onHeightChange when grouping is active
+        const isGrouped = !!effectiveGroupBy || (groupByRulesFromConfig && groupByRulesFromConfig.length > 0)
+
+        return (
+          <ListView
+            highlightRules={config.highlight_rules}
+            tableId={tableId}
+            viewId={viewUuid || undefined}
+            supabaseTableName={table.supabase_table}
+            tableFields={tableFields}
+            filters={allFilters}
+            sorts={activeSorts}
+            groupBy={effectiveGroupBy}
+            groupByRules={groupByRulesFromConfig}
+            defaultChoiceGroupsCollapsed={defaultChoiceGroupsCollapsed}
+            searchQuery=""
+            onRecordClick={onRecordClick}
+            showAddRecord={showAddRecord}
+            canCreateRecord={canCreateRecord}
+            titleField={titleField}
+            subtitleFields={subtitleFields}
+            imageField={imageField}
+            pillFields={pillFields}
+            metaFields={metaFields}
+            modalFields={(config as any).modal_fields}
+            reloadKey={refreshKey}
+            onHeightChange={isGrouped ? handleHeightChange : undefined}
+            rowHeight={rowHeight}
           />
         )
       }

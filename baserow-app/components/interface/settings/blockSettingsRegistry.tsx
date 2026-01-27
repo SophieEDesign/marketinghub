@@ -84,7 +84,7 @@ const DATA_SETTINGS_RENDERERS: Partial<Record<BlockType, DataRenderer>> = {
   field: (ctx) => <FieldDataSettings {...ctx} pageTableId={ctx.pageTableId ?? null} />,
   number: (ctx) => <FieldDataSettings {...ctx} pageTableId={ctx.pageTableId ?? null} />,
   button: (ctx) => <ButtonDataSettings {...ctx} />,
-  list: (ctx) => <ListDataSettings {...ctx} />,
+  list: (ctx) => <GridDataSettings {...ctx} />,
   multi_calendar: (ctx) => <MultiSourceDataSettings {...ctx} />,
   multi_timeline: (ctx) => <MultiSourceDataSettings {...ctx} />,
   calendar: (ctx) => <GridDataSettings {...ctx} />,
