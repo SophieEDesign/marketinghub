@@ -252,7 +252,6 @@ export default function Canvas({
     setLayout(currentLayout => {
       if (isExpanding && deltaChange > 0) {
         // Block expanding - push blocks below down using the change in delta
-        // @ts-expect-error - Functions defined later, but available at runtime
         const updatedLayout = pushBlocksDown(currentLayout, blockId, deltaChange)
         if (process.env.NODE_ENV === 'development') {
           console.log('[Canvas] Pushed blocks down after ephemeral expand', { blockId, deltaChange })
@@ -260,7 +259,6 @@ export default function Canvas({
         return updatedLayout
       } else if (isCollapsing) {
         // Block collapsing - compact vertically
-        // @ts-expect-error - Functions defined later, but available at runtime
         const compactedLayout = compactLayoutVertically(currentLayout, blocks)
         if (process.env.NODE_ENV === 'development') {
           console.log('[Canvas] Compacted layout after ephemeral collapse', { blockId, deltaH })
@@ -2252,8 +2250,8 @@ export default function Canvas({
                     editableFieldNames={editableFieldNames}
                     hideEditButton={topTwoFieldBlockIds.has(block.id)}
                     allBlocks={blocks}
-                    onEphemeralHeightDelta={(deltaPx) => handleEphemeralHeightDelta(block.id, deltaPx)}
-                    rowHeight={layoutSettings.rowHeight || 30}
+                    onEphemeralHeightDelta={(blockId: string, deltaPx: number) => handleEphemeralHeightDelta(blockId, deltaPx)}
+                    rowHeight={Number(layoutSettings?.rowHeight) || 30}
                   />
                 </div>
               </BlockAppearanceWrapper>
