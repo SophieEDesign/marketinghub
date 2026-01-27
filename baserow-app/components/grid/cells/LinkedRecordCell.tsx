@@ -8,6 +8,7 @@ import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/L
 import { getPrimaryFieldName } from "@/lib/fields/primary"
 import { toPostgrestColumn } from "@/lib/supabase/postgrest"
 import RecordModal from "@/components/calendar/RecordModal"
+import { createLookupFieldConfig } from "@/lib/fields/linkedFieldConfig"
 
 type LinkedValue =
   | string
@@ -99,15 +100,8 @@ export default function LinkedRecordCell({
   const isMirrored = !!field.options?.read_only
   const isDisabled = !editable || isMirrored
 
-  const lookupConfig: LookupFieldConfig | undefined = linkedTableId
-    ? {
-        lookupTableId: linkedTableId,
-        relationshipType,
-        maxSelections: field.options?.max_selections,
-        required: field.required,
-        allowCreate: field.options?.allow_create,
-      }
-    : undefined
+  // Use shared utility to create config - ensures consistency with FieldBlock
+  const lookupConfig: LookupFieldConfig | undefined = createLookupFieldConfig(field)
 
   const handleLinkedRecordClick = async (tableId: string, recordId: string) => {
     // Never open the current record (self-link edge case)

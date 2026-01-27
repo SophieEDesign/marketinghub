@@ -233,6 +233,8 @@ export interface BlockConfig {
     attachment_display_style?: 'thumbnails' | 'list' | 'hero' | 'cover' | 'gallery' // Display style for attachments
     attachment_size?: 'small' | 'medium' | 'large' // Preview size for attachments (for thumbnails/list)
     attachment_max_visible?: number // Max number of previews to show before "+X more"
+    // Linked field display settings (for field blocks)
+    linked_field_display_mode?: 'compact' | 'inline' | 'expanded' // Display mode for linked record fields
   }
   // List block specific config (at root level for backward compatibility)
   list_title_field?: string

@@ -1391,88 +1391,84 @@ export default function FieldSettingsDrawer({
           {type === 'lookup' && (
             <>
               <div className="space-y-2">
-                <Label htmlFor="lookup-table">Lookup Table</Label>
+                <Label htmlFor="lookup-field">Linked Field *</Label>
                 <Select
-                  value={options.lookup_table_id || undefined}
-                  onValueChange={(tableId) =>
+                  value={options.lookup_field_id || undefined}
+                  onValueChange={(linkedFieldId) => {
+                    // Find the selected linked field to get its linked_table_id
+                    const selectedLinkedField = tableFields.find(f => f.id === linkedFieldId && f.type === 'link_to_table')
+                    const linkedTableId = selectedLinkedField?.options?.linked_table_id
+                    
                     setOptions({ 
                       ...options, 
-                      lookup_table_id: tableId || undefined,
-                      // Reset display fields when table changes
+                      lookup_field_id: linkedFieldId || undefined,
+                      lookup_table_id: linkedTableId || undefined,
+                      // Reset display fields when linked field changes
+                      lookup_result_field_id: undefined,
                       primary_label_field: undefined,
                       secondary_label_fields: undefined,
                     })
-                  }
+                  }}
                 >
-                  <SelectTrigger id="lookup-table">
-                    <SelectValue placeholder="Select a table" />
+                  <SelectTrigger id="lookup-field">
+                    <SelectValue placeholder="Select a linked field" />
                   </SelectTrigger>
                   <SelectContent>
-                    {loadingTables ? (
-                      <SelectItem value="__loading__" disabled>Loading tables...</SelectItem>
-                    ) : (
-                      tables
-                        .filter(t => t.id !== tableId)
-                        .map((table) => (
-                          <SelectItem key={table.id} value={table.id}>
-                            {table.name}
+                    {(() => {
+                      // Show all link_to_table fields from current table
+                      const linkedFields = tableFields.filter(
+                        (f) =>
+                          f.type === 'link_to_table' &&
+                          f.id !== field?.id // Don't show the lookup field itself
+                      )
+
+                      if (linkedFields.length === 0) {
+                        return (
+                          <SelectItem value="__no_fields__" disabled>
+                            No linked fields found. Create a link field first.
                           </SelectItem>
-                        ))
-                    )}
+                        )
+                      }
+
+                      return linkedFields.map((f) => (
+                        <SelectItem key={f.id} value={f.id}>
+                          {getFieldDisplayName(f)}
+                        </SelectItem>
+                      ))
+                    })()}
                   </SelectContent>
                 </Select>
-                {options.lookup_table_id && (() => {
-                  const linkField = tableFields.find(f => f.id === options.lookup_field_id)
-                  return (
-                    <p className="text-xs text-muted-foreground">
-                      {linkField 
-                        ? `This lookup field will pull data from records linked via the "${getFieldDisplayName(linkField)}" field.`
-                        : `Select a linked field above to establish the relationship for this lookup.`}
-                    </p>
-                  )
-                })()}
+                <p className="text-xs text-muted-foreground">
+                  Select a linked field in this table that connects to the table you want to look up. The lookup table will be determined automatically.
+                </p>
               </div>
               {options.lookup_table_id && (
                 <>
                   <div className="space-y-2">
-                    <Label htmlFor="lookup-field">Linked Field</Label>
+                    <Label htmlFor="lookup-result-field">Display Field *</Label>
                     <Select
-                      value={options.lookup_field_id || undefined}
+                      value={options.lookup_result_field_id || undefined}
                       onValueChange={(fieldId) =>
-                        setOptions({ ...options, lookup_field_id: fieldId || undefined })
+                        setOptions({ ...options, lookup_result_field_id: fieldId || undefined })
                       }
                     >
-                      <SelectTrigger id="lookup-field">
-                        <SelectValue placeholder="Select a linked field" />
+                      <SelectTrigger id="lookup-result-field">
+                        <SelectValue placeholder="Select a field to display" />
                       </SelectTrigger>
                       <SelectContent>
-                        {(() => {
-                          // Filter to only show link_to_table fields from current table that link to the lookup table
-                          const validLinkedFields = tableFields.filter(
-                            (f) =>
-                              f.type === 'link_to_table' &&
-                              f.options?.linked_table_id === options.lookup_table_id &&
-                              f.id !== field?.id // Don't show the lookup field itself
-                          )
-
-                          if (validLinkedFields.length === 0) {
-                            return (
-                              <SelectItem value="__no_fields__" disabled>
-                                No linked fields found. Create a link field to this table first.
-                              </SelectItem>
-                            )
-                          }
-
-                          return validLinkedFields.map((field) => (
-                            <SelectItem key={field.id} value={field.id}>
-                              {getFieldDisplayName(field)}
+                        {loadingLookupFields ? (
+                          <SelectItem value="__loading__" disabled>Loading fields...</SelectItem>
+                        ) : (
+                          lookupTableFields.map((f) => (
+                            <SelectItem key={f.id} value={f.id}>
+                              {f.name} ({f.type})
                             </SelectItem>
                           ))
-                        })()}
+                        )}
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
-                      Select a linked field in this table that connects to the lookup table. This establishes the relationship used to determine which records to look up.
+                      Select which field from the linked table to display in this lookup field.
                     </p>
                   </div>
                   

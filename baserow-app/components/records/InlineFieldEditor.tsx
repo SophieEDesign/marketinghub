@@ -35,6 +35,7 @@ interface InlineFieldEditorProps {
   tableId?: string // For attachment uploads
   recordId?: string // For attachment uploads
   tableName?: string // For attachment uploads (supabase table name)
+  displayMode?: 'compact' | 'inline' | 'expanded' // Display mode for linked fields (default: 'compact')
 }
 
 export default function InlineFieldEditor({
@@ -52,6 +53,7 @@ export default function InlineFieldEditor({
   tableId,
   recordId,
   tableName,
+  displayMode = 'compact',
 }: InlineFieldEditorProps) {
   const { toast } = useToast()
   const [localValue, setLocalValue] = useState(value)
@@ -174,13 +176,17 @@ export default function InlineFieldEditor({
       : field.options?.lookup_table_id
 
     // Build lookup config from field options
-    const lookupConfig: LookupFieldConfig | undefined = linkedTableId ? {
-      lookupTableId: linkedTableId,
-      relationshipType: field.options?.relationship_type || (field.type === "link_to_table" ? 'one-to-many' : 'one-to-one'),
-      maxSelections: field.options?.max_selections,
-      required: field.required,
-      allowCreate: field.options?.allow_create,
-    } : undefined
+    // For link_to_table fields, use shared utility to ensure consistency with Grid block
+    // For lookup fields, create config inline (lookup fields are read-only derived fields)
+    const lookupConfig: LookupFieldConfig | undefined = field.type === "link_to_table"
+      ? createLookupFieldConfig(field)
+      : linkedTableId ? {
+          lookupTableId: linkedTableId,
+          relationshipType: field.options?.relationship_type || 'one-to-one',
+          maxSelections: field.options?.max_selections,
+          required: field.required,
+          allowCreate: field.options?.allow_create,
+        } : undefined
 
     // Handle create new record - opens RecordModal
     const handleCreateRecord = async (tableId: string): Promise<string | null> => {
@@ -237,6 +243,7 @@ export default function InlineFieldEditor({
               placeholder="No linked records"
               onRecordClick={onLinkedRecordClick}
               isLookupField={true}
+              compact={displayMode === 'compact'}
             />
           ) : (
             <div className={readOnlyBoxClassName}>
@@ -265,6 +272,7 @@ export default function InlineFieldEditor({
               onRecordClick={onLinkedRecordClick}
               onCreateRecord={lookupConfig.allowCreate ? handleCreateRecord : undefined}
               isLookupField={false}
+              compact={displayMode === 'compact'}
             />
           ) : (
             <div className={readOnlyBoxClassName}>

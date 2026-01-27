@@ -410,58 +410,80 @@ export default function FieldBuilderDrawer({
         )
 
       case "lookup":
+        // Get linked fields from current table
+        const linkedFields = tableFields.filter(
+          (f) => f.type === 'link_to_table' && f.id !== field?.id
+        )
+
         return (
           <div className="space-y-2">
-            <label className="block text-sm font-medium">Lookup Table</label>
-            <select
-              value={options.lookup_table_id || ""}
-              onChange={(e) =>
-                setOptions({
-                  ...options,
-                  lookup_table_id: e.target.value || undefined,
-                  // Reset field when table changes
-                  lookup_field_id: undefined,
-                })
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white mb-2"
-              disabled={loadingTables}
-            >
-              <option value="" disabled>
-                {loadingTables ? "Loading tables..." : "Select a table"}
-              </option>
-              {tables
-                .filter((t) => t.id !== tableId)
-                .map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-            </select>
-            <label className="block text-sm font-medium">Lookup Field</label>
+            <label className="block text-sm font-medium">Linked Field *</label>
             <select
               value={options.lookup_field_id || ""}
-              onChange={(e) =>
+              onChange={(e) => {
+                const linkedFieldId = e.target.value || undefined
+                // Find the selected linked field to get its linked_table_id
+                const selectedLinkedField = linkedFields.find(f => f.id === linkedFieldId)
+                const linkedTableId = selectedLinkedField?.options?.linked_table_id
+                
                 setOptions({
                   ...options,
-                  lookup_field_id: e.target.value || undefined,
+                  lookup_field_id: linkedFieldId,
+                  lookup_table_id: linkedTableId || undefined,
+                  // Reset result field when linked field changes
+                  lookup_result_field_id: undefined,
                 })
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white"
-              disabled={!options.lookup_table_id || loadingLookupFields}
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white mb-2"
             >
               <option value="" disabled>
-                {!options.lookup_table_id
-                  ? "Select a table first"
-                  : loadingLookupFields
-                    ? "Loading fields..."
-                    : "Select a field"}
+                Select a linked field
               </option>
-              {lookupTableFields.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name} ({f.type})
+              {linkedFields.length === 0 ? (
+                <option value="" disabled>
+                  No linked fields found. Create a link field first.
                 </option>
-              ))}
+              ) : (
+                linkedFields.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {getFieldDisplayName(f)}
+                  </option>
+                ))
+              )}
             </select>
+            <p className="text-xs text-gray-500 mb-2">
+              Select a linked field in this table that connects to the table you want to look up.
+            </p>
+            {options.lookup_table_id && (
+              <>
+                <label className="block text-sm font-medium">Display Field *</label>
+                <select
+                  value={options.lookup_result_field_id || ""}
+                  onChange={(e) =>
+                    setOptions({
+                      ...options,
+                      lookup_result_field_id: e.target.value || undefined,
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white"
+                  disabled={loadingLookupFields}
+                >
+                  <option value="" disabled>
+                    {loadingLookupFields
+                      ? "Loading fields..."
+                      : "Select a field to display"}
+                  </option>
+                  {lookupTableFields.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name} ({f.type})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500">
+                  Select which field from the linked table to display in this lookup field.
+                </p>
+              </>
+            )}
           </div>
         )
 

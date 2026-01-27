@@ -75,9 +75,11 @@ export default function FieldAppearanceSettings({
   }
 
   const isAttachmentField = field?.type === 'attachment'
+  const isLinkedField = field?.type === 'link_to_table'
   const attachmentDisplayStyle = appearance.attachment_display_style || field?.options?.attachment_display_style || 'thumbnails'
   const attachmentSize = appearance.attachment_size || field?.options?.attachment_preview_size || 'medium'
   const attachmentMaxVisible = appearance.attachment_max_visible || field?.options?.attachment_max_visible || 10
+  const linkedFieldDisplayMode = appearance.linked_field_display_mode || 'compact'
 
   return (
     <div className="space-y-6">
@@ -206,6 +208,48 @@ export default function FieldAppearanceSettings({
             />
             <p className="text-xs text-gray-500">
               Maximum number of attachments to show before showing &quot;+X more&quot;
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Linked Field Display Settings */}
+      {isLinkedField && (
+        <div className="space-y-4 border-t border-gray-200 pt-4">
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold text-gray-900">Linked Field Display</h3>
+            <p className="text-xs text-gray-500">
+              Configure how linked records are displayed in this block
+            </p>
+          </div>
+
+          {/* Display Mode */}
+          <div className="space-y-2">
+            <Label htmlFor="linked-field-display-mode">Display Mode</Label>
+            <Select
+              value={linkedFieldDisplayMode}
+              onValueChange={(value: 'compact' | 'inline' | 'expanded') => {
+                onUpdate({
+                  appearance: {
+                    ...appearance,
+                    linked_field_display_mode: value,
+                  },
+                })
+              }}
+            >
+              <SelectTrigger id="linked-field-display-mode">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="compact">Compact (pills only)</SelectItem>
+                <SelectItem value="inline">Inline list</SelectItem>
+                <SelectItem value="expanded">Expanded (embedded records)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-gray-500">
+              {linkedFieldDisplayMode === 'compact' && "Shows linked records as compact pills (matches Grid cell behavior)"}
+              {linkedFieldDisplayMode === 'inline' && "Shows linked records as pills in a list format with better wrapping"}
+              {linkedFieldDisplayMode === 'expanded' && "Shows embedded Airtable-style record cards (future enhancement)"}
             </p>
           </div>
         </div>

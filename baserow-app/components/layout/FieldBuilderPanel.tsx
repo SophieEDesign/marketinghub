@@ -489,7 +489,7 @@ function NewFieldForm({
     }
   }, [type])
 
-  // Load fields for lookup table selection.
+  // Load fields for lookup table when lookup_table_id is set (auto-determined from linked field)
   useEffect(() => {
     if (type !== "lookup" || !options.lookup_table_id) {
       setLookupTableFields([])
@@ -732,55 +732,67 @@ function NewFieldForm({
         )
 
       case "lookup":
+        // Get linked fields from current table
+        const linkedFields = tableFields.filter(
+          (f) => f.type === 'link_to_table' && f.id !== field?.id
+        )
+
         return (
           <div className="space-y-3">
             <div className="space-y-2">
-              <Label className="text-xs font-medium text-gray-700">Lookup table</Label>
+              <Label className="text-xs font-medium text-gray-700">Linked Field *</Label>
               <Select
-                value={options.lookup_table_id || undefined}
-                onValueChange={(v) =>
+                value={options.lookup_field_id || undefined}
+                onValueChange={(linkedFieldId) => {
+                  // Find the selected linked field to get its linked_table_id
+                  const selectedLinkedField = linkedFields.find(f => f.id === linkedFieldId)
+                  const linkedTableId = selectedLinkedField?.options?.linked_table_id
+                  
                   setOptions({
                     ...options,
-                    lookup_table_id: v || undefined,
-                    lookup_field_id: undefined,
+                    lookup_field_id: linkedFieldId || undefined,
+                    lookup_table_id: linkedTableId || undefined,
+                    // Reset result field when linked field changes
+                    lookup_result_field_id: undefined,
                   })
-                }
+                }}
               >
                 <SelectTrigger className="mt-1 h-8 text-sm">
-                  <SelectValue placeholder={loadingTables ? "Loading..." : "Select a table"} />
+                  <SelectValue placeholder="Select a linked field" />
                 </SelectTrigger>
                 <SelectContent>
-                  {loadingTables ? (
-                    <SelectItem value="__loading__" disabled>
-                      Loading tables...
+                  {linkedFields.length === 0 ? (
+                    <SelectItem value="__no_fields__" disabled>
+                      No linked fields found. Create a link field first.
                     </SelectItem>
                   ) : (
-                    tables
-                      .filter((t) => t.id !== tableId)
-                      .map((t) => (
-                        <SelectItem key={t.id} value={t.id}>
-                          {t.name}
-                        </SelectItem>
-                      ))
+                    linkedFields.map((f) => (
+                      <SelectItem key={f.id} value={f.id}>
+                        {getFieldDisplayName(f)}
+                      </SelectItem>
+                    ))
                   )}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-gray-500">
+                Select a linked field in this table that connects to the table you want to look up.
+              </p>
             </div>
 
             {options.lookup_table_id && (
               <div className="space-y-2">
-                <Label className="text-xs font-medium text-gray-700">Lookup field</Label>
+                <Label className="text-xs font-medium text-gray-700">Display Field *</Label>
                 <Select
-                  value={options.lookup_field_id || undefined}
+                  value={options.lookup_result_field_id || undefined}
                   onValueChange={(v) =>
                     setOptions({
                       ...options,
-                      lookup_field_id: v || undefined,
+                      lookup_result_field_id: v || undefined,
                     })
                   }
                 >
                   <SelectTrigger className="mt-1 h-8 text-sm">
-                    <SelectValue placeholder={loadingLookupFields ? "Loading..." : "Select a field"} />
+                    <SelectValue placeholder={loadingLookupFields ? "Loading..." : "Select a field to display"} />
                   </SelectTrigger>
                   <SelectContent>
                     {loadingLookupFields ? (
@@ -796,11 +808,11 @@ function NewFieldForm({
                     )}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-gray-500">
+                  Select which field from the linked table to display in this lookup field.
+                </p>
               </div>
             )}
-            <p className="text-xs text-gray-500">
-              Required to create a lookup field.
-            </p>
           </div>
         )
 

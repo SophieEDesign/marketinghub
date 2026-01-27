@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import type { PageBlock } from "@/lib/interface/types"
@@ -10,6 +10,7 @@ import { useToast } from "@/components/ui/use-toast"
 import AttachmentPreview, { type Attachment } from "@/components/attachments/AttachmentPreview"
 import InlineFieldEditor from "@/components/records/InlineFieldEditor"
 import { resolveSystemFieldAlias } from "@/lib/fields/systemFieldAliases"
+import RecordModal from "@/components/calendar/RecordModal"
 
 interface FieldBlockProps {
   block: PageBlock
@@ -44,6 +45,10 @@ export default function FieldBlock({
   const [tableName, setTableName] = useState<string | null>(null)
   const [userRole, setUserRole] = useState<'admin' | 'member' | null>(null)
   const [canEditInline, setCanEditInline] = useState(false)
+  const [createRecordModalOpen, setCreateRecordModalOpen] = useState(false)
+  const [createRecordTableId, setCreateRecordTableId] = useState<string | null>(null)
+  const [createRecordTableFields, setCreateRecordTableFields] = useState<any[]>([])
+  const [createRecordResolve, setCreateRecordResolve] = useState<((id: string | null) => void) | null>(null)
   const { toast } = useToast()
 
   const allowInlineEdit = config?.allow_inline_edit || false
@@ -270,12 +275,69 @@ export default function FieldBlock({
 
   const isEditable = canEditInline && !isEditing && !!field
   const showLabel = config?.appearance?.showTitle !== false // Default to true if not set
+  const linkedFieldDisplayMode = config?.appearance?.linked_field_display_mode || 'compact'
 
   // Handle attachment fields specially
   const isAttachmentField = field?.type === 'attachment'
   const attachments: Attachment[] = isAttachmentField && fieldValue 
     ? (Array.isArray(fieldValue) ? fieldValue : [fieldValue])
     : []
+
+  // Handle creating new linked records
+  const handleCreateLinkedRecord = useCallback(async (tableId: string): Promise<string | null> => {
+    if (!tableId) return null
+    
+    return new Promise((resolve) => {
+      const supabase = createClient()
+      
+      // Fetch table fields for the modal
+      supabase
+        .from("table_fields")
+        .select("*")
+        .eq("table_id", tableId)
+        .order("position", { ascending: true })
+        .then(({ data: fields, error }) => {
+          if (error) {
+            console.error("[FieldBlock] Error loading table fields:", error)
+            toast({
+              title: "Failed to load fields",
+              description: error.message || "Please try again",
+              variant: "destructive",
+            })
+            resolve(null)
+            return
+          }
+
+          // Store the resolve function and open modal
+          setCreateRecordResolve(() => resolve)
+          setCreateRecordTableId(tableId)
+          setCreateRecordTableFields(fields || [])
+          setCreateRecordModalOpen(true)
+        })
+    })
+  }, [toast])
+
+  // Handle modal save - called when RecordModal saves successfully
+  const handleModalSave = useCallback((createdRecordId?: string | null) => {
+    if (createRecordResolve) {
+      createRecordResolve(createdRecordId || null)
+      setCreateRecordResolve(null)
+    }
+    setCreateRecordModalOpen(false)
+    setCreateRecordTableId(null)
+    setCreateRecordTableFields([])
+  }, [createRecordResolve])
+
+  // Handle modal close - called when RecordModal is closed without saving
+  const handleModalClose = useCallback(() => {
+    if (createRecordResolve) {
+      createRecordResolve(null)
+      setCreateRecordResolve(null)
+    }
+    setCreateRecordModalOpen(false)
+    setCreateRecordTableId(null)
+    setCreateRecordTableFields([])
+  }, [createRecordResolve])
 
   async function handleCommit(newValue: any) {
     if (!recordId || !tableName || !field) {
@@ -340,17 +402,13 @@ export default function FieldBlock({
           }
           window.location.href = `/tables/${linkedTableId}/records/${linkedRecordId}`
         }}
-        onAddLinkedRecord={() => {
-          toast({
-            title: "Not implemented",
-            description: "Adding linked records is not available here yet.",
-          })
-        }}
+        onAddLinkedRecord={handleCreateLinkedRecord}
         isReadOnly={false}
         showLabel={false}
         tableId={pageTableId || undefined}
         recordId={recordId || undefined}
         tableName={tableName || undefined}
+        displayMode={linkedFieldDisplayMode}
       />
     ) : (
       <div className="flex-1">
@@ -399,31 +457,41 @@ export default function FieldBlock({
         }
         window.location.href = `/tables/${linkedTableId}/records/${linkedRecordId}`
       }}
-      onAddLinkedRecord={() => {
-        toast({
-          title: "Not implemented",
-          description: "Adding linked records is not available here yet.",
-        })
-      }}
+      onAddLinkedRecord={handleCreateLinkedRecord}
       isReadOnly={!isEditable}
       showLabel={false}
+      displayMode={linkedFieldDisplayMode}
     />
   )
 
   return (
-    <div className="h-full p-3">
-      {showLabel ? (
-        <div className="grid grid-cols-1 sm:grid-cols-[140px_minmax(0,1fr)] gap-x-4 gap-y-1 items-start">
-          <div className="text-xs font-medium text-gray-500 leading-5 sm:pt-1.5">
-            {field.name}
-            {field.required && <span className="text-red-500 ml-1">*</span>}
+    <>
+      <div className="h-full p-3">
+        {showLabel ? (
+          <div className="grid grid-cols-1 sm:grid-cols-[140px_minmax(0,1fr)] gap-x-4 gap-y-1 items-start">
+            <div className="text-xs font-medium text-gray-500 leading-5 sm:pt-1.5">
+              {field.name}
+              {field.required && <span className="text-red-500 ml-1">*</span>}
+            </div>
+            <div className="min-w-0">{content}</div>
           </div>
-          <div className="min-w-0">{content}</div>
-        </div>
-      ) : (
-        content
+        ) : (
+          content
+        )}
+      </div>
+      
+      {/* Record creation modal */}
+      {createRecordTableId && (
+        <RecordModal
+          open={createRecordModalOpen}
+          onClose={handleModalClose}
+          tableId={createRecordTableId}
+          recordId={null}
+          tableFields={createRecordTableFields}
+          onSave={handleModalSave}
+        />
       )}
-    </div>
+    </>
   )
-}
+
 

@@ -1,6 +1,6 @@
 "use client"
 
-import type { PageBlock, BlockType } from "@/lib/interface/types"
+import type { PageBlock, BlockType, ViewType } from "@/lib/interface/types"
 import { normalizeBlockConfig, isBlockConfigComplete } from "@/lib/interface/block-validator"
 import { assertBlockConfig, shouldShowBlockSetupUI } from "@/lib/interface/assertBlockConfig"
 import { useMemo } from "react"
@@ -400,12 +400,12 @@ export default function BlockRenderer({
       case "list":
         // List block - migrate to grid block with view_type='list' for backward compatibility
         // CRITICAL: key={block.id} ONLY - no index, no compound keys, no pageId
-        const listBlockAsGrid = {
+        const listBlockAsGrid: PageBlock = {
           ...safeBlock,
           type: 'grid' as BlockType,
           config: {
             ...mergedConfig,
-            view_type: 'list',
+            view_type: 'list' as ViewType,
           },
         }
         return (
