@@ -1235,8 +1235,8 @@ export default function Canvas({
     }
 
     // Update only the changed block's height in layout
-    setLayout(currentLayout => {
-      const updatedLayout = currentLayout.map(item => {
+    setLayout((currentLayout: Layout[]): Layout[] => {
+      const updatedLayout: Layout[] = currentLayout.map((item: Layout): Layout => {
         if (item.i === blockId) {
           const oldHeight = item.h || 4
           if (Math.abs(oldHeight - newHeight) > 0.01) {
@@ -1256,35 +1256,35 @@ export default function Canvas({
 
       // PHASE 3.1: Re-enable push/compact after content height change
       // Check if block grew or shrunk
-      const changedBlock = updatedLayout.find(item => item.i === blockId)
+      const changedBlock: Layout | undefined = updatedLayout.find((item: Layout) => item.i === blockId)
       if (!changedBlock) return updatedLayout
       
-      const oldHeight = currentLayout.find(item => item.i === blockId)?.h || 4
-      const newHeight = changedBlock.h || 4
+      const oldHeight = currentLayout.find((item: Layout) => item.i === blockId)?.h || 4
+      const changedBlockHeight = changedBlock.h || 4
       
-      let finalLayout = updatedLayout
+      let finalLayout: Layout[] = updatedLayout
       
-      if (newHeight > oldHeight) {
+      if (changedBlockHeight > oldHeight) {
         // Block grew - push blocks below down
         finalLayout = pushBlocksDown(updatedLayout, blockId)
         console.log('[HeightChange] Applied push down after content height increase', {
           blockId,
           oldHeight,
-          newHeight,
+          newHeight: changedBlockHeight,
         })
-      } else if (newHeight < oldHeight) {
+      } else if (changedBlockHeight < oldHeight) {
         // Block shrunk - compact layout vertically
         finalLayout = compactLayoutVertically(updatedLayout, blocks)
         console.log('[HeightChange] Applied compaction after content height decrease', {
           blockId,
           oldHeight,
-          newHeight,
+          newHeight: changedBlockHeight,
         })
       }
 
       return finalLayout
     })
-  }, [])
+  }, [blocks, pushBlocksDown, compactLayoutVertically])
 
   const handleLayoutChange = useCallback(
     (newLayout: Layout[]) => {
