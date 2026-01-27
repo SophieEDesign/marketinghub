@@ -282,10 +282,12 @@ export interface VisibilityRule {
 
 export interface HighlightRule {
   field: string
-  operator: 'eq' | 'neq' | 'gt' | 'lt' | 'contains'
-  value: any
+  operator: 'eq' | 'neq' | 'gt' | 'lt' | 'contains' | 'date_before' | 'date_after' | 'date_today' | 'date_overdue' | 'is_empty' | 'is_not_empty'
+  value?: any
   background_color?: string
   text_color?: string
+  scope?: 'cell' | 'row' | 'group' // Where the color applies: cell (specific field), row (entire row), or group (group header)
+  target_field?: string // Optional field name for cell-level formatting (when scope is 'cell')
 }
 
 export interface Page {

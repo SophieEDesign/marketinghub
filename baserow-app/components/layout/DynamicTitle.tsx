@@ -1,10 +1,10 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { usePathname } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
+import React, { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
-export default function DynamicTitle() {
+const DynamicTitle: React.FC = () => {
   const pathname = usePathname()
   const [workspaceName, setWorkspaceName] = useState<string | null>(null)
   const [pageTitle, setPageTitle] = useState<string | null>(null)

@@ -197,7 +197,7 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
   ),
   grid: (ctx) => (
     <>
-      <GridAppearanceSettings config={ctx.config} onUpdate={ctx.onUpdateAppearance} fields={ctx.fields} />
+      <GridAppearanceSettings config={ctx.config} onUpdate={ctx.onUpdateAppearance} onUpdateConfig={ctx.onUpdateConfig} fields={ctx.fields} />
       <CommonAppearanceSettings
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}
@@ -241,7 +241,7 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
   ),
   list: (ctx) => (
     <>
-      <GridAppearanceSettings config={ctx.config} onUpdate={ctx.onUpdateAppearance} fields={ctx.fields} />
+      <GridAppearanceSettings config={ctx.config} onUpdate={ctx.onUpdateAppearance} onUpdateConfig={ctx.onUpdateConfig} fields={ctx.fields} />
       <CommonAppearanceSettings
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}
@@ -252,7 +252,7 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
   ),
   calendar: (ctx) => (
     <>
-      <GridAppearanceSettings config={ctx.config} onUpdate={ctx.onUpdateAppearance} fields={ctx.fields} />
+      <GridAppearanceSettings config={ctx.config} onUpdate={ctx.onUpdateAppearance} onUpdateConfig={ctx.onUpdateConfig} fields={ctx.fields} />
       <CommonAppearanceSettings
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}
@@ -263,7 +263,7 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
   ),
   multi_calendar: (ctx) => (
     <>
-      <GridAppearanceSettings config={ctx.config} onUpdate={ctx.onUpdateAppearance} fields={ctx.fields} />
+      <GridAppearanceSettings config={ctx.config} onUpdate={ctx.onUpdateAppearance} onUpdateConfig={ctx.onUpdateConfig} fields={ctx.fields} />
       <CommonAppearanceSettings
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}
@@ -274,7 +274,7 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
   ),
   kanban: (ctx) => (
     <>
-      <GridAppearanceSettings config={ctx.config} onUpdate={ctx.onUpdateAppearance} fields={ctx.fields} />
+      <GridAppearanceSettings config={ctx.config} onUpdate={ctx.onUpdateAppearance} onUpdateConfig={ctx.onUpdateConfig} fields={ctx.fields} />
       <CommonAppearanceSettings
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}
@@ -285,7 +285,7 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
   ),
   timeline: (ctx) => (
     <>
-      <GridAppearanceSettings config={ctx.config} onUpdate={ctx.onUpdateAppearance} fields={ctx.fields} />
+      <GridAppearanceSettings config={ctx.config} onUpdate={ctx.onUpdateAppearance} onUpdateConfig={ctx.onUpdateConfig} fields={ctx.fields} />
       <CommonAppearanceSettings
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}
@@ -296,7 +296,7 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
   ),
   multi_timeline: (ctx) => (
     <>
-      <GridAppearanceSettings config={ctx.config} onUpdate={ctx.onUpdateAppearance} fields={ctx.fields} />
+      <GridAppearanceSettings config={ctx.config} onUpdate={ctx.onUpdateAppearance} onUpdateConfig={ctx.onUpdateConfig} fields={ctx.fields} />
       <CommonAppearanceSettings
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}
@@ -307,7 +307,7 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
   ),
   gallery: (ctx) => (
     <>
-      <GridAppearanceSettings config={ctx.config} onUpdate={ctx.onUpdateAppearance} fields={ctx.fields} />
+      <GridAppearanceSettings config={ctx.config} onUpdate={ctx.onUpdateAppearance} onUpdateConfig={ctx.onUpdateConfig} fields={ctx.fields} />
       <CommonAppearanceSettings
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}

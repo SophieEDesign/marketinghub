@@ -35,6 +35,8 @@ import type { FilterTree } from "@/lib/filters/canonical-model"
 import { asArray } from "@/lib/utils/asArray"
 import { sortRowsByFieldType, shouldUseClientSideSorting } from "@/lib/sorting/fieldTypeAwareSort"
 import { resolveChoiceColor, normalizeHexColor, resolveFieldColor } from '@/lib/field-colors'
+import type { HighlightRule } from '@/lib/interface/types'
+import { evaluateHighlightRules, getFormattingStyle } from '@/lib/conditional-formatting/evaluator'
 
 // Helper to convert hex color to RGB
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
@@ -126,6 +128,8 @@ interface GridViewProps {
   onGroupByChange?: (fieldName: string | null) => Promise<void>
   /** Callback when block content height changes (for grouped blocks) */
   onHeightChange?: (height: number) => void
+  /** Conditional formatting rules */
+  highlightRules?: HighlightRule[]
 }
 
 const ITEMS_PER_PAGE = 100
@@ -566,6 +570,7 @@ export default function GridView({
   onFilterCreate,
   onGroupByChange,
   onHeightChange,
+  highlightRules = [],
 }: GridViewProps) {
   const { openRecord } = useRecordPanel()
   const isMobile = useIsMobile()
@@ -3337,6 +3342,16 @@ export default function GridView({
                   const canOpenRecord = enableRecordOpen && allowOpenRecord
                   const thisRowId = row?.id ? String(row.id) : null
                   const thisRowHeight = getEffectiveRowHeight(thisRowId)
+                  
+                  // Evaluate conditional formatting rules for grouped rows
+                  const matchingRuleGrouped = highlightRules && highlightRules.length > 0
+                    ? evaluateHighlightRules(highlightRules, row, safeTableFields)
+                    : null
+                  
+                  // Get formatting style for row-level rules
+                  const rowFormattingStyleGrouped = matchingRuleGrouped && matchingRuleGrouped.scope !== 'cell'
+                    ? getFormattingStyle(matchingRuleGrouped)
+                    : {}
 
                   return (
                     <tr
@@ -3344,7 +3359,7 @@ export default function GridView({
                       className={`border-b border-gray-100 transition-colors ${
                         thisRowId && selectedRowId === thisRowId ? 'bg-blue-50' : 'hover:bg-gray-50/50'
                       } cursor-default`}
-                      style={{ ...borderColor, height: `${thisRowHeight}px`, minHeight: `${thisRowHeight}px`, maxHeight: `${thisRowHeight}px` }}
+                      style={{ ...borderColor, ...rowFormattingStyleGrouped, height: `${thisRowHeight}px`, minHeight: `${thisRowHeight}px`, maxHeight: `${thisRowHeight}px` }}
                       data-rowid="true"
                       data-row-key={thisRowId || ''}
                       onClick={thisRowId ? () => handleRowSelect(thisRowId) : undefined}
@@ -3441,6 +3456,18 @@ export default function GridView({
                               
                               const isFrozen = fieldIndex < frozenColumns
                               
+                              // Check for cell-level conditional formatting in grouped rows
+                              const cellRuleGrouped = matchingRuleGrouped && matchingRuleGrouped.scope === 'cell' && matchingRuleGrouped.target_field === field.field_name
+                                ? matchingRuleGrouped
+                                : highlightRules && highlightRules.length > 0
+                                  ? (() => {
+                                      const cellRules = highlightRules.filter(r => r.scope === 'cell' && r.target_field === field.field_name)
+                                      return evaluateHighlightRules(cellRules, row, safeTableFields)
+                                    })()
+                                  : null
+                              
+                              const cellFormattingStyleGrouped = cellRuleGrouped ? getFormattingStyle(cellRuleGrouped) : {}
+                              
                               const cellStyle: React.CSSProperties = { 
                                 width: `${columnWidth}px`, 
                                 minWidth: `${columnWidth}px`, 
@@ -3448,14 +3475,18 @@ export default function GridView({
                                 height: `${thisRowHeight}px`,
                                 minHeight: `${thisRowHeight}px`,
                                 maxHeight: `${thisRowHeight}px`,
-                                overflow: 'hidden'
+                                overflow: 'hidden',
+                                ...cellFormattingStyleGrouped
                               }
                               
                               if (isFrozen && frozenColumns > 0) {
                                 cellStyle.position = 'sticky'
                                 cellStyle.left = `${leftOffset}px`
                                 cellStyle.zIndex = 10
-                                cellStyle.backgroundColor = 'white'
+                                // Only override background if not set by conditional formatting
+                                if (!cellFormattingStyleGrouped.backgroundColor) {
+                                  cellStyle.backgroundColor = 'white'
+                                }
                               }
 
                               return (
@@ -3517,13 +3548,23 @@ export default function GridView({
                   const thisRowId = row?.id ? String(row.id) : null
                   const thisRowHeight = getEffectiveRowHeight(thisRowId)
                   
+                  // Evaluate conditional formatting rules
+                  const matchingRule = highlightRules && highlightRules.length > 0
+                    ? evaluateHighlightRules(highlightRules, row, safeTableFields)
+                    : null
+                  
+                  // Get formatting style for row-level rules
+                  const rowFormattingStyle = matchingRule && matchingRule.scope !== 'cell'
+                    ? getFormattingStyle(matchingRule)
+                    : {}
+                  
                   return (
                   <tr
                     key={row?.id || `row-${Math.random()}`}
                     className={`border-b border-gray-100 transition-colors ${
                       thisRowId && selectedRowId === thisRowId ? 'bg-blue-50' : 'hover:bg-gray-50/50'
                     } cursor-default`}
-                    style={{ ...borderColor, height: `${thisRowHeight}px`, minHeight: `${thisRowHeight}px`, maxHeight: `${thisRowHeight}px` }}
+                    style={{ ...borderColor, ...rowFormattingStyle, height: `${thisRowHeight}px`, minHeight: `${thisRowHeight}px`, maxHeight: `${thisRowHeight}px` }}
                     data-rowid="true"
                     data-row-key={thisRowId || ''}
                     onClick={thisRowId ? () => handleRowSelect(thisRowId) : undefined}
@@ -3623,6 +3664,18 @@ export default function GridView({
                             
                             const isFrozen = fieldIndex < frozenColumns
                             
+                            // Check for cell-level conditional formatting
+                            const cellRule = matchingRule && matchingRule.scope === 'cell' && matchingRule.target_field === field.field_name
+                              ? matchingRule
+                              : highlightRules && highlightRules.length > 0
+                                ? (() => {
+                                    const cellRules = highlightRules.filter(r => r.scope === 'cell' && r.target_field === field.field_name)
+                                    return evaluateHighlightRules(cellRules, row, safeTableFields)
+                                  })()
+                                : null
+                            
+                            const cellFormattingStyle = cellRule ? getFormattingStyle(cellRule) : {}
+                            
                             const cellStyle: React.CSSProperties = { 
                               width: `${columnWidth}px`, 
                               minWidth: `${columnWidth}px`, 
@@ -3630,14 +3683,18 @@ export default function GridView({
                               height: `${thisRowHeight}px`,
                               minHeight: `${thisRowHeight}px`,
                               maxHeight: `${thisRowHeight}px`,
-                              overflow: 'hidden'
+                              overflow: 'hidden',
+                              ...cellFormattingStyle
                             }
                             
                             if (isFrozen && frozenColumns > 0) {
                               cellStyle.position = 'sticky'
                               cellStyle.left = `${leftOffset}px`
                               cellStyle.zIndex = 10
-                              cellStyle.backgroundColor = 'white'
+                              // Only override background if not set by conditional formatting
+                              if (!cellFormattingStyle.backgroundColor) {
+                                cellStyle.backgroundColor = 'white'
+                              }
                             }
 
                             return (

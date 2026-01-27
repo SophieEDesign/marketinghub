@@ -14,16 +14,19 @@ import { X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { TableField } from "@/types/fields"
+import ConditionalFormattingEditor from "./ConditionalFormattingEditor"
 
 interface GridAppearanceSettingsProps {
   config: BlockConfig
   onUpdate: (updates: Partial<BlockConfig['appearance']>) => void
+  onUpdateConfig?: (updates: Partial<BlockConfig>) => void // For updating highlight_rules
   fields?: TableField[] // Optional: fields passed from SettingsPanel
 }
 
 export default function GridAppearanceSettings({
   config,
   onUpdate,
+  onUpdateConfig,
   fields: fieldsProp,
 }: GridAppearanceSettingsProps) {
   const appearance = config.appearance || {}
@@ -360,6 +363,19 @@ export default function GridAppearanceSettings({
           )}
         </div>
       )}
+
+      {/* Conditional Formatting Section */}
+      <div className="border-t pt-4 mt-4">
+        <ConditionalFormattingEditor
+          rules={config.highlight_rules || []}
+          fields={fields}
+          onRulesChange={(rules) => {
+            if (onUpdateConfig) {
+              onUpdateConfig({ highlight_rules: rules })
+            }
+          }}
+        />
+      </div>
     </div>
   )
 }

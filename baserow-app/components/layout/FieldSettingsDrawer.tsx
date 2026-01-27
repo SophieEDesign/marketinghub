@@ -683,6 +683,9 @@ export default function FieldSettingsDrawer({
           default_value: defaultValue ?? null,
           options: (() => {
             let opts: FieldOptions = { ...options }
+            
+            // Preserve choiceColorTheme before normalization (it might get lost)
+            const preservedTheme = opts.choiceColorTheme
 
             // Canonicalize select field options (ordering + colors)
             if (type === 'single_select' || type === 'multi_select') {
@@ -699,6 +702,11 @@ export default function FieldSettingsDrawer({
                 }))
                 .sort((a, b) => a.sort_index - b.sort_index) // Sort by preserved sort_index
               opts = syncSelectOptionsPayload(opts, trimmed, { dropEmpty: true })
+              
+              // Restore preserved theme after normalization
+              if (preservedTheme) {
+                opts.choiceColorTheme = preservedTheme
+              }
             }
             
             // Filter out empty choices
@@ -716,9 +724,13 @@ export default function FieldSettingsDrawer({
               delete opts.read_only
             }
             
-            // Remove undefined/null values
+            // Remove undefined/null values (but preserve choiceColorTheme if it's a valid theme)
             Object.keys(opts).forEach(key => {
               const value = opts[key as keyof FieldOptions]
+              // Don't delete choiceColorTheme if it's a valid theme
+              if (key === 'choiceColorTheme' && isChoiceColorTheme(value)) {
+                return // Keep it
+              }
               if (value === undefined || value === null || 
                   (Array.isArray(value) && value.length === 0)) {
                 delete opts[key as keyof FieldOptions]

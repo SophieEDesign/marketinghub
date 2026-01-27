@@ -21,6 +21,7 @@ import QuickFilterBar from "@/components/filters/QuickFilterBar"
 import RecordModal from "@/components/calendar/RecordModal"
 import { useToast } from "@/components/ui/use-toast"
 import { VIEWS_ENABLED } from "@/lib/featureFlags"
+import type { GroupRule } from "@/lib/grouping/types"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 function isUuidLike(value: string | null | undefined): value is string {
@@ -424,6 +425,7 @@ export default function ListBlock({
         filters={allFilters}
         sorts={activeSorts}
         groupBy={groupBy}
+        groupByRules={groupByRulesFromConfig}
         defaultChoiceGroupsCollapsed={defaultChoiceGroupsCollapsed}
         searchQuery=""
         onRecordClick={onRecordClick}
@@ -436,7 +438,7 @@ export default function ListBlock({
         metaFields={metaFields}
         modalFields={modalFields}
         reloadKey={refreshKey}
-        onHeightChange={groupBy ? handleHeightChange : undefined}
+        onHeightChange={(groupBy || (groupByRulesFromConfig && groupByRulesFromConfig.length > 0)) ? handleHeightChange : undefined}
         rowHeight={rowHeight}
       />
     </div>
