@@ -124,6 +124,24 @@ export function generateChangeColumnTypeSQL(
     usingClause = ' USING CASE WHEN trim("' + sanitizedColumnName + '") = \'\' THEN NULL ELSE CAST(trim("' + sanitizedColumnName + '") AS timestamptz) END'
   } else if (oldType === 'date' && newType === 'text') {
     usingClause = ' USING CAST("' + sanitizedColumnName + '" AS text)'
+  } else if ((oldType === 'text' || oldType === 'single_select' || oldType === 'multi_select') && newType === 'link_to_table') {
+    // For text/select → link_to_table, data migration happens before SQL column change
+    // The column should already contain UUIDs (or null) from the migration step
+    // Just cast to uuid/uuid[] - if values aren't UUIDs, they'll become null
+    const relationshipType = options?.relationship_type
+    const maxSelections = options?.max_selections
+    const isMulti =
+      relationshipType === 'one-to-many' ||
+      relationshipType === 'many-to-many' ||
+      (typeof maxSelections === 'number' && maxSelections > 1)
+    
+    if (isMulti) {
+      // For multi-link, cast to uuid[] - handle both single values and arrays
+      usingClause = ' USING CASE WHEN "' + sanitizedColumnName + '" IS NULL THEN NULL::uuid[] WHEN "' + sanitizedColumnName + '"::text ~ \'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$\' THEN ARRAY["' + sanitizedColumnName + '"::uuid] ELSE NULL::uuid[] END'
+    } else {
+      // For single link, cast to uuid - invalid values become null
+      usingClause = ' USING CASE WHEN "' + sanitizedColumnName + '" IS NULL THEN NULL WHEN "' + sanitizedColumnName + '"::text ~ \'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$\' THEN "' + sanitizedColumnName + '"::uuid ELSE NULL END'
+    }
   }
 
   return `ALTER TABLE ${quoteMaybeQualifiedName(tableName)} ALTER COLUMN ${quoteIdent(columnName)} TYPE ${newPgType}${usingClause};`

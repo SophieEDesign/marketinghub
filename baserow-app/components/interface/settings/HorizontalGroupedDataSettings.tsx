@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
 import {
   Select,
   SelectContent,
@@ -9,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Edit2, Check, X } from "lucide-react"
 import type { BlockConfig, BlockSort } from "@/lib/interface/types"
 import type { Table, TableField } from "@/types/database"
 import TableSelector from "./shared/TableSelector"
@@ -23,6 +25,8 @@ interface HorizontalGroupedDataSettingsProps {
   fields: TableField[]
   onUpdate: (updates: Partial<BlockConfig>) => void
   onTableChange: (tableId: string) => Promise<void>
+  onEditCanvas?: () => void // Callback to enter canvas edit mode
+  isEditingCanvas?: boolean // Whether canvas is currently being edited
 }
 
 interface FieldConfig {
@@ -37,6 +41,9 @@ export default function HorizontalGroupedDataSettings({
   fields,
   onUpdate,
   onTableChange,
+  onEditCanvas,
+  isEditingCanvas = false,
+  onExitBlockCanvas,
 }: HorizontalGroupedDataSettingsProps) {
   const [recordFields, setRecordFields] = useState<FieldConfig[]>(
     (config.record_fields as FieldConfig[]) || []
@@ -123,9 +130,39 @@ export default function HorizontalGroupedDataSettings({
           )}
 
           <div className="space-y-2">
-            <Label>Record Fields</Label>
+            <div className="flex items-center justify-between">
+              <Label>Record Fields</Label>
+              {onEditCanvas && (
+                <Button
+                  variant={isEditingCanvas ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    if (isEditingCanvas && onExitBlockCanvas) {
+                      // If already editing, exit and save
+                      onExitBlockCanvas()
+                    } else if (onEditCanvas) {
+                      // Enter edit mode
+                      onEditCanvas()
+                    }
+                  }}
+                  className="h-7"
+                >
+                  {isEditingCanvas ? (
+                    <>
+                      <Check className="h-3 w-3 mr-1" />
+                      Done Editing
+                    </>
+                  ) : (
+                    <>
+                      <Edit2 className="h-3 w-3 mr-1" />
+                      Edit Canvas
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
             <p className="text-xs text-muted-foreground mb-2">
-              Configure which fields appear in each record&apos;s canvas. You can drag and rearrange fields in edit mode.
+              Configure which fields appear in each record&apos;s canvas. Click &quot;Edit Canvas&quot; to drag and rearrange fields.
             </p>
             <RecordViewFieldSettings
               tableId={config.table_id}

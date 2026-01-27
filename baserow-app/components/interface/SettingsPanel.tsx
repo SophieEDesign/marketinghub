@@ -31,6 +31,9 @@ interface SettingsPanelProps {
   onLock?: (blockId: string, locked: boolean) => void
   pageTableId?: string | null // Table ID from the page (for field blocks on record_view pages)
   allBlocks?: PageBlock[] // All blocks on the page (for Filter block settings)
+  editingBlockCanvasId?: string | null // ID of block whose canvas is being edited
+  onEditBlockCanvas?: (blockId: string) => void // Callback to enter block canvas edit mode
+  onExitBlockCanvas?: () => void // Callback to exit block canvas edit mode
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -48,6 +51,9 @@ export default function SettingsPanel({
   onLock,
   pageTableId = null,
   allBlocks = [],
+  editingBlockCanvasId = null,
+  onEditBlockCanvas,
+  onExitBlockCanvas,
 }: SettingsPanelProps) {
   const { toast } = useToast()
   const [tables, setTables] = useState<Table[]>([])
@@ -508,6 +514,21 @@ export default function SettingsPanel({
       ? "grid"
       : block?.type) as BlockType | undefined
 
+    // For horizontal_grouped blocks, pass canvas editing callbacks
+    const additionalProps = normalizedBlockType === 'horizontal_grouped' ? {
+      onEditCanvas: () => {
+        if (block && onEditBlockCanvas) {
+          onEditBlockCanvas(block.id)
+        }
+      },
+      isEditingCanvas: editingBlockCanvasId === block?.id,
+      onExitBlockCanvas: () => {
+        if (onExitBlockCanvas) {
+          onExitBlockCanvas()
+        }
+      },
+    } : {}
+
     const rendered = renderBlockDataSettings(normalizedBlockType, {
       config,
       tables,
@@ -517,7 +538,8 @@ export default function SettingsPanel({
       onTableChange,
       pageTableId,
       allBlocks,
-    })
+      ...additionalProps,
+    } as any)
 
     if (rendered) return rendered
 

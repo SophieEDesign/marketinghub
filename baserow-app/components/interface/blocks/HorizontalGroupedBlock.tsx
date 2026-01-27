@@ -19,6 +19,7 @@ interface HorizontalGroupedBlockProps {
   onRecordClick?: (recordId: string) => void
   pageShowAddRecord?: boolean
   onUpdate?: (blockId: string, config: Partial<PageBlock["config"]>) => void
+  isEditingCanvas?: boolean // Whether this block's canvas is being edited
 }
 
 /**
@@ -141,7 +142,7 @@ export default function HorizontalGroupedBlock({
         groupByRules={groupByRules}
         onRecordClick={onRecordClick}
         recordFields={recordFields}
-        isEditing={isEditing}
+        isEditing={isEditingCanvas || isEditing}
         onBlockUpdate={handleLayoutUpdate}
         storedLayout={storedLayout}
       />

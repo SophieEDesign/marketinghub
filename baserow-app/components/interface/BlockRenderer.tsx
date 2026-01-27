@@ -67,6 +67,7 @@ interface BlockRendererProps {
   allBlocks?: PageBlock[] // All blocks on the page (for FilterBlock connection awareness)
   onEphemeralHeightDelta?: (blockId: string, deltaPx: number) => void // Callback for ephemeral height changes (collapsible expansion)
   rowHeight?: number // Row height in pixels (for height calculation)
+  isEditingCanvas?: boolean // Whether this block's internal canvas is being edited (for horizontal_grouped blocks)
 }
 
 export default function BlockRenderer({
@@ -430,6 +431,7 @@ export default function BlockRenderer({
               onRecordClick={onRecordClick}
               pageShowAddRecord={pageShowAddRecord}
               onUpdate={onUpdate}
+              isEditingCanvas={isEditingCanvas}
             />
           </LazyBlockWrapper>
         )

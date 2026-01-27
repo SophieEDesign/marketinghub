@@ -221,6 +221,8 @@ export default function InterfaceBuilder({
   const [isSaving, setIsSaving] = useState(false)
   const [pageSettingsOpen, setPageSettingsOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState<Page>(page)
+  // Track which block's internal canvas is being edited (for horizontal_grouped blocks)
+  const [editingBlockCanvasId, setEditingBlockCanvasId] = useState<string | null>(null)
   // CRITICAL: Store latest grid layout in ref (source of truth during editing)
   // The grid library (react-grid-layout) has the authoritative layout
   // Blocks state is derived and may lag behind grid interactions
@@ -1381,6 +1383,7 @@ export default function InterfaceBuilder({
               }
               pageEditable={pageEditable}
               editableFieldNames={editableFieldNames}
+              editingBlockCanvasId={editingBlockCanvasId}
             />
             )}
           </FilterStateProvider>
@@ -1397,6 +1400,10 @@ export default function InterfaceBuilder({
           onClose={() => {
             setSettingsPanelOpen(false)
             setSelectedBlockId(null)
+            // Exit block canvas editing when closing settings
+            if (editingBlockCanvasId) {
+              setEditingBlockCanvasId(null)
+            }
           }}
           onSave={handleSaveSettings}
           onMoveToTop={handleMoveBlockToTop}
@@ -1404,6 +1411,13 @@ export default function InterfaceBuilder({
           pageTableId={pageTableId}
           allBlocks={blocks}
           onLock={handleLockBlock}
+          editingBlockCanvasId={editingBlockCanvasId}
+          onEditBlockCanvas={(blockId) => {
+            setEditingBlockCanvasId(blockId)
+          }}
+          onExitBlockCanvas={() => {
+            setEditingBlockCanvasId(null)
+          }}
         />
       )}
 

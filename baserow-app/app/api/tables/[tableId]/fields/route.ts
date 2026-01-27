@@ -709,6 +709,281 @@ export async function PATCH(
       updates.type = type as FieldType
       updates.options = options || existingField.options || {}
 
+      // Data migration for text/select → link_to_table conversion
+      const isConvertingToLinkedField = 
+        (existingField.type === 'text' || 
+         existingField.type === 'single_select' || 
+         existingField.type === 'multi_select') &&
+        type === 'link_to_table'
+
+      if (isConvertingToLinkedField) {
+        const linkedTableId = (options || existingField.options)?.linked_table_id
+        if (!linkedTableId) {
+          return NextResponse.json(
+            { error: 'Cannot convert to linked field: linked_table_id is required' },
+            { status: 400 }
+          )
+        }
+
+        // Get linked table info
+        const { data: linkedTable, error: linkedTableError } = await supabase
+          .from('tables')
+          .select('id, supabase_table, primary_field_name')
+          .eq('id', linkedTableId)
+          .single()
+
+        if (linkedTableError || !linkedTable) {
+          return NextResponse.json(
+            { error: 'Linked table not found' },
+            { status: 404 }
+          )
+        }
+
+        // Get linked table fields to determine primary field
+        const { data: linkedTableFields } = await supabase
+          .from('table_fields')
+          .select('id, name, type')
+          .eq('table_id', linkedTableId)
+          .order('position', { ascending: true })
+
+        // Determine primary field name for matching
+        let primaryFieldName: string | null = null
+        if (linkedTable.primary_field_name && linkedTable.primary_field_name !== 'id') {
+          primaryFieldName = linkedTable.primary_field_name
+        } else if (linkedTableFields && linkedTableFields.length > 0) {
+          // Use first non-system, non-virtual field
+          const primaryField = linkedTableFields.find((f: any) => 
+            f.type !== 'formula' && f.type !== 'lookup' && !(f.options as any)?.system
+          )
+          if (primaryField) {
+            primaryFieldName = primaryField.name
+          }
+        }
+
+        if (!primaryFieldName) {
+          return NextResponse.json(
+            { error: 'Cannot convert: linked table has no suitable primary field for matching' },
+            { status: 400 }
+          )
+        }
+
+        // Get all records from source table with the field value
+        const fieldName = existingField.name
+        const { data: sourceRecords, error: sourceRecordsError } = await supabase
+          .from(table.supabase_table)
+          .select(`id, ${fieldName}`)
+          .not(fieldName, 'is', null)
+
+        if (sourceRecordsError) {
+          console.error('Error fetching source records:', sourceRecordsError)
+          return NextResponse.json(
+            { error: 'Failed to fetch records for migration' },
+            { status: 500 }
+          )
+        }
+
+        // Get all records from linked table with primary field values
+        const { data: linkedRecords, error: linkedRecordsError } = await supabase
+          .from(linkedTable.supabase_table)
+          .select(`id, ${primaryFieldName}`)
+
+        if (linkedRecordsError) {
+          console.error('Error fetching linked records:', linkedRecordsError)
+          return NextResponse.json(
+            { error: 'Failed to fetch linked table records for migration' },
+            { status: 500 }
+          )
+        }
+
+        // Create a map of primary field values to record IDs (case-insensitive matching)
+        const valueToIdMap = new Map<string, string>()
+        if (linkedRecords) {
+          for (const record of linkedRecords) {
+            const value = record[primaryFieldName]
+            if (value != null) {
+              const normalizedValue = String(value).trim().toLowerCase()
+              // Store first match (if duplicates exist, first one wins)
+              if (!valueToIdMap.has(normalizedValue)) {
+                valueToIdMap.set(normalizedValue, record.id)
+              }
+            }
+          }
+        }
+
+        // Determine if multi-link based on relationship type
+        const relationshipType = (options || existingField.options)?.relationship_type
+        const maxSelections = (options || existingField.options)?.max_selections
+        const isMulti =
+          relationshipType === 'one-to-many' ||
+          relationshipType === 'many-to-many' ||
+          (typeof maxSelections === 'number' && maxSelections > 1)
+
+        // Migrate data: convert text/select values to linked record IDs
+        const migrationErrors: Array<{ recordId: string; value: string }> = []
+        
+        if (sourceRecords && sourceRecords.length > 0) {
+          const updates: Array<{ id: string; value: string | string[] | null }> = []
+
+          for (const record of sourceRecords) {
+            const textValue = record[fieldName]
+            if (textValue == null || textValue === '') {
+              updates.push({ id: record.id, value: null })
+              continue
+            }
+
+            // Handle multi-select (array) or single value
+            if (existingField.type === 'multi_select' || Array.isArray(textValue)) {
+              const values = Array.isArray(textValue) ? textValue : [textValue]
+              const matchedIds: string[] = []
+              const unmatchedValues: string[] = []
+
+              for (const val of values) {
+                const normalized = String(val).trim().toLowerCase()
+                const matchedId = valueToIdMap.get(normalized)
+                if (matchedId) {
+                  matchedIds.push(matchedId)
+                } else {
+                  unmatchedValues.push(String(val))
+                }
+              }
+
+              if (isMulti) {
+                updates.push({ id: record.id, value: matchedIds.length > 0 ? matchedIds : null })
+              } else {
+                // Single link: take first match
+                updates.push({ id: record.id, value: matchedIds.length > 0 ? matchedIds[0] : null })
+              }
+
+              if (unmatchedValues.length > 0) {
+                migrationErrors.push({ recordId: record.id, value: unmatchedValues.join(', ') })
+              }
+            } else {
+              // Single value
+              const normalized = String(textValue).trim().toLowerCase()
+              const matchedId = valueToIdMap.get(normalized)
+              
+              if (matchedId) {
+                updates.push({ id: record.id, value: isMulti ? [matchedId] : matchedId })
+              } else {
+                updates.push({ id: record.id, value: null })
+                migrationErrors.push({ recordId: record.id, value: String(textValue) })
+              }
+            }
+          }
+
+          // Apply updates in batches
+          const batchSize = 100
+          for (let i = 0; i < updates.length; i += batchSize) {
+            const batch = updates.slice(i, i + batchSize)
+            const updatePromises = batch.map(({ id, value }) =>
+              supabase
+                .from(table.supabase_table)
+                .update({ [fieldName]: value })
+                .eq('id', id)
+            )
+            await Promise.all(updatePromises)
+          }
+
+          // Store migration errors in field options for UI display
+          if (migrationErrors.length > 0) {
+            const currentOptions = { ...(updates.options || {}) }
+            currentOptions._migration_errors = migrationErrors
+            updates.options = currentOptions
+            // Also update the options that will be used for SQL generation
+            if (options) {
+              options._migration_errors = migrationErrors
+            }
+          }
+        }
+      }
+
+      // Auto-configuration for text/select → lookup conversion
+      const isConvertingToLookupField = 
+        (existingField.type === 'text' || 
+         existingField.type === 'single_select' || 
+         existingField.type === 'multi_select') &&
+        type === 'lookup'
+
+      if (isConvertingToLookupField) {
+        const lookupTableId = (options || existingField.options)?.lookup_table_id
+        
+        if (lookupTableId) {
+          // Get lookup table info
+          const { data: lookupTable, error: lookupTableError } = await supabase
+            .from('tables')
+            .select('id, supabase_table, primary_field_name')
+            .eq('id', lookupTableId)
+            .single()
+
+          if (lookupTableError || !lookupTable) {
+            return NextResponse.json(
+              { error: 'Lookup table not found' },
+              { status: 404 }
+            )
+          }
+
+          // Get lookup table fields to determine primary field
+          const { data: lookupTableFields } = await supabase
+            .from('table_fields')
+            .select('id, name, type')
+            .eq('table_id', lookupTableId)
+            .order('position', { ascending: true })
+
+          // Determine primary field name for lookup_result_field_id
+          let primaryFieldId: string | null = null
+          let primaryFieldName: string | null = null
+          
+          if (lookupTable.primary_field_name && lookupTable.primary_field_name !== 'id') {
+            primaryFieldName = lookupTable.primary_field_name
+            const primaryField = lookupTableFields?.find((f: any) => f.name === primaryFieldName)
+            if (primaryField) {
+              primaryFieldId = primaryField.id
+            }
+          } else if (lookupTableFields && lookupTableFields.length > 0) {
+            // Use first non-system, non-virtual field
+            const primaryField = lookupTableFields.find((f: any) => 
+              f.type !== 'formula' && f.type !== 'lookup' && !(f.options as any)?.system
+            )
+            if (primaryField) {
+              primaryFieldId = primaryField.id
+              primaryFieldName = primaryField.name
+            }
+          }
+
+          // Try to find an existing linked field that connects to the lookup table
+          const { data: existingFields } = await supabase
+            .from('table_fields')
+            .select('id, name, type, options')
+            .eq('table_id', tableId)
+            .eq('type', 'link_to_table')
+            .neq('id', fieldId) // Don't include the field being converted
+
+          const matchingLinkedField = existingFields?.find((f: any) => 
+            f.options?.linked_table_id === lookupTableId
+          )
+
+          // Auto-configure lookup options
+          const lookupOptions = { ...(updates.options || {}) }
+          lookupOptions.lookup_table_id = lookupTableId
+          
+          if (matchingLinkedField) {
+            // Use existing linked field
+            lookupOptions.lookup_field_id = matchingLinkedField.id
+          }
+          // If no matching linked field, user will need to create one or select one manually
+          // We'll allow saving without lookup_field_id for now (validation will handle it)
+
+          if (primaryFieldId) {
+            lookupOptions.lookup_result_field_id = primaryFieldId
+          }
+
+          updates.options = lookupOptions
+          if (options) {
+            Object.assign(options, lookupOptions)
+          }
+        }
+      }
+
       // Only change SQL column type for certain conversions
       // For text → date/number/checkbox, we update metadata only (no data migration)
       const shouldMigrateData = !(

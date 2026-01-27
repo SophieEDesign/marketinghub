@@ -88,6 +88,14 @@ export default function LinkedRecordCell({
     return isMulti ? ids : ids[0]
   }, [isMulti, value])
 
+  // Check if this cell has a migration error (unmatched value)
+  const migrationErrors = field.options?._migration_errors as Array<{ recordId: string; value: string }> | undefined
+  const cellError = useMemo(() => {
+    if (!migrationErrors || value != null) return null
+    // If value is null and there's a migration error for this record, show it
+    return migrationErrors.find(err => err.recordId === rowId)
+  }, [migrationErrors, rowId, value])
+
   const isMirrored = !!field.options?.read_only
   const isDisabled = !editable || isMirrored
 
@@ -185,10 +193,13 @@ export default function LinkedRecordCell({
   return (
     <>
       <div
-        className="w-full h-full px-2 flex items-center overflow-hidden"
+        className={`w-full h-full px-2 flex items-center overflow-hidden ${
+          cellError ? 'bg-red-50 border border-red-300 rounded' : ''
+        }`}
         style={rowHeight ? { height: `${rowHeight}px` } : undefined}
         onClick={(e) => e.stopPropagation()}
         onDoubleClick={(e) => e.stopPropagation()}
+        title={cellError ? `Unmatched value: "${cellError.value}" (could not find matching record in linked table)` : undefined}
       >
         <LookupFieldPicker
           field={field}
@@ -204,7 +215,13 @@ export default function LinkedRecordCell({
           }}
           config={lookupConfig}
           disabled={isDisabled}
-          placeholder={isDisabled ? placeholder : `Add ${field.name}...`}
+          placeholder={
+            cellError 
+              ? `⚠ Unmatched: "${cellError.value}"` 
+              : isDisabled 
+                ? placeholder 
+                : `Add ${field.name}...`
+          }
           onRecordClick={handleLinkedRecordClick}
           onCreateRecord={lookupConfig.allowCreate && !isDisabled ? handleCreateLinkedRecord : undefined}
           isLookupField={false}

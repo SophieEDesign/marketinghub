@@ -75,6 +75,7 @@ interface CanvasProps {
   pageShowAddRecord?: boolean // Page-level default for showing "Add record" buttons in data blocks
   pageEditable?: boolean // Page-level editability (for field blocks)
   editableFieldNames?: string[] // Field-level editable list (for field blocks)
+  editingBlockCanvasId?: string | null // ID of block whose canvas is being edited
 }
 
 export default function Canvas({
@@ -104,6 +105,7 @@ export default function Canvas({
   pageShowAddRecord = false,
   pageEditable,
   editableFieldNames = [],
+  editingBlockCanvasId = null,
 }: CanvasProps) {
   // Get filters from filter blocks for this block
   const { getFiltersForBlock, getFilterTreeForBlock } = useFilterState()
@@ -2427,6 +2429,7 @@ export default function Canvas({
                     allBlocks={blocks}
                     onEphemeralHeightDelta={(blockId: string, deltaPx: number) => handleEphemeralHeightDelta(blockId, deltaPx)}
                     rowHeight={Number(layoutSettings?.rowHeight) || 30}
+                    isEditingCanvas={editingBlockCanvasId === block.id}
                   />
                 </div>
               </BlockAppearanceWrapper>

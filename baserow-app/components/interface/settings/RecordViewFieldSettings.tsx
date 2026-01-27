@@ -110,13 +110,49 @@ export default function RecordViewFieldSettings({
     onChange(reordered)
   }
 
+  const handleSelectAll = () => {
+    const allFieldConfigs: FieldConfig[] = allFields.map((field, index) => ({
+      field: field.name,
+      editable: true,
+      order: index,
+    }))
+    setLocalFields(allFieldConfigs)
+    onChange(allFieldConfigs)
+  }
+
+  const handleSelectNone = () => {
+    setLocalFields([])
+    onChange([])
+  }
+
   return (
     <div className="space-y-4">
       <div>
-        <Label className="text-sm font-semibold">Field Panel Configuration</Label>
-        <p className="text-xs text-gray-500 mt-1">
-          Select which fields appear in the Record Field Panel and configure their order and editability.
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <Label className="text-sm font-semibold">Field Panel Configuration</Label>
+            <p className="text-xs text-gray-500 mt-1">
+              Select which fields appear in the Record Field Panel and configure their order and editability.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleSelectAll}
+              className="text-xs text-blue-600 hover:text-blue-700 underline"
+            >
+              Select All
+            </button>
+            <span className="text-xs text-gray-300">|</span>
+            <button
+              type="button"
+              onClick={handleSelectNone}
+              className="text-xs text-blue-600 hover:text-blue-700 underline"
+            >
+              Select None
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Configured Fields */}

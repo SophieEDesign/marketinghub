@@ -80,15 +80,16 @@ export function validateFieldOptions(
       break
 
     case 'link_to_table':
-      if (!options.linked_table_id) {
-        return { valid: false, error: 'Link field must specify a linked table' }
-      }
+      // Allow saving without linked_table_id for initial setup
+      // The actual data conversion will require linked_table_id, but we allow saving field settings
+      // This enables the workflow: change type → select table → save → convert data
+      // Note: The API route will require linked_table_id when actually converting data
       break
 
     case 'lookup':
-      if (!options.lookup_table_id || !options.lookup_field_id) {
-        return { valid: false, error: 'Lookup field must specify lookup table and linked field' }
-      }
+      // Allow saving without lookup_field_id for initial setup
+      // The actual conversion will require lookup_table_id, but we allow saving field settings
+      // This enables the workflow: change type → select table → auto-configure → save
       // Note: Full validation (checking that lookup_field_id is a valid linked field) 
       // is done server-side in the API route where we have access to table fields
       break
@@ -170,6 +171,22 @@ export function canChangeType(
     return { 
       canChange: true, 
       warning: 'Changing from number to text: numeric precision will be lost.' 
+    }
+  }
+
+  // Text/Select to linked field - will attempt to match by primary field
+  if ((oldType === 'text' || oldType === 'single_select' || oldType === 'multi_select') && newType === 'link_to_table') {
+    return { 
+      canChange: true, 
+      warning: 'Changing to linked field: existing text/select values will be matched to records in the linked table by title. Unmatched values will be left empty and highlighted as errors.' 
+    }
+  }
+
+  // Text/Select to lookup field - will auto-configure lookup based on existing data
+  if ((oldType === 'text' || oldType === 'single_select' || oldType === 'multi_select') && newType === 'lookup') {
+    return { 
+      canChange: true, 
+      warning: 'Changing to lookup field: the system will attempt to auto-configure the lookup by finding or creating a linked field to match your existing data. You may need to manually configure the lookup relationship after conversion.' 
     }
   }
 
