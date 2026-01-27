@@ -2716,38 +2716,64 @@ export default function GridView({
     })
   }
 
-  // Measure content height when grouping changes (expand/collapse or enable/disable)
-  // CRITICAL: No debouncing - measure immediately for instant reflow on collapse
-  // Height must be DERIVED from content, not remembered
+  // Track base height (minimum/collapsed height) for delta calculation
+  const baseHeightRef = useRef<number | null>(null)
+  const previousHeightRef = useRef<number | null>(null)
+  
+  // Measure content height and report ephemeral delta (not total height)
+  // CRITICAL: Report delta from base (collapsed) state for ephemeral expansion
   useEffect(() => {
-    if (!onHeightChange || !contentRef.current) return
+    if (!onHeightChange || !contentRef.current) {
+      baseHeightRef.current = null
+      previousHeightRef.current = null
+      return
+    }
     
     const isGrouped = effectiveGroupRules.length > 0
-    if (!isGrouped) return // No grouping, skip measurement
+    if (!isGrouped) {
+      baseHeightRef.current = null
+      previousHeightRef.current = null
+      return // No grouping, no ephemeral expansion
+    }
 
-    // Measure immediately - no debouncing
-    // This ensures immediate reflow when blocks collapse
-    // Get computed styles to account for padding and margins
+    // Measure current height
     const computedStyle = window.getComputedStyle(contentRef.current)
     const paddingTop = parseFloat(computedStyle.paddingTop) || 0
     const paddingBottom = parseFloat(computedStyle.paddingBottom) || 0
     const marginTop = parseFloat(computedStyle.marginTop) || 0
     const marginBottom = parseFloat(computedStyle.marginBottom) || 0
     
-    // Measure the actual scroll height of the content
     const pixelHeight = contentRef.current.scrollHeight || contentRef.current.clientHeight || 0
+    const currentHeightPx = pixelHeight + paddingTop + paddingBottom + marginTop + marginBottom
     
-    // Add padding and margins to total height
-    const totalPixelHeight = pixelHeight + paddingTop + paddingBottom + marginTop + marginBottom
+    // Track minimum height as base (when most collapsed)
+    if (baseHeightRef.current === null) {
+      baseHeightRef.current = currentHeightPx
+      previousHeightRef.current = currentHeightPx
+      return // First measurement, no delta yet
+    }
     
-    // Convert to grid units (round up to ensure content fits)
-    const heightInGridUnits = Math.ceil(totalPixelHeight / rowHeightPixels)
+    // Update base if current is lower (more collapsed)
+    baseHeightRef.current = Math.min(baseHeightRef.current, currentHeightPx)
     
-    // Apply min and max constraints (max: 50 grid units)
-    const finalHeight = Math.max(2, Math.min(heightInGridUnits, 50))
+    // Calculate delta from base (ephemeral expansion)
+    const deltaPx = currentHeightPx - baseHeightRef.current
     
-    // Update height immediately - no delay
-    onHeightChange(finalHeight)
+    // Only report if height actually changed
+    if (previousHeightRef.current !== null && Math.abs(currentHeightPx - previousHeightRef.current) > 1) {
+      // Calculate delta change from previous
+      const previousDelta = (previousHeightRef.current || baseHeightRef.current) - baseHeightRef.current
+      const deltaChange = deltaPx - previousDelta
+      
+      // Report delta change (positive = expanding, negative = collapsing)
+      // Note: onHeightChange signature will be updated to onEphemeralHeightDelta(blockId, deltaPx)
+      // For now, report as total height (will be converted in GridBlock)
+      if (deltaChange !== 0) {
+        onHeightChange(deltaPx) // Temporary: report total delta, GridBlock will convert
+      }
+    }
+    
+    previousHeightRef.current = currentHeightPx
   }, [collapsedGroups, effectiveGroupRules.length, groupBy, onHeightChange, rowHeightPixels])
 
   // CRITICAL: Defensive guards - ensure we have required data before rendering

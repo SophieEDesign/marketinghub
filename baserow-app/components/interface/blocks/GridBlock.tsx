@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo, useRef } from "react"
+import { useEffect, useState, useMemo, useRef, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { PageBlock, ViewType } from "@/lib/interface/types"
 import GridViewWrapper from "@/components/grid/GridViewWrapper"
@@ -40,7 +40,7 @@ interface GridBlockProps {
   filterTree?: FilterTree // Canonical filter tree from filter blocks (supports groups/OR)
   onRecordClick?: (recordId: string, tableId?: string) => void // Callback for record clicks (for RecordReview integration)
   pageShowAddRecord?: boolean // Page-level default for showing Add record
-  onHeightChange?: (height: number) => void // Callback when block content height changes (for grouped blocks)
+  onEphemeralHeightDelta?: (blockId: string, deltaPx: number) => void // Callback for ephemeral height changes (collapsible expansion)
   rowHeight?: number // Row height in pixels (for height calculation)
 }
 
@@ -54,10 +54,49 @@ export default function GridBlock({
   filterTree = null,
   onRecordClick,
   pageShowAddRecord = false,
-  onHeightChange,
+  onEphemeralHeightDelta,
   rowHeight = 30,
 }: GridBlockProps) {
   const { config } = block
+  
+  // Track base height (collapsed state) to calculate deltas
+  const baseHeightRef = useRef<number | null>(null)
+  const previousHeightRef = useRef<number | null>(null)
+  
+  // Convert total height from GridView to ephemeral delta
+  const handleHeightChange = useCallback((totalHeightGridUnits: number) => {
+    if (!onEphemeralHeightDelta) return
+    
+    // Convert grid units back to pixels for delta calculation
+    const totalHeightPx = totalHeightGridUnits * rowHeight
+    
+    // Track minimum height as base (when most collapsed)
+    if (baseHeightRef.current === null) {
+      baseHeightRef.current = totalHeightPx
+      previousHeightRef.current = totalHeightPx
+      return // First measurement, no delta yet
+    }
+    
+    // Update base if current is lower (more collapsed)
+    baseHeightRef.current = Math.min(baseHeightRef.current, totalHeightPx)
+    
+    // Calculate delta from base (ephemeral expansion)
+    const deltaPx = totalHeightPx - baseHeightRef.current
+    
+    // Only report if height actually changed
+    if (previousHeightRef.current !== null && Math.abs(totalHeightPx - previousHeightRef.current) > 1) {
+      // Calculate previous delta
+      const previousDelta = (previousHeightRef.current || baseHeightRef.current) - baseHeightRef.current
+      const deltaChange = deltaPx - previousDelta
+      
+      // Report delta change (positive = expanding, negative = collapsing)
+      if (Math.abs(deltaChange) > 1) {
+        onEphemeralHeightDelta(block.id, deltaChange)
+      }
+    }
+    
+    previousHeightRef.current = totalHeightPx
+  }, [onEphemeralHeightDelta, block.id, rowHeight])
   // Grid block table_id resolution: use config.table_id first, fallback to pageTableId
   // This ensures calendar/list/kanban pages work even if table_id isn't explicitly set in block config
   // Backward compatibility: some legacy data used camelCase `tableId`
@@ -883,7 +922,7 @@ export default function GridBlock({
             }}
             hideEmptyState={hideEmptyState}
             blockLevelSettings={blockLevelSettings}
-            onHeightChange={isGrouped ? onHeightChange : undefined}
+            onHeightChange={isGrouped ? handleHeightChange : undefined}
             rowHeightPixels={rowHeight}
           />
         )

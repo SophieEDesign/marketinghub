@@ -36,7 +36,7 @@ interface ListBlockProps {
   filterTree?: FilterTree
   onRecordClick?: (recordId: string) => void
   pageShowAddRecord?: boolean // Page-level default for showing Add record
-  onHeightChange?: (height: number) => void // Callback when block content height changes (for grouped blocks)
+  onEphemeralHeightDelta?: (blockId: string, deltaPx: number) => void // Callback for ephemeral height changes (collapsible expansion)
   rowHeight?: number // Row height in pixels (for height calculation)
 }
 
@@ -49,11 +49,42 @@ export default function ListBlock({
   filterTree = null,
   onRecordClick,
   pageShowAddRecord = false,
-  onHeightChange,
+  onEphemeralHeightDelta,
   rowHeight = 30,
 }: ListBlockProps) {
   const { toast } = useToast()
   const { config } = block
+  
+  // Track base height (collapsed state) to calculate deltas
+  const baseHeightRef = useRef<number | null>(null)
+  const previousHeightRef = useRef<number | null>(null)
+  
+  // Convert total height to ephemeral delta
+  const handleHeightChange = useCallback((totalHeightGridUnits: number) => {
+    if (!onEphemeralHeightDelta) return
+    
+    const totalHeightPx = totalHeightGridUnits * rowHeight
+    
+    if (baseHeightRef.current === null) {
+      baseHeightRef.current = totalHeightPx
+      previousHeightRef.current = totalHeightPx
+      return
+    }
+    
+    baseHeightRef.current = Math.min(baseHeightRef.current, totalHeightPx)
+    const deltaPx = totalHeightPx - baseHeightRef.current
+    
+    if (previousHeightRef.current !== null && Math.abs(totalHeightPx - previousHeightRef.current) > 1) {
+      const previousDelta = (previousHeightRef.current || baseHeightRef.current) - baseHeightRef.current
+      const deltaChange = deltaPx - previousDelta
+      
+      if (Math.abs(deltaChange) > 1) {
+        onEphemeralHeightDelta(block.id, deltaChange)
+      }
+    }
+    
+    previousHeightRef.current = totalHeightPx
+  }, [onEphemeralHeightDelta, block.id, rowHeight])
   const tableId = config?.table_id || pageTableId || (config as any)?.base_table || null
   // RULE: Views are currently not used; ignore view_id unless explicitly enabled.
   const viewId = VIEWS_ENABLED ? config?.view_id : null
@@ -405,7 +436,7 @@ export default function ListBlock({
         metaFields={metaFields}
         modalFields={modalFields}
         reloadKey={refreshKey}
-        onHeightChange={groupBy ? onHeightChange : undefined}
+        onHeightChange={groupBy ? handleHeightChange : undefined}
         rowHeight={rowHeight}
       />
     </div>
