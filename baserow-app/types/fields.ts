@@ -21,7 +21,7 @@ export type FieldType =
  * - `vibrant`: current default behaviour (semantic for single-select, muted for multi-select)
  * - Other themes are fixed palettes (useful for brand-aligned or calmer visuals)
  */
-export type ChoiceColorTheme = 'vibrant' | 'pastel' | 'blues'
+export type ChoiceColorTheme = 'vibrant' | 'pastel' | 'blues' | 'heatmap' | 'cool' | 'earth' | 'sunset' | 'ocean' | 'forest' | 'grayscale' | 'rainbow'
 
 export interface SelectOption {
   id: string

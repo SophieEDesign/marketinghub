@@ -1274,11 +1274,35 @@ export default function Canvas({
         return
       }
       
+      // CRITICAL: During resize, clamp bounds to prevent blocks from going off-screen
+      // This provides immediate feedback and prevents visual overflow
+      const cols = layoutSettings?.cols || 12
+      const clampedLayout = newLayout.map(item => {
+        // Only clamp if we're resizing this specific block
+        if (currentlyResizingBlockIdRef.current === item.i) {
+          const blockX = item.x || 0
+          const blockW = item.w || 4
+          const clampedX = Math.max(0, Math.min(blockX, cols - 2)) // Ensure at least minW (2) fits
+          const maxW = cols - clampedX
+          const clampedW = Math.max(2, Math.min(blockW, maxW)) // minW is 2
+          
+          // Only return clamped version if it differs (avoid unnecessary updates)
+          if (clampedX !== blockX || clampedW !== blockW) {
+            return {
+              ...item,
+              x: clampedX,
+              w: clampedW,
+            }
+          }
+        }
+        return item
+      })
+      
       // Update local layout state immediately for responsive UI
       // Final persistence happens in onResizeStop/onDragStop via applyUserLayoutChange
-      setLayout(newLayout)
+      setLayout(clampedLayout)
     },
-    [isEditing]
+    [isEditing, layoutSettings?.cols]
   )
   
   // Reset first layout change flag when entering edit mode
@@ -1785,13 +1809,15 @@ export default function Canvas({
             const deltaH = ephemeralDeltas.get(item.i) || 0
             const effectiveH = (item.h || 4) + deltaH
             const cols = layoutSettings?.cols || 12
-            // Ensure maxW is set based on current position to prevent overflow
+            // CRITICAL: Always recalculate maxW based on current position to prevent overflow
+            // This ensures maxW is always correct even if block position changes
             const itemX = item.x || 0
             const itemMaxW = cols - itemX
+            const calculatedMaxW = Math.max(2, itemMaxW) // Ensure maxW is at least minW (2)
             return {
               ...item,
               h: effectiveH, // React Grid Layout uses effectiveH for positioning
-              maxW: item.maxW || Math.max(2, itemMaxW), // Ensure maxW is set to prevent overflow
+              maxW: calculatedMaxW, // Always use calculated maxW to prevent overflow
             }
           }) }}
           breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}

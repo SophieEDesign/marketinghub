@@ -850,17 +850,17 @@ export default function FieldSettingsDrawer({
             />
           </div>
 
-          {/* Group Name */}
+          {/* Section Name */}
           <div className="space-y-2">
-            <Label htmlFor="group-name">Group (Optional)</Label>
+            <Label htmlFor="group-name">Section Name (Optional)</Label>
             <Input
               id="group-name"
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
-              placeholder="e.g., Personal Info, Contact Details"
+              placeholder="e.g., Social Media Fields, Press Fields, Contact Details"
             />
             <p className="text-xs text-muted-foreground">
-              Group fields together in the sidebar
+              Organize fields into sections. Fields with the same section name will be grouped together in pickers, modals, and canvas.
             </p>
           </div>
 

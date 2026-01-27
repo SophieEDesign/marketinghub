@@ -74,10 +74,21 @@ export const CHOICE_COLOR_THEME_LABELS: Record<ChoiceColorTheme, string> = {
   vibrant: 'Vibrant (default)',
   pastel: 'Pastel',
   blues: 'Blue variations',
+  heatmap: 'Heat Map',
+  cool: 'Cool Tones',
+  earth: 'Earth Tones',
+  sunset: 'Sunset',
+  ocean: 'Ocean',
+  forest: 'Forest',
+  grayscale: 'Grayscale',
+  rainbow: 'Rainbow',
 }
 
 export function isChoiceColorTheme(value: unknown): value is ChoiceColorTheme {
-  return value === 'vibrant' || value === 'pastel' || value === 'blues'
+  return typeof value === 'string' && [
+    'vibrant', 'pastel', 'blues', 'heatmap', 'cool', 'earth', 
+    'sunset', 'ocean', 'forest', 'grayscale', 'rainbow'
+  ].includes(value)
 }
 
 export const CHOICE_COLOR_THEME_PALETTES: Record<
@@ -145,6 +156,258 @@ export const CHOICE_COLOR_THEME_PALETTES: Record<
       '#D1FAE5', // green-100 (kept subtle contrast option)
       '#F1F5F9', // slate-100 (neutral)
       '#E2E8F0', // slate-200 (neutral)
+    ],
+  },
+  heatmap: {
+    // Warm colors from yellow through orange to red (heat map style)
+    single: [
+      '#FEF3C7', // yellow-100
+      '#FDE68A', // amber-200
+      '#FCD34D', // amber-300
+      '#FBBF24', // amber-400
+      '#F59E0B', // amber-500
+      '#F97316', // orange-500
+      '#FB923C', // orange-400
+      '#FDBA74', // orange-300
+      '#EF4444', // red-500
+      '#F87171', // red-400
+      '#FCA5A5', // red-300
+      '#DC2626', // red-600
+    ],
+    multi: [
+      '#FFFBEB', // amber-50
+      '#FEF3C7', // amber-100
+      '#FDE68A', // amber-200
+      '#FED7AA', // orange-200
+      '#FEE2E2', // red-100
+      '#FECACA', // red-200
+      '#FFF7ED', // orange-50
+      '#FFEDD5', // orange-100
+      '#FEF9C3', // yellow-100
+      '#FEF3C7', // amber-100
+      '#FEE2E2', // red-100
+      '#FECACA', // red-200
+    ],
+  },
+  cool: {
+    // Cool tones: greens, teals, cyans, cool blues
+    single: [
+      '#10B981', // green-500
+      '#059669', // green-600
+      '#34D399', // green-400
+      '#14B8A6', // teal-500
+      '#0D9488', // teal-600
+      '#2DD4BF', // teal-400
+      '#06B6D4', // cyan-500
+      '#0891B2', // cyan-600
+      '#22D3EE', // cyan-400
+      '#0EA5E9', // sky-500
+      '#0284C7', // sky-600
+      '#38BDF8', // sky-400
+    ],
+    multi: [
+      '#D1FAE5', // green-100
+      '#A7F3D0', // green-200
+      '#6EE7B7', // green-300
+      '#CCFBF1', // teal-100
+      '#99F6E4', // teal-200
+      '#5EEAD4', // teal-300
+      '#CFFAFE', // cyan-100
+      '#A5F3FC', // cyan-200
+      '#67E8F9', // cyan-300
+      '#E0F2FE', // sky-100
+      '#BAE6FD', // sky-200
+      '#7DD3FC', // sky-300
+    ],
+  },
+  earth: {
+    // Earth tones: browns, tans, beiges, warm grays
+    single: [
+      '#92400E', // amber-800
+      '#B45309', // amber-700
+      '#D97706', // amber-600
+      '#F59E0B', // amber-500
+      '#78716C', // stone-600
+      '#57534E', // stone-700
+      '#44403C', // stone-800
+      '#A16207', // yellow-700
+      '#CA8A04', // yellow-600
+      '#EAB308', // yellow-500
+      '#713F12', // amber-900
+      '#854D0E', // amber-800
+    ],
+    multi: [
+      '#FEF3C7', // amber-100
+      '#FDE68A', // amber-200
+      '#FCD34D', // amber-300
+      '#F5F5F4', // stone-100
+      '#E7E5E4', // stone-200
+      '#D6D3D1', // stone-300
+      '#FEF9C3', // yellow-100
+      '#FEF08A', // yellow-200
+      '#FDE047', // yellow-300
+      '#FEF3C7', // amber-100
+      '#FED7AA', // orange-200
+      '#FECACA', // red-200
+    ],
+  },
+  sunset: {
+    // Sunset colors: oranges, pinks, purples, magentas
+    single: [
+      '#F97316', // orange-500
+      '#FB923C', // orange-400
+      '#F87171', // red-400
+      '#EC4899', // pink-500
+      '#F472B6', // pink-400
+      '#A855F7', // violet-500
+      '#C084FC', // violet-400
+      '#9333EA', // violet-600
+      '#DB2777', // pink-600
+      '#EA580C', // orange-600
+      '#DC2626', // red-600
+      '#BE185D', // pink-700
+    ],
+    multi: [
+      '#FFEDD5', // orange-100
+      '#FED7AA', // orange-200
+      '#FEE2E2', // red-100
+      '#FCE7F3', // pink-100
+      '#FBCFE8', // pink-200
+      '#F3E8FF', // violet-100
+      '#E9D5FF', // violet-200
+      '#FDF2F8', // pink-50
+      '#FFF7ED', // orange-50
+      '#FEF2F2', // red-50
+      '#FAF5FF', // violet-50
+      '#FDF4FF', // fuchsia-50
+    ],
+  },
+  ocean: {
+    // Ocean colors: deep blues, teals, cyans
+    single: [
+      '#0C4A6E', // sky-900
+      '#075985', // sky-800
+      '#0369A1', // sky-700
+      '#0284C7', // sky-600
+      '#0EA5E9', // sky-500
+      '#0891B2', // cyan-600
+      '#06B6D4', // cyan-500
+      '#0D9488', // teal-600
+      '#14B8A6', // teal-500
+      '#155E75', // cyan-800
+      '#164E63', // cyan-900
+      '#134E4A', // teal-800
+    ],
+    multi: [
+      '#E0F2FE', // sky-100
+      '#BAE6FD', // sky-200
+      '#7DD3FC', // sky-300
+      '#CFFAFE', // cyan-100
+      '#A5F3FC', // cyan-200
+      '#67E8F9', // cyan-300
+      '#CCFBF1', // teal-100
+      '#99F6E4', // teal-200
+      '#5EEAD4', // teal-300
+      '#F0F9FF', // sky-50
+      '#ECFEFF', // cyan-50
+      '#F0FDFA', // teal-50
+    ],
+  },
+  forest: {
+    // Forest colors: various greens, browns, deep teals
+    single: [
+      '#14532D', // green-900
+      '#166534', // green-800
+      '#15803D', // green-700
+      '#16A34A', // green-600
+      '#22C55E', // green-500
+      '#0D9488', // teal-600
+      '#14B8A6', // teal-500
+      '#365314', // lime-800
+      '#4B5563', // gray-600
+      '#57534E', // stone-700
+      '#059669', // green-600
+      '#10B981', // green-500
+    ],
+    multi: [
+      '#F0FDF4', // green-50
+      '#DCFCE7', // green-100
+      '#BBF7D0', // green-200
+      '#86EFAC', // green-300
+      '#F0FDFA', // teal-50
+      '#CCFBF1', // teal-100
+      '#99F6E4', // teal-200
+      '#5EEAD4', // teal-300
+      '#F7FEE7', // lime-50
+      '#ECFCCB', // lime-100
+      '#D9F99D', // lime-200
+      '#BEF264', // lime-300
+    ],
+  },
+  grayscale: {
+    // Grayscale: various shades of gray
+    single: [
+      '#111827', // gray-900
+      '#1F2937', // gray-800
+      '#374151', // gray-700
+      '#4B5563', // gray-600
+      '#6B7280', // gray-500
+      '#9CA3AF', // gray-400
+      '#D1D5DB', // gray-300
+      '#E5E7EB', // gray-200
+      '#F3F4F6', // gray-100
+      '#F9FAFB', // gray-50
+      '#000000', // black
+      '#FFFFFF', // white (with border)
+    ],
+    multi: [
+      '#F9FAFB', // gray-50
+      '#F3F4F6', // gray-100
+      '#E5E7EB', // gray-200
+      '#D1D5DB', // gray-300
+      '#9CA3AF', // gray-400
+      '#6B7280', // gray-500
+      '#4B5563', // gray-600
+      '#374151', // gray-700
+      '#1F2937', // gray-800
+      '#111827', // gray-900
+      '#F9FAFB', // gray-50
+      '#E5E7EB', // gray-200
+    ],
+  },
+  rainbow: {
+    // Rainbow: full spectrum of colors
+    single: [
+      '#EF4444', // red-500
+      '#F97316', // orange-500
+      '#FBBF24', // amber-400
+      '#EAB308', // yellow-500
+      '#84CC16', // lime-500
+      '#22C55E', // green-500
+      '#10B981', // green-500
+      '#14B8A6', // teal-500
+      '#06B6D4', // cyan-500
+      '#3B82F6', // blue-500
+      '#6366F1', // indigo-500
+      '#8B5CF6', // violet-500
+      '#A855F7', // violet-500
+      '#EC4899', // pink-500
+    ],
+    multi: [
+      '#FEE2E2', // red-100
+      '#FED7AA', // orange-200
+      '#FDE68A', // amber-200
+      '#FEF08A', // yellow-200
+      '#D9F99D', // lime-200
+      '#BBF7D0', // green-200
+      '#A7F3D0', // green-200
+      '#99F6E4', // teal-200
+      '#A5F3FC', // cyan-200
+      '#BFDBFE', // blue-200
+      '#C7D2FE', // indigo-200
+      '#DDD6FE', // violet-200
+      '#E9D5FF', // violet-200
+      '#FBCFE8', // pink-200
     ],
   },
 }

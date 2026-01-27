@@ -213,6 +213,24 @@ export default function FieldDataSettings({
           />
         </div>
 
+        {/* Section Name */}
+        <div className="space-y-2">
+          <Label htmlFor="section-name">Section Name (Optional)</Label>
+          <Input
+            id="section-name"
+            value={field.group_name || ''}
+            onChange={(e) => {
+              handleFieldUpdate({ group_name: e.target.value.trim() || null })
+            }}
+            disabled={saving}
+            className="text-sm"
+            placeholder="e.g., Social Media Fields, Press Fields"
+          />
+          <p className="text-xs text-gray-500">
+            Organize fields into sections. Fields with the same section name will be grouped together.
+          </p>
+        </div>
+
         {/* Field Type (read-only display) */}
         <div className="space-y-2">
           <Label>Field Type</Label>

@@ -322,16 +322,48 @@ export default function AirtableSidebar({
               <div className="space-y-0.5 px-2">
                 {tables.map((table) => {
                   const isTableActive = pathname.includes(`/tables/${table.id}`)
+                  const targetPath = `/tables/${table.id}`
                   
                   return (
                     <Link
                       key={table.id}
-                      href={`/tables/${table.id}`}
+                      href={targetPath}
                       className={cn(
                         "flex items-center gap-2 px-2 py-1.5 rounded transition-colors hover:bg-black/10",
                         isTableActive && "bg-black/20 font-medium"
                       )}
                       style={{ color: sidebarTextColor }}
+                      onClick={(e) => {
+                        const debugEnabled = typeof window !== "undefined" && localStorage.getItem("DEBUG_NAVIGATION") === "1"
+                        const isCurrentlyActive = pathname === targetPath
+                        
+                        if (debugEnabled) {
+                          console.log("[Table Link] Click detected:", {
+                            href: targetPath,
+                            currentPath: pathname,
+                            isActive: isCurrentlyActive,
+                            defaultPrevented: e.defaultPrevented,
+                            target: e.target,
+                          })
+                        }
+                        
+                        // If clicking the same page, force a refresh
+                        if (isCurrentlyActive) {
+                          if (debugEnabled) {
+                            console.log("[Table Link] Already on this page - forcing refresh")
+                          }
+                          e.preventDefault()
+                          e.stopPropagation()
+                          router.refresh()
+                          return
+                        }
+                        
+                        // For navigation to different pages, let Next.js Link handle it
+                        // Don't call preventDefault or stopPropagation - let the Link work normally
+                        if (debugEnabled) {
+                          console.log("[Table Link] Navigation allowed - letting Next.js Link handle it")
+                        }
+                      }}
                     >
                       <Database className="h-4 w-4 flex-shrink-0" style={{ color: sidebarTextColor }} />
                       <span className="text-sm truncate">{table.name}</span>
