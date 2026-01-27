@@ -126,9 +126,8 @@ export default function Canvas({
   // Track when blocks are updated from user interaction (drag/resize) vs database reload
   // This prevents sync effect from overwriting user changes
   const blocksUpdatedFromUserRef = useRef(false)
-  // Track pending layout changes until blocks prop reflects them (robust guard)
-  const pendingLayoutRef = useRef<Map<string, { x: number; y: number; w: number; h: number }>>(new Map())
-  const hasPendingLayoutRef = useRef(false)
+  // CRITICAL: Track when reflow is in progress to prevent sync from overwriting reflow results
+  const reflowInProgressRef = useRef(false)
   // Track recent height changes to prevent infinite loops
   // Maps blockId -> { gridH, timestamp } to prevent processing duplicate height changes
   const recentHeightChangesRef = useRef<Map<string, { gridH: number; timestamp: number }>>(new Map())
@@ -143,15 +142,12 @@ export default function Canvas({
     return Math.max(2, Math.ceil((px + marginY) / (rowHeight + marginY)))
   }, [layoutSettings?.rowHeight, layoutSettings?.margin])
   
-  // Helper to track pending layout changes and call onLayoutChange
+  // Helper to notify parent of layout changes and set guards
   const notifyLayoutChange = useCallback((layoutItems: LayoutItem[]) => {
     if (!onLayoutChange) return
     
-    // Track pending layout to prevent sync effect from overwriting
-    pendingLayoutRef.current = new Map(
-      layoutItems.map(i => [i.i, { x: i.x, y: i.y, w: i.w, h: i.h }])
-    )
-    hasPendingLayoutRef.current = true
+    // Mark that blocks are being updated from user interaction or reflow
+    // This prevents sync effect from overwriting changes until save completes
     blocksUpdatedFromUserRef.current = true
     
     onLayoutChange(layoutItems)
@@ -329,34 +325,19 @@ export default function Canvas({
       return
     }
     
+    // CRITICAL: Don't sync if reflow is in progress - prevents overwriting reflow results
+    if (reflowInProgressRef.current) {
+      debugLog('LAYOUT', '[Canvas] Sync skipped - reflow in progress')
+      return
+    }
+    
     // Don't sync if blocks were just updated from user interaction (drag/resize)
-    // Wait until blocks prop actually reflects the pending layout (robust guard, no magic timeout)
-    if (blocksUpdatedFromUserRef.current && hasPendingLayoutRef.current) {
-      // Check if blocks prop matches the pending layout we emitted
-      const matches = blocks.every(b => {
-        const p = pendingLayoutRef.current.get(b.id)
-        if (!p) return false
-        return (
-          Math.abs((b.x || 0) - p.x) < 0.01 &&
-          Math.abs((b.y || 0) - p.y) < 0.01 &&
-          Math.abs((b.w || 4) - p.w) < 0.01 &&
-          Math.abs((b.h ?? 4) - p.h) < 0.01
-        )
+    // Wait until save completes and blocks prop reflects the changes
+    if (blocksUpdatedFromUserRef.current) {
+      debugLog('LAYOUT', '[Canvas] Sync skipped - waiting for user changes to save', {
+        currentBlockIds: blocks.map(b => b.id),
       })
-      
-      if (!matches) {
-        debugLog('LAYOUT', '[Canvas] Sync skipped - waiting for blocks to reflect pending layout', {
-          pendingBlockIds: Array.from(pendingLayoutRef.current.keys()),
-          currentBlockIds: blocks.map(b => b.id),
-        })
-        return
-      }
-      
-      // Parent caught up; safe to sync normally again
-      hasPendingLayoutRef.current = false
-      pendingLayoutRef.current.clear()
-      blocksUpdatedFromUserRef.current = false
-      debugLog('LAYOUT', '[Canvas] Pending layout confirmed - sync guard cleared')
+      return
     }
 
     // Don't hydrate if no blocks - but reset refs to allow hydration when blocks load
@@ -1390,6 +1371,9 @@ export default function Canvas({
       // oldHeight is already defined above from currentItem
       const changedBlockHeight = changedBlock.h || 4
       
+      // CRITICAL: Set reflow guard to prevent sync from overwriting reflow results
+      reflowInProgressRef.current = true
+      
       let finalLayout: Layout[] = updatedLayout
       
       if (changedBlockHeight > oldHeight) {
@@ -1409,6 +1393,9 @@ export default function Canvas({
           newHeight: changedBlockHeight,
         })
       }
+      
+      // CRITICAL: Clear reflow guard after reflow completes
+      reflowInProgressRef.current = false
 
       // CRITICAL: Update tracking ref to prevent sync effect from overwriting content-driven height
       // This ensures the sync effect doesn't see the height as "different" and re-hydrate from DB
@@ -1444,19 +1431,17 @@ export default function Canvas({
         note: heightMode === 'auto' ? 'Height will not persist (content-driven)' : 'Height will persist (fixed)',
       })
 
-      // CRITICAL: Clear in-progress flag and update recent changes tracking after layout update
-      // Use setTimeout to ensure this happens after the state update completes
-      setTimeout(() => {
-        heightChangeInProgressRef.current.delete(blockId)
-        recentHeightChangesRef.current.set(blockId, { gridH, timestamp: Date.now() })
-        // Clean up old entries (older than 1 second) to prevent memory leak
-        const oneSecondAgo = Date.now() - 1000
-        for (const [id, change] of recentHeightChangesRef.current.entries()) {
-          if (change.timestamp < oneSecondAgo) {
-            recentHeightChangesRef.current.delete(id)
-          }
+      // CRITICAL: Clear in-progress flag and update recent changes tracking immediately
+      // No setTimeout - flags must be cleared synchronously to prevent race conditions
+      heightChangeInProgressRef.current.delete(blockId)
+      recentHeightChangesRef.current.set(blockId, { gridH, timestamp: Date.now() })
+      // Clean up old entries (older than 1 second) to prevent memory leak
+      const oneSecondAgo = Date.now() - 1000
+      for (const [id, change] of recentHeightChangesRef.current.entries()) {
+        if (change.timestamp < oneSecondAgo) {
+          recentHeightChangesRef.current.delete(id)
         }
-      }, 0)
+      }
 
       return finalLayout
     })
@@ -1563,167 +1548,11 @@ export default function Canvas({
       }))
       notifyLayoutChange(layoutItems)
       
-      // Reset resize flag after resize/drag completes (no more layout changes for 300ms)
-      // This allows the layout to persist and prevents useEffect from resetting it during resize
+      // CRITICAL: Clear interaction flags after a brief delay to allow reflow/snap to complete
+      // Reflow and snapping now happen immediately in onResizeStop/onDragStop, so this timeout
+      // only serves to clear interaction state after operations complete
       resizeTimeoutRef.current = setTimeout(() => {
-        // CRITICAL: Use current layout state (from setLayout) to check for shrinkage/growth
-        // We need to check the actual current state, not the closure value
-        setLayout(currentLayout => {
-          // CRITICAL: Check if any block grew or shrunk
-          let needsPushDown = false
-          let needsCompaction = false
-          let resizedBlockId: string | null = null
-          const heightsBeforeResize = new Map(blockHeightsBeforeResizeRef.current)
-          
-          heightsBeforeResize.forEach((previousHeight, blockId) => {
-            const currentBlock = currentLayout.find(l => l.i === blockId)
-            if (currentBlock) {
-              const currentHeight = currentBlock.h || 4
-              if (currentHeight > previousHeight) {
-                // Block grew - push blocks down instead of reordering
-                needsPushDown = true
-                resizedBlockId = blockId
-                debugLog('LAYOUT', `[Canvas] Block ${blockId} grew from ${previousHeight} to ${currentHeight} - pushing blocks down`)
-              } else if (currentHeight < previousHeight) {
-                // Block shrunk - compact layout vertically
-                needsCompaction = true
-                debugLog('LAYOUT', `[Canvas] Block ${blockId} shrunk from ${previousHeight} to ${currentHeight} - compacting layout`)
-              }
-            }
-          })
-          
-          // Apply smart snapping to dragged blocks before push/compaction
-          // Priority: horizontal snap > vertical snap > push down / compaction
-          let snappedLayout = [...currentLayout]
-          const cols = layoutSettings?.cols || 12
-          
-          // Find the block that was just dragged (if any)
-          const draggedBlockId = currentlyDraggingBlockIdRef.current
-          if (draggedBlockId) {
-            const draggedBlock = snappedLayout.find(l => l.i === draggedBlockId)
-            if (draggedBlock) {
-              // Calculate drag vector from start to end position
-              const dragStart = dragStartPositionRef.current.get(draggedBlockId)
-              const dragLast = dragLastPositionRef.current.get(draggedBlockId)
-              
-              let dragVector: { dx: number; dy: number } | null = null
-              if (dragStart && dragLast) {
-                dragVector = {
-                  dx: dragLast.x - dragStart.x,
-                  dy: dragLast.y - dragStart.y,
-                }
-              }
-              
-              // PHASE 3.2: Re-enable smart snap, but it runs AFTER height is settled and layout is stable
-              // Snapping happens after push/compact operations complete
-              const snappedBlock = applySmartSnap(draggedBlock, snappedLayout, dragVector, cols)
-              
-              // Only update layout if snap actually changed the position
-              // This prevents unnecessary layout updates that might trigger sync
-              const positionChanged = 
-                Math.abs((snappedBlock.x || 0) - (draggedBlock.x || 0)) > 0.01 ||
-                Math.abs((snappedBlock.y || 0) - (draggedBlock.y || 0)) > 0.01
-              
-              if (positionChanged) {
-                // Update the layout with snapped position
-                snappedLayout = snappedLayout.map(item => 
-                  item.i === draggedBlockId ? snappedBlock : item
-                )
-              }
-              
-              // Clear drag tracking
-              dragStartPositionRef.current.delete(draggedBlockId)
-              dragLastPositionRef.current.delete(draggedBlockId)
-              currentlyDraggingBlockIdRef.current = null
-            }
-          }
-          
-          // PHASE 3.1: Re-enable push/compact after resize stop (single code path)
-          // Only apply push/compact for resize operations, not drag operations
-          let finalLayout = snappedLayout
-          if (needsPushDown && resizedBlockId && !draggedBlockId) {
-            // Block grew from resize - push blocks below down (preserves order)
-            finalLayout = pushBlocksDown(snappedLayout, resizedBlockId)
-            debugLog('LAYOUT', '[Canvas] Applied push down after resize grow', {
-              resizedBlockId,
-            })
-          } else if (needsCompaction && !draggedBlockId) {
-            // Block shrunk from resize - compact layout vertically (removes gaps)
-            finalLayout = compactLayoutVertically(snappedLayout, blocks)
-            debugLog('LAYOUT', '[Canvas] Applied compaction after resize shrink')
-          } else if (draggedBlockId && !needsPushDown && !needsCompaction) {
-            // After dragging (not resizing), preserve the layout
-            // Push/compact only applies to resize operations
-            finalLayout = snappedLayout
-            debugLog('LAYOUT', '[Canvas] Preserved layout after drag', {
-              draggedBlockId,
-            })
-          }
-          
-          // Check if layout changed (either from snapping, push down, or compaction)
-          // CRITICAL: Include width/height changes (for resize-only changes)
-          const layoutChanged = finalLayout.some((item) => {
-            const original = currentLayout.find(l => l.i === item.i)
-            if (!original) return true
-            return (
-              Math.abs((item.x || 0) - (original.x || 0)) > 0.01 ||
-              Math.abs((item.y || 0) - (original.y || 0)) > 0.01 ||
-              Math.abs((item.w || 4) - (original.w || 4)) > 0.01 ||
-              Math.abs((item.h || 4) - (original.h || 4)) > 0.01
-            )
-          })
-          
-          if (layoutChanged) {
-            debugLog('LAYOUT', '[Canvas] Applied snap/push/compaction after drag/resize end', {
-              hadSnap: draggedBlockId !== null,
-              hadPushDown: needsPushDown,
-              hadCompaction: needsCompaction,
-              draggedBlockId,
-              resizedBlockId,
-            })
-            
-            // CRITICAL: Update position tracking ref BEFORE clearing blocksUpdatedFromUserRef
-            // This prevents sync effect from detecting false differences
-            finalLayout.forEach(layoutItem => {
-              // PHASE 1.2: Log height mutation in resize timeout
-              const oldHeight = previousBlockPositionsRef.current.get(layoutItem.i)?.h
-              const newHeight = layoutItem.h || 4
-              if (oldHeight !== undefined && Math.abs(oldHeight - newHeight) > 0.01) {
-                console.log('[HeightMutation] resizeTimeout', {
-                  blockId: layoutItem.i,
-                  oldHeight,
-                  newHeight,
-                  source: 'resizeTimeout',
-                  currentlyResizing: currentlyResizingBlockIdRef.current,
-                })
-              }
-              previousBlockPositionsRef.current.set(layoutItem.i, {
-                x: layoutItem.x || 0,
-                y: layoutItem.y || 0,
-                w: layoutItem.w || 4,
-                h: layoutItem.h || 4,
-              })
-            })
-            
-            // Notify parent of final layout asynchronously to avoid state update conflicts
-            setTimeout(() => {
-              const layoutItems: LayoutItem[] = finalLayout.map((item) => ({
-                i: item.i,
-                x: item.x || 0,
-                y: item.y || 0,
-                w: item.w || 4,
-                h: item.h || 4,
-              }))
-              notifyLayoutChange(layoutItems)
-            }, 0)
-            
-            return finalLayout
-          }
-          
-          return currentLayout
-        })
-        
-        // CRITICAL: Clear all resize state immediately
+        // CRITICAL: Clear all resize state
         // Height must be DERIVED, not remembered - clear all cached heights
         isResizingRef.current = false
         userInteractionInProgressRef.current = false
@@ -1737,7 +1566,7 @@ export default function Canvas({
           blocksUpdatedFromUserRef.current = false
         }, 600)
         resizeTimeoutRef.current = null
-      }, 300)
+      }, 100) // Reduced from 300ms since reflow/snap are now immediate
     },
     [onLayoutChange, isEditing, pageId, compactLayoutVertically, pushBlocksDown, blocks, applySmartSnap, layoutSettings?.cols]
   )
@@ -1779,67 +1608,66 @@ export default function Canvas({
     const wasHydrated = layoutHydratedRef.current && previousBlockCountRef.current > 0
     
     if (blockCountDecreased && wasHydrated && !isResizingRef.current && isEditing && layout.length > 0) {
-      debugLog('LAYOUT', '[Canvas] Block deleted - triggering compaction', {
+      debugLog('LAYOUT', '[Canvas] Block deleted - triggering immediate compaction', {
         previousCount: previousBlockCountRef.current,
         currentCount: blocks.length,
       })
       
-      // Wait a brief moment for the layout to update, then compact
-      setTimeout(() => {
-        setLayout(currentLayout => {
-          // Filter out any blocks that no longer exist
-          const validLayout = currentLayout.filter(item => 
-            blocks.some(block => block.id === item.i)
+      // CRITICAL: Apply compaction immediately (synchronous, no timeout)
+      // Set reflow guard to prevent sync from overwriting reflow results
+      reflowInProgressRef.current = true
+      
+      setLayout(currentLayout => {
+        // Filter out any blocks that no longer exist
+        const validLayout = currentLayout.filter(item => 
+          blocks.some(block => block.id === item.i)
+        )
+        
+        // Apply compaction immediately
+        const compactedLayout = compactLayoutVertically(validLayout, blocks)
+        
+        // Check if compaction changed anything
+        // CRITICAL: Include all position changes (x, y, w, h) for complete comparison
+        const layoutChanged = compactedLayout.some((item) => {
+          const original = validLayout.find(l => l.i === item.i)
+          if (!original) return true
+          return (
+            Math.abs((item.x || 0) - (original.x || 0)) > 0.01 ||
+            Math.abs((item.y || 0) - (original.y || 0)) > 0.01 ||
+            Math.abs((item.w || 4) - (original.w || 4)) > 0.01 ||
+            Math.abs((item.h || 4) - (original.h || 4)) > 0.01
           )
-          
-          // PHASE 3.1: Re-enable compaction after block deletion (single code path)
-          const compactedLayout = compactLayoutVertically(validLayout, blocks)
-          
-          // Check if compaction changed anything
-          const layoutChanged = compactedLayout.some((item) => {
-            const original = validLayout.find(l => l.i === item.i)
-            if (!original) return false
-            return Math.abs((item.y || 0) - (original.y || 0)) > 0.01
+        })
+        
+        if (layoutChanged) {
+          // Update position tracking ref
+          compactedLayout.forEach(layoutItem => {
+            previousBlockPositionsRef.current.set(layoutItem.i, {
+              x: layoutItem.x || 0,
+              y: layoutItem.y || 0,
+              w: layoutItem.w || 4,
+              h: layoutItem.h || 4,
+            })
           })
           
-          if (layoutChanged) {
-            // Update position tracking ref
-            compactedLayout.forEach(layoutItem => {
-              // PHASE 1.2: Log height mutation in block deletion
-              const oldHeight = previousBlockPositionsRef.current.get(layoutItem.i)?.h
-              const newHeight = layoutItem.h || 4
-              if (oldHeight !== undefined && Math.abs(oldHeight - newHeight) > 0.01) {
-                console.log('[HeightMutation] blockDeletion', {
-                  blockId: layoutItem.i,
-                  oldHeight,
-                  newHeight,
-                  source: 'blockDeletion',
-                })
-              }
-              previousBlockPositionsRef.current.set(layoutItem.i, {
-                x: layoutItem.x || 0,
-                y: layoutItem.y || 0,
-                w: layoutItem.w || 4,
-                h: layoutItem.h || 4,
-              })
-            })
-            
-            // Notify parent of compacted layout
-            const layoutItems: LayoutItem[] = compactedLayout.map((item) => ({
-              i: item.i,
-              x: item.x || 0,
-              y: item.y || 0,
-              w: item.w || 4,
-              h: item.h || 4,
-            }))
-            notifyLayoutChange(layoutItems)
-            
-            return compactedLayout
-          }
+          // Notify parent of compacted layout
+          const layoutItems: LayoutItem[] = compactedLayout.map((item) => ({
+            i: item.i,
+            x: item.x || 0,
+            y: item.y || 0,
+            w: item.w || 4,
+            h: item.h || 4,
+          }))
+          notifyLayoutChange(layoutItems)
           
-          return validLayout
-        })
-      }, 100)
+          return compactedLayout
+        }
+        
+        return validLayout
+      })
+      
+      // CRITICAL: Clear reflow guard after compaction completes
+      reflowInProgressRef.current = false
     }
     
     previousBlockCountRef.current = blocks.length
@@ -2331,10 +2159,9 @@ export default function Canvas({
             })
           }}
           onResizeStop={(layout, oldItem, newItem, placeholder, e, element) => {
-            // CRITICAL: Immediately clear ALL resize state when resize ends
-            // This ensures no cached heights remain after manual resize completes
+            // CRITICAL: Immediately apply reflow when resize ends (synchronous, no timeout)
             const blockId = oldItem.i
-            const previousHeight = blockHeightsBeforeResizeRef.current.get(blockId)
+            const previousHeight = blockHeightsBeforeResizeRef.current.get(blockId) || oldItem.h || 4
             const newHeight = newItem.h || 4
             
             debugLog('LAYOUT', `[Canvas] Resize stopped for block ${blockId}, height: ${previousHeight} → ${newHeight}`)
@@ -2354,12 +2181,81 @@ export default function Canvas({
               }
             }
             
+            // CRITICAL: Apply reflow immediately (synchronous) - no timeout delay
+            // Set reflow guard to prevent sync from overwriting reflow results
+            reflowInProgressRef.current = true
+            
+            setLayout(currentLayout => {
+              // Check if block grew or shrunk
+              const heightIncreased = newHeight > previousHeight
+              const heightDecreased = newHeight < previousHeight
+              
+              let finalLayout = currentLayout
+              
+              if (heightIncreased) {
+                // Block grew - push blocks below down
+                finalLayout = pushBlocksDown(currentLayout, blockId)
+                debugLog('LAYOUT', '[Canvas] Applied immediate push down after resize grow', {
+                  blockId,
+                  previousHeight,
+                  newHeight,
+                })
+              } else if (heightDecreased) {
+                // Block shrunk - compact layout vertically
+                finalLayout = compactLayoutVertically(currentLayout, blocks)
+                debugLog('LAYOUT', '[Canvas] Applied immediate compaction after resize shrink', {
+                  blockId,
+                  previousHeight,
+                  newHeight,
+                })
+              }
+              
+              // Check if layout changed
+              const layoutChanged = finalLayout.some((item) => {
+                const original = currentLayout.find(l => l.i === item.i)
+                if (!original) return true
+                return (
+                  Math.abs((item.x || 0) - (original.x || 0)) > 0.01 ||
+                  Math.abs((item.y || 0) - (original.y || 0)) > 0.01 ||
+                  Math.abs((item.w || 4) - (original.w || 4)) > 0.01 ||
+                  Math.abs((item.h || 4) - (original.h || 4)) > 0.01
+                )
+              })
+              
+              if (layoutChanged) {
+                // Update position tracking ref
+                finalLayout.forEach(layoutItem => {
+                  previousBlockPositionsRef.current.set(layoutItem.i, {
+                    x: layoutItem.x || 0,
+                    y: layoutItem.y || 0,
+                    w: layoutItem.w || 4,
+                    h: layoutItem.h || 4,
+                  })
+                })
+                
+                // Notify parent of final layout
+                const layoutItems: LayoutItem[] = finalLayout.map((item) => ({
+                  i: item.i,
+                  x: item.x || 0,
+                  y: item.y || 0,
+                  w: item.w || 4,
+                  h: item.h || 4,
+                }))
+                notifyLayoutChange(layoutItems)
+                
+                return finalLayout
+              }
+              
+              return currentLayout
+            })
+            
+            // CRITICAL: Clear reflow guard after reflow completes (outside setLayout)
+            reflowInProgressRef.current = false
+            
             // CRITICAL: Clear cached height immediately - do NOT persist after resize
             // Old heights must never be cached after collapse
             blockHeightsBeforeResizeRef.current.delete(blockId)
             currentlyResizingBlockIdRef.current = null
-            
-            // Compaction will be handled by handleLayoutChange timeout
           }}
           onDragStart={(layout, oldItem, newItem, placeholder, e, element) => {
             userInteractionInProgressRef.current = true
@@ -2536,7 +2432,7 @@ export default function Canvas({
             }
           }}
           onDragStop={(layout, oldItem, newItem, placeholder, e, element) => {
-            // Update final position for drag vector calculation
+            // CRITICAL: Apply snapping immediately when drag ends (synchronous, no timeout)
             const blockId = oldItem.i
             dragLastPositionRef.current.set(blockId, {
               x: newItem.x || 0,
@@ -2553,8 +2449,66 @@ export default function Canvas({
             setActiveSnapTargets(null)
             setDragGhost(null)
             
-            // Use the same timeout mechanism as resize to ensure layout is stable
-            // The handleLayoutChange will be called and will apply snap/compaction after timeout
+            // Apply smart snapping immediately
+            setLayout(currentLayout => {
+              const draggedBlock = currentLayout.find(l => l.i === blockId)
+              if (!draggedBlock) return currentLayout
+              
+              // Calculate drag vector from start to end position
+              const dragStart = dragStartPositionRef.current.get(blockId)
+              const dragLast = dragLastPositionRef.current.get(blockId)
+              
+              let dragVector: { dx: number; dy: number } | null = null
+              if (dragStart && dragLast) {
+                dragVector = {
+                  dx: dragLast.x - dragStart.x,
+                  dy: dragLast.y - dragStart.y,
+                }
+              }
+              
+              const cols = layoutSettings?.cols || 12
+              const snappedBlock = applySmartSnap(draggedBlock, currentLayout, dragVector, cols)
+              
+              // Only update layout if snap actually changed the position
+              const positionChanged = 
+                Math.abs((snappedBlock.x || 0) - (draggedBlock.x || 0)) > 0.01 ||
+                Math.abs((snappedBlock.y || 0) - (draggedBlock.y || 0)) > 0.01
+              
+              if (positionChanged) {
+                const snappedLayout = currentLayout.map(item => 
+                  item.i === blockId ? snappedBlock : item
+                )
+                
+                // Update position tracking ref
+                snappedLayout.forEach(layoutItem => {
+                  previousBlockPositionsRef.current.set(layoutItem.i, {
+                    x: layoutItem.x || 0,
+                    y: layoutItem.y || 0,
+                    w: layoutItem.w || 4,
+                    h: layoutItem.h || 4,
+                  })
+                })
+                
+                // Notify parent of snapped layout
+                const layoutItems: LayoutItem[] = snappedLayout.map((item) => ({
+                  i: item.i,
+                  x: item.x || 0,
+                  y: item.y || 0,
+                  w: item.w || 4,
+                  h: item.h || 4,
+                }))
+                notifyLayoutChange(layoutItems)
+                
+                return snappedLayout
+              }
+              
+              return currentLayout
+            })
+            
+            // Clear drag tracking
+            dragStartPositionRef.current.delete(blockId)
+            dragLastPositionRef.current.delete(blockId)
+            currentlyDraggingBlockIdRef.current = null
           }}
           draggableHandle=".drag-handle"
           resizeHandles={['se', 'sw', 'ne', 'nw', 'e', 'w', 's', 'n']}
