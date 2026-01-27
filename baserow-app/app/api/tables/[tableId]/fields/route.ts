@@ -800,13 +800,14 @@ export async function PATCH(
         if (linkedRecords && Array.isArray(linkedRecords)) {
           for (const record of linkedRecords) {
             // Type guard: ensure record has id property
-            if (record && typeof record === 'object' && 'id' in record && typeof record.id === 'string') {
-              const value = record[primaryFieldName as keyof typeof record]
+            if (record && typeof record === 'object' && 'id' in record && typeof (record as { id: unknown }).id === 'string') {
+              const typedRecord = record as { id: string; [key: string]: unknown }
+              const value = typedRecord[primaryFieldName]
               if (value != null) {
                 const normalizedValue = String(value).trim().toLowerCase()
                 // Store first match (if duplicates exist, first one wins)
                 if (!valueToIdMap.has(normalizedValue)) {
-                  valueToIdMap.set(normalizedValue, record.id)
+                  valueToIdMap.set(normalizedValue, typedRecord.id)
                 }
               }
             }
@@ -829,12 +830,13 @@ export async function PATCH(
 
           for (const record of sourceRecords) {
             // Type guard: ensure record has id property
-            if (!record || typeof record !== 'object' || !('id' in record) || typeof record.id !== 'string') {
+            if (!record || typeof record !== 'object' || !('id' in record) || typeof (record as { id: unknown }).id !== 'string') {
               continue
             }
-            const textValue = record[fieldName]
+            const typedRecord = record as { id: string; [key: string]: unknown }
+            const textValue = typedRecord[fieldName]
             if (textValue == null || textValue === '') {
-              updates.push({ id: record.id, value: null })
+              updates.push({ id: typedRecord.id, value: null })
               continue
             }
 
@@ -855,14 +857,14 @@ export async function PATCH(
               }
 
               if (isMulti) {
-                updates.push({ id: record.id, value: matchedIds.length > 0 ? matchedIds : null })
+                updates.push({ id: typedRecord.id, value: matchedIds.length > 0 ? matchedIds : null })
               } else {
                 // Single link: take first match
-                updates.push({ id: record.id, value: matchedIds.length > 0 ? matchedIds[0] : null })
+                updates.push({ id: typedRecord.id, value: matchedIds.length > 0 ? matchedIds[0] : null })
               }
 
               if (unmatchedValues.length > 0) {
-                migrationErrors.push({ recordId: record.id, value: unmatchedValues.join(', ') })
+                migrationErrors.push({ recordId: typedRecord.id, value: unmatchedValues.join(', ') })
               }
             } else {
               // Single value
@@ -870,10 +872,10 @@ export async function PATCH(
               const matchedId = valueToIdMap.get(normalized)
               
               if (matchedId) {
-                updates.push({ id: record.id, value: isMulti ? [matchedId] : matchedId })
+                updates.push({ id: typedRecord.id, value: isMulti ? [matchedId] : matchedId })
               } else {
-                updates.push({ id: record.id, value: null })
-                migrationErrors.push({ recordId: record.id, value: String(textValue) })
+                updates.push({ id: typedRecord.id, value: null })
+                migrationErrors.push({ recordId: typedRecord.id, value: String(textValue) })
               }
             }
           }

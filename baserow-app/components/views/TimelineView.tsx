@@ -1555,29 +1555,54 @@ export default function TimelineView({
                     : null
                 }
 
-                // Determine text color for contrast
-                const textColorClass = groupColor ? getTextColorForBackground(groupColor) : 'text-gray-700'
-                const textColorStyle = groupColor ? {} : { color: undefined }
+                // Evaluate conditional formatting rules for group headers
+                // Create a mock row with the group value for evaluation
+                const groupMockRow: Record<string, any> = {}
+                if (resolvedGroupByField && groupKey !== 'Unassigned') {
+                  groupMockRow[resolvedGroupByField.name] = groupKey
+                }
+                const groupMatchingRule = highlightRules && highlightRules.length > 0 && Object.keys(groupMockRow).length > 0
+                  ? evaluateHighlightRules(
+                      highlightRules.filter(r => r.scope === 'group'),
+                      groupMockRow,
+                      tableFields
+                    )
+                  : null
                 
-                // Background color with opacity
-                const bgColorStyle = groupColor 
-                  ? (() => {
-                      const rgb = hexToRgb(groupColor)
-                      if (rgb) {
-                        return {
-                          backgroundColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)`, // 15% opacity
-                          borderColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.4)`, // 40% opacity for border
+                // Get formatting style for group-level rules
+                const groupFormattingStyle = groupMatchingRule
+                  ? getFormattingStyle(groupMatchingRule)
+                  : {}
+                
+                // Determine text color for contrast (conditional formatting takes precedence)
+                const finalTextColor = groupFormattingStyle.color || undefined
+                const textColorClass = finalTextColor ? '' : (groupColor ? getTextColorForBackground(groupColor) : 'text-gray-700')
+                const textColorStyle = finalTextColor ? { color: finalTextColor } : (groupColor ? {} : { color: undefined })
+                
+                // Background color with opacity (use conditional formatting if available, otherwise use group color)
+                const bgColorStyle = groupFormattingStyle.backgroundColor
+                  ? {
+                      backgroundColor: groupFormattingStyle.backgroundColor,
+                      borderColor: groupFormattingStyle.backgroundColor,
+                    }
+                  : groupColor 
+                    ? (() => {
+                        const rgb = hexToRgb(groupColor)
+                        if (rgb) {
+                          return {
+                            backgroundColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)`, // 15% opacity
+                            borderColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.4)`, // 40% opacity for border
+                          }
                         }
-                      }
-                      return {
+                        return {
+                          backgroundColor: 'white',
+                          borderColor: '#e5e7eb',
+                        }
+                      })()
+                    : {
                         backgroundColor: 'white',
                         borderColor: '#e5e7eb',
                       }
-                    })()
-                  : {
-                      backgroundColor: 'white',
-                      borderColor: '#e5e7eb',
-                    }
 
                 return (
                   <div key={groupKey} className={rowSizeSpacing.laneSpacing}>
@@ -1587,16 +1612,16 @@ export default function TimelineView({
                       style={bgColorStyle}
                     >
                       <div className="flex items-center gap-2">
-                        {groupColor && (
+                        {(groupFormattingStyle.backgroundColor || groupColor) && (
                           <div
                             className="w-3 h-3 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: groupColor }}
+                            style={{ backgroundColor: groupFormattingStyle.backgroundColor || groupColor || undefined }}
                           />
                         )}
                         <span className={`text-xs font-medium ${textColorClass}`} style={textColorStyle}>
                           {groupLabel}
                         </span>
-                        <span className={`text-xs ${groupColor ? 'opacity-80' : 'text-gray-400'}`}>
+                        <span className={`text-xs ${groupFormattingStyle.backgroundColor || groupColor ? 'opacity-80' : 'text-gray-400'}`} style={textColorStyle}>
                           ({groupEvents.length})
                         </span>
                       </div>

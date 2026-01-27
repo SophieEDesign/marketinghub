@@ -18,6 +18,9 @@ import Canvas from "@/components/interface/Canvas"
 import BlockRenderer from "@/components/interface/BlockRenderer"
 import { FilterStateProvider } from "@/lib/interface/filter-state"
 import type { PageBlock, LayoutItem } from "@/lib/interface/types"
+import type { FilterTree } from "@/lib/filters/canonical-model"
+import type { HighlightRule } from "@/lib/interface/types"
+import { evaluateHighlightRules, getFormattingStyle } from "@/lib/conditional-formatting/evaluator"
 
 interface FieldConfig {
   field: string // Field name or ID
@@ -31,6 +34,7 @@ interface HorizontalGroupedViewProps {
   supabaseTableName: string
   tableFields: TableField[]
   filters?: FilterConfig[]
+  filterTree?: FilterTree | null // Filter tree from filter blocks (supports groups/OR)
   sorts?: Array<{ field_name: string; direction: 'asc' | 'desc' }>
   groupBy?: string
   groupByRules?: GroupRule[]
@@ -50,6 +54,7 @@ export default function HorizontalGroupedView({
   supabaseTableName,
   tableFields,
   filters = [],
+  filterTree = null,
   sorts = [],
   groupBy,
   groupByRules,
@@ -60,6 +65,7 @@ export default function HorizontalGroupedView({
   isEditing = false,
   onBlockUpdate,
   storedLayout: storedLayoutProp,
+  highlightRules = [],
 }: HorizontalGroupedViewProps) {
   const [rows, setRows] = useState<Record<string, any>[]>([])
   const [loading, setLoading] = useState(true)
@@ -136,7 +142,7 @@ export default function HorizontalGroupedView({
     return () => {
       cancelled = true
     }
-  }, [tableId, supabaseTableName, JSON.stringify(filters), JSON.stringify(sorts), reloadKey])
+  }, [tableId, supabaseTableName, JSON.stringify(filters), JSON.stringify(filterTree), JSON.stringify(sorts), reloadKey])
 
   // Filter rows by search query
   const filteredRows = useMemo(() => {
@@ -472,21 +478,45 @@ export default function HorizontalGroupedView({
                 groupColor = getGroupColor(group.label)
               }
 
-              // Determine text color for contrast
-              const textColorClass = groupColor ? getTextColorForBackground(groupColor) : 'text-gray-900'
+              // Evaluate conditional formatting rules for group headers (tabs)
+              // Create a mock row with the group value for evaluation
+              const groupMockRow: Record<string, any> = {}
+              if (groupField && group.label) {
+                groupMockRow[groupField.name] = group.label
+              }
+              const groupMatchingRule = highlightRules && highlightRules.length > 0 && Object.keys(groupMockRow).length > 0
+                ? evaluateHighlightRules(
+                    highlightRules.filter(r => r.scope === 'group'),
+                    groupMockRow,
+                    tableFields
+                  )
+                : null
+              
+              // Get formatting style for group-level rules
+              const groupFormattingStyle = groupMatchingRule
+                ? getFormattingStyle(groupMatchingRule)
+                : {}
+              
+              // Combine group color with conditional formatting (conditional formatting takes precedence)
+              const finalTabBgColor = groupFormattingStyle.backgroundColor || (groupColor ? groupColor + '1A' : undefined)
+              const finalTabTextColor = groupFormattingStyle.color || (groupColor ? groupColor : undefined)
+              const finalTabBorderColor = groupFormattingStyle.backgroundColor || (activeTab === group.key ? groupColor : 'transparent')
+              
+              // Determine text color for contrast (only if no conditional formatting text color)
+              const textColorClass = finalTabTextColor ? '' : (groupColor ? getTextColorForBackground(groupColor) : 'text-gray-900')
               
               return (
                 <TabsTrigger
                   key={group.key}
                   value={group.key}
                   className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
-                  style={groupColor ? {
-                    backgroundColor: groupColor + '1A',
-                    borderBottomColor: activeTab === group.key ? groupColor : 'transparent',
-                    color: groupColor,
+                  style={finalTabBgColor || finalTabTextColor ? {
+                    backgroundColor: finalTabBgColor,
+                    borderBottomColor: finalTabBorderColor,
+                    color: finalTabTextColor,
                   } : undefined}
                 >
-                  <span className={textColorClass}>
+                  <span className={textColorClass} style={finalTabTextColor ? { color: finalTabTextColor } : undefined}>
                     {group.label} ({group.items.length})
                   </span>
                 </TabsTrigger>

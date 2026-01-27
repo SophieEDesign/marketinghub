@@ -695,9 +695,29 @@ export default function GalleryView({
               groupColor = getGroupColor(group.key)
             }
 
-            // Determine text color for contrast
-            const textColorClass = groupColor ? getTextColorForBackground(groupColor) : 'text-gray-900'
-            const textColorStyle = groupColor ? {} : { color: undefined }
+            // Evaluate conditional formatting rules for group headers
+            // Create a mock row with the group value for evaluation
+            const groupMockRow: Record<string, any> = {}
+            if (group.rule && group.rule.type === 'field') {
+              const groupField = (Array.isArray(tableFields) ? tableFields : []).find(
+                (f: any) => f && (f.name === group.rule.field || f.id === group.rule.field)
+              ) as TableField | undefined
+              if (groupField && group.key) {
+                groupMockRow[groupField.name] = group.key
+              }
+            }
+            const groupMatchingRule = highlightRules && highlightRules.length > 0 && Object.keys(groupMockRow).length > 0
+              ? evaluateHighlightRules(
+                  highlightRules.filter(r => r.scope === 'group'),
+                  groupMockRow,
+                  Array.isArray(tableFields) ? tableFields : []
+                )
+              : null
+            
+            // Get formatting style for group-level rules
+            const groupFormattingStyle = groupMatchingRule
+              ? getFormattingStyle(groupMatchingRule)
+              : {}
             
             // Helper to convert hex to RGB
             const hexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
@@ -711,19 +731,29 @@ export default function GalleryView({
                 : null
             }
             
-            // Background color with opacity
-            const bgColorStyle = groupColor 
-              ? (() => {
-                  const rgb = hexToRgb(groupColor)
-                  if (rgb) {
-                    return {
-                      backgroundColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)`, // 15% opacity
-                      borderColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.4)`, // 40% opacity for border
+            // Background color with opacity (use conditional formatting if available, otherwise use group color)
+            const bgColorStyle = groupFormattingStyle.backgroundColor
+              ? {
+                  backgroundColor: groupFormattingStyle.backgroundColor,
+                  borderColor: groupFormattingStyle.backgroundColor,
+                }
+              : groupColor 
+                ? (() => {
+                    const rgb = hexToRgb(groupColor)
+                    if (rgb) {
+                      return {
+                        backgroundColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)`, // 15% opacity
+                        borderColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.4)`, // 40% opacity for border
+                      }
                     }
-                  }
-                  return {}
-                })()
-              : {}
+                    return {}
+                  })()
+                : {}
+            
+            // Determine text color for contrast (conditional formatting takes precedence)
+            const finalTextColor = groupFormattingStyle.color || undefined
+            const textColorClass = finalTextColor ? '' : (groupColor ? getTextColorForBackground(groupColor) : 'text-gray-900')
+            const textColorStyle = finalTextColor ? { color: finalTextColor } : (groupColor ? {} : { color: undefined })
             
             return (
               <div key={group.pathKey} className="space-y-3">
@@ -731,7 +761,7 @@ export default function GalleryView({
                   type="button"
                   onClick={() => toggleGroupCollapsed(group.pathKey)}
                   className={`w-full flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-left transition-colors ${
-                    groupColor ? '' : 'border-gray-200 bg-white hover:bg-gray-50'
+                    groupFormattingStyle.backgroundColor || groupColor ? '' : 'border-gray-200 bg-white hover:bg-gray-50'
                   }`}
                   style={{
                     ...bgColorStyle,
@@ -739,17 +769,18 @@ export default function GalleryView({
                   }}
                 >
                   <div className="min-w-0">
-                    <div className={`text-sm font-semibold truncate ${textColorClass}`}>
+                    <div className={`text-sm font-semibold truncate ${textColorClass}`} style={textColorStyle}>
                       {group.label}
                     </div>
-                    <div className={`text-xs ${groupColor ? 'opacity-80' : 'text-gray-500'}`}>
+                    <div className={`text-xs ${groupFormattingStyle.backgroundColor || groupColor ? 'opacity-80' : 'text-gray-500'}`} style={textColorStyle}>
                       {group.size} {group.size === 1 ? "record" : "records"}
                     </div>
                   </div>
                   <ChevronDown
                     className={`h-4 w-4 transition-transform ${isCollapsed ? "-rotate-90" : ""} ${
-                      groupColor ? textColorClass : 'text-gray-500'
+                      groupFormattingStyle.backgroundColor || groupColor ? textColorClass : 'text-gray-500'
                     }`}
+                    style={textColorStyle}
                   />
                 </button>
 

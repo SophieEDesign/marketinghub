@@ -47,6 +47,7 @@ export default function HorizontalGroupedBlock({
   const groupByRules = block.config?.group_by_rules as GroupRule[] | undefined
   const recordFields = (block.config?.record_fields as Array<{ field: string; editable?: boolean; order?: number }>) || []
   const storedLayout = (block.config?.record_field_layout as PageBlock[]) || null
+  const highlightRules = (block.config?.highlight_rules as any[]) || []
 
   // Handle layout updates from HorizontalGroupedView
   const handleLayoutUpdate = useCallback(async (blocks: PageBlock[]) => {
@@ -138,6 +139,7 @@ export default function HorizontalGroupedBlock({
         supabaseTableName={tableName}
         tableFields={tableFields}
         filters={effectiveFilters}
+        filterTree={filterTree}
         sorts={sorts}
         groupBy={groupBy}
         groupByRules={groupByRules}
@@ -146,6 +148,7 @@ export default function HorizontalGroupedBlock({
         isEditing={isEditingCanvas || isEditing}
         onBlockUpdate={handleLayoutUpdate}
         storedLayout={storedLayout}
+        highlightRules={highlightRules}
       />
     </div>
   )

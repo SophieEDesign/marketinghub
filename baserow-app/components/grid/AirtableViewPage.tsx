@@ -40,7 +40,7 @@ interface AirtableViewPageProps {
   initialViewSorts: Array<{
     id: string
     field_name: string
-    direction: string
+    direction: "asc" | "desc"
   }>
   initialTableFields: any[]
   initialGroupBy?: string | null

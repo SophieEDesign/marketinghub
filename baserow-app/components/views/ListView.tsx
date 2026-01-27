@@ -1028,16 +1028,43 @@ export default function ListView({
                 groupColor = getGroupColor(node.key)
               }
 
-              // Determine text color for contrast
-              const textColorClass = groupColor ? getTextColorForBackground(groupColor) : 'text-gray-900'
-              const textColorStyle = groupColor ? {} : { color: undefined }
+              // Evaluate conditional formatting rules for group headers
+              // Create a mock row with the group value for evaluation
+              const groupMockRow: Record<string, any> = {}
+              if (node.rule.type === 'field') {
+                const groupField = tableFields.find((f) => f.name === node.rule.field || f.id === node.rule.field)
+                if (groupField && node.label) {
+                  groupMockRow[groupField.name] = node.key
+                }
+              }
+              const groupMatchingRule = highlightRules && highlightRules.length > 0 && Object.keys(groupMockRow).length > 0
+                ? evaluateHighlightRules(
+                    highlightRules.filter(r => r.scope === 'group'),
+                    groupMockRow,
+                    tableFields
+                  )
+                : null
+              
+              // Get formatting style for group-level rules
+              const groupFormattingStyle = groupMatchingRule
+                ? getFormattingStyle(groupMatchingRule)
+                : {}
+              
+              // Combine group color with conditional formatting (conditional formatting takes precedence)
+              const finalHeaderBgColor = groupFormattingStyle.backgroundColor || (groupColor ? `${groupColor}80` : 'rgb(249, 250, 251)')
+              const finalHeaderTextColor = groupFormattingStyle.color || (groupColor ? undefined : undefined)
+              
+              // Determine text color for contrast (only if no conditional formatting text color)
+              const textColorClass = finalHeaderTextColor ? '' : (groupColor ? getTextColorForBackground(groupColor) : 'text-gray-900')
+              const textColorStyle = finalHeaderTextColor ? { color: finalHeaderTextColor } : (groupColor ? {} : { color: undefined })
               
               return (
                 <div key={node.pathKey} className="border-b border-gray-200 last:border-b-0">
                   <div 
                     className="flex items-center justify-between px-4 py-2 transition-colors"
                     style={{
-                      backgroundColor: groupColor ? `${groupColor}80` : 'rgb(249, 250, 251)',
+                      backgroundColor: finalHeaderBgColor,
+                      ...textColorStyle,
                     }}
                     onMouseEnter={(e) => {
                       if (groupColor) {
