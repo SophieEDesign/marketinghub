@@ -1326,6 +1326,13 @@ export default function Canvas({
       return // Ignore - user is dragging
     }
     
+    // CRITICAL: Ignore content-driven height changes for fixed-height blocks
+    // Fixed-height blocks should only change size via manual resize, never from content
+    if (heightMode === 'fixed') {
+      console.log('[HeightChange] IGNORED - block has fixed height mode', { blockId, gridH })
+      return // Ignore - block height is fixed, content changes should not affect it
+    }
+    
     // Mark height change as in progress
     heightChangeInProgressRef.current.add(blockId)
 
@@ -2449,61 +2456,71 @@ export default function Canvas({
             setActiveSnapTargets(null)
             setDragGhost(null)
             
-            // Apply smart snapping immediately
-            setLayout(currentLayout => {
-              const draggedBlock = currentLayout.find(l => l.i === blockId)
-              if (!draggedBlock) return currentLayout
-              
-              // Calculate drag vector from start to end position
-              const dragStart = dragStartPositionRef.current.get(blockId)
-              const dragLast = dragLastPositionRef.current.get(blockId)
-              
-              let dragVector: { dx: number; dy: number } | null = null
-              if (dragStart && dragLast) {
-                dragVector = {
-                  dx: dragLast.x - dragStart.x,
-                  dy: dragLast.y - dragStart.y,
-                }
+            // CRITICAL: Use the layout parameter (has updated positions) not currentLayout state
+            // The layout parameter from react-grid-layout has the current dragged position
+            const draggedBlock = layout.find(l => l.i === blockId)
+            if (!draggedBlock) {
+              // Clear drag tracking and return
+              dragStartPositionRef.current.delete(blockId)
+              dragLastPositionRef.current.delete(blockId)
+              currentlyDraggingBlockIdRef.current = null
+              return
+            }
+            
+            // Calculate drag vector from start to end position
+            const dragStart = dragStartPositionRef.current.get(blockId)
+            const dragLast = dragLastPositionRef.current.get(blockId)
+            
+            let dragVector: { dx: number; dy: number } | null = null
+            if (dragStart && dragLast) {
+              dragVector = {
+                dx: dragLast.x - dragStart.x,
+                dy: dragLast.y - dragStart.y,
               }
+            }
+            
+            const cols = layoutSettings?.cols || 12
+            const snappedBlock = applySmartSnap(draggedBlock, layout, dragVector, cols)
+            
+            // Only update layout if snap actually changed the position
+            const positionChanged = 
+              Math.abs((snappedBlock.x || 0) - (draggedBlock.x || 0)) > 0.01 ||
+              Math.abs((snappedBlock.y || 0) - (draggedBlock.y || 0)) > 0.01
+            
+            if (positionChanged) {
+              const snappedLayout = layout.map(item => 
+                item.i === blockId ? snappedBlock : item
+              )
               
-              const cols = layoutSettings?.cols || 12
-              const snappedBlock = applySmartSnap(draggedBlock, currentLayout, dragVector, cols)
+              // Update layout state
+              setLayout(snappedLayout)
               
-              // Only update layout if snap actually changed the position
-              const positionChanged = 
-                Math.abs((snappedBlock.x || 0) - (draggedBlock.x || 0)) > 0.01 ||
-                Math.abs((snappedBlock.y || 0) - (draggedBlock.y || 0)) > 0.01
-              
-              if (positionChanged) {
-                const snappedLayout = currentLayout.map(item => 
-                  item.i === blockId ? snappedBlock : item
-                )
-                
-                // Update position tracking ref
-                snappedLayout.forEach(layoutItem => {
-                  previousBlockPositionsRef.current.set(layoutItem.i, {
-                    x: layoutItem.x || 0,
-                    y: layoutItem.y || 0,
-                    w: layoutItem.w || 4,
-                    h: layoutItem.h || 4,
-                  })
+              // Update position tracking ref
+              snappedLayout.forEach(layoutItem => {
+                previousBlockPositionsRef.current.set(layoutItem.i, {
+                  x: layoutItem.x || 0,
+                  y: layoutItem.y || 0,
+                  w: layoutItem.w || 4,
+                  h: layoutItem.h || 4,
                 })
-                
-                // Notify parent of snapped layout
-                const layoutItems: LayoutItem[] = snappedLayout.map((item) => ({
-                  i: item.i,
-                  x: item.x || 0,
-                  y: item.y || 0,
-                  w: item.w || 4,
-                  h: item.h || 4,
-                }))
-                notifyLayoutChange(layoutItems)
-                
-                return snappedLayout
-              }
+              })
               
-              return currentLayout
-            })
+              // Notify parent of snapped layout
+              const layoutItems: LayoutItem[] = snappedLayout.map((item) => ({
+                i: item.i,
+                x: item.x || 0,
+                y: item.y || 0,
+                w: item.w || 4,
+                h: item.h || 4,
+              }))
+              notifyLayoutChange(layoutItems)
+              
+              debugLog('LAYOUT', '[Canvas] Applied snap after drag', {
+                blockId,
+                originalPos: { x: draggedBlock.x, y: draggedBlock.y },
+                snappedPos: { x: snappedBlock.x, y: snappedBlock.y },
+              })
+            }
             
             // Clear drag tracking
             dragStartPositionRef.current.delete(blockId)
