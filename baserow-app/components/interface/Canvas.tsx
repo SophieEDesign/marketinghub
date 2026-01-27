@@ -150,7 +150,7 @@ export default function Canvas({
   // Usage: In browser console, call window.resetCanvasHeights()
   useEffect(() => {
     if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-      // @ts-ignore - Dev utility
+      // @ts-expect-error - Dev utility
       window.resetCanvasHeights = async () => {
         console.log('[Canvas] PHASE 4: Resetting layout heights for all blocks...')
         
@@ -202,7 +202,7 @@ export default function Canvas({
       return () => {
         // Cleanup: Remove dev utility on unmount
         if (typeof window !== 'undefined') {
-          // @ts-ignore
+          // @ts-expect-error
           delete window.resetCanvasHeights
         }
       }
