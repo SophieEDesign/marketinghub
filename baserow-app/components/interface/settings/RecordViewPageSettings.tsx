@@ -109,6 +109,7 @@ export default function RecordViewPageSettings({
   const [leftPanelSortBy, setLeftPanelSortBy] = useState<string>(leftPanelConfig.sort_by?.[0]?.field || "")
   const [leftPanelSortDirection, setLeftPanelSortDirection] = useState<'asc' | 'desc'>(leftPanelConfig.sort_by?.[0]?.direction || 'asc')
   const [leftPanelGroupBy, setLeftPanelGroupBy] = useState<string>(leftPanelConfig.group_by || "")
+  const [leftPanelGroupByRules, setLeftPanelGroupByRules] = useState<GroupRule[] | undefined>(leftPanelConfig.group_by_rules || undefined)
   const [leftPanelColorField, setLeftPanelColorField] = useState<string>(leftPanelConfig.color_field || "")
   const [leftPanelImageField, setLeftPanelImageField] = useState<string>(leftPanelConfig.image_field || "")
   const [leftPanelTitleField, setLeftPanelTitleField] = useState<string>(leftPanelConfig.title_field || config.title_field || "")

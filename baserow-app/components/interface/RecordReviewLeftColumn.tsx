@@ -30,6 +30,8 @@ import { evaluateFilterTree } from "@/lib/filters/evaluation"
 import { filterConfigsToFilterTree } from "@/lib/filters/converters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import { isAbortError } from "@/lib/api/error-handling"
+import type { GroupRule } from "@/lib/grouping/types"
+import { buildGroupTree, flattenGroupTree } from "@/lib/grouping/groupTree"
 
 interface RecordReviewLeftColumnProps {
   pageId?: string
@@ -843,7 +845,7 @@ export default function RecordReviewLeftColumn({
               filteredRecords.map(renderRecordRow)
             ) : (
               // Render nested groups using flattened structure
-              flattenedGroups.map((it, idx) => {
+              flattenedGroups.map((it: any, idx: number) => {
                 if (it.type === 'group') {
                   const node = it.node
                   return (

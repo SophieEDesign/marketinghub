@@ -4,6 +4,7 @@
  */
 
 import type { FilterTree } from '@/lib/filters/canonical-model'
+import type { GroupRule } from '@/lib/grouping/types'
 
 export interface PageConfig {
   // Visualization settings
@@ -76,7 +77,8 @@ export interface PageConfig {
     filter_by?: Array<{ field: string; operator: string; value: any }>
     filter_tree?: FilterTree
     sort_by?: Array<{ field: string; direction: 'asc' | 'desc' }>
-    group_by?: string // Field name to group by
+    group_by?: string // Field name to group by (legacy)
+    group_by_rules?: GroupRule[] // Nested grouping rules (takes precedence over group_by)
     
     // List item display
     color_field?: string // Field name for color

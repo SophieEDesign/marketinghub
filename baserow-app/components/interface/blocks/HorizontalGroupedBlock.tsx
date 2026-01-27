@@ -34,6 +34,7 @@ export default function HorizontalGroupedBlock({
   filterTree = null,
   onRecordClick,
   pageShowAddRecord = false,
+  onUpdate,
 }: HorizontalGroupedBlockProps) {
   const [tableFields, setTableFields] = useState<TableField[]>([])
   const [tableName, setTableName] = useState<string | null>(null)

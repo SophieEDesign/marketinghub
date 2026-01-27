@@ -110,6 +110,7 @@ export default function GridViewWrapper({
   isEditing = false,
   onRecordClick,
   modalFields,
+  modalLayout,
   appearance = {},
   permissions,
   hideEmptyState = false, // Hide "No columns configured" UI (for record view contexts)

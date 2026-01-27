@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Label } from "@/components/ui/label"
-import type { BlockConfig } from "@/lib/interface/types"
+import type { BlockConfig, BlockSort } from "@/lib/interface/types"
 import type { Table, TableField } from "@/types/database"
 import TableSelector from "./shared/TableSelector"
 import GroupBySelector from "./shared/GroupBySelector"
@@ -20,7 +20,7 @@ interface HorizontalGroupedDataSettingsProps {
 
 interface FieldConfig {
   field: string
-  editable?: boolean
+  editable: boolean
   order?: number
 }
 
@@ -94,9 +94,9 @@ export default function HorizontalGroupedDataSettings({
 
           <div className="space-y-2">
             <SortSelector
-              sorts={config.sorts || []}
+              value={config.sorts || []}
               fields={fields}
-              onChange={(sorts) => onUpdate({ sorts })}
+              onChange={(sorts) => onUpdate({ sorts: sorts as BlockSort[] })}
             />
           </div>
         </>
