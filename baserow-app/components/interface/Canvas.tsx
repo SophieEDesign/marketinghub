@@ -365,12 +365,15 @@ export default function Canvas({
   const [keyboardMoveHighlight, setKeyboardMoveHighlight] = useState<string | null>(null)
   
   // Grid overlay toggle
-  const [showGridOverlay, setShowGridOverlay] = useState<boolean>(() => {
+  // CRITICAL: Use useState to prevent hydration mismatch - localStorage access must happen after mount
+  const [showGridOverlay, setShowGridOverlay] = useState<boolean>(false)
+  
+  // Initialize grid overlay state from localStorage after mount
+  useEffect(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('canvas-grid-overlay') === 'true'
+      setShowGridOverlay(localStorage.getItem('canvas-grid-overlay') === 'true')
     }
-    return false
-  })
+  }, [])
   
   // Drag ghost/preview state
   const [dragGhost, setDragGhost] = useState<{
@@ -460,6 +463,8 @@ export default function Canvas({
           height: block.h,
         })
         
+        const cols = layoutSettings?.cols || 12
+        
         if (!layout) {
           // New block - apply defaults
           return {
@@ -470,10 +475,13 @@ export default function Canvas({
             h: 4,
             minW: 2,
             minH: 2,
+            maxW: cols, // Prevent blocks from exceeding grid width
           }
         }
         
         // Existing block - use DB values (always use persistent h, no autofit)
+        // Set maxW based on current position to prevent overflow
+        const maxW = cols - (layout.x || 0)
         return {
           i: block.id,
           x: layout.x,
@@ -482,6 +490,7 @@ export default function Canvas({
           h: layout.h || 4, // Always use persistent h from DB
           minW: 2,
           minH: 2,
+          maxW: Math.max(2, maxW), // Ensure maxW is at least minW
         }
       })
       
@@ -1775,9 +1784,14 @@ export default function Canvas({
             // Use effective height (persistent h + ephemeral deltaH) for positioning
             const deltaH = ephemeralDeltas.get(item.i) || 0
             const effectiveH = (item.h || 4) + deltaH
+            const cols = layoutSettings?.cols || 12
+            // Ensure maxW is set based on current position to prevent overflow
+            const itemX = item.x || 0
+            const itemMaxW = cols - itemX
             return {
               ...item,
               h: effectiveH, // React Grid Layout uses effectiveH for positioning
+              maxW: item.maxW || Math.max(2, itemMaxW), // Ensure maxW is set to prevent overflow
             }
           }) }}
           breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
@@ -1804,61 +1818,85 @@ export default function Canvas({
             })
           }}
           onResizeStop={(layout, oldItem, newItem, placeholder, e, element) => {
-            const blockId = oldItem.i
-            const previousHeight = oldItem.h || 4
-            const newHeight = newItem.h || 4
-            const cols = layoutSettings?.cols || 12
-            
-            if (process.env.NODE_ENV === 'development') {
-              console.log('[Canvas] Resize stopped - persisting user layout change', {
-                blockId,
-                previousHeight,
-                newHeight,
+            try {
+              const blockId = oldItem.i
+              const previousHeight = oldItem.h || 4
+              const newHeight = newItem.h || 4
+              const cols = layoutSettings?.cols || 12
+              
+              if (process.env.NODE_ENV === 'development') {
+                console.log('[Canvas] Resize stopped - persisting user layout change', {
+                  blockId,
+                  previousHeight,
+                  newHeight,
+                })
+              }
+              
+              // Use layout parameter (has current resized position)
+              const resizedBlock = layout.find(l => l.i === blockId)
+              if (!resizedBlock) {
+                currentlyResizingBlockIdRef.current = null
+                return
+              }
+              
+              // CRITICAL: Ensure block stays within grid bounds after resize
+              const blockX = resizedBlock.x || 0
+              const blockW = resizedBlock.w || 4
+              const clampedX = Math.max(0, Math.min(blockX, cols - 2)) // Ensure at least minW (2) fits
+              const maxW = cols - clampedX
+              const clampedW = Math.max(2, Math.min(blockW, maxW)) // minW is 2
+              
+              if (process.env.NODE_ENV === 'development') {
+                if (clampedX !== blockX || clampedW !== blockW) {
+                  console.log('[Canvas] Clamped resize bounds', {
+                    blockId,
+                    original: { x: blockX, w: blockW },
+                    clamped: { x: clampedX, w: clampedW },
+                    cols,
+                  })
+                }
+              }
+              
+              // Check if height changed and apply reflow
+              const heightIncreased = newHeight > previousHeight
+              const heightDecreased = newHeight < previousHeight
+              
+              // Update layout with clamped bounds - only update the resized block
+              let finalLayout = layout.map(item => {
+                if (item.i === blockId) {
+                  return { 
+                    ...item, 
+                    x: clampedX, 
+                    w: clampedW, 
+                    h: newHeight,
+                  }
+                }
+                return item
               })
-            }
-            
-            // Use layout parameter (has current resized position)
-            const resizedBlock = layout.find(l => l.i === blockId)
-            if (!resizedBlock) {
+              
+              if (heightIncreased) {
+                // Block grew - push blocks below down
+                finalLayout = pushBlocksDown(finalLayout, blockId, 0) // No ephemeral delta for manual resize
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('[Canvas] Pushed blocks down after resize grow', { blockId, newHeight })
+                }
+              } else if (heightDecreased) {
+                // Block shrunk - compact vertically
+                finalLayout = compactLayoutVertically(finalLayout, blocks)
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('[Canvas] Compacted layout after resize shrink', { blockId, newHeight })
+                }
+              }
+              
+              // Persist final layout (user resize always persists)
+              applyUserLayoutChange(finalLayout)
+              
+              // Clear resize tracking
               currentlyResizingBlockIdRef.current = null
-              return
+            } catch (error) {
+              console.error('[Canvas] Error in onResizeStop:', error)
+              currentlyResizingBlockIdRef.current = null
             }
-            
-            // CRITICAL: Ensure block stays within grid bounds after resize
-            const blockX = resizedBlock.x || 0
-            const blockW = resizedBlock.w || 4
-            const clampedX = Math.max(0, Math.min(blockX, cols - blockW))
-            const clampedW = Math.max(2, Math.min(blockW, cols - clampedX)) // minW is 2
-            
-            // Check if height changed and apply reflow
-            const heightIncreased = newHeight > previousHeight
-            const heightDecreased = newHeight < previousHeight
-            
-            let finalLayout = layout.map(item => 
-              item.i === blockId 
-                ? { ...item, x: clampedX, w: clampedW, h: newHeight }
-                : item
-            )
-            
-            if (heightIncreased) {
-              // Block grew - push blocks below down
-              finalLayout = pushBlocksDown(finalLayout, blockId, 0) // No ephemeral delta for manual resize
-              if (process.env.NODE_ENV === 'development') {
-                console.log('[Canvas] Pushed blocks down after resize grow', { blockId, newHeight })
-              }
-            } else if (heightDecreased) {
-              // Block shrunk - compact vertically
-              finalLayout = compactLayoutVertically(finalLayout, blocks)
-              if (process.env.NODE_ENV === 'development') {
-                console.log('[Canvas] Compacted layout after resize shrink', { blockId, newHeight })
-              }
-            }
-            
-            // Persist final layout (user resize always persists)
-            applyUserLayoutChange(finalLayout)
-            
-            // Clear resize tracking
-            currentlyResizingBlockIdRef.current = null
           }}
           onDragStart={(layout, oldItem, newItem, placeholder, e, element) => {
             // Track drag start position for snap detection

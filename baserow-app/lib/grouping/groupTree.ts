@@ -220,19 +220,43 @@ function buildNodesAtLevel<TItem extends Record<string, any>>(
     return []
   }
 
-  const rule = normalizeGroupRuleFieldName(ctx, rules[ruleIndex])
+  // Normalize the rule to ensure field name matches data structure
+  // Rules should already be normalized at the top level, but we normalize again
+  // to ensure we're using the correct field name for data access
+  const originalRule = rules[ruleIndex]
+  if (!originalRule) {
+    console.warn(`GroupTree: Missing rule at index ${ruleIndex}`)
+    return []
+  }
+  
+  const rule = normalizeGroupRuleFieldName(ctx, originalRule)
   const field = resolveField(ctx, rule.field)
+
+  // If field cannot be resolved, skip this grouping level
+  if (!field && rule.type === 'field') {
+    console.warn(`GroupTree: Cannot resolve field "${rule.field}" for grouping rule at index ${ruleIndex}. Available fields:`, Array.from(ctx.fieldByName.keys()))
+    return []
+  }
+  
+  // Ensure we have a valid field name to access data
+  if (!rule.field) {
+    console.warn(`GroupTree: Rule at index ${ruleIndex} has no field name`)
+    return []
+  }
 
   const buckets = new Map<string, { key: GroupKey; items: TItem[] }>()
 
   for (const item of items) {
+    // Access the field value using the normalized field name
     const raw = (item as any)?.[rule.field]
     const groupKeys = getGroupKeysForValue(ctx, rule, field, raw)
     for (const gk of groupKeys) {
       const existing = buckets.get(gk.key)
       if (existing) {
+        // Ensure we're adding the item to the correct bucket
         existing.items.push(item)
       } else {
+        // Create a new array for each bucket to avoid sharing references
         buckets.set(gk.key, { key: gk, items: [item] })
       }
     }
@@ -243,9 +267,16 @@ function buildNodesAtLevel<TItem extends Record<string, any>>(
   return entries.map(({ key, items: bucketItems }) => {
     const nextParts = [...pathParts, { ruleIndex, key: key.key }]
     const pathKey = joinPath(nextParts)
+    // Recursively build children using the same rules array (already normalized at top level)
+    // Pass bucketItems which contains only items that belong to this specific group
     const children = buildNodesAtLevel(ctx, bucketItems, rules, ruleIndex + 1, nextParts)
     const isLeafLevel = ruleIndex === rules.length - 1
+    
+    // Calculate size: if this is a leaf, use bucketItems.length
+    // If it has children, the size should still be bucketItems.length (total items in this group)
+    // The children will show the breakdown, but the parent size is the total
     const size = bucketItems.length
+    
     const node: GroupedNode<TItem> = {
       type: 'group',
       ruleIndex,
