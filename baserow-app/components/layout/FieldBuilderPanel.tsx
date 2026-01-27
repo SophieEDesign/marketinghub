@@ -734,7 +734,7 @@ function NewFieldForm({
       case "lookup":
         // Get linked fields from current table
         const linkedFields = tableFields.filter(
-          (f) => f.type === 'link_to_table' && f.id !== field?.id
+          (f) => f.type === 'link_to_table'
         )
 
         return (

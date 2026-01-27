@@ -12,6 +12,7 @@ import AttachmentPreview, { type Attachment } from "@/components/attachments/Att
 import InlineSelectDropdown from "@/components/fields/InlineSelectDropdown"
 import { isUserField, getUserDisplayName } from "@/lib/users/userDisplay"
 import RecordModal from "@/components/calendar/RecordModal"
+import { createLookupFieldConfig } from "@/lib/fields/linkedFieldConfig"
 
 import {
   resolveChoiceColor,
