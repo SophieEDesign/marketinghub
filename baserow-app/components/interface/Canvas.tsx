@@ -202,7 +202,7 @@ export default function Canvas({
       return () => {
         // Cleanup: Remove dev utility on unmount
         if (typeof window !== 'undefined') {
-          // @ts-expect-error
+          // @ts-expect-error - Dev utility function added dynamically
           delete window.resetCanvasHeights
         }
       }
