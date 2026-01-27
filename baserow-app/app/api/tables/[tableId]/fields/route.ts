@@ -797,14 +797,17 @@ export async function PATCH(
 
         // Create a map of primary field values to record IDs (case-insensitive matching)
         const valueToIdMap = new Map<string, string>()
-        if (linkedRecords) {
-          for (const record of linkedRecords as Array<{ id: string; [key: string]: any }>) {
-            const value = record[primaryFieldName]
-            if (value != null) {
-              const normalizedValue = String(value).trim().toLowerCase()
-              // Store first match (if duplicates exist, first one wins)
-              if (!valueToIdMap.has(normalizedValue)) {
-                valueToIdMap.set(normalizedValue, record.id)
+        if (linkedRecords && Array.isArray(linkedRecords)) {
+          for (const record of linkedRecords) {
+            // Type guard: ensure record has id property
+            if (record && typeof record === 'object' && 'id' in record && typeof record.id === 'string') {
+              const value = record[primaryFieldName as keyof typeof record]
+              if (value != null) {
+                const normalizedValue = String(value).trim().toLowerCase()
+                // Store first match (if duplicates exist, first one wins)
+                if (!valueToIdMap.has(normalizedValue)) {
+                  valueToIdMap.set(normalizedValue, record.id)
+                }
               }
             }
           }
@@ -821,10 +824,14 @@ export async function PATCH(
         // Migrate data: convert text/select values to linked record IDs
         const migrationErrors: Array<{ recordId: string; value: string }> = []
         
-        if (sourceRecords && sourceRecords.length > 0) {
+        if (sourceRecords && Array.isArray(sourceRecords) && sourceRecords.length > 0) {
           const updates: Array<{ id: string; value: string | string[] | null }> = []
 
-          for (const record of sourceRecords as Array<{ id: string; [key: string]: any }>) {
+          for (const record of sourceRecords) {
+            // Type guard: ensure record has id property
+            if (!record || typeof record !== 'object' || !('id' in record) || typeof record.id !== 'string') {
+              continue
+            }
             const textValue = record[fieldName]
             if (textValue == null || textValue === '') {
               updates.push({ id: record.id, value: null })

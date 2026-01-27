@@ -1068,6 +1068,8 @@ export default function FieldSettingsDrawer({
                                 value={label}
                                 onChange={(e) => {
                                   const next = ordered.slice()
+                                  // Preserve all characters including spaces - don't trim during input
+                                  const newLabel = e.target.value
                                   const preservedColor =
                                     next[index]?.color ||
                                     options.choiceColors?.[label] ||
@@ -1075,7 +1077,7 @@ export default function FieldSettingsDrawer({
                                     undefined
                                   next[index] = {
                                     ...next[index],
-                                    label: e.target.value,
+                                    label: newLabel,
                                     color: preservedColor,
                                     created_at: next[index]?.created_at || nowIso(),
                                   }

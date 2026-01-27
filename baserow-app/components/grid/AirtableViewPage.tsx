@@ -377,6 +377,7 @@ export default function AirtableViewPage({
             viewName={view.name}
             viewId={viewId}
             viewFilters={filters}
+            viewSorts={sorts}
             rowHeight={rowHeight}
             editable={true}
             fields={tableFields}

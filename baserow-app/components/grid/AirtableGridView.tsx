@@ -63,6 +63,12 @@ interface AirtableGridViewProps {
     operator: FilterType
     value?: string
   }>
+  viewSorts?: Array<{
+    id?: string
+    field_name: string
+    direction: 'asc' | 'desc'
+    order_index?: number
+  }>
   rowHeight?: 'short' | 'medium' | 'tall'
   editable?: boolean
   fields?: TableField[]
@@ -99,6 +105,7 @@ export default function AirtableGridView({
   viewName = 'default',
   viewId,
   viewFilters = [],
+  viewSorts = [],
   rowHeight = 'medium',
   editable = true,
   fields = [],
@@ -253,12 +260,30 @@ export default function AirtableGridView({
       }))
   }, [viewFilters])
 
+  // Convert viewSorts (with field_name) to sorts (with field) format
+  const standardizedSorts = useMemo<Array<{ field: string; direction: 'asc' | 'desc' }>>(() => {
+    const safe = asArray(viewSorts)
+    // Sort by order_index if available to ensure correct order
+    const sorted = [...safe].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+    return sorted
+      .filter((s) => !!s && typeof s.field_name === 'string' && typeof s.direction === 'string')
+      .map((s) => ({
+        field: s.field_name,
+        direction: s.direction as 'asc' | 'desc',
+      }))
+  }, [viewSorts])
+
+  // Update local sorts state from viewSorts prop
+  useEffect(() => {
+    setSorts(standardizedSorts)
+  }, [standardizedSorts])
+
   const { rows: allRows, loading, error, updateCell, refresh, retry, insertRow, physicalColumns } = useGridData({
     tableName,
     tableId: tableIdState || tableId,
     fields,
     filters: standardizedFilters,
-    sorts,
+    sorts: standardizedSorts,
     onError: (err, message) => handleError(err, "Grid Error", message),
   })
 

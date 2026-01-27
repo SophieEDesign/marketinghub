@@ -357,17 +357,22 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
             {/* Ungrouped fields */}
             {groupedFields.ungrouped.length > 0 && (
               <div className="space-y-2">
-                {groupedFields.ungrouped.map((field) => (
-                  <SortableFieldItem
-                    key={field.id}
-                    field={field}
-                    onEdit={() => {
-                      setEditingField(field)
-                      setSettingsDrawerOpen(true)
-                    }}
-                    onDelete={() => handleDeleteField(field.id, field.name)}
-                  />
-                ))}
+                {groupedFields.ungrouped.map((field, index) => {
+                  const globalIndex = fields.findIndex(f => f.id === field.id)
+                  const orderIndex = field.order_index ?? field.position ?? globalIndex
+                  return (
+                    <SortableFieldItem
+                      key={field.id}
+                      field={field}
+                      orderIndex={orderIndex + 1}
+                      onEdit={() => {
+                        setEditingField(field)
+                        setSettingsDrawerOpen(true)
+                      }}
+                      onDelete={() => handleDeleteField(field.id, field.name)}
+                    />
+                  )
+                })}
               </div>
             )}
 
@@ -377,17 +382,22 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
                 <div className="px-2 py-1 text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-50 rounded">
                   {groupName}
                 </div>
-                {groupFields.map((field) => (
-                  <SortableFieldItem
-                    key={field.id}
-                    field={field}
-                    onEdit={() => {
-                      setEditingField(field)
-                      setSettingsDrawerOpen(true)
-                    }}
-                    onDelete={() => handleDeleteField(field.id, field.name)}
-                  />
-                ))}
+                {groupFields.map((field) => {
+                  const globalIndex = fields.findIndex(f => f.id === field.id)
+                  const orderIndex = field.order_index ?? field.position ?? globalIndex
+                  return (
+                    <SortableFieldItem
+                      key={field.id}
+                      field={field}
+                      orderIndex={orderIndex + 1}
+                      onEdit={() => {
+                        setEditingField(field)
+                        setSettingsDrawerOpen(true)
+                      }}
+                      onDelete={() => handleDeleteField(field.id, field.name)}
+                    />
+                  )
+                })}
               </div>
             ))}
           </div>
@@ -882,10 +892,12 @@ function NewFieldForm({
 
 function SortableFieldItem({
   field,
+  orderIndex,
   onEdit,
   onDelete,
 }: {
   field: TableField
+  orderIndex: number
   onEdit: () => void
   onDelete: () => void
 }) {
@@ -923,6 +935,9 @@ function SortableFieldItem({
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-gray-400 w-6 text-right">
+              #{orderIndex}
+            </span>
             <span className="text-sm font-medium text-gray-900 truncate">
               {getFieldDisplayName(field)}
             </span>
@@ -930,7 +945,7 @@ function SortableFieldItem({
               <span className="text-xs text-red-600">*</span>
             )}
           </div>
-          <div className="mt-1 flex items-center gap-2">
+          <div className="mt-1 flex items-center gap-2 ml-8">
             <span className="text-xs text-gray-500">
               {FIELD_TYPES.find(t => t.type === field.type)?.label || field.type}
             </span>

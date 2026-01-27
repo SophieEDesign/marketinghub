@@ -273,6 +273,11 @@ export default function FieldBuilderModal({
 
       onSave()
       onClose()
+      
+      // Refresh the page after adding a new field (not when editing)
+      if (!isEdit) {
+        window.location.reload()
+      }
     } catch (err: any) {
       setError(err.message || "Failed to save field")
     } finally {
@@ -430,6 +435,8 @@ export default function FieldBuilderModal({
                               value={label}
                               onChange={(e) => {
                                 const next = ordered.slice()
+                                // Preserve all characters including spaces - don't trim during input
+                                const newLabel = e.target.value
                                 const preservedColor =
                                   next[index]?.color ||
                                   options.choiceColors?.[label] ||
@@ -437,7 +444,7 @@ export default function FieldBuilderModal({
                                   undefined
                                 next[index] = {
                                   ...next[index],
-                                  label: e.target.value,
+                                  label: newLabel,
                                   color: preservedColor,
                                   created_at: next[index]?.created_at || nowIso(),
                                 }

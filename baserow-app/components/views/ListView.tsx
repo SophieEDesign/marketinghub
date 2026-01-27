@@ -1,13 +1,16 @@
 "use client"
 
-import { useState, useEffect, useMemo, useCallback, useRef } from "react"
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
 import { resolveChoiceColor, normalizeHexColor, getTextColorForBackground, SEMANTIC_COLORS } from '@/lib/field-colors'
 import { formatDateUK } from "@/lib/utils"
 import type { TableField } from "@/types/fields"
+import { renderPill, renderPills } from "@/lib/ui/pills"
+import { sortLabelsByManualOrder } from "@/lib/fields/select-options"
 import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
+import { sortRowsByFieldType, shouldUseClientSideSorting, type ViewSort } from "@/lib/sorting/fieldTypeAwareSort"
 import type { FilterType } from "@/types/database"
 import { ChevronDown, ChevronRight, Filter, Group, MapPin, MoreHorizontal, Plus, Database } from "lucide-react"
 import { useIsMobile } from "@/hooks/useResponsive"
@@ -247,8 +250,15 @@ export default function ListView({
         query = applyFiltersToQuery(query, currentFilters, normalizedFields)
       }
 
+      // Check if we need client-side sorting (for select fields that sort by sort_index)
+      const needsClientSideSort = shouldUseClientSideSorting(
+        sorts.map(s => ({ field_name: s.field_name, direction: s.direction as 'asc' | 'desc' })),
+        tableFields
+      )
+
       // Apply sorting
-      if (sorts.length > 0) {
+      if (sorts.length > 0 && !needsClientSideSort) {
+        // Use database sorting for fields that don't require client-side sorting
         sorts.forEach((sort, index) => {
           if (index === 0) {
             const col = toPostgrestColumn(sort.field_name)
@@ -262,7 +272,7 @@ export default function ListView({
             // For now, just use the first sort
           }
         })
-      } else {
+      } else if (sorts.length === 0) {
         query = query.order('created_at', { ascending: false })
       }
 
@@ -284,7 +294,18 @@ export default function ListView({
       } else {
         // Success - reset failure count
         consecutiveFailuresRef.current = 0
-        setRows(data || [])
+        
+        // Apply client-side sorting if needed (for select fields that sort by sort_index)
+        let rowsData = data || []
+        if (needsClientSideSort && sorts.length > 0) {
+          rowsData = sortRowsByFieldType(
+            rowsData,
+            sorts.map(s => ({ field_name: s.field_name, direction: s.direction as 'asc' | 'desc' })),
+            tableFields
+          )
+        }
+        
+        setRows(rowsData)
         
         // Fetch user display names for user fields in loaded rows
         if (data && data.length > 0) {
@@ -850,34 +871,54 @@ export default function ListView({
               </div>
             )}
 
-            {/* Tags (pills) */}
+            {/* Tags (pills) - Use standardized pill rendering with proper sort order */}
             {pillFields.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-2">
-                {pillFields.flatMap((fieldNameOrId) => {
+                {pillFields.map((fieldNameOrId) => {
                   const field = tableFields.find((f) => f.name === fieldNameOrId || f.id === fieldNameOrId)
-                  if (!field) return []
+                  if (!field) return null
+                  
                   const raw = row?.[field.name]
-                  if (raw == null || raw === '' || (Array.isArray(raw) && raw.length === 0)) return []
+                  if (raw == null || raw === '' || (Array.isArray(raw) && raw.length === 0)) return null
 
-                  const values = field.type === 'multi_select' ? (Array.isArray(raw) ? raw : []) : [raw]
-                  return values
-                    .filter((v) => v != null && String(v).trim() !== '')
-                    .map((v) => {
-                      const label = String(v).trim()
-                      const color = getPillColor(field, label)
-                      const bg = color ? `${color}1A` : '#F3F4F6'
-                      const border = color ? `${color}33` : '#E5E7EB'
-                      const text = color || '#374151'
-                      return (
-                        <span
-                          key={`${field.name}:${label}`}
-                          className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium border"
-                          style={{ backgroundColor: bg, borderColor: border, color: text }}
-                        >
-                          {label}
-                        </span>
-                      )
-                    })
+                  // Use standardized pill rendering which respects sort_index order
+                  if (field.type === 'multi_select') {
+                    const values = Array.isArray(raw) ? raw : []
+                    const validValues = values.filter((v) => v != null && String(v).trim() !== '')
+                    if (validValues.length === 0) return null
+                    
+                    // Sort by manual order (sort_index) before rendering
+                    const sortedValues = sortLabelsByManualOrder(
+                      validValues.map(v => String(v).trim()),
+                      'multi_select',
+                      field.options
+                    )
+                    
+                    return (
+                      <React.Fragment key={field.name}>
+                        {renderPills(field, sortedValues, { density: 'default' })}
+                      </React.Fragment>
+                    )
+                  } else if (field.type === 'single_select') {
+                    const value = String(raw).trim()
+                    if (!value) return null
+                    return (
+                      <React.Fragment key={field.name}>
+                        {renderPill({ field, value, density: 'default' })}
+                      </React.Fragment>
+                    )
+                  } else if (field.type === 'link_to_table' || field.type === 'lookup') {
+                    // For linked fields, render as pills if they support it
+                    const value = String(raw).trim()
+                    if (!value) return null
+                    return (
+                      <React.Fragment key={field.name}>
+                        {renderPill({ field, value, density: 'default' })}
+                      </React.Fragment>
+                    )
+                  }
+                  
+                  return null
                 })}
               </div>
             )}
