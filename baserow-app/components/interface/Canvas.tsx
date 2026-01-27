@@ -126,6 +126,32 @@ export default function Canvas({
   // Track when blocks are updated from user interaction (drag/resize) vs database reload
   // This prevents sync effect from overwriting user changes
   const blocksUpdatedFromUserRef = useRef(false)
+  // Track pending layout changes until blocks prop reflects them (robust guard)
+  const pendingLayoutRef = useRef<Map<string, { x: number; y: number; w: number; h: number }>>(new Map())
+  const hasPendingLayoutRef = useRef(false)
+  
+  // CRITICAL: Convert pixels to grid units (React Grid Layout height includes margins)
+  // This ensures height values from content measurement are correctly converted
+  const toGridH = useCallback((px: number): number => {
+    const rowHeight = layoutSettings?.rowHeight || 30
+    const marginY = (layoutSettings?.margin || [10, 10])[1]
+    // RGL height includes margins between rows. This is the practical conversion:
+    return Math.max(2, Math.ceil((px + marginY) / (rowHeight + marginY)))
+  }, [layoutSettings?.rowHeight, layoutSettings?.margin])
+  
+  // Helper to track pending layout changes and call onLayoutChange
+  const notifyLayoutChange = useCallback((layoutItems: LayoutItem[]) => {
+    if (!onLayoutChange) return
+    
+    // Track pending layout to prevent sync effect from overwriting
+    pendingLayoutRef.current = new Map(
+      layoutItems.map(i => [i.i, { x: i.x, y: i.y, w: i.w, h: i.h }])
+    )
+    hasPendingLayoutRef.current = true
+    blocksUpdatedFromUserRef.current = true
+    
+    onLayoutChange(layoutItems)
+  }, [onLayoutChange])
   // CRITICAL: Only treat layout changes as persistable when triggered by explicit user drag/resize.
   // Environmental changes (window resize, side panels, modals, container size changes, edit mode toggles)
   // must NEVER propagate as "user layout changes" to the parent.
@@ -300,10 +326,33 @@ export default function Canvas({
     }
     
     // Don't sync if blocks were just updated from user interaction (drag/resize)
-    // This prevents overwriting user changes when InterfaceBuilder updates blocks to match layout
-    if (blocksUpdatedFromUserRef.current) {
-      debugLog('LAYOUT', '[Canvas] Sync skipped - blocks updated from user interaction')
-      return
+    // Wait until blocks prop actually reflects the pending layout (robust guard, no magic timeout)
+    if (blocksUpdatedFromUserRef.current && hasPendingLayoutRef.current) {
+      // Check if blocks prop matches the pending layout we emitted
+      const matches = blocks.every(b => {
+        const p = pendingLayoutRef.current.get(b.id)
+        if (!p) return false
+        return (
+          Math.abs((b.x || 0) - p.x) < 0.01 &&
+          Math.abs((b.y || 0) - p.y) < 0.01 &&
+          Math.abs((b.w || 4) - p.w) < 0.01 &&
+          Math.abs((b.h ?? 4) - p.h) < 0.01
+        )
+      })
+      
+      if (!matches) {
+        debugLog('LAYOUT', '[Canvas] Sync skipped - waiting for blocks to reflect pending layout', {
+          pendingBlockIds: Array.from(pendingLayoutRef.current.keys()),
+          currentBlockIds: blocks.map(b => b.id),
+        })
+        return
+      }
+      
+      // Parent caught up; safe to sync normally again
+      hasPendingLayoutRef.current = false
+      pendingLayoutRef.current.clear()
+      blocksUpdatedFromUserRef.current = false
+      debugLog('LAYOUT', '[Canvas] Pending layout confirmed - sync guard cleared')
     }
 
     // Don't hydrate if no blocks - but reset refs to allow hydration when blocks load
@@ -573,7 +622,9 @@ export default function Canvas({
     // This prevents jumping while still allowing blocks to snap together
     // The margin is handled by react-grid-layout as CSS, so blocks can be adjacent in grid coords
     const baseThreshold = Math.ceil(marginInGridUnits * 1.5)
-    const calculatedThreshold = snapThreshold ?? Math.max(1, Math.min(2, baseThreshold))
+    // CRITICAL: Snap threshold must be generous and predictable (at least 3 grid units)
+    // Previous max(1, min(2, ...)) was too restrictive and prevented snapping from triggering
+    const calculatedThreshold = snapThreshold ?? 3
     
     const draggedX = draggedBlock.x || 0
     const draggedY = draggedBlock.y || 0
@@ -1231,11 +1282,16 @@ export default function Canvas({
   }, [])
 
   // PHASE 1.2 & 2.1: onHeightChange handler with logging and guards
-  const handleHeightChange = useCallback((blockId: string, newHeight: number) => {
+  const handleHeightChange = useCallback((blockId: string, newHeightPx: number) => {
+    // CRITICAL: Convert pixels to grid units (React Grid Layout uses grid units, not pixels)
+    // Views may send pixels or incorrectly-converted grid units - always convert properly here
+    const gridH = toGridH(newHeightPx)
+    
     // PHASE 1.2: Log height change from content
     console.log('[HeightChange]', {
       blockId,
-      newHeight,
+      newHeightPx,
+      gridH,
       source: 'content',
       currentlyResizing: currentlyResizingBlockIdRef.current,
       currentlyDragging: currentlyDraggingBlockIdRef.current,
@@ -1256,15 +1312,16 @@ export default function Canvas({
       const updatedLayout: Layout[] = currentLayout.map((item: Layout): Layout => {
         if (item.i === blockId) {
           const oldHeight = item.h || 4
-          if (Math.abs(oldHeight - newHeight) > 0.01) {
+          if (Math.abs(oldHeight - gridH) > 0.01) {
             console.log('[HeightChange] UPDATING layout height', {
               blockId,
               oldHeight,
-              newHeight,
+              newHeightPx,
+              gridH,
             })
             return {
               ...item,
-              h: newHeight,
+              h: gridH,
             }
           }
         }
@@ -1314,20 +1371,18 @@ export default function Canvas({
 
       // CRITICAL: Save content-driven height changes to database
       // This ensures the height persists and sync effect doesn't overwrite it
-      if (onLayoutChange) {
-        const layoutItems: LayoutItem[] = finalLayout.map((item) => ({
-          i: item.i,
-          x: item.x || 0,
-          y: item.y || 0,
-          w: item.w || 4,
-          h: item.h || 4,
-        }))
-        onLayoutChange(layoutItems)
-      }
+      const layoutItems: LayoutItem[] = finalLayout.map((item) => ({
+        i: item.i,
+        x: item.x || 0,
+        y: item.y || 0,
+        w: item.w || 4,
+        h: item.h || 4,
+      }))
+      notifyLayoutChange(layoutItems)
 
       return finalLayout
     })
-  }, [blocks, pushBlocksDown, compactLayoutVertically, onLayoutChange])
+  }, [blocks, pushBlocksDown, compactLayoutVertically, notifyLayoutChange, toGridH])
 
   const handleLayoutChange = useCallback(
     (newLayout: Layout[]) => {
@@ -1421,16 +1476,14 @@ export default function Canvas({
       })
       
       // Notify parent of layout change (for debounced save)
-      if (onLayoutChange) {
-        const layoutItems: LayoutItem[] = newLayout.map((item) => ({
-          i: item.i,
-          x: item.x || 0,
-          y: item.y || 0,
-          w: item.w || 4,
-          h: item.h || 4,
-        }))
-        onLayoutChange(layoutItems)
-      }
+      const layoutItems: LayoutItem[] = newLayout.map((item) => ({
+        i: item.i,
+        x: item.x || 0,
+        y: item.y || 0,
+        w: item.w || 4,
+        h: item.h || 4,
+      }))
+      notifyLayoutChange(layoutItems)
       
       // Reset resize flag after resize/drag completes (no more layout changes for 300ms)
       // This allows the layout to persist and prevents useEffect from resetting it during resize
@@ -1576,16 +1629,14 @@ export default function Canvas({
             
             // Notify parent of final layout asynchronously to avoid state update conflicts
             setTimeout(() => {
-              if (onLayoutChange) {
-                const layoutItems: LayoutItem[] = finalLayout.map((item) => ({
-                  i: item.i,
-                  x: item.x || 0,
-                  y: item.y || 0,
-                  w: item.w || 4,
-                  h: item.h || 4,
-                }))
-                onLayoutChange(layoutItems)
-              }
+              const layoutItems: LayoutItem[] = finalLayout.map((item) => ({
+                i: item.i,
+                x: item.x || 0,
+                y: item.y || 0,
+                w: item.w || 4,
+                h: item.h || 4,
+              }))
+              notifyLayoutChange(layoutItems)
             }, 0)
             
             return finalLayout
@@ -1696,16 +1747,14 @@ export default function Canvas({
             })
             
             // Notify parent of compacted layout
-            if (onLayoutChange) {
-              const layoutItems: LayoutItem[] = compactedLayout.map((item) => ({
-                i: item.i,
-                x: item.x || 0,
-                y: item.y || 0,
-                w: item.w || 4,
-                h: item.h || 4,
-              }))
-              onLayoutChange(layoutItems)
-            }
+            const layoutItems: LayoutItem[] = compactedLayout.map((item) => ({
+              i: item.i,
+              x: item.x || 0,
+              y: item.y || 0,
+              w: item.w || 4,
+              h: item.h || 4,
+            }))
+            notifyLayoutChange(layoutItems)
             
             return compactedLayout
           }
@@ -1844,21 +1893,19 @@ export default function Canvas({
       setTimeout(() => setKeyboardMoveHighlight(null), 200)
       
       // Notify parent
-      if (onLayoutChange) {
-        const layoutItems: LayoutItem[] = newLayout.map((item) => ({
-          i: item.i,
-          x: item.x || 0,
-          y: item.y || 0,
-          w: item.w || 4,
-          h: item.h || 4,
-        }))
-        onLayoutChange(layoutItems)
-      }
+      const layoutItems: LayoutItem[] = newLayout.map((item) => ({
+        i: item.i,
+        x: item.x || 0,
+        y: item.y || 0,
+        w: item.w || 4,
+        h: item.h || 4,
+      }))
+      notifyLayoutChange(layoutItems)
     }
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isEditing, selectedBlockId, layout, layoutSettings?.cols, applySmartSnap, onLayoutChange])
+  }, [isEditing, selectedBlockId, layout, layoutSettings?.cols, applySmartSnap, notifyLayoutChange])
 
   // CRITICAL: Grid configuration must be IDENTICAL for edit and public view
   // isEditing ONLY controls interactivity (isDraggable, isResizable)
