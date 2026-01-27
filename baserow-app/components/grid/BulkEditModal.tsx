@@ -311,87 +311,92 @@ export default function BulkEditModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Bulk Edit {selectedCount} Records</DialogTitle>
-          <DialogDescription>
-            Update multiple records at once. Only the selected field will be changed.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-6 py-4">
-          {/* Field Selection */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium text-gray-700">Select Field</Label>
-            <Select value={selectedFieldName} onValueChange={handleFieldChange}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choose a field to edit" />
-              </SelectTrigger>
-              <SelectContent>
-                {editableFields.map((field) => (
-                  <SelectItem key={field.id} value={field.name}>
-                    {field.name} ({FIELD_TYPES.find((t) => t.type === field.type)?.label || field.type})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0">
+        {/* Sticky top bar with save button */}
+        <div className="sticky top-0 z-10 bg-white border-b px-6 py-3 flex items-center justify-between gap-2">
+          <div>
+            <DialogTitle className="text-lg font-semibold">Bulk Edit {selectedCount} Records</DialogTitle>
+            <DialogDescription className="text-sm text-gray-500 mt-1">
+              Update multiple records at once. Only the selected field will be changed.
+            </DialogDescription>
           </div>
-
-          {/* Operation Selection */}
-          {selectedField && (
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-gray-700">Operation</Label>
-              <RadioGroup value={operation} onValueChange={(v) => setOperation(v as Operation)}>
-                {availableOperations.map((op) => (
-                  <div key={op} className="flex items-center space-x-2">
-                    <RadioGroupItem value={op} id={`op-${op}`} />
-                    <Label htmlFor={`op-${op}`} className="cursor-pointer capitalize">
-                      {op === "set" && "Set value"}
-                      {op === "clear" && "Clear value"}
-                      {op === "append" && "Append text"}
-                      {op === "add" && "Add values"}
-                      {op === "remove" && "Remove values"}
-                    </Label>
-                  </div>
-                ))}
-              </RadioGroup>
-            </div>
-          )}
-
-          {/* Field Input */}
-          {selectedField && operation !== "clear" && renderFieldInput()}
-
-          {/* Summary */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm text-blue-900">
-              <strong>You are about to update {selectedCount} record{selectedCount !== 1 ? "s" : ""}.</strong>
-            </p>
-            {selectedField && (
-              <p className="text-sm text-blue-700 mt-1">
-                Field: <strong>{selectedField.name}</strong> will be {operation === "set" ? "set to" : operation === "clear" ? "cleared" : operation === "append" ? "appended with" : operation === "add" ? "added with" : "removed from"}{" "}
-                {operation !== "clear" && <strong>{typeof value === "object" ? JSON.stringify(value) : String(value)}</strong>}
-              </p>
+          <div className="flex items-center gap-2">
+            {canDelete && onDelete && (
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={saving || deleting}
+                title="Delete selected records"
+              >
+                {deleting ? "Deleting..." : `Delete ${selectedCount} Record${selectedCount !== 1 ? "s" : ""}`}
+              </Button>
             )}
+            <Button variant="outline" onClick={onClose} disabled={saving || deleting}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={saving || deleting || !selectedFieldName}>
+              {saving ? "Saving..." : `Apply to ${selectedCount} Record${selectedCount !== 1 ? "s" : ""}`}
+            </Button>
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 pt-4 border-t">
-          {canDelete && onDelete && (
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={saving || deleting}
-              className="mr-auto"
-            >
-              {deleting ? "Deleting..." : `Delete ${selectedCount} Record${selectedCount !== 1 ? "s" : ""}`}
-            </Button>
-          )}
-          <Button variant="outline" onClick={onClose} disabled={saving}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={saving || deleting || !selectedFieldName}>
-            {saving ? "Saving..." : `Apply to ${selectedCount} Record${selectedCount !== 1 ? "s" : ""}`}
-          </Button>
+        {/* Scrollable content area */}
+        <div className="flex-1 overflow-y-auto px-6">
+          <div className="space-y-6 py-4">
+            {/* Field Selection */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-gray-700">Select Field</Label>
+              <Select value={selectedFieldName} onValueChange={handleFieldChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a field to edit" />
+                </SelectTrigger>
+                <SelectContent>
+                  {editableFields.map((field) => (
+                    <SelectItem key={field.id} value={field.name}>
+                      {field.name} ({FIELD_TYPES.find((t) => t.type === field.type)?.label || field.type})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Operation Selection */}
+            {selectedField && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700">Operation</Label>
+                <RadioGroup value={operation} onValueChange={(v) => setOperation(v as Operation)}>
+                  {availableOperations.map((op) => (
+                    <div key={op} className="flex items-center space-x-2">
+                      <RadioGroupItem value={op} id={`op-${op}`} />
+                      <Label htmlFor={`op-${op}`} className="cursor-pointer capitalize">
+                        {op === "set" && "Set value"}
+                        {op === "clear" && "Clear value"}
+                        {op === "append" && "Append text"}
+                        {op === "add" && "Add values"}
+                        {op === "remove" && "Remove values"}
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </div>
+            )}
+
+            {/* Field Input */}
+            {selectedField && operation !== "clear" && renderFieldInput()}
+
+            {/* Summary */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-900">
+                <strong>You are about to update {selectedCount} record{selectedCount !== 1 ? "s" : ""}.</strong>
+              </p>
+              {selectedField && (
+                <p className="text-sm text-blue-700 mt-1">
+                  Field: <strong>{selectedField.name}</strong> will be {operation === "set" ? "set to" : operation === "clear" ? "cleared" : operation === "append" ? "appended with" : operation === "add" ? "added with" : "removed from"}{" "}
+                  {operation !== "clear" && <strong>{typeof value === "object" ? JSON.stringify(value) : String(value)}</strong>}
+                </p>
+              )}
+            </div>
+          </div>
         </div>
       </DialogContent>
       <ConfirmDialog

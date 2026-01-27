@@ -347,8 +347,9 @@ export default function RecordModal({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0">
+        {/* Sticky top bar with save button */}
+        <div className="sticky top-0 z-10 bg-white border-b px-6 py-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
@@ -358,113 +359,116 @@ export default function RecordModal({
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <DialogTitle>{recordId ? 'Record Details' : 'Create New Record'}</DialogTitle>
+            <DialogTitle className="text-lg font-semibold">
+              {recordId ? 'Record Details' : 'Create New Record'}
+            </DialogTitle>
           </div>
-        </DialogHeader>
-
-        {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="text-gray-500">Loading...</div>
-          </div>
-        ) : (
-          <div className="space-y-4 py-4">
-            {/* Use custom layout if available, otherwise fall back to simple field list */}
-            {modalLayout?.blocks && modalLayout.blocks.length > 0 ? (
-              <div className="min-h-[400px]">
-                <ModalCanvas
-                  blocks={modalBlocks}
-                  tableId={tableId}
-                  recordId={recordId}
-                  tableName={effectiveTableName || ''}
-                  tableFields={tableFields}
-                  pageEditable={userRole === 'admin'}
-                  editableFieldNames={tableFields.map(f => f.name)}
-                  onFieldChange={handleFieldChange}
-                />
-              </div>
-            ) : showFieldSections && sectionedFields ? (
-              // Render with sections
-              sectionedFields.map(([sectionName, sectionFields]) => {
-                const isCollapsed = collapsedSections.has(sectionName)
-                return (
-                  <div key={sectionName} className="space-y-2">
-                    <button
-                      type="button"
-                      onClick={() => toggleSection(sectionName)}
-                      className="w-full flex items-center justify-between text-left py-1 -mx-1 px-1 rounded-md hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
-                      aria-expanded={!isCollapsed}
-                      aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${sectionName} section`}
-                    >
-                      <span className="text-sm font-semibold text-gray-900">{sectionName}</span>
-                      <span className="text-gray-400">
-                        {isCollapsed ? (
-                          <ChevronRight className="h-4 w-4" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4" />
-                        )}
-                      </span>
-                    </button>
-                    {!isCollapsed && (
-                      <div className="space-y-4 pl-4">
-                        {sectionFields.map((field) => {
-                          const value = formData[field.name]
-                          return (
-                            <FieldEditor
-                              key={field.id}
-                              field={field}
-                              value={value}
-                              onChange={(newValue) => handleFieldChange(field.name, newValue)}
-                              required={field.required || false}
-                              recordId={recordId || undefined}
-                              tableName={effectiveTableName || undefined}
-                            />
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )
-              })
-            ) : (
-              // Render flat list (default behavior)
-              filteredFields.map((field) => {
-                const value = formData[field.name]
-                return (
-                  <FieldEditor
-                    key={field.id}
-                    field={field}
-                    value={value}
-                    onChange={(newValue) => handleFieldChange(field.name, newValue)}
-                    required={field.required || false}
-                    recordId={recordId || undefined}
-                    tableName={effectiveTableName || undefined}
-                  />
-                )
-              })
+          <div className="flex items-center gap-2">
+            {recordId && userRole === 'admin' && (
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={deleting || saving || loading}
+                title="Delete this record"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                {deleting ? 'Deleting…' : 'Delete'}
+              </Button>
             )}
-          </div>
-        )}
-
-        <div className="flex justify-end gap-2 pt-4 border-t">
-          {recordId && userRole === 'admin' && (
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={deleting || saving || loading}
-              className="mr-auto"
-              title="Delete this record"
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              {deleting ? 'Deleting…' : 'Delete'}
+            <Button variant="outline" onClick={onClose} disabled={deleting || saving}>
+              Cancel
             </Button>
+            <Button onClick={handleSave} disabled={saving || loading}>
+              <Save className="mr-2 h-4 w-4" />
+              {saving ? 'Saving...' : 'Save'}
+            </Button>
+          </div>
+        </div>
+
+        {/* Scrollable content area */}
+        <div className="flex-1 overflow-y-auto px-6">
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-gray-500">Loading...</div>
+            </div>
+          ) : (
+            <div className="space-y-4 py-4">
+              {/* Use custom layout if available, otherwise fall back to simple field list */}
+              {modalLayout?.blocks && modalLayout.blocks.length > 0 ? (
+                <div className="min-h-[400px]">
+                  <ModalCanvas
+                    blocks={modalBlocks}
+                    tableId={tableId}
+                    recordId={recordId}
+                    tableName={effectiveTableName || ''}
+                    tableFields={tableFields}
+                    pageEditable={userRole === 'admin'}
+                    editableFieldNames={tableFields.map(f => f.name)}
+                    onFieldChange={handleFieldChange}
+                  />
+                </div>
+              ) : showFieldSections && sectionedFields ? (
+                // Render with sections
+                sectionedFields.map(([sectionName, sectionFields]) => {
+                  const isCollapsed = collapsedSections.has(sectionName)
+                  return (
+                    <div key={sectionName} className="space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleSection(sectionName)}
+                        className="w-full flex items-center justify-between text-left py-1 -mx-1 px-1 rounded-md hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
+                        aria-expanded={!isCollapsed}
+                        aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${sectionName} section`}
+                      >
+                        <span className="text-sm font-semibold text-gray-900">{sectionName}</span>
+                        <span className="text-gray-400">
+                          {isCollapsed ? (
+                            <ChevronRight className="h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4" />
+                          )}
+                        </span>
+                      </button>
+                      {!isCollapsed && (
+                        <div className="space-y-4 pl-4">
+                          {sectionFields.map((field) => {
+                            const value = formData[field.name]
+                            return (
+                              <FieldEditor
+                                key={field.id}
+                                field={field}
+                                value={value}
+                                onChange={(newValue) => handleFieldChange(field.name, newValue)}
+                                required={field.required || false}
+                                recordId={recordId || undefined}
+                                tableName={effectiveTableName || undefined}
+                              />
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
+              ) : (
+                // Render flat list (default behavior)
+                filteredFields.map((field) => {
+                  const value = formData[field.name]
+                  return (
+                    <FieldEditor
+                      key={field.id}
+                      field={field}
+                      value={value}
+                      onChange={(newValue) => handleFieldChange(field.name, newValue)}
+                      required={field.required || false}
+                      recordId={recordId || undefined}
+                      tableName={effectiveTableName || undefined}
+                    />
+                  )
+                })
+              )}
+            </div>
           )}
-          <Button variant="outline" onClick={onClose} disabled={deleting}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={saving || loading}>
-            <Save className="mr-2 h-4 w-4" />
-            {saving ? 'Saving...' : 'Save'}
-          </Button>
         </div>
       </DialogContent>
     </Dialog>

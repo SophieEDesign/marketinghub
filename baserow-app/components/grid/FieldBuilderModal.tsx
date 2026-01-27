@@ -734,134 +734,138 @@ export default function FieldBuilderModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit Field" : "Add Field"}</DialogTitle>
-          <DialogDescription>
-            {isEdit ? "Update the field properties below." : "Create a new field for this table."}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4 py-4">
-          {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
-              {error}
-            </div>
-          )}
-
-          {/* Field Name */}
-          <div className="space-y-2">
-            <Label htmlFor="field-name">Field Name *</Label>
-            <Input
-              id="field-name"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Enter field name"
-              disabled={loading}
-            />
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0">
+        {/* Sticky top bar with save button */}
+        <div className="sticky top-0 z-10 bg-white border-b px-6 py-3 flex items-center justify-between gap-2">
+          <div>
+            <DialogTitle className="text-lg font-semibold">{isEdit ? "Edit Field" : "Add Field"}</DialogTitle>
+            <DialogDescription className="text-sm text-gray-500 mt-1">
+              {isEdit ? "Update the field properties below." : "Create a new field for this table."}
+            </DialogDescription>
           </div>
-
-          {/* Section Name */}
-          <div className="space-y-2">
-            <Label htmlFor="section-name">Section Name (Optional)</Label>
-            <Input
-              id="section-name"
-              type="text"
-              value={groupName}
-              onChange={(e) => setGroupName(e.target.value)}
-              placeholder="e.g., Social Media Fields, Press Fields"
-              disabled={loading}
-            />
-            <p className="text-xs text-gray-500">
-              Organize fields into sections. Fields with the same section name will be grouped together in pickers, modals, and canvas.
-            </p>
-          </div>
-
-          {/* Field Type */}
-          <div className="space-y-2">
-            <Label htmlFor="field-type">Field Type *</Label>
-            <select
-              id="field-type"
-              value={type}
-              onChange={(e) => {
-                setType(e.target.value as FieldType)
-                setOptions({})
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
               disabled={loading}
             >
-              {FIELD_TYPES.map((ft) => (
-                <option key={ft.type} value={ft.type}>
-                  {ft.label} {ft.isVirtual ? "(Virtual)" : ""}
-                </option>
-              ))}
-            </select>
-            {isVirtual && (
-              <p className="text-xs text-gray-500">
-                Virtual fields are calculated and do not store data in the database
-              </p>
-            )}
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSave}
+              disabled={loading || !name.trim()}
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {loading ? "Saving..." : "Save"}
+            </Button>
           </div>
-
-          {/* Required */}
-          {!isVirtual && (
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="required"
-                checked={required}
-                onChange={(e) => setRequired(e.target.checked)}
-                className="w-4 h-4"
-                disabled={loading}
-              />
-              <Label htmlFor="required">Required</Label>
-            </div>
-          )}
-
-          {/* Default Value */}
-          {!isVirtual && (
-            <div className="space-y-2">
-              <Label htmlFor="default-value">Default Value</Label>
-              <Input
-                id="default-value"
-                type={type === "number" ? "number" : "text"}
-                value={defaultValue ?? ""}
-                onChange={(e) => {
-                  if (type === "number") {
-                    setDefaultValue(e.target.value ? Number(e.target.value) : null)
-                  } else {
-                    setDefaultValue(e.target.value || null)
-                  }
-                }}
-                placeholder="Default value (optional)"
-                disabled={loading}
-              />
-            </div>
-          )}
-
-          {/* Type-specific Options */}
-          {renderTypeSpecificOptions()}
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 pt-4 border-t">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onClose}
-            disabled={loading}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            onClick={handleSave}
-            disabled={loading || !name.trim()}
-          >
-            <Save className="h-4 w-4 mr-2" />
-            {loading ? "Saving..." : "Save"}
-          </Button>
+        {/* Scrollable content area */}
+        <div className="flex-1 overflow-y-auto px-6">
+          <div className="space-y-4 py-4">
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+                {error}
+              </div>
+            )}
+
+            {/* Field Name */}
+            <div className="space-y-2">
+              <Label htmlFor="field-name">Field Name *</Label>
+              <Input
+                id="field-name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Enter field name"
+                disabled={loading}
+              />
+            </div>
+
+            {/* Section Name */}
+            <div className="space-y-2">
+              <Label htmlFor="section-name">Section Name (Optional)</Label>
+              <Input
+                id="section-name"
+                type="text"
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                placeholder="e.g., Social Media Fields, Press Fields"
+                disabled={loading}
+              />
+              <p className="text-xs text-gray-500">
+                Organize fields into sections. Fields with the same section name will be grouped together in pickers, modals, and canvas.
+              </p>
+            </div>
+
+            {/* Field Type */}
+            <div className="space-y-2">
+              <Label htmlFor="field-type">Field Type *</Label>
+              <select
+                id="field-type"
+                value={type}
+                onChange={(e) => {
+                  setType(e.target.value as FieldType)
+                  setOptions({})
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={loading}
+              >
+                {FIELD_TYPES.map((ft) => (
+                  <option key={ft.type} value={ft.type}>
+                    {ft.label} {ft.isVirtual ? "(Virtual)" : ""}
+                  </option>
+                ))}
+              </select>
+              {isVirtual && (
+                <p className="text-xs text-gray-500">
+                  Virtual fields are calculated and do not store data in the database
+                </p>
+              )}
+            </div>
+
+            {/* Required */}
+            {!isVirtual && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="required"
+                  checked={required}
+                  onChange={(e) => setRequired(e.target.checked)}
+                  className="w-4 h-4"
+                  disabled={loading}
+                />
+                <Label htmlFor="required">Required</Label>
+              </div>
+            )}
+
+            {/* Default Value */}
+            {!isVirtual && (
+              <div className="space-y-2">
+                <Label htmlFor="default-value">Default Value</Label>
+                <Input
+                  id="default-value"
+                  type={type === "number" ? "number" : "text"}
+                  value={defaultValue ?? ""}
+                  onChange={(e) => {
+                    if (type === "number") {
+                      setDefaultValue(e.target.value ? Number(e.target.value) : null)
+                    } else {
+                      setDefaultValue(e.target.value || null)
+                    }
+                  }}
+                  placeholder="Default value (optional)"
+                  disabled={loading}
+                />
+              </div>
+            )}
+
+            {/* Type-specific Options */}
+            {renderTypeSpecificOptions()}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
