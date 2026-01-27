@@ -107,8 +107,12 @@ export default function HorizontalGroupedBlock({
   // Combine: page filters first (from Filter blocks), then block filters
   const effectiveFilters = [...pageFilters, ...blockFilters]
 
-  // Get sorts from block config
-  const sorts = (block.config?.sorts as Array<{ field_name: string; direction: 'asc' | 'desc' }>) || []
+  // Get sorts from block config and convert BlockSort[] to expected format
+  const blockSorts = (block.config?.sorts as Array<{ field: string; direction: 'asc' | 'desc' }>) || []
+  const sorts = blockSorts.map(sort => ({
+    field_name: sort.field,
+    direction: sort.direction
+  }))
 
   return (
     <div className="h-full w-full">

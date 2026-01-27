@@ -32,6 +32,7 @@ const iconMap: Record<BlockType, React.ElementType> = {
   multi_timeline: GitBranch,
   list: List,
   number: Hash,
+  horizontal_grouped: Columns,
 }
 
 export default function BlockPicker({ onSelectBlock, isCollapsed = false }: BlockPickerProps) {

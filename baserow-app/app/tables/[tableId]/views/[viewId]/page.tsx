@@ -112,8 +112,12 @@ export default async function ViewPage({
     ])
 
     const viewFields = viewFieldsRes.status === 'fulfilled' && !viewFieldsRes.value.error ? (viewFieldsRes.value.data || []) : []
-    const viewFilters = viewFiltersRes.status === 'fulfilled' && !viewFiltersRes.value.error ? (viewFiltersRes.value.data || []) : []
-    const viewSorts = viewSortsRes.status === 'fulfilled' && !viewSortsRes.value.error ? (viewSortsRes.value.data || []) : []
+    const viewFilters = viewFiltersRes.status === 'fulfilled' && !viewFiltersRes.value.error 
+      ? (viewFiltersRes.value.data || []).map((f: any) => ({ ...f, view_id: viewId })) 
+      : []
+    const viewSorts = viewSortsRes.status === 'fulfilled' && !viewSortsRes.value.error 
+      ? (viewSortsRes.value.data || []).map((s: any) => ({ ...s, view_id: viewId })) 
+      : []
     const tableFields = tableFieldsRes.status === 'fulfilled' && !tableFieldsRes.value.error ? (tableFieldsRes.value.data || []) : []
     
     // Get groupBy from grid_view_settings (fallback to view.config for backward compatibility)

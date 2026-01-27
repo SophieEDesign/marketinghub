@@ -31,7 +31,6 @@ export default function HorizontalGroupedDataSettings({
           value={config.table_id || ""}
           onChange={onTableChange}
           tables={tables}
-          placeholder="Select a table"
         />
       </div>
 
@@ -61,9 +60,9 @@ export default function HorizontalGroupedDataSettings({
 
           <div className="space-y-2">
             <SortSelector
-              sorts={config.sorts || []}
+              value={config.sorts || []}
               fields={fields}
-              onChange={(sorts) => onUpdate({ sorts })}
+              onChange={(sorts) => onUpdate({ sorts: typeof sorts === 'string' ? undefined : sorts })}
             />
           </div>
         </>

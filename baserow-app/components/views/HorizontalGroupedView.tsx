@@ -76,8 +76,12 @@ export default function HorizontalGroupedView({
         // Apply sorts
         if (sorts.length > 0) {
           for (const sort of sorts) {
-            const column = toPostgrestColumn(sort.field_name)
-            query = query.order(column, { ascending: sort.direction === 'asc' })
+            if (sort.field_name) {
+              const column = toPostgrestColumn(sort.field_name)
+              if (column) {
+                query = query.order(column, { ascending: sort.direction === 'asc' })
+              }
+            }
           }
         } else {
           // Default sort by created_at
@@ -231,9 +235,9 @@ export default function HorizontalGroupedView({
     return group?.items || []
   }, [activeTab, groups])
 
-  // Get primary field for record title
+  // Get primary field for record title (first text field or first field)
   const primaryField = useMemo(() => {
-    return tableFields.find(f => f.primary) || tableFields.find(f => f.type === 'text') || tableFields[0]
+    return tableFields.find(f => f.type === 'text') || tableFields[0]
   }, [tableFields])
 
   if (loading) {

@@ -1,30 +1,72 @@
 -- Migration: Fix allocated_to foreign key constraint for table_tasks_1768655456178
--- This fixes the foreign key constraint to properly reference auth.users and handles invalid values
---
--- IMPORTANT: If "allocated_to" is configured as a link_to_table field in table_fields:
---   - It should NOT be a link_to_table field pointing to a "users" table
---   - Instead, it should be a regular UUID field that directly references auth.users(id)
---   - OR you need to create a users table/view in public.tables for the link_to_table to work
---   - The LookupFieldPicker component expects linked_table_id to point to a table in public.tables
---
--- If the field is incorrectly configured as link_to_table, you may need to:
---   1. Change the field type from 'link_to_table' to a regular field type (or create a custom user picker)
---   2. OR create a users table/view that the link_to_table can reference
+-- This fixes the foreign key constraint to properly reference the contacts table
+-- The allocated_to field is a link_to_table field that links to the contacts table
 
 -- Create a SECURITY DEFINER function to handle the constraint fix
--- This is needed to access auth.users which requires elevated privileges
 CREATE OR REPLACE FUNCTION public.fix_allocated_to_foreign_key()
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, auth
+SET search_path = public
 AS $$
 DECLARE
     constraint_exists boolean;
     constraint_ref_table text;
     constraint_ref_schema text;
     needs_recreate boolean := false;
+    tasks_table_id uuid;
+    allocated_to_field_type text;
+    linked_table_id_val uuid;
+    contacts_table_supabase_name text;
+    contacts_table_exists boolean;
 BEGIN
+    -- Find the table_id for table_tasks_1768655456178
+    SELECT id INTO tasks_table_id
+    FROM public.tables
+    WHERE supabase_table = 'table_tasks_1768655456178'
+    LIMIT 1;
+
+    IF tasks_table_id IS NULL THEN
+        RAISE NOTICE 'Table table_tasks_1768655456178 not found in public.tables';
+        RETURN;
+    END IF;
+
+    -- Check the allocated_to field configuration
+    SELECT type, (options->>'linked_table_id')::uuid
+    INTO allocated_to_field_type, linked_table_id_val
+    FROM public.table_fields
+    WHERE table_id = tasks_table_id
+    AND name = 'allocated_to'
+    LIMIT 1;
+
+    -- If it's a link_to_table field, find the contacts table
+    IF allocated_to_field_type = 'link_to_table' AND linked_table_id_val IS NOT NULL THEN
+        SELECT supabase_table, EXISTS (
+            SELECT 1 FROM information_schema.tables 
+            WHERE table_schema = 'public' 
+            AND table_name = supabase_table
+        )
+        INTO contacts_table_supabase_name, contacts_table_exists
+        FROM public.tables
+        WHERE id = linked_table_id_val
+        LIMIT 1;
+
+        IF contacts_table_supabase_name IS NULL THEN
+            RAISE WARNING 'Linked table for allocated_to field not found';
+            RETURN;
+        END IF;
+
+        IF NOT contacts_table_exists THEN
+            RAISE WARNING 'Contacts table % does not exist', contacts_table_supabase_name;
+            RETURN;
+        END IF;
+
+        RAISE NOTICE 'allocated_to field links to contacts table: %', contacts_table_supabase_name;
+    ELSE
+        RAISE WARNING 'allocated_to field is not configured as link_to_table or linked_table_id is missing';
+        RETURN;
+    END IF;
+
     -- Check if constraint exists using pg_constraint (more reliable)
     SELECT EXISTS (
         SELECT 1 
@@ -56,26 +98,28 @@ BEGIN
 
         -- If it references the wrong table, mark for recreation
         IF constraint_ref_schema IS NULL OR constraint_ref_table IS NULL OR 
-           constraint_ref_schema != 'auth' OR constraint_ref_table != 'users' THEN
-            RAISE NOTICE 'Constraint exists but references %.% (should be auth.users). Will recreate.', 
+           constraint_ref_schema != 'public' OR constraint_ref_table != contacts_table_supabase_name THEN
+            RAISE NOTICE 'Constraint exists but references %.% (should be public.%). Will recreate.', 
                 COALESCE(constraint_ref_schema, 'NULL'), 
-                COALESCE(constraint_ref_table, 'NULL');
+                COALESCE(constraint_ref_table, 'NULL'),
+                contacts_table_supabase_name;
             needs_recreate := true;
         ELSE
-            RAISE NOTICE 'Constraint already exists and correctly references auth.users';
+            RAISE NOTICE 'Constraint already exists and correctly references public.%', contacts_table_supabase_name;
         END IF;
     END IF;
 
-    -- Clean up any invalid allocated_to values (set to NULL if user doesn't exist)
+    -- Clean up any invalid allocated_to values (set to NULL if contact doesn't exist)
     -- Do this BEFORE dropping the constraint to avoid constraint violations
     RAISE NOTICE 'Cleaning up invalid allocated_to values...';
-    UPDATE public.table_tasks_1768655456178
-    SET allocated_to = NULL
-    WHERE allocated_to IS NOT NULL
-    AND NOT EXISTS (
-        SELECT 1 FROM auth.users u 
-        WHERE u.id = table_tasks_1768655456178.allocated_to
-    );
+    EXECUTE format('
+        UPDATE public.table_tasks_1768655456178
+        SET allocated_to = NULL
+        WHERE allocated_to IS NOT NULL
+        AND NOT EXISTS (
+            SELECT 1 FROM public.%I c 
+            WHERE c.id = table_tasks_1768655456178.allocated_to
+        )', contacts_table_supabase_name);
 
     -- Drop and recreate if needed, or create if it doesn't exist
     IF needs_recreate THEN
@@ -83,21 +127,23 @@ BEGIN
         ALTER TABLE public.table_tasks_1768655456178
         DROP CONSTRAINT IF EXISTS table_tasks_allocated_to_fkey;
         
-        RAISE NOTICE 'Adding foreign key constraint to auth.users...';
-        ALTER TABLE public.table_tasks_1768655456178
-        ADD CONSTRAINT table_tasks_allocated_to_fkey
-        FOREIGN KEY (allocated_to) 
-        REFERENCES auth.users(id)
-        ON DELETE SET NULL;
+        RAISE NOTICE 'Adding foreign key constraint to public.%...', contacts_table_supabase_name;
+        EXECUTE format('
+            ALTER TABLE public.table_tasks_1768655456178
+            ADD CONSTRAINT table_tasks_allocated_to_fkey
+            FOREIGN KEY (allocated_to) 
+            REFERENCES public.%I(id)
+            ON DELETE SET NULL', contacts_table_supabase_name);
         
         RAISE NOTICE 'Successfully recreated foreign key constraint';
     ELSIF NOT constraint_exists THEN
-        RAISE NOTICE 'Adding foreign key constraint to auth.users...';
-        ALTER TABLE public.table_tasks_1768655456178
-        ADD CONSTRAINT table_tasks_allocated_to_fkey
-        FOREIGN KEY (allocated_to) 
-        REFERENCES auth.users(id)
-        ON DELETE SET NULL;
+        RAISE NOTICE 'Adding foreign key constraint to public.%...', contacts_table_supabase_name;
+        EXECUTE format('
+            ALTER TABLE public.table_tasks_1768655456178
+            ADD CONSTRAINT table_tasks_allocated_to_fkey
+            FOREIGN KEY (allocated_to) 
+            REFERENCES public.%I(id)
+            ON DELETE SET NULL', contacts_table_supabase_name);
         
         RAISE NOTICE 'Successfully added foreign key constraint';
     END IF;
@@ -110,70 +156,75 @@ SELECT public.fix_allocated_to_foreign_key();
 -- Drop the temporary function
 DROP FUNCTION IF EXISTS public.fix_allocated_to_foreign_key();
 
--- ============================================================================
--- Diagnostic: Check if allocated_to field is incorrectly configured
--- ============================================================================
--- This checks if the allocated_to field is configured as link_to_table
--- which would cause issues since there's no users table in public.tables
-DO $$
-DECLARE
-    field_type text;
-    linked_table_id text;
-    table_id_val uuid;
-BEGIN
-    -- Find the table_id for table_tasks_1768655456178
-    SELECT id INTO table_id_val
-    FROM public.tables
-    WHERE supabase_table = 'table_tasks_1768655456178'
-    LIMIT 1;
-
-    IF table_id_val IS NOT NULL THEN
-        -- Check the allocated_to field configuration
-        SELECT type, options->>'linked_table_id' INTO field_type, linked_table_id
-        FROM public.table_fields
-        WHERE table_id = table_id_val
-        AND name = 'allocated_to'
-        LIMIT 1;
-
-        IF field_type = 'link_to_table' THEN
-            RAISE WARNING 'WARNING: allocated_to field is configured as link_to_table (linked_table_id: %). This may cause issues because:
-  1. LookupFieldPicker expects linked_table_id to point to a table in public.tables
-  2. There is no users table in public.tables (users are in auth.users)
-  3. The UI will try to query a non-existent table, causing errors
-  
-  Solutions:
-  - Option 1: Change the field type to a regular field and use a custom user picker
-  - Option 2: Create a users table/view in public.tables that the link_to_table can reference
-  - Option 3: Modify the UI to handle user fields specially (query auth.users/profiles instead)', 
-                COALESCE(linked_table_id, 'NULL');
-        END IF;
-    END IF;
-END $$;
 
 -- Create a function to validate allocated_to before insert/update
--- Uses SECURITY DEFINER to access auth.users
--- Automatically sets to NULL if user doesn't exist (graceful degradation)
+-- Automatically sets to NULL if contact doesn't exist (graceful degradation)
+-- This function dynamically checks against the contacts table
 CREATE OR REPLACE FUNCTION public.validate_allocated_to()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, auth
+SET search_path = public
 AS $$
+DECLARE
+    tasks_table_id uuid;
+    linked_table_id_val uuid;
+    contacts_table_supabase_name text;
+    contact_exists boolean;
 BEGIN
-    -- If allocated_to is set, verify it exists in auth.users
+    -- Find the contacts table that allocated_to links to
+    SELECT id INTO tasks_table_id
+    FROM public.tables
+    WHERE supabase_table = 'table_tasks_1768655456178'
+    LIMIT 1;
+
+    IF tasks_table_id IS NULL THEN
+        RETURN NEW;
+    END IF;
+
+    SELECT (options->>'linked_table_id')::uuid
+    INTO linked_table_id_val
+    FROM public.table_fields
+    WHERE table_id = tasks_table_id
+    AND name = 'allocated_to'
+    LIMIT 1;
+
+    IF linked_table_id_val IS NULL THEN
+        RETURN NEW;
+    END IF;
+
+    SELECT supabase_table INTO contacts_table_supabase_name
+    FROM public.tables
+    WHERE id = linked_table_id_val
+    LIMIT 1;
+
+    IF contacts_table_supabase_name IS NULL THEN
+        RETURN NEW;
+    END IF;
+
+    -- If allocated_to is set, verify it exists in the contacts table
     -- If not, automatically set to NULL instead of raising an error
-    -- This provides better UX when users are deleted or invalid IDs are passed
     IF NEW.allocated_to IS NOT NULL THEN
-        IF NOT EXISTS (
-            SELECT 1 FROM auth.users WHERE id = NEW.allocated_to
-        ) THEN
+        EXECUTE format('
+            SELECT EXISTS (
+                SELECT 1 FROM public.%I WHERE id = $1
+            )', contacts_table_supabase_name)
+        USING NEW.allocated_to
+        INTO contact_exists;
+        
+        IF NOT contact_exists THEN
             -- Log a warning but don't fail - set to NULL instead
-            RAISE WARNING 'Invalid allocated_to value: user with id % does not exist in auth.users. Setting to NULL.', NEW.allocated_to;
+            RAISE WARNING 'Invalid allocated_to value: contact with id % does not exist in %. Setting to NULL.', 
+                NEW.allocated_to, contacts_table_supabase_name;
             NEW.allocated_to := NULL;
         END IF;
     END IF;
     
     RETURN NEW;
+EXCEPTION
+    WHEN OTHERS THEN
+        -- If anything goes wrong, just return NEW (don't block the operation)
+        RETURN NEW;
 END;
 $$;
 
