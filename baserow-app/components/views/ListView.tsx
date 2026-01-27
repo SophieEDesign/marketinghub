@@ -24,6 +24,8 @@ import type { LinkedField } from "@/types/fields"
 import { resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
 import { normalizeUuid } from "@/lib/utils/ids"
 import { isUserField, getUserDisplayNames } from "@/lib/users/userDisplay"
+import type { HighlightRule } from "@/lib/interface/types"
+import { evaluateHighlightRules, getFormattingStyle } from "@/lib/conditional-formatting/evaluator"
 
 // PostgREST expects unquoted identifiers in order clauses; see `lib/supabase/postgrest`.
 

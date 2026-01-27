@@ -25,6 +25,8 @@ import { sanitizeFieldName } from "@/lib/fields/validation"
 import { resolveSystemFieldAlias } from "@/lib/fields/systemFieldAliases"
 import { normalizeSelectOptionsForUi } from "@/lib/fields/select-options"
 import { getPrimaryField } from "@/lib/fields/primary"
+import type { HighlightRule } from "@/lib/interface/types"
+import { evaluateHighlightRules, getFormattingStyle } from "@/lib/conditional-formatting/evaluator"
 
 interface TimelineViewProps {
   tableId: string

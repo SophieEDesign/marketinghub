@@ -13,6 +13,7 @@ import type { FilterTree } from "@/lib/filters/canonical-model"
 import { asArray } from "@/lib/utils/asArray"
 import { normalizeUuid } from "@/lib/utils/ids"
 import type { GroupRule } from "@/lib/grouping/types"
+import type { HighlightRule } from "@/lib/interface/types"
 
 interface Filter {
   id?: string

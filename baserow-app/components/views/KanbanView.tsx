@@ -14,6 +14,8 @@ import { CellFactory } from "@/components/grid/CellFactory"
 import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
 import { isAbortError } from "@/lib/api/error-handling"
 import EmptyState from "@/components/empty-states/EmptyState"
+import type { HighlightRule } from "@/lib/interface/types"
+import { evaluateHighlightRules, getFormattingStyle } from "@/lib/conditional-formatting/evaluator"
 
 interface KanbanViewProps {
   tableId: string

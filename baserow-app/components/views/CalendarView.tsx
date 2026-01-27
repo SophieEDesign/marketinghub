@@ -1090,7 +1090,7 @@ export default function CalendarView({
             f.name.toLowerCase().includes('date_from') ||
             f.name.toLowerCase().includes('from_date')
           )
-        )
+        ) ?? null
       }
       
       const actualFromFieldName = resolvedFromField?.name || startField?.name || viewConfig?.calendar_start_field || autoDetectedFromField?.name || actualFieldName || null
@@ -1113,7 +1113,7 @@ export default function CalendarView({
             f.name.toLowerCase().includes('date_to') ||
             f.name.toLowerCase().includes('to_date')
           )
-        )
+        ) ?? null
       }
       
       const actualToFieldName = resolvedToField?.name || endField?.name || viewConfig?.calendar_end_field || autoDetectedToField?.name || null

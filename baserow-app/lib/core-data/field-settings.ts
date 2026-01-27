@@ -7,7 +7,7 @@
  */
 
 import { createClient } from '@/lib/supabase/client'
-import type { TableField, FieldOptions, SelectOption } from '@/types/fields'
+import type { TableField, FieldOptions, SelectOption, FieldType } from '@/types/fields'
 import type { CanonicalFieldSettings, FieldSettingsUpdate, ValidationResult } from './types'
 import { normalizeSelectOptionsForUi } from '@/lib/fields/select-options'
 import { getFieldDisplayName } from '@/lib/fields/display'

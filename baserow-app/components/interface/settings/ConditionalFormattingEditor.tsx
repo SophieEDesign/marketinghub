@@ -260,11 +260,11 @@ export default function ConditionalFormattingEditor({
                 value={currentRule.field}
                 onValueChange={(value) => {
                   const field = fields.find(f => f.name === value || f.id === value)
-                  const operators = field ? getOperatorsForFieldType(field.type) : ['eq', 'neq']
+                  const operators = field ? getOperatorsForFieldType(field.type) : ['eq', 'neq'] as HighlightRule['operator'][]
                   setCurrentRule({
                     ...currentRule,
                     field: value,
-                    operator: operators.includes(currentRule.operator) ? currentRule.operator : operators[0],
+                    operator: operators.includes(currentRule.operator) ? currentRule.operator : (operators[0] as HighlightRule['operator']),
                     value: undefined, // Reset value when field changes
                   })
                 }}
