@@ -1246,6 +1246,8 @@ export default function FieldSettingsDrawer({
                       // Reset display fields when table changes
                       primary_label_field: undefined,
                       secondary_label_fields: undefined,
+                      // Enable allow_create by default when table is selected
+                      allow_create: tableId ? (options.allow_create !== false ? true : false) : options.allow_create,
                     })
                   }
                 >
@@ -1396,7 +1398,7 @@ export default function FieldSettingsDrawer({
                     </div>
                     <Switch
                       id="link-allow-create"
-                      checked={options.allow_create || false}
+                      checked={options.allow_create !== false}
                       onCheckedChange={(checked) =>
                         setOptions({ ...options, allow_create: checked })
                       }

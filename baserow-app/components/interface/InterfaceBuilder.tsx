@@ -10,6 +10,7 @@ import Canvas from "./Canvas"
 import FloatingBlockPicker from "./FloatingBlockPicker"
 import SettingsPanel from "./SettingsPanel"
 import PageSettingsDrawer from "./PageSettingsDrawer"
+import HorizontalGroupedCanvasModal from "./blocks/HorizontalGroupedCanvasModal"
 import type { PageBlock, LayoutItem, Page } from "@/lib/interface/types"
 import { BLOCK_REGISTRY } from "@/lib/interface/registry"
 import type { BlockType } from "@/lib/interface/types"
@@ -31,6 +32,9 @@ import {
 import { usePageAggregates } from "@/lib/dashboard/usePageAggregates"
 import { useFilterState } from "@/lib/interface/filter-state"
 import SaveStatusIndicator from "@/components/save-status/SaveStatusIndicator"
+import { createClient } from "@/lib/supabase/client"
+import type { FilterConfig } from "@/lib/interface/filters"
+import type { FilterTree } from "@/lib/filters/canonical-model"
 
 interface InterfaceBuilderProps {
   page: Page
@@ -223,6 +227,14 @@ export default function InterfaceBuilder({
   const [currentPage, setCurrentPage] = useState<Page>(page)
   // Track which block's internal canvas is being edited (for horizontal_grouped blocks)
   const [editingBlockCanvasId, setEditingBlockCanvasId] = useState<string | null>(null)
+  // Track modal state for horizontal_grouped canvas editing
+  const [canvasModalOpen, setCanvasModalOpen] = useState(false)
+  const [canvasModalBlock, setCanvasModalBlock] = useState<PageBlock | null>(null)
+  const [canvasModalData, setCanvasModalData] = useState<{
+    tableId: string
+    tableName: string
+    tableFields: any[]
+  } | null>(null)
   // CRITICAL: Store latest grid layout in ref (source of truth during editing)
   // The grid library (react-grid-layout) has the authoritative layout
   // Blocks state is derived and may lag behind grid interactions
@@ -1412,8 +1424,61 @@ export default function InterfaceBuilder({
           allBlocks={blocks}
           onLock={handleLockBlock}
           editingBlockCanvasId={editingBlockCanvasId}
-          onEditBlockCanvas={(blockId) => {
-            setEditingBlockCanvasId(blockId)
+          onEditBlockCanvas={async (blockId) => {
+            // For horizontal_grouped blocks, open modal instead of inline editing
+            const block = blocks.find(b => b.id === blockId)
+            if (block?.type === 'horizontal_grouped') {
+              const tableId = block.config?.table_id || pageTableId
+              if (!tableId) {
+                toast({
+                  variant: "destructive",
+                  title: "Table not configured",
+                  description: "Please configure a table in block settings first.",
+                })
+                return
+              }
+              
+              // Load table data for modal
+              try {
+                const supabase = createClient()
+                const { data: tableData } = await supabase
+                  .from("tables")
+                  .select("supabase_table")
+                  .eq("id", tableId)
+                  .single()
+                
+                if (!tableData?.supabase_table) {
+                  toast({
+                    variant: "destructive",
+                    title: "Error",
+                    description: "Could not load table information.",
+                  })
+                  return
+                }
+                
+                // Load fields
+                const response = await fetch(`/api/tables/${tableId}/fields`)
+                const data = await response.json()
+                
+                setCanvasModalData({
+                  tableId,
+                  tableName: tableData.supabase_table,
+                  tableFields: data.fields || [],
+                })
+                setCanvasModalBlock(block)
+                setCanvasModalOpen(true)
+              } catch (error) {
+                console.error("Error loading table data for modal:", error)
+                toast({
+                  variant: "destructive",
+                  title: "Error",
+                  description: "Failed to load table data.",
+                })
+              }
+            } else {
+              // For other block types, use inline editing
+              setEditingBlockCanvasId(blockId)
+            }
           }}
           onExitBlockCanvas={() => {
             setEditingBlockCanvasId(null)
@@ -1433,6 +1498,53 @@ export default function InterfaceBuilder({
         onOpenChange={setPageSettingsOpen}
         onPageUpdate={handlePageUpdate}
       />
+
+      {/* Horizontal Grouped Canvas Modal */}
+      {canvasModalOpen && canvasModalBlock && canvasModalData && (
+        <HorizontalGroupedCanvasModal
+          open={canvasModalOpen}
+          onOpenChange={setCanvasModalOpen}
+          block={canvasModalBlock}
+          tableId={canvasModalData.tableId}
+          tableName={canvasModalData.tableName}
+          tableFields={canvasModalData.tableFields}
+          filters={[]}
+          filterTree={null}
+          groupBy={canvasModalBlock.config?.group_by_field}
+          groupByRules={canvasModalBlock.config?.group_by_rules as any}
+          recordFields={(canvasModalBlock.config?.record_fields as any) || []}
+          storedLayout={(canvasModalBlock.config?.record_field_layout as any) || null}
+          highlightRules={(canvasModalBlock.config?.highlight_rules as any) || []}
+          onSave={async (blocks) => {
+            // Save the layout to block config
+            await handleBlockUpdate(canvasModalBlock.id, {
+              record_field_layout: blocks,
+            })
+            // Update the block in local state
+            setBlocks((prev) =>
+              prev.map((b) =>
+                b.id === canvasModalBlock.id
+                  ? { ...b, config: { ...b.config, record_field_layout: blocks } }
+                  : b
+              )
+            )
+            // Update canvasModalBlock to reflect changes
+            setCanvasModalBlock((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    config: { ...prev.config, record_field_layout: blocks },
+                  }
+                : null
+            )
+            toast({
+              variant: "default",
+              title: "Canvas layout saved",
+              description: "Changes have been saved successfully.",
+            })
+          }}
+        />
+      )}
     </div>
   )
 }

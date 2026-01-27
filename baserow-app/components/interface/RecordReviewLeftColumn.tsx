@@ -219,38 +219,72 @@ export default function RecordReviewLeftColumn({
   useEffect(() => {
     if (!tableId) return
 
+    const abortController = new AbortController()
+
     async function loadTableInfo() {
-      const supabase = createClient()
-      
-      // Load table name
-      const { data: table } = await supabase
-        .from("tables")
-        .select("name, supabase_table")
-        .eq("id", tableId)
-        .single()
-
-      if (table) {
-        setTableName(table.name)
-        setSupabaseTableName(table.supabase_table || null)
+      try {
+        const supabase = createClient()
         
-        // Load fields
-        const { data: tableFields } = await supabase
-          .from("table_fields")
-          .select("*")
-          .eq("table_id", tableId)
-          .order("order_index", { ascending: true })
+        // Load table name
+        const { data: table, error: tableError } = await supabase
+          .from("tables")
+          .select("name, supabase_table")
+          .eq("id", tableId)
+          .single()
 
-        if (tableFields) {
-          setFields(tableFields as TableField[])
+        if (abortController.signal.aborted) return
+
+        if (tableError) {
+          if (!isAbortError(tableError)) {
+            console.error("Error loading table:", tableError)
+          }
+          return
         }
 
-        // Load records
-        await loadRecords(table.supabase_table)
+        if (table) {
+          if (abortController.signal.aborted) return
+          setTableName(table.name)
+          setSupabaseTableName(table.supabase_table || null)
+          
+          // Load fields
+          const { data: tableFields, error: fieldsError } = await supabase
+            .from("table_fields")
+            .select("*")
+            .eq("table_id", tableId)
+            .order("order_index", { ascending: true })
+
+          if (abortController.signal.aborted) return
+
+          if (fieldsError) {
+            if (!isAbortError(fieldsError)) {
+              console.error("Error loading fields:", fieldsError)
+            }
+            return
+          }
+
+          if (tableFields) {
+            if (abortController.signal.aborted) return
+            setFields(tableFields as TableField[])
+          }
+
+          // Load records
+          if (!abortController.signal.aborted) {
+            await loadRecords(table.supabase_table)
+          }
+        }
+      } catch (error) {
+        if (!isAbortError(error)) {
+          console.error("Error loading table info:", error)
+        }
       }
     }
 
     loadTableInfo()
-  }, [tableId])
+
+    return () => {
+      abortController.abort()
+    }
+  }, [tableId, loadRecords])
 
   const loadRecords = useCallback(async (supabaseTableName: string) => {
     if (!supabaseTableName) return
@@ -501,6 +535,8 @@ export default function RecordReviewLeftColumn({
   // Build group tree using the grouping library
   const groupModel = useMemo(() => {
     if (effectiveGroupRules.length === 0) return null
+    // Don't build group tree if fields aren't loaded yet (needed to resolve field names)
+    if (!fields || fields.length === 0) return null
     return buildGroupTree(filteredRecords, fields, effectiveGroupRules, {
       emptyLabel: '(Empty)',
       emptyLast: true,

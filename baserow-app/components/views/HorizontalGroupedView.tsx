@@ -213,6 +213,8 @@ export default function HorizontalGroupedView({
   // Build group tree
   const groupModel = useMemo(() => {
     if (effectiveGroupRules.length === 0) return null
+    // Don't build group tree if fields aren't loaded yet (needed to resolve field names)
+    if (!tableFields || tableFields.length === 0) return null
     return buildGroupTree(filteredRows, tableFields, effectiveGroupRules, {
       emptyLabel: '(Empty)',
       emptyLast: true,
@@ -465,7 +467,7 @@ export default function HorizontalGroupedView({
 
   return (
     <div className="flex flex-col h-full">
-      <Tabs value={activeTab || undefined} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+      <Tabs value={activeTab ?? ""} onValueChange={setActiveTab} className="flex-1 flex flex-col">
         <div className="border-b bg-background px-4">
           <TabsList className="w-full justify-start h-auto p-0 bg-transparent">
             {groups.map((group) => {

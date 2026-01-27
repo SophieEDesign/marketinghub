@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { createClient } from "@/lib/supabase/client"
+import { isAbortError } from "@/lib/api/error-handling"
 
 interface PermissionsTabProps {
   tableId: string
@@ -36,7 +37,10 @@ const PermissionsTab = memo(function PermissionsTab({ tableId, tableName }: Perm
 
       setUserRole(profile?.role || null)
     } catch (error) {
-      console.error('Error loading user role:', error)
+      // Only log non-abort errors (abort errors are expected during rapid navigation/unmount)
+      if (!isAbortError(error)) {
+        console.error('Error loading user role:', error)
+      }
     }
   }
 

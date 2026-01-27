@@ -11,6 +11,7 @@ import AttachmentPreview, { type Attachment } from "@/components/attachments/Att
 import InlineFieldEditor from "@/components/records/InlineFieldEditor"
 import { resolveSystemFieldAlias } from "@/lib/fields/systemFieldAliases"
 import RecordModal from "@/components/calendar/RecordModal"
+import { isAbortError } from "@/lib/api/error-handling"
 
 interface FieldBlockProps {
   block: PageBlock
@@ -196,7 +197,10 @@ export default function FieldBlock({
       // Default to member if no profile found
       setUserRole('member')
     } catch (error) {
-      console.error("Error loading user role:", error)
+      // Ignore abort errors (expected during rapid navigation/unmount)
+      if (!isAbortError(error)) {
+        console.error("Error loading user role:", error)
+      }
       setUserRole('member')
     }
   }
@@ -247,7 +251,10 @@ export default function FieldBlock({
         setField(fieldData as TableField)
       }
     } catch (error) {
-      console.error("Error loading field info:", error)
+      // Ignore abort errors (expected during rapid navigation/unmount)
+      if (!isAbortError(error)) {
+        console.error("Error loading field info:", error)
+      }
     } finally {
       setLoading(false)
     }
@@ -392,7 +399,10 @@ export default function FieldBlock({
         setFieldValue(value)
       }
     } catch (error) {
-      console.error("Error loading field value:", error)
+      // Ignore abort errors (expected during rapid navigation/unmount)
+      if (!isAbortError(error)) {
+        console.error("Error loading field value:", error)
+      }
       setFieldValue(null)
     } finally {
       setLoading(false)

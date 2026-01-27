@@ -194,6 +194,11 @@ export async function POST(
 
     // Normalize options early (we may mutate for bidirectional links).
     const normalizedOptions: FieldOptions = (options || {}) as FieldOptions
+    
+    // Enable allow_create by default for link_to_table fields
+    if (type === 'link_to_table' && normalizedOptions.allow_create === undefined) {
+      normalizedOptions.allow_create = true
+    }
 
     // Start transaction-like operation
     // 1. Create metadata record (table_fields table must exist)

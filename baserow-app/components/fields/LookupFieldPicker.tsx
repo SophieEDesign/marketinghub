@@ -9,6 +9,7 @@ import type { TableField } from "@/types/fields"
 import { cn } from "@/lib/utils"
 import { getPrimaryFieldName } from "@/lib/fields/primary"
 import { toPostgrestColumn } from "@/lib/supabase/postgrest"
+import { resolveFieldColor, normalizeHexColor, getTextColorForBackground } from "@/lib/field-colors"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 function isUuid(v: unknown): v is string {
@@ -589,6 +590,14 @@ export default function LookupFieldPicker({
     [isMultiSelect, options, selectedIdSet]
   )
 
+  // Resolve color for linked field pills
+  const fieldColor = useMemo(() => {
+    if (field.type === 'link_to_table' || field.type === 'lookup') {
+      return resolveFieldColor(field.type, null, field.options)
+    }
+    return null
+  }, [field.type, field.options])
+
   // For lookup fields (read-only), render as informational pills without popover
   if (isLookupField || disabled) {
     return (
@@ -608,27 +617,36 @@ export default function LookupFieldPicker({
           )}
         >
           {selectedOptions.length > 0 ? (
-            selectedOptions.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                className={cn(
-                  "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium",
-                  isLookupField 
-                    ? "bg-gray-100/80 text-gray-600 border border-gray-200/50" 
-                    : "bg-gray-100 text-gray-700",
-                  onRecordClick && "group"
-                )}
-                style={{ boxShadow: isLookupField ? 'none' : '0 1px 2px rgba(0, 0, 0, 0.05)' }}
-                onClick={(e) => handleNavigateToRecord(e, option.id)}
-                title="Open linked record"
-                aria-label={`Open linked record: ${option.primaryLabel}`}
-              >
-                <span className={cn(onRecordClick && "hover:text-blue-600 hover:underline transition-colors")}>
-                  {option.primaryLabel}
-                </span>
-              </button>
-            ))
+            selectedOptions.map((option) => {
+              // Use field color if available, otherwise use default gray
+              const bgColor = fieldColor ? normalizeHexColor(fieldColor) : '#F3F4F6'
+              const textColorClass = fieldColor ? getTextColorForBackground(bgColor) : 'text-gray-600'
+              const borderColor = fieldColor ? `${bgColor}33` : '#E5E7EB'
+              
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  className={cn(
+                    "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border",
+                    textColorClass,
+                    onRecordClick && "group cursor-pointer hover:opacity-80 transition-opacity"
+                  )}
+                  style={{ 
+                    backgroundColor: bgColor,
+                    borderColor: borderColor,
+                    boxShadow: isLookupField ? 'none' : '0 1px 2px rgba(0, 0, 0, 0.05)' 
+                  }}
+                  onClick={(e) => handleNavigateToRecord(e, option.id)}
+                  title="Open linked record"
+                  aria-label={`Open linked record: ${option.primaryLabel}`}
+                >
+                  <span className={cn(onRecordClick && "hover:underline transition-colors")}>
+                    {option.primaryLabel}
+                  </span>
+                </button>
+              )
+            })
           ) : (
             <span className="text-gray-400 italic">{placeholder}</span>
           )}
@@ -662,57 +680,78 @@ export default function LookupFieldPicker({
           >
             {selectedOptions.length > 0 ? (
               <>
-                {selectedOptions.map((option) => (
-                  <span
-                    key={option.id}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200/50"
-                    style={{ boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)' }}
-                    onMouseDown={(e) => {
-                      // Allow drag operations to pass through (same as select fields)
-                      e.stopPropagation()
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      // Clicking the pill navigates to the linked record (Airtable mental model).
-                      if (onRecordClick && lookupTableId) {
-                        onRecordClick(lookupTableId, option.id)
-                      }
-                    }}
-                    title="Open linked record"
-                    role="button"
-                  >
+                {selectedOptions.map((option) => {
+                  // Use field color if available, otherwise use default blue
+                  const bgColor = fieldColor ? normalizeHexColor(fieldColor) : '#DBEAFE'
+                  const textColorClass = fieldColor ? getTextColorForBackground(bgColor) : 'text-blue-700'
+                  const borderColor = fieldColor ? `${bgColor}33` : '#BFDBFE'
+                  const hoverBgColor = fieldColor ? `${bgColor}CC` : '#BFDBFE'
+                  
+                  return (
                     <span
+                      key={option.id}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border cursor-pointer",
+                        textColorClass
+                      )}
+                      style={{ 
+                        backgroundColor: bgColor,
+                        borderColor: borderColor,
+                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)' 
+                      }}
                       onMouseDown={(e) => {
                         // Allow drag operations to pass through (same as select fields)
                         e.stopPropagation()
                       }}
                       onClick={(e) => {
-                        // Already handled by pill click; keep for accessibility/selection.
-                        handleNavigateToRecord(e, option.id)
+                        e.stopPropagation()
+                        // Clicking the pill navigates to the linked record (Airtable mental model).
+                        if (onRecordClick && lookupTableId) {
+                          onRecordClick(lookupTableId, option.id)
+                        }
                       }}
-                      className="cursor-pointer hover:text-blue-800 hover:underline transition-colors"
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = hoverBgColor
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = bgColor
+                      }}
+                      title="Open linked record"
+                      role="button"
                     >
-                      {option.primaryLabel}
-                    </span>
-                    {!disabled && (
-                      <button
+                      <span
                         onMouseDown={(e) => {
                           // Allow drag operations to pass through (same as select fields)
                           e.stopPropagation()
                         }}
                         onClick={(e) => {
-                          e.stopPropagation()
-                          handleRemove(option.id)
+                          // Already handled by pill click; keep for accessibility/selection.
+                          handleNavigateToRecord(e, option.id)
                         }}
-                        className="ml-0.5 rounded-full p-0.5 hover:bg-blue-200/50 transition-colors opacity-70 hover:opacity-100"
-                        title="Remove"
-                        aria-label="Remove"
+                        className="hover:underline transition-colors"
                       >
-                        <X className="h-3 w-3" />
-                      </button>
-                    )}
-                  </span>
-                ))}
+                        {option.primaryLabel}
+                      </span>
+                      {!disabled && (
+                        <button
+                          onMouseDown={(e) => {
+                            // Allow drag operations to pass through (same as select fields)
+                            e.stopPropagation()
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleRemove(option.id)
+                          }}
+                          className="ml-0.5 rounded-full p-0.5 hover:bg-black/10 transition-colors opacity-70 hover:opacity-100"
+                          title="Remove"
+                          aria-label="Remove"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
+                    </span>
+                  )
+                })}
                 {isMultiSelect && selectedOptions.length > 1 && (
                   <span className="text-gray-500 text-xs ml-1">
                     {selectedOptions.length} selected

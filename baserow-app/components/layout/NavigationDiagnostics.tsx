@@ -97,9 +97,15 @@ export default function NavigationDiagnostics() {
 
     // Run diagnostics on pathname change
     // Only show detailed diagnostics if there's an issue, otherwise just a summary
-    const runDiagnostics = () => {
+    const runDiagnostics = (isDelayedCheck = false) => {
       const sidebarCheck = document.querySelector('[data-sidebar]')
       if (!sidebarCheck) {
+        // During navigation transitions, sidebar might be temporarily unmounted
+        // Only show error if this is a delayed check (after navigation should have completed)
+        if (!isDelayedCheck) {
+          // Skip immediate check during navigation - will check again after delay
+          return
+        }
         console.group("🔍 Navigation Diagnostics - ISSUES DETECTED")
         console.error("❌ CRITICAL: Sidebar not found! Looking for [data-sidebar] attribute")
         // Try to find sidebar by other means
@@ -289,11 +295,15 @@ export default function NavigationDiagnostics() {
       console.groupEnd()
     }
 
-    // Run immediately and after a delay (but only show details if issues found)
-    runDiagnostics()
-    const timeout = setTimeout(runDiagnostics, 1000)
+    // Run after a delay to allow navigation to complete and sidebar to mount
+    // First check is delayed to avoid false positives during navigation transitions
+    const timeout1 = setTimeout(() => runDiagnostics(false), 100)
+    const timeout2 = setTimeout(() => runDiagnostics(true), 1000)
 
-    return () => clearTimeout(timeout)
+    return () => {
+      clearTimeout(timeout1)
+      clearTimeout(timeout2)
+    }
   }, [pathname, enabled])
 
   // Add click listener to document to catch ALL clicks (even blocked ones)

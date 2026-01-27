@@ -11,6 +11,7 @@ import { supabase } from "@/lib/supabase/client"
 import type { TableField } from "@/types/fields"
 import type { ViewType, FilterType } from "@/types/database"
 import { normalizeUuid } from "@/lib/utils/ids"
+import { isAbortError } from "@/lib/api/error-handling"
 
 interface AirtableViewPageProps {
   tableId: string
@@ -142,7 +143,10 @@ export default function AirtableViewPage({
       // Default to editor so existing edit flows keep working; server still enforces admin-only deletes.
       setUserRole("editor")
     } catch (error) {
-      console.error("Error loading user role:", error)
+      // Only log non-abort errors (abort errors are expected during rapid navigation/unmount)
+      if (!isAbortError(error)) {
+        console.error("Error loading user role:", error)
+      }
       setUserRole("editor")
     }
   }

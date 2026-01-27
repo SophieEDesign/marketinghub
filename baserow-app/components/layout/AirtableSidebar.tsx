@@ -401,9 +401,10 @@ export default function AirtableSidebar({
                                   actual: newPathname,
                                   stillOn: initialPathname,
                                 })
-                                // Fallback: manually trigger navigation if Next.js Link didn't work
+                                // Fallback: use window.location for more reliable navigation
+                                // This works even if the component is unmounting
                                 console.log("[Table Link] Attempting manual navigation fallback...")
-                                router.push(targetPath)
+                                window.location.href = targetPath
                               }
                             }, 100)
                           }

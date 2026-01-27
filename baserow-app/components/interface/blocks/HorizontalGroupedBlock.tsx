@@ -66,35 +66,73 @@ export default function HorizontalGroupedBlock({
       return
     }
 
+    const abortController = new AbortController()
+
     async function loadTableInfo() {
       try {
         const supabase = createClient()
         
         // Load table name
-        const { data: tableData } = await supabase
+        const { data: tableData, error: tableError } = await supabase
           .from("tables")
           .select("supabase_table")
           .eq("id", tableId)
           .single()
 
+        if (abortController.signal.aborted) return
+
+        if (tableError) {
+          if (tableError.name !== 'AbortError') {
+            console.error("Error loading table:", tableError)
+          }
+          return
+        }
+
         if (tableData) {
+          if (abortController.signal.aborted) return
           setTableName(tableData.supabase_table)
         }
 
-        // Load fields
-        const response = await fetch(`/api/tables/${tableId}/fields`)
-        const data = await response.json()
-        if (data.fields) {
-          setTableFields(data.fields)
+        // Load fields with abort signal
+        const response = await fetch(`/api/tables/${tableId}/fields`, {
+          signal: abortController.signal,
+          cache: 'no-store'
+        })
+        
+        if (abortController.signal.aborted) return
+
+        if (!response.ok) {
+          console.error(`Error loading fields: ${response.status} ${response.statusText}`)
+          return
         }
-      } catch (error) {
+
+        const data = await response.json()
+        if (abortController.signal.aborted) return
+
+        if (data.fields && Array.isArray(data.fields)) {
+          setTableFields(data.fields)
+        } else {
+          console.warn("Fields API returned unexpected format:", data)
+          setTableFields([])
+        }
+      } catch (error: any) {
+        // Ignore abort errors (expected during navigation/unmount)
+        if (error?.name === 'AbortError') {
+          return
+        }
         console.error("Error loading table info:", error)
       } finally {
-        setLoading(false)
+        if (!abortController.signal.aborted) {
+          setLoading(false)
+        }
       }
     }
 
     loadTableInfo()
+
+    return () => {
+      abortController.abort()
+    }
   }, [tableId])
 
   if (loading) {
@@ -111,6 +149,15 @@ export default function HorizontalGroupedBlock({
         <div className="text-sm text-muted-foreground text-center">
           {isEditing ? "Please configure a table in block settings" : "No table configured"}
         </div>
+      </div>
+    )
+  }
+
+  // Don't render view until fields are loaded (needed for grouping)
+  if (tableFields.length === 0 && (groupBy || (groupByRules && groupByRules.length > 0))) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[200px]">
+        <div className="text-sm text-muted-foreground">Loading fields...</div>
       </div>
     )
   }
@@ -145,7 +192,7 @@ export default function HorizontalGroupedBlock({
         groupByRules={groupByRules}
         onRecordClick={onRecordClick}
         recordFields={recordFields}
-        isEditing={isEditingCanvas || isEditing}
+        isEditing={isEditingCanvas}
         onBlockUpdate={handleLayoutUpdate}
         storedLayout={storedLayout}
         highlightRules={highlightRules}

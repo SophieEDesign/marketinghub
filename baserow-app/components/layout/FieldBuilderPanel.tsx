@@ -39,6 +39,7 @@ import FieldSettingsDrawer from "./FieldSettingsDrawer"
 import { getTableSections, reorderSections, upsertSectionSettings, ensureSectionExists } from "@/lib/core-data/section-settings"
 import type { SectionSettings } from "@/lib/core-data/types"
 import { ChevronUp, ChevronDown } from "lucide-react"
+import { isAbortError } from "@/lib/api/error-handling"
 
 interface FieldBuilderPanelProps {
   tableId: string
@@ -171,7 +172,10 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
         await loadSections()
       }
     } catch (error) {
-      console.error("Error loading fields:", error)
+      // Ignore abort errors (expected during rapid navigation/unmount)
+      if (!isAbortError(error)) {
+        console.error("Error loading fields:", error)
+      }
     } finally {
       setLoading(false)
     }
@@ -381,10 +385,6 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
     }
   }
 
-  if (loading) {
-    return <div className="text-center py-8 text-gray-500">Loading fields...</div>
-  }
-
   // Get all unique section names from fields (including those not in sections table yet)
   const allSectionNames = useMemo(() => {
     const sectionSet = new Set<string>()
@@ -448,6 +448,10 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
       return a.name.localeCompare(b.name)
     })
   }, [sections, allSectionNames, fields, tableId])
+
+  if (loading) {
+    return <div className="text-center py-8 text-gray-500">Loading fields...</div>
+  }
 
   return (
     <div className="space-y-4">
@@ -873,6 +877,8 @@ function NewFieldForm({
                   setOptions({
                     ...options,
                     linked_table_id: v || undefined,
+                    // Enable allow_create by default when table is selected
+                    allow_create: options.allow_create !== false ? true : false,
                   })
                 }
               >
@@ -953,6 +959,28 @@ function NewFieldForm({
                 )}
               </div>
             )}
+            
+            {/* Allow Create Option */}
+            <div className="space-y-2 border-t pt-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-xs font-medium text-gray-700">
+                    Allow creating new records
+                  </Label>
+                  <p className="text-xs text-gray-500">
+                    Enable users to create new records directly from this linked field
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={options.allow_create !== false}
+                  onChange={(e) =>
+                    setOptions({ ...options, allow_create: e.target.checked })
+                  }
+                  className="w-4 h-4"
+                />
+              </div>
+            </div>
           </div>
         )
 
