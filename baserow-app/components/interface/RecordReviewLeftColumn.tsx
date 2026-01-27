@@ -57,7 +57,8 @@ interface RecordReviewLeftColumnProps {
     filter_by?: Array<{ field: string; operator: string; value: any }>
     filter_tree?: FilterTree
     sort_by?: Array<{ field: string; direction: "asc" | "desc" }>
-    group_by?: string | string[]
+    group_by?: string | string[] // Legacy: single field or array of fields
+    group_by_rules?: GroupRule[] // New: nested grouping rules (takes precedence over group_by)
     color_field?: string
     image_field?: string
   }
@@ -188,13 +189,29 @@ export default function RecordReviewLeftColumn({
     return Array.isArray(sorts) ? sorts : []
   }, [effectiveLeftPanelConfig?.sort_by])
 
+  // Support both nested groups (group_by_rules) and legacy single field/array (group_by)
+  const groupByRules: GroupRule[] | undefined = useMemo(() => {
+    const rules = effectiveLeftPanelConfig?.group_by_rules
+    if (Array.isArray(rules) && rules.length > 0) {
+      return rules.filter(Boolean) as GroupRule[]
+    }
+    return undefined
+  }, [effectiveLeftPanelConfig?.group_by_rules])
+
   const groupByFields: string[] = useMemo(() => {
+    // If group_by_rules exists, convert to legacy format for backward compatibility
+    if (groupByRules && groupByRules.length > 0) {
+      return groupByRules
+        .filter(r => r.type === 'field')
+        .map(r => r.field)
+    }
+    // Otherwise use legacy group_by
     const gb = effectiveLeftPanelConfig?.group_by
     if (!gb) return []
     if (Array.isArray(gb)) return gb.filter(Boolean)
     if (typeof gb === "string" && gb.trim()) return [gb.trim()]
     return []
-  }, [effectiveLeftPanelConfig?.group_by])
+  }, [effectiveLeftPanelConfig?.group_by, groupByRules])
 
   // Load table name and fields
   useEffect(() => {
@@ -281,7 +298,7 @@ export default function RecordReviewLeftColumn({
   const handleOpenCreateModal = useCallback(() => {
     // Only enable this UX for record_view pages (requested)
     if (!isRecordView) return
-    if (!showAddRecord || !supabaseTableName || creating) return
+    if (!supabaseTableName || creating) return
     if (!canCreateRecord(userRole, pageConfig)) {
       toast({
         variant: "destructive",
@@ -291,7 +308,7 @@ export default function RecordReviewLeftColumn({
       return
     }
     setCreateModalOpen(true)
-  }, [creating, isRecordView, pageConfig, showAddRecord, supabaseTableName, toast, userRole])
+  }, [creating, isRecordView, pageConfig, supabaseTableName, toast, userRole])
 
   const handleCreateRecord = useCallback(async (primaryValue: string) => {
     if (!isRecordView) return
@@ -399,7 +416,6 @@ export default function RecordReviewLeftColumn({
     pageId,
     pageConfig,
     primaryCreateField?.name,
-    showAddRecord,
     supabaseTableName,
     toast,
     userRole,
@@ -468,105 +484,72 @@ export default function RecordReviewLeftColumn({
     return Array.isArray(choices) ? choices : []
   }, [fields])
 
-  const groupRecords = useCallback((rows: any[], groupFields: string[]) => {
-    // Returns a nested tree:
-    // - leaf nodes: { type: 'leaf', records: any[] }
-    // - group nodes: { type: 'group', field: string, key: string, label: string, children: Node }
-    type Node =
-      | { type: "leaf"; records: any[] }
-      | { type: "branch"; field: string; groups: Array<{ key: string; label: string; child: Node; count: number }> }
-
-    const build = (subset: any[], depth: number): Node => {
-      const fieldName = groupFields[depth]
-      if (!fieldName) return { type: "leaf", records: subset }
-
-      const order = getGroupOrder(fieldName)
-      const buckets = new Map<string, any[]>()
-
-      for (const r of subset) {
-        const v = r?.[fieldName]
-        if (Array.isArray(v)) {
-          // multi-select: show record in each group (Airtable behavior)
-          const vals = v.filter((x) => x !== null && x !== undefined && String(x).trim() !== "")
-          if (vals.length === 0) {
-            buckets.set("", [...(buckets.get("") || []), r])
-          } else {
-            for (const vv of vals) {
-              const key = String(vv)
-              buckets.set(key, [...(buckets.get(key) || []), r])
-            }
-          }
-        } else if (v === null || v === undefined || String(v).trim() === "") {
-          buckets.set("", [...(buckets.get("") || []), r])
-        } else {
-          const key = String(v)
-          buckets.set(key, [...(buckets.get(key) || []), r])
-        }
-      }
-
-      const keys = Array.from(buckets.keys())
-      // Prefer select option order if available; otherwise alpha. Empty group last.
-      const ordered = keys
-        .filter((k) => k !== "")
-        .sort((a, b) => {
-          const ai = order.indexOf(a)
-          const bi = order.indexOf(b)
-          const aIn = ai !== -1
-          const bIn = bi !== -1
-          if (aIn && bIn) return ai - bi
-          if (aIn) return -1
-          if (bIn) return 1
-          return a.localeCompare(b)
-        })
-
-      if (keys.includes("")) ordered.push("")
-
-      return {
-        type: "branch",
-        field: fieldName,
-        groups: ordered.map((k) => {
-          const recs = buckets.get(k) || []
-          const child = build(recs, depth + 1)
-          const count = recs.length
-          return { key: k, label: k === "" ? "Ungrouped" : k, child, count }
-        }),
-      }
+  // Build effective group rules: prefer group_by_rules, fallback to group_by fields
+  const effectiveGroupRules = useMemo<GroupRule[]>(() => {
+    if (groupByRules && groupByRules.length > 0) {
+      return groupByRules
     }
+    // Convert legacy group_by fields to rules format
+    if (groupByFields.length > 0) {
+      return groupByFields.map(field => ({ type: 'field' as const, field }))
+    }
+    return []
+  }, [groupByRules, groupByFields])
 
-    return build(rows, 0)
-  }, [getGroupOrder])
+  // Build group tree using the grouping library
+  const groupModel = useMemo(() => {
+    if (effectiveGroupRules.length === 0) return null
+    return buildGroupTree(filteredRecords, fields, effectiveGroupRules, {
+      emptyLabel: '(Empty)',
+      emptyLast: true,
+    })
+  }, [effectiveGroupRules, filteredRecords, fields])
 
-  const groupedTree = useMemo(() => {
-    if (!groupByFields.length) return null
-    return groupRecords(filteredRecords, groupByFields)
-  }, [filteredRecords, groupByFields, groupRecords])
-
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
-  const toggleGroupCollapsed = useCallback((path: string) => {
-    setCollapsedGroups((prev) => ({ ...prev, [path]: !prev[path] }))
+  // Flatten the group tree for rendering
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  const toggleGroupCollapsed = useCallback((pathKey: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(pathKey)) {
+        next.delete(pathKey)
+      } else {
+        next.add(pathKey)
+      }
+      return next
+    })
   }, [])
 
-  const renderGroupHeader = useCallback((fieldName: string, groupValue: string, label: string, count: number, path: string) => {
-    const fieldDef = fields.find((f) => f.name === fieldName)
-    const isCollapsed = collapsedGroups[path] === true
+  const flattenedGroups = useMemo(() => {
+    if (!groupModel || groupModel.rootGroups.length === 0) return null
+    return flattenGroupTree(groupModel.rootGroups, collapsedGroups)
+  }, [groupModel, collapsedGroups])
+
+  const renderGroupHeader = useCallback((node: any, level: number) => {
+    const fieldName = node.rule?.field || ''
+    const fieldDef = fields.find((f) => f.name === fieldName || f.id === fieldName)
+    const isCollapsed = collapsedGroups.has(node.pathKey)
+    const ruleLabel = node.rule?.type === 'date'
+      ? node.rule.granularity === 'year' ? 'Year' : 'Month'
+      : fieldName
 
     // If it's a select field, reuse choice color logic for a badge-like header.
     if (fieldDef?.type === "single_select" || fieldDef?.type === "multi_select") {
       const normalizedColor = normalizeHexColor(
-        resolveChoiceColor(String(groupValue), fieldDef.type, fieldDef.options, fieldDef.type === "single_select")
+        resolveChoiceColor(String(node.key), fieldDef.type, fieldDef.options, fieldDef.type === "single_select")
       )
       const textColor = getTextColorForBackground(normalizedColor)
       return (
         <button
           type="button"
-          onClick={() => toggleGroupCollapsed(path)}
+          onClick={() => toggleGroupCollapsed(node.pathKey)}
           className="w-full flex items-center justify-between px-2 py-1 hover:bg-gray-50 rounded"
+          style={{ paddingLeft: 8 + level * 16 }}
         >
           <div className="flex items-center gap-2 min-w-0">
             <Badge className={`text-xs font-medium ${textColor} border border-opacity-20`} style={{ backgroundColor: normalizedColor }}>
-              {label}
+              {node.label}
             </Badge>
-            <span className="text-xs text-gray-500">{count}</span>
+            <span className="text-xs text-gray-500">{node.size}</span>
           </div>
           <span className="text-xs text-gray-400">{isCollapsed ? "▸" : "▾"}</span>
         </button>
@@ -576,12 +559,15 @@ export default function RecordReviewLeftColumn({
     return (
       <button
         type="button"
-        onClick={() => toggleGroupCollapsed(path)}
+        onClick={() => toggleGroupCollapsed(node.pathKey)}
         className="w-full flex items-center justify-between px-2 py-1 hover:bg-gray-50 rounded"
+        style={{ paddingLeft: 8 + level * 16 }}
       >
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xs font-semibold text-gray-700 truncate">{label}</span>
-          <span className="text-xs text-gray-500">{count}</span>
+          <span className="text-xs font-semibold text-gray-700 truncate">
+            {ruleLabel}: {node.label}
+          </span>
+          <span className="text-xs text-gray-500">{node.size}</span>
         </div>
         <span className="text-xs text-gray-400">{isCollapsed ? "▸" : "▾"}</span>
       </button>
@@ -811,7 +797,7 @@ export default function RecordReviewLeftColumn({
               className="pl-8 h-8 text-sm"
             />
           </div>
-          {isRecordView && showAddRecord && canCreateRecord(userRole, pageConfig) && (
+          {isRecordView && (
             <Button
               type="button"
               variant="outline"
@@ -853,43 +839,27 @@ export default function RecordReviewLeftColumn({
           <div className="p-4 text-sm text-gray-500">No records found</div>
         ) : (
           <div className="divide-y divide-gray-100">
-            {!groupedTree ? (
+            {!flattenedGroups ? (
               filteredRecords.map(renderRecordRow)
             ) : (
-              // Render nested groups (Airtable-style)
-              (() => {
-                type Node =
-                  | { type: "leaf"; records: any[] }
-                  | { type: "branch"; field: string; groups: Array<{ key: string; label: string; child: any; count: number }> }
-
-                const renderNode = (node: any, path: string): ReactNode => {
-                  const typed = node as Node
-                  if (typed.type === "leaf") {
-                    return <div className="divide-y divide-gray-100">{typed.records.map(renderRecordRow)}</div>
-                  }
-
+              // Render nested groups using flattened structure
+              flattenedGroups.map((it, idx) => {
+                if (it.type === 'group') {
+                  const node = it.node
                   return (
-                    <div className="space-y-2 p-2">
-                      {typed.groups.map((g) => {
-                        const nextPath = `${path}/${typed.field}:${g.key}`
-                        const isCollapsed = collapsedGroups[nextPath] === true
-                        return (
-                          <div key={nextPath}>
-                            {renderGroupHeader(typed.field, g.key, g.label, g.count, nextPath)}
-                            {!isCollapsed && (
-                              <div className="ml-2 border-l border-gray-100 pl-2">
-                                {renderNode(g.child, nextPath)}
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })}
+                    <div key={node.pathKey} className="border-b border-gray-100">
+                      {renderGroupHeader(node, it.level || 0)}
+                    </div>
+                  )
+                } else {
+                  // Render record row with indentation based on level
+                  return (
+                    <div key={`record-${it.item?.id || idx}`}>
+                      {renderRecordRow(it.item)}
                     </div>
                   )
                 }
-
-                return renderNode(groupedTree as any, "root")
-              })()
+              })
             )}
           </div>
         )}

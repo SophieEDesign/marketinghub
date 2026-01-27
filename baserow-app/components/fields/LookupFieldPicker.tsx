@@ -654,6 +654,10 @@ export default function LookupFieldPicker({
               "focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-400/20 focus-within:ring-offset-1",
               disabled && "opacity-50 cursor-not-allowed bg-gray-50"
             )}
+            onMouseDown={(e) => {
+              // Allow drag operations to pass through (same as select fields)
+              e.stopPropagation()
+            }}
             onClick={() => !disabled && setOpen(true)}
           >
             {selectedOptions.length > 0 ? (
@@ -663,6 +667,10 @@ export default function LookupFieldPicker({
                     key={option.id}
                     className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200/50"
                     style={{ boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)' }}
+                    onMouseDown={(e) => {
+                      // Allow drag operations to pass through (same as select fields)
+                      e.stopPropagation()
+                    }}
                     onClick={(e) => {
                       e.stopPropagation()
                       // Clicking the pill navigates to the linked record (Airtable mental model).
@@ -674,6 +682,10 @@ export default function LookupFieldPicker({
                     role="button"
                   >
                     <span
+                      onMouseDown={(e) => {
+                        // Allow drag operations to pass through (same as select fields)
+                        e.stopPropagation()
+                      }}
                       onClick={(e) => {
                         // Already handled by pill click; keep for accessibility/selection.
                         handleNavigateToRecord(e, option.id)
@@ -684,6 +696,10 @@ export default function LookupFieldPicker({
                     </span>
                     {!disabled && (
                       <button
+                        onMouseDown={(e) => {
+                          // Allow drag operations to pass through (same as select fields)
+                          e.stopPropagation()
+                        }}
                         onClick={(e) => {
                           e.stopPropagation()
                           handleRemove(option.id)
@@ -705,6 +721,10 @@ export default function LookupFieldPicker({
                 {/* Add button - only show when field is editable and not disabled */}
                 {!disabled && (
                   <button
+                    onMouseDown={(e) => {
+                      // Allow drag operations to pass through (same as select fields)
+                      e.stopPropagation()
+                    }}
                     onClick={(e) => {
                       e.stopPropagation()
                       setOpen(true)
@@ -722,6 +742,10 @@ export default function LookupFieldPicker({
                 <span className="text-gray-400 italic">{placeholder}</span>
                 {!disabled && (
                   <button
+                    onMouseDown={(e) => {
+                      // Allow drag operations to pass through (same as select fields)
+                      e.stopPropagation()
+                    }}
                     onClick={(e) => {
                       e.stopPropagation()
                       setOpen(true)

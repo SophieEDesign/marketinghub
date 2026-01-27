@@ -429,6 +429,7 @@ export default function BlockRenderer({
               filterTree={filterTree}
               onRecordClick={onRecordClick}
               pageShowAddRecord={pageShowAddRecord}
+              onUpdate={onUpdate}
             />
           </LazyBlockWrapper>
         )

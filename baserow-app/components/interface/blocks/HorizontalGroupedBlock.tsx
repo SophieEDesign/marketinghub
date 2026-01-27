@@ -4,7 +4,7 @@ import type { PageBlock } from "@/lib/interface/types"
 import HorizontalGroupedView from "@/components/views/HorizontalGroupedView"
 import type { FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { TableField } from "@/types/fields"
 import type { GroupRule } from "@/lib/grouping/types"
@@ -18,6 +18,7 @@ interface HorizontalGroupedBlockProps {
   filterTree?: FilterTree
   onRecordClick?: (recordId: string) => void
   pageShowAddRecord?: boolean
+  onUpdate?: (blockId: string, config: Partial<PageBlock["config"]>) => void
 }
 
 /**
@@ -41,6 +42,18 @@ export default function HorizontalGroupedBlock({
   const tableId = block.config?.table_id || pageTableId
   const groupBy = block.config?.group_by_field
   const groupByRules = block.config?.group_by_rules as GroupRule[] | undefined
+  const recordFields = (block.config?.record_fields as Array<{ field: string; editable?: boolean; order?: number }>) || []
+  const storedLayout = (block.config?.record_field_layout as PageBlock[]) || null
+
+  // Handle layout updates from HorizontalGroupedView
+  const handleLayoutUpdate = useCallback(async (blocks: PageBlock[]) => {
+    if (!onUpdate) return
+    
+    // Save layout to block config
+    await onUpdate(block.id, {
+      record_field_layout: blocks,
+    })
+  }, [block.id, onUpdate])
 
   // Load table info and fields
   useEffect(() => {
@@ -118,6 +131,7 @@ export default function HorizontalGroupedBlock({
     <div className="h-full w-full">
       <HorizontalGroupedView
         tableId={tableId}
+        viewId={pageId || block.id}
         supabaseTableName={tableName}
         tableFields={tableFields}
         filters={effectiveFilters}
@@ -125,6 +139,10 @@ export default function HorizontalGroupedBlock({
         groupBy={groupBy}
         groupByRules={groupByRules}
         onRecordClick={onRecordClick}
+        recordFields={recordFields}
+        isEditing={isEditing}
+        onBlockUpdate={handleLayoutUpdate}
+        storedLayout={storedLayout}
       />
     </div>
   )

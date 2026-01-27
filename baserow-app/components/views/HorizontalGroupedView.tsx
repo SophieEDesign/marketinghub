@@ -13,6 +13,17 @@ import { normalizeUuid } from "@/lib/utils/ids"
 import { resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
 import type { LinkedField } from "@/types/fields"
 import EmptyState from "@/components/empty-states/EmptyState"
+import { resolveChoiceColor, normalizeHexColor, getTextColorForBackground, SEMANTIC_COLORS } from '@/lib/field-colors'
+import Canvas from "@/components/interface/Canvas"
+import BlockRenderer from "@/components/interface/BlockRenderer"
+import { FilterStateProvider } from "@/lib/interface/filter-state"
+import type { PageBlock, LayoutItem } from "@/lib/interface/types"
+
+interface FieldConfig {
+  field: string // Field name or ID
+  editable?: boolean
+  order?: number
+}
 
 interface HorizontalGroupedViewProps {
   tableId: string
@@ -26,6 +37,11 @@ interface HorizontalGroupedViewProps {
   searchQuery?: string
   onRecordClick?: (recordId: string) => void
   reloadKey?: any
+  // Field configuration for record display
+  recordFields?: FieldConfig[] // Configured fields to show in record canvas
+  isEditing?: boolean // Whether canvas is in edit mode
+  onBlockUpdate?: (blocks: PageBlock[]) => void | Promise<void> // Callback when blocks are updated
+  storedLayout?: PageBlock[] | null // Stored layout from block config
 }
 
 export default function HorizontalGroupedView({
@@ -40,6 +56,10 @@ export default function HorizontalGroupedView({
   searchQuery = "",
   onRecordClick,
   reloadKey,
+  recordFields = [],
+  isEditing = false,
+  onBlockUpdate,
+  storedLayout: storedLayoutProp,
 }: HorizontalGroupedViewProps) {
   const [rows, setRows] = useState<Record<string, any>[]>([])
   const [loading, setLoading] = useState(true)
@@ -235,10 +255,176 @@ export default function HorizontalGroupedView({
     return group?.items || []
   }, [activeTab, groups])
 
-  // Get primary field for record title (first text field or first field)
-  const primaryField = useMemo(() => {
-    return tableFields.find(f => f.type === 'text') || tableFields[0]
-  }, [tableFields])
+  // Helper to get pill color for select fields
+  const getPillColor = useCallback((field: TableField, value: any): string | null => {
+    if (field.type !== 'single_select' && field.type !== 'multi_select') {
+      return null
+    }
+
+    const normalizedValue = String(value).trim()
+    return normalizeHexColor(
+      resolveChoiceColor(
+        normalizedValue,
+        field.type,
+        field.options,
+        field.type === 'single_select'
+      )
+    )
+  }, [])
+
+  // Helper to generate a color for any group value (hash-based)
+  const getGroupColor = useCallback((value: any): string => {
+    const normalizedValue = String(value || '').trim()
+    if (!normalizedValue) return '#9CA3AF' // Gray for empty values
+    
+    // Use hash-based color selection from SEMANTIC_COLORS
+    let hash = 0
+    for (let i = 0; i < normalizedValue.length; i++) {
+      hash = normalizedValue.charCodeAt(i) + ((hash << 5) - hash)
+    }
+    return SEMANTIC_COLORS[Math.abs(hash) % SEMANTIC_COLORS.length]
+  }, [])
+
+  // Get group field for color calculation
+  const groupField = useMemo(() => {
+    if (effectiveGroupRules.length === 0) return null
+    const firstRule = effectiveGroupRules[0]
+    if (firstRule.type === 'field') {
+      return tableFields.find(f => f.name === firstRule.field || f.id === firstRule.field)
+    }
+    return null
+  }, [effectiveGroupRules, tableFields])
+
+  // Create field blocks from recordFields configuration
+  // Use stored layout if available, otherwise create default grid
+  const createFieldBlocks = useCallback((recordId: string, template?: PageBlock[]): PageBlock[] => {
+    // If we have a layout template (from editing), use it as template
+    if (template && template.length > 0) {
+      return template.map(block => {
+        const fieldName = block.config?.field_name || ''
+        return {
+          ...block,
+          id: `field-${recordId}-${fieldName}`,
+          page_id: `${viewId || `view-${tableId}`}-${recordId}`,
+          config: {
+            ...block.config,
+            table_id: tableId,
+            field_name: fieldName,
+          },
+        }
+      })
+    }
+
+    // Otherwise, create from recordFields config
+    if (recordFields.length === 0) {
+      // Default: show first 10 fields in a grid
+      const defaultFields = tableFields.slice(0, 10)
+      return defaultFields.map((field, index) => ({
+        id: `field-${recordId}-${field.name}`,
+        page_id: viewId || `view-${tableId}`,
+        type: 'field' as const,
+        x: index % 2 === 0 ? 0 : 6,
+        y: Math.floor(index / 2) * 2,
+        w: 6,
+        h: 2,
+        config: {
+          field_id: field.id,
+          field_name: field.name,
+          table_id: tableId,
+        },
+        order_index: index,
+        created_at: new Date().toISOString(),
+      }))
+    }
+
+    // Use configured fields with stored layout positions if available
+    return recordFields.map((fieldConfig, index) => {
+      const field = tableFields.find(f => f.name === fieldConfig.field || f.id === fieldConfig.field)
+      if (!field) return null
+
+      return {
+        id: `field-${recordId}-${field.name}`,
+        page_id: viewId || `view-${tableId}`,
+        type: 'field' as const,
+        x: (fieldConfig as any).x ?? (index % 2 === 0 ? 0 : 6),
+        y: (fieldConfig as any).y ?? Math.floor(index / 2) * 2,
+        w: (fieldConfig as any).w ?? 6,
+        h: (fieldConfig as any).h ?? 2,
+        config: {
+          field_id: field.id,
+          field_name: field.name,
+          table_id: tableId,
+          allow_inline_edit: fieldConfig.editable !== false,
+        },
+        order_index: fieldConfig.order ?? index,
+        created_at: new Date().toISOString(),
+      }
+    }).filter(Boolean) as PageBlock[]
+  }, [recordFields, tableFields, tableId, viewId])
+
+  // Store layout template (shared across all records)
+  // Load from stored layout if available (from block config)
+  const [layoutTemplate, setLayoutTemplate] = useState<PageBlock[] | null>(storedLayoutProp || null)
+  const [currentBlocks, setCurrentBlocks] = useState<PageBlock[]>([])
+
+  // When stored layout changes, update template
+  useEffect(() => {
+    if (storedLayoutProp) {
+      setLayoutTemplate(storedLayoutProp)
+      setCurrentBlocks(storedLayoutProp)
+    }
+  }, [storedLayoutProp])
+
+  // Handle layout changes from Canvas
+  const handleLayoutChange = useCallback((layout: LayoutItem[]) => {
+    if (!isEditing) return
+    
+    // Update blocks with new layout positions
+    setCurrentBlocks(prevBlocks => {
+      const updated = prevBlocks.map(block => {
+        const layoutItem = layout.find(item => item.i === block.id)
+        if (layoutItem) {
+          return {
+            ...block,
+            x: layoutItem.x,
+            y: layoutItem.y,
+            w: layoutItem.w,
+            h: layoutItem.h,
+          }
+        }
+        return block
+      })
+      
+      // Update layout template
+      setLayoutTemplate(updated)
+      
+      // Debounce save to block config
+      if (onBlockUpdate) {
+        setTimeout(() => {
+          onBlockUpdate(updated)
+        }, 500)
+      }
+      
+      return updated
+    })
+  }, [isEditing, onBlockUpdate])
+
+  // Initialize current blocks from first record when editing starts
+  useEffect(() => {
+    if (isEditing && groups.length > 0 && activeTab) {
+      const activeGroup = groups.find(g => g.key === activeTab)
+      if (activeGroup && activeGroup.items.length > 0 && currentBlocks.length === 0) {
+        const firstRecordId = activeGroup.items[0].id || activeGroup.items[0][`${supabaseTableName}_id`]
+        if (firstRecordId) {
+          const blocks = createFieldBlocks(firstRecordId, layoutTemplate || undefined)
+          setCurrentBlocks(blocks)
+          if (!layoutTemplate) {
+            setLayoutTemplate(blocks)
+          }
+        }
+      }
+    }
+  }, [isEditing, groups, activeTab, layoutTemplate, currentBlocks.length, supabaseTableName, createFieldBlocks])
 
   if (loading) {
     return (
@@ -275,15 +461,37 @@ export default function HorizontalGroupedView({
       <Tabs value={activeTab || undefined} onValueChange={setActiveTab} className="flex-1 flex flex-col">
         <div className="border-b bg-background px-4">
           <TabsList className="w-full justify-start h-auto p-0 bg-transparent">
-            {groups.map((group) => (
-              <TabsTrigger
-                key={group.key}
-                value={group.key}
-                className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
-              >
-                {group.label} ({group.items.length})
-              </TabsTrigger>
-            ))}
+            {groups.map((group) => {
+              // Get group color
+              let groupColor: string | null = null
+              if (groupField && (groupField.type === 'single_select' || groupField.type === 'multi_select')) {
+                // Use field-specific color for select fields
+                groupColor = getPillColor(groupField, group.label)
+              } else {
+                // Generate hash-based color for all other field types
+                groupColor = getGroupColor(group.label)
+              }
+
+              // Determine text color for contrast
+              const textColorClass = groupColor ? getTextColorForBackground(groupColor) : 'text-gray-900'
+              
+              return (
+                <TabsTrigger
+                  key={group.key}
+                  value={group.key}
+                  className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+                  style={groupColor ? {
+                    backgroundColor: groupColor + '1A',
+                    borderBottomColor: activeTab === group.key ? groupColor : 'transparent',
+                    color: groupColor,
+                  } : undefined}
+                >
+                  <span className={textColorClass}>
+                    {group.label} ({group.items.length})
+                  </span>
+                </TabsTrigger>
+              )
+            })}
           </TabsList>
         </div>
 
@@ -301,38 +509,44 @@ export default function HorizontalGroupedView({
                     description="This group is empty."
                   />
                 ) : (
-                  group.items.map((record: any) => {
+                  group.items.map((record: any, recordIndex: number) => {
                     const recordId = record.id || record[`${supabaseTableName}_id`]
-                    const recordTitle = primaryField ? (record[primaryField.name] || 'Untitled') : 'Record'
+                    const blocks = createFieldBlocks(recordId, layoutTemplate || undefined)
+                    
+                    // Only allow editing on the first record (acts as template)
+                    // All records share the same layout
+                    const canEditThisRecord = isEditing && recordIndex === 0
+                    
+                    // Use current blocks if editing, otherwise use generated blocks
+                    const displayBlocks = canEditThisRecord && currentBlocks.length > 0 ? currentBlocks : blocks
                     
                     return (
                       <div
                         key={recordId}
-                        className="border rounded-lg p-4 bg-card hover:bg-accent/50 transition-colors cursor-pointer"
-                        onClick={() => onRecordClick?.(recordId)}
+                        className="border rounded-lg bg-card overflow-hidden"
+                        style={{ minHeight: '200px' }}
                       >
-                        <div className="space-y-2">
-                          <h3 className="font-semibold text-lg">{String(recordTitle)}</h3>
-                          <div className="grid grid-cols-2 gap-2 text-sm">
-                            {tableFields.slice(0, 6).map((field) => {
-                              if (field.name === primaryField?.name) return null
-                              const value = record[field.name]
-                              if (value === null || value === undefined || value === '') return null
-                              
-                              return (
-                                <div key={field.name} className="flex flex-col">
-                                  <span className="text-muted-foreground text-xs">{field.label || field.name}</span>
-                                  <span className="font-medium">
-                                    {Array.isArray(value) 
-                                      ? `${value.length} item${value.length !== 1 ? 's' : ''}`
-                                      : String(value)
-                                    }
-                                  </span>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        </div>
+                        <FilterStateProvider>
+                          <Canvas
+                            blocks={displayBlocks}
+                            isEditing={canEditThisRecord}
+                            onLayoutChange={canEditThisRecord ? handleLayoutChange : undefined}
+                            onBlockUpdate={canEditThisRecord ? (blockId, config) => {
+                              // Update block config
+                              setCurrentBlocks(prev => prev.map(b => 
+                                b.id === blockId ? { ...b, config: { ...b.config, ...config } } : b
+                              ))
+                              // Update template
+                              setLayoutTemplate(prev => prev ? prev.map(b => 
+                                b.id === blockId ? { ...b, config: { ...b.config, ...config } } : b
+                              ) : null)
+                            } : undefined}
+                            pageTableId={tableId}
+                            pageId={viewId || `view-${tableId}`}
+                            recordId={recordId}
+                            mode={canEditThisRecord ? 'edit' : 'view'}
+                          />
+                        </FilterStateProvider>
                       </div>
                     )
                   })

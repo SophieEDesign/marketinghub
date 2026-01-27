@@ -38,6 +38,8 @@ import FieldPickerModal from "@/components/interface/FieldPickerModal"
 import FilterBuilder from "@/components/filters/FilterBuilder"
 import { filterConfigsToFilterTree } from "@/lib/filters/converters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
+import NestedGroupBySelector from "./shared/NestedGroupBySelector"
+import type { GroupRule } from "@/lib/grouping/types"
 import {
   DndContext,
   closestCenter,
@@ -126,6 +128,7 @@ export default function RecordViewPageSettings({
     setLeftPanelSortBy(leftPanel.sort_by?.[0]?.field || "")
     setLeftPanelSortDirection(leftPanel.sort_by?.[0]?.direction || 'asc')
     setLeftPanelGroupBy(leftPanel.group_by || "")
+    setLeftPanelGroupByRules(leftPanel.group_by_rules || undefined)
     setLeftPanelColorField(leftPanel.color_field || "")
     setLeftPanelImageField(leftPanel.image_field || "")
     setLeftPanelTitleField(leftPanel.title_field || config.title_field || "")
@@ -937,40 +940,39 @@ export default function RecordViewPageSettings({
                       </p>
                     </div>
 
-                    {/* Group by */}
+                    {/* Group by - Support nested groups */}
                     <div className="space-y-2">
                       <Label>Group by</Label>
-                      <Select 
-                        value={leftPanelGroupBy || "__none__"} 
-                        onValueChange={(value) => {
-                          const fieldName = value === "__none__" ? "" : value
+                      <NestedGroupBySelector
+                        value={leftPanelGroupBy || undefined}
+                        groupByRules={leftPanelGroupByRules}
+                        onChange={(value) => {
+                          const fieldName = value === "__none__" || !value ? "" : value
                           setLeftPanelGroupBy(fieldName)
                           onUpdate({
                             left_panel: {
                               ...leftPanelConfig,
                               group_by: fieldName || undefined,
+                              // Clear group_by_rules if using legacy single field
+                              ...(fieldName ? {} : { group_by_rules: null }),
                             }
                           })
                         }}
-                        disabled={!selectedTableId || fields.length === 0}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="None" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">None</SelectItem>
-                          {fields
-                            .filter(f => f.type === 'single_select' || f.type === 'multi_select')
-                            .map((field) => (
-                              <SelectItem key={field.id} value={field.name}>
-                                {getFieldDisplayName(field)}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-gray-500">
-                        Group records by field (select fields only).
-                      </p>
+                        onRulesChange={(rules) => {
+                          setLeftPanelGroupByRules(rules)
+                          onUpdate({
+                            left_panel: {
+                              ...leftPanelConfig,
+                              group_by_rules: rules,
+                              // For backward compatibility, also set group_by to first rule's field
+                              group_by: rules && rules.length > 0 && rules[0].type === 'field' ? rules[0].field : undefined,
+                            }
+                          })
+                        }}
+                        fields={fields}
+                        filterGroupableFields={true}
+                        description="Add up to 2 grouping levels to group records into nested collapsible sections (like Airtable)."
+                      />
                     </div>
                   </div>
                 </div>

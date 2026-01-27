@@ -1885,7 +1885,6 @@ export default function Canvas({
               
               // Check if height changed and apply reflow
               const heightIncreased = newHeight > previousHeight
-              const heightDecreased = newHeight < previousHeight
               
               // Update layout with clamped bounds - only update the resized block
               let finalLayout = layout.map(item => {
@@ -1901,18 +1900,14 @@ export default function Canvas({
               })
               
               if (heightIncreased) {
-                // Block grew - push blocks below down
+                // Block grew - push blocks below down to make room
                 finalLayout = pushBlocksDown(finalLayout, blockId, 0) // No ephemeral delta for manual resize
                 if (process.env.NODE_ENV === 'development') {
                   console.log('[Canvas] Pushed blocks down after resize grow', { blockId, newHeight })
                 }
-              } else if (heightDecreased) {
-                // Block shrunk - compact vertically
-                finalLayout = compactLayoutVertically(finalLayout, blocks)
-                if (process.env.NODE_ENV === 'development') {
-                  console.log('[Canvas] Compacted layout after resize shrink', { blockId, newHeight })
-                }
               }
+              // When block shrinks, keep blocks below in their current position (don't move them up)
+              // This allows gaps to remain, giving user control over spacing
               
               // Persist final layout (user resize always persists)
               applyUserLayoutChange(finalLayout)

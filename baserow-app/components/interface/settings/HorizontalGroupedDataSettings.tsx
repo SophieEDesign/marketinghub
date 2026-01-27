@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Label } from "@/components/ui/label"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { Table, TableField } from "@/types/database"
@@ -7,6 +8,7 @@ import TableSelector from "./shared/TableSelector"
 import GroupBySelector from "./shared/GroupBySelector"
 import BlockFilterEditor from "./BlockFilterEditor"
 import SortSelector from "./shared/SortSelector"
+import RecordViewFieldSettings from "./RecordViewFieldSettings"
 
 interface HorizontalGroupedDataSettingsProps {
   config: BlockConfig
@@ -16,6 +18,12 @@ interface HorizontalGroupedDataSettingsProps {
   onTableChange: (tableId: string) => Promise<void>
 }
 
+interface FieldConfig {
+  field: string
+  editable?: boolean
+  order?: number
+}
+
 export default function HorizontalGroupedDataSettings({
   config,
   tables,
@@ -23,6 +31,19 @@ export default function HorizontalGroupedDataSettings({
   onUpdate,
   onTableChange,
 }: HorizontalGroupedDataSettingsProps) {
+  const [recordFields, setRecordFields] = useState<FieldConfig[]>(
+    (config.record_fields as FieldConfig[]) || []
+  )
+
+  useEffect(() => {
+    setRecordFields((config.record_fields as FieldConfig[]) || [])
+  }, [config.record_fields])
+
+  const handleRecordFieldsChange = (newFields: FieldConfig[]) => {
+    setRecordFields(newFields)
+    onUpdate({ record_fields: newFields })
+  }
+
   return (
     <div className="space-y-6">
       <div className="space-y-2">
@@ -48,6 +69,19 @@ export default function HorizontalGroupedDataSettings({
           </div>
 
           <div className="space-y-2">
+            <Label>Record Fields</Label>
+            <p className="text-xs text-muted-foreground mb-2">
+              Configure which fields appear in each record's canvas. You can drag and rearrange fields in edit mode.
+            </p>
+            <RecordViewFieldSettings
+              tableId={config.table_id}
+              fields={recordFields}
+              allFields={fields}
+              onChange={handleRecordFieldsChange}
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label>Filters</Label>
             <BlockFilterEditor
               filters={config.filters || []}
@@ -60,9 +94,9 @@ export default function HorizontalGroupedDataSettings({
 
           <div className="space-y-2">
             <SortSelector
-              value={config.sorts || []}
+              sorts={config.sorts || []}
               fields={fields}
-              onChange={(sorts) => onUpdate({ sorts: typeof sorts === 'string' ? undefined : sorts })}
+              onChange={(sorts) => onUpdate({ sorts })}
             />
           </div>
         </>
