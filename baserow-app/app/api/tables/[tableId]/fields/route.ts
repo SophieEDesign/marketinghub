@@ -798,7 +798,7 @@ export async function PATCH(
         // Create a map of primary field values to record IDs (case-insensitive matching)
         const valueToIdMap = new Map<string, string>()
         if (linkedRecords) {
-          for (const record of linkedRecords) {
+          for (const record of linkedRecords as Array<{ id: string; [key: string]: any }>) {
             const value = record[primaryFieldName]
             if (value != null) {
               const normalizedValue = String(value).trim().toLowerCase()
@@ -824,7 +824,7 @@ export async function PATCH(
         if (sourceRecords && sourceRecords.length > 0) {
           const updates: Array<{ id: string; value: string | string[] | null }> = []
 
-          for (const record of sourceRecords) {
+          for (const record of sourceRecords as Array<{ id: string; [key: string]: any }>) {
             const textValue = record[fieldName]
             if (textValue == null || textValue === '') {
               updates.push({ id: record.id, value: null })
@@ -886,13 +886,15 @@ export async function PATCH(
 
           // Store migration errors in field options for UI display
           if (migrationErrors.length > 0) {
-            const currentOptions = { ...(updates.options || {}) }
+            // Update the field options with migration errors
+            const currentOptions = { ...(existingField.options || {}) }
             currentOptions._migration_errors = migrationErrors
-            updates.options = currentOptions
             // Also update the options that will be used for SQL generation
             if (options) {
               options._migration_errors = migrationErrors
             }
+            // Update the existing field options
+            existingField.options = currentOptions
           }
         }
       }

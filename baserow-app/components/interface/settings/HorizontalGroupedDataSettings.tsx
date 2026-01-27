@@ -27,6 +27,7 @@ interface HorizontalGroupedDataSettingsProps {
   onTableChange: (tableId: string) => Promise<void>
   onEditCanvas?: () => void // Callback to enter canvas edit mode
   isEditingCanvas?: boolean // Whether canvas is currently being edited
+  onExitBlockCanvas?: () => void // Callback to exit canvas edit mode
 }
 
 interface FieldConfig {

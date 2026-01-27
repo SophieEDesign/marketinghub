@@ -90,6 +90,7 @@ export default function BlockRenderer({
   allBlocks = [],
   onEphemeralHeightDelta,
   rowHeight = 30,
+  isEditingCanvas = false,
 }: BlockRendererProps) {
   const diagnosticsEnabled = process.env.NODE_ENV === 'development'
 

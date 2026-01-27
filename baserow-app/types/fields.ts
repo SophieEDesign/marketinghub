@@ -110,6 +110,9 @@ export interface FieldOptions {
   // Some metadata fields are flagged as "system" (not user-editable / hidden from certain UIs).
   // This is stored in options for backward compatibility with older schemas.
   system?: boolean
+
+  // Migration errors for field type conversions (e.g., text to link_to_table)
+  _migration_errors?: Array<{ recordId: string; value: string }>
 }
 
 export interface LookupFieldFilter {

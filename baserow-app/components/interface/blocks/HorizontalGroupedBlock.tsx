@@ -36,6 +36,7 @@ export default function HorizontalGroupedBlock({
   onRecordClick,
   pageShowAddRecord = false,
   onUpdate,
+  isEditingCanvas = false,
 }: HorizontalGroupedBlockProps) {
   const [tableFields, setTableFields] = useState<TableField[]>([])
   const [tableName, setTableName] = useState<string | null>(null)
