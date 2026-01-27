@@ -166,14 +166,28 @@ export default function GalleryView({
 
   const safeFieldIds = useMemo(() => (Array.isArray(fieldIds) ? fieldIds : []), [fieldIds])
 
-  const effectiveGroupByField = useMemo(() => {
+  // Support both nested groups (group_by_rules) and legacy single field
+  const effectiveGroupByRules = useMemo(() => {
+    const rules = (blockConfig as any)?.group_by_rules
+    if (Array.isArray(rules) && rules.length > 0) {
+      return rules
+    }
     const raw =
       (blockConfig as any)?.gallery_group_by ||
       (blockConfig as any)?.group_by_field ||
       (blockConfig as any)?.group_by
-    if (typeof raw !== "string") return null
-    const trimmed = raw.trim()
-    if (!trimmed) return null
+    if (typeof raw === "string" && raw.trim()) {
+      return [{ type: 'field' as const, field: raw.trim() }]
+    }
+    return null
+  }, [blockConfig])
+
+  const effectiveGroupByField = useMemo(() => {
+    if (effectiveGroupByRules && effectiveGroupByRules.length > 0 && effectiveGroupByRules[0].type === 'field') {
+      return effectiveGroupByRules[0].field
+    }
+    return null
+  }, [effectiveGroupByRules])
 
     const tf = (Array.isArray(tableFields) ? tableFields : []).find(
       (f: any) => f?.name === trimmed || f?.id === trimmed
@@ -328,20 +342,20 @@ export default function GalleryView({
   type GalleryGroupItem = Record<string, any> & { __row: TableRow; __rowId: string }
 
   const groupedRows = useMemo((): GroupedNode<GalleryGroupItem>[] | null => {
-    if (!effectiveGroupByField) return null
+    if (!effectiveGroupByRules || effectiveGroupByRules.length === 0) return null
     const safeFields = (Array.isArray(tableFields) ? tableFields : []).filter(Boolean) as TableField[]
     const items: GalleryGroupItem[] = filteredRows.map((r) => ({
       ...(r.data || {}),
       __row: r,
       __rowId: String(r.id),
     }))
-    const { rootGroups } = buildGroupTree(items, safeFields, [{ type: "field", field: effectiveGroupByField }], {
+    const { rootGroups } = buildGroupTree(items, safeFields, effectiveGroupByRules, {
       emptyLabel: "(Empty)",
       emptyLast: true,
       valueLabelMaps: groupValueLabelMaps,
     })
     return rootGroups
-  }, [effectiveGroupByField, filteredRows, tableFields, groupValueLabelMaps])
+  }, [effectiveGroupByRules, filteredRows, tableFields, groupValueLabelMaps])
 
   // When grouping, allow "start collapsed" behavior (default: collapsed).
   // This is intentionally applied only on initial load / when the groupBy field changes / when the setting flips,

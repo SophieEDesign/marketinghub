@@ -145,6 +145,70 @@ export default function Canvas({
   const dragLastPositionRef = useRef<Map<string, { x: number; y: number }>>(new Map())
   const currentlyDraggingBlockIdRef = useRef<string | null>(null)
   
+  // PHASE 4.1: Dev utility to reset layout heights (one-time use)
+  // Exposes a function to reset all block heights, keeping x/y/w
+  // Usage: In browser console, call window.resetCanvasHeights()
+  useEffect(() => {
+    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+      // @ts-ignore - Dev utility
+      window.resetCanvasHeights = async () => {
+        console.log('[Canvas] PHASE 4: Resetting layout heights for all blocks...')
+        
+        if (!pageId) {
+          console.error('[Canvas] Cannot reset heights: pageId is required')
+          return
+        }
+        
+        try {
+          // Call API to reset heights
+          const response = await fetch(`/api/pages/${pageId}/blocks/reset-heights`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          })
+          
+          if (!response.ok) {
+            const error = await response.text()
+            throw new Error(`Failed to reset heights: ${error}`)
+          }
+          
+          const result = await response.json()
+          console.log('[Canvas] Heights reset complete:', result)
+          console.log('[Canvas] Refreshing page to see changes...')
+          
+          // Reload page to see the reset take effect
+          window.location.reload()
+        } catch (error) {
+          console.error('[Canvas] Error resetting heights:', error)
+          console.log('[Canvas] Falling back to manual reset via layout update...')
+          
+          // Fallback: Update layout with default heights (4) and let content re-measure
+          if (onLayoutChange) {
+            const resetLayout: LayoutItem[] = blocks.map((block) => ({
+              i: block.id,
+              x: block.x || 0,
+              y: block.y || 0,
+              w: block.w || 4,
+              h: 4, // Default height - content will re-measure via onHeightChange
+            }))
+            
+            onLayoutChange(resetLayout)
+            console.log('[Canvas] Layout updated with default heights. Content will re-measure.')
+          }
+        }
+      }
+      
+      return () => {
+        // Cleanup: Remove dev utility on unmount
+        if (typeof window !== 'undefined') {
+          // @ts-ignore
+          delete window.resetCanvasHeights
+        }
+      }
+    }
+  }, [pageId, blocks, onLayoutChange])
+
   // Track active snap targets for visual feedback during drag
   const [activeSnapTargets, setActiveSnapTargets] = useState<{
     vertical?: { x: number; blockId: string }
@@ -374,13 +438,44 @@ export default function Canvas({
           x = layout.x
           y = layout.y
           w = layout.w
-          h = layout.h
+          
+          // PHASE 2.2: Stop hydrating height from database for auto-sized blocks
+          // Blocks with grouping (groupBy) are content-driven and should derive height from content
+          const config = block.config as any
+          const hasGrouping = 
+            (block.type === 'grid' || block.type === 'list') &&
+            (config?.group_by || config?.group_by_field || config?.group_by_rules)
+          
+          if (hasGrouping) {
+            // Auto-sized block - ignore h from database, let content re-measure
+            // Use a default height that will be replaced by content measurement
+            h = 4 // Default, will be updated by onHeightChange
+            console.log('[HeightHydration] SKIPPED for auto-sized block', {
+              blockId: block.id,
+              blockType: block.type,
+              hasGrouping: true,
+              dbHeight: block.h,
+              appliedHeight: h,
+              reason: 'content-driven block',
+            })
+          } else {
+            // Non-auto-sized block - use height from database
+            h = layout.h
+            // PHASE 1.2: Log height mutation in layout hydration
+            console.log('[HeightMutation] layoutHydration', {
+              blockId: block.id,
+              height: h,
+              source: 'layoutHydration',
+              fromDB: block.h,
+            })
+          }
           
           // DEBUG_LAYOUT: Log DB values used
           debugLog('LAYOUT', `Block ${block.id}: FROM DB`, {
             blockId: block.id,
             fromDB: { x: block.x, y: block.y, w: block.w, h: block.h },
             applied: { x, y, w, h },
+            isAutoSized: hasGrouping,
           })
         }
         
@@ -1118,6 +1213,79 @@ export default function Canvas({
     return compacted
   }, [])
 
+  // PHASE 1.2 & 2.1: onHeightChange handler with logging and guards
+  const handleHeightChange = useCallback((blockId: string, newHeight: number) => {
+    // PHASE 1.2: Log height change from content
+    console.log('[HeightChange]', {
+      blockId,
+      newHeight,
+      source: 'content',
+      currentlyResizing: currentlyResizingBlockIdRef.current,
+      currentlyDragging: currentlyDraggingBlockIdRef.current,
+    })
+
+    // PHASE 2.1: Enforce height ownership rule - ignore if user is manually resizing or dragging
+    if (currentlyResizingBlockIdRef.current === blockId) {
+      console.log('[HeightChange] IGNORED - user is manually resizing', { blockId })
+      return // Ignore - user is manually resizing
+    }
+    if (currentlyDraggingBlockIdRef.current === blockId) {
+      console.log('[HeightChange] IGNORED - user is dragging', { blockId })
+      return // Ignore - user is dragging
+    }
+
+    // Update only the changed block's height in layout
+    setLayout(currentLayout => {
+      const updatedLayout = currentLayout.map(item => {
+        if (item.i === blockId) {
+          const oldHeight = item.h || 4
+          if (Math.abs(oldHeight - newHeight) > 0.01) {
+            console.log('[HeightChange] UPDATING layout height', {
+              blockId,
+              oldHeight,
+              newHeight,
+            })
+            return {
+              ...item,
+              h: newHeight,
+            }
+          }
+        }
+        return item
+      })
+
+      // PHASE 3.1: Re-enable push/compact after content height change
+      // Check if block grew or shrunk
+      const changedBlock = updatedLayout.find(item => item.i === blockId)
+      if (!changedBlock) return updatedLayout
+      
+      const oldHeight = currentLayout.find(item => item.i === blockId)?.h || 4
+      const newHeight = changedBlock.h || 4
+      
+      let finalLayout = updatedLayout
+      
+      if (newHeight > oldHeight) {
+        // Block grew - push blocks below down
+        finalLayout = pushBlocksDown(updatedLayout, blockId)
+        console.log('[HeightChange] Applied push down after content height increase', {
+          blockId,
+          oldHeight,
+          newHeight,
+        })
+      } else if (newHeight < oldHeight) {
+        // Block shrunk - compact layout vertically
+        finalLayout = compactLayoutVertically(updatedLayout, blocks)
+        console.log('[HeightChange] Applied compaction after content height decrease', {
+          blockId,
+          oldHeight,
+          newHeight,
+        })
+      }
+
+      return finalLayout
+    })
+  }, [])
+
   const handleLayoutChange = useCallback(
     (newLayout: Layout[]) => {
       // CRITICAL: Ignore layout changes when not in edit mode
@@ -1188,6 +1356,19 @@ export default function Canvas({
       // This ensures that when blocks are updated locally to match layout,
       // the sync effect won't detect a change and overwrite the layout
       newLayout.forEach(layoutItem => {
+        // PHASE 1.2: Log height mutation in handleLayoutChange
+        const oldHeight = previousBlockPositionsRef.current.get(layoutItem.i)?.h
+        const newHeight = layoutItem.h || 4
+        if (oldHeight !== undefined && Math.abs(oldHeight - newHeight) > 0.01) {
+          console.log('[HeightMutation] handleLayoutChange', {
+            blockId: layoutItem.i,
+            oldHeight,
+            newHeight,
+            source: 'handleLayoutChange',
+            currentlyResizing: currentlyResizingBlockIdRef.current,
+            currentlyDragging: currentlyDraggingBlockIdRef.current,
+          })
+        }
         previousBlockPositionsRef.current.set(layoutItem.i, {
           x: layoutItem.x || 0,
           y: layoutItem.y || 0,
@@ -1259,7 +1440,8 @@ export default function Canvas({
                 }
               }
               
-              // Apply smart snap (horizontal > vertical > none)
+              // PHASE 3.2: Re-enable smart snap, but it runs AFTER height is settled and layout is stable
+              // Snapping happens after push/compact operations complete
               const snappedBlock = applySmartSnap(draggedBlock, snappedLayout, dragVector, cols)
               
               // Only update layout if snap actually changed the position
@@ -1282,24 +1464,24 @@ export default function Canvas({
             }
           }
           
-          // Apply push down or compaction based on resize direction
+          // PHASE 3.1: Re-enable push/compact after resize stop (single code path)
+          // Only apply push/compact for resize operations, not drag operations
           let finalLayout = snappedLayout
-          if (needsPushDown && resizedBlockId) {
-            // Block grew - push blocks below down (preserves order)
+          if (needsPushDown && resizedBlockId && !draggedBlockId) {
+            // Block grew from resize - push blocks below down (preserves order)
             finalLayout = pushBlocksDown(snappedLayout, resizedBlockId)
             debugLog('LAYOUT', '[Canvas] Applied push down after resize grow', {
               resizedBlockId,
             })
-          } else if (needsCompaction) {
-            // Block shrunk - compact layout vertically (removes gaps)
+          } else if (needsCompaction && !draggedBlockId) {
+            // Block shrunk from resize - compact layout vertically (removes gaps)
             finalLayout = compactLayoutVertically(snappedLayout, blocks)
             debugLog('LAYOUT', '[Canvas] Applied compaction after resize shrink')
           } else if (draggedBlockId && !needsPushDown && !needsCompaction) {
-            // After dragging (not resizing), preserve the snapped layout
-            // Snapping should align blocks, and compaction would break that alignment
-            // Only compact when blocks are resized or deleted, not when dragging
+            // After dragging (not resizing), preserve the layout
+            // Push/compact only applies to resize operations
             finalLayout = snappedLayout
-            debugLog('LAYOUT', '[Canvas] Preserved snapped layout after drag', {
+            debugLog('LAYOUT', '[Canvas] Preserved layout after drag', {
               draggedBlockId,
             })
           }
@@ -1329,6 +1511,18 @@ export default function Canvas({
             // CRITICAL: Update position tracking ref BEFORE clearing blocksUpdatedFromUserRef
             // This prevents sync effect from detecting false differences
             finalLayout.forEach(layoutItem => {
+              // PHASE 1.2: Log height mutation in resize timeout
+              const oldHeight = previousBlockPositionsRef.current.get(layoutItem.i)?.h
+              const newHeight = layoutItem.h || 4
+              if (oldHeight !== undefined && Math.abs(oldHeight - newHeight) > 0.01) {
+                console.log('[HeightMutation] resizeTimeout', {
+                  blockId: layoutItem.i,
+                  oldHeight,
+                  newHeight,
+                  source: 'resizeTimeout',
+                  currentlyResizing: currentlyResizingBlockIdRef.current,
+                })
+              }
               previousBlockPositionsRef.current.set(layoutItem.i, {
                 x: layoutItem.x || 0,
                 y: layoutItem.y || 0,
@@ -1426,7 +1620,7 @@ export default function Canvas({
             blocks.some(block => block.id === item.i)
           )
           
-          // Compact the layout
+          // PHASE 3.1: Re-enable compaction after block deletion (single code path)
           const compactedLayout = compactLayoutVertically(validLayout, blocks)
           
           // Check if compaction changed anything
@@ -1439,6 +1633,17 @@ export default function Canvas({
           if (layoutChanged) {
             // Update position tracking ref
             compactedLayout.forEach(layoutItem => {
+              // PHASE 1.2: Log height mutation in block deletion
+              const oldHeight = previousBlockPositionsRef.current.get(layoutItem.i)?.h
+              const newHeight = layoutItem.h || 4
+              if (oldHeight !== undefined && Math.abs(oldHeight - newHeight) > 0.01) {
+                console.log('[HeightMutation] blockDeletion', {
+                  blockId: layoutItem.i,
+                  oldHeight,
+                  newHeight,
+                  source: 'blockDeletion',
+                })
+              }
               previousBlockPositionsRef.current.set(layoutItem.i, {
                 x: layoutItem.x || 0,
                 y: layoutItem.y || 0,
@@ -1581,6 +1786,7 @@ export default function Canvas({
         dy: newY - (selectedBlock.y || 0),
       }
       
+      // PHASE 3.2: Re-enable smart snap for keyboard moves (runs after layout is stable)
       const snappedBlock = applySmartSnap(movedBlock, layout, dragVector, cols)
       
       // Update layout
@@ -1948,6 +2154,13 @@ export default function Canvas({
             currentlyResizingBlockIdRef.current = blockId
             blockHeightsBeforeResizeRef.current.set(blockId, oldItem.h || 4)
             debugLog('LAYOUT', `[Canvas] Resize started for block ${blockId}, initial height: ${oldItem.h || 4}`)
+            // PHASE 1.2: Log height mutation in onResizeStart
+            console.log('[HeightMutation] onResizeStart', {
+              blockId,
+              oldHeight: oldItem.h || 4,
+              newHeight: newItem.h || 4,
+              source: 'onResizeStart',
+            })
           }}
           onResizeStop={(layout, oldItem, newItem, placeholder, e, element) => {
             // CRITICAL: Immediately clear ALL resize state when resize ends
@@ -2374,7 +2587,7 @@ export default function Canvas({
                     editableFieldNames={editableFieldNames}
                     hideEditButton={topTwoFieldBlockIds.has(block.id)}
                     allBlocks={blocks}
-                    onHeightChange={undefined}
+                    onHeightChange={(height) => handleHeightChange(block.id, height)}
                     rowHeight={layoutSettings.rowHeight || 30}
                   />
                 </div>

@@ -17,6 +17,8 @@ import { Input } from "@/components/ui/input"
 import BlockFilterEditor from "./BlockFilterEditor"
 import TableSelector from "./shared/TableSelector"
 import GroupBySelector from "./shared/GroupBySelector"
+import NestedGroupBySelector from "./shared/NestedGroupBySelector"
+import type { GroupRule } from "@/lib/grouping/types"
 import SortSelector from "./shared/SortSelector"
 import ModalFieldsSelector from "./shared/ModalFieldsSelector"
 
@@ -393,16 +395,27 @@ export default function ListDataSettings({
 
       {/* Group By (Optional) */}
       {config.table_id && fields.length > 0 && (
-        <GroupBySelector
+        <NestedGroupBySelector
           value={groupBy}
+          groupByRules={(config as any).group_by_rules}
           onChange={(value) => {
             onUpdate({
               // Persist clear as null so the server actually receives it.
               group_by: value === undefined ? (null as any) : value,
+              // Clear group_by_rules if using legacy single field
+              ...(value ? {} : { group_by_rules: null }),
             })
+          }}
+          onRulesChange={(rules) => {
+            onUpdate({
+              group_by_rules: rules,
+              // For backward compatibility, also set group_by to first rule's field
+              group_by: rules && rules.length > 0 && rules[0].type === 'field' ? rules[0].field : null,
+            } as any)
           }}
           fields={fields}
           filterGroupableFields={true}
+          description="Add up to 2 grouping levels to create nested groups (like Airtable). Records will be grouped hierarchically by the selected fields."
         />
       )}
 
