@@ -5,6 +5,7 @@
 
 import type { BlockType, BlockConfig } from './types'
 import { validateBlockConfig } from './block-config-types'
+import { BLOCK_REGISTRY } from './registry'
 
 // Re-export validateBlockConfig for convenience
 export { validateBlockConfig } from './block-config-types'
@@ -75,8 +76,7 @@ export function normalizeBlockConfig(
  * This ensures consistency between block creation and validation fallbacks.
  */
 function getDefaultConfigForType(blockType: BlockType): BlockConfig {
-  // Import registry to use as single source of truth
-  const { BLOCK_REGISTRY } = require('./registry')
+  // Use registry as single source of truth
   const definition = BLOCK_REGISTRY[blockType]
   
   if (definition && definition.defaultConfig) {
