@@ -189,12 +189,6 @@ export default function GalleryView({
     return null
   }, [effectiveGroupByRules])
 
-    const tf = (Array.isArray(tableFields) ? tableFields : []).find(
-      (f: any) => f?.name === trimmed || f?.id === trimmed
-    )
-    return (tf?.name as string | undefined) || trimmed
-  }, [blockConfig, tableFields])
-
   // Track previous groupBy to detect changes
   const prevGroupByRef = useRef<string | null>(effectiveGroupByField)
   // Track whether we've initialized collapsed groups for the current groupBy
