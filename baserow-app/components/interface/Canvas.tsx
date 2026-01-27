@@ -1282,9 +1282,29 @@ export default function Canvas({
         if (currentlyResizingBlockIdRef.current === item.i) {
           const blockX = item.x || 0
           const blockW = item.w || 4
-          const clampedX = Math.max(0, Math.min(blockX, cols - 2)) // Ensure at least minW (2) fits
-          const maxW = cols - clampedX
-          const clampedW = Math.max(2, Math.min(blockW, maxW)) // minW is 2
+          
+          // CRITICAL: During resize, preserve the original X position unless the block would overflow
+          // Only adjust X if the block would go off the right edge
+          const rightEdge = blockX + blockW
+          let clampedX = blockX
+          let clampedW = blockW
+          
+          // If block extends beyond right edge, clamp width first
+          if (rightEdge > cols) {
+            clampedW = Math.max(2, cols - blockX) // Ensure at least minW (2) fits
+          }
+          
+          // If block extends beyond left edge (shouldn't happen during resize, but safety check)
+          if (blockX < 0) {
+            clampedX = 0
+            // Adjust width to maintain right edge if possible
+            if (blockX + blockW > cols) {
+              clampedW = Math.max(2, cols - clampedX)
+            }
+          }
+          
+          // Ensure minimum width
+          clampedW = Math.max(2, clampedW)
           
           // Only return clamped version if it differs (avoid unnecessary updates)
           if (clampedX !== blockX || clampedW !== blockW) {
@@ -1866,11 +1886,27 @@ export default function Canvas({
               }
               
               // CRITICAL: Ensure block stays within grid bounds after resize
+              // During resize, preserve X position unless block would overflow
               const blockX = resizedBlock.x || 0
               const blockW = resizedBlock.w || 4
-              const clampedX = Math.max(0, Math.min(blockX, cols - 2)) // Ensure at least minW (2) fits
-              const maxW = cols - clampedX
-              const clampedW = Math.max(2, Math.min(blockW, maxW)) // minW is 2
+              
+              // Preserve X position during resize - only clamp width if it would overflow
+              let clampedX = blockX
+              let clampedW = blockW
+              
+              // If block extends beyond right edge, clamp width
+              if (blockX + blockW > cols) {
+                clampedW = Math.max(2, cols - blockX) // Ensure at least minW (2) fits
+              }
+              
+              // Safety check: if X is negative (shouldn't happen, but be safe)
+              if (blockX < 0) {
+                clampedX = 0
+                clampedW = Math.max(2, Math.min(blockW, cols))
+              }
+              
+              // Ensure minimum width
+              clampedW = Math.max(2, clampedW)
               
               if (process.env.NODE_ENV === 'development') {
                 if (clampedX !== blockX || clampedW !== blockW) {

@@ -213,12 +213,12 @@ export default function RecordFields({
             <section key={groupName} className="space-y-3">
               <button
                 onClick={() => toggleGroup(groupName)}
-                className="w-full flex items-center justify-between text-left py-2 px-2 -mx-2 rounded-md bg-gray-50/50 hover:bg-gray-100/70 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
+                className="w-full flex items-center justify-between text-left py-2.5 px-3 -mx-3 rounded-md bg-gray-100 border border-gray-200 hover:bg-gray-200 hover:border-gray-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
                 aria-expanded={!isCollapsed}
                 aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${groupName} group`}
               >
-                <span className="text-sm font-semibold text-gray-900">{groupName}</span>
-                <span className="text-gray-400">
+                <span className="text-sm font-semibold text-gray-900 uppercase tracking-wide">{groupName}</span>
+                <span className="text-gray-500">
                   {isCollapsed ? (
                     <ChevronRight className="h-4 w-4" />
                   ) : (

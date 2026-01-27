@@ -955,18 +955,19 @@ export default function RecordViewPageSettings({
                               ...leftPanelConfig,
                               group_by: fieldName || undefined,
                               // Clear group_by_rules if using legacy single field
-                              ...(fieldName ? {} : { group_by_rules: null }),
+                              ...(fieldName ? {} : { group_by_rules: undefined }),
                             }
                           })
                         }}
                         onRulesChange={(rules) => {
-                          setLeftPanelGroupByRules(rules)
+                          const normalizedRules = rules ?? undefined
+                          setLeftPanelGroupByRules(normalizedRules)
                           onUpdate({
                             left_panel: {
                               ...leftPanelConfig,
-                              group_by_rules: rules,
+                              group_by_rules: normalizedRules,
                               // For backward compatibility, also set group_by to first rule's field
-                              group_by: rules && rules.length > 0 && rules[0].type === 'field' ? rules[0].field : undefined,
+                              group_by: normalizedRules && normalizedRules.length > 0 && normalizedRules[0].type === 'field' ? normalizedRules[0].field : undefined,
                             }
                           })
                         }}
