@@ -95,6 +95,7 @@ function getDefaultConfigForType(blockType: BlockType): BlockConfig {
     multi_timeline: { sources: [] },
     list: { table_id: '', view_type: 'grid' },
     number: { table_id: '', field_id: '' },
+    horizontal_grouped: { table_id: '', group_by_field: '' },
   }
 
   return defaults[blockType] || {}

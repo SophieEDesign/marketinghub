@@ -309,6 +309,33 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
     icon: 'List',
     defaultWidth: 12,
     defaultHeight: 8,
+    minWidth: 6,
+    minHeight: 6,
+    defaultConfig: {
+      title: 'List View',
+      table_id: '',
+    },
+  },
+  horizontal_grouped: {
+    type: 'horizontal_grouped',
+    label: 'Horizontal Grouped',
+    icon: 'LayoutGrid',
+    defaultWidth: 12,
+    defaultHeight: 8,
+    minWidth: 6,
+    minHeight: 6,
+    defaultConfig: {
+      title: 'Horizontal Grouped View',
+      table_id: '',
+      group_by_field: '',
+    },
+  },
+  number: {
+    type: 'number',
+    label: 'Number',
+    icon: 'Hash',
+    defaultWidth: 12,
+    defaultHeight: 8,
     minWidth: 4,
     minHeight: 4,
     defaultConfig: {

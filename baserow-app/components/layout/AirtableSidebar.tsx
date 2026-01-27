@@ -344,6 +344,11 @@ export default function AirtableSidebar({
                             isActive: isCurrentlyActive,
                             defaultPrevented: e.defaultPrevented,
                             target: e.target,
+                            targetTag: (e.target as HTMLElement)?.tagName,
+                            targetClasses: (e.target as HTMLElement)?.className,
+                            currentElement: e.currentTarget,
+                            currentElementTag: (e.currentTarget as HTMLElement)?.tagName,
+                            timestamp: performance.now(),
                           })
                         }
                         
@@ -361,7 +366,48 @@ export default function AirtableSidebar({
                         // For navigation to different pages, let Next.js Link handle it
                         // Don't call preventDefault or stopPropagation - let the Link work normally
                         if (debugEnabled) {
-                          console.log("[Table Link] Navigation allowed - letting Next.js Link handle it")
+                          console.log("[Table Link] Navigation allowed - letting Next.js Link handle it", {
+                            willNavigate: !e.defaultPrevented,
+                            eventPhase: e.eventPhase,
+                            bubbles: e.bubbles,
+                            cancelable: e.cancelable,
+                          })
+                          
+                          // Track if navigation actually happens
+                          const startTime = performance.now()
+                          const initialPathname = pathname
+                          
+                          // Check multiple times to catch navigation at different stages
+                          const checkNavigation = (attempt: number) => {
+                            setTimeout(() => {
+                              const newPathname = window.location.pathname
+                              const elapsed = performance.now() - startTime
+                              
+                              if (newPathname === targetPath) {
+                                console.log("[Table Link] ✅ Navigation completed successfully", {
+                                  elapsed: `${elapsed.toFixed(2)}ms`,
+                                  attempt,
+                                  from: initialPathname,
+                                  to: newPathname,
+                                })
+                              } else if (attempt < 3) {
+                                // Check again (navigation might be in progress)
+                                checkNavigation(attempt + 1)
+                              } else {
+                                // After 3 attempts (~300ms), navigation likely didn't happen
+                                console.warn("[Table Link] ⚠️ Navigation did not occur after multiple checks", {
+                                  elapsed: `${elapsed.toFixed(2)}ms`,
+                                  expected: targetPath,
+                                  actual: newPathname,
+                                  stillOn: initialPathname,
+                                })
+                                // Fallback: manually trigger navigation if Next.js Link didn't work
+                                console.log("[Table Link] Attempting manual navigation fallback...")
+                                router.push(targetPath)
+                              }
+                            }, 100)
+                          }
+                          checkNavigation(1)
                         }
                       }}
                     >

@@ -29,6 +29,7 @@ export default function FieldBuilderDrawer({
   const [name, setName] = useState("")
   const [type, setType] = useState<FieldType>("text")
   const [required, setRequired] = useState(false)
+  const [groupName, setGroupName] = useState<string>("")
   const [defaultValue, setDefaultValue] = useState<any>(null)
   const [options, setOptions] = useState<FieldOptions>({})
   const [loading, setLoading] = useState(false)
@@ -51,12 +52,14 @@ export default function FieldBuilderDrawer({
       setName(getFieldDisplayName(field))
       setType(field.type)
       setRequired(field.required || false)
+      setGroupName(field.group_name || "")
       setDefaultValue(field.default_value)
       setOptions(field.options || {})
     } else {
       setName("")
       setType("text")
       setRequired(false)
+      setGroupName("")
       setDefaultValue(null)
       setOptions({})
     }
@@ -145,6 +148,7 @@ export default function FieldBuilderDrawer({
             label: name.trim(),
             type,
             required,
+            group_name: groupName.trim() || null,
             default_value: defaultValue,
             options,
           }
@@ -152,6 +156,7 @@ export default function FieldBuilderDrawer({
             label: name.trim(),
             type,
             required,
+            group_name: groupName.trim() || null,
             default_value: defaultValue,
             options,
           }
@@ -558,6 +563,24 @@ export default function FieldBuilderDrawer({
               placeholder="Enter field name"
               disabled={loading}
             />
+          </div>
+
+          {/* Section Name */}
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Section Name (Optional)
+            </label>
+            <input
+              type="text"
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g., Social Media Fields, Press Fields"
+              disabled={loading}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Organize fields into sections. Fields with the same section name will be grouped together in pickers, modals, and canvas.
+            </p>
           </div>
 
           {/* Field Type */}

@@ -101,7 +101,7 @@ export default async function ViewPage({
         .order("order_index", { ascending: true }),
       supabase
         .from("grid_view_settings")
-        .select("group_by_field")
+        .select("group_by_field, group_by_rules")
         .eq("view_id", viewId)
         .maybeSingle(),
       supabase
@@ -119,11 +119,16 @@ export default async function ViewPage({
     // Get groupBy from grid_view_settings (fallback to view.config for backward compatibility)
     const gridSettings = gridSettingsRes.status === 'fulfilled' && !gridSettingsRes.value.error ? gridSettingsRes.value.data : null
     const groupBy = gridSettings?.group_by_field || (view.config as { groupBy?: string })?.groupBy
+    const groupByRules = gridSettings?.group_by_rules || null
     
     // For Kanban views, get group field from settings or config
     const kanbanGroupField = view.type === "kanban" 
       ? (groupBy || (view.config as { kanbanGroupField?: string })?.kanbanGroupField)
       : undefined
+
+    // For horizontal_grouped views, get group field and rules from settings
+    const horizontalGroupedGroupField = view.type === "horizontal_grouped" ? groupBy : undefined
+    const horizontalGroupedGroupRules = view.type === "horizontal_grouped" ? (groupByRules as any) : undefined
 
     return (
       <WorkspaceShellWrapper title={view.name}>
@@ -139,6 +144,19 @@ export default async function ViewPage({
             initialTableFields={tableFields}
             initialGroupBy={groupBy}
             initialGridSettings={gridSettings}
+          />
+        ) : view.type === "horizontal_grouped" ? (
+          <NonGridViewWrapper
+            viewType="horizontal_grouped"
+            viewName={view.name}
+            tableId={tableId}
+            viewId={viewId}
+            fieldIds={Array.isArray(viewFields) ? viewFields.map((f) => f.field_name).filter(Boolean) : []}
+            groupingFieldId={horizontalGroupedGroupField}
+            groupByRules={horizontalGroupedGroupRules}
+            viewFilters={viewFilters}
+            viewSorts={viewSorts}
+            tableFields={tableFields}
           />
         ) : (
           <NonGridViewWrapper

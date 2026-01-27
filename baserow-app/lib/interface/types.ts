@@ -21,6 +21,7 @@ export type BlockType =
   | 'multi_timeline'
   | 'list'
   | 'number'
+  | 'horizontal_grouped'
 
 export type ChartType = 'bar' | 'line' | 'pie' | 'area' | 'stacked_bar'
 export type AggregateType = 'count' | 'sum' | 'avg' | 'min' | 'max'
@@ -39,7 +40,7 @@ export interface PageBlock {
   updated_at?: string
 }
 
-export type ViewType = 'grid' | 'kanban' | 'calendar' | 'gallery' | 'timeline' | 'form'
+export type ViewType = 'grid' | 'kanban' | 'calendar' | 'gallery' | 'timeline' | 'form' | 'horizontal_grouped'
 
 export interface BlockConfig {
   title?: string

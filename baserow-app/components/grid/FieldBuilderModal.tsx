@@ -36,6 +36,7 @@ export default function FieldBuilderModal({
   const [name, setName] = useState("")
   const [type, setType] = useState<FieldType>("text")
   const [required, setRequired] = useState(false)
+  const [groupName, setGroupName] = useState<string>("")
   const [defaultValue, setDefaultValue] = useState<any>(null)
   const [options, setOptions] = useState<FieldOptions>({})
   const [loading, setLoading] = useState(false)
@@ -117,12 +118,14 @@ export default function FieldBuilderModal({
       setName(getFieldDisplayName(field))
       setType(field.type)
       setRequired(field.required || false)
+      setGroupName(field.group_name || "")
       setDefaultValue(field.default_value)
       setOptions(field.options || {})
     } else {
       setName("")
       setType("text")
       setRequired(false)
+      setGroupName("")
       setDefaultValue(null)
       setOptions({})
     }
@@ -241,6 +244,7 @@ export default function FieldBuilderModal({
             label: name.trim(),
             type,
             required,
+            group_name: groupName.trim() || null,
             default_value: defaultValue,
             options: optionsForSave,
           }
@@ -248,6 +252,7 @@ export default function FieldBuilderModal({
             label: name.trim(),
             type,
             required,
+            group_name: groupName.trim() || null,
             default_value: defaultValue,
             options: optionsForSave,
           }
@@ -735,6 +740,22 @@ export default function FieldBuilderModal({
               placeholder="Enter field name"
               disabled={loading}
             />
+          </div>
+
+          {/* Section Name */}
+          <div className="space-y-2">
+            <Label htmlFor="section-name">Section Name (Optional)</Label>
+            <Input
+              id="section-name"
+              type="text"
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+              placeholder="e.g., Social Media Fields, Press Fields"
+              disabled={loading}
+            />
+            <p className="text-xs text-gray-500">
+              Organize fields into sections. Fields with the same section name will be grouped together in pickers, modals, and canvas.
+            </p>
           </div>
 
           {/* Field Type */}

@@ -193,7 +193,7 @@ CREATE TABLE IF NOT EXISTS public.views (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   table_id uuid,
   name text NOT NULL,
-  type text NOT NULL CHECK (type = ANY (ARRAY['grid'::text, 'kanban'::text, 'calendar'::text, 'form'::text, 'interface'::text, 'gallery'::text, 'timeline'::text])),
+  type text NOT NULL CHECK (type = ANY (ARRAY['grid'::text, 'kanban'::text, 'calendar'::text, 'form'::text, 'interface'::text, 'gallery'::text, 'timeline'::text, 'horizontal_grouped'::text])),
   description text,
   config jsonb DEFAULT '{}'::jsonb,
   access_level text NOT NULL DEFAULT 'authenticated'::text,

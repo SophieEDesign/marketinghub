@@ -30,6 +30,7 @@ import FieldDataSettings from "./FieldDataSettings"
 import FieldAppearanceSettings from "./FieldAppearanceSettings"
 import ButtonDataSettings from "./ButtonDataSettings"
 import ButtonAppearanceSettings from "./ButtonAppearanceSettings"
+import HorizontalGroupedDataSettings from "./HorizontalGroupedDataSettings"
 import CommonAppearanceSettings from "./CommonAppearanceSettings"
 
 export type DataSettingsCtx = {
@@ -87,6 +88,7 @@ const DATA_SETTINGS_RENDERERS: Partial<Record<BlockType, DataRenderer>> = {
   kanban: (ctx) => <GridDataSettings {...ctx} />,
   timeline: (ctx) => <GridDataSettings {...ctx} />,
   gallery: (ctx) => <GridDataSettings {...ctx} />,
+  horizontal_grouped: (ctx) => <HorizontalGroupedDataSettings {...ctx} />,
 }
 
 const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRenderer>> = {
@@ -306,6 +308,16 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
   gallery: (ctx) => (
     <>
       <GridAppearanceSettings config={ctx.config} onUpdate={ctx.onUpdateAppearance} fields={ctx.fields} />
+      <CommonAppearanceSettings
+        config={ctx.config}
+        onUpdate={ctx.onUpdateAppearance}
+        blockType={ctx.blockType}
+        fields={ctx.fields}
+      />
+    </>
+  ),
+  horizontal_grouped: (ctx) => (
+    <>
       <CommonAppearanceSettings
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}

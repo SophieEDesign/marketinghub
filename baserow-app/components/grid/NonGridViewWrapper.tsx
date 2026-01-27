@@ -7,18 +7,26 @@ import FormView from "@/components/views/FormView"
 import KanbanView from "@/components/views/KanbanView"
 import CalendarView from "@/components/views/CalendarView"
 import TimelineView from "@/components/views/TimelineView"
+import HorizontalGroupedView from "@/components/views/HorizontalGroupedView"
 import DesignSidebar from "@/components/layout/DesignSidebar"
 import { supabase } from "@/lib/supabase/client"
 import type { TableField } from "@/types/fields"
+import type { ViewFilter, ViewSort } from "@/types/database"
+import { applyFiltersToQuery, type FilterConfig } from "@/lib/interface/filters"
+import type { GroupRule } from "@/lib/grouping/types"
 
 interface NonGridViewWrapperProps {
-  viewType: "form" | "kanban" | "calendar" | "timeline"
+  viewType: "form" | "kanban" | "calendar" | "timeline" | "horizontal_grouped"
   viewName: string
   tableId: string
   viewId: string
   fieldIds: string[]
   groupingFieldId?: string
+  groupByRules?: GroupRule[]
   dateFieldId?: string
+  viewFilters?: ViewFilter[]
+  viewSorts?: ViewSort[]
+  tableFields?: TableField[]
 }
 
 export default function NonGridViewWrapper({
@@ -28,7 +36,11 @@ export default function NonGridViewWrapper({
   viewId,
   fieldIds: fieldIdsProp,
   groupingFieldId,
+  groupByRules,
   dateFieldId,
+  viewFilters = [],
+  viewSorts = [],
+  tableFields: tableFieldsProp = [],
 }: NonGridViewWrapperProps) {
   // Ensure fieldIds is always an array
   const fieldIds = Array.isArray(fieldIdsProp) ? fieldIdsProp : []
@@ -37,7 +49,7 @@ export default function NonGridViewWrapper({
   const searchQuery = searchParams.get("q") || ""
   const [designSidebarOpen, setDesignSidebarOpen] = useState(false)
   const [tableInfo, setTableInfo] = useState<{ name: string; supabase_table: string } | null>(null)
-  const [tableFields, setTableFields] = useState<TableField[]>([])
+  const [tableFields, setTableFields] = useState<TableField[]>(tableFieldsProp)
 
   useEffect(() => {
     async function loadTableInfo() {
@@ -58,8 +70,13 @@ export default function NonGridViewWrapper({
     loadTableInfo()
   }, [tableId])
 
-  // Load table fields
+  // Load table fields (only if not provided as prop)
   useEffect(() => {
+    if (tableFieldsProp.length > 0) {
+      setTableFields(tableFieldsProp)
+      return
+    }
+    
     async function loadFields() {
       try {
         const response = await fetch(`/api/tables/${tableId}/fields`)
@@ -72,7 +89,7 @@ export default function NonGridViewWrapper({
       }
     }
     loadFields()
-  }, [tableId])
+  }, [tableId, tableFieldsProp])
 
 
   async function handleNewRecord() {
@@ -149,6 +166,26 @@ export default function NonGridViewWrapper({
             fieldIds={fieldIds}
             searchQuery={searchQuery}
             tableFields={tableFields}
+          />
+        )}
+        {viewType === "horizontal_grouped" && tableInfo && (
+          <HorizontalGroupedView
+            tableId={tableId}
+            viewId={viewId}
+            supabaseTableName={tableInfo.supabase_table}
+            tableFields={tableFields}
+            filters={viewFilters.map(f => ({
+              field: f.field_name,
+              operator: f.operator as FilterConfig['operator'],
+              value: f.value,
+            }))}
+            sorts={viewSorts.map(s => ({
+              field_name: s.field_name,
+              direction: s.direction as 'asc' | 'desc',
+            }))}
+            groupBy={groupingFieldId}
+            groupByRules={groupByRules}
+            searchQuery={searchQuery}
           />
         )}
       </div>

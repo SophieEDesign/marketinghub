@@ -37,6 +37,7 @@ import MultiTimelineBlock from "./blocks/MultiTimelineBlock"
 import GalleryBlock from "./blocks/GalleryBlock"
 import ListBlock from "./blocks/ListBlock"
 import NumberBlock from "./blocks/NumberBlock"
+import HorizontalGroupedBlock from "./blocks/HorizontalGroupedBlock"
 import { ErrorBoundary } from "./ErrorBoundary"
 import type { FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
@@ -411,6 +412,23 @@ export default function BlockRenderer({
               pageShowAddRecord={pageShowAddRecord}
               onEphemeralHeightDelta={onEphemeralHeightDelta}
               rowHeight={rowHeight}
+            />
+          </LazyBlockWrapper>
+        )
+
+      case "horizontal_grouped":
+        // Horizontal Grouped block - displays records grouped by field in tabs
+        return (
+          <LazyBlockWrapper enabled={!isEditing}>
+            <HorizontalGroupedBlock
+              block={safeBlock}
+              isEditing={canEdit}
+              pageTableId={pageTableId}
+              pageId={pageId}
+              filters={filters}
+              filterTree={filterTree}
+              onRecordClick={onRecordClick}
+              pageShowAddRecord={pageShowAddRecord}
             />
           </LazyBlockWrapper>
         )
