@@ -79,6 +79,9 @@ function InterfacePageClientInternal({
   // Track both the loaded state and the pageId to ensure we reset when page changes
   const blocksLoadedRef = useRef<{ pageId: string | null; loaded: boolean }>({ pageId: null, loaded: false })
   
+  // CRITICAL: Track if loadBlocks is currently executing to prevent concurrent calls
+  const blocksLoadingRef = useRef<boolean>(false)
+  
   // CRITICAL: Reset blocks and edit mode state ONLY when pageId actually changes
   // This ensures previous page's edit mode doesn't leak to the new page
   // DO NOT clear blocks for: edit mode toggles, viewer mode, saveLayout reloads, block updates, forceReload
@@ -345,10 +348,21 @@ function InterfacePageClientInternal({
     // Reset loaded state when pageId changes
     if (blocksLoadedRef.current.pageId !== page.id) {
       blocksLoadedRef.current = { pageId: page.id, loaded: false }
+      blocksLoadingRef.current = false // Reset loading flag on page change
+    }
+    
+    // CRITICAL: Prevent concurrent calls - check both state and ref
+    // The ref prevents race conditions where useEffect runs multiple times before state updates
+    if (blocksLoadingRef.current || blocksLoading) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[loadBlocks] Skipping - already loading: pageId=${page.id}`)
+      }
+      return
     }
     
     // Only load if blocks haven't been loaded yet for this page
-    if (!blocksLoading && (!blocksLoadedRef.current.loaded || blocks.length === 0)) {
+    // loadBlocks() manages the blocksLoadingRef flag internally
+    if (!blocksLoadedRef.current.loaded || blocks.length === 0) {
       loadBlocks()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -676,8 +690,19 @@ function InterfacePageClientInternal({
   }
 
   async function loadBlocks(forceReload = false) {
-    console.log('🔥 loadBlocks CALLED', { pageId: page?.id || 'NO_PAGE', forceReload, previousPageId: previousPageIdRef.current })
-    if (!page) return
+    console.log('🔥 loadBlocks CALLED', { pageId: page?.id || 'NO_PAGE', forceReload, previousPageId: previousPageIdRef.current, alreadyLoading: blocksLoadingRef.current })
+    if (!page) {
+      blocksLoadingRef.current = false
+      return
+    }
+    
+    // CRITICAL: Prevent concurrent calls - check ref at function entry
+    if (!forceReload && blocksLoadingRef.current) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[loadBlocks] Already loading - skipping duplicate call: pageId=${page.id}`)
+      }
+      return
+    }
     
     // CRITICAL: Only reset loaded state if pageId actually changed (not just on every call)
     // DO NOT clear blocks here - that's handled by the page change effect above
@@ -693,8 +718,12 @@ function InterfacePageClientInternal({
     // CRITICAL: Only load blocks once per page visit (prevent remounts)
     // Unless forceReload is true (e.g., when exiting edit mode to refresh saved content)
     if (!forceReload && blocksLoadedRef.current.loaded && blocks.length > 0) {
+      blocksLoadingRef.current = false
       return
     }
+    
+    // Set loading flag
+    blocksLoadingRef.current = true
 
     setBlocksLoading(true)
     try {
@@ -848,6 +877,7 @@ function InterfacePageClientInternal({
       blocksLoadedRef.current = { pageId: page.id, loaded: true }
     } finally {
       setBlocksLoading(false)
+      blocksLoadingRef.current = false // CRITICAL: Always clear loading flag
     }
   }
 

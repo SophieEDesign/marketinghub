@@ -16,6 +16,8 @@ import TimelineFieldValue from "./TimelineFieldValue"
 import {
   resolveChoiceColor,
   normalizeHexColor,
+  getTextColorForBackground,
+  SEMANTIC_COLORS,
 } from "@/lib/field-colors"
 import { resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
 import { normalizeUuid } from "@/lib/utils/ids"
@@ -683,6 +685,36 @@ export default function TimelineView({
         blockConfig?.appearance?.card_wrap_title ||
         false
   }, [wrapTitleProp, blockConfig])
+
+  // Helper to get pill color for select fields
+  const getPillColor = useCallback((field: TableField, value: any): string | null => {
+    if (field.type !== 'single_select' && field.type !== 'multi_select') {
+      return null
+    }
+
+    const normalizedValue = String(value).trim()
+    return normalizeHexColor(
+      resolveChoiceColor(
+        normalizedValue,
+        field.type,
+        field.options,
+        field.type === 'single_select'
+      )
+    )
+  }, [])
+
+  // Helper to generate a color for any group value (hash-based)
+  const getGroupColor = useCallback((value: any): string => {
+    const normalizedValue = String(value || '').trim()
+    if (!normalizedValue) return '#9CA3AF' // Gray for empty values
+    
+    // Use hash-based color selection from SEMANTIC_COLORS
+    let hash = 0
+    for (let i = 0; i < normalizedValue.length; i++) {
+      hash = normalizedValue.charCodeAt(i) + ((hash << 5) - hash)
+    }
+    return SEMANTIC_COLORS[Math.abs(hash) % SEMANTIC_COLORS.length]
+  }, [])
 
   // Convert rows to timeline events
   const events = useMemo<TimelineEvent[]>(() => {
@@ -1492,34 +1524,76 @@ export default function TimelineView({
               Object.entries(groupedEvents).map(([groupKey, groupEvents], groupIndex) => {
                 // Get group label and color
                 const groupLabel = groupKey === 'Unassigned' ? 'Unassigned' : groupKey
-                let groupColor: string | undefined = undefined
-                if (groupKey !== 'Unassigned' && resolvedGroupByField.options) {
-                  // Type assertion: resolvedGroupByField is already filtered to be single_select or multi_select
-                  const fieldType = (resolvedGroupByField.type === 'single_select' || resolvedGroupByField.type === 'multi_select')
-                    ? resolvedGroupByField.type as 'single_select' | 'multi_select'
-                    : 'single_select' as const // Fallback (shouldn't happen due to filtering)
-                  const hexColor = resolveChoiceColor(
-                    groupKey,
-                    fieldType,
-                    resolvedGroupByField.options,
-                    resolvedGroupByField.type === 'single_select'
-                  )
-                  groupColor = normalizeHexColor(hexColor)
+                let groupColor: string | null = null
+                if (groupKey !== 'Unassigned' && resolvedGroupByField) {
+                  if (resolvedGroupByField.type === 'single_select' || resolvedGroupByField.type === 'multi_select') {
+                    // Use field-specific color for select fields
+                    groupColor = getPillColor(resolvedGroupByField, groupKey)
+                  } else {
+                    // Generate hash-based color for all other field types
+                    groupColor = getGroupColor(groupKey)
+                  }
+                } else if (groupKey === 'Unassigned') {
+                  // Gray for unassigned
+                  groupColor = '#9CA3AF'
                 }
+
+                // Helper to convert hex to RGB
+                const hexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
+                  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+                  return result
+                    ? {
+                        r: parseInt(result[1], 16),
+                        g: parseInt(result[2], 16),
+                        b: parseInt(result[3], 16),
+                      }
+                    : null
+                }
+
+                // Determine text color for contrast
+                const textColorClass = groupColor ? getTextColorForBackground(groupColor) : 'text-gray-700'
+                const textColorStyle = groupColor ? {} : { color: undefined }
+                
+                // Background color with opacity
+                const bgColorStyle = groupColor 
+                  ? (() => {
+                      const rgb = hexToRgb(groupColor)
+                      if (rgb) {
+                        return {
+                          backgroundColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)`, // 15% opacity
+                          borderColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.4)`, // 40% opacity for border
+                        }
+                      }
+                      return {
+                        backgroundColor: 'white',
+                        borderColor: '#e5e7eb',
+                      }
+                    })()
+                  : {
+                      backgroundColor: 'white',
+                      borderColor: '#e5e7eb',
+                    }
 
                 return (
                   <div key={groupKey} className={rowSizeSpacing.laneSpacing}>
                     {/* Group header */}
-                    <div className="sticky top-12 bg-white z-5 border-b border-gray-200 pb-1 mb-2">
+                    <div 
+                      className="sticky top-12 z-5 border-b pb-1 mb-2 px-2 py-1 rounded"
+                      style={bgColorStyle}
+                    >
                       <div className="flex items-center gap-2">
                         {groupColor && (
                           <div
-                            className="w-3 h-3 rounded-full"
+                            className="w-3 h-3 rounded-full flex-shrink-0"
                             style={{ backgroundColor: groupColor }}
                           />
                         )}
-                        <span className="text-xs font-medium text-gray-700">{groupLabel}</span>
-                        <span className="text-xs text-gray-400">({groupEvents.length})</span>
+                        <span className={`text-xs font-medium ${textColorClass}`} style={textColorStyle}>
+                          {groupLabel}
+                        </span>
+                        <span className={`text-xs ${groupColor ? 'opacity-80' : 'text-gray-400'}`}>
+                          ({groupEvents.length})
+                        </span>
                       </div>
                     </div>
 

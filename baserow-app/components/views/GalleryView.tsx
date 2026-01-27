@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
 import { applyFiltersToQuery, stripFilterBlockFilters, type FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
-import { resolveChoiceColor, normalizeHexColor } from "@/lib/field-colors"
+import { resolveChoiceColor, normalizeHexColor, getTextColorForBackground, SEMANTIC_COLORS } from "@/lib/field-colors"
 import { ChevronDown, ChevronRight, Settings, Image, Database } from "lucide-react"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { CellFactory } from "@/components/grid/CellFactory"
@@ -261,6 +261,36 @@ export default function GalleryView({
     },
     [imageField]
   )
+
+  // Helper to get pill color for select fields
+  const getPillColor = useCallback((field: TableField, value: any): string | null => {
+    if (field.type !== 'single_select' && field.type !== 'multi_select') {
+      return null
+    }
+
+    const normalizedValue = String(value).trim()
+    return normalizeHexColor(
+      resolveChoiceColor(
+        normalizedValue,
+        field.type,
+        field.options,
+        field.type === 'single_select'
+      )
+    )
+  }, [])
+
+  // Helper to generate a color for any group value (hash-based)
+  const getGroupColor = useCallback((value: any): string => {
+    const normalizedValue = String(value || '').trim()
+    if (!normalizedValue) return '#9CA3AF' // Gray for empty values
+    
+    // Use hash-based color selection from SEMANTIC_COLORS
+    let hash = 0
+    for (let i = 0; i < normalizedValue.length; i++) {
+      hash = normalizedValue.charCodeAt(i) + ((hash << 5) - hash)
+    }
+    return SEMANTIC_COLORS[Math.abs(hash) % SEMANTIC_COLORS.length]
+  }, [])
 
   const filteredRows = useMemo(() => {
     if (!searchQuery || !Array.isArray(tableFields) || tableFields.length === 0) return rows
@@ -629,23 +659,80 @@ export default function GalleryView({
           {groupedRows.map((group) => {
             const isCollapsed = collapsedGroups.has(group.pathKey)
             const items = Array.isArray(group.items) ? group.items : []
+            
+            // Get group color - generate for ALL groups
+            let groupColor: string | null = null
+            if (group.rule && group.rule.type === 'field') {
+              const groupField = (Array.isArray(tableFields) ? tableFields : []).find(
+                (f: any) => f && (f.name === group.rule.field || f.id === group.rule.field)
+              ) as TableField | undefined
+              if (groupField && (groupField.type === 'single_select' || groupField.type === 'multi_select')) {
+                // Use field-specific color for select fields
+                groupColor = getPillColor(groupField, group.key)
+              } else {
+                // Generate hash-based color for all other field types
+                groupColor = getGroupColor(group.key)
+              }
+            } else if (group.rule && group.rule.type === 'date') {
+              // For date-based grouping, generate color from the date value
+              groupColor = getGroupColor(group.key)
+            }
+
+            // Determine text color for contrast
+            const textColorClass = groupColor ? getTextColorForBackground(groupColor) : 'text-gray-900'
+            const textColorStyle = groupColor ? {} : { color: undefined }
+            
+            // Helper to convert hex to RGB
+            const hexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
+              const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+              return result
+                ? {
+                    r: parseInt(result[1], 16),
+                    g: parseInt(result[2], 16),
+                    b: parseInt(result[3], 16),
+                  }
+                : null
+            }
+            
+            // Background color with opacity
+            const bgColorStyle = groupColor 
+              ? (() => {
+                  const rgb = hexToRgb(groupColor)
+                  if (rgb) {
+                    return {
+                      backgroundColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)`, // 15% opacity
+                      borderColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.4)`, // 40% opacity for border
+                    }
+                  }
+                  return {}
+                })()
+              : {}
+            
             return (
               <div key={group.pathKey} className="space-y-3">
                 <button
                   type="button"
                   onClick={() => toggleGroupCollapsed(group.pathKey)}
-                  className="w-full flex items-center justify-between gap-3 rounded-md border border-gray-200 bg-white px-3 py-2 text-left hover:bg-gray-50"
+                  className={`w-full flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-left transition-colors ${
+                    groupColor ? '' : 'border-gray-200 bg-white hover:bg-gray-50'
+                  }`}
+                  style={{
+                    ...bgColorStyle,
+                    ...textColorStyle,
+                  }}
                 >
                   <div className="min-w-0">
-                    <div className="text-sm font-semibold text-gray-900 truncate">
+                    <div className={`text-sm font-semibold truncate ${textColorClass}`}>
                       {group.label}
                     </div>
-                    <div className="text-xs text-gray-500">
+                    <div className={`text-xs ${groupColor ? 'opacity-80' : 'text-gray-500'}`}>
                       {group.size} {group.size === 1 ? "record" : "records"}
                     </div>
                   </div>
                   <ChevronDown
-                    className={`h-4 w-4 text-gray-500 transition-transform ${isCollapsed ? "-rotate-90" : ""}`}
+                    className={`h-4 w-4 transition-transform ${isCollapsed ? "-rotate-90" : ""} ${
+                      groupColor ? textColorClass : 'text-gray-500'
+                    }`}
                   />
                 </button>
 
