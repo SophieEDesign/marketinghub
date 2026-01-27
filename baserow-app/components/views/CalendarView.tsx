@@ -419,9 +419,10 @@ export default function CalendarView({
   const prevFiltersKeyRef = useRef<string>("")
   
   const filtersKey = useMemo(() => {
-    const dateRangeKey = dateFromKey || dateToKey ? `${dateFromKey}|${dateToKey}` : ''
+    // Date range is NOT included in filtersKey since it only affects calendar view display (via validRange),
+    // not record filtering, so we don't need to reload data when date range changes
     const filtersStr = JSON.stringify(filters || [])
-    const newKey = filtersStr + dateRangeKey
+    const newKey = filtersStr
     
     // Only update if key actually changed
     if (newKey === prevFiltersKeyRef.current) {
@@ -430,28 +431,19 @@ export default function CalendarView({
     
     prevFiltersKeyRef.current = newKey
     return newKey
-  }, [filters, dateFromKey, dateToKey])
+  }, [filters])
   
   // CRITICAL: Cache previous combinedFilters to prevent unnecessary recalculations
   const prevCombinedFiltersRef = useRef<string>("")
   
-  // Build combined filters including date range
+  // Build combined filters (date range is NOT included - it only filters calendar view display, not records)
   // CRITICAL: Use dateFromKey and dateToKey (string values) instead of Date objects to prevent infinite loops
   const combinedFilters = useMemo(() => {
     const baseFilters = filterTree ? stripFilterBlockFilters(filters || []) : (filters || [])
     const allFilters: FilterConfig[] = [...baseFilters]
     
-    // Add date range filter if dates are set
-    if (resolvedDateFieldId && (dateFromKey || dateToKey)) {
-      allFilters.push({
-        field: resolvedDateFieldId,
-        operator: 'date_range',
-        // IMPORTANT: use local date formatting (not UTC via toISOString),
-        // otherwise the day can shift for users outside UTC.
-        value: dateFromKey || undefined,
-        value2: dateToKey || undefined,
-      })
-    }
+    // NOTE: Date range is NOT added to filters here - it only affects calendar view display via validRange prop
+    // This ensures the date range filters the calendar view (which dates are visible) but does NOT filter the records
     
     // CRITICAL: Serialize and compare to prevent unnecessary object creation
     const serialized = JSON.stringify(allFilters)
@@ -463,7 +455,7 @@ export default function CalendarView({
     
     prevCombinedFiltersRef.current = serialized
     return allFilters
-  }, [filters, filterTree, resolvedDateFieldId, dateFromKey, dateToKey])
+  }, [filters, filterTree])
 
   // For "new record defaults" (Airtable-like), include flattened filter-tree conditions as best-effort.
   const combinedFiltersForDefaults = useMemo(() => {
@@ -1881,6 +1873,14 @@ export default function CalendarView({
             eventContent={calendarEventContent}
             eventClick={onCalendarEventClick}
             dateClick={onCalendarDateClick}
+            validRange={
+              dateFrom || dateTo
+                ? {
+                    start: dateFrom ? format(dateFrom, 'yyyy-MM-dd') : undefined,
+                    end: dateTo ? format(dateTo, 'yyyy-MM-dd') : undefined,
+                  }
+                : undefined
+            }
           />
         ) : (
           <div className="flex items-center justify-center h-64 text-gray-500">

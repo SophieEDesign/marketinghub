@@ -511,18 +511,10 @@ export default function Canvas({
     top?: { block: Layout; distance: number; targetY: number }
     bottom?: { block: Layout; distance: number; targetY: number }
   } => {
-    // Calculate adaptive snap threshold - keep it small to prevent jumping
-    // Only snap when blocks are very close (within ~1 grid unit)
-    const margin = layoutSettings?.margin || [10, 10]
-    const rowHeight = layoutSettings?.rowHeight || 30
-    // Convert margin from pixels to grid units
-    const marginInGridUnits = Math.max(margin[0], margin[1]) / rowHeight
-    // Use a small threshold (1-1.5 grid units) to only snap when blocks are truly close
-    // This prevents jumping while still allowing blocks to snap together
-    // The margin is handled by react-grid-layout as CSS, so blocks can be adjacent in grid coords
-    const baseThreshold = Math.ceil(marginInGridUnits * 1.5)
     // CRITICAL: Snap threshold must be generous and predictable (at least 3 grid units)
-    // Previous max(1, min(2, ...)) was too restrictive and prevented snapping from triggering
+    // This allows blocks to snap together when they're close, making it feel intuitive
+    // A threshold that's too small (1-2 grid units) prevents snapping from triggering
+    // The margin is handled by react-grid-layout as CSS, so blocks can be adjacent in grid coords
     const calculatedThreshold = snapThreshold ?? 3
     
     const draggedX = draggedBlock.x || 0
@@ -864,9 +856,36 @@ export default function Canvas({
     dragVector: { dx: number; dy: number } | null,
     cols: number
   ): Layout => {
+    // CRITICAL: Use persistent heights for snap detection (not effective heights with ephemeral deltas)
+    // Snap detection should work on the actual saved layout, not runtime-expanded heights
+    const persistentLayout = allLayout.map(item => ({
+      ...item,
+      h: item.h || 4, // Use persistent h only (ephemeral deltas don't affect snap detection)
+    }))
+    
+    const persistentDraggedBlock = {
+      ...draggedBlock,
+      h: draggedBlock.h || 4, // Use persistent h only
+    }
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[Canvas] Applying smart snap', {
+        blockId: draggedBlock.i,
+        dragVector,
+        layoutCount: allLayout.length,
+      })
+    }
+    
     // First, try corner snap (simultaneous X and Y)
-    const cornerSnapped = applyCornerSnap(draggedBlock, allLayout, dragVector, cols)
+    const cornerSnapped = applyCornerSnap(persistentDraggedBlock, persistentLayout, dragVector, cols)
     if (cornerSnapped) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Canvas] Applied corner snap', {
+          blockId: draggedBlock.i,
+          originalPos: { x: draggedBlock.x, y: draggedBlock.y },
+          snappedPos: { x: cornerSnapped.x, y: cornerSnapped.y },
+        })
+      }
       debugLog('LAYOUT', `[Canvas] Applied corner snap to block ${draggedBlock.i}`, {
         originalX: draggedBlock.x,
         originalY: draggedBlock.y,
@@ -882,8 +901,15 @@ export default function Canvas({
     
     // If dragging primarily vertically, try vertical snap first
     if (isVerticalDrag) {
-      const verticalSnapped = applyVerticalSnap(draggedBlock, allLayout)
+      const verticalSnapped = applyVerticalSnap(persistentDraggedBlock, persistentLayout)
       if (verticalSnapped) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[Canvas] Applied vertical snap', {
+            blockId: draggedBlock.i,
+            originalY: draggedBlock.y,
+            snappedY: verticalSnapped.y,
+          })
+        }
         debugLog('LAYOUT', `[Canvas] Applied vertical snap to block ${draggedBlock.i}`, {
           originalY: draggedBlock.y,
           snappedY: verticalSnapped.y,
@@ -893,8 +919,15 @@ export default function Canvas({
       }
       
       // If vertical snap didn't work, try horizontal as fallback
-      const horizontalSnapped = applyHorizontalSnap(draggedBlock, allLayout, dragVector, cols)
+      const horizontalSnapped = applyHorizontalSnap(persistentDraggedBlock, persistentLayout, dragVector, cols)
       if (horizontalSnapped) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[Canvas] Applied horizontal snap (fallback)', {
+            blockId: draggedBlock.i,
+            originalX: draggedBlock.x,
+            snappedX: horizontalSnapped.x,
+          })
+        }
         debugLog('LAYOUT', `[Canvas] Applied horizontal snap to block ${draggedBlock.i} (fallback)`, {
           originalX: draggedBlock.x,
           snappedX: horizontalSnapped.x,
@@ -904,8 +937,15 @@ export default function Canvas({
       }
     } else {
       // Default: try horizontal snap first (for horizontal drags or no clear direction)
-      const horizontalSnapped = applyHorizontalSnap(draggedBlock, allLayout, dragVector, cols)
+      const horizontalSnapped = applyHorizontalSnap(persistentDraggedBlock, persistentLayout, dragVector, cols)
       if (horizontalSnapped) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[Canvas] Applied horizontal snap', {
+            blockId: draggedBlock.i,
+            originalX: draggedBlock.x,
+            snappedX: horizontalSnapped.x,
+          })
+        }
         debugLog('LAYOUT', `[Canvas] Applied horizontal snap to block ${draggedBlock.i}`, {
           originalX: draggedBlock.x,
           snappedX: horizontalSnapped.x,
@@ -915,8 +955,15 @@ export default function Canvas({
       }
       
       // Try vertical snap as second priority
-      const verticalSnapped = applyVerticalSnap(draggedBlock, allLayout)
+      const verticalSnapped = applyVerticalSnap(persistentDraggedBlock, persistentLayout)
       if (verticalSnapped) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[Canvas] Applied vertical snap', {
+            blockId: draggedBlock.i,
+            originalY: draggedBlock.y,
+            snappedY: verticalSnapped.y,
+          })
+        }
         debugLog('LAYOUT', `[Canvas] Applied vertical snap to block ${draggedBlock.i}`, {
           originalY: draggedBlock.y,
           snappedY: verticalSnapped.y,
@@ -927,6 +974,9 @@ export default function Canvas({
     }
     
     // No snap available - return original position
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[Canvas] No snap available', { blockId: draggedBlock.i })
+    }
     // Vertical compaction will be applied separately if needed
     return draggedBlock
   }, [applyHorizontalSnap, applyVerticalSnap, applyCornerSnap])
@@ -1757,6 +1807,7 @@ export default function Canvas({
             const blockId = oldItem.i
             const previousHeight = oldItem.h || 4
             const newHeight = newItem.h || 4
+            const cols = layoutSettings?.cols || 12
             
             if (process.env.NODE_ENV === 'development') {
               console.log('[Canvas] Resize stopped - persisting user layout change', {
@@ -1773,21 +1824,31 @@ export default function Canvas({
               return
             }
             
+            // CRITICAL: Ensure block stays within grid bounds after resize
+            const blockX = resizedBlock.x || 0
+            const blockW = resizedBlock.w || 4
+            const clampedX = Math.max(0, Math.min(blockX, cols - blockW))
+            const clampedW = Math.max(2, Math.min(blockW, cols - clampedX)) // minW is 2
+            
             // Check if height changed and apply reflow
             const heightIncreased = newHeight > previousHeight
             const heightDecreased = newHeight < previousHeight
             
-            let finalLayout = layout
+            let finalLayout = layout.map(item => 
+              item.i === blockId 
+                ? { ...item, x: clampedX, w: clampedW, h: newHeight }
+                : item
+            )
             
             if (heightIncreased) {
               // Block grew - push blocks below down
-              finalLayout = pushBlocksDown(layout, blockId, 0) // No ephemeral delta for manual resize
+              finalLayout = pushBlocksDown(finalLayout, blockId, 0) // No ephemeral delta for manual resize
               if (process.env.NODE_ENV === 'development') {
                 console.log('[Canvas] Pushed blocks down after resize grow', { blockId, newHeight })
               }
             } else if (heightDecreased) {
               // Block shrunk - compact vertically
-              finalLayout = compactLayoutVertically(layout, blocks)
+              finalLayout = compactLayoutVertically(finalLayout, blocks)
               if (process.env.NODE_ENV === 'development') {
                 console.log('[Canvas] Compacted layout after resize shrink', { blockId, newHeight })
               }
@@ -2012,8 +2073,9 @@ export default function Canvas({
               Math.abs((snappedBlock.x || 0) - (draggedBlock.x || 0)) > 0.01 ||
               Math.abs((snappedBlock.y || 0) - (draggedBlock.y || 0)) > 0.01
             
+            let finalLayout = layout
             if (positionChanged) {
-              const snappedLayout = layout.map(item => 
+              finalLayout = layout.map(item => 
                 item.i === blockId ? snappedBlock : item
               )
               
@@ -2024,13 +2086,31 @@ export default function Canvas({
                   snappedPos: { x: snappedBlock.x, y: snappedBlock.y },
                 })
               }
-              
-              // Persist snapped layout
-              applyUserLayoutChange(snappedLayout)
-            } else {
-              // No snap, just persist current position
-              applyUserLayoutChange(layout)
             }
+            
+            // CRITICAL: After snapping, compact vertically to close any gaps
+            // This ensures blocks are packed together (default behavior is clean packed grid)
+            // Use persistent heights for compaction (not effective heights with ephemeral deltas)
+            const persistentLayoutForCompaction = finalLayout.map(item => ({
+              ...item,
+              h: item.h || 4, // Use persistent h only
+            }))
+            finalLayout = compactLayoutVertically(persistentLayoutForCompaction, blocks)
+            
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[Canvas] Compacted layout after drag', { 
+                blockId,
+                layoutChanged: finalLayout.some((item, idx) => {
+                  const original = persistentLayoutForCompaction[idx]
+                  return original && (
+                    Math.abs((item.y || 0) - (original.y || 0)) > 0.01
+                  )
+                })
+              })
+            }
+            
+            // Persist final layout (snapped + compacted)
+            applyUserLayoutChange(finalLayout)
             
             // Clear drag tracking
             dragStartPositionRef.current.delete(blockId)

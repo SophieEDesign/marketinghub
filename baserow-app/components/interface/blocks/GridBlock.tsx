@@ -966,7 +966,7 @@ export default function GridBlock({
         )}
 
       {(() => {
-        const showUnifiedCalendarHeader = !isEditing && viewType === "calendar"
+        const showUnifiedCalendarHeader = viewType === "calendar"
         if (!showUnifiedCalendarHeader) return null
         const hasAnyDateField = (safeTableFields || []).some((f) => f && f.type === "date")
 
