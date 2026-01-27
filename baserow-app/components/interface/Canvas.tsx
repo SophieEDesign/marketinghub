@@ -129,6 +129,10 @@ export default function Canvas({
   // Track pending layout changes until blocks prop reflects them (robust guard)
   const pendingLayoutRef = useRef<Map<string, { x: number; y: number; w: number; h: number }>>(new Map())
   const hasPendingLayoutRef = useRef(false)
+  // Track recent height changes to prevent infinite loops
+  // Maps blockId -> { gridH, timestamp } to prevent processing duplicate height changes
+  const recentHeightChangesRef = useRef<Map<string, { gridH: number; timestamp: number }>>(new Map())
+  const heightChangeInProgressRef = useRef<Set<string>>(new Set())
   
   // CRITICAL: Convert pixels to grid units (React Grid Layout height includes margins)
   // This ensures height values from content measurement are correctly converted
@@ -1301,6 +1305,25 @@ export default function Canvas({
     // Get height mode for this block
     const heightMode = getHeightMode(blockId)
     
+    // CRITICAL: Prevent infinite loops - check if height change is already in progress
+    if (heightChangeInProgressRef.current.has(blockId)) {
+      console.log('[HeightChange] IGNORED - height change already in progress', { blockId, gridH })
+      return
+    }
+    
+    // CRITICAL: Prevent processing duplicate height changes within a short time window
+    const recentChange = recentHeightChangesRef.current.get(blockId)
+    const now = Date.now()
+    if (recentChange && Math.abs(recentChange.gridH - gridH) < 0.01 && (now - recentChange.timestamp) < 100) {
+      console.log('[HeightChange] IGNORED - duplicate height change (within 100ms)', { 
+        blockId, 
+        gridH, 
+        previousGridH: recentChange.gridH,
+        timeSinceLastChange: now - recentChange.timestamp 
+      })
+      return
+    }
+    
     // PHASE 1.2: Log height change from content
     console.log('[HeightChange]', {
       blockId,
@@ -1321,23 +1344,35 @@ export default function Canvas({
       console.log('[HeightChange] IGNORED - user is dragging', { blockId })
       return // Ignore - user is dragging
     }
+    
+    // Mark height change as in progress
+    heightChangeInProgressRef.current.add(blockId)
 
     // Update only the changed block's height in layout
     setLayout((currentLayout: Layout[]): Layout[] => {
+      const currentItem = currentLayout.find(item => item.i === blockId)
+      const oldHeight = currentItem?.h || 4
+      
+      // CRITICAL: Early return if height hasn't actually changed
+      if (Math.abs(oldHeight - gridH) < 0.01) {
+        // Height hasn't changed - clear in-progress flag and return
+        heightChangeInProgressRef.current.delete(blockId)
+        // Update recent changes tracking
+        recentHeightChangesRef.current.set(blockId, { gridH, timestamp: now })
+        return currentLayout
+      }
+      
       const updatedLayout: Layout[] = currentLayout.map((item: Layout): Layout => {
         if (item.i === blockId) {
-          const oldHeight = item.h || 4
-          if (Math.abs(oldHeight - gridH) > 0.01) {
-            console.log('[HeightChange] UPDATING layout height', {
-              blockId,
-              oldHeight,
-              newHeightPx,
-              gridH,
-            })
-            return {
-              ...item,
-              h: gridH,
-            }
+          console.log('[HeightChange] UPDATING layout height', {
+            blockId,
+            oldHeight,
+            newHeightPx,
+            gridH,
+          })
+          return {
+            ...item,
+            h: gridH,
           }
         }
         return item
@@ -1346,9 +1381,13 @@ export default function Canvas({
       // PHASE 3.1: Re-enable push/compact after content height change
       // Check if block grew or shrunk
       const changedBlock: Layout | undefined = updatedLayout.find((item: Layout) => item.i === blockId)
-      if (!changedBlock) return updatedLayout
+      if (!changedBlock) {
+        // Clear in-progress flag if block not found
+        heightChangeInProgressRef.current.delete(blockId)
+        return updatedLayout
+      }
       
-      const oldHeight = currentLayout.find((item: Layout) => item.i === blockId)?.h || 4
+      // oldHeight is already defined above from currentItem
       const changedBlockHeight = changedBlock.h || 4
       
       let finalLayout: Layout[] = updatedLayout
@@ -1404,6 +1443,20 @@ export default function Canvas({
         heightMode,
         note: heightMode === 'auto' ? 'Height will not persist (content-driven)' : 'Height will persist (fixed)',
       })
+
+      // CRITICAL: Clear in-progress flag and update recent changes tracking after layout update
+      // Use setTimeout to ensure this happens after the state update completes
+      setTimeout(() => {
+        heightChangeInProgressRef.current.delete(blockId)
+        recentHeightChangesRef.current.set(blockId, { gridH, timestamp: Date.now() })
+        // Clean up old entries (older than 1 second) to prevent memory leak
+        const oneSecondAgo = Date.now() - 1000
+        for (const [id, change] of recentHeightChangesRef.current.entries()) {
+          if (change.timestamp < oneSecondAgo) {
+            recentHeightChangesRef.current.delete(id)
+          }
+        }
+      }, 0)
 
       return finalLayout
     })
