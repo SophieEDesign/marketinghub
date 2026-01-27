@@ -225,7 +225,7 @@ function buildNodesAtLevel<TItem extends Record<string, any>>(
   // to ensure we're using the correct field name for data access
   const originalRule = rules[ruleIndex]
   if (!originalRule) {
-    console.warn(`GroupTree: Missing rule at index ${ruleIndex}`)
+    console.warn(`[GroupTree] Missing rule at index ${ruleIndex}`, { ruleIndex, rulesLength: rules.length })
     return []
   }
   
@@ -234,14 +234,25 @@ function buildNodesAtLevel<TItem extends Record<string, any>>(
 
   // If field cannot be resolved, skip this grouping level
   if (!field && rule.type === 'field') {
-    console.warn(`GroupTree: Cannot resolve field "${rule.field}" for grouping rule at index ${ruleIndex}. Available fields:`, Array.from(ctx.fieldByName.keys()))
+    console.warn(`[GroupTree] Cannot resolve field "${rule.field}" for grouping rule at index ${ruleIndex}. Available fields:`, Array.from(ctx.fieldByName.keys()))
     return []
   }
   
   // Ensure we have a valid field name to access data
   if (!rule.field) {
-    console.warn(`GroupTree: Rule at index ${ruleIndex} has no field name`)
+    console.warn(`[GroupTree] Rule at index ${ruleIndex} has no field name`, { rule })
     return []
+  }
+  
+  // Debug logging for nested groups
+  if (ruleIndex > 0 && items.length > 0) {
+    console.log(`[GroupTree] Building level ${ruleIndex + 1} groups:`, {
+      ruleIndex,
+      field: rule.field,
+      itemCount: items.length,
+      sampleItem: items[0] ? Object.keys(items[0]) : [],
+      sampleValue: items[0] ? (items[0] as any)?.[rule.field] : undefined,
+    })
   }
 
   const buckets = new Map<string, { key: GroupKey; items: TItem[] }>()
@@ -249,6 +260,12 @@ function buildNodesAtLevel<TItem extends Record<string, any>>(
   for (const item of items) {
     // Access the field value using the normalized field name
     const raw = (item as any)?.[rule.field]
+    
+    // Debug: Log if field is missing in data (only for nested levels to avoid spam)
+    if (ruleIndex > 0 && raw === undefined && items.length > 0 && items.indexOf(item) === 0) {
+      console.log(`[GroupTree] Field "${rule.field}" not found in item data at level ${ruleIndex + 1}. Available keys:`, Object.keys(item || {}))
+    }
+    
     const groupKeys = getGroupKeysForValue(ctx, rule, field, raw)
     for (const gk of groupKeys) {
       const existing = buckets.get(gk.key)
@@ -260,6 +277,11 @@ function buildNodesAtLevel<TItem extends Record<string, any>>(
         buckets.set(gk.key, { key: gk, items: [item] })
       }
     }
+  }
+  
+  // Debug: Log bucket creation for nested levels
+  if (ruleIndex > 0 && buckets.size > 0) {
+    console.log(`[GroupTree] Created ${buckets.size} buckets at level ${ruleIndex + 1}:`, Array.from(buckets.keys()))
   }
 
   const entries = Array.from(buckets.values()).sort((a, b) => compareGroupKeys(a.key, b.key))
@@ -311,7 +333,40 @@ export function buildGroupTree<TItem extends Record<string, any>>(
   if (safeRules.length === 0) return { rules: [], rootGroups: [] }
 
   const normalizedRules = safeRules.map((r) => normalizeGroupRuleFieldName(ctx, r))
+  
+  // Debug logging for nested groups
+  if (normalizedRules.length > 1) {
+    console.log('[GroupTree] Building nested groups:', {
+      ruleCount: normalizedRules.length,
+      rules: normalizedRules.map(r => ({ type: r.type, field: r.field })),
+      itemCount: items.length,
+      availableFields: Array.from(ctx.fieldByName.keys()),
+    })
+  }
+  
   const rootGroups = buildNodesAtLevel(ctx, items, normalizedRules, 0, [])
+  
+  // Debug: Check if second level groups were created
+  if (normalizedRules.length > 1 && rootGroups.length > 0) {
+    const firstGroup = rootGroups[0]
+    console.log('[GroupTree] First level group created:', {
+      label: firstGroup.label,
+      size: firstGroup.size,
+      hasChildren: Array.isArray(firstGroup.children) && firstGroup.children.length > 0,
+      childrenCount: firstGroup.children?.length || 0,
+      hasItems: Array.isArray(firstGroup.items) && firstGroup.items.length > 0,
+      itemsCount: firstGroup.items?.length || 0,
+    })
+    if (firstGroup.children && firstGroup.children.length > 0) {
+      console.log('[GroupTree] Second level groups:', firstGroup.children.map(c => ({
+        label: c.label,
+        size: c.size,
+        hasItems: Array.isArray(c.items) && c.items.length > 0,
+        itemsCount: c.items?.length || 0,
+      })))
+    }
+  }
+  
   return { rules: normalizedRules, rootGroups }
 }
 

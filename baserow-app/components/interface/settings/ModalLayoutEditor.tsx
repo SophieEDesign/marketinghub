@@ -27,6 +27,8 @@ import { getFieldDisplayName } from "@/lib/fields/display"
 import BlockRenderer from "../BlockRenderer"
 import BlockAppearanceWrapper from "../BlockAppearanceWrapper"
 import { ErrorBoundary } from "../ErrorBoundary"
+import { createClient } from "@/lib/supabase/client"
+import { isAbortError } from "@/lib/api/error-handling"
 
 const ResponsiveGridLayout = WidthProvider(Responsive)
 
@@ -61,6 +63,63 @@ export default function ModalLayoutEditor({
   const [layoutBlocks, setLayoutBlocks] = useState<ModalLayoutBlock[]>([])
   const [layout, setLayout] = useState<Layout[]>([])
   const [addFieldValue, setAddFieldValue] = useState<string>("")
+  const [previewRecord, setPreviewRecord] = useState<Record<string, any> | null>(null)
+  const [previewRecordId, setPreviewRecordId] = useState<string | null>(null)
+  const [tableName, setTableName] = useState<string | null>(null)
+  const [loadingPreview, setLoadingPreview] = useState(false)
+
+  // Load table name and preview record
+  useEffect(() => {
+    if (!open || !tableId) {
+      setTableName(null)
+      setPreviewRecord(null)
+      setPreviewRecordId(null)
+      return
+    }
+
+    async function loadTableAndPreview() {
+      setLoadingPreview(true)
+      try {
+        const supabase = createClient()
+        
+        // Load table name
+        const { data: table } = await supabase
+          .from("tables")
+          .select("supabase_table")
+          .eq("id", tableId)
+          .single()
+
+        if (!table?.supabase_table) {
+          setLoadingPreview(false)
+          return
+        }
+
+        setTableName(table.supabase_table)
+
+        // Load first record for preview
+        const { data: records, error } = await supabase
+          .from(table.supabase_table)
+          .select("*")
+          .limit(1)
+          .order("created_at", { ascending: false })
+
+        if (error && !isAbortError(error)) {
+          console.error("Error loading preview record:", error)
+        } else if (records && records.length > 0) {
+          setPreviewRecord(records[0])
+          setPreviewRecordId(records[0].id)
+        }
+      } catch (error: any) {
+        if (!isAbortError(error)) {
+          console.error("Error loading preview:", error)
+        }
+      } finally {
+        setLoadingPreview(false)
+      }
+    }
+
+    loadTableAndPreview()
+  }, [open, tableId])
 
   // Load existing modal layout or initialize from modal_fields
   useEffect(() => {
@@ -282,11 +341,29 @@ export default function ModalLayoutEditor({
             </Button>
           </div>
 
+          {/* Preview Info */}
+          {previewRecordId && (
+            <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-800">
+              <span className="font-medium">Preview:</span> Showing data from the most recent record. Drag and resize blocks to customize the layout.
+            </div>
+          )}
+
           {/* Canvas Preview */}
           <div className="flex-1 overflow-auto border rounded-lg bg-gray-50 p-4">
             {layoutBlocks.length === 0 ? (
               <div className="flex items-center justify-center h-full text-gray-400">
                 <p>No fields in layout. Add fields using the dropdown above.</p>
+              </div>
+            ) : loadingPreview ? (
+              <div className="flex items-center justify-center h-full text-gray-400">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2" />
+                  <p className="text-sm">Loading preview data...</p>
+                </div>
+              </div>
+            ) : !previewRecordId ? (
+              <div className="flex items-center justify-center h-full text-gray-400">
+                <p className="text-sm">No records available for preview. Create a record to see how fields will appear.</p>
               </div>
             ) : (
               <ResponsiveGridLayout
@@ -311,9 +388,10 @@ export default function ModalLayoutEditor({
                   <div key={block.id} className="block-wrapper bg-white border rounded shadow-sm relative group">
                     <ErrorBoundary>
                       <BlockAppearanceWrapper block={block}>
-                        <div className="p-2">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-medium text-gray-600">
+                        <div className="h-full w-full flex flex-col">
+                          {/* Header with field name and remove button */}
+                          <div className="flex items-center justify-between px-3 py-2 border-b bg-gray-50 flex-shrink-0">
+                            <span className="text-xs font-medium text-gray-700">
                               {block.type === 'field' && block.config?.field_name
                                 ? getFieldDisplayName(fields.find(f => f.name === block.config.field_name) || fields[0])
                                 : block.type}
@@ -326,8 +404,16 @@ export default function ModalLayoutEditor({
                               <Trash2 className="h-3 w-3 text-red-600" />
                             </button>
                           </div>
-                          <div className="text-xs text-gray-400">
-                            Field preview
+                          {/* Actual field block content - matches canvas styling */}
+                          <div className="flex-1 overflow-auto min-h-0">
+                            <BlockRenderer
+                              block={block}
+                              isEditing={false}
+                              pageTableId={tableId}
+                              recordId={previewRecordId}
+                              mode="view"
+                              pageEditable={false}
+                            />
                           </div>
                         </div>
                       </BlockAppearanceWrapper>

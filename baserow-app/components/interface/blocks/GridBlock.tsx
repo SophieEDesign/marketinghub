@@ -900,6 +900,7 @@ export default function GridBlock({
             filterTree={filterTree}
             initialSorts={activeSorts}
             initialGroupBy={effectiveGroupBy}
+            initialGroupByRules={groupByRulesFromConfig}
             initialTableFields={tableFields}
             isEditing={isEditing}
             onRecordClick={handleRecordClick}

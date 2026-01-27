@@ -25,7 +25,7 @@ import { useBranding } from "@/contexts/BrandingContext"
 
 interface ViewTopBarProps {
   viewName: string
-  viewType?: "grid" | "kanban" | "calendar" | "form" | "timeline"
+  viewType?: "grid" | "kanban" | "calendar" | "form" | "timeline" | "horizontal_grouped"
   onFilter?: () => void
   onSort?: () => void
   onGroup?: () => void
