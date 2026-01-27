@@ -71,7 +71,7 @@ export default function HorizontalGroupedDataSettings({
           <div className="space-y-2">
             <Label>Record Fields</Label>
             <p className="text-xs text-muted-foreground mb-2">
-              Configure which fields appear in each record's canvas. You can drag and rearrange fields in edit mode.
+              Configure which fields appear in each record&apos;s canvas. You can drag and rearrange fields in edit mode.
             </p>
             <RecordViewFieldSettings
               tableId={config.table_id}
