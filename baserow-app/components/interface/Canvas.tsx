@@ -344,12 +344,23 @@ export default function Canvas({
         // Block not in layout - need to sync (new block or layout was cleared)
         return true
       }
+      
+      // For auto-sized blocks without manual height, exclude height from comparison
+      // (height is content-driven and will differ, but that's expected)
+      const config = block.config as any
+      const hasGrouping = 
+        (block.type === 'grid' || block.type === 'list') &&
+        (config?.group_by || config?.group_by_field || config?.group_by_rules)
+      const dbHeight = block.h
+      const isAutoSizedWithoutManualHeight = hasGrouping && (dbHeight === null || dbHeight === undefined)
+      
       // Check if positions differ (allowing for small floating point differences)
+      // For auto-sized blocks without manual height, don't compare height
       const positionsDiffer = 
         Math.abs((currentLayoutItem.x || 0) - (block.x || 0)) > 0.01 ||
         Math.abs((currentLayoutItem.y || 0) - (block.y || 0)) > 0.01 ||
         Math.abs((currentLayoutItem.w || 4) - (block.w || 4)) > 0.01 ||
-        Math.abs((currentLayoutItem.h || 4) - (block.h || 4)) > 0.01
+        (!isAutoSizedWithoutManualHeight && Math.abs((currentLayoutItem.h || 4) - (block.h || 4)) > 0.01)
       
       if (!positionsDiffer) {
         // Positions match - update ref to track this state
@@ -440,26 +451,30 @@ export default function Canvas({
           w = layout.w
           
           // PHASE 2.2: Stop hydrating height from database for auto-sized blocks
-          // Blocks with grouping (groupBy) are content-driven and should derive height from content
+          // BUT: Respect manually set heights (if user resized, database will have a value)
+          // Only skip height if database height is null (never manually set)
           const config = block.config as any
           const hasGrouping = 
             (block.type === 'grid' || block.type === 'list') &&
             (config?.group_by || config?.group_by_field || config?.group_by_rules)
           
-          if (hasGrouping) {
-            // Auto-sized block - ignore h from database, let content re-measure
+          const dbHeight = layout.h
+          const isHeightNull = dbHeight === null || dbHeight === undefined
+          
+          if (hasGrouping && isHeightNull) {
+            // Auto-sized block with no manual height - ignore h from database, let content re-measure
             // Use a default height that will be replaced by content measurement
             h = 4 // Default, will be updated by onHeightChange
-            console.log('[HeightHydration] SKIPPED for auto-sized block', {
+            console.log('[HeightHydration] SKIPPED for auto-sized block (no manual height)', {
               blockId: block.id,
               blockType: block.type,
               hasGrouping: true,
               dbHeight: block.h,
               appliedHeight: h,
-              reason: 'content-driven block',
+              reason: 'content-driven block, height never manually set',
             })
           } else {
-            // Non-auto-sized block - use height from database
+            // Use height from database (either non-auto-sized block, or auto-sized with manual height)
             h = layout.h
             // PHASE 1.2: Log height mutation in layout hydration
             console.log('[HeightMutation] layoutHydration', {
@@ -467,6 +482,8 @@ export default function Canvas({
               height: h,
               source: 'layoutHydration',
               fromDB: block.h,
+              isAutoSized: hasGrouping,
+              hasManualHeight: hasGrouping && !isHeightNull,
             })
           }
           
@@ -1282,9 +1299,35 @@ export default function Canvas({
         })
       }
 
+      // CRITICAL: Update tracking ref to prevent sync effect from overwriting content-driven height
+      // This ensures the sync effect doesn't see the height as "different" and re-hydrate from DB
+      finalLayout.forEach(layoutItem => {
+        if (layoutItem.i === blockId) {
+          previousBlockPositionsRef.current.set(layoutItem.i, {
+            x: layoutItem.x || 0,
+            y: layoutItem.y || 0,
+            w: layoutItem.w || 4,
+            h: layoutItem.h || 4,
+          })
+        }
+      })
+
+      // CRITICAL: Save content-driven height changes to database
+      // This ensures the height persists and sync effect doesn't overwrite it
+      if (onLayoutChange) {
+        const layoutItems: LayoutItem[] = finalLayout.map((item) => ({
+          i: item.i,
+          x: item.x || 0,
+          y: item.y || 0,
+          w: item.w || 4,
+          h: item.h || 4,
+        }))
+        onLayoutChange(layoutItems)
+      }
+
       return finalLayout
     })
-  }, [blocks, pushBlocksDown, compactLayoutVertically])
+  }, [blocks, pushBlocksDown, compactLayoutVertically, onLayoutChange])
 
   const handleLayoutChange = useCallback(
     (newLayout: Layout[]) => {
