@@ -63,6 +63,7 @@ interface GridViewWrapperProps {
   standardizedFilters?: FilterConfig[] // Standardized filters (preferred over initialFilters)
   filterTree?: FilterTree // Canonical filter tree from filter blocks (supports groups/OR)
   modalFields?: string[] // Fields to show in modal (if empty, show all)
+  modalLayout?: any // Custom modal layout (BlockConfig['modal_layout'])
   appearance?: {
     show_toolbar?: boolean
     show_search?: boolean
@@ -868,6 +869,7 @@ export default function GridViewWrapper({
           enableRecordOpen={appearance.enable_record_open !== false}
           recordOpenStyle={appearance.record_open_style || 'side_panel'}
           modalFields={modalFields}
+          modalLayout={modalLayout}
           onTableFieldsRefresh={loadFields}
           reloadKey={reloadKey}
           defaultGroupsCollapsed={defaultGroupsCollapsed}

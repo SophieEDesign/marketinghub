@@ -20,6 +20,11 @@ interface ModalCanvasProps {
   pageEditable?: boolean
   editableFieldNames?: string[]
   onFieldChange?: (fieldName: string, value: any) => void
+  layoutSettings?: {
+    cols?: number
+    rowHeight?: number
+    margin?: [number, number]
+  }
 }
 
 export default function ModalCanvas({
@@ -31,15 +36,16 @@ export default function ModalCanvas({
   pageEditable = false,
   editableFieldNames = [],
   onFieldChange,
+  layoutSettings: propLayoutSettings,
 }: ModalCanvasProps) {
   const [layout, setLayout] = useState<Layout[]>([])
 
-  // Default layout settings for modals (smaller grid)
+  // Use provided layout settings or defaults (no gaps - blocks snap together)
   const layoutSettings = useMemo(() => ({
-    cols: 8,
-    rowHeight: 30,
-    margin: [8, 8] as [number, number],
-  }), [])
+    cols: propLayoutSettings?.cols || 8,
+    rowHeight: propLayoutSettings?.rowHeight || 30,
+    margin: propLayoutSettings?.margin || [0, 0] as [number, number], // No gaps by default
+  }), [propLayoutSettings])
 
   // Convert blocks to layout format
   useEffect(() => {

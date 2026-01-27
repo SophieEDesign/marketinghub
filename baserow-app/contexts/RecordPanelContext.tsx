@@ -2,6 +2,8 @@
 
 import React, { createContext, useContext, useState, useCallback, ReactNode } from "react"
 
+import type { BlockConfig } from "@/lib/interface/types"
+
 interface RecordPanelState {
   isOpen: boolean
   tableId: string | null
@@ -11,12 +13,13 @@ interface RecordPanelState {
   isPinned: boolean
   isFullscreen: boolean
   modalFields?: string[] // Fields to show in modal (if empty, show all)
+  modalLayout?: BlockConfig['modal_layout'] // Custom modal layout
   history: Array<{ tableId: string; recordId: string; tableName: string }> // For breadcrumb navigation
 }
 
 interface RecordPanelContextType {
   state: RecordPanelState
-  openRecord: (tableId: string, recordId: string, tableName: string, modalFields?: string[]) => void
+  openRecord: (tableId: string, recordId: string, tableName: string, modalFields?: string[], modalLayout?: BlockConfig['modal_layout']) => void
   closeRecord: () => void
   setWidth: (width: number) => void
   togglePin: () => void
@@ -43,7 +46,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
     history: [],
   })
 
-  const openRecord = useCallback((tableId: string, recordId: string, tableName: string, modalFields?: string[]) => {
+  const openRecord = useCallback((tableId: string, recordId: string, tableName: string, modalFields?: string[], modalLayout?: BlockConfig['modal_layout']) => {
     setState((prev) => ({
       ...prev,
       isOpen: true,
@@ -51,6 +54,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
       recordId,
       tableName,
       modalFields,
+      modalLayout,
       history: prev.isOpen && prev.tableId === tableId && prev.recordId === recordId
         ? prev.history // Don't add to history if same record
         : [...prev.history, { tableId, recordId, tableName }],

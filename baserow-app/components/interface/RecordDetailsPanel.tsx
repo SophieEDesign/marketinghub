@@ -287,7 +287,7 @@ export default function RecordDetailsPanel({
     <div className="flex-1 border-l border-gray-200 flex flex-col overflow-hidden bg-white">
       {/* Header - Record context */}
       <div className="border-b border-gray-200 bg-white flex-shrink-0">
-        <div className="px-6 py-4">
+        <div className="px-6 py-5">
           {loading ? (
             <div className="space-y-3">
               <div className="h-7 w-64 bg-gray-200 rounded animate-pulse" />
@@ -328,15 +328,15 @@ export default function RecordDetailsPanel({
                 </h1>
 
                 {/* Status and Metadata Row */}
-                <div className="flex items-center gap-3 mt-3">
+                <div className="flex items-center gap-4 mt-3">
                   {statusField && statusValue && (
                     <div
-                      className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      className={`px-3 py-1 rounded-full text-xs font-medium shadow-sm border ${
                         statusField.type === "checkbox"
                           ? statusValue
-                            ? "bg-green-100 text-green-800"
-                            : "bg-gray-100 text-gray-600"
-                          : "bg-blue-100 text-blue-800"
+                            ? "bg-green-100 text-green-800 border-green-200"
+                            : "bg-gray-100 text-gray-600 border-gray-200"
+                          : "bg-blue-100 text-blue-800 border-blue-200"
                       }`}
                     >
                       {statusField.type === "checkbox"
@@ -412,7 +412,7 @@ export default function RecordDetailsPanel({
       </div>
 
       {/* Record Fields + Blocks */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto bg-gray-50/30">
         {loading ? (
           <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4">
             <div className="text-center">
@@ -438,6 +438,11 @@ export default function RecordDetailsPanel({
                 }}
               />
             </div>
+
+            {/* Visual separator between fields and blocks */}
+            {page && blocks.length > 0 && (
+              <div className="border-t border-gray-200/60 mx-6"></div>
+            )}
 
             {/* Blocks Section - optional, excludes field blocks (fields are shown above) */}
             {page ? (

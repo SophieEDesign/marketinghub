@@ -25,6 +25,7 @@ import Cell from "./Cell"
 import { CellFactory } from "./CellFactory"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { TableField } from "@/types/fields"
+import RecordModal from "./RecordModal"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 import { SkeletonLoader } from "@/components/ui/SkeletonLoader"
 import EmptyTableState from "@/components/empty-states/EmptyTableState"
@@ -113,6 +114,7 @@ interface GridViewProps {
   enableRecordOpen?: boolean // Enable record opening (default: true)
   recordOpenStyle?: 'side_panel' | 'modal' // How to open records (default: 'side_panel')
   modalFields?: string[] // Fields to show in modal (if empty, show all)
+  modalLayout?: any // Custom modal layout (BlockConfig['modal_layout'])
   onTableFieldsRefresh?: () => void // Refresh tableFields after option updates (select/multi-select)
   /** Bump to force a refetch (e.g. after external record creation). */
   reloadKey?: number
@@ -557,6 +559,7 @@ export default function GridView({
   enableRecordOpen = true,
   recordOpenStyle = 'side_panel',
   modalFields,
+  modalLayout,
   onTableFieldsRefresh,
   reloadKey,
   defaultGroupsCollapsed = true,
@@ -589,6 +592,7 @@ export default function GridView({
   const [pendingAction, setPendingAction] = useState<(() => Promise<void>) | null>(null)
   const [fieldToDelete, setFieldToDelete] = useState<string | null>(null)
   const [missingRequiredFields, setMissingRequiredFields] = useState<string[]>([])
+  const [modalRecordId, setModalRecordId] = useState<string | null>(null)
 
   // Track previous groupBy to detect changes
   const prevGroupByRef = useRef<string | undefined>(groupBy)
@@ -2343,8 +2347,14 @@ export default function GridView({
       return
     }
 
-    // Default: use RecordPanel context (for views)
-    openRecord(tableId, rowId, supabaseTableName, modalFields)
+    // If recordOpenStyle is 'modal', open modal directly
+    if (recordOpenStyle === 'modal') {
+      setModalRecordId(rowId)
+      return
+    }
+
+    // Default: use RecordPanel context (for side panel)
+    openRecord(tableId, rowId, supabaseTableName, modalFields, modalLayout)
   }
 
   function handleOpenRecordClick(e: React.MouseEvent, rowId: string) {
@@ -3725,6 +3735,19 @@ export default function GridView({
         cancelLabel="Cancel"
         variant="destructive"
       />
+
+      {/* Record Modal (when recordOpenStyle is 'modal') */}
+      {recordOpenStyle === 'modal' && (
+        <RecordModal
+          isOpen={!!modalRecordId}
+          onClose={() => setModalRecordId(null)}
+          tableId={tableId}
+          recordId={modalRecordId || ''}
+          tableName={supabaseTableName}
+          modalFields={modalFields}
+          modalLayout={modalLayout}
+        />
+      )}
     </div>
   )
 }

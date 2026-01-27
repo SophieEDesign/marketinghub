@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
-import { Link2, Plus, X, Calculator, Link as LinkIcon, Paperclip, ExternalLink, Mail } from "lucide-react"
+import { Link2, Plus, X, Calculator, Link as LinkIcon, Paperclip, ExternalLink, Mail, Pencil } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { formatDateUK } from "@/lib/utils"
 import type { TableField } from "@/types/fields"
@@ -76,10 +76,10 @@ export default function InlineFieldEditor({
     }
   }, [isUserFieldType, value])
   const displayBoxClassName = showLabel
-    ? "px-3 py-2 border border-gray-200 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer text-sm text-gray-900"
-    : "-mx-2 px-2 py-1.5 rounded-md text-sm text-gray-900 hover:bg-gray-50 hover:ring-1 hover:ring-gray-200 transition-colors cursor-pointer"
+    ? "px-3 py-2.5 border border-gray-200 rounded-md hover:border-blue-400 hover:bg-blue-50/30 hover:border-l-4 hover:border-l-blue-500 transition-all duration-200 cursor-pointer text-sm text-gray-900 relative group"
+    : "-mx-2 px-3 py-2.5 rounded-md text-sm text-gray-900 hover:bg-gray-50 hover:ring-1 hover:ring-gray-200 hover:border-l-4 hover:border-l-blue-500 transition-all duration-200 cursor-pointer relative group"
   const readOnlyBoxClassName = showLabel
-    ? "px-3 py-2 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-600 italic"
+    ? "px-3 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-600 italic"
     : "-mx-2 px-2 py-1.5 rounded-md text-sm text-gray-600"
   const inputBoxClassName = showLabel
     ? "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -367,9 +367,12 @@ export default function InlineFieldEditor({
         ) : (
           <div
             onClick={onEditStart}
-            className={displayBoxClassName}
+            className={`${displayBoxClassName} ${!dateValueForDisplay ? "bg-gray-50/50" : ""}`}
           >
-            {dateValueForDisplay || <span className="text-gray-400">Click to set date...</span>}
+            {dateValueForDisplay || <span className="text-gray-400 italic">Click to set date...</span>}
+            {!isReadOnly && (
+              <Pencil className="h-3.5 w-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity absolute right-2 top-1/2 -translate-y-1/2" />
+            )}
           </div>
         )}
       </div>
@@ -455,7 +458,7 @@ export default function InlineFieldEditor({
         ) : (
           <div
             onClick={onEditStart}
-            className={`${displayBoxClassName} ${showLabel ? "min-h-[48px]" : ""}`}
+            className={`${displayBoxClassName} ${showLabel ? "min-h-[48px]" : ""} ${!value ? "bg-gray-50/50" : ""}`}
           >
             {value ? (
               <div 
@@ -463,7 +466,10 @@ export default function InlineFieldEditor({
                 dangerouslySetInnerHTML={{ __html: value }}
               />
             ) : (
-              <span className="text-gray-400">Click to add text...</span>
+              <span className="text-gray-400 italic">Click to add text...</span>
+            )}
+            {!isReadOnly && (
+              <Pencil className="h-3.5 w-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity absolute right-2 top-1/2 -translate-y-1/2" />
             )}
           </div>
         )}
@@ -513,7 +519,7 @@ export default function InlineFieldEditor({
           className={
             isReadOnly
               ? `${readOnlyBoxClassName} ${attachments.length > 0 ? "not-italic" : ""}`
-              : `${displayBoxClassName} ${showLabel ? "min-h-[48px] flex items-center" : ""}`
+              : `${displayBoxClassName} ${showLabel ? "min-h-[48px] flex items-center" : ""} ${attachments.length === 0 ? "bg-gray-50/50" : ""}`
           }
           role={!isReadOnly ? "button" : undefined}
           tabIndex={!isReadOnly ? 0 : undefined}
@@ -537,7 +543,10 @@ export default function InlineFieldEditor({
           ) : (
             <div className={`flex items-center gap-2 ${isReadOnly ? (showLabel ? "" : "text-gray-400 italic") : "text-gray-400"}`}>
               <Paperclip className="h-4 w-4" />
-              {isReadOnly ? "No attachments" : "Click to add attachments..."}
+              {isReadOnly ? "No attachments" : <span className="text-gray-400 italic">Click to add attachments...</span>}
+              {!isReadOnly && (
+                <Pencil className="h-3.5 w-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity ml-auto" />
+              )}
             </div>
           )}
         </div>
@@ -629,7 +638,10 @@ export default function InlineFieldEditor({
                 <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
               </a>
             ) : (
-              <span className="text-gray-400">Click to edit...</span>
+              <span className="text-gray-400 italic">Click to edit...</span>
+            )}
+            {!isReadOnly && (
+              <Pencil className="h-3.5 w-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity absolute right-2 top-1/2 -translate-y-1/2" />
             )}
           </div>
         )}
@@ -688,7 +700,7 @@ export default function InlineFieldEditor({
         ) : (
           <div
             onClick={onEditStart}
-            className={`${displayBoxClassName} ${showLabel ? "min-h-[36px] flex items-center" : "flex items-center"}`}
+            className={`${displayBoxClassName} ${showLabel ? "min-h-[36px] flex items-center" : "flex items-center"} ${!value ? "bg-gray-50/50" : ""}`}
             title={value || undefined}
           >
             {value ? (
@@ -703,7 +715,10 @@ export default function InlineFieldEditor({
                 </a>
               </>
             ) : (
-              <span className="text-gray-400">Click to edit...</span>
+              <span className="text-gray-400 italic">Click to edit...</span>
+            )}
+            {!isReadOnly && (
+              <Pencil className="h-3.5 w-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity absolute right-2 top-1/2 -translate-y-1/2" />
             )}
           </div>
         )}
@@ -764,14 +779,17 @@ export default function InlineFieldEditor({
       ) : (
         <div
           onClick={onEditStart}
-          className={`${displayBoxClassName} ${showLabel ? "min-h-[36px] flex items-center" : ""}`}
+          className={`${displayBoxClassName} ${showLabel ? "min-h-[36px] flex items-center" : ""} ${!value ? "bg-gray-50/50" : ""}`}
         >
           {isUserFieldType && userDisplayName ? (
             userDisplayName
           ) : value !== null && value !== undefined ? (
             String(value)
           ) : (
-            <span className="text-gray-400">Click to edit...</span>
+            <span className="text-gray-400 italic">Click to edit...</span>
+          )}
+          {!isReadOnly && (
+            <Pencil className="h-3.5 w-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity absolute right-2 top-1/2 -translate-y-1/2" />
           )}
         </div>
       )}

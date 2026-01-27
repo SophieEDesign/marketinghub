@@ -179,14 +179,14 @@ export default function ModalLayoutEditor({
     return fields.filter(f => f.name !== 'id' && !usedFieldNames.has(f.name))
   }, [fields, layoutBlocks])
 
-  // Grid configuration
+  // Grid configuration - no gaps, blocks snap together like canvas
   const GRID_CONFIG = useMemo(() => ({
     cols: { lg: 8, md: 6, sm: 4, xs: 2, xxs: 2 },
     rowHeight: 30,
-    margin: [8, 8] as [number, number],
-    compactType: null,
+    margin: [0, 0] as [number, number], // No gaps - blocks snap together
+    compactType: null, // Disabled - we store absolute positions
     isBounded: false,
-    preventCollision: false,
+    preventCollision: false, // Allow blocks to adjust into grid
     allowOverlap: false,
     containerPadding: [0, 0] as [number, number],
     useCSSTransforms: true,
@@ -267,7 +267,7 @@ export default function ModalLayoutEditor({
       layoutSettings: {
         cols: 8,
         rowHeight: 30,
-        margin: [8, 8] as [number, number],
+        margin: [0, 0] as [number, number], // No gaps - matches preview
       },
     }
     onSave(modalLayout)

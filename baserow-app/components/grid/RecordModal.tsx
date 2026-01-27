@@ -323,6 +323,7 @@ export default function RecordModal({
                     pageEditable={userRole === 'admin'}
                     editableFieldNames={fields.map(f => f.name)}
                     onFieldChange={handleFieldChange}
+                    layoutSettings={modalLayout.layoutSettings}
                   />
                 </div>
               ) : (

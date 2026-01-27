@@ -905,6 +905,7 @@ export default function GridBlock({
             isEditing={isEditing}
             onRecordClick={handleRecordClick}
             modalFields={(config as any).modal_fields}
+            modalLayout={(config as any).modal_layout}
             reloadKey={refreshKey}
             defaultGroupsCollapsed={defaultGroupsCollapsed}
             appearance={{
