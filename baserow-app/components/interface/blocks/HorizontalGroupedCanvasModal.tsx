@@ -79,6 +79,10 @@ export default function HorizontalGroupedCanvasModal({
     }
   }, [onOpenChange])
 
+  const handleDoneClick = useCallback(() => {
+    onOpenChange(false)
+  }, [onOpenChange])
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full flex flex-col p-0">
@@ -117,7 +121,7 @@ export default function HorizontalGroupedCanvasModal({
             Cancel
           </Button>
           <Button
-            onClick={handleClose}
+            onClick={handleDoneClick}
             disabled={isSaving}
           >
             <Check className="h-4 w-4 mr-2" />

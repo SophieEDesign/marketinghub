@@ -215,6 +215,34 @@ export default function RecordReviewLeftColumn({
     return []
   }, [effectiveLeftPanelConfig?.group_by, groupByRules])
 
+  const loadRecords = useCallback(async (supabaseTableName: string) => {
+    if (!supabaseTableName) return
+
+    setLoading(true)
+    try {
+      const supabase = createClient()
+      const query = supabase.from(supabaseTableName).select("*").limit(500)
+
+      const { data, error } = await query
+
+      if (error) {
+        // Ignore abort errors (expected during navigation/unmount)
+        if (!isAbortError(error)) {
+          console.error("Error loading records:", error)
+        }
+      } else {
+        setRecords(data || [])
+      }
+    } catch (error) {
+      // Ignore abort errors (expected during navigation/unmount)
+      if (!isAbortError(error)) {
+        console.error("Error loading records:", error)
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
   // Load table name and fields
   useEffect(() => {
     if (!tableId) return
@@ -285,34 +313,6 @@ export default function RecordReviewLeftColumn({
       abortController.abort()
     }
   }, [tableId, loadRecords])
-
-  const loadRecords = useCallback(async (supabaseTableName: string) => {
-    if (!supabaseTableName) return
-
-    setLoading(true)
-    try {
-      const supabase = createClient()
-      const query = supabase.from(supabaseTableName).select("*").limit(500)
-
-      const { data, error } = await query
-
-      if (error) {
-        // Ignore abort errors (expected during navigation/unmount)
-        if (!isAbortError(error)) {
-          console.error("Error loading records:", error)
-        }
-      } else {
-        setRecords(data || [])
-      }
-    } catch (error) {
-      // Ignore abort errors (expected during navigation/unmount)
-      if (!isAbortError(error)) {
-        console.error("Error loading records:", error)
-      }
-    } finally {
-      setLoading(false)
-    }
-  }, [])
 
   useEffect(() => {
     if (tableId) {
