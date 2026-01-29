@@ -618,30 +618,29 @@ export default function LookupFieldPicker({
         >
           {selectedOptions.length > 0 ? (
             selectedOptions.map((option) => {
-              // Use field color if available, otherwise use default gray
-              const bgColor = fieldColor ? normalizeHexColor(fieldColor) : '#F3F4F6'
-              const textColorClass = fieldColor ? getTextColorForBackground(bgColor) : 'text-gray-600'
-              const borderColor = fieldColor ? `${bgColor}33` : '#E5E7EB'
-              
+              // Same as normal pill: light tint, subtle border, dark text
+              const hex = fieldColor ? normalizeHexColor(fieldColor) : null
+              const bgColor = hex ? `${hex}1A` : '#F3F4F6'
+              const borderColor = hex ? `${hex}33` : '#E5E7EB'
+              const textColorClass = hex ? 'text-gray-700' : getTextColorForBackground(bgColor)
               return (
                 <button
                   key={option.id}
                   type="button"
                   className={cn(
-                    "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border",
+                    "inline-flex items-center gap-1.5 max-w-[200px] shrink-0 px-3 py-1 rounded-full text-xs font-medium border whitespace-nowrap overflow-hidden text-ellipsis",
                     textColorClass,
                     onRecordClick && "group cursor-pointer hover:opacity-80 transition-opacity"
                   )}
-                  style={{ 
+                  style={{
                     backgroundColor: bgColor,
                     borderColor: borderColor,
-                    boxShadow: isLookupField ? 'none' : '0 1px 2px rgba(0, 0, 0, 0.05)' 
                   }}
                   onClick={(e) => handleNavigateToRecord(e, option.id)}
                   title="Open linked record"
                   aria-label={`Open linked record: ${option.primaryLabel}`}
                 >
-                  <span className={cn(onRecordClick && "hover:underline transition-colors")}>
+                  <span className={cn("block min-w-0 truncate", onRecordClick && "hover:underline transition-colors")}>
                     {option.primaryLabel}
                   </span>
                 </button>
@@ -681,68 +680,62 @@ export default function LookupFieldPicker({
             {selectedOptions.length > 0 ? (
               <>
                 {selectedOptions.map((option) => {
-                  // Use field color if available, otherwise use default blue
-                  const bgColor = fieldColor ? normalizeHexColor(fieldColor) : '#DBEAFE'
-                  const textColorClass = fieldColor ? getTextColorForBackground(bgColor) : 'text-blue-700'
-                  const borderColor = fieldColor ? `${bgColor}33` : '#BFDBFE'
-                  const hoverBgColor = fieldColor ? `${bgColor}CC` : '#BFDBFE'
-                  
+                  // Same visual as normal pills: light tint, subtle border, dark text, compact
+                  const hex = fieldColor ? normalizeHexColor(fieldColor) : null
+                  const bgColor = hex ? `${hex}1A` : '#F3F4F6'
+                  const borderColor = hex ? `${hex}33` : '#E5E7EB'
+                  const hoverBorderColor = hex ? `${hex}66` : '#D1D5DB'
+                  const textColorClass = hex ? 'text-gray-700' : getTextColorForBackground(bgColor)
                   return (
                     <span
                       key={option.id}
                       className={cn(
-                        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border cursor-pointer",
+                        "inline-flex items-center gap-1.5 max-w-[200px] px-3 py-1 rounded-full text-xs font-medium border cursor-pointer shrink-0",
                         textColorClass
                       )}
-                      style={{ 
+                      style={{
                         backgroundColor: bgColor,
                         borderColor: borderColor,
-                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)' 
                       }}
                       onMouseDown={(e) => {
-                        // Allow drag operations to pass through (same as select fields)
                         e.stopPropagation()
                       }}
                       onClick={(e) => {
                         e.stopPropagation()
-                        // Clicking the pill navigates to the linked record (Airtable mental model).
                         if (onRecordClick && lookupTableId) {
                           onRecordClick(lookupTableId, option.id)
                         }
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = hoverBgColor
+                        e.currentTarget.style.borderColor = hoverBorderColor
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = bgColor
+                        e.currentTarget.style.borderColor = borderColor
                       }}
                       title="Open linked record"
                       role="button"
                     >
                       <span
                         onMouseDown={(e) => {
-                          // Allow drag operations to pass through (same as select fields)
                           e.stopPropagation()
                         }}
                         onClick={(e) => {
-                          // Already handled by pill click; keep for accessibility/selection.
                           handleNavigateToRecord(e, option.id)
                         }}
-                        className="hover:underline transition-colors"
+                        className="block min-w-0 truncate hover:underline transition-colors"
                       >
                         {option.primaryLabel}
                       </span>
                       {!disabled && (
                         <button
                           onMouseDown={(e) => {
-                            // Allow drag operations to pass through (same as select fields)
                             e.stopPropagation()
                           }}
                           onClick={(e) => {
                             e.stopPropagation()
                             handleRemove(option.id)
                           }}
-                          className="ml-0.5 rounded-full p-0.5 hover:bg-black/10 transition-colors opacity-70 hover:opacity-100"
+                          className="ml-0.5 rounded-full p-0.5 hover:bg-black/10 transition-colors opacity-70 hover:opacity-100 shrink-0"
                           title="Remove"
                           aria-label="Remove"
                         >
@@ -757,18 +750,17 @@ export default function LookupFieldPicker({
                     {selectedOptions.length} selected
                   </span>
                 )}
-                {/* Add button - only show when field is editable and not disabled */}
+                {/* Add button - neutral style to match normal pill row */}
                 {!disabled && (
                   <button
                     onMouseDown={(e) => {
-                      // Allow drag operations to pass through (same as select fields)
                       e.stopPropagation()
                     }}
                     onClick={(e) => {
                       e.stopPropagation()
                       setOpen(true)
                     }}
-                    className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors flex-shrink-0"
+                    className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors flex-shrink-0"
                     title={tableName ? `Add record from ${tableName}` : "Add record"}
                     aria-label={tableName ? `Add record from ${tableName}` : "Add record"}
                   >
@@ -789,7 +781,7 @@ export default function LookupFieldPicker({
                       e.stopPropagation()
                       setOpen(true)
                     }}
-                    className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors flex-shrink-0"
+                    className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors flex-shrink-0"
                     title={tableName ? `Add record from ${tableName}` : "Add record"}
                     aria-label={tableName ? `Add record from ${tableName}` : "Add record"}
                   >
