@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
 import type { TableField } from "@/types/fields"
@@ -13,6 +13,14 @@ import { normalizeUuid } from "@/lib/utils/ids"
 import { resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
 import type { LinkedField } from "@/types/fields"
 import EmptyState from "@/components/empty-states/EmptyState"
+import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { resolveChoiceColor, normalizeHexColor, getTextColorForBackground, SEMANTIC_COLORS } from '@/lib/field-colors'
 import Canvas from "@/components/interface/Canvas"
 import BlockRenderer from "@/components/interface/BlockRenderer"
@@ -305,28 +313,84 @@ export default function HorizontalGroupedView({
   }, [effectiveGroupRules, tableFields])
 
   // Create field blocks from recordFields configuration
-  // Use stored layout if available, otherwise create default grid
+  // Merge stored layout with record_fields: layout is source of truth for position, record_fields for which fields exist.
+  // New fields in record_fields get a block added; fields removed from record_fields are removed from layout.
   const createFieldBlocks = useCallback((recordId: string, template?: PageBlock[]): PageBlock[] => {
-    // If we have a layout template (from editing), use it as template
+    const recordFieldSet = new Set(
+      recordFields.map((c) => {
+        const f = tableFields.find((tf) => tf.name === c.field || tf.id === c.field)
+        return f?.name
+      }).filter(Boolean) as string[]
+    )
+
+    // If we have a stored layout: keep only blocks whose field is in record_fields, then add blocks for record_fields not in layout
     if (template && template.length > 0) {
-      return template.map(block => {
+      const existingByField = new Map<string, PageBlock>()
+      for (const block of template) {
         const fieldName = block.config?.field_name || ''
-        return {
-          ...block,
-          id: `field-${recordId}-${fieldName}`,
-          page_id: `${viewId || `view-${tableId}`}-${recordId}`,
-          config: {
-            ...block.config,
-            table_id: tableId,
-            field_name: fieldName,
-          },
+        if (fieldName && recordFieldSet.has(fieldName)) {
+          existingByField.set(fieldName, block)
         }
-      })
+      }
+
+      const result: PageBlock[] = []
+      let maxY = -1
+      for (const block of template) {
+        const fieldName = block.config?.field_name || ''
+        if (fieldName && recordFieldSet.has(fieldName)) {
+          const h = block.h ?? 2
+          maxY = Math.max(maxY, (block.y ?? 0) + h)
+          result.push({
+            ...block,
+            id: `field-${recordId}-${fieldName}`,
+            page_id: `${viewId || `view-${tableId}`}-${recordId}`,
+            config: {
+              ...block.config,
+              table_id: tableId,
+              field_name: fieldName,
+            },
+          })
+        }
+      }
+
+      // Add blocks for record_fields that don't have a block yet (e.g. new fields added in panel)
+      const orderedRecordFields = recordFields
+        .map((c) => {
+          const field = tableFields.find((f) => f.name === c.field || f.id === c.field)
+          return field ? { field, config: c } : null
+        })
+        .filter((x): x is { field: TableField; config: FieldConfig } => x != null)
+
+      let newBlockIndex = 0
+      for (const { field, config } of orderedRecordFields) {
+        if (existingByField.has(field.name)) continue
+        const row = Math.floor(newBlockIndex / 2)
+        const col = newBlockIndex % 2
+        const y = maxY + 1 + row * 2
+        result.push({
+          id: `field-${recordId}-${field.name}`,
+          page_id: viewId || `view-${tableId}`,
+          type: 'field' as const,
+          x: col === 0 ? 0 : 6,
+          y,
+          w: 6,
+          h: 2,
+          config: {
+            field_id: field.id,
+            field_name: field.name,
+            table_id: tableId,
+            allow_inline_edit: config.editable !== false,
+          },
+          order_index: result.length,
+          created_at: new Date().toISOString(),
+        })
+        newBlockIndex++
+      }
+      return result
     }
 
-    // Otherwise, create from recordFields config
+    // No stored layout: build from record_fields or default
     if (recordFields.length === 0) {
-      // Default: show first 10 fields in a grid
       const defaultFields = tableFields.slice(0, 10)
       return defaultFields.map((field, index) => ({
         id: `field-${recordId}-${field.name}`,
@@ -346,11 +410,9 @@ export default function HorizontalGroupedView({
       }))
     }
 
-    // Use configured fields with stored layout positions if available
     return recordFields.map((fieldConfig, index) => {
-      const field = tableFields.find(f => f.name === fieldConfig.field || f.id === fieldConfig.field)
+      const field = tableFields.find((f) => f.name === fieldConfig.field || f.id === fieldConfig.field)
       if (!field) return null
-
       return {
         id: `field-${recordId}-${field.name}`,
         page_id: viewId || `view-${tableId}`,
@@ -376,7 +438,7 @@ export default function HorizontalGroupedView({
   const [layoutTemplate, setLayoutTemplate] = useState<PageBlock[] | null>(storedLayoutProp || null)
   const [currentBlocks, setCurrentBlocks] = useState<PageBlock[]>([])
 
-  // When stored layout changes, update template
+  // When stored layout changes (e.g. from parent), update template
   useEffect(() => {
     if (storedLayoutProp) {
       setLayoutTemplate(storedLayoutProp)
@@ -384,14 +446,33 @@ export default function HorizontalGroupedView({
     }
   }, [storedLayoutProp])
 
+  // When entering edit mode, merge record_fields with stored layout once and persist so new fields appear
+  const hasInitializedEditRef = useRef(false)
+  useEffect(() => {
+    if (!isEditing) {
+      hasInitializedEditRef.current = false
+      return
+    }
+    if (groups.length === 0 || !activeTab) return
+    const activeGroup = groups.find((g) => g.key === activeTab)
+    if (!activeGroup?.items?.length) return
+    const firstRecordId = activeGroup.items[0].id || activeGroup.items[0][`${supabaseTableName}_id`]
+    if (!firstRecordId) return
+    if (hasInitializedEditRef.current) return
+    hasInitializedEditRef.current = true
+    const blocks = createFieldBlocks(firstRecordId, layoutTemplate || undefined)
+    setCurrentBlocks(blocks)
+    setLayoutTemplate(blocks)
+    if (onBlockUpdate) onBlockUpdate(blocks)
+  }, [isEditing, groups, activeTab, layoutTemplate, supabaseTableName, createFieldBlocks, onBlockUpdate])
+
   // Handle layout changes from Canvas
   const handleLayoutChange = useCallback((layout: LayoutItem[]) => {
     if (!isEditing) return
-    
-    // Update blocks with new layout positions
-    setCurrentBlocks(prevBlocks => {
-      const updated = prevBlocks.map(block => {
-        const layoutItem = layout.find(item => item.i === block.id)
+
+    setCurrentBlocks((prevBlocks) => {
+      const updated = prevBlocks.map((block) => {
+        const layoutItem = layout.find((item) => item.i === block.id)
         if (layoutItem) {
           return {
             ...block,
@@ -403,20 +484,72 @@ export default function HorizontalGroupedView({
         }
         return block
       })
-      
-      // Update layout template
       setLayoutTemplate(updated)
-      
-      // Debounce save to block config
       if (onBlockUpdate) {
-        setTimeout(() => {
-          onBlockUpdate(updated)
-        }, 500)
+        setTimeout(() => onBlockUpdate(updated), 500)
       }
-      
       return updated
     })
   }, [isEditing, onBlockUpdate])
+
+  // Remove a field block from the canvas and persist
+  const handleBlockDelete = useCallback(
+    (blockId: string) => {
+      setCurrentBlocks((prev) => {
+        const updated = prev.filter((b) => b.id !== blockId)
+        setLayoutTemplate(updated)
+        if (onBlockUpdate) onBlockUpdate(updated)
+        return updated
+      })
+    },
+    [onBlockUpdate]
+  )
+
+  // Add a field block to the canvas (for record_fields not yet in layout)
+  const handleAddFieldBlock = useCallback(
+    (fieldNameOrId: string) => {
+      const field = tableFields.find((f) => f.name === fieldNameOrId || f.id === fieldNameOrId)
+      if (!field) return
+      const fieldConfig = recordFields.find((c) => c.field === field.name || c.field === field.id)
+      if (!fieldConfig) return
+      setCurrentBlocks((prev) => {
+        const maxY = prev.length > 0 ? Math.max(...prev.map((b) => (b.y ?? 0) + (b.h ?? 2))) : -1
+        const y = maxY + 1
+        const x = 0
+        const firstRecordId =
+          groups.length > 0 && activeTab
+            ? (() => {
+                const g = groups.find((gr) => gr.key === activeTab)
+                const first = g?.items?.[0]
+                return first?.id || first?.[`${supabaseTableName}_id`]
+              })()
+            : null
+        if (!firstRecordId) return prev
+        const newBlock: PageBlock = {
+          id: `field-${firstRecordId}-${field.name}`,
+          page_id: viewId || `view-${tableId}`,
+          type: 'field',
+          x,
+          y,
+          w: 6,
+          h: 2,
+          config: {
+            field_id: field.id,
+            field_name: field.name,
+            table_id: tableId,
+            allow_inline_edit: fieldConfig.editable !== false,
+          },
+          order_index: prev.length,
+          created_at: new Date().toISOString(),
+        }
+        const updated = [...prev, newBlock]
+        setLayoutTemplate(updated)
+        if (onBlockUpdate) onBlockUpdate(updated)
+        return updated
+      })
+    },
+    [tableFields, recordFields, groups, activeTab, supabaseTableName, viewId, tableId, onBlockUpdate]
+  )
 
   // Initialize current blocks from first record when editing starts
   useEffect(() => {
@@ -554,27 +687,75 @@ export default function HorizontalGroupedView({
                     // Use current blocks if editing, otherwise use generated blocks
                     const displayBlocks = canEditThisRecord && currentBlocks.length > 0 ? currentBlocks : blocks
                     
+                    const fieldsInLayout = new Set(
+                      (canEditThisRecord ? displayBlocks : []).map((b) => b.config?.field_name).filter(Boolean)
+                    )
+                    const availableToAdd =
+                      canEditThisRecord
+                        ? recordFields
+                            .map((c) => {
+                              const f = tableFields.find((tf) => tf.name === c.field || tf.id === c.field)
+                              return f && !fieldsInLayout.has(f.name) ? f : null
+                            })
+                            .filter((x): x is TableField => x != null)
+                        : []
+
                     return (
                       <div
                         key={recordId}
                         className="border rounded-lg bg-card overflow-hidden"
                         style={{ minHeight: '200px' }}
                       >
+                        {canEditThisRecord && (
+                          <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/50">
+                            {availableToAdd.length > 0 ? (
+                              <Select
+                                value=""
+                                onValueChange={(value) => {
+                                  if (value) handleAddFieldBlock(value)
+                                }}
+                              >
+                                <SelectTrigger className="w-[200px] h-8 text-xs">
+                                  <SelectValue placeholder="Add field to canvas…" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {availableToAdd.map((f) => (
+                                    <SelectItem key={f.id} value={f.name}>
+                                      {f.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : null}
+                            <span className="text-xs text-muted-foreground">
+                              Drag to rearrange · Delete block to remove field from canvas
+                            </span>
+                          </div>
+                        )}
                         <FilterStateProvider>
                           <Canvas
                             blocks={displayBlocks}
                             isEditing={canEditThisRecord}
                             onLayoutChange={canEditThisRecord ? handleLayoutChange : undefined}
-                            onBlockUpdate={canEditThisRecord ? (blockId, config) => {
-                              // Update block config
-                              setCurrentBlocks(prev => prev.map(b => 
-                                b.id === blockId ? { ...b, config: { ...b.config, ...config } } : b
-                              ))
-                              // Update template
-                              setLayoutTemplate(prev => prev ? prev.map(b => 
-                                b.id === blockId ? { ...b, config: { ...b.config, ...config } } : b
-                              ) : null)
-                            } : undefined}
+                            onBlockUpdate={
+                              canEditThisRecord
+                                ? (blockId, config) => {
+                                    setCurrentBlocks((prev) =>
+                                      prev.map((b) =>
+                                        b.id === blockId ? { ...b, config: { ...b.config, ...config } } : b
+                                      )
+                                    )
+                                    setLayoutTemplate((prev) =>
+                                      prev
+                                        ? prev.map((b) =>
+                                            b.id === blockId ? { ...b, config: { ...b.config, ...config } } : b
+                                          )
+                                        : null
+                                    )
+                                  }
+                                : undefined
+                            }
+                            onBlockDelete={canEditThisRecord ? handleBlockDelete : undefined}
                             pageTableId={tableId}
                             pageId={viewId || `view-${tableId}`}
                             recordId={recordId}
