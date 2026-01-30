@@ -25,7 +25,7 @@ export function isSelectFieldType(type: any): type is 'single_select' | 'multi_s
 
 export function getSelectOptionsRaw(fieldOptions?: FieldOptions | null): SelectOption[] {
   const opts = fieldOptions || {}
-  const so = (opts as any).selectOptions
+  const so = (opts as any).selectOptions ?? (opts as any).select_options
   if (Array.isArray(so)) {
     return so.filter(Boolean) as SelectOption[]
   }
@@ -52,7 +52,8 @@ export function normalizeSelectOptionsForUi(
   if (raw.length > 0) {
     selectOptions = raw.map((o: any, idx: number) => {
       const label = String(o?.label ?? o?.value ?? '').trim()
-      const id = String(o?.id ?? '').trim() || safeRandomId()
+      // Prefer id; fall back to value so DB-stored option keys (e.g. UUID) map correctly to labels
+      const id = String((o?.id ?? o?.value) ?? '').trim() || safeRandomId()
       const created_at = typeof o?.created_at === 'string' && o.created_at ? o.created_at : nowIso()
       const sort_index =
         typeof o?.sort_index === 'number' && Number.isFinite(o.sort_index) ? Math.trunc(o.sort_index) : idx

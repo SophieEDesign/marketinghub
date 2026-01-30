@@ -72,16 +72,19 @@ export default function HorizontalGroupedCanvasModal({
     await onSave(blocks)
   }, [onSave])
 
-  // Handle close - just close, layout is already saved
-  const handleClose = useCallback((open: boolean) => {
+  // Handle close (e.g. overlay click, Escape) - flush layout so main view updates after exiting modal
+  const handleClose = useCallback(async (open: boolean) => {
     if (!open) {
+      await onSave(currentLayout)
       onOpenChange(false)
     }
-  }, [onOpenChange])
+  }, [onOpenChange, onSave, currentLayout])
 
-  const handleDoneClick = useCallback(() => {
+  const handleDoneClick = useCallback(async () => {
+    // Flush current layout to parent so main view updates immediately after exiting modal
+    await onSave(currentLayout)
     onOpenChange(false)
-  }, [onOpenChange])
+  }, [onOpenChange, onSave, currentLayout])
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>

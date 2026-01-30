@@ -94,13 +94,16 @@ export default function FilterBlock({
   const tableId = config?.table_id || pageTableId
 
   const isFilterableDataBlock = useCallback((b: PageBlock) => {
-    return ['grid', 'chart', 'kpi', 'kanban', 'calendar', 'timeline', 'list'].includes(b.type)
+    const type = (b?.type ?? '') as string
+    return ['grid', 'chart', 'kpi', 'kanban', 'calendar', 'timeline', 'list', 'horizontal_grouped', 'gallery'].includes(type)
   }, [])
 
   const isSameTable = useCallback((b: PageBlock) => {
-    if (!tableId) return false
-    const blockTableId = b.config?.table_id || pageTableId
-    return !!blockTableId && blockTableId === tableId
+    const effectiveTableId = tableId ?? pageTableId
+    if (effectiveTableId == null || effectiveTableId === '') return false
+    const blockTableId = b.config?.table_id ?? pageTableId
+    if (blockTableId == null || blockTableId === '') return false
+    return String(blockTableId) === String(effectiveTableId)
   }, [tableId, pageTableId])
 
   // Sync filter tree when config changes externally

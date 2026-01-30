@@ -96,6 +96,17 @@ export default function AirtableViewPage({
   const [editingField, setEditingField] = useState<TableField | null>(null)
   const [designSidebarOpen, setDesignSidebarOpen] = useState(false)
 
+  // Open Design sidebar when "Settings" is chosen from right-click on view tab
+  useEffect(() => {
+    const handler = (e: CustomEvent<{ viewId: string }>) => {
+      if (e.detail?.viewId && normalizeUuid(e.detail.viewId) === viewUuid) {
+        setDesignSidebarOpen(true)
+      }
+    }
+    window.addEventListener("core-data-open-view-settings", handler as EventListener)
+    return () => window.removeEventListener("core-data-open-view-settings", handler as EventListener)
+  }, [viewUuid])
+
   // Load user role from profiles so we can correctly gate actions (e.g. bulk delete).
   // Mapping: profiles.admin -> "admin"; profiles.member -> "editor" (can edit, cannot delete).
   useEffect(() => {

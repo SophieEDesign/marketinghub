@@ -51,6 +51,17 @@ export default function NonGridViewWrapper({
   const [tableInfo, setTableInfo] = useState<{ name: string; supabase_table: string } | null>(null)
   const [tableFields, setTableFields] = useState<TableField[]>(tableFieldsProp)
 
+  // Open Design sidebar when "Settings" is chosen from right-click on view tab
+  useEffect(() => {
+    const handler = (e: CustomEvent<{ viewId: string }>) => {
+      if (e.detail?.viewId && e.detail.viewId === viewId) {
+        setDesignSidebarOpen(true)
+      }
+    }
+    window.addEventListener("core-data-open-view-settings", handler as EventListener)
+    return () => window.removeEventListener("core-data-open-view-settings", handler as EventListener)
+  }, [viewId])
+
   useEffect(() => {
     async function loadTableInfo() {
       try {
