@@ -109,8 +109,10 @@ export default function FilterDialog({
       // Initialize groups
       if (groups && groups.length > 0) {
         groups.forEach((group) => {
+          const conditionType: FilterConditionType = group.condition_type === 'OR' ? 'OR' : 'AND'
           groupsMap.set(group.id, {
             ...group,
+            condition_type: conditionType,
             filters: [],
           })
         })

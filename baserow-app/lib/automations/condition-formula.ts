@@ -241,6 +241,8 @@ function formatConditionSummary(
   const operatorLabels: Record<FilterOperator, string> = {
     equal: 'is',
     not_equal: 'is not',
+    is_any_of: 'is any of',
+    is_not_any_of: 'is not any of',
     contains: 'contains',
     not_contains: 'does not contain',
     is_empty: 'is empty',

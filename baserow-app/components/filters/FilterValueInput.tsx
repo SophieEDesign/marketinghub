@@ -122,7 +122,7 @@ export default function FilterValueInput({
         <div className={`min-h-8 flex flex-wrap items-center gap-1.5 px-2 py-1.5 border border-input rounded-md bg-background ${textSize} ${className}`}>
           {selectedValues.map((choice) => {
             const bgColor = normalizeHexColor(
-              resolveChoiceColor(choice, field.type, field.options, field.type === 'single_select')
+              resolveChoiceColor(choice, field.type as 'single_select' | 'multi_select', field.options, field.type === 'single_select')
             )
             return (
               <span
@@ -151,7 +151,7 @@ export default function FilterValueInput({
               <SelectContent>
                 {availableChoices.map((choice: string) => {
                   const bgColor = normalizeHexColor(
-                    resolveChoiceColor(choice, field.type, field.options, field.type === 'single_select')
+                    resolveChoiceColor(choice, field.type as 'single_select' | 'multi_select', field.options, field.type === 'single_select')
                   )
                   return (
                     <SelectItem key={choice} value={choice}>
