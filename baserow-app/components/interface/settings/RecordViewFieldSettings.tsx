@@ -130,9 +130,9 @@ export default function RecordViewFieldSettings({
       <div>
         <div className="flex items-center justify-between">
           <div>
-            <Label className="text-sm font-semibold">Field Panel Configuration</Label>
+            <Label className="text-sm font-semibold">Fields to show on cards</Label>
             <p className="text-xs text-gray-500 mt-1">
-              Select which fields appear in the Record Field Panel and configure their order and editability.
+              Choose which fields appear on each record card. Reorder with the arrows; tick Editable to allow inline editing.
             </p>
           </div>
           <div className="flex gap-2">
@@ -141,7 +141,7 @@ export default function RecordViewFieldSettings({
               onClick={handleSelectAll}
               className="text-xs text-blue-600 hover:text-blue-700 underline"
             >
-              Select All
+              Select all
             </button>
             <span className="text-xs text-gray-300">|</span>
             <button
@@ -149,7 +149,7 @@ export default function RecordViewFieldSettings({
               onClick={handleSelectNone}
               className="text-xs text-blue-600 hover:text-blue-700 underline"
             >
-              Select None
+              Clear
             </button>
           </div>
         </div>
@@ -157,10 +157,10 @@ export default function RecordViewFieldSettings({
 
       {/* Configured Fields */}
       <div className="space-y-2">
-        <Label className="text-xs font-medium text-gray-700">Selected Fields</Label>
+        <Label className="text-xs font-medium text-gray-700">Included fields</Label>
         {configuredFields.length === 0 ? (
-          <div className="text-sm text-gray-500 py-4 text-center border border-gray-200 rounded-lg">
-            No fields selected. Add fields below.
+          <div className="text-sm text-gray-500 py-4 text-center border border-dashed border-gray-200 rounded-lg bg-gray-50/50">
+            No fields added yet. Add from the list below.
           </div>
         ) : (
           <div className="space-y-2">
@@ -172,7 +172,7 @@ export default function RecordViewFieldSettings({
               return (
                 <div
                   key={field.id}
-                  className="flex items-center gap-2 p-2 border border-gray-200 rounded-lg hover:bg-gray-50"
+                  className="flex items-center gap-2 p-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   <GripVertical className="h-4 w-4 text-gray-400 cursor-move" />
                   <div className="flex-1 min-w-0">
@@ -232,7 +232,7 @@ export default function RecordViewFieldSettings({
       {/* Available Fields */}
       {availableFields.length > 0 && (
         <div className="space-y-2">
-          <Label className="text-xs font-medium text-gray-700">Available Fields</Label>
+          <Label className="text-xs font-medium text-gray-700">Add a field</Label>
           <div className="grid grid-cols-2 gap-2">
             {availableFields.map((field) => (
               <Button

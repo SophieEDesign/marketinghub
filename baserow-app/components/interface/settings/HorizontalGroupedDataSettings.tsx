@@ -132,17 +132,15 @@ export default function HorizontalGroupedDataSettings({
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>Record Fields</Label>
+              <Label>Fields on record cards</Label>
               {onEditCanvas && (
                 <Button
                   variant={isEditingCanvas ? "default" : "outline"}
                   size="sm"
                   onClick={() => {
                     if (isEditingCanvas && onExitBlockCanvas) {
-                      // If already editing, exit and save
                       onExitBlockCanvas()
                     } else if (onEditCanvas) {
-                      // Enter edit mode
                       onEditCanvas()
                     }
                   }}
@@ -151,19 +149,19 @@ export default function HorizontalGroupedDataSettings({
                   {isEditingCanvas ? (
                     <>
                       <Check className="h-3 w-3 mr-1" />
-                      Done Editing
+                      Done
                     </>
                   ) : (
                     <>
                       <Edit2 className="h-3 w-3 mr-1" />
-                      Edit Canvas
+                      Edit layout
                     </>
                   )}
                 </Button>
               )}
             </div>
             <p className="text-xs text-muted-foreground mb-2">
-              Configure which fields appear in each record&apos;s canvas. Click &quot;Edit Canvas&quot; to drag and rearrange fields.
+              Choose which fields show on each record card below. Use &quot;Edit layout&quot; to arrange and resize them on the card.
             </p>
             <RecordViewFieldSettings
               tableId={config.table_id}

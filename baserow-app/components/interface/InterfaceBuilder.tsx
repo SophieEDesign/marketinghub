@@ -242,6 +242,7 @@ export default function InterfaceBuilder({
   const latestLayoutRef = useRef<LayoutItem[] | null>(null)
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const componentIdRef = useRef(`interface-builder-${page.id}`)
+  const canvasScrollContainerRef = useRef<HTMLDivElement | null>(null)
   
   // Undo/Redo for layout changes
   const initialLayoutState = useMemo(() => {
@@ -733,14 +734,20 @@ export default function InterfaceBuilder({
     [page.id, toast]
   )
 
-  // Helper function to find next available position without overlapping
-  // Prioritizes filling gaps over expanding layout
-  const findNextAvailablePosition = useCallback((newWidth: number, newHeight: number, existingBlocks: PageBlock[]): { x: number; y: number } => {
+  // Helper function to find next available position without overlapping.
+  // If preferredY is provided (e.g. from current scroll position), tries to place near that row first.
+  const findNextAvailablePosition = useCallback((
+    newWidth: number,
+    newHeight: number,
+    existingBlocks: PageBlock[],
+    preferredY?: number
+  ): { x: number; y: number } => {
     const GRID_COLS = 12
     
-    // If no blocks exist, start at top-left
+    // If no blocks exist, start at top-left or at preferredY
     if (existingBlocks.length === 0) {
-      return { x: 0, y: 0 }
+      const y = preferredY != null && preferredY >= 0 ? Math.round(preferredY) : 0
+      return { x: 0, y }
     }
 
     // Create a set of occupied cells for fast collision detection
@@ -751,7 +758,6 @@ export default function InterfaceBuilder({
       const w = block.w ?? 4
       const h = block.h ?? 4
       
-      // Mark all cells occupied by this block
       for (let cellX = x; cellX < x + w && cellX < GRID_COLS; cellX++) {
         for (let cellY = y; cellY < y + h; cellY++) {
           occupied.add(`${cellX},${cellY}`)
@@ -759,16 +765,34 @@ export default function InterfaceBuilder({
       }
     })
 
-    // Find the maximum Y position to know where to start searching
     const maxY = existingBlocks.length > 0 
       ? Math.max(...existingBlocks.map((b) => (b.y ?? 0) + (b.h ?? 4)))
       : 0
 
-    // First pass: Try to fill gaps (positions within existing layout)
-    // This prioritizes compact layouts over expanding downward
+    // If preferredY is set (current viewport), try that region first: from preferredY-1 to preferredY+newHeight+2
+    if (preferredY != null && preferredY >= 0) {
+      const startYMin = Math.max(0, Math.floor(preferredY) - 1)
+      const startYMax = Math.min(maxY + newHeight, Math.ceil(preferredY) + newHeight + 2)
+      for (let startY = startYMin; startY <= startYMax; startY++) {
+        for (let startX = 0; startX <= GRID_COLS - newWidth; startX++) {
+          let canFit = true
+          for (let cellX = startX; cellX < startX + newWidth; cellX++) {
+            for (let cellY = startY; cellY < startY + newHeight; cellY++) {
+              if (occupied.has(`${cellX},${cellY}`)) {
+                canFit = false
+                break
+              }
+            }
+            if (!canFit) break
+          }
+          if (canFit) return { x: startX, y: startY }
+        }
+      }
+    }
+
+    // Fill gaps from top
     for (let startY = 0; startY <= maxY; startY++) {
       for (let startX = 0; startX <= GRID_COLS - newWidth; startX++) {
-        // Check if this position fits without overlapping
         let canFit = true
         for (let cellX = startX; cellX < startX + newWidth; cellX++) {
           for (let cellY = startY; cellY < startY + newHeight; cellY++) {
@@ -779,15 +803,10 @@ export default function InterfaceBuilder({
           }
           if (!canFit) break
         }
-        
-        if (canFit) {
-          return { x: startX, y: startY }
-        }
+        if (canFit) return { x: startX, y: startY }
       }
     }
 
-    // Second pass: If no gap found, place below all existing blocks
-    // This ensures new blocks are always placed somewhere valid
     return { x: 0, y: maxY }
   }, [])
 
@@ -795,8 +814,16 @@ export default function InterfaceBuilder({
     async (type: BlockType) => {
       const def = BLOCK_REGISTRY[type]
       
-      // Find next available position that doesn't overlap
-      const position = findNextAvailablePosition(def.defaultWidth, def.defaultHeight, blocks)
+      // Prefer position in current viewport so user doesn't have to scroll to find the new block
+      const rowHeight = page.settings?.layout?.rowHeight ?? 30
+      const marginY = (page.settings?.layout?.margin && Array.isArray(page.settings.layout.margin))
+        ? page.settings.layout.margin[1]
+        : 10
+      const rowPx = rowHeight + marginY
+      const scrollTop = canvasScrollContainerRef.current?.scrollTop ?? 0
+      const preferredY = rowPx > 0 ? scrollTop / rowPx : undefined
+      
+      const position = findNextAvailablePosition(def.defaultWidth, def.defaultHeight, blocks, preferredY)
 
       try {
         // Use createBlockWithDefaults to get proper defaults
@@ -839,7 +866,7 @@ export default function InterfaceBuilder({
         })
       }
     },
-    [page.id, blocks, toast, findNextAvailablePosition]
+    [page.id, page.settings, blocks, toast, findNextAvailablePosition]
   )
 
   const handleDeleteBlock = useCallback(
@@ -934,18 +961,15 @@ export default function InterfaceBuilder({
       const layoutItemToMove = currentLayout.find((item) => item.i === blockId)
       if (!layoutItemToMove) return
 
-      // Find minimum Y position from current layout
-      const minY = Math.min(...currentLayout.map((item) => item.y || 0))
-      
-      // Move block to top (y = minY - 1 or 0)
-      const newY = Math.max(0, minY - 1)
+      const moveH = layoutItemToMove.h ?? 4
+      // Place moved block at top (y=0); shift all other blocks down by its height to avoid overlap
+      const newY = 0
 
       try {
-        // Create new layout with moved block
         const newLayout: LayoutItem[] = currentLayout.map((item) => ({
           i: item.i,
           x: item.x,
-          y: item.i === blockId ? newY : item.y,
+          y: item.i === blockId ? newY : (item.y ?? 0) + moveH,
           w: item.w,
           h: item.h,
         }))
@@ -958,9 +982,12 @@ export default function InterfaceBuilder({
 
         await saveLayout(newLayout, true)
         
-        // Update local state
+        // Update local state so Canvas syncs and shows new positions
         setBlocks((prev) =>
-          prev.map((b) => (b.id === blockId ? { ...b, y: newY } : b))
+          prev.map((b) => {
+            const item = newLayout.find((l) => l.i === b.id)
+            return item ? { ...b, y: item.y, x: item.x } : b
+          })
         )
 
         toast({
@@ -1018,9 +1045,12 @@ export default function InterfaceBuilder({
 
         await saveLayout(newLayout, true)
         
-        // Update local state
+        // Update local state so Canvas syncs and shows new positions
         setBlocks((prev) =>
-          prev.map((b) => (b.id === blockId ? { ...b, y: newY } : b))
+          prev.map((b) => {
+            const item = newLayout.find((l) => l.i === b.id)
+            return item ? { ...b, y: item.y, x: item.x } : b
+          })
         )
 
         toast({
@@ -1336,7 +1366,7 @@ export default function InterfaceBuilder({
         {/* Canvas */}
         {/* CRITICAL: Canvas container must have min-width: 0 to prevent flex collapse */}
         {/* Without min-width: 0, flex children can overflow and cause grid width issues */}
-        <div className="flex-1 overflow-auto p-4 min-w-0 w-full">
+        <div ref={canvasScrollContainerRef} className="flex-1 overflow-auto p-4 min-w-0 w-full">
           <FilterStateProvider>
             {/* CRITICAL: Hydration lock - never render Canvas until blocks are loaded */}
             {/* This prevents Canvas from committing empty layout state before blocks arrive */}

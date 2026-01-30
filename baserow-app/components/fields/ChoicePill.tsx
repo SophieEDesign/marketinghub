@@ -48,18 +48,15 @@ export function ChoicePill({
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-md text-xs font-medium",
+        "inline-flex items-center rounded-md text-xs font-medium shrink-0",
         density === "compact" ? "px-2 py-0.5" : "px-2 py-0.5",
         textColorClass,
         className
       )}
-      style={{ 
-        backgroundColor: bgColor, 
-        maxWidth: "100%",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
+      style={{
+        backgroundColor: bgColor,
         whiteSpace: "nowrap",
-        ...style 
+        ...style,
       }}
       title={normalized}
       {...props}

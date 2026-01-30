@@ -131,41 +131,17 @@ export default function TextCell({
     }
   }
 
-  const clickTimerRef = useRef<NodeJS.Timeout | null>(null)
-
-  const handleSingleClick = (e: React.MouseEvent) => {
-    // Single click: copy value (with delay to detect double-click)
-    if (e.detail === 1) {
-      if (clickTimerRef.current) {
-        clearTimeout(clickTimerRef.current)
-      }
-      clickTimerRef.current = setTimeout(() => {
-        handleCopy()
-      }, 200) // Small delay to detect double-click
-    }
-  }
-
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation()
-    // Clear the single-click timer
-    if (clickTimerRef.current) {
-      clearTimeout(clickTimerRef.current)
-      clickTimerRef.current = null
-    }
     if (editable) {
       // Double-click: start inline editing
       setEditing(true)
     }
   }
 
-  // Cleanup timer on unmount
-  useEffect(() => {
-    return () => {
-      if (clickTimerRef.current) {
-        clearTimeout(clickTimerRef.current)
-      }
-    }
-  }, [])
+  // Note: We no longer copy on single-click. That overwrote the user's clipboard
+  // when they clicked a cell before pasting from another document. Copy is still
+  // available via context menu (right-click → Copy) or Ctrl+C when cell is selected.
 
   if (editing && editable) {
     // Container to properly constrain the input within the cell
@@ -221,7 +197,6 @@ export default function TextCell({
         <ContextMenuTrigger asChild>
           <div
             ref={cellRef}
-            onClick={handleSingleClick}
             onDoubleClick={handleDoubleClick}
             className={`w-full h-full px-3 py-1 text-sm text-gray-900 cursor-pointer hover:bg-gray-50/50 rounded-md transition-colors flex overflow-hidden relative group ${
               wrapText ? 'items-start' : 'items-center'

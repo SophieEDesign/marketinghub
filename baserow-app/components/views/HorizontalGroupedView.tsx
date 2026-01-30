@@ -703,11 +703,11 @@ export default function HorizontalGroupedView({
                     return (
                       <div
                         key={recordId}
-                        className="border rounded-lg bg-card overflow-hidden"
+                        className="border rounded-lg bg-card overflow-hidden shadow-sm"
                         style={{ minHeight: '200px' }}
                       >
                         {canEditThisRecord && (
-                          <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/50">
+                          <div className="flex items-center gap-3 px-3 py-2.5 border-b bg-muted/40 text-muted-foreground">
                             {availableToAdd.length > 0 ? (
                               <Select
                                 value=""
@@ -716,7 +716,7 @@ export default function HorizontalGroupedView({
                                 }}
                               >
                                 <SelectTrigger className="w-[200px] h-8 text-xs">
-                                  <SelectValue placeholder="Add field to canvas…" />
+                                  <SelectValue placeholder="Add a field…" />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {availableToAdd.map((f) => (
@@ -728,7 +728,7 @@ export default function HorizontalGroupedView({
                               </Select>
                             ) : null}
                             <span className="text-xs text-muted-foreground">
-                              Drag to rearrange · Delete block to remove field from canvas
+                              Drag to move · Resize with the corner · Delete to remove from card
                             </span>
                           </div>
                         )}

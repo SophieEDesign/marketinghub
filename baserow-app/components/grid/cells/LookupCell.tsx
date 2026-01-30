@@ -1,9 +1,11 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRecordPanel } from '@/contexts/RecordPanelContext'
 import { ExternalLink } from 'lucide-react'
+import { ChoicePill } from '@/components/fields/ChoicePill'
+import type { FieldOptions } from '@/types/fields'
 
 interface LookupCellProps {
   value: string | null | any | Array<string | { id: string; value: string }>
@@ -20,14 +22,19 @@ interface LookupCellProps {
   placeholder?: string
 }
 
+/** Lookup target field shape (type + options for pill colours). */
+type LookupTargetField = { type: 'single_select' | 'multi_select'; options?: FieldOptions } | null
+
 interface LookupPillProps {
   item: string | { id: string; value: string }
   lookupTableId: string
   lookupFieldId: string
   onOpenRecord: (tableId: string, recordId: string, tableName: string) => void
+  /** When set and type is select, render a coloured pill instead of grey. */
+  lookupTargetField?: LookupTargetField
 }
 
-function LookupPill({ item, lookupTableId, lookupFieldId, onOpenRecord }: LookupPillProps) {
+function LookupPill({ item, lookupTableId, lookupFieldId, onOpenRecord, lookupTargetField }: LookupPillProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -134,20 +141,38 @@ function LookupPill({ item, lookupTableId, lookupFieldId, onOpenRecord }: Lookup
     }
   }
 
+  const pillContent =
+    lookupTargetField?.type === 'single_select' || lookupTargetField?.type === 'multi_select' ? (
+      <ChoicePill
+        label={displayValue}
+        fieldType={lookupTargetField.type}
+        fieldOptions={lookupTargetField.options}
+        density="compact"
+      />
+    ) : (
+      <span>{displayValue}</span>
+    )
+
+  const isColoredPill = lookupTargetField?.type === 'single_select' || lookupTargetField?.type === 'multi_select'
+
   return (
     <button
       onClick={handleClick}
       onDoubleClick={(e) => e.stopPropagation()}
       disabled={loading}
-      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 hover:shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed border border-transparent hover:border-gray-200"
+      className={
+        isColoredPill
+          ? 'inline-flex items-center gap-1.5 rounded-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed border-0 bg-transparent p-0 hover:opacity-90'
+          : 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 hover:shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed border border-transparent hover:border-gray-200'
+      }
       title="Click to open record"
       aria-label={`Open record: ${displayValue}`}
     >
-      <span>{displayValue}</span>
+      {pillContent}
       {loading ? (
-        <span className="h-3 w-3 border-2 border-gray-600 border-t-transparent rounded-full animate-spin" />
+        <span className="h-3 w-3 border-2 border-gray-600 border-t-transparent rounded-full animate-spin flex-shrink-0" />
       ) : (
-        <ExternalLink className="h-3 w-3 text-gray-500 opacity-70" />
+        <ExternalLink className="h-3 w-3 text-gray-500 opacity-70 flex-shrink-0" />
       )}
       {error && (
         <span className="text-red-600 text-xs" title={error}>⚠</span>
@@ -165,7 +190,42 @@ export default function LookupCell({
   placeholder = '—',
 }: LookupCellProps) {
   const { openRecord } = useRecordPanel()
+  const [lookupTargetField, setLookupTargetField] = useState<LookupTargetField>(null)
   const containerStyle: React.CSSProperties = rowHeight ? { height: `${rowHeight}px` } : {}
+
+  const lookupFieldId = field.options?.lookup_field_id
+
+  useEffect(() => {
+    if (!lookupFieldId) {
+      setLookupTargetField(null)
+      return
+    }
+    let cancelled = false
+    const supabase = createClient()
+    supabase
+      .from('table_fields')
+      .select('type, options')
+      .eq('id', lookupFieldId)
+      .single()
+      .then(({ data, error }) => {
+        if (cancelled || error || !data) {
+          if (!cancelled) setLookupTargetField(null)
+          return
+        }
+        const t = data.type as string
+        if (t === 'single_select' || t === 'multi_select') {
+          setLookupTargetField({
+            type: t as 'single_select' | 'multi_select',
+            options: (data.options as FieldOptions) ?? undefined,
+          })
+        } else {
+          setLookupTargetField(null)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [lookupFieldId])
 
   if (!value) {
     return (
@@ -234,6 +294,7 @@ export default function LookupCell({
           lookupTableId={lookupTableId}
           lookupFieldId={lookupFieldId}
           onOpenRecord={openRecord}
+          lookupTargetField={lookupTargetField}
         />
       ))}
     </div>

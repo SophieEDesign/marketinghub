@@ -86,16 +86,9 @@ export default function LongTextCell({
     }
   }
 
-  const handleSingleClick = (e: React.MouseEvent) => {
-    // Single click: copy value
-    if (e.detail === 1) {
-      const timer = setTimeout(() => {
-        handleCopy()
-      }, 200) // Small delay to detect double-click
-      
-      return () => clearTimeout(timer)
-    }
-  }
+  // Note: We no longer copy on single-click. That overwrote the user's clipboard
+  // when they clicked a cell before pasting from another document. Copy is still
+  // available via context menu (right-click → Copy) or Ctrl+C when cell is selected.
 
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -159,7 +152,6 @@ export default function LongTextCell({
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <div
-            onClick={handleSingleClick}
             onDoubleClick={handleDoubleClick}
             className={`w-full h-full px-3 py-1 text-sm cursor-pointer hover:bg-gray-50/50 rounded-md transition-colors overflow-hidden flex relative group ${
               wrapText ? 'items-start' : 'items-center'

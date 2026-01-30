@@ -7,6 +7,7 @@ import { buildSelectClause, toPostgrestColumn } from '@/lib/supabase/postgrest'
 import { isAbortError } from '@/lib/api/error-handling'
 import { useToast } from '@/components/ui/use-toast'
 import { syncLinkedFieldBidirectional } from '@/lib/dataView/linkedFields'
+import { computeLookupValues } from '@/lib/grid/computeLookupValues'
 
 // Helper functions for SQL quoting (inline to avoid circular dependencies)
 function quoteIdent(ident: string): string {
@@ -511,6 +512,17 @@ export function useGridData({
 
         // CRITICAL: Normalize data to array
         const normalizedRows = asArray<GridRow>(data)
+
+        // Enrich rows with computed lookup field values (lookups are not stored; they are derived at runtime)
+        if (tableId && normalizedRows.length > 0) {
+          try {
+            await computeLookupValues(supabase, tableId, tableName, safeFields, normalizedRows)
+          } catch (lookupErr) {
+            if (typeof window !== 'undefined' && (process.env.NODE_ENV === 'development' || localStorage.getItem('DEBUG_GRID_DATA') === '1')) {
+              console.warn('[useGridData] Lookup value computation failed (non-fatal):', lookupErr)
+            }
+          }
+        }
         
         // Diagnostic: If we got 0 rows, check if data might be in table_rows instead
         // This helps identify storage system mismatches

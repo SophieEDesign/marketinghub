@@ -50,6 +50,7 @@ import { resolveChoiceColor, normalizeHexColor, getTextColorForBackground } from
 import { CellFactory } from "./CellFactory"
 import { buildSelectClause, toPostgrestColumn } from "@/lib/supabase/postgrest"
 import { getManualChoiceLabels } from "@/lib/fields/select-options"
+import { getFieldDisplayName } from "@/lib/fields/display"
 import { isAbortError } from "@/lib/api/error-handling"
 
 // PostgREST expects unquoted identifiers in select/order clauses; see `lib/supabase/postgrest`.
@@ -371,18 +372,24 @@ export default function AirtableKanbanView({
     })
   }
 
-  // Get card fields to display
+  // Get card fields to display (match by name, id, or display name so all selected fields show)
   const displayCardFields = useMemo(() => {
-    // Ensure cardFields and tableFields are arrays
     const safeCardFields = Array.isArray(cardFields) ? cardFields : []
     const safeTableFields = Array.isArray(tableFields) ? tableFields : []
-    
+
     if (safeCardFields.length > 0) {
       return safeCardFields
-        .map((fieldName) => safeTableFields.find((f) => f && f.name === fieldName))
+        .map((key) =>
+          safeTableFields.find(
+            (f) =>
+              f &&
+              (f.name === key ||
+                f.id === key ||
+                getFieldDisplayName(f) === key)
+          )
+        )
         .filter((f): f is TableField => f !== undefined && f !== null)
     }
-    // Default: show first 3 visible fields (excluding group field)
     return safeTableFields
       .filter((f) => f && f.name !== groupField?.name)
       .slice(0, 3)

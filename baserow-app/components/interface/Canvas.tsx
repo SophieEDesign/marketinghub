@@ -156,6 +156,7 @@ export default function Canvas({
   
   // Basic refs for tracking state
   const previousBlockIdsRef = useRef<string>("")
+  const previousBlocksLayoutSignatureRef = useRef<string>("")
   const prevPageIdRef = useRef<string | null>(pageId || null)
   const isFirstLayoutChangeRef = useRef(true)
   
@@ -427,6 +428,7 @@ export default function Canvas({
     if (blocks.length === 0) {
       if (previousBlockIdsRef.current !== "") {
         previousBlockIdsRef.current = ""
+        previousBlocksLayoutSignatureRef.current = ""
         layoutVersionRef.current = 0
         setLayout([])
         setEphemeralDeltas(new Map())
@@ -438,10 +440,15 @@ export default function Canvas({
     const previousBlockIds = previousBlockIdsRef.current
     const blockIdsChanged = previousBlockIds === "" || currentBlockIds !== previousBlockIds
     const layoutIsEmpty = layout.length === 0 && blocks.length > 0
+    // Signature of block positions so we sync when move-to-top/bottom (or other programmatic layout) updates blocks
+    const blocksLayoutSignature = blocks
+      .map((b) => `${b.id}:${b.x ?? 0}:${b.y ?? 0}:${b.w ?? 4}:${b.h ?? 4}`)
+      .sort()
+      .join("|")
+    const blocksLayoutChanged = previousBlocksLayoutSignatureRef.current !== "" && blocksLayoutSignature !== previousBlocksLayoutSignatureRef.current
     
-    // Only sync if block IDs changed or layout is empty (first load)
-    // Version tracking prevents stale overwrites (handled by layoutVersionRef in applyUserLayoutChange)
-    const shouldSync = blockIdsChanged || layoutIsEmpty
+    // Sync when block IDs changed, layout is empty (first load), or positions changed (e.g. move to top/bottom)
+    const shouldSync = blockIdsChanged || layoutIsEmpty || blocksLayoutChanged
     
     if (process.env.NODE_ENV === 'development') {
       debugLog('LAYOUT', '[Canvas] Layout sync check', {
@@ -498,6 +505,7 @@ export default function Canvas({
       
       setLayout(newLayout)
       previousBlockIdsRef.current = currentBlockIds
+      previousBlocksLayoutSignatureRef.current = blocksLayoutSignature
       
       if (process.env.NODE_ENV === 'development') {
         debugLog('LAYOUT', '[Canvas] Layout synced from blocks', {
@@ -2389,8 +2397,9 @@ export default function Canvas({
             {/* Block Content */}
             {/* CRITICAL: No min-height - height must be DERIVED from content */}
             {/* min-h-0 allows flex children to shrink below content size */}
+            {/* In view mode use overflow-auto so saved block sizes are respected but content remains visible (scroll if needed) */}
             <div 
-              className={`h-full w-full min-h-0 overflow-hidden rounded-lg ${block.config?.locked ? 'pointer-events-none opacity-75' : ''}`}
+              className={`h-full w-full min-h-0 rounded-lg ${block.config?.locked ? 'pointer-events-none opacity-75' : ''} ${isEditing ? 'overflow-hidden' : 'overflow-auto'}`}
               data-block-id={block.id}
               style={{
                 // CRITICAL: Do NOT set minHeight - height must be DERIVED from content

@@ -36,7 +36,7 @@ interface HorizontalGroupedCanvasModalProps {
 
 /**
  * Modal for editing the canvas layout of a horizontal grouped block
- * Opens when "Edit Canvas" button is clicked in block settings
+ * Opens when "Edit layout" is clicked in block settings
  */
 export default function HorizontalGroupedCanvasModal({
   open,
@@ -87,9 +87,9 @@ export default function HorizontalGroupedCanvasModal({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full flex flex-col p-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
-          <DialogTitle>Edit Canvas Layout</DialogTitle>
+          <DialogTitle>Edit record card layout</DialogTitle>
           <DialogDescription>
-            Drag and rearrange fields in the canvas. Changes are saved automatically.
+            Drag blocks to rearrange; use the corner handle to resize. Changes save automatically.
           </DialogDescription>
         </DialogHeader>
         
