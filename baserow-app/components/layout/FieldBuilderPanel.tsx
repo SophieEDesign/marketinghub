@@ -47,6 +47,102 @@ interface FieldBuilderPanelProps {
   onFieldsUpdated: () => void
 }
 
+function SortableSectionRow({
+  section,
+  index,
+  fieldCount,
+  isGeneral,
+  canMoveUp,
+  canMoveDown,
+  reorderingSections,
+  onMoveUp,
+  onMoveDown,
+}: {
+  section: SectionSettings
+  index: number
+  fieldCount: number
+  isGeneral: boolean
+  canMoveUp: boolean
+  canMoveDown: boolean
+  reorderingSections: boolean
+  onMoveUp: () => void
+  onMoveDown: () => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: `section-order-${section.name}`,
+    disabled: isGeneral,
+  })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center justify-between p-2 bg-white rounded border border-gray-200 gap-2 ${
+        isDragging ? "opacity-60 shadow-md" : ""
+      }`}
+    >
+      <div className="flex items-center gap-3 min-w-0 flex-1">
+        {!isGeneral ? (
+          <button
+            type="button"
+            className="touch-none cursor-grab active:cursor-grabbing p-0.5 rounded text-gray-400 hover:text-gray-600"
+            {...attributes}
+            {...listeners}
+            aria-label="Drag to reorder"
+          >
+            <GripVertical className="h-4 w-4" />
+          </button>
+        ) : (
+          <span className="w-5" aria-hidden />
+        )}
+        <span className="text-sm font-medium text-gray-600 w-8 flex-shrink-0">
+          {index + 1}
+        </span>
+        <span className="text-sm font-medium text-gray-900 truncate">
+          {section.display_name || section.name}
+        </span>
+        <span className="text-xs text-gray-500 flex-shrink-0">
+          ({fieldCount} {fieldCount === 1 ? "field" : "fields"})
+        </span>
+      </div>
+      {!isGeneral && (
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onMoveUp}
+            disabled={!canMoveUp || reorderingSections}
+            className="h-7 w-7 p-0"
+            title="Move up"
+          >
+            <ChevronUp className="h-4 w-4" />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onMoveDown}
+            disabled={!canMoveDown || reorderingSections}
+            className="h-7 w-7 p-0"
+            title="Move down"
+          >
+            <ChevronDown className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 const FieldBuilderPanel = memo(function FieldBuilderPanel({
   tableId,
   supabaseTableName,
@@ -62,6 +158,9 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
   const [sections, setSections] = useState<SectionSettings[]>([])
   const [loadingSections, setLoadingSections] = useState(false)
   const [reorderingSections, setReorderingSections] = useState(false)
+  const [showAddSection, setShowAddSection] = useState(false)
+  const [newSectionName, setNewSectionName] = useState("")
+  const [addingSection, setAddingSection] = useState(false)
 
   useEffect(() => {
     loadFields()
@@ -149,6 +248,94 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
       console.error("Error reordering sections:", error)
       alert("Failed to reorder sections")
       await loadSections() // Revert on error
+    } finally {
+      setReorderingSections(false)
+    }
+  }
+
+  async function handleAddSection() {
+    const name = newSectionName.trim()
+    if (!name) {
+      return
+    }
+    if (name === "General") {
+      alert('"General" is reserved for ungrouped fields.')
+      return
+    }
+    if (allSections.some((s) => s.name.toLowerCase() === name.toLowerCase())) {
+      alert("A section with this name already exists.")
+      return
+    }
+    setAddingSection(true)
+    try {
+      const nonGeneral = allSections.filter((s) => s.name !== "General")
+      const nextOrderIndex =
+        nonGeneral.length === 0
+          ? 0
+          : Math.max(...nonGeneral.map((s) => s.order_index), 0) + 1
+      const result = await upsertSectionSettings(tableId, name, {
+        display_name: name,
+        order_index: nextOrderIndex,
+        default_collapsed: false,
+        default_visible: true,
+      })
+      if (!result.success) {
+        alert(result.error || "Failed to add section")
+        return
+      }
+      setNewSectionName("")
+      setShowAddSection(false)
+      await loadSections()
+      onFieldsUpdated()
+    } catch (error) {
+      console.error("Error adding section:", error)
+      alert("Failed to add section")
+    } finally {
+      setAddingSection(false)
+    }
+  }
+
+  async function handleSectionDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const activeId = String(active.id)
+    const overId = String(over.id)
+    if (!activeId.startsWith("section-order-") || !overId.startsWith("section-order-")) return
+    const activeName = activeId.replace("section-order-", "")
+    const overName = overId.replace("section-order-", "")
+    const fromIndex = allSections.findIndex((s) => s.name === activeName)
+    const toIndex = allSections.findIndex((s) => s.name === overName)
+    if (fromIndex === -1 || toIndex === -1) return
+    const isGeneral = allSections[fromIndex].name === "General" || allSections[toIndex].name === "General"
+    if (isGeneral) return
+    setReorderingSections(true)
+    try {
+      const newSections = [...allSections]
+      const [moved] = newSections.splice(fromIndex, 1)
+      newSections.splice(toIndex, 0, moved)
+      const sectionsToReorder = newSections.filter((s) => s.name !== "General")
+      const sectionOrders: Array<{ sectionId: string; order_index: number }> = []
+      for (let i = 0; i < sectionsToReorder.length; i++) {
+        const section = sectionsToReorder[i]
+        if (!section.id) {
+          const result = await ensureSectionExists(tableId, section.name)
+          section.id = result.id
+        }
+        sectionOrders.push({ sectionId: section.id, order_index: i })
+      }
+      if (sectionOrders.length > 0) {
+        const result = await reorderSections(tableId, sectionOrders)
+        if (!result.success) {
+          alert(result.error || "Failed to reorder sections")
+          await loadSections()
+          return
+        }
+      }
+      await loadSections()
+    } catch (error) {
+      console.error("Error reordering sections:", error)
+      alert("Failed to reorder sections")
+      await loadSections()
     } finally {
       setReorderingSections(false)
     }
@@ -456,65 +643,106 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
   return (
     <div className="space-y-4">
       {/* Section Ordering */}
-      {allSections.length > 0 && (
-        <div className="space-y-2">
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <Label className="text-sm font-semibold text-gray-900">Section Order</Label>
-          <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
-            {allSections.map((section, index) => {
-              const fieldCount = fields.filter(f => (f.group_name || 'General') === section.name).length
-              const isGeneral = section.name === 'General'
-              const canMoveUp = !isGeneral && index > (allSections[0]?.name === 'General' ? 1 : 0)
-              const canMoveDown = !isGeneral && index < allSections.length - 1
-              
-              return (
-                <div
-                  key={section.name}
-                  className="flex items-center justify-between p-2 bg-white rounded border border-gray-200"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-gray-600 w-8">
-                      {index + 1}
-                    </span>
-                    <span className="text-sm font-medium text-gray-900">
-                      {section.display_name || section.name}
-                    </span>
-                    <span className="text-xs text-gray-500">
-                      ({fieldCount} {fieldCount === 1 ? 'field' : 'fields'})
-                    </span>
-                  </div>
-                  {!isGeneral && (
-                    <div className="flex items-center gap-1">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleReorderSections(section.name, 'up')}
-                        disabled={!canMoveUp || reorderingSections}
-                        className="h-7 w-7 p-0"
-                        title="Move up"
-                      >
-                        <ChevronUp className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleReorderSections(section.name, 'down')}
-                        disabled={!canMoveDown || reorderingSections}
-                        className="h-7 w-7 p-0"
-                        title="Move down"
-                      >
-                        <ChevronDown className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-          <p className="text-xs text-gray-500">
-            Sections are ordered by their index. Fields will appear in this order in pickers and modals.
-          </p>
+          {!showAddSection ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAddSection(true)}
+              className="gap-1.5"
+            >
+              <Plus className="h-4 w-4" />
+              Add section
+            </Button>
+          ) : (
+            <div className="flex items-center gap-2 flex-wrap">
+              <Input
+                placeholder="Section name"
+                value={newSectionName}
+                onChange={(e) => setNewSectionName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleAddSection()
+                  if (e.key === "Escape") setShowAddSection(false)
+                }}
+                className="h-8 w-48"
+                autoFocus
+              />
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleAddSection}
+                disabled={addingSection || !newSectionName.trim()}
+              >
+                Save
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowAddSection(false)
+                  setNewSectionName("")
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          )}
         </div>
-      )}
+        {(allSections.length > 0 || showAddSection) && (
+          <>
+            <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleSectionDragEnd}
+              >
+                <SortableContext
+                  items={allSections
+                    .filter((s) => s.name !== "General")
+                    .map((s) => `section-order-${s.name}`)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {allSections.map((section, index) => {
+                    const fieldCount = fields.filter(
+                      (f) => (f.group_name || "General") === section.name
+                    ).length
+                    const isGeneral = section.name === "General"
+                    const canMoveUp =
+                      !isGeneral &&
+                      index > (allSections[0]?.name === "General" ? 1 : 0)
+                    const canMoveDown =
+                      !isGeneral && index < allSections.length - 1
+                    return (
+                      <SortableSectionRow
+                        key={section.name}
+                        section={section}
+                        index={index}
+                        fieldCount={fieldCount}
+                        isGeneral={isGeneral}
+                        canMoveUp={canMoveUp}
+                        canMoveDown={canMoveDown}
+                        reorderingSections={reorderingSections}
+                        onMoveUp={() => handleReorderSections(section.name, "up")}
+                        onMoveDown={() =>
+                          handleReorderSections(section.name, "down")
+                        }
+                      />
+                    )
+                  })}
+                </SortableContext>
+              </DndContext>
+            </div>
+            <p className="text-xs text-gray-500">
+              Sections are ordered by their index. Drag to reorder or use the
+              arrows. Fields will appear in this order in pickers and modals.
+            </p>
+          </>
+        )}
+      </div>
 
       <div className="space-y-2">
         <Label className="text-sm font-semibold text-gray-900">Primary / Default Field</Label>

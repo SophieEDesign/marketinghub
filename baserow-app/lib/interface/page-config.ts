@@ -57,6 +57,7 @@ export interface PageConfig {
   editable_fields?: string[] // Fields that are editable (page-level, subset of visible_fields)
   show_field_list?: boolean // Toggle to show/hide structured field list (page-level)
   show_blocks_section?: boolean // Toggle to show/hide blocks section (page-level)
+  show_field_names?: boolean // Toggle to show/hide field names on blocks (page-level; default true)
 
   /**
    * Record actions permissions for record-based pages (record_view / record_review).
@@ -163,6 +164,7 @@ export function getDefaultPageConfig(pageType: string): PageConfig {
       editable_fields: [],
       show_field_list: true,
       show_blocks_section: true,
+      show_field_names: true,
     },
     record_view: {
       visualisation: 'record_view',
@@ -174,6 +176,7 @@ export function getDefaultPageConfig(pageType: string): PageConfig {
       editable_fields: [],
       show_field_list: true,
       show_blocks_section: true,
+      show_field_names: true,
     },
     blank: {
       visualisation: 'blank',

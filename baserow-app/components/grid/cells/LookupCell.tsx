@@ -249,9 +249,8 @@ export default function LookupCell({
     )
   }
 
-  // Type guard: ensure lookup config exists
+  // Type guard: ensure lookup config exists (lookupFieldId already declared above)
   const lookupTableId = field.options?.lookup_table_id
-  const lookupFieldId = field.options?.lookup_field_id
 
   if (!lookupTableId || !lookupFieldId) {
     // If lookup config is missing, just display the value(s)

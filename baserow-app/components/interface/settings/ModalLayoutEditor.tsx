@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { X, Plus, Trash2 } from "lucide-react"
+import { X, Plus, Trash2, Type } from "lucide-react"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { TableField } from "@/types/database"
 import { getFieldDisplayName } from "@/lib/fields/display"
@@ -238,9 +238,37 @@ export default function ModalLayoutEditor({
     setAddFieldValue("")
   }, [fields, layoutBlocks])
 
+  // Add text block (static content block for modal sections)
+  const handleAddTextBlock = useCallback(() => {
+    const maxY = layoutBlocks.length > 0
+      ? Math.max(...layoutBlocks.map(b => b.y + b.h))
+      : 0
+
+    const newBlock: ModalLayoutBlock = {
+      id: `text-${Date.now()}`,
+      type: 'text',
+      x: 0,
+      y: maxY,
+      w: 4,
+      h: 3,
+      config: {
+        content_json: { type: 'doc', content: [] },
+      },
+    }
+
+    setLayoutBlocks(prev => [...prev, newBlock])
+  }, [layoutBlocks])
+
   // Remove block
   const handleRemoveBlock = useCallback((blockId: string) => {
     setLayoutBlocks(prev => prev.filter(b => b.id !== blockId))
+  }, [])
+
+  // Update block config (e.g. text block content) so it persists when saving layout
+  const handleUpdateBlockConfig = useCallback((blockId: string, configUpdate: Record<string, any>) => {
+    setLayoutBlocks(prev => prev.map(b =>
+      b.id === blockId ? { ...b, config: { ...b.config, ...configUpdate } } : b
+    ))
   }, [])
 
   // Convert blocks to PageBlock format for rendering
@@ -255,7 +283,7 @@ export default function ModalLayoutEditor({
       config: {
         ...block.config,
         field_id: block.type === 'field' ? fields.find(f => f.name === block.fieldName)?.id : undefined,
-        field_name: block.fieldName,
+        field_name: block.type === 'field' ? block.fieldName : undefined,
       },
     })) as any[]
   }, [layoutBlocks, fields])
@@ -312,29 +340,42 @@ export default function ModalLayoutEditor({
 
         <div className="flex-1 overflow-hidden flex flex-col gap-4">
           {/* Controls */}
-          <div className="flex items-center justify-between gap-4 border-b pb-4">
-            <div className="flex items-center gap-2 flex-1">
-              <Label>Add Field</Label>
-              {availableFields.length > 0 ? (
-                <Select value={addFieldValue} onValueChange={(value) => {
-                  if (value) {
-                    handleAddField(value)
-                  }
-                }}>
-                  <SelectTrigger className="w-64">
-                    <SelectValue placeholder="Select a field..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableFields.map((field) => (
-                      <SelectItem key={field.id} value={field.name}>
-                        {getFieldDisplayName(field)} ({field.type})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <p className="text-sm text-gray-500">All fields are already in the layout</p>
-              )}
+          <div className="flex items-center justify-between gap-4 border-b pb-4 flex-wrap">
+            <div className="flex items-center gap-3 flex-1 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Label>Add Field</Label>
+                {availableFields.length > 0 ? (
+                  <Select value={addFieldValue} onValueChange={(value) => {
+                    if (value) {
+                      handleAddField(value)
+                    }
+                  }}>
+                    <SelectTrigger className="w-64">
+                      <SelectValue placeholder="Select a field..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableFields.map((field) => (
+                        <SelectItem key={field.id} value={field.name}>
+                          {getFieldDisplayName(field)} ({field.type})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-sm text-gray-500">All fields in layout</p>
+                )}
+              </div>
+              <span className="text-gray-400">or</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleAddTextBlock}
+                className="gap-1.5"
+              >
+                <Type className="h-4 w-4" />
+                Add Text block
+              </Button>
             </div>
             <Button variant="outline" size="sm" onClick={handleReset}>
               Reset to Default
@@ -352,7 +393,7 @@ export default function ModalLayoutEditor({
           <div className="flex-1 overflow-auto border rounded-lg bg-gray-50 p-4">
             {layoutBlocks.length === 0 ? (
               <div className="flex items-center justify-center h-full text-gray-400">
-                <p>No fields in layout. Add fields using the dropdown above.</p>
+                <p>No sections in layout. Add a field from the dropdown or add a Text block above.</p>
               </div>
             ) : loadingPreview ? (
               <div className="flex items-center justify-center h-full text-gray-400">
@@ -394,7 +435,9 @@ export default function ModalLayoutEditor({
                             <span className="text-xs font-medium text-gray-700">
                               {block.type === 'field' && block.config?.field_name
                                 ? getFieldDisplayName(fields.find(f => f.name === block.config.field_name) || fields[0])
-                                : block.type}
+                                : block.type === 'text'
+                                  ? 'Text block'
+                                  : block.type}
                             </span>
                             <button
                               onClick={() => handleRemoveBlock(block.id)}
@@ -408,7 +451,8 @@ export default function ModalLayoutEditor({
                           <div className="flex-1 overflow-auto min-h-0">
                             <BlockRenderer
                               block={block}
-                              isEditing={false}
+                              isEditing={block.type === 'text'}
+                              onUpdate={block.type === 'text' ? (_, configUpdate) => handleUpdateBlockConfig(block.id, configUpdate) : undefined}
                               pageTableId={tableId}
                               recordId={previewRecordId}
                               mode="view"

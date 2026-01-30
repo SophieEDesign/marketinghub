@@ -289,16 +289,16 @@ export default function RecordPanel() {
     }
   }, [state.tableName, record, state.tableId])
 
-  // Handle back button - navigate to core data table view if in fullscreen, otherwise use history
+  // Handle back button - go back to the view we came from (core data, interface, etc.)
   const handleBack = useCallback(() => {
-    if (state.isFullscreen && state.tableId) {
-      // In fullscreen mode, navigate to the core data table view
-      router.push(`/tables/${state.tableId}`)
+    if (state.isFullscreen) {
+      // In fullscreen mode, use browser history so we return to the previous view
+      router.back()
     } else {
-      // In side panel mode, use history-based navigation
+      // In side panel mode, use record history (previous record in stack)
       goBack()
     }
-  }, [state.isFullscreen, state.tableId, router, goBack])
+  }, [state.isFullscreen, router, goBack])
 
   if (!state.isOpen) return null
 
@@ -390,7 +390,7 @@ export default function RecordPanel() {
               <button
                 onClick={handleBack}
                 className="p-1 hover:bg-gray-200 rounded transition-colors"
-                title={state.isFullscreen ? "Back to Core Data" : "Go back"}
+                title="Go back"
               >
                 <ChevronLeft className="h-4 w-4 text-gray-600" />
               </button>

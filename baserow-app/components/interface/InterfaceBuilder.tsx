@@ -1425,6 +1425,7 @@ export default function InterfaceBuilder({
               }
               pageEditable={pageEditable}
               editableFieldNames={editableFieldNames}
+              pageShowFieldNames={(page as any).config?.show_field_names !== false}
               editingBlockCanvasId={editingBlockCanvasId}
             />
             )}

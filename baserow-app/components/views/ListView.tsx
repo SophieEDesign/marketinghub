@@ -729,6 +729,14 @@ export default function ListView({
     }
   }, [showAddRecord, canCreateRecord, supabaseTableName, tableId, effectiveGroupRules.length, groupPathMap, tableFields, filters])
 
+  const handleOpenCreateModal = useCallback(() => {
+    if (!showAddRecord || !canCreateRecord || !tableId || !supabaseTableName) return
+    const defaultsFromFilters = deriveDefaultValuesFromFilters(filters, tableFields)
+    const initial = Object.keys(defaultsFromFilters).length > 0 ? defaultsFromFilters : {}
+    setCreateInitialData(initial)
+    setCreateModalOpen(true)
+  }, [showAddRecord, canCreateRecord, tableId, supabaseTableName, filters, tableFields])
+
   const createRecordModal = (
     <RecordModal
       open={createModalOpen}
@@ -997,6 +1005,18 @@ export default function ListView({
               </span>
             )}
           </Button>
+          {showAddRecord && canCreateRecord && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleOpenCreateModal}
+              className="h-8 ml-auto"
+              title="Add a new record"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add record
+            </Button>
+          )}
         </div>
 
         {/* Grouped Content */}
@@ -1224,6 +1244,18 @@ export default function ListView({
               </span>
             )}
           </Button>
+          {showAddRecord && canCreateRecord && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleOpenCreateModal}
+              className="h-8 ml-auto"
+              title="Add a new record"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add record
+            </Button>
+          )}
         </div>
         <div className="flex-1 flex items-center justify-center p-4">
           <EmptyState
@@ -1320,6 +1352,18 @@ export default function ListView({
             </span>
           )}
         </Button>
+        {showAddRecord && canCreateRecord && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleOpenCreateModal}
+            className="h-8 ml-auto"
+            title="Add a new record"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add record
+          </Button>
+        )}
       </div>
       <div className="flex-1 overflow-y-auto">
         <div className="p-3 space-y-3">

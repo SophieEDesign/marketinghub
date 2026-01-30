@@ -651,9 +651,16 @@ export default function RecordViewPageSettings({
               <Label>Title Field</Label>
               <Select
                 value={config.title_field || "__none__"}
-                onValueChange={(value) =>
-                  onUpdate({ title_field: value === "__none__" ? undefined : value })
-                }
+                onValueChange={(value) => {
+                  const fieldName = value === "__none__" ? undefined : value
+                  onUpdate({
+                    title_field: fieldName,
+                    left_panel: {
+                      ...(config.left_panel || {}),
+                      title_field: fieldName,
+                    },
+                  })
+                }}
                 disabled={!selectedTableId || fields.length === 0}
               >
                 <SelectTrigger>
@@ -1346,6 +1353,22 @@ export default function RecordViewPageSettings({
               <Switch
                 checked={(config as any).show_add_record === true}
                 onCheckedChange={(checked) => onUpdate({ show_add_record: checked } as any)}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Show field names on blocks</Label>
+                <p className="text-xs text-gray-500 mt-1">
+                  Display the field name (label) above each field block. Individual blocks can still
+                  hide their label in block appearance settings.
+                </p>
+              </div>
+              <Switch
+                checked={config.show_field_names !== false}
+                onCheckedChange={(checked) =>
+                  onUpdate({ show_field_names: checked })
+                }
               />
             </div>
 

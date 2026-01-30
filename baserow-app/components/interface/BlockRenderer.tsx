@@ -63,6 +63,7 @@ interface BlockRendererProps {
   pageShowAddRecord?: boolean // Page-level default for "Add record" buttons in data blocks
   pageEditable?: boolean // Page-level editability (for field blocks)
   editableFieldNames?: string[] // Field-level editable list (for field blocks)
+  pageShowFieldNames?: boolean // Page-level: show field names on field blocks (default true)
   hideEditButton?: boolean // Hide Edit button for top field blocks (inline editing only)
   allBlocks?: PageBlock[] // All blocks on the page (for FilterBlock connection awareness)
   onEphemeralHeightDelta?: (blockId: string, deltaPx: number) => void // Callback for ephemeral height changes (collapsible expansion)
@@ -86,6 +87,7 @@ export default function BlockRenderer({
   pageShowAddRecord = false,
   pageEditable,
   editableFieldNames = [],
+  pageShowFieldNames = true,
   hideEditButton = false,
   allBlocks = [],
   onEphemeralHeightDelta,
@@ -261,7 +263,7 @@ export default function BlockRenderer({
           ...safeBlock,
           config: fieldBlockConfig,
         }
-        return <FieldBlock block={fieldBlockWithConfig} isEditing={canEdit} pageTableId={pageTableId} recordId={recordId} hideEditButton={hideEditButton} />
+        return <FieldBlock block={fieldBlockWithConfig} isEditing={canEdit} pageTableId={pageTableId} recordId={recordId} pageShowFieldNames={pageShowFieldNames} hideEditButton={hideEditButton} />
 
       case "field_section":
         // Field section block displays all fields from a section (group_name)

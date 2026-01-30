@@ -107,10 +107,12 @@ export default function RecordReviewLeftColumn({
   
   // For record_view: simplified 3-field configuration
   // CRITICAL: RecordViewPageSettings saves field names (title_field, field_1, field_2), not IDs
-  // Support both field names and field IDs for backward compatibility
+  // Support both field names and field IDs for backward compatibility.
+  // Fall back to page-level title_field when left_panel.title_field is not set (main Title Field dropdown).
   const titleFieldNameOrId = isRecordView ? (
-    leftPanelSettings?.title_field || 
-    leftPanelSettings?.titleFieldId || 
+    leftPanelSettings?.title_field ||
+    leftPanelSettings?.titleFieldId ||
+    pageConfig?.title_field ||
     null
   ) : null
   const subtitleFieldNameOrId = isRecordView ? (

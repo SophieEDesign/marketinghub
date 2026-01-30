@@ -275,7 +275,7 @@ export default function RecordPageClient({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => router.push(`/tables/${tableId}`)}
+              onClick={() => router.back()}
               className="mobile:px-2"
             >
               <ArrowLeft className="h-4 w-4 mobile:mr-0 mr-2" />

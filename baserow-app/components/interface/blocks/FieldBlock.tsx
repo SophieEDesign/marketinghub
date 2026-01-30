@@ -18,6 +18,7 @@ interface FieldBlockProps {
   isEditing?: boolean
   pageTableId?: string | null
   recordId?: string | null // Record ID from page context (required for field blocks)
+  pageShowFieldNames?: boolean // Page-level: show field names on blocks (default true)
   hideEditButton?: boolean // Hide Edit button for top fields (inline editing only)
 }
 
@@ -35,6 +36,7 @@ export default function FieldBlock({
   isEditing = false, 
   pageTableId = null,
   recordId = null,
+  pageShowFieldNames = true,
   hideEditButton = false
 }: FieldBlockProps) {
   const { config } = block
@@ -464,7 +466,7 @@ export default function FieldBlock({
   }
 
   const isEditable = canEditInline && !isEditing && !!field
-  const showLabel = config?.appearance?.showTitle !== false // Default to true if not set
+  const showLabel = (pageShowFieldNames !== false) && (config?.appearance?.showTitle !== false) // Page and block both allow showing label
   const linkedFieldDisplayMode = config?.appearance?.linked_field_display_mode || 'compact'
 
   // Handle attachment fields specially
@@ -602,8 +604,8 @@ export default function FieldBlock({
     <>
       <div className="h-full p-3">
         {showLabel ? (
-          <div className="grid grid-cols-1 sm:grid-cols-[140px_minmax(0,1fr)] gap-x-4 gap-y-1 items-start">
-            <div className="text-xs font-medium text-gray-500 leading-5 sm:pt-1.5">
+          <div className="grid grid-cols-1 sm:grid-cols-[140px_minmax(0,1fr)] gap-x-4 gap-y-3 items-start">
+            <div className="text-xs font-medium text-gray-500 leading-5 sm:pt-1.5 min-w-0 break-words">
               {field.name}
               {field.required && <span className="text-red-500 ml-1">*</span>}
             </div>

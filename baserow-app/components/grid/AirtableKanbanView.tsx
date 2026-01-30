@@ -49,7 +49,7 @@ import { sortRowsByFieldType, shouldUseClientSideSorting } from "@/lib/sorting/f
 import { resolveChoiceColor, normalizeHexColor, getTextColorForBackground } from "@/lib/field-colors"
 import { CellFactory } from "./CellFactory"
 import { buildSelectClause, toPostgrestColumn } from "@/lib/supabase/postgrest"
-import { getManualChoiceLabels } from "@/lib/fields/select-options"
+import { normalizeSelectOptionsForUi } from "@/lib/fields/select-options"
 import { getFieldDisplayName } from "@/lib/fields/display"
 import { isAbortError } from "@/lib/api/error-handling"
 
@@ -102,7 +102,6 @@ export default function AirtableKanbanView({
   const searchQuery = searchParams.get("q") || ""
   const [rows, setRows] = useState<Record<string, any>[]>([])
   const [loading, setLoading] = useState(true)
-  const [columns, setColumns] = useState<KanbanColumn[]>([])
   const [groupField, setGroupField] = useState<TableField | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null)
@@ -120,35 +119,19 @@ export default function AirtableKanbanView({
     })
   )
 
-  const loadColumns = useCallback((field: TableField) => {
-    const choices =
-      field.type === "single_select" || field.type === "multi_select"
-        ? getManualChoiceLabels(field.type, field.options)
-        : []
-    const columnList: KanbanColumn[] = choices.map((choice, index) => ({
-      id: choice,
-      name: choice,
-      collapsed: collapsedColumns.has(choice),
-    }))
-    setColumns(columnList)
-  }, [collapsedColumns])
-
   // Find groupable field - require explicit selection, no auto-detection
   useEffect(() => {
     if (kanbanGroupField) {
       const field = tableFields.find((f) => f.name === kanbanGroupField)
       if (field && (field.type === "single_select" || field.type === "multi_select")) {
         setGroupField(field)
-        loadColumns(field)
       } else {
-        // Field not found or wrong type - clear group field
         setGroupField(null)
       }
     } else {
-      // No group field specified - require user to select one
       setGroupField(null)
     }
-  }, [kanbanGroupField, tableFields, loadColumns])
+  }, [kanbanGroupField, tableFields])
 
   const loadRows = useCallback(async () => {
     if (!supabaseTableName || !groupField) return
@@ -248,20 +231,69 @@ export default function AirtableKanbanView({
     return filterRowsBySearch(rows, tableFields, searchQuery, visibleFieldNames)
   }, [rows, tableFields, searchQuery, visibleFieldNames])
 
-  // Group rows by column
+  // Group rows by column (keyed by raw value: option id or label as stored in DB)
   const groupedRows = useMemo(() => {
     if (!groupField) return {}
     const groups: Record<string, typeof filteredRows> = {}
     filteredRows.forEach((row) => {
       const value = row[groupField.name]
-      const columnValue = value || "—"
-      if (!groups[columnValue]) {
-        groups[columnValue] = []
+      const key =
+        value == null || value === ""
+          ? "—"
+          : Array.isArray(value)
+            ? (value[0] ?? "—")
+            : String(value).trim() || "—"
+      if (!groups[key]) {
+        groups[key] = []
       }
-      groups[columnValue].push(row)
+      groups[key].push(row)
     })
     return groups
   }, [filteredRows, groupField])
+
+  // Derive columns from select options so header shows label, not id (DB may store option id)
+  const columns = useMemo((): KanbanColumn[] => {
+    if (!groupField || (groupField.type !== "single_select" && groupField.type !== "multi_select")) return []
+    const { selectOptions } = normalizeSelectOptionsForUi(groupField.type, groupField.options)
+    const idToLabel = new Map<string, string>()
+    for (const o of selectOptions) {
+      idToLabel.set(o.id, o.label)
+      if (o.id !== o.label) idToLabel.set(o.label, o.label)
+    }
+    idToLabel.set("—", "—")
+
+    const uniqueInData = new Set<string>()
+    filteredRows.forEach((row) => {
+      const v = row[groupField.name]
+      const key = v == null || v === "" ? "—" : Array.isArray(v) ? (v[0] ?? "—") : String(v).trim() || "—"
+      uniqueInData.add(key)
+    })
+
+    const ordered = [...selectOptions].sort((a, b) => a.sort_index - b.sort_index)
+    const seen = new Set<string>()
+    const result: KanbanColumn[] = []
+
+    for (const o of ordered) {
+      if (!seen.has(o.id)) {
+        seen.add(o.id)
+        result.push({ id: o.id, name: idToLabel.get(o.id) ?? o.id, collapsed: collapsedColumns.has(o.id) })
+      }
+      if (o.id !== o.label && !seen.has(o.label)) {
+        seen.add(o.label)
+        result.push({ id: o.label, name: o.label, collapsed: collapsedColumns.has(o.label) })
+      }
+    }
+    if (!seen.has("—")) {
+      result.push({ id: "—", name: "—", collapsed: collapsedColumns.has("—") })
+    }
+    for (const key of uniqueInData) {
+      if (!seen.has(key)) {
+        seen.add(key)
+        result.push({ id: key, name: idToLabel.get(key) ?? key, collapsed: collapsedColumns.has(key) })
+      }
+    }
+    return result
+  }, [groupField, filteredRows, collapsedColumns])
 
   function handleDragStart(event: DragStartEvent) {
     setActiveId(event.active.id as string)

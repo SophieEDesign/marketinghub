@@ -234,9 +234,9 @@ export default function RecordFields({
                     return (
                       <div
                         key={field.id}
-                        className="grid grid-cols-1 sm:grid-cols-[160px_minmax(0,1fr)] gap-x-4 gap-y-1 items-start rounded-md hover:bg-gray-50/50 transition-colors px-1 py-0.5 -mx-1"
+                        className="grid grid-cols-1 sm:grid-cols-[160px_minmax(0,1fr)] gap-x-4 gap-y-3 items-start rounded-md hover:bg-gray-50/50 transition-colors px-1 py-0.5 -mx-1"
                       >
-                        <div className="text-xs font-semibold text-gray-600 leading-5 sm:pt-1.5">
+                        <div className="text-xs font-semibold text-gray-600 leading-5 sm:pt-1.5 min-w-0 break-words">
                           {getFieldDisplayName(field)}
                         </div>
                         <div className="min-w-0">

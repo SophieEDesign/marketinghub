@@ -130,8 +130,9 @@ export async function computeLookupValues(
           break
         }
         for (const r of asArray(lookupRows)) {
-          const id = (r as { id: string }).id
-          const val = (r as Record<string, unknown>)[resultFieldName]
+          const row = r as unknown as { id: string } & Record<string, unknown>
+          const id = row.id
+          const val = row[resultFieldName]
           if (id != null) idToValue.set(id, val)
         }
       }

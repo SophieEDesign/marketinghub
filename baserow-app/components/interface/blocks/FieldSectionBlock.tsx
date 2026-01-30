@@ -302,12 +302,12 @@ export default function FieldSectionBlock({
                 <div
                   key={field.id}
                   className={cn(
-                    "grid gap-x-4 gap-y-1 items-start",
+                    "grid gap-x-4 gap-y-3 items-start",
                     showLabels ? "grid-cols-1 sm:grid-cols-[140px_minmax(0,1fr)]" : "grid-cols-1"
                   )}
                 >
                   {showLabels && (
-                    <div className="text-xs font-medium text-gray-500 leading-5 sm:pt-1.5">
+                    <div className="text-xs font-medium text-gray-500 leading-5 sm:pt-1.5 min-w-0 break-words">
                       {field.name}
                       {field.required && <span className="text-red-500 ml-1">*</span>}
                     </div>
