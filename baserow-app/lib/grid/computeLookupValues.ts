@@ -115,20 +115,59 @@ export async function computeLookupValues(
       const idList = Array.from(allIds)
       const idToValue = new Map<string, unknown>()
 
-      // Fetch in batches to avoid PostgREST URL limits.
-      // Use .eq for a single id to avoid PostgREST 400 on some servers (id=in.(uuid) edge case).
+      // PostgREST parses hyphens in UUIDs as minus; wrap UUID in double quotes to avoid 400.
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      const isUuid = (s: string) => uuidRegex.test(s)
+
       for (let i = 0; i < idList.length; i += BATCH_SIZE) {
         const chunk = idList.slice(i, i + BATCH_SIZE)
-        const { data: lookupRows, error: fetchErr } =
-          chunk.length === 1
-            ? await supabase
-                .from(lookupTableName)
-                .select(`id, ${resultFieldName}`)
-                .eq('id', chunk[0])
-            : await supabase
-                .from(lookupTableName)
-                .select(`id, ${resultFieldName}`)
-                .in('id', chunk)
+        let lookupRows: unknown[] | null = null
+        let fetchErr: { message?: string } | null = null
+
+        if (chunk.length === 1 && isUuid(chunk[0])) {
+          // Single UUID: use quoted filter so PostgREST does not parse hyphens as minus (400).
+          const supabaseUrl =
+            typeof process !== 'undefined' ? process.env?.NEXT_PUBLIC_SUPABASE_URL : undefined
+          const anonKey =
+            typeof process !== 'undefined' ? process.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY : undefined
+          if (supabaseUrl && anonKey) {
+            const quotedUuid = `"${chunk[0]}"`
+            const params = new URLSearchParams({
+              select: `id,${resultFieldName}`,
+              id: `eq.${quotedUuid}`,
+            })
+            const { data: { session } } = await supabase.auth.getSession()
+            const res = await fetch(
+              `${supabaseUrl.replace(/\/$/, '')}/rest/v1/${encodeURIComponent(lookupTableName)}?${params.toString()}`,
+              {
+                headers: {
+                  apikey: anonKey,
+                  Authorization: `Bearer ${session?.access_token ?? anonKey}`,
+                  'Content-Type': 'application/json',
+                },
+              }
+            )
+            if (res.ok) {
+              lookupRows = await res.json()
+            } else {
+              fetchErr = { message: await res.text() }
+            }
+          } else {
+            const { data, error } = await supabase
+              .from(lookupTableName)
+              .select(`id, ${resultFieldName}`)
+              .in('id', chunk)
+            lookupRows = data
+            fetchErr = error
+          }
+        } else {
+          const { data, error } = await supabase
+            .from(lookupTableName)
+            .select(`id, ${resultFieldName}`)
+            .in('id', chunk)
+          lookupRows = data
+          fetchErr = error
+        }
 
         if (fetchErr) {
           if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {

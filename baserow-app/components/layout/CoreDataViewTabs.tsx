@@ -9,6 +9,7 @@ import {
   FileText,
   Clock,
   Layers,
+  Plus,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useBranding } from "@/contexts/BrandingContext"
@@ -55,10 +56,13 @@ export default function CoreDataViewTabs({
     return null
   }
 
+  const newViewHref = `/tables/${tableId}/views/new`
+  const isNewPage = pathname === newViewHref
+
   return (
     <div className="border-b border-gray-200 bg-white px-4 shadow-sm">
       <nav
-        className="-mb-px flex gap-0 overflow-x-auto"
+        className="-mb-px flex items-center gap-0 overflow-x-auto"
         aria-label="Core Data views"
       >
         {views.map((view) => {
@@ -83,6 +87,19 @@ export default function CoreDataViewTabs({
             </Link>
           )
         })}
+        <Link
+          href={newViewHref}
+          className={cn(
+            "flex items-center gap-1.5 whitespace-nowrap border-b-2 border-transparent px-3 py-3 text-sm font-medium text-muted-foreground transition-colors hover:border-gray-300 hover:text-foreground",
+            isNewPage && "border-current text-current"
+          )}
+          style={isNewPage ? { borderColor: primaryColor, color: primaryColor } : undefined}
+          title="Create new view"
+          aria-label="Create new view"
+        >
+          <Plus className="h-4 w-4" />
+          <span className="sr-only sm:not-sr-only sm:inline">New view</span>
+        </Link>
       </nav>
     </div>
   )

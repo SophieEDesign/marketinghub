@@ -79,8 +79,9 @@ export function normalizeFilter(filter: BlockFilter | FilterConfig): FilterConfi
     return asConfig
   }
   
+  const field = (filter as any).field ?? (filter as any).field_name ?? ''
   return {
-    field: filter.field,
+    field,
     operator: filter.operator as FilterConfig['operator'],
     value: filter.value,
   }
@@ -159,9 +160,13 @@ export function applyFiltersToQuery(
   tableFields: Array<{ name: string; type: string; id?: string; options?: any }> = []
 ): any {
   if (!filters) return query
-  if (Array.isArray(filters) && filters.length === 0) return query
+  if (Array.isArray(filters)) {
+    const valid = filters.filter((f) => f && typeof (f as FilterConfig).field === 'string' && (f as FilterConfig).field.trim() !== '')
+    if (valid.length === 0) return query
+    filters = valid
+  }
 
-  const filterTree: FilterTree = Array.isArray(filters) ? filterConfigsToFilterTree(filters, 'AND') : (filters as FilterTree)
+  const filterTree: FilterTree = Array.isArray(filters) ? filterConfigsToFilterTree(filters as FilterConfig[], 'AND') : (filters as FilterTree)
   return applyFiltersToQueryUnified(query, filterTree, tableFields as any)
 }
 

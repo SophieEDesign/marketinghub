@@ -373,10 +373,11 @@ function InterfacePageClientInternal({
   // Blocks are already correct after save - no reload needed
   // Removing block reload on exit edit mode - this was causing flicker and layout resets
 
-  async function loadPage() {
-    // CRITICAL: Only load if not already loaded (prevent overwriting initial data)
-    if (pageLoadedRef.current || loading) return
+  async function loadPage(forceReload = false) {
+    // When forceReload (e.g. after filter/settings save), always refetch so the page reflects new config
+    if (!forceReload && (pageLoadedRef.current || loading)) return
     
+    if (forceReload) pageLoadedRef.current = false
     setLoading(true)
     try {
       const res = await fetch(`/api/interface-pages/${pageId}`)
@@ -1091,18 +1092,17 @@ function InterfacePageClientInternal({
   }
 
   async function handlePageUpdate() {
-    // CRITICAL: Reset loaded flags to allow reload after settings update
-    // This is intentional - user explicitly updated settings
+    // CRITICAL: Reset loaded flags and force reload so filters/settings changes are reflected
     pageLoadedRef.current = false
     if (page?.id) {
       blocksLoadedRef.current = { pageId: page.id, loaded: false }
     }
-    // Reload page data after settings update
-    // Parallelize independent requests
+    // Refresh server cache so API routes return latest data
+    router.refresh()
+    // Force reload page and blocks so the UI shows updated filters/sorts/config
     await Promise.all([
-      loadPage(),
-      // UNIFIED: All pages support blocks
-      loadBlocks(),
+      loadPage(true),
+      loadBlocks(true),
     ])
     // Load data after page is loaded (depends on page.source_view)
     if (page?.source_view) {

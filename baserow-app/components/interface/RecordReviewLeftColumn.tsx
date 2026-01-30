@@ -32,6 +32,7 @@ import type { FilterTree } from "@/lib/filters/canonical-model"
 import { isAbortError } from "@/lib/api/error-handling"
 import type { GroupRule } from "@/lib/grouping/types"
 import { buildGroupTree, flattenGroupTree } from "@/lib/grouping/groupTree"
+import { getFieldDisplayName } from "@/lib/fields/display"
 
 interface RecordReviewLeftColumnProps {
   pageId?: string
@@ -570,7 +571,7 @@ export default function RecordReviewLeftColumn({
     const isCollapsed = collapsedGroups.has(node.pathKey)
     const ruleLabel = node.rule?.type === 'date'
       ? node.rule.granularity === 'year' ? 'Year' : 'Month'
-      : fieldName
+      : fieldDef ? getFieldDisplayName(fieldDef) : fieldName
 
     // If it's a select field, reuse choice color logic for a badge-like header.
     if (fieldDef?.type === "single_select" || fieldDef?.type === "multi_select") {
@@ -789,7 +790,7 @@ export default function RecordReviewLeftColumn({
         </div>
         {showLabels && displayField && (
           <div className="text-xs text-gray-500 mt-1.5">
-            {displayField.name}
+            {getFieldDisplayName(displayField)}
           </div>
         )}
       </button>

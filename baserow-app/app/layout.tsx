@@ -9,6 +9,7 @@ import DiagnosticsInitializer from "@/components/layout/DiagnosticsInitializer"
 import InteractionFailsafe from "@/components/layout/InteractionFailsafe"
 import NavigationDiagnostics from "@/components/layout/NavigationDiagnostics"
 import PerformanceMonitor from "@/components/layout/PerformanceMonitor"
+import NavigationProgress from "@/components/layout/NavigationProgress"
 import SWRProvider from "@/components/providers/SWRProvider"
 import { getWorkspaceSettings } from "@/lib/branding"
 
@@ -82,6 +83,7 @@ export default function RootLayout({
           <InteractionFailsafe />
           <PerformanceMonitor />
           <NavigationDiagnostics />
+          <NavigationProgress />
           <DynamicTitle />
           {children}
           <Toaster />
