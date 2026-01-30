@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { X, Plus } from "lucide-react"
 import type { TableField } from "@/types/fields"
 import type { FilterOperator } from "@/lib/filters/canonical-model"
 import type { RelativeDateValue, RelativeDateUnit, RelativeDateDirection } from "@/lib/filters/canonical-model"
@@ -89,9 +90,18 @@ export default function FilterValueInput({
   }
 
   // Select fields: Show dropdown with options and colors
+  // For is_any_of / is_not_any_of: multiselect (tags)
   if (field.type === 'single_select' || field.type === 'multi_select') {
     const choices = getManualChoiceLabels(field.type, field.options)
-    
+    const isMultiValue = operator === 'is_any_of' || operator === 'is_not_any_of'
+    const selectedValues: string[] = isMultiValue
+      ? Array.isArray(value)
+        ? (value as string[]).filter((v): v is string => typeof v === 'string')
+        : value != null && value !== ''
+          ? [String(value)]
+          : []
+      : []
+
     if (choices.length === 0) {
       return (
         <div className={`${controlHeight} flex items-center text-xs text-gray-400 px-3 ${className}`}>
@@ -100,21 +110,84 @@ export default function FilterValueInput({
       )
     }
 
+    if (isMultiValue) {
+      const addChoice = (choice: string) => {
+        if (!selectedValues.includes(choice)) onChange([...selectedValues, choice])
+      }
+      const removeChoice = (choice: string) => {
+        onChange(selectedValues.filter((v) => v !== choice))
+      }
+      const availableChoices = choices.filter((c) => !selectedValues.includes(c))
+      return (
+        <div className={`min-h-8 flex flex-wrap items-center gap-1.5 px-2 py-1.5 border border-input rounded-md bg-background ${textSize} ${className}`}>
+          {selectedValues.map((choice) => {
+            const bgColor = normalizeHexColor(
+              resolveChoiceColor(choice, field.type, field.options, field.type === 'single_select')
+            )
+            return (
+              <span
+                key={choice}
+                className="inline-flex items-center gap-1 rounded-md pl-1.5 pr-1 py-0.5 text-xs font-medium border border-gray-200 bg-gray-50"
+                style={{ borderLeftColor: bgColor, borderLeftWidth: 3 }}
+              >
+                <span className="truncate max-w-[120px]">{choice}</span>
+                <button
+                  type="button"
+                  onClick={() => removeChoice(choice)}
+                  className="rounded p-0.5 hover:bg-gray-200 text-gray-500 hover:text-gray-700"
+                  aria-label={`Remove ${choice}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )
+          })}
+          {availableChoices.length > 0 ? (
+            <Select value="" onValueChange={addChoice}>
+              <SelectTrigger className="h-6 min-w-0 w-auto border-0 shadow-none bg-transparent focus:ring-0 p-0 gap-0.5 text-gray-500 hover:text-gray-700 inline-flex">
+                <Plus className="h-3.5 w-3.5" />
+                <SelectValue placeholder="Add" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableChoices.map((choice: string) => {
+                  const bgColor = normalizeHexColor(
+                    resolveChoiceColor(choice, field.type, field.options, field.type === 'single_select')
+                  )
+                  return (
+                    <SelectItem key={choice} value={choice}>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="inline-block w-3 h-3 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: bgColor }}
+                        />
+                        <span>{choice}</span>
+                      </div>
+                    </SelectItem>
+                  )
+                })}
+              </SelectContent>
+            </Select>
+          ) : null}
+        </div>
+      )
+    }
+
+    const singleValue = Array.isArray(value) && value.length > 0 ? (value[0] as string) : (value as string) ?? ""
     return (
       <Select
-        value={value as string || ""}
+        value={singleValue}
         onValueChange={(val) => onChange(val)}
       >
         <SelectTrigger className={`${controlHeight} ${textSize} ${className}`}>
           <SelectValue placeholder="Select value...">
-            {value && (
+            {singleValue && (
               <div className="flex items-center gap-2">
                 <span
                   className="inline-block w-3 h-3 rounded-full flex-shrink-0"
                   style={{
                     backgroundColor: normalizeHexColor(
                       resolveChoiceColor(
-                        value as string,
+                        singleValue,
                         field.type,
                         field.options,
                         field.type === 'single_select'
@@ -122,7 +195,7 @@ export default function FilterValueInput({
                     ),
                   }}
                 />
-                <span>{value}</span>
+                <span>{singleValue}</span>
               </div>
             )}
           </SelectValue>

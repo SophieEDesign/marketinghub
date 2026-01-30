@@ -151,10 +151,12 @@ export default function KanbanView({
     return null
   }, [imageFieldName])
 
+  // Refetch when table, reloadKey, or filter-block filters change
+  const filtersSignature = useMemo(() => JSON.stringify(filters), [filters])
   useEffect(() => {
     loadRows()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableId, reloadKey])
+  }, [tableId, reloadKey, filtersSignature])
 
   async function loadRows() {
     if (!tableId) {

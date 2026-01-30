@@ -64,15 +64,19 @@ export default function UnifiedFilterDialog({
       if (!viewUuid) {
         throw new Error("Invalid viewId (expected UUID).")
       }
-      
-      // Load filter groups
-      const { data: groups, error: groupsError } = await supabase
+
+      // Load filter groups (optional: table may not exist or RLS may return 500)
+      let groups: ViewFilterGroup[] = []
+      const { data: groupsData, error: groupsError } = await supabase
         .from("view_filter_groups")
         .select("*")
         .eq("view_id", viewUuid)
         .order("order_index", { ascending: true })
 
-      if (groupsError) throw groupsError
+      if (!groupsError && groupsData) {
+        groups = groupsData as ViewFilterGroup[]
+      }
+      // If view_filter_groups fails (500, missing table, etc.), continue with empty groups
 
       // Load all filters
       const { data: allFilters, error: filtersError } = await supabase
@@ -84,7 +88,7 @@ export default function UnifiedFilterDialog({
       if (filtersError) throw filtersError
 
       // Convert to canonical filter tree
-      const tree = dbFiltersToFilterTree(allFilters || [], groups || [])
+      const tree = dbFiltersToFilterTree(allFilters || [], groups)
       setFilterTree(tree)
     } catch (error) {
       console.error("Error loading filters:", error)
@@ -103,57 +107,86 @@ export default function UnifiedFilterDialog({
         return
       }
 
-      // Delete existing filter groups and filters
-      await supabase.from("view_filters").delete().eq("view_id", viewUuid)
-      await supabase.from("view_filter_groups").delete().eq("view_id", viewUuid)
-
-      // Convert filter tree to database format
       const { groups, filters: dbFilters } = filterTreeToDbFormat(filterTree, viewUuid)
 
-      // Insert filter groups first
+      // Core Data views: save via API (allows filters except on "All Records" view)
+      const apiRes = await fetch(`/api/views/${viewUuid}/filters`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          groups: groups.map((g) => ({
+            view_id: g.view_id,
+            condition_type: g.condition_type,
+            order_index: g.order_index ?? 0,
+          })),
+          filters: dbFilters.map((f) => ({
+            view_id: f.view_id,
+            field_name: f.field_name,
+            operator: f.operator,
+            value: f.value,
+            filter_group_id: f.filter_group_id ?? null,
+            order_index: f.order_index ?? 0,
+          })),
+        }),
+      })
+
+      const apiJson = await apiRes.json().catch(() => ({}))
+      if (apiRes.ok && apiJson.ok === true) {
+        const flattenedFilters = (apiJson.filters || []).map((f: { id: string; field_name: string; operator: string; value?: string }) => ({
+          id: f.id,
+          field_name: f.field_name,
+          operator: f.operator,
+          value: f.value,
+        }))
+        onFiltersChange?.(flattenedFilters)
+        onClose()
+        return
+      }
+      if (apiRes.status === 400 && apiJson.error_code === "ALL_RECORDS_VIEW") {
+        alert(apiJson.error || "Filters cannot be saved on the default All Records view. Create another view to save filters.")
+        return
+      }
+
+      // Fallback: direct Supabase (e.g. interface views or when API not used)
+      await supabase.from("view_filters").delete().eq("view_id", viewUuid)
+      const { error: deleteGroupsErr } = await supabase
+        .from("view_filter_groups")
+        .delete()
+        .eq("view_id", viewUuid)
+      if (deleteGroupsErr) {
+        // view_filter_groups table may not exist or RLS may fail; continue
+      }
+
       let insertedGroupIds: string[] = []
       if (groups.length > 0) {
         const { data: insertedGroups, error: groupsError } = await supabase
           .from("view_filter_groups")
           .insert(groups)
           .select("id")
-
-        if (groupsError) throw groupsError
-        insertedGroupIds = insertedGroups?.map((g) => g.id) || []
+        if (!groupsError && insertedGroups) {
+          insertedGroupIds = insertedGroups.map((g) => g.id)
+        }
       }
 
-      // Map filters to groups using temp indices
       const filtersToInsert = dbFilters.map((filter) => {
-        // If filter has a temp group ID (temp-0, temp-1, etc.), map it to actual group ID
-        if (filter.filter_group_id && typeof filter.filter_group_id === 'string' && filter.filter_group_id.startsWith('temp-')) {
-          const tempIndex = parseInt(filter.filter_group_id.replace('temp-', ''), 10)
-          const actualGroupId = insertedGroupIds[tempIndex] || null
-          return {
-            ...filter,
-            filter_group_id: actualGroupId,
-          }
+        if (filter.filter_group_id && typeof filter.filter_group_id === "string" && filter.filter_group_id.startsWith("temp-")) {
+          const tempIndex = parseInt(filter.filter_group_id.replace("temp-", ""), 10)
+          const actualGroupId = insertedGroupIds[tempIndex] ?? null
+          return { ...filter, filter_group_id: actualGroupId }
         }
         return filter
       })
 
-      // Insert all filters
       if (filtersToInsert.length > 0) {
-        const { error: filtersError } = await supabase
-          .from("view_filters")
-          .insert(filtersToInsert)
-
+        const { error: filtersError } = await supabase.from("view_filters").insert(filtersToInsert)
         if (filtersError) throw filtersError
       }
 
-      // Notify parent component (flattened for backward compatibility)
-      // Note: filtersToInsert doesn't have id yet (it's Omit<ViewFilter, "id">)
-      // We need to reload filters to get the actual IDs
       const { data: insertedFilters } = await supabase
         .from("view_filters")
         .select("id, field_name, operator, value")
         .eq("view_id", viewUuid)
         .order("order_index", { ascending: true })
-      
       const flattenedFilters = (insertedFilters || []).map((f) => ({
         id: f.id,
         field_name: f.field_name,
@@ -161,7 +194,6 @@ export default function UnifiedFilterDialog({
         value: f.value,
       }))
       onFiltersChange?.(flattenedFilters)
-
       onClose()
     } catch (error) {
       console.error("Error saving filters:", error)

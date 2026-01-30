@@ -731,6 +731,7 @@ export default function GridBlock({
             fieldIds={fieldIds}
             searchQuery=""
             tableFields={tableFields}
+            filters={allFilters}
             colorField={appearance.color_field}
             imageField={appearance.image_field}
             fitImageSize={appearance.fit_image_size}

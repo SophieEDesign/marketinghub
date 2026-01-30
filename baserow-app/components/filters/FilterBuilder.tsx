@@ -176,8 +176,8 @@ export default function FilterBuilder({
     if (variant === "airtable") {
       const joinLabel = isFirst ? "Where" : groupOperator.toLowerCase()
       return (
-        <div key={pathKey} className="flex items-center gap-2">
-          <div className="w-14 text-[11px] font-medium text-gray-600">{joinLabel}</div>
+        <div key={pathKey} className="flex items-center gap-1.5 py-1">
+          <div className="w-12 text-[11px] font-medium text-gray-600 shrink-0">{joinLabel}</div>
 
           <Select
             value={condition.field_id}
@@ -190,7 +190,7 @@ export default function FilterBuilder({
               })
             }}
           >
-            <SelectTrigger className="h-8 text-xs min-w-36">
+            <SelectTrigger className="h-7 text-xs min-w-[7rem] border-gray-200">
               <SelectValue placeholder="Field" />
             </SelectTrigger>
             <SelectContent>
@@ -206,7 +206,7 @@ export default function FilterBuilder({
             value={condition.operator}
             onValueChange={(value) => updateCondition(path, { operator: value as FilterCondition["operator"] })}
           >
-            <SelectTrigger className="h-8 text-xs min-w-32">
+            <SelectTrigger className="h-7 text-xs min-w-[6.5rem] border-gray-200">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -218,7 +218,7 @@ export default function FilterBuilder({
             </SelectContent>
           </Select>
 
-          <div className="flex-1 min-w-44">
+          <div className="flex-1 min-w-32 max-w-[14rem]">
             <FilterValueInput
               field={field || null}
               operator={condition.operator}
@@ -232,19 +232,19 @@ export default function FilterBuilder({
             variant="ghost"
             size="sm"
             onClick={() => duplicateItem(path)}
-            className="h-8 w-8 p-0 text-gray-500 hover:text-gray-700"
+            className="h-7 w-7 p-0 text-gray-500 hover:text-gray-700 shrink-0"
             title="Duplicate"
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-3.5 w-3.5" />
           </Button>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => removeItem(path)}
-            className="h-8 w-8 p-0 text-gray-400 hover:text-red-700 hover:bg-red-50"
+            className="h-7 w-7 p-0 text-gray-400 hover:text-red-700 hover:bg-red-50 shrink-0"
             title="Remove"
           >
-            <X className="h-4 w-4" />
+            <X className="h-3.5 w-3.5" />
           </Button>
         </div>
       )
@@ -364,9 +364,9 @@ export default function FilterBuilder({
 
     if (variant === "airtable" && path.length === 0) {
       return (
-        <div key={pathKey} className="space-y-2">
+        <div key={pathKey} className="space-y-1">
           {group.children.length === 0 ? (
-            <div className="text-sm text-gray-500 border border-dashed border-gray-300 rounded-md p-4">
+            <div className="text-xs text-gray-500 border border-dashed border-gray-300 rounded py-2.5 px-3">
               No filters applied
             </div>
           ) : (
@@ -379,14 +379,14 @@ export default function FilterBuilder({
             })
           )}
 
-          <div className="flex gap-2 pt-2">
+          <div className="flex gap-1.5 pt-1.5">
             <Button
               variant="outline"
               size="sm"
               onClick={() => addCondition(path)}
-              className="h-8 px-2 text-xs"
+              className="h-7 px-2 text-[11px] border-gray-200"
             >
-              <Plus className="h-3.5 w-3.5 mr-1.5" />
+              <Plus className="h-3 w-3 mr-1" />
               Add condition
             </Button>
             {allowGroups && (
@@ -394,9 +394,9 @@ export default function FilterBuilder({
                 variant="outline"
                 size="sm"
                 onClick={() => addGroup(path, "AND")}
-                className="h-8 px-2 text-xs"
+                className="h-7 px-2 text-[11px] border-gray-200"
               >
-                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                <Plus className="h-3 w-3 mr-1" />
                 Add group
               </Button>
             )}
@@ -666,7 +666,7 @@ export default function FilterBuilder({
   const isEmpty = isEmptyFilterTree(normalizedTree)
 
   return (
-    <div className={`${variant === "airtable" ? "space-y-2" : "space-y-4"} ${className}`}>
+    <div className={`${variant === "airtable" ? "space-y-1" : "space-y-4"} ${className}`}>
       {isEmpty ? (
         <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-300 rounded-lg">
           <p className="text-sm mb-1">No filters applied</p>

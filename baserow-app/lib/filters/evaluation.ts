@@ -119,11 +119,26 @@ function conditionToSupabaseString(condition: FilterCondition): string {
   const fieldName = field_id
   const fieldValue = value ?? ''
   
+  const multiValuesForString: string[] =
+    operator === 'is_any_of' || operator === 'is_not_any_of'
+      ? Array.isArray(value)
+        ? (value as string[]).filter((v): v is string => typeof v === 'string')
+        : value != null && value !== ''
+          ? [String(value)]
+          : []
+      : []
+
   switch (operator) {
     case 'equal':
       return `${fieldName}.eq.${fieldValue}`
     case 'not_equal':
       return `${fieldName}.neq.${fieldValue}`
+    case 'is_any_of':
+      if (multiValuesForString.length === 0) return ''
+      return `${fieldName}.in.(${multiValuesForString.join(',')})`
+    case 'is_not_any_of':
+      if (multiValuesForString.length === 0) return ''
+      return `${fieldName}.not.in.(${multiValuesForString.join(',')})`
     case 'contains':
       return `${fieldName}.ilike.%${fieldValue}%`
     case 'not_contains':
@@ -238,6 +253,16 @@ function applyCondition(
   const field = tableFields?.find(f => f.name === field_id || f.id === field_id)
   const fieldType = field?.type
 
+  // Normalize multi-value for is_any_of / is_not_any_of
+  const multiValues: string[] =
+    operator === 'is_any_of' || operator === 'is_not_any_of'
+      ? Array.isArray(value)
+        ? (value as string[]).filter((v): v is string => typeof v === 'string')
+        : value != null && value !== ''
+          ? [String(value)]
+          : []
+      : []
+
   switch (operator) {
     case 'equal':
       if (fieldType === 'multi_select') {
@@ -250,6 +275,31 @@ function applyCondition(
       }
       return query.eq(fieldName, value)
       
+    case 'is_any_of':
+      if (fieldType === 'multi_select') {
+        if (multiValues.length === 0) return query.eq('id', -1) // no selection => no rows
+        return query.or(multiValues.map((v) => `${fieldName}.cs.{${String(v)}}`).join(','))
+      }
+      // single_select (and text etc.)
+      if (multiValues.length === 0) return query.eq('id', -1)
+      return query.in(fieldName, multiValues)
+
+    case 'is_not_any_of':
+      if (fieldType === 'multi_select') {
+        let q = query
+        for (const v of multiValues) {
+          q = q.not(fieldName, 'cs', `{${String(v)}}`)
+        }
+        return q
+      }
+      // single_select: field not in list
+      if (multiValues.length === 0) return query
+      let q = query
+      for (const v of multiValues) {
+        q = q.neq(fieldName, v)
+      }
+      return q
+
     case 'not_equal':
       if (fieldType === 'multi_select') {
         // Multi-select: check if array does NOT contain the value
@@ -527,11 +577,30 @@ export function evaluateFilterTree(
       return Number.isNaN(d.getTime()) ? null : d
     }
 
+    const multiValuesEval: string[] =
+      operator === 'is_any_of' || operator === 'is_not_any_of'
+        ? Array.isArray(value)
+          ? (value as string[]).filter((v): v is string => typeof v === 'string')
+          : value != null && value !== ''
+            ? [String(value)]
+            : []
+        : []
+
     switch (operator) {
       case 'equal':
         return String(fieldValue) === String(value)
       case 'not_equal':
         return String(fieldValue) !== String(value)
+      case 'is_any_of': {
+        if (multiValuesEval.length === 0) return false
+        const fvArr = Array.isArray(fieldValue) ? (fieldValue as string[]).map(String) : fieldValue != null ? [String(fieldValue)] : []
+        return multiValuesEval.some((v) => fvArr.includes(v))
+      }
+      case 'is_not_any_of': {
+        if (multiValuesEval.length === 0) return true
+        const fvArr2 = Array.isArray(fieldValue) ? (fieldValue as string[]).map(String) : fieldValue != null ? [String(fieldValue)] : []
+        return !multiValuesEval.some((v) => fvArr2.includes(v))
+      }
       case 'contains':
         return String(fieldValue || '').toLowerCase().includes(String(value || '').toLowerCase())
       case 'not_contains':

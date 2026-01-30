@@ -15,6 +15,8 @@ export interface FilterConfig {
   operator:
     | 'equal'
     | 'not_equal'
+    | 'is_any_of'
+    | 'is_not_any_of'
     | 'contains'
     | 'not_contains'
     | 'greater_than'
@@ -308,9 +310,9 @@ export function deriveDefaultValuesFromFilters(
 
   const isEligibleOperator = (op: FilterConfig['operator']): boolean => {
     // "contains" here is only considered when it effectively represents a single value selection
-    // (e.g. some UIs use "contains" semantics for select-like fields).
-    // "has" is used for linked record fields (link_to_table) in the canonical filter model.
-    return op === 'equal' || op === 'contains' || op === 'has'
+    // "has" is used for linked record fields (link_to_table).
+    // "is_any_of" can imply a default (first value or full list for multi_select).
+    return op === 'equal' || op === 'contains' || op === 'has' || op === 'is_any_of'
   }
 
   for (const f of safeFilters) {
@@ -323,7 +325,12 @@ export function deriveDefaultValuesFromFilters(
     const field = fieldByNameOrId.get(fieldName)
     if (field?.type === 'formula' || field?.type === 'lookup') continue
 
-    const value = normalizeSingleValue(f.value)
+    let value: any
+    if (f.operator === 'is_any_of' && Array.isArray(f.value) && f.value.length > 0) {
+      value = f.value
+    } else {
+      value = normalizeSingleValue(f.value)
+    }
     if (value === undefined) continue
 
     // Only apply defaults for field types where a filter implies an obvious default selection.
@@ -335,12 +342,14 @@ export function deriveDefaultValuesFromFilters(
 
     // multi_select: union values (Airtable-like "add the filtered value")
     if (fieldType === 'multi_select') {
-      const nextVal = String(value)
+      const nextVals = Array.isArray(value) ? value.map(String) : [String(value)]
       const existing = defaults[fieldName]
       const existingArr = Array.isArray(existing) ? existing.map(String) : []
-      if (!existingArr.includes(nextVal)) {
-        defaults[fieldName] = [...existingArr, nextVal]
+      const merged = [...existingArr]
+      for (const v of nextVals) {
+        if (!merged.includes(v)) merged.push(v)
       }
+      if (merged.length > 0) defaults[fieldName] = merged
       continue
     }
 
@@ -359,8 +368,8 @@ export function deriveDefaultValuesFromFilters(
       continue
     }
 
-    // single_select: direct assignment (string labels)
-    const nextVal = String(value)
+    // single_select: direct assignment (string labels); is_any_of array → use first
+    const nextVal = Array.isArray(value) && value.length > 0 ? String(value[0]) : String(value)
     if (Object.prototype.hasOwnProperty.call(defaults, fieldName)) {
       if (!valuesLooselyEqual(defaults[fieldName], nextVal)) {
         delete defaults[fieldName]

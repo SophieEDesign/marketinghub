@@ -80,14 +80,18 @@ export default function FilterDialog({
       if (!viewUuid) {
         throw new Error("Invalid viewId (expected UUID).")
       }
-      // Load filter groups
-      const { data: groups, error: groupsError } = await supabase
+      // Load filter groups (optional: table may not exist or RLS may return 500)
+      let groups: { id: string; view_id: string; condition_type: string; order_index: number }[] = []
+      const { data: groupsData, error: groupsError } = await supabase
         .from("view_filter_groups")
         .select("*")
         .eq("view_id", viewUuid)
         .order("order_index", { ascending: true })
 
-      if (groupsError) throw groupsError
+      if (!groupsError && groupsData) {
+        groups = groupsData
+      }
+      // If view_filter_groups fails, continue with empty groups
 
       // Load all filters
       const { data: allFilters, error: filtersError } = await supabase
@@ -103,7 +107,7 @@ export default function FilterDialog({
       const ungrouped: LocalFilter[] = []
 
       // Initialize groups
-      if (groups) {
+      if (groups && groups.length > 0) {
         groups.forEach((group) => {
           groupsMap.set(group.id, {
             ...group,

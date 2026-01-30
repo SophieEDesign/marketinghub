@@ -115,13 +115,20 @@ export async function computeLookupValues(
       const idList = Array.from(allIds)
       const idToValue = new Map<string, unknown>()
 
-      // Fetch in batches to avoid PostgREST URL limits
+      // Fetch in batches to avoid PostgREST URL limits.
+      // Use .eq for a single id to avoid PostgREST 400 on some servers (id=in.(uuid) edge case).
       for (let i = 0; i < idList.length; i += BATCH_SIZE) {
         const chunk = idList.slice(i, i + BATCH_SIZE)
-        const { data: lookupRows, error: fetchErr } = await supabase
-          .from(lookupTableName)
-          .select(`id, ${resultFieldName}`)
-          .in('id', chunk)
+        const { data: lookupRows, error: fetchErr } =
+          chunk.length === 1
+            ? await supabase
+                .from(lookupTableName)
+                .select(`id, ${resultFieldName}`)
+                .eq('id', chunk[0])
+            : await supabase
+                .from(lookupTableName)
+                .select(`id, ${resultFieldName}`)
+                .in('id', chunk)
 
         if (fetchErr) {
           if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {

@@ -17,6 +17,8 @@
 export type FilterOperator = 
   | 'equal'
   | 'not_equal'
+  | 'is_any_of'
+  | 'is_not_any_of'
   | 'contains'
   | 'not_contains'
   | 'is_empty'
