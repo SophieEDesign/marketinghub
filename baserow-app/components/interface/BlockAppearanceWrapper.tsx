@@ -40,15 +40,9 @@ export default function BlockAppearanceWrapper({
   })()
   const showTitle = appearance?.showTitle !== false && !!title
 
-  // Only apply appearance styling if any appearance settings exist
-  // Otherwise, return children as-is for backward compatibility
+  // Only apply appearance styling if any appearance settings exist (title/header or accent).
+  // Container style (background, border, radius, shadow) and spacing (padding, margin) have been removed.
   const hasAppearanceSettings = appearance && (
-    appearance.background ||
-    appearance.border ||
-    appearance.radius ||
-    appearance.shadow ||
-    appearance.padding ||
-    appearance.margin ||
     appearance.accent ||
     appearance.showTitle !== undefined ||
     appearance.titleSize ||
@@ -60,26 +54,8 @@ export default function BlockAppearanceWrapper({
     return <>{children}</>
   }
 
-  // Get padding class for content area
-  // Handle both new style (string) and legacy (number)
-  const getContentPadding = () => {
-    if (!appearance?.padding) return 'p-4' // default
-    if (typeof appearance.padding === 'number') {
-      // Legacy: use numeric padding (convert to Tailwind class or use inline style)
-      return '' // Will use inline style
-    }
-    // New style: string values
-    return appearance.padding === 'compact' 
-      ? 'p-2' 
-      : appearance.padding === 'spacious' 
-      ? 'p-6' 
-      : 'p-4'
-  }
-  
-  const contentPadding = getContentPadding()
-  const legacyPaddingStyle = typeof appearance?.padding === 'number' 
-    ? { padding: `${appearance.padding}px` } 
-    : undefined
+  // Padding/spacing UI removed; use fixed default so legacy config does not drive styling
+  const contentPadding = 'p-4'
 
   return (
     <div className={cn(containerClasses, accentBorder, className, "w-full flex flex-col min-h-0")}>
@@ -107,11 +83,8 @@ export default function BlockAppearanceWrapper({
         </>
       )}
 
-      {/* Block content with padding - use min-h-0 to allow flex children to shrink */}
-      <div 
-        className={cn("flex-1 min-h-0", contentPadding)}
-        style={legacyPaddingStyle}
-      >
+      {/* Block content with fixed padding */}
+      <div className={cn("flex-1 min-h-0", contentPadding)}>
         {children}
       </div>
     </div>

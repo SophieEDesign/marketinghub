@@ -321,6 +321,13 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
   ),
   horizontal_grouped: (ctx) => (
     <>
+      <GridAppearanceSettings
+        config={ctx.config}
+        onUpdate={ctx.onUpdateAppearance}
+        onUpdateConfig={ctx.onUpdateConfig}
+        fields={ctx.fields}
+        blockType={ctx.blockType}
+      />
       <CommonAppearanceSettings
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}

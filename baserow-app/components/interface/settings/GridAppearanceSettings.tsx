@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select"
 import { X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import type { BlockConfig } from "@/lib/interface/types"
+import type { BlockConfig, BlockType } from "@/lib/interface/types"
 import type { TableField } from "@/types/fields"
 import ConditionalFormattingEditor from "./ConditionalFormattingEditor"
 
@@ -21,6 +21,7 @@ interface GridAppearanceSettingsProps {
   onUpdate: (updates: Partial<BlockConfig['appearance']>) => void
   onUpdateConfig?: (updates: Partial<BlockConfig>) => void // For updating highlight_rules
   fields?: TableField[] // Optional: fields passed from SettingsPanel
+  blockType?: BlockType // For horizontal_grouped: use list-like view type so grid-only options are hidden
 }
 
 export default function GridAppearanceSettings({
@@ -28,6 +29,7 @@ export default function GridAppearanceSettings({
   onUpdate,
   onUpdateConfig,
   fields: fieldsProp,
+  blockType,
 }: GridAppearanceSettingsProps) {
   const appearance = config.appearance || {}
   const [fields, setFields] = useState<TableField[]>([])
@@ -70,8 +72,11 @@ export default function GridAppearanceSettings({
     f.type === 'attachment' || f.type === 'url' // URL can contain image URLs
   )
 
-  // Get view type from config to show view-specific settings
-  const viewType = (config as any)?.view_type || 'grid'
+  // Get view type from config to show view-specific settings.
+  // For horizontal_grouped blocks, config.view_type is unset; use list-like so grid-only options (e.g. Wrap cell text) are hidden.
+  const viewType = blockType === 'horizontal_grouped'
+    ? 'list'
+    : ((config as any)?.view_type || 'grid')
 
   return (
     <div className="space-y-4">
@@ -94,6 +99,8 @@ export default function GridAppearanceSettings({
         <p className="text-xs text-gray-500">
           {viewType === 'timeline' || viewType === 'calendar'
             ? "Control the vertical spacing of rows/lanes and card padding"
+            : viewType === 'list'
+            ? "Control the height of record cards. Applies to all cards in the block."
             : "Control the height of rows in the grid view. Applies to all rows in the block."}
         </p>
       </div>
