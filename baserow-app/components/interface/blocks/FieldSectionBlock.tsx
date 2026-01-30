@@ -10,12 +10,15 @@ import InlineFieldEditor from "@/components/records/InlineFieldEditor"
 import { sectionAndSortFields } from "@/lib/fields/sectioning"
 import { resolveSystemFieldAlias } from "@/lib/fields/systemFieldAliases"
 import { useToast } from "@/components/ui/use-toast"
+import { FIELD_LABEL_CLASS_NO_MARGIN, FIELD_LABEL_GAP_CLASS } from "@/lib/fields/field-label"
+import { getFieldDisplayName } from "@/lib/fields/display"
 
 interface FieldSectionBlockProps {
   block: PageBlock
   isEditing?: boolean
   pageTableId?: string | null
   recordId?: string | null // Record ID from page context (required for field section blocks)
+  pageShowFieldNames?: boolean // Page-level: show field names (default true)
   hideEditButton?: boolean // Hide Edit button for top fields (inline editing only)
 }
 
@@ -34,13 +37,14 @@ export default function FieldSectionBlock({
   isEditing = false, 
   pageTableId = null,
   recordId = null,
+  pageShowFieldNames = true,
   hideEditButton = false
 }: FieldSectionBlockProps) {
   const { config } = block
   const sectionName = config?.group_name as string | undefined
   const fieldNames = config?.field_names as string[] | undefined // Optional: filter specific fields
   const defaultCollapsed = config?.collapsed ?? false
-  const showLabels = config?.show_labels !== false // Default to true
+  const showLabels = (config?.show_labels !== false) && (pageShowFieldNames !== false)
   
   const [fields, setFields] = useState<TableField[]>([])
   const [fieldValues, setFieldValues] = useState<Record<string, any>>({})
@@ -238,7 +242,7 @@ export default function FieldSectionBlock({
             <div className="space-y-2 text-sm text-gray-400 italic">
               {fields.map((field) => (
                 <div key={field.id} className="border border-dashed border-gray-300 rounded p-2">
-                  {field.name}
+                  {getFieldDisplayName(field)}
                 </div>
               ))}
             </div>
@@ -301,16 +305,13 @@ export default function FieldSectionBlock({
               return (
                 <div
                   key={field.id}
-                  className={cn(
-                    "grid gap-x-4 gap-y-3 items-start",
-                    showLabels ? "grid-cols-1 sm:grid-cols-[140px_minmax(0,1fr)]" : "grid-cols-1"
-                  )}
+                  className={cn("min-w-0", FIELD_LABEL_GAP_CLASS)}
                 >
                   {showLabels && (
-                    <div className="text-xs font-medium text-gray-500 leading-5 sm:pt-1.5 min-w-0 break-words">
-                      {field.name}
+                    <label className={cn(FIELD_LABEL_CLASS_NO_MARGIN, "flex-shrink-0")}>
+                      {getFieldDisplayName(field)}
                       {field.required && <span className="text-red-500 ml-1">*</span>}
-                    </div>
+                    </label>
                   )}
                   <div className="min-w-0">
                     <InlineFieldEditor

@@ -12,6 +12,8 @@ import InlineFieldEditor from "@/components/records/InlineFieldEditor"
 import { resolveSystemFieldAlias } from "@/lib/fields/systemFieldAliases"
 import RecordModal from "@/components/calendar/RecordModal"
 import { isAbortError } from "@/lib/api/error-handling"
+import { FIELD_LABEL_CLASS_NO_MARGIN, FIELD_LABEL_GAP_CLASS } from "@/lib/fields/field-label"
+import { getFieldDisplayName } from "@/lib/fields/display"
 
 interface FieldBlockProps {
   block: PageBlock
@@ -432,8 +434,8 @@ export default function FieldBlock({
       // Show field name preview in edit mode
       return (
         <div className="h-full flex flex-col p-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            {field.name}
+          <label className={cn(FIELD_LABEL_CLASS_NO_MARGIN, "flex-shrink-0")}>
+            {getFieldDisplayName(field)}
             {field.required && <span className="text-red-500 ml-1">*</span>}
           </label>
           <div className="flex-1 text-sm text-gray-400 italic border border-dashed border-gray-300 rounded p-3 flex items-center">
@@ -602,17 +604,17 @@ export default function FieldBlock({
 
   return (
     <>
-      <div className="h-full p-3">
+      <div className={cn("h-full p-3 flex flex-col min-h-0", FIELD_LABEL_GAP_CLASS)}>
         {showLabel ? (
-          <div className="grid grid-cols-1 sm:grid-cols-[140px_minmax(0,1fr)] gap-x-4 gap-y-3 items-start">
-            <div className="text-xs font-medium text-gray-500 leading-5 sm:pt-1.5 min-w-0 break-words">
-              {field.name}
+          <>
+            <label className={cn(FIELD_LABEL_CLASS_NO_MARGIN, "flex-shrink-0")}>
+              {getFieldDisplayName(field)}
               {field.required && <span className="text-red-500 ml-1">*</span>}
-            </div>
-            <div className="min-w-0">{content}</div>
-          </div>
+            </label>
+            <div className="flex-1 min-h-0 min-w-0">{content}</div>
+          </>
         ) : (
-          content
+          <div className="flex-1 min-h-0 min-w-0">{content}</div>
         )}
       </div>
       

@@ -19,6 +19,7 @@ import { useToast } from "@/components/ui/use-toast"
 import InlineFieldEditor from "./InlineFieldEditor"
 import type { TableField } from "@/types/fields"
 import { getFieldDisplayName } from "@/lib/fields/display"
+import { FIELD_LABEL_CLASS } from "@/lib/fields/field-label"
 import { isAbortError } from "@/lib/api/error-handling"
 import { syncLinkedFieldBidirectional } from "@/lib/dataView/linkedFields"
 
@@ -509,7 +510,7 @@ export default function RecordFieldPanel({
 
             return (
               <div key={field.id} className="border border-gray-200 rounded-lg p-4">
-                <div className="text-sm font-medium text-gray-700 mb-2">
+                <div className={FIELD_LABEL_CLASS}>
                   <div className="truncate">{getFieldDisplayName(field)}</div>
                   {isMirroredLinkedField && (
                     <div className="text-[11px] text-gray-500 font-normal truncate">

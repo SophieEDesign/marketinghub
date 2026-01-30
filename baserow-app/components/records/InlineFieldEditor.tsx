@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import { Link2, Plus, X, Calculator, Link as LinkIcon, Paperclip, ExternalLink, Mail, Pencil } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { formatDateUK } from "@/lib/utils"
+import { formatDateUK, cn } from "@/lib/utils"
 import type { TableField } from "@/types/fields"
 import { useToast } from "@/components/ui/use-toast"
 import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/LookupFieldPicker"
@@ -20,6 +20,8 @@ import {
   getTextColorForBackground,
   normalizeHexColor,
 } from "@/lib/field-colors"
+import { getFieldDisplayName } from "@/lib/fields/display"
+import { FIELD_LABEL_CLASS_NO_MARGIN, FIELD_LABEL_GAP_CLASS } from "@/lib/fields/field-label"
 
 interface InlineFieldEditorProps {
   field: TableField
@@ -65,8 +67,8 @@ export default function InlineFieldEditor({
   const [createRecordTableFields, setCreateRecordTableFields] = useState<TableField[]>([])
   const [createRecordResolve, setCreateRecordResolve] = useState<((id: string | null) => void) | null>(null)
   const showLabel = propShowLabel
-  const labelClassName = propLabelClassName || "block text-sm font-medium text-gray-700"
-  const containerClassName = showLabel ? "space-y-1.5" : ""
+  const labelClassName = propLabelClassName ?? FIELD_LABEL_CLASS_NO_MARGIN
+  const containerClassName = showLabel ? FIELD_LABEL_GAP_CLASS : ""
   
   // Check if this is a user field and fetch display name
   const isUserFieldType = isUserField(field.name)
@@ -227,7 +229,7 @@ export default function InlineFieldEditor({
         <div className={containerClassName} onPaste={handlePaste}>
           {showLabel && (
             <label className={`${labelClassName} flex items-center gap-2`}>
-              {field.name}
+              {getFieldDisplayName(field)}
               <span title="Derived field (read-only)" className="flex items-center gap-1 text-xs text-gray-400 font-normal">
                 <LinkIcon className="h-3 w-3" />
                 <span>Derived</span>
@@ -260,7 +262,7 @@ export default function InlineFieldEditor({
       <>
         <div className={containerClassName} onPaste={handlePaste}>
           {showLabel && (
-            <label className={labelClassName}>{field.name}</label>
+            <label className={labelClassName}>{getFieldDisplayName(field)}</label>
           )}
           {lookupConfig ? (
             <LookupFieldPicker
@@ -269,7 +271,7 @@ export default function InlineFieldEditor({
               onChange={onChange}
               config={lookupConfig}
               disabled={isReadOnly}
-              placeholder={`Add ${field.name}...`}
+              placeholder={`Add ${getFieldDisplayName(field)}...`}
               onRecordClick={onLinkedRecordClick}
               onCreateRecord={lookupConfig.allowCreate ? handleCreateRecord : undefined}
               isLookupField={false}
@@ -306,7 +308,7 @@ export default function InlineFieldEditor({
       <div className={containerClassName}>
         {showLabel && (
           <label className={`${labelClassName} flex items-center gap-2`}>
-            {field.name}
+            {getFieldDisplayName(field)}
             {isVirtual && (
               <span title="Formula or lookup field">
                 <Calculator className="h-3 w-3 text-gray-400" />
@@ -343,7 +345,7 @@ export default function InlineFieldEditor({
     if (isEditing && !isReadOnly) {
       return (
         <div className={containerClassName}>
-          {showLabel && <label className={labelClassName}>{field.name}</label>}
+          {showLabel && <label className={labelClassName}>{getFieldDisplayName(field)}</label>}
           <input
             ref={inputRef as React.RefObject<HTMLInputElement>}
             type="date"
@@ -361,7 +363,7 @@ export default function InlineFieldEditor({
       <div className={containerClassName}>
         {showLabel && (
           <label className={`${labelClassName} flex items-center gap-2`}>
-            {field.name}
+            {getFieldDisplayName(field)}
             {isVirtual && (
               <span title="Formula or lookup field">
                 <Calculator className="h-3 w-3 text-gray-400" />
@@ -394,7 +396,7 @@ export default function InlineFieldEditor({
       <div className={containerClassName}>
         {showLabel && (
           <label className={`${labelClassName} flex items-center gap-2`}>
-            {field.name}
+            {getFieldDisplayName(field)}
             {isVirtual && (
               <span title="Formula or lookup field">
                 <Calculator className="h-3 w-3 text-gray-400" />
@@ -421,31 +423,33 @@ export default function InlineFieldEditor({
     )
   }
 
-  // Long text
+  // Long text — use flex layout so content fills available height (e.g. canvas block)
   if (field.type === "long_text") {
+    const longTextContainerClass = cn("flex flex-col flex-1 min-h-0", containerClassName)
     if (isEditing && !isReadOnly) {
       return (
-        <div className={containerClassName}>
-          {showLabel && <label className={labelClassName}>{field.name}</label>}
-          <RichTextEditor
-            value={localValue ?? ""}
-            onChange={handleChange}
-            onBlur={handleBlur}
-            editable={true}
-            showToolbar={true}
-            // Give enough space so the toolbar doesn't "take over" in tight layouts.
-            // The editor will still scroll internally if the parent is constrained.
-            minHeight="240px"
-          />
+        <div className={longTextContainerClass}>
+          {showLabel && <label className={cn(labelClassName, "flex-shrink-0 flex items-center gap-2")}>{getFieldDisplayName(field)}</label>}
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            <RichTextEditor
+              value={localValue ?? ""}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              editable={true}
+              showToolbar={true}
+              minHeight="240px"
+              className="flex-1 min-h-0"
+            />
+          </div>
         </div>
       )
     }
 
     return (
-      <div className={containerClassName}>
+      <div className={longTextContainerClass}>
         {showLabel && (
-          <label className={`${labelClassName} flex items-center gap-2`}>
-            {field.name}
+          <label className={cn(labelClassName, "flex-shrink-0 flex items-center gap-2")}>
+            {getFieldDisplayName(field)}
             {isVirtual && (
               <span title="Formula or lookup field">
                 <Calculator className="h-3 w-3 text-gray-400" />
@@ -454,7 +458,7 @@ export default function InlineFieldEditor({
           </label>
         )}
         {isReadOnly ? (
-          <div className={`${readOnlyBoxClassName} ${showLabel ? "min-h-[48px]" : ""}`}>
+          <div className={cn("flex-1 min-h-0 overflow-auto", readOnlyBoxClassName)}>
             {value ? (
               <div 
                 className="prose prose-sm max-w-none"
@@ -467,7 +471,7 @@ export default function InlineFieldEditor({
         ) : (
           <div
             onClick={onEditStart}
-            className={`${displayBoxClassName} ${showLabel ? "min-h-[48px]" : "min-h-[40px]"} ${!value ? "bg-white" : ""}`}
+            className={cn("flex-1 min-h-0 overflow-auto min-h-[40px]", displayBoxClassName, !value && "bg-white")}
           >
             {value ? (
               <div 
@@ -510,7 +514,7 @@ export default function InlineFieldEditor({
       <div className={containerClassName}>
         {showLabel && (
           <label className={`${labelClassName} flex items-center gap-2`}>
-            {field.name}
+            {getFieldDisplayName(field)}
             {isVirtual && (
               <span title="Formula or lookup field">
                 <Calculator className="h-3 w-3 text-gray-400" />
@@ -586,7 +590,7 @@ export default function InlineFieldEditor({
     if (isEditing && !isReadOnly) {
       return (
         <div className={containerClassName}>
-          {showLabel && <label className={labelClassName}>{field.name}</label>}
+          {showLabel && <label className={labelClassName}>{getFieldDisplayName(field)}</label>}
           <input
             ref={inputRef as React.RefObject<HTMLInputElement>}
             type="url"
@@ -605,7 +609,7 @@ export default function InlineFieldEditor({
       <div className={containerClassName}>
         {showLabel && (
           <label className={`${labelClassName} flex items-center gap-2`}>
-            {field.name}
+            {getFieldDisplayName(field)}
             {isVirtual && (
               <span title="Formula or lookup field">
                 <Calculator className="h-3 w-3 text-gray-400" />
@@ -663,7 +667,7 @@ export default function InlineFieldEditor({
     if (isEditing && !isReadOnly) {
       return (
         <div className={containerClassName}>
-          {showLabel && <label className={labelClassName}>{field.name}</label>}
+          {showLabel && <label className={labelClassName}>{getFieldDisplayName(field)}</label>}
           <input
             ref={inputRef as React.RefObject<HTMLInputElement>}
             type="email"
@@ -682,7 +686,7 @@ export default function InlineFieldEditor({
       <div className={containerClassName}>
         {showLabel && (
           <label className={`${labelClassName} flex items-center gap-2`}>
-            {field.name}
+            {getFieldDisplayName(field)}
             {isVirtual && (
               <span title="Formula or lookup field">
                 <Calculator className="h-3 w-3 text-gray-400" />
@@ -741,7 +745,7 @@ export default function InlineFieldEditor({
 
     return (
       <div className={containerClassName}>
-        {showLabel && <label className={labelClassName}>{field.name}</label>}
+        {showLabel && <label className={labelClassName}>{getFieldDisplayName(field)}</label>}
         <input
           ref={inputRef as React.RefObject<HTMLInputElement>}
           type={inputType}
@@ -752,7 +756,7 @@ export default function InlineFieldEditor({
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
           className={inputBoxClassName}
-          placeholder={`Enter ${field.name}...`}
+          placeholder={`Enter ${getFieldDisplayName(field)}...`}
         />
       </div>
     )
@@ -762,7 +766,7 @@ export default function InlineFieldEditor({
     <div className={containerClassName}>
       {showLabel && (
         <label className={`${labelClassName} flex items-center gap-2`}>
-          {field.name}
+          {getFieldDisplayName(field)}
           {isVirtual && (
             <span title="Formula or lookup field">
               <Calculator className="h-3 w-3 text-gray-400" />
@@ -950,7 +954,7 @@ function AttachmentFieldEditor({
 
   return (
     <div className="space-y-2.5">
-      <label className="block text-sm font-medium text-gray-700">{field.name}</label>
+      <label className="block text-sm font-medium text-gray-700">{getFieldDisplayName(field)}</label>
       
       <input
         type="file"

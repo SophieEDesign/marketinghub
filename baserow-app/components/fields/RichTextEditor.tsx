@@ -256,12 +256,15 @@ export default function RichTextEditor({
   }
 
   return (
-    <div className={cn("space-y-2", className)}>
+    <div className={cn("flex flex-col min-h-0 space-y-2", className)}>
       {showToolbar && editable && <Toolbar />}
-      <div className={cn(
-        "border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent overflow-auto",
-        !editable && "bg-gray-50"
-      )} style={{ minHeight }}>
+      <div
+        className={cn(
+          "border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent overflow-auto flex-1 min-h-0",
+          !editable && "bg-gray-50"
+        )}
+        style={{ minHeight }}
+      >
         <EditorContent editor={editor} />
       </div>
     </div>

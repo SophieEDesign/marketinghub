@@ -268,7 +268,7 @@ export default function BlockRenderer({
       case "field_section":
         // Field section block displays all fields from a section (group_name)
         // Respect page-level editability similar to field blocks
-        return <FieldSectionBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} recordId={recordId} hideEditButton={hideEditButton} />
+        return <FieldSectionBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} recordId={recordId} pageShowFieldNames={pageShowFieldNames} hideEditButton={hideEditButton} />
 
       case "text":
         // Lazy-load TextBlock to improve initial page load performance

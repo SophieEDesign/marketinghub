@@ -595,7 +595,6 @@ export default function AirtableKanbanView({
           field={groupField}
           tableId={tableId}
           onFieldUpdated={async () => {
-            await loadColumns(groupField)
             await loadRows()
           }}
         />

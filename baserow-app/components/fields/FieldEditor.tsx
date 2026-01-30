@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client"
 import { formatDateUK } from "@/lib/utils"
 import type { TableField } from "@/types/fields"
 import { getFieldDisplayName } from "@/lib/fields/display"
+import { FIELD_LABEL_CLASS_NO_MARGIN } from "@/lib/fields/field-label"
 import {
   resolveChoiceColor,
   getTextColorForBackground,
@@ -313,7 +314,7 @@ export default function FieldEditor({
   onChange,
   isReadOnly: propIsReadOnly,
   showLabel = true,
-  labelClassName = "block text-sm font-medium text-gray-700",
+  labelClassName = FIELD_LABEL_CLASS_NO_MARGIN,
   inputClassName = "",
   onLinkedRecordClick,
   onCreateRecord,

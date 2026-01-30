@@ -1358,10 +1358,10 @@ export default function RecordViewPageSettings({
 
             <div className="flex items-center justify-between">
               <div>
-                <Label>Show field names on blocks</Label>
+                <Label>Show field titles</Label>
                 <p className="text-xs text-gray-500 mt-1">
-                  Display the field name (label) above each field block. Individual blocks can still
-                  hide their label in block appearance settings.
+                  Display the field title above each field block and field section block. Individual
+                  blocks can still hide their label in block appearance settings.
                 </p>
               </div>
               <Switch

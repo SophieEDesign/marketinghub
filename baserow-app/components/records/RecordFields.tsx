@@ -8,6 +8,8 @@ import { useToast } from "@/components/ui/use-toast"
 import InlineFieldEditor from "./InlineFieldEditor"
 import type { TableField } from "@/types/fields"
 import { getFieldDisplayName } from "@/lib/fields/display"
+import { FIELD_LABEL_CLASS_NO_MARGIN, FIELD_LABEL_GAP_CLASS } from "@/lib/fields/field-label"
+import { cn } from "@/lib/utils"
 
 interface RecordFieldsProps {
   fields: TableField[]
@@ -18,6 +20,7 @@ interface RecordFieldsProps {
   recordId: string
   isFieldEditable?: (fieldName: string) => boolean // Function to check if a field is editable
   tableName?: string // Supabase table name (optional, will be fetched if not provided)
+  showFieldNames?: boolean // Show field titles above inputs (default true)
 }
 
 const DEFAULT_GROUP_NAME = "General"
@@ -38,6 +41,7 @@ export default function RecordFields({
   recordId,
   isFieldEditable = () => true, // Default to all fields editable if not provided
   tableName: propTableName,
+  showFieldNames = true,
 }: RecordFieldsProps) {
   const { navigateToLinkedRecord } = useRecordPanel()
   const { toast } = useToast()
@@ -234,11 +238,13 @@ export default function RecordFields({
                     return (
                       <div
                         key={field.id}
-                        className="grid grid-cols-1 sm:grid-cols-[160px_minmax(0,1fr)] gap-x-4 gap-y-3 items-start rounded-md hover:bg-gray-50/50 transition-colors px-1 py-0.5 -mx-1"
+                        className={cn("rounded-md hover:bg-gray-50/50 transition-colors px-1 py-0.5 -mx-1 min-w-0", FIELD_LABEL_GAP_CLASS)}
                       >
-                        <div className="text-xs font-semibold text-gray-600 leading-5 sm:pt-1.5 min-w-0 break-words">
-                          {getFieldDisplayName(field)}
-                        </div>
+                        {showFieldNames && (
+                          <label className={cn(FIELD_LABEL_CLASS_NO_MARGIN, "flex-shrink-0")}>
+                            {getFieldDisplayName(field)}
+                          </label>
+                        )}
                         <div className="min-w-0">
                           <InlineFieldEditor
                             field={field}
