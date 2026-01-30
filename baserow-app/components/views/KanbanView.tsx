@@ -13,6 +13,7 @@ import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { CellFactory } from "@/components/grid/CellFactory"
 import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
 import { isAbortError } from "@/lib/api/error-handling"
+import { normalizeSelectOptionsForUi } from "@/lib/fields/select-options"
 import EmptyState from "@/components/empty-states/EmptyState"
 import type { HighlightRule } from "@/lib/interface/types"
 import { evaluateHighlightRules, getFormattingStyle } from "@/lib/conditional-formatting/evaluator"
@@ -91,6 +92,24 @@ export default function KanbanView({
     )
     return (match?.name as string) || raw
   }, [imageField, tableFields])
+
+  // Resolve group value (option id or label as stored in DB) to display label for column header
+  const groupValueToLabel = useMemo(() => {
+    const field = (Array.isArray(tableFields) ? tableFields : []).find(
+      (f: any) => f && (f.name === groupingFieldName || f.id === groupingFieldName)
+    ) as TableField | undefined
+    if (!field || (field.type !== "single_select" && field.type !== "multi_select")) {
+      return new Map<string, string>()
+    }
+    const { selectOptions } = normalizeSelectOptionsForUi(field.type, field.options)
+    const map = new Map<string, string>()
+    for (const o of selectOptions) {
+      map.set(o.id, o.label)
+      if (o.id !== o.label) map.set(o.label, o.label)
+    }
+    map.set("Uncategorized", "Uncategorized")
+    return map
+  }, [tableFields, groupingFieldName])
 
   // Filter rows by search query
   const filteredRows = useMemo(() => {
@@ -360,10 +379,12 @@ export default function KanbanView({
   return (
     <div className="w-full h-full overflow-x-auto bg-gray-50">
       <div className="flex gap-4 min-w-max p-6">
-        {groups.map((groupName) => (
+        {groups.map((groupName) => {
+          const displayName = groupValueToLabel.get(groupName) ?? groupName
+          return (
           <div key={groupName} className="flex-shrink-0 w-80">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 mb-3">
-              <h3 className="text-sm font-semibold text-gray-900">{groupName}</h3>
+              <h3 className="text-sm font-semibold text-gray-900">{displayName}</h3>
               <p className="text-xs text-gray-500 mt-0.5">{groupedRows[groupName].length} items</p>
             </div>
             <div className="space-y-2">
@@ -482,7 +503,8 @@ export default function KanbanView({
               </Button>
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )

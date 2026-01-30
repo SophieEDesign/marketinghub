@@ -8,7 +8,7 @@ import BlockRenderer from "./BlockRenderer"
 import BlockAppearanceWrapper from "./BlockAppearanceWrapper"
 import { ErrorBoundary } from "./ErrorBoundary"
 import type { PageBlock, LayoutItem } from "@/lib/interface/types"
-import { MODAL_CANVAS_LAYOUT_DEFAULTS } from "@/lib/interface/canvas-layout-defaults"
+import { MODAL_CANVAS_LAYOUT_DEFAULTS, MODAL_CANVAS_LAYOUT_CONSTRAINTS } from "@/lib/interface/canvas-layout-defaults"
 
 const ResponsiveGridLayout = WidthProvider(Responsive)
 
@@ -61,10 +61,7 @@ export default function ModalCanvas({
       y: block.y ?? 0,
       w: block.w ?? 4,
       h: block.h ?? 4,
-      minW: 2,
-      minH: 2,
-      maxW: 8,
-      maxH: 20,
+      ...MODAL_CANVAS_LAYOUT_CONSTRAINTS,
     }))
 
     setLayout(layoutItems)
