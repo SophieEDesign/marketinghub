@@ -324,6 +324,31 @@ export default function FieldBuilderModal({
               <p className="text-xs text-gray-500">
                 Applies to pills without a custom colour.
               </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs text-blue-600 hover:text-blue-700"
+                onClick={() => {
+                  const { selectOptions } = normalizeSelectOptionsForUi(type as any, options)
+                  const withTheme = selectOptions
+                    .filter((o) => String(o?.label ?? '').trim().length > 0)
+                    .map((o) => ({
+                      ...o,
+                      color: resolveChoiceColor(
+                        String(o.label ?? '').trim(),
+                        type as 'single_select' | 'multi_select',
+                        options,
+                        type === 'single_select'
+                      ),
+                    }))
+                  if (withTheme.length > 0) {
+                    setOptions((prev) => syncSelectOptionsPayload(prev, withTheme, { dropEmpty: false }))
+                  }
+                }}
+              >
+                Apply theme to existing options
+              </Button>
             </div>
             <div className="space-y-2">
               {(() => {

@@ -7,7 +7,8 @@ import NonGridViewWrapper from "@/components/grid/NonGridViewWrapper"
 import InterfacePage from "@/components/views/InterfacePage"
 import WorkspaceShellWrapper from "@/components/layout/WorkspaceShellWrapper"
 import { getTable } from "@/lib/crud/tables"
-import { getView } from "@/lib/crud/views"
+import { getView, getViews } from "@/lib/crud/views"
+import CoreDataViewTabs from "@/components/layout/CoreDataViewTabs"
 import { Button } from "@/components/ui/button"
 import type { View } from "@/types/database"
 import { normalizeUuid } from "@/lib/utils/ids"
@@ -71,12 +72,17 @@ export default async function ViewPage({
       )
     }
 
+    const tableViews = await getViews(tableId).catch(() => [])
+
     // For page type views, use InterfacePage (full width, no container)
     if (view.type === "page") {
       return (
         <WorkspaceShellWrapper title={view.name}>
-          <div className="w-full h-full -m-6">
-            <InterfacePage viewId={viewId} />
+          <div className="flex flex-col w-full h-full">
+            <CoreDataViewTabs tableId={tableId} currentViewId={viewId} views={tableViews} />
+            <div className="flex-1 w-full -m-6 min-h-0">
+              <InterfacePage viewId={viewId} />
+            </div>
           </div>
         </WorkspaceShellWrapper>
       )
@@ -136,47 +142,50 @@ export default async function ViewPage({
 
     return (
       <WorkspaceShellWrapper title={view.name}>
-        {view.type === "grid" ? (
-          <AirtableViewPage
-            tableId={tableId}
-            viewId={viewId}
-            table={table}
-            view={view}
-            initialViewFields={viewFields}
-            initialViewFilters={viewFilters}
-            initialViewSorts={viewSorts}
-            initialTableFields={tableFields}
-            initialGroupBy={groupBy}
-            initialGridSettings={gridSettings}
-          />
-        ) : view.type === "horizontal_grouped" ? (
-          <NonGridViewWrapper
-            viewType="horizontal_grouped"
-            viewName={view.name}
-            tableId={tableId}
-            viewId={viewId}
-            fieldIds={Array.isArray(viewFields) ? viewFields.map((f) => f.field_name).filter(Boolean) : []}
-            groupingFieldId={horizontalGroupedGroupField}
-            groupByRules={horizontalGroupedGroupRules}
-            viewFilters={viewFilters}
-            viewSorts={viewSorts}
-            tableFields={tableFields}
-          />
-        ) : (
-          <NonGridViewWrapper
-            viewType={view.type as "form" | "kanban" | "calendar" | "timeline"}
-            viewName={view.name}
-            tableId={tableId}
-            viewId={viewId}
-            fieldIds={Array.isArray(viewFields) ? viewFields.map((f) => f.field_name).filter(Boolean) : []}
-            groupingFieldId={kanbanGroupField}
-            dateFieldId={
-              view.type === "calendar" || view.type === "timeline"
-                ? (Array.isArray(viewFields) && viewFields[0]?.field_name) || undefined
-                : undefined
-            }
-          />
-        )}
+        <div className="flex flex-col min-h-0 flex-1">
+          <CoreDataViewTabs tableId={tableId} currentViewId={viewId} views={tableViews} />
+          {view.type === "grid" ? (
+            <AirtableViewPage
+              tableId={tableId}
+              viewId={viewId}
+              table={table}
+              view={view}
+              initialViewFields={viewFields}
+              initialViewFilters={viewFilters}
+              initialViewSorts={viewSorts}
+              initialTableFields={tableFields}
+              initialGroupBy={groupBy}
+              initialGridSettings={gridSettings}
+            />
+          ) : view.type === "horizontal_grouped" ? (
+            <NonGridViewWrapper
+              viewType="horizontal_grouped"
+              viewName={view.name}
+              tableId={tableId}
+              viewId={viewId}
+              fieldIds={Array.isArray(viewFields) ? viewFields.map((f) => f.field_name).filter(Boolean) : []}
+              groupingFieldId={horizontalGroupedGroupField}
+              groupByRules={horizontalGroupedGroupRules}
+              viewFilters={viewFilters}
+              viewSorts={viewSorts}
+              tableFields={tableFields}
+            />
+          ) : (
+            <NonGridViewWrapper
+              viewType={view.type as "form" | "kanban" | "calendar" | "timeline"}
+              viewName={view.name}
+              tableId={tableId}
+              viewId={viewId}
+              fieldIds={Array.isArray(viewFields) ? viewFields.map((f) => f.field_name).filter(Boolean) : []}
+              groupingFieldId={kanbanGroupField}
+              dateFieldId={
+                view.type === "calendar" || view.type === "timeline"
+                  ? (Array.isArray(viewFields) && viewFields[0]?.field_name) || undefined
+                  : undefined
+              }
+            />
+          )}
+        </div>
       </WorkspaceShellWrapper>
     )
   } catch (error: any) {

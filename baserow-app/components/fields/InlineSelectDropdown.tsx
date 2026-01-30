@@ -183,9 +183,22 @@ export default function InlineSelectDropdown({
       const base =
         normalizeSelectOptionsForUi(fieldType, mergedOptions).repairedFieldOptions || mergedOptions
       const { selectOptions } = normalizeSelectOptionsForUi(fieldType, base)
+      // Assign colour from current theme so new option gets consistent pill colour (existing + new)
+      const themeColor = resolveChoiceColor(
+        newChoice,
+        fieldType,
+        base,
+        fieldType === 'single_select'
+      )
       const nextSelectOptions = [
         ...selectOptions,
-        { id: safeId(), label: newChoice, sort_index: selectOptions.length, created_at: nowIso() },
+        {
+          id: safeId(),
+          label: newChoice,
+          sort_index: selectOptions.length,
+          created_at: nowIso(),
+          ...(themeColor ? { color: themeColor } : {}),
+        },
       ].sort((a, b) => a.sort_index - b.sort_index)
 
       const nextOptions = buildSelectOptionsPayload(base, nextSelectOptions)

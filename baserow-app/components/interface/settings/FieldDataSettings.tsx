@@ -282,6 +282,36 @@ export default function FieldDataSettings({
                 <p className="text-xs text-gray-500">
                   Applies to pills without a custom colour.
                 </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs text-blue-600 hover:text-blue-700"
+                  disabled={saving}
+                  onClick={() => {
+                    const choices = options.choices || []
+                    if (choices.length === 0) return
+                    const newChoiceColors: Record<string, string> = {}
+                    for (const choice of choices) {
+                      const c = String(choice ?? '').trim()
+                      if (!c) continue
+                      newChoiceColors[c] = resolveChoiceColor(
+                        c,
+                        field.type as 'single_select' | 'multi_select',
+                        options,
+                        field.type === 'single_select'
+                      )
+                    }
+                    handleFieldUpdate({
+                      options: {
+                        ...options,
+                        choiceColors: newChoiceColors,
+                      },
+                    })
+                  }}
+                >
+                  Apply theme to existing options
+                </Button>
               </div>
 
               {(options.choices && options.choices.length > 0 ? options.choices : []).map((choice, index) => {

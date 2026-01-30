@@ -1882,15 +1882,14 @@ export default function AirtableGridView({
                   style={{ height: effectiveRowHeight }}
                   data-group-level={item.level || 0}
                   onClick={(e) => {
+                    // Only the checkbox at the end of the row triggers row selection (build/edit/delete).
+                    // Row click only clears cell/column selection.
                     const target = e.target as HTMLElement
-                    // Contract: single click selects the row ONLY (never opens a record).
-                    // Ignore clicks originating from cells/editors/open button/checkbox.
                     if (target.closest('[data-grid-open="true"]')) return
                     if (target.closest('[data-grid-cell="true"]')) return
                     if (target.closest('.cell-editor')) return
                     if (target.closest('input[type="checkbox"]')) return
 
-                    handleRowSelect(row.id, rowIndex, e)
                     setSelectedColumnId(null)
                     setSelectedCell(null)
                   }}
