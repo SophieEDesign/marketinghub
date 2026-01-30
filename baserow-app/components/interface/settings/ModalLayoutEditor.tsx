@@ -29,6 +29,7 @@ import BlockAppearanceWrapper from "../BlockAppearanceWrapper"
 import { ErrorBoundary } from "../ErrorBoundary"
 import { createClient } from "@/lib/supabase/client"
 import { isAbortError } from "@/lib/api/error-handling"
+import { MODAL_CANVAS_LAYOUT_DEFAULTS } from "@/lib/interface/canvas-layout-defaults"
 
 const ResponsiveGridLayout = WidthProvider(Responsive)
 
@@ -179,11 +180,11 @@ export default function ModalLayoutEditor({
     return fields.filter(f => f.name !== 'id' && !usedFieldNames.has(f.name))
   }, [fields, layoutBlocks])
 
-  // Grid configuration - no gaps, blocks snap together like canvas
+  // Grid configuration - shared modal defaults (no gaps, blocks snap together)
   const GRID_CONFIG = useMemo(() => ({
-    cols: { lg: 8, md: 6, sm: 4, xs: 2, xxs: 2 },
-    rowHeight: 30,
-    margin: [0, 0] as [number, number], // No gaps - blocks snap together
+    cols: { lg: MODAL_CANVAS_LAYOUT_DEFAULTS.cols, md: 6, sm: 4, xs: 2, xxs: 2 },
+    rowHeight: MODAL_CANVAS_LAYOUT_DEFAULTS.rowHeight,
+    margin: MODAL_CANVAS_LAYOUT_DEFAULTS.margin,
     compactType: null, // Disabled - we store absolute positions
     isBounded: false,
     preventCollision: false, // Allow blocks to adjust into grid
@@ -288,14 +289,14 @@ export default function ModalLayoutEditor({
     })) as any[]
   }, [layoutBlocks, fields])
 
-  // Save layout
+  // Save layout (unified modal canvas settings)
   const handleSave = useCallback(() => {
     const modalLayout = {
       blocks: layoutBlocks,
       layoutSettings: {
-        cols: 8,
-        rowHeight: 30,
-        margin: [0, 0] as [number, number], // No gaps - matches preview
+        cols: MODAL_CANVAS_LAYOUT_DEFAULTS.cols,
+        rowHeight: MODAL_CANVAS_LAYOUT_DEFAULTS.rowHeight,
+        margin: MODAL_CANVAS_LAYOUT_DEFAULTS.margin,
       },
     }
     onSave(modalLayout)

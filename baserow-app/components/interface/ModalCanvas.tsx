@@ -8,6 +8,7 @@ import BlockRenderer from "./BlockRenderer"
 import BlockAppearanceWrapper from "./BlockAppearanceWrapper"
 import { ErrorBoundary } from "./ErrorBoundary"
 import type { PageBlock, LayoutItem } from "@/lib/interface/types"
+import { MODAL_CANVAS_LAYOUT_DEFAULTS } from "@/lib/interface/canvas-layout-defaults"
 
 const ResponsiveGridLayout = WidthProvider(Responsive)
 
@@ -40,11 +41,11 @@ export default function ModalCanvas({
 }: ModalCanvasProps) {
   const [layout, setLayout] = useState<Layout[]>([])
 
-  // Use provided layout settings or defaults (no gaps - blocks snap together)
+  // Use provided layout settings or shared modal defaults (no gaps - blocks snap together)
   const layoutSettings = useMemo(() => ({
-    cols: propLayoutSettings?.cols || 8,
-    rowHeight: propLayoutSettings?.rowHeight || 30,
-    margin: propLayoutSettings?.margin || [0, 0] as [number, number], // No gaps by default
+    cols: propLayoutSettings?.cols ?? MODAL_CANVAS_LAYOUT_DEFAULTS.cols,
+    rowHeight: propLayoutSettings?.rowHeight ?? MODAL_CANVAS_LAYOUT_DEFAULTS.rowHeight,
+    margin: (propLayoutSettings?.margin ?? MODAL_CANVAS_LAYOUT_DEFAULTS.margin) as [number, number],
   }), [propLayoutSettings])
 
   // Convert blocks to layout format

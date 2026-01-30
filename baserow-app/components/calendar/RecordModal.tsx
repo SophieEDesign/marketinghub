@@ -405,6 +405,7 @@ export default function RecordModal({
                     pageEditable={userRole === 'admin'}
                     editableFieldNames={tableFields.map(f => f.name)}
                     onFieldChange={handleFieldChange}
+                    layoutSettings={modalLayout?.layoutSettings}
                   />
                 </div>
               ) : showFieldSections && sectionedFields ? (
