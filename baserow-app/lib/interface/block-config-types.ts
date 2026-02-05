@@ -59,7 +59,13 @@ export interface ImageBlockConfig extends BaseBlockConfig {
   // Note: image_alt is already in BlockConfig
 }
 
-// Gallery Block Config (table-based, card/grid layout)
+/**
+ * Gallery Block Config (table-based, card/grid layout).
+ * Used by GalleryView. Card content comes from visible_fields (first = title, next 3 = secondary);
+ * optional overrides: gallery_title_field, card_title_field, title_field.
+ * Grouping: group_by_rules, group_by_field, group_by, gallery_group_by.
+ * Behavior: gallery_groups_default_collapsed (or grid_groups_default_collapsed).
+ */
 export interface GalleryBlockConfig extends GridBlockConfig {
   view_type?: 'gallery'
 }

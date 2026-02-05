@@ -1606,10 +1606,27 @@ export default function CalendarView({
     const cardFields = Array.isArray(cardFieldsRaw) ? cardFieldsRaw : []
     const titleField = eventInfo.event.extendedProps?.titleField as TableField | null | undefined
     const titleValue = (eventInfo.event.extendedProps as any)?.titleValue
-    const tooltip = String(eventInfo.event.title || "")
+
+    // Rich tooltip: full title + each card field label and value (so truncated text is readable on hover)
+    const titleLine = String(eventInfo.event.title || "Untitled")
+    const cardLines = cardFields.slice(0, 2).map((f: { field: TableField; value: unknown }) => {
+      const label = f?.field?.name ?? "Field"
+      const valueMap = f?.field ? (stableLinkedValueLabelMaps[f.field.name] || stableLinkedValueLabelMaps[f.field.id]) : undefined
+      let valStr = ""
+      if (f?.value !== null && f?.value !== undefined) {
+        if (f?.field?.type === "link_to_table" && Array.isArray(f.value)) {
+          const ids = f.value as string[]
+          valStr = ids.map((id: string) => valueMap?.[id] ?? id).filter(Boolean).join(", ") || String(f.value)
+        } else {
+          valStr = Array.isArray(f.value) ? (f.value as unknown[]).map(String).join(", ") : String(f.value)
+        }
+      }
+      return `${label}: ${valStr}`
+    })
+    const fullTooltip = [titleLine, ...cardLines].join("\n")
 
     return (
-      <div className="flex items-center gap-1.5 h-full min-w-0" title={tooltip}>
+      <div className="flex items-center gap-1.5 h-full min-w-0 px-1.5 py-1" title={fullTooltip}>
         {image && (
           <div
             className={`flex-shrink-0 w-4 h-4 rounded overflow-hidden bg-gray-100 ${

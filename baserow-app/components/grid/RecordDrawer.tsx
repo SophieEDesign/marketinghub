@@ -2,14 +2,16 @@
 
 import { useEffect, useState, useMemo } from "react"
 import { X, Save, Trash2, ChevronDown, ChevronRight } from "lucide-react"
-import { supabase } from "@/lib/supabase/client"
 
 import type { TableField } from "@/types/fields"
 import FieldEditor from "@/components/fields/FieldEditor"
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
 import { sectionAndSortFields } from "@/lib/fields/sectioning"
+import { useRecordEditorCore } from "@/lib/interface/record-editor-core"
+import { isAbortError } from "@/lib/api/error-handling"
 
 interface RecordDrawerProps {
+  tableId: string
   isOpen: boolean
   onClose: () => void
   tableName: string
@@ -24,6 +26,7 @@ interface RecordDrawerProps {
 const getCollapsedSectionsKey = (tableName: string) => `record-drawer-collapsed-sections-${tableName}`
 
 export default function RecordDrawer({
+  tableId,
   isOpen,
   onClose,
   tableName,
@@ -34,12 +37,35 @@ export default function RecordDrawer({
   onDelete,
   showFieldSections = false,
 }: RecordDrawerProps) {
-  const [record, setRecord] = useState<Record<string, any> | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [formData, setFormData] = useState<Record<string, any>>({})
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+  const core = useRecordEditorCore({
+    tableId,
+    recordId: rowId,
+    supabaseTableName: tableName,
+    tableFields: tableFields.length > 0 ? tableFields : null,
+    modalFields: fieldNames,
+    active: isOpen,
+    onSave: () => {
+      onSave?.()
+      onClose()
+    },
+    onDeleted: () => {
+      onDelete?.()
+      onClose()
+    },
+  })
+
+  const {
+    loading,
+    formData,
+    fields: fieldsToDisplay,
+    saving,
+    deleting,
+    save,
+    deleteRecord,
+    handleFieldChange,
+  } = core
 
   // Load collapsed sections state from localStorage
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
@@ -81,22 +107,6 @@ export default function RecordDrawer({
   }
 
   useEffect(() => {
-    if (isOpen && rowId && tableName) {
-      loadRecord()
-    } else {
-      setRecord(null)
-      setFormData({})
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, rowId, tableName])
-
-  useEffect(() => {
-    if (record) {
-      setFormData({ ...record })
-    }
-  }, [record])
-
-  useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isOpen) {
         onClose()
@@ -106,110 +116,33 @@ export default function RecordDrawer({
     return () => window.removeEventListener("keydown", handleEscape)
   }, [isOpen, onClose])
 
-  async function loadRecord() {
-    if (!rowId || !tableName) return
-
-    setLoading(true)
-    try {
-      const { data, error } = await supabase
-        .from(tableName)
-        .select("*")
-        .eq("id", rowId)
-        .single()
-
-      if (error) {
-        console.error("Error loading record:", error)
-      } else {
-        setRecord(data)
-      }
-    } catch (error) {
-      console.error("Error loading record:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function handleSave() {
-    if (!rowId || !tableName || saving) return
-
-    setSaving(true)
-    try {
-      const { error } = await supabase
-        .from(tableName)
-        .update(formData)
-        .eq("id", rowId)
-
-      if (error) {
-        console.error("Error saving record:", error)
-        alert("Failed to save record: " + error.message)
-      } else {
-        await loadRecord()
-        onSave?.()
-      }
-    } catch (error: any) {
-      console.error("Error saving record:", error)
-      alert("Failed to save record: " + error.message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function handleDelete() {
+  function handleDelete() {
     if (!rowId || !tableName || deleting) return
     setShowDeleteConfirm(true)
   }
 
   async function confirmDelete() {
     if (!rowId || !tableName || deleting) return
-
-    setDeleting(true)
     try {
-      const { error } = await supabase
-        .from(tableName)
-        .delete()
-        .eq("id", rowId)
-
-      if (error) {
-        console.error("Error deleting record:", error)
-        alert("Failed to delete record: " + error.message)
-      } else {
-        onDelete?.()
-        onClose()
-      }
+      await deleteRecord({ skipConfirm: true })
     } catch (error: any) {
-      console.error("Error deleting record:", error)
-      alert("Failed to delete record: " + error.message)
-    } finally {
-      setDeleting(false)
+      if (!isAbortError(error)) {
+        console.error("Error deleting record:", error)
+        alert("Failed to delete record: " + (error?.message ?? "Please try again"))
+      }
     }
   }
 
-  function handleFieldChange(fieldName: string, value: any) {
-    setFormData((prev) => ({
-      ...prev,
-      [fieldName]: value,
-    }))
-  }
-
-  // Get fields to display
-  const fieldsToDisplay = useMemo(() => {
-    if (fieldNames.length > 0) {
-      // Use provided field names
-      return fieldNames
-        .map((name) => tableFields.find((f) => f.name === name))
-        .filter((f): f is TableField => f !== undefined)
-    } else if (record) {
-      // Show all fields from record (excluding system fields)
-      return tableFields.filter(
-        (f) =>
-          f.name !== "id" &&
-          f.name !== "created_at" &&
-          f.name !== "updated_at" &&
-          record.hasOwnProperty(f.name)
-      )
+  async function handleSave() {
+    try {
+      await save()
+    } catch (error: any) {
+      if (!isAbortError(error)) {
+        console.error("Error saving record:", error)
+        alert("Failed to save record: " + (error?.message ?? "Please try again"))
+      }
     }
-    return []
-  }, [fieldNames, tableFields, record])
+  }
 
   // Section fields if showFieldSections is enabled
   const sectionedFields = useMemo(() => {
@@ -248,7 +181,7 @@ export default function RecordDrawer({
         <div className="flex-1 overflow-y-auto p-6">
           {loading ? (
             <div className="text-center py-8 text-gray-500">Loading...</div>
-          ) : record ? (
+          ) : formData && Object.keys(formData).length > 0 ? (
             <div className="space-y-4">
               {showFieldSections && sectionedFields ? (
                 // Render with sections

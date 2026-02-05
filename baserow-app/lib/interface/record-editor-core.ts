@@ -257,10 +257,12 @@ export function useRecordEditorCore(
   ])
 
   const deleteRecord = useCallback(
-    async (opts?: { confirmMessage?: string }) => {
+    async (opts?: { confirmMessage?: string; skipConfirm?: boolean }) => {
       if (!recordId || !effectiveTableName) return
-      const msg = opts?.confirmMessage ?? 'Are you sure you want to delete this record? This action cannot be undone.'
-      if (!confirm(msg)) return
+      if (opts?.skipConfirm !== true) {
+        const msg = opts?.confirmMessage ?? 'Are you sure you want to delete this record? This action cannot be undone.'
+        if (!confirm(msg)) return
+      }
       setDeleting(true)
       try {
         const supabase = createClient()

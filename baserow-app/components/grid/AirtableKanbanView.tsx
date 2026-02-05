@@ -602,6 +602,7 @@ export default function AirtableKanbanView({
 
       {openRow && (
         <RecordDrawer
+          tableId={tableId}
           isOpen={!!openRow}
           onClose={() => setOpenRow(null)}
           tableName={supabaseTableName}

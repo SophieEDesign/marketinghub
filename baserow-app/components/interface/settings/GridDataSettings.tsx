@@ -458,6 +458,14 @@ export default function GridDataSettings({
       {/* Gallery-Specific Settings - Airtable Style */}
       {currentViewType === 'gallery' && config.table_id && fields.length > 0 && (
         <>
+          {/* Card fields explanation */}
+          <div className="space-y-3 pt-2 border-t border-gray-200">
+            <Label className="text-sm font-semibold">Card fields</Label>
+            <p className="text-xs text-gray-500">
+              Gallery cards use the ordered <span className="font-medium">Fields to Show on Cards/Table</span> above: the first field is the card title, the next 3 fields appear below the cover image. Set the cover image in <span className="font-medium">Appearance</span>.
+            </p>
+          </div>
+
           {/* Options Section - Airtable Style */}
           <div className="space-y-3 pt-2 border-t border-gray-200">
             <Label className="text-sm font-semibold">Options</Label>

@@ -465,6 +465,7 @@ export default function GalleryView({
     )
   }, [supabaseTableName])
 
+  // Card layout: title and secondary fields from visible_fields (first = title, next 3 = secondary); cover image and color from appearance.image_field / color_field.
   const renderCard = useCallback(
     (row: TableRow, reactKey: string) => {
       const cardColor = getCardColor(row)
@@ -598,7 +599,6 @@ export default function GalleryView({
       supabaseTableName,
       highlightRules,
       tableFields,
-      tableFields,
       titleField,
     ]
   )
@@ -647,13 +647,7 @@ export default function GalleryView({
         description={filters.length > 0 
           ? "No records match your current filters. Try adjusting your filters or create a new record."
           : "This table doesn't have any records yet. Create your first record to get started."}
-        action={filters.length === 0 ? {
-          label: "Create Record",
-          onClick: () => {
-            // Try to open record creation - this would need to be passed as a prop
-            // For now, just show the message
-          },
-        } : undefined}
+        action={undefined}
       />
     )
   }
