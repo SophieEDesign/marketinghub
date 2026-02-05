@@ -430,3 +430,19 @@
 [data-block-editing="true"] * {
   /* Allow text selection and editing */
 }
+
+/* Navigation progress bar (top-of-page loading indicator) */
+@keyframes navigation-progress {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(200%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+.navigation-progress-bar {
+  animation: navigation-progress 1.2s ease-in-out infinite;
+}

@@ -8,6 +8,7 @@ import ConsoleErrorFilter from "@/components/layout/ConsoleErrorFilter"
 import DiagnosticsInitializer from "@/components/layout/DiagnosticsInitializer"
 import InteractionFailsafe from "@/components/layout/InteractionFailsafe"
 import NavigationDiagnostics from "@/components/layout/NavigationDiagnostics"
+import NavigationProgress from "@/components/layout/NavigationProgress"
 import PerformanceMonitor from "@/components/layout/PerformanceMonitor"
 import SWRProvider from "@/components/providers/SWRProvider"
 import { getWorkspaceSettings } from "@/lib/branding"
@@ -81,6 +82,7 @@ export default function RootLayout({
           <DiagnosticsInitializer />
           <InteractionFailsafe />
           <PerformanceMonitor />
+          <NavigationProgress />
           <NavigationDiagnostics />
           <DynamicTitle />
           {children}
