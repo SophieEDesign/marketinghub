@@ -9,7 +9,6 @@ import WorkspaceShellWrapper from "@/components/layout/WorkspaceShellWrapper"
 import { getTable } from "@/lib/crud/tables"
 import { getView } from "@/lib/crud/views"
 import { Button } from "@/components/ui/button"
-import type { View } from "@/types/database"
 import { normalizeUuid } from "@/lib/utils/ids"
 
 // Type aliases for Promise.allSettled results to avoid TS1005 inline assertion issues
@@ -116,11 +115,22 @@ export default async function ViewPage({
     ])
 
     const viewFields = viewFieldsRes.status === 'fulfilled' && !viewFieldsRes.value.error ? (viewFieldsRes.value.data || []) : []
-    const viewFilters = viewFiltersRes.status === 'fulfilled' && !viewFiltersRes.value.error 
-      ? ((viewFiltersRes.value.data || []) as ViewFilterRow[]).map((f) => ({ ...f, view_id: viewId })) 
+    const viewFilters = viewFiltersRes.status === 'fulfilled' && !viewFiltersRes.value.error
+      ? ((viewFiltersRes.value.data || []) as ViewFilterRow[]).map((f, i) => ({
+          id: f.id ?? `filter-${i}`,
+          view_id: viewId,
+          field_name: f.field_name,
+          operator: f.operator as import('@/types/database').FilterType,
+          value: f.value != null ? String(f.value) : undefined,
+        }))
       : []
-    const viewSorts = viewSortsRes.status === 'fulfilled' && !viewSortsRes.value.error 
-      ? ((viewSortsRes.value.data || []) as ViewSortRow[]).map((s) => ({ ...s, view_id: viewId })) 
+    const viewSorts = viewSortsRes.status === 'fulfilled' && !viewSortsRes.value.error
+      ? ((viewSortsRes.value.data || []) as ViewSortRow[]).map((s, i) => ({
+          id: s.id ?? `sort-${i}`,
+          view_id: viewId,
+          field_name: s.field_name,
+          direction: (s.direction === 'desc' ? 'desc' : 'asc') as 'asc' | 'desc',
+        }))
       : []
     const tableFields = tableFieldsRes.status === 'fulfilled' && !tableFieldsRes.value.error ? (tableFieldsRes.value.data || []) : []
     

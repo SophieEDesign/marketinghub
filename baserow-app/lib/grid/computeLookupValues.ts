@@ -155,7 +155,7 @@ export async function computeLookupValues(
           if (is400(singleErr) && !singleRow) {
             res = await tryId("id")
             if (!res.error && res.data) {
-              singleRow = res.data as Record<string, unknown>
+              singleRow = res.data as unknown as Record<string, unknown>
               singleErr = null
             }
           }
@@ -166,7 +166,7 @@ export async function computeLookupValues(
               .eq("record_id", chunk[0])
               .maybeSingle()
             if (!byRecordId.error && byRecordId.data) {
-              singleRow = byRecordId.data as Record<string, unknown>
+              singleRow = byRecordId.data as unknown as Record<string, unknown>
               singleErr = null
             }
           }

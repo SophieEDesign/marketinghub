@@ -469,7 +469,9 @@ export default function FieldBlock({
 
   const isEditable = canEditInline && !isEditing && !!field
   const showLabel = (pageShowFieldNames !== false) && (config?.appearance?.showTitle !== false) // Page and block both allow showing label
-  const linkedFieldDisplayMode = config?.appearance?.linked_field_display_mode || 'compact'
+  const linkedFieldDisplayModeRaw = config?.appearance?.linked_field_display_mode || 'compact'
+  const linkedFieldDisplayMode: 'compact' | 'inline' | 'expanded' =
+    linkedFieldDisplayModeRaw === 'list' ? 'compact' : linkedFieldDisplayModeRaw === 'inline' ? 'inline' : linkedFieldDisplayModeRaw === 'expanded' ? 'expanded' : 'compact'
 
   // Handle attachment fields specially
   const isAttachmentField = field?.type === 'attachment'

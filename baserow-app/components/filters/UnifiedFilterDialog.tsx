@@ -13,7 +13,7 @@ import { supabase } from "@/lib/supabase/client"
 import type { TableField } from "@/types/fields"
 import type { ViewFilterGroup, ViewFilter, FilterConditionType, FilterType } from "@/types/database"
 import type { FilterTree } from "@/lib/filters/canonical-model"
-import { dbFiltersToFilterTree, filterTreeToDbFormat } from "@/lib/filters/converters"
+import { dbFiltersToFilterTree, filterTreeToDbFormat, type ViewFilterInput } from "@/lib/filters/converters"
 import FilterBuilder from "./FilterBuilder"
 import { normalizeUuid } from "@/lib/utils/ids"
 import { isAbortError } from "@/lib/api/error-handling"
@@ -110,7 +110,7 @@ export default function UnifiedFilterDialog({
       if (filtersError) throw filtersError
 
       // Convert to canonical filter tree
-      const tree = dbFiltersToFilterTree(allFilters || [], groups)
+      const tree = dbFiltersToFilterTree((allFilters || []) as ViewFilterInput[], groups)
       setFilterTree(tree)
     } catch (error) {
       if (!isAbortError(error)) {

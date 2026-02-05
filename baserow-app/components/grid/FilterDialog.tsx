@@ -105,19 +105,19 @@ export default function FilterDialog({
       // If view_filter_groups fails, continue with empty groups
 
       // Load all filters (fallback without order_index if column missing)
-      let allFilters: unknown[] | null = null
+      let allFilters: ViewFilter[] | null = null
       let filtersError: unknown = null
       let res = await supabase
         .from("view_filters")
         .select("*")
         .eq("view_id", viewUuid)
         .order("order_index", { ascending: true })
-      allFilters = res.data
+      allFilters = (res.data ?? null) as ViewFilter[] | null
       filtersError = res.error
       if (filtersError && ((filtersError as { code?: string; status?: number })?.code === "42703" || (filtersError as { status?: number })?.status === 500)) {
         res = await supabase.from("view_filters").select("*").eq("view_id", viewUuid)
         if (!res.error && res.data) {
-          allFilters = Array.isArray(res.data) ? res.data.sort((a: { order_index?: number }, b: { order_index?: number }) => (a.order_index ?? 0) - (b.order_index ?? 0)) : []
+          allFilters = Array.isArray(res.data) ? (res.data as ViewFilter[]).sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)) : []
           filtersError = null
         }
       }
