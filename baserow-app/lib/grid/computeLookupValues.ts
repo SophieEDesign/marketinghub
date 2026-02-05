@@ -10,6 +10,13 @@ import { asArray } from '@/lib/utils/asArray'
 
 const BATCH_SIZE = 200 // Max IDs per .in() query to avoid URL length limits
 
+/** Get lookup display value from a row; when metadata field name differs from DB column (e.g. quarter_core_theme vs core_theme), use first non-id column. */
+function getLookupDisplayValue(row: Record<string, unknown>, resultFieldName: string): unknown {
+  if (row[resultFieldName] != null) return row[resultFieldName]
+  const otherKey = Object.keys(row).find((k) => k !== 'id' && k !== 'record_id' && row[k] != null)
+  return otherKey != null ? row[otherKey] : undefined
+}
+
 export interface GridRow {
   id: string
   [key: string]: unknown
@@ -132,7 +139,7 @@ export async function computeLookupValues(
         for (const r of asArray(lookupRows)) {
           const row = r as unknown as { id: string } & Record<string, unknown>
           const id = row.id
-          const val = row[resultFieldName]
+          const val = getLookupDisplayValue(row, resultFieldName) ?? (id != null ? id : undefined)
           if (id != null) idToValue.set(id, val)
         }
       }
