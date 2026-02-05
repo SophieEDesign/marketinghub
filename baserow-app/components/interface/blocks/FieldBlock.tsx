@@ -546,7 +546,7 @@ export default function FieldBlock({
           }
           window.location.href = `/tables/${linkedTableId}/records/${linkedRecordId}`
         }}
-        onAddLinkedRecord={blockCanCreate ? handleAddLinkedRecord : undefined}
+        onAddLinkedRecord={blockCanCreate ? handleAddLinkedRecord : () => {}}
         isReadOnly={false}
         showLabel={false}
         tableId={pageTableId || undefined}
@@ -601,7 +601,7 @@ export default function FieldBlock({
         }
         window.location.href = `/tables/${linkedTableId}/records/${linkedRecordId}`
       }}
-      onAddLinkedRecord={blockCanCreate ? handleAddLinkedRecord : undefined}
+      onAddLinkedRecord={blockCanCreate ? handleAddLinkedRecord : () => {}}
       isReadOnly={!isEditable}
       showLabel={false}
       displayMode={linkedFieldDisplayMode}
