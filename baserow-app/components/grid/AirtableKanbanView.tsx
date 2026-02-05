@@ -404,13 +404,14 @@ export default function AirtableKanbanView({
     })
   }
 
-  // Get card fields to display (match by name, id, or display name so all selected fields show)
+  // Get card fields to display (match by name, id, or display name; dedupe by id to avoid duplicate title/labels)
   const displayCardFields = useMemo(() => {
     const safeCardFields = Array.isArray(cardFields) ? cardFields : []
     const safeTableFields = Array.isArray(tableFields) ? tableFields : []
 
+    let fields: TableField[]
     if (safeCardFields.length > 0) {
-      return safeCardFields
+      fields = safeCardFields
         .map((key) =>
           safeTableFields.find(
             (f) =>
@@ -421,10 +422,19 @@ export default function AirtableKanbanView({
           )
         )
         .filter((f): f is TableField => f !== undefined && f !== null)
+    } else {
+      fields = safeTableFields
+        .filter((f) => f && f.name !== groupField?.name)
+        .slice(0, 3)
     }
-    return safeTableFields
-      .filter((f) => f && f.name !== groupField?.name)
-      .slice(0, 3)
+    // Dedupe by field id so the same field never appears twice (avoids duplicate title on card)
+    const seen = new Set<string>()
+    return fields.filter((f) => {
+      const key = f.id ?? f.name
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
   }, [cardFields, tableFields, groupField])
 
   const handleCellSave = useCallback(
@@ -780,14 +790,15 @@ function KanbanCard({ row, displayFields, tableFields, selected, onSelect, onOpe
     opacity: isDragging ? 0.5 : 1,
   }
 
-  const primaryField = displayFields[0]
+  const list = Array.isArray(displayFields) ? displayFields : []
+  const primaryField = list[0]
   const primaryValue = primaryField ? row[primaryField.name] : null
-  const otherFields = (Array.isArray(displayFields) ? displayFields : []).slice(1)
+  const primaryId = primaryField ? (primaryField.id ?? primaryField.name) : ""
+  const otherFields = list.slice(1).filter((f) => f && (f.id ?? f.name) !== primaryId)
 
-  // Helper to get full field definition (with options) from tableFields
   const getFullField = (field: TableField): TableField => {
     if (!field || !tableFields) return field
-    const fullField = tableFields.find(f => f.id === field.id || f.name === field.name)
+    const fullField = tableFields.find((f) => f.id === field.id || f.name === field.name)
     return fullField || field
   }
 
@@ -795,8 +806,8 @@ function KanbanCard({ row, displayFields, tableFields, selected, onSelect, onOpe
     <Card
       ref={setNodeRef}
       style={style}
-      className={`group hover:shadow-lg transition-all duration-200 bg-white border border-gray-200 rounded-lg shadow-sm cursor-default ${
-        selected ? "ring-1 ring-blue-400/40 bg-blue-50/30" : ""
+      className={`group hover:shadow-md transition-all duration-200 bg-white border border-gray-200 rounded-lg shadow-sm cursor-default ${
+        selected ? "ring-2 ring-blue-400/50 bg-blue-50/40" : ""
       }`}
       onClick={() => onSelect()}
       onDoubleClick={(e) => {
@@ -807,7 +818,7 @@ function KanbanCard({ row, displayFields, tableFields, selected, onSelect, onOpe
         onOpen()
       }}
     >
-      <CardContent className="p-4">
+      <CardContent className="p-3">
         <div className="flex items-start gap-2">
           {canEdit && (
             <div
@@ -819,60 +830,75 @@ function KanbanCard({ row, displayFields, tableFields, selected, onSelect, onOpe
               <GripVertical className="h-4 w-4 text-gray-400" />
             </div>
           )}
-          <button
-            type="button"
-            data-kanban-open="true"
-            onClick={(e) => {
-              e.stopPropagation()
-              onOpen()
-            }}
-            className="mt-0.5 flex-shrink-0 w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
-            title="Open record"
-            aria-label="Open record"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-          <div className="flex-1 space-y-2.5 min-w-0">
-            {primaryField && (
-              <div className="font-semibold text-sm text-gray-900 break-words leading-tight" data-kanban-field="true" onClick={(e) => e.stopPropagation()}>
-                <CellFactory
-                  field={getFullField(primaryField)}
-                  value={primaryValue}
-                  rowId={String(row.id)}
-                  tableName={tableName}
-                  editable={canEdit && !getFullField(primaryField).options?.read_only}
-                  wrapText={true}
-                  rowHeight={32}
-                  onSave={(value) => onCellSave(String(row.id), getFullField(primaryField).name, value)}
-                />
-              </div>
-            )}
-            {otherFields.map((field) => {
-              if (!field || !field.name) return null
-              const full = getFullField(field)
-              const value = row[full.name]
-              
-              return (
+          <div className="flex-1 min-w-0 space-y-2">
+            {/* Title row: primary field + open button */}
+            <div className="flex items-start gap-1.5">
+              {primaryField && (
                 <div
-                  key={field.name}
-                  className="text-xs break-words"
+                  className="flex-1 font-semibold text-sm text-gray-900 break-words leading-tight"
                   data-kanban-field="true"
                   onClick={(e) => e.stopPropagation()}
-                  onDoubleClick={(e) => e.stopPropagation()}
                 >
                   <CellFactory
-                    field={full}
-                    value={value}
+                    field={getFullField(primaryField)}
+                    value={primaryValue}
                     rowId={String(row.id)}
                     tableName={tableName}
-                    editable={canEdit && !full.options?.read_only && full.type !== "lookup" && full.type !== "formula"}
+                    editable={canEdit && !getFullField(primaryField).options?.read_only}
                     wrapText={true}
                     rowHeight={28}
-                    onSave={(v) => onCellSave(String(row.id), full.name, v)}
+                    onSave={(value) => onCellSave(String(row.id), getFullField(primaryField).name, value)}
                   />
                 </div>
-              )
-            })}
+              )}
+              <button
+                type="button"
+                data-kanban-open="true"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onOpen()
+                }}
+                className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
+                title="Open record"
+                aria-label="Open record"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+            {/* Secondary fields with label */}
+            {otherFields.length > 0 && (
+              <div className="space-y-1.5 pt-0.5 border-t border-gray-100">
+                {otherFields.map((field) => {
+                  if (!field?.name) return null
+                  const full = getFullField(field)
+                  const value = row[full.name]
+                  const label = getFieldDisplayName(full)
+                  return (
+                    <div
+                      key={full.id ?? full.name}
+                      className="text-xs"
+                      data-kanban-field="true"
+                      onClick={(e) => e.stopPropagation()}
+                      onDoubleClick={(e) => e.stopPropagation()}
+                    >
+                      <span className="text-gray-500 font-medium uppercase tracking-wide block mb-0.5">{label}</span>
+                      <div className="break-words text-gray-900">
+                        <CellFactory
+                          field={full}
+                          value={value}
+                          rowId={String(row.id)}
+                          tableName={tableName}
+                          editable={canEdit && !full.options?.read_only && full.type !== "lookup" && full.type !== "formula"}
+                          wrapText={true}
+                          rowHeight={24}
+                          onSave={(v) => onCellSave(String(row.id), full.name, v)}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </div>
       </CardContent>

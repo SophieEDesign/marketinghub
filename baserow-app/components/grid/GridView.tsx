@@ -117,6 +117,8 @@ interface GridViewProps {
   recordOpenStyle?: 'side_panel' | 'modal' // How to open records (default: 'side_panel')
   modalFields?: string[] // Fields to show in modal (if empty, show all)
   modalLayout?: any // Custom modal layout (BlockConfig['modal_layout'])
+  /** Optional: when provided (e.g. from GridBlock), permission flags are applied in RecordModal/RecordPanel. */
+  cascadeContext?: { pageConfig?: any; blockConfig?: any } | null
   onTableFieldsRefresh?: () => void // Refresh tableFields after option updates (select/multi-select)
   /** Bump to force a refetch (e.g. after external record creation). */
   reloadKey?: number
@@ -553,6 +555,7 @@ export default function GridView({
   recordOpenStyle = 'side_panel',
   modalFields,
   modalLayout,
+  cascadeContext,
   onTableFieldsRefresh,
   reloadKey,
   defaultGroupsCollapsed = true,
@@ -2350,7 +2353,7 @@ export default function GridView({
     }
 
     // Default: use RecordPanel context (for side panel)
-    openRecord(tableId, rowId, supabaseTableName, modalFields, modalLayout)
+    openRecord(tableId, rowId, supabaseTableName, modalFields, modalLayout, cascadeContext)
   }
 
   function handleOpenRecordClick(e: React.MouseEvent, rowId: string) {
@@ -3850,6 +3853,7 @@ export default function GridView({
           tableName={supabaseTableName}
           modalFields={modalFields}
           modalLayout={modalLayout}
+          cascadeContext={cascadeContext}
         />
       )}
     </div>

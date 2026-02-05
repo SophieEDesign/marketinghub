@@ -992,6 +992,7 @@ export default function MultiCalendarView({
           tableFields={fieldsBySource[createDraft.sourceId] || []}
           modalFields={Array.isArray((blockConfig as any)?.modal_fields) ? (blockConfig as any).modal_fields : []}
           initialData={createDraft.initialData}
+          cascadeContext={blockConfig ? { blockConfig } : undefined}
           onSave={async () => {
             setCreateDraft(null)
             await loadAll()

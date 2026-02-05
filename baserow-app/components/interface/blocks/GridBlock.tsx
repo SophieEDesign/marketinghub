@@ -1011,6 +1011,7 @@ export default function GridBlock({
             onRecordClick={handleRecordClick}
             modalFields={(config as any).modal_fields}
             modalLayout={(config as any).modal_layout}
+            cascadeContext={{ blockConfig: config }}
             reloadKey={refreshKey}
             defaultGroupsCollapsed={defaultGroupsCollapsed}
             appearance={{

@@ -68,6 +68,8 @@ interface ListViewProps {
   rowHeight?: number
   /** Conditional formatting rules */
   highlightRules?: HighlightRule[]
+  /** Optional: when provided, permission flags are applied in RecordModal. */
+  cascadeContext?: { pageConfig?: any; blockConfig?: any } | null
 }
 
 export default function ListView({
@@ -96,6 +98,7 @@ export default function ListView({
   onHeightChange,
   rowHeight = 30,
   highlightRules = [],
+  cascadeContext,
 }: ListViewProps) {
   const { openRecord } = useRecordPanel()
   const isMobile = useIsMobile()
@@ -762,6 +765,7 @@ export default function ListView({
         setCreateInitialData(null)
       }}
       supabaseTableName={supabaseTableName}
+      cascadeContext={cascadeContext}
     />
   )
 

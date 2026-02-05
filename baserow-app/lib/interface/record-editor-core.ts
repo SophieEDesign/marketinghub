@@ -256,6 +256,11 @@ export function useRecordEditorCore(
 
   const save = useCallback(async () => {
     if (!effectiveTableName) return
+    // Optional defence-in-depth: only enforce when cascadeContext was provided; do not change successful paths
+    if (cascadeContext != null) {
+      if (recordId && !canEditRecords) return
+      if (!recordId && !canCreateRecords) return
+    }
     setSaving(true)
     try {
       const supabase = createClient()
@@ -295,11 +300,16 @@ export function useRecordEditorCore(
     filteredFields,
     normalizeUpdateValue,
     onSave,
+    cascadeContext,
+    canEditRecords,
+    canCreateRecords,
   ])
 
   const deleteRecord = useCallback(
     async (opts?: { confirmMessage?: string; skipConfirm?: boolean }) => {
       if (!recordId || !effectiveTableName) return
+      // Optional defence-in-depth: only enforce when cascadeContext was provided
+      if (cascadeContext != null && !canDeleteRecords) return
       if (opts?.skipConfirm !== true) {
         const msg = opts?.confirmMessage ?? 'Are you sure you want to delete this record? This action cannot be undone.'
         if (!confirm(msg)) return
@@ -316,7 +326,7 @@ export function useRecordEditorCore(
         setDeleting(false)
       }
     },
-    [recordId, effectiveTableName, onDeleted]
+    [recordId, effectiveTableName, onDeleted, cascadeContext, canDeleteRecords]
   )
 
   return {

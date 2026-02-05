@@ -1924,6 +1924,7 @@ export default function CalendarView({
           recordId={selectedRecordId}
           tableFields={Array.isArray(loadedTableFields) ? loadedTableFields : []}
           supabaseTableName={supabaseTableName}
+          cascadeContext={blockConfig ? { blockConfig } : undefined}
           onSave={() => {
             // Reload rows after save
             if (resolvedTableId && supabaseTableName) {
@@ -1949,6 +1950,7 @@ export default function CalendarView({
           recordId={null}
           tableFields={Array.isArray(loadedTableFields) ? loadedTableFields : []}
           supabaseTableName={supabaseTableName}
+          cascadeContext={blockConfig ? { blockConfig } : undefined}
           initialData={(() => {
             // Pre-fill the date field(s) based on the clicked date
             const initial: Record<string, any> = {}

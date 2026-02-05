@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from "react"
 
 import type { BlockConfig } from "@/lib/interface/types"
+import type { RecordEditorCascadeContext } from "@/lib/interface/record-editor-core"
 
 interface RecordPanelState {
   isOpen: boolean
@@ -15,11 +16,13 @@ interface RecordPanelState {
   modalFields?: string[] // Fields to show in modal (if empty, show all)
   modalLayout?: BlockConfig['modal_layout'] // Custom modal layout
   history: Array<{ tableId: string; recordId: string; tableName: string }> // For breadcrumb navigation
+  /** When provided, RecordPanel enforces canEditRecords/canDeleteRecords from cascade. */
+  cascadeContext?: RecordEditorCascadeContext | null
 }
 
 interface RecordPanelContextType {
   state: RecordPanelState
-  openRecord: (tableId: string, recordId: string, tableName: string, modalFields?: string[], modalLayout?: BlockConfig['modal_layout']) => void
+  openRecord: (tableId: string, recordId: string, tableName: string, modalFields?: string[], modalLayout?: BlockConfig['modal_layout'], cascadeContext?: RecordEditorCascadeContext | null) => void
   closeRecord: () => void
   setWidth: (width: number) => void
   togglePin: () => void
@@ -46,7 +49,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
     history: [],
   })
 
-  const openRecord = useCallback((tableId: string, recordId: string, tableName: string, modalFields?: string[], modalLayout?: BlockConfig['modal_layout']) => {
+  const openRecord = useCallback((tableId: string, recordId: string, tableName: string, modalFields?: string[], modalLayout?: BlockConfig['modal_layout'], cascadeContext?: RecordEditorCascadeContext | null) => {
     setState((prev) => ({
       ...prev,
       isOpen: true,
@@ -55,6 +58,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
       tableName,
       modalFields,
       modalLayout,
+      cascadeContext,
       history: prev.isOpen && prev.tableId === tableId && prev.recordId === recordId
         ? prev.history // Don't add to history if same record
         : [...prev.history, { tableId, recordId, tableName }],
@@ -97,6 +101,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
       tableId,
       recordId,
       tableName,
+      cascadeContext: undefined, // Clear when navigating; caller can pass again if needed
       history: [...prev.history, { tableId, recordId, tableName }],
     }))
   }, [])
@@ -114,6 +119,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
         tableId: previous.tableId,
         recordId: previous.recordId,
         tableName: previous.tableName,
+        cascadeContext: undefined,
         history: newHistory,
       }
     })

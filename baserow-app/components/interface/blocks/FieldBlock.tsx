@@ -14,6 +14,7 @@ import RecordModal from "@/components/calendar/RecordModal"
 import { isAbortError } from "@/lib/api/error-handling"
 import { FIELD_LABEL_CLASS_NO_MARGIN, FIELD_LABEL_GAP_CLASS } from "@/lib/fields/field-label"
 import { getFieldDisplayName } from "@/lib/fields/display"
+import { canCreateRecords as blockCanCreateRecords } from "@/lib/interface/block-permissions"
 
 interface FieldBlockProps {
   block: PageBlock
@@ -58,6 +59,7 @@ export default function FieldBlock({
 
   const allowInlineEdit = config?.allow_inline_edit || false
   const editPermission = config?.inline_edit_permission || 'both'
+  const blockCanCreate = blockCanCreateRecords(config)
 
   // Handle creating new linked records
   const handleCreateLinkedRecord = useCallback(async (tableId: string): Promise<string | null> => {
@@ -544,7 +546,7 @@ export default function FieldBlock({
           }
           window.location.href = `/tables/${linkedTableId}/records/${linkedRecordId}`
         }}
-        onAddLinkedRecord={handleAddLinkedRecord}
+        onAddLinkedRecord={blockCanCreate ? handleAddLinkedRecord : undefined}
         isReadOnly={false}
         showLabel={false}
         tableId={pageTableId || undefined}
@@ -599,7 +601,7 @@ export default function FieldBlock({
         }
         window.location.href = `/tables/${linkedTableId}/records/${linkedRecordId}`
       }}
-      onAddLinkedRecord={handleAddLinkedRecord}
+      onAddLinkedRecord={blockCanCreate ? handleAddLinkedRecord : undefined}
       isReadOnly={!isEditable}
       showLabel={false}
       displayMode={linkedFieldDisplayMode}

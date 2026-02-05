@@ -7,7 +7,7 @@ import type { TableField } from "@/types/fields"
 import FieldEditor from "@/components/fields/FieldEditor"
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
 import { sectionAndSortFields } from "@/lib/fields/sectioning"
-import { useRecordEditorCore } from "@/lib/interface/record-editor-core"
+import { useRecordEditorCore, type RecordEditorCascadeContext } from "@/lib/interface/record-editor-core"
 import { isAbortError } from "@/lib/api/error-handling"
 
 interface RecordDrawerProps {
@@ -21,6 +21,8 @@ interface RecordDrawerProps {
   onSave?: () => void
   onDelete?: () => void
   showFieldSections?: boolean // Optional: show fields grouped by sections (default: false)
+  /** Optional: when provided, permission flags from cascade are applied (edit/delete). */
+  cascadeContext?: RecordEditorCascadeContext | null
 }
 
 const getCollapsedSectionsKey = (tableName: string) => `record-drawer-collapsed-sections-${tableName}`
@@ -36,6 +38,7 @@ export default function RecordDrawer({
   onSave,
   onDelete,
   showFieldSections = false,
+  cascadeContext,
 }: RecordDrawerProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
@@ -46,6 +49,7 @@ export default function RecordDrawer({
     tableFields: tableFields.length > 0 ? tableFields : null,
     modalFields: fieldNames,
     active: isOpen,
+    cascadeContext,
     onSave: () => {
       onSave?.()
       onClose()
@@ -65,6 +69,8 @@ export default function RecordDrawer({
     save,
     deleteRecord,
     handleFieldChange,
+    canEditRecords,
+    canDeleteRecords,
   } = core
 
   // Load collapsed sections state from localStorage
@@ -218,6 +224,7 @@ export default function RecordDrawer({
                                 required={field.required || false}
                                 recordId={rowId || undefined}
                                 tableName={tableName}
+                                isReadOnly={!canEditRecords}
                               />
                             )
                           })}
@@ -239,6 +246,7 @@ export default function RecordDrawer({
                       required={field.required || false}
                       recordId={rowId || undefined}
                       tableName={tableName}
+                      isReadOnly={!canEditRecords}
                     />
                   )
                 })
@@ -253,8 +261,10 @@ export default function RecordDrawer({
         <div className="border-t p-4 flex items-center justify-between gap-2">
           <button
             onClick={handleDelete}
-            disabled={deleting || !rowId}
+            disabled={deleting || !rowId || !canDeleteRecords}
             className="px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            title={!canDeleteRecords ? "You don't have permission to delete this record" : undefined}
+            aria-disabled={deleting || !rowId || !canDeleteRecords}
           >
             <Trash2 className="h-4 w-4" />
             {deleting ? "Deleting..." : "Delete"}
@@ -268,8 +278,10 @@ export default function RecordDrawer({
             </button>
             <button
               onClick={handleSave}
-              disabled={saving || !rowId}
+              disabled={saving || !rowId || !canEditRecords}
               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              title={!canEditRecords ? "You don't have permission to edit this record" : undefined}
+              aria-disabled={saving || !rowId || !canEditRecords}
             >
               <Save className="h-4 w-4" />
               {saving ? "Saving..." : "Save"}

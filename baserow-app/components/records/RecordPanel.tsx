@@ -30,12 +30,14 @@ export default function RecordPanel() {
   const resizeCleanupRef = useRef<null | (() => void)>(null)
 
   const active = Boolean(state.isOpen && state.tableId && state.recordId)
+  const cascadeContext = state.cascadeContext
   const core = useRecordEditorCore({
     tableId: state.tableId ?? "",
     recordId: state.recordId,
     supabaseTableName: state.tableName ?? undefined,
     modalFields: state.modalFields ?? [],
     active,
+    cascadeContext,
     onDeleted: () => {
       toast({
         title: "Record deleted",
@@ -45,7 +47,10 @@ export default function RecordPanel() {
     },
   })
 
-  const { loading: recordLoading, formData, setFormData, deleteRecord } = core
+  const { loading: recordLoading, formData, setFormData, deleteRecord, canEditRecords, canDeleteRecords } = core
+  // Only enforce permission flags when cascadeContext was provided (preserve current behaviour when opened from core data)
+  const allowEdit = cascadeContext != null ? canEditRecords : true
+  const allowDelete = cascadeContext != null ? canDeleteRecords : true
 
   useEffect(() => {
     if (state.isOpen && state.tableId && state.recordId) {
@@ -176,7 +181,7 @@ export default function RecordPanel() {
   }
 
   const handleFieldChange = useCallback(async (fieldName: string, value: any) => {
-    if (!state.recordId || !state.tableName) return
+    if (!state.recordId || !state.tableName || !allowEdit) return
 
     // Optimistic local update
     setFormData((prev) => ({ ...prev, [fieldName]: value }))
@@ -198,10 +203,18 @@ export default function RecordPanel() {
       })
       await refetchRecord()
     }
-  }, [state.recordId, state.tableName, toast, setFormData, refetchRecord])
+  }, [state.recordId, state.tableName, toast, setFormData, refetchRecord, allowEdit])
 
   const handleDelete = useCallback(async () => {
     if (!state.recordId || !state.tableName) return
+    if (!allowDelete) {
+      toast({
+        variant: "destructive",
+        title: "Not allowed",
+        description: "You don't have permission to delete this record.",
+      })
+      return
+    }
     try {
       await deleteRecord({
         confirmMessage: "Are you sure you want to delete this record? This action cannot be undone.",
@@ -216,7 +229,7 @@ export default function RecordPanel() {
         })
       }
     }
-  }, [state.recordId, state.tableName, deleteRecord, toast])
+  }, [state.recordId, state.tableName, deleteRecord, toast, allowDelete])
 
   const handleCopyLink = useCallback(() => {
     const url = `${window.location.origin}/tables/${state.tableId}/records/${state.recordId}`
@@ -355,6 +368,8 @@ export default function RecordPanel() {
           saving={false}
           hasChanges={false}
           loading={headerLoading}
+          canEdit={allowEdit}
+          canDelete={allowDelete}
         />
 
         {/* Toolbar */}
@@ -445,6 +460,7 @@ export default function RecordPanel() {
                 tableId={state.tableId || ""}
                 recordId={state.recordId || ""}
                 tableName={state.tableName || undefined}
+                isFieldEditable={() => allowEdit}
               />
 
               {/* Activity Section */}

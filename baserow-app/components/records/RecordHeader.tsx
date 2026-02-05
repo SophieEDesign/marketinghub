@@ -18,6 +18,9 @@ interface RecordHeaderProps {
   saving: boolean
   hasChanges: boolean
   loading: boolean
+  /** When false, edit/delete actions are disabled (permission enforcement). Default true. */
+  canEdit?: boolean
+  canDelete?: boolean
 }
 
 export default function RecordHeader({
@@ -33,6 +36,8 @@ export default function RecordHeader({
   saving,
   hasChanges,
   loading,
+  canEdit = true,
+  canDelete = true,
 }: RecordHeaderProps) {
   const [isEditingName, setIsEditingName] = useState(false)
   const [nameValue, setNameValue] = useState("")
@@ -129,12 +134,12 @@ export default function RecordHeader({
         ) : (
           <h1
             className={`text-2xl font-semibold text-gray-900 flex-1 min-w-0 truncate ${
-              primaryNameField ? "cursor-text hover:bg-gray-50 -mx-2 px-2 py-1 rounded-md transition-colors" : ""
+              primaryNameField && canEdit ? "cursor-text hover:bg-gray-50 -mx-2 px-2 py-1 rounded-md transition-colors" : ""
             }`}
             onClick={() => {
-              if (primaryNameField) setIsEditingName(true)
+              if (primaryNameField && canEdit) setIsEditingName(true)
             }}
-            title={primaryNameField ? "Click to edit" : undefined}
+            title={primaryNameField && canEdit ? "Click to edit" : primaryNameField && !canEdit ? "View only" : undefined}
           >
             {recordName || "Untitled"}
           </h1>
@@ -193,8 +198,10 @@ export default function RecordHeader({
           </button>
           <button
             onClick={onDelete}
-            className="p-2 hover:bg-red-100 rounded transition-colors"
-            title="Delete record"
+            disabled={!canDelete}
+            className="p-2 hover:bg-red-100 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title={!canDelete ? "You don't have permission to delete this record" : "Delete record"}
+            aria-disabled={!canDelete}
           >
             <Trash2 className="h-4 w-4 text-red-600" />
           </button>

@@ -65,6 +65,8 @@ interface GridViewWrapperProps {
   filterTree?: FilterTree // Canonical filter tree from filter blocks (supports groups/OR)
   modalFields?: string[] // Fields to show in modal (if empty, show all)
   modalLayout?: any // Custom modal layout (BlockConfig['modal_layout'])
+  /** Optional: when provided, permission flags are applied in RecordModal/RecordPanel. */
+  cascadeContext?: { pageConfig?: any; blockConfig?: any } | null
   appearance?: {
     show_toolbar?: boolean
     show_search?: boolean
@@ -114,6 +116,7 @@ export default function GridViewWrapper({
   onRecordClick,
   modalFields,
   modalLayout,
+  cascadeContext,
   appearance = {},
   permissions,
   hideEmptyState = false, // Hide "No columns configured" UI (for record view contexts)
@@ -875,6 +878,7 @@ export default function GridViewWrapper({
           recordOpenStyle={appearance.record_open_style || 'side_panel'}
           modalFields={modalFields}
           modalLayout={modalLayout}
+          cascadeContext={cascadeContext}
           onTableFieldsRefresh={loadFields}
           reloadKey={reloadKey}
           defaultGroupsCollapsed={defaultGroupsCollapsed}

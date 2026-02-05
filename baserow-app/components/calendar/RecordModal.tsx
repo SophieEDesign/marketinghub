@@ -12,12 +12,11 @@ import { Button } from '@/components/ui/button'
 import type { TableField } from '@/types/fields'
 import FieldEditor from '@/components/fields/FieldEditor'
 import { useToast } from '@/components/ui/use-toast'
-import { useUserRole } from '@/lib/hooks/useUserRole'
 import { isAbortError } from '@/lib/api/error-handling'
 import ModalCanvas from '@/components/interface/ModalCanvas'
 import type { BlockConfig } from '@/lib/interface/types'
 import { sectionAndSortFields } from '@/lib/fields/sectioning'
-import { useRecordEditorCore } from '@/lib/interface/record-editor-core'
+import { useRecordEditorCore, type RecordEditorCascadeContext } from '@/lib/interface/record-editor-core'
 
 export interface RecordModalProps {
   open: boolean
@@ -33,6 +32,8 @@ export interface RecordModalProps {
   supabaseTableName?: string | null // Optional: if provided, skips table info fetch for faster loading
   modalLayout?: BlockConfig['modal_layout'] // Custom modal layout
   showFieldSections?: boolean // Optional: show fields grouped by sections (default: false)
+  /** Optional: when provided, permission flags from cascade are applied (edit/create/delete). */
+  cascadeContext?: RecordEditorCascadeContext | null
 }
 
 const DEFAULT_SECTION_NAME = "General"
@@ -53,9 +54,9 @@ export default function RecordModal({
   supabaseTableName: supabaseTableNameProp,
   modalLayout,
   showFieldSections = false,
+  cascadeContext,
 }: RecordModalProps) {
   const { toast } = useToast()
-  const { role: userRole } = useUserRole()
 
   const core = useRecordEditorCore({
     tableId,
@@ -65,6 +66,7 @@ export default function RecordModal({
     modalFields,
     initialData,
     active: open,
+    cascadeContext,
     onSave: (createdId) => {
       onSave?.(createdId)
       onClose()
@@ -86,7 +88,12 @@ export default function RecordModal({
     save,
     deleteRecord,
     handleFieldChange,
+    canEditRecords,
+    canCreateRecords,
+    canDeleteRecords,
   } = core
+
+  const canSave = recordId ? canEditRecords : canCreateRecords
 
   // Load collapsed sections state from localStorage
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
@@ -140,11 +147,11 @@ export default function RecordModal({
   }
 
   async function handleDelete() {
-    if (userRole !== 'admin') {
+    if (!canDeleteRecords) {
       toast({
         variant: 'destructive',
         title: 'Not allowed',
-        description: 'Only admins can delete records here.',
+        description: "You don't have permission to delete this record.",
       })
       return
     }
@@ -212,21 +219,25 @@ export default function RecordModal({
             </DialogTitle>
           </div>
           <div className="flex items-center gap-2">
-            {recordId && userRole === 'admin' && (
-              <Button
-                variant="destructive"
-                onClick={handleDelete}
-                disabled={deleting || saving || loading}
-                title="Delete this record"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                {deleting ? 'Deleting…' : 'Delete'}
-              </Button>
-            )}
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={!recordId || deleting || saving || loading || !canDeleteRecords}
+              title={!canDeleteRecords ? "You don't have permission to delete this record" : "Delete this record"}
+              aria-disabled={!recordId || !canDeleteRecords || deleting || saving || loading}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              {deleting ? 'Deleting…' : 'Delete'}
+            </Button>
             <Button variant="outline" onClick={onClose} disabled={deleting || saving}>
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={saving || loading}>
+            <Button
+              onClick={handleSave}
+              disabled={saving || loading || !canSave}
+              title={!canSave ? (recordId ? "You don't have permission to edit this record" : "You don't have permission to create records") : undefined}
+              aria-disabled={saving || loading || !canSave}
+            >
               <Save className="mr-2 h-4 w-4" />
               {saving ? 'Saving...' : 'Save'}
             </Button>
@@ -250,7 +261,7 @@ export default function RecordModal({
                     recordId={recordId}
                     tableName={effectiveTableName || ''}
                     tableFields={tableFields}
-                    pageEditable={userRole === 'admin'}
+                    pageEditable={canEditRecords}
                     editableFieldNames={tableFields.map(f => f.name)}
                     onFieldChange={handleFieldChange}
                     layoutSettings={modalLayout?.layoutSettings}
@@ -291,6 +302,7 @@ export default function RecordModal({
                                 required={field.required || false}
                                 recordId={recordId || undefined}
                                 tableName={effectiveTableName || undefined}
+                                isReadOnly={!canEditRecords}
                               />
                             )
                           })}
@@ -312,6 +324,7 @@ export default function RecordModal({
                       required={field.required || false}
                       recordId={recordId || undefined}
                       tableName={effectiveTableName || undefined}
+                      isReadOnly={!canEditRecords}
                     />
                   )
                 })

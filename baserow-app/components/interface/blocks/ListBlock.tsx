@@ -380,6 +380,7 @@ export default function ListBlock({
           initialData={createInitialData}
           onSave={handleCreateRecordSave}
           supabaseTableName={table.supabase_table}
+          cascadeContext={{ blockConfig: config }}
         />
       )}
       {(((appearance.showTitle ?? (appearance as any).show_title) !== false && (appearance.title || (isEditing ? config.title : table?.name))) || showAddRecord) && (
@@ -445,6 +446,7 @@ export default function ListBlock({
         reloadKey={refreshKey}
         onHeightChange={(groupBy || (groupByRulesFromConfig && groupByRulesFromConfig.length > 0)) ? handleHeightChange : undefined}
         rowHeight={rowHeight}
+        cascadeContext={{ blockConfig: config }}
       />
     </div>
   )

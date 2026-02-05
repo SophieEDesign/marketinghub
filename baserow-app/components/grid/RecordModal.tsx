@@ -11,14 +11,13 @@ import {
 import { createClient } from "@/lib/supabase/client"
 import RecordFields from "@/components/records/RecordFields"
 import { useToast } from "@/components/ui/use-toast"
-import { useUserRole } from "@/lib/hooks/useUserRole"
 import { Trash2 } from "lucide-react"
 import { isAbortError } from "@/lib/api/error-handling"
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
 import ModalCanvas from "@/components/interface/ModalCanvas"
 import type { BlockConfig } from "@/lib/interface/types"
 import { useMemo } from "react"
-import { useRecordEditorCore } from "@/lib/interface/record-editor-core"
+import { useRecordEditorCore, type RecordEditorCascadeContext } from "@/lib/interface/record-editor-core"
 
 interface RecordModalProps {
   isOpen: boolean
@@ -29,6 +28,8 @@ interface RecordModalProps {
   tableName: string
   modalFields?: string[] // Fields to show in modal (if empty, show all)
   modalLayout?: BlockConfig['modal_layout'] // Custom modal layout
+  /** Optional: when provided, permission flags from cascade are applied (edit/delete). */
+  cascadeContext?: RecordEditorCascadeContext | null
 }
 
 export default function RecordModal({
@@ -40,11 +41,11 @@ export default function RecordModal({
   tableName,
   modalFields,
   modalLayout,
+  cascadeContext,
 }: RecordModalProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const supabase = createClient()
   const { toast } = useToast()
-  const { role: userRole } = useUserRole()
 
   const core = useRecordEditorCore({
     tableId,
@@ -52,6 +53,7 @@ export default function RecordModal({
     supabaseTableName: tableName,
     modalFields: modalFields ?? [],
     active: isOpen,
+    cascadeContext,
     onDeleted: async () => {
       toast({ title: "Record deleted", description: "The record has been deleted." })
       await onDeleted?.()
@@ -68,10 +70,12 @@ export default function RecordModal({
     deleting,
     normalizeUpdateValue,
     deleteRecord,
+    canEditRecords,
+    canDeleteRecords,
   } = core
 
   async function handleFieldChange(fieldName: string, value: any) {
-    if (!record || !tableNameFromCore) return
+    if (!record || !tableNameFromCore || !canEditRecords) return
 
     try {
       const normalizedValue = normalizeUpdateValue(fieldName, value)
@@ -122,11 +126,11 @@ export default function RecordModal({
 
   async function handleDeleteRecord() {
     if (!tableNameFromCore || !recordId) return
-    if (userRole !== 'admin') {
+    if (!canDeleteRecords) {
       toast({
         variant: "destructive",
         title: "Not allowed",
-        description: "Only admins can delete records here.",
+        description: "You don't have permission to delete this record.",
       })
       return
     }
@@ -180,17 +184,16 @@ export default function RecordModal({
           <div className="flex items-center justify-between gap-3">
             <DialogTitle>Record Details</DialogTitle>
             <div className="flex items-center gap-2">
-              {userRole === 'admin' && (
-                <button
-                  onClick={handleDeleteRecord}
-                  disabled={deleting || loading}
-                  className="p-2 rounded-md hover:bg-red-50 transition-colors disabled:opacity-50"
-                  aria-label="Delete record"
-                  title="Delete"
-                >
-                  <Trash2 className="h-4 w-4 text-red-600" />
-                </button>
-              )}
+              <button
+                onClick={handleDeleteRecord}
+                disabled={deleting || loading || !canDeleteRecords}
+                className="p-2 rounded-md hover:bg-red-50 transition-colors disabled:opacity-50"
+                aria-label="Delete record"
+                aria-disabled={!canDeleteRecords || deleting || loading}
+                title={!canDeleteRecords ? "You don't have permission to delete this record" : "Delete"}
+              >
+                <Trash2 className="h-4 w-4 text-red-600" />
+              </button>
               <button
                 onClick={onClose}
                 className="p-2 rounded-md hover:bg-gray-100 transition-colors"
@@ -216,7 +219,7 @@ export default function RecordModal({
                     recordId={recordId}
                     tableName={tableNameFromCore || tableName}
                     tableFields={fields}
-                    pageEditable={userRole === 'admin'}
+                    pageEditable={canEditRecords}
                     editableFieldNames={fields.map(f => f.name)}
                     onFieldChange={handleFieldChange}
                     layoutSettings={modalLayout.layoutSettings}
@@ -231,7 +234,7 @@ export default function RecordModal({
                   tableId={tableId}
                   recordId={recordId}
                   tableName={tableNameFromCore || tableName}
-                  isFieldEditable={() => true}
+                  isFieldEditable={() => canEditRecords}
                 />
               )}
 
@@ -240,9 +243,10 @@ export default function RecordModal({
                 <button
                   type="button"
                   onClick={handleDeleteRecord}
-                  disabled={deleting || loading || userRole !== 'admin'}
+                  disabled={deleting || loading || !canDeleteRecords}
                   className="inline-flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={userRole !== 'admin' ? 'Only admins can delete records' : 'Delete this record'}
+                  title={!canDeleteRecords ? "You don't have permission to delete this record" : "Delete this record"}
+                  aria-disabled={!canDeleteRecords || deleting || loading}
                 >
                   <Trash2 className="h-4 w-4" />
                   Delete record
