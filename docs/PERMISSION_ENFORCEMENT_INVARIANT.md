@@ -11,7 +11,7 @@
 
 Shells that use the core with `cascadeContext` must honour these flags in UI (disabled buttons, read-only fields, no-op handlers) and rely on the core to gate `save()` and `deleteRecord()` when context is present.
 
-See: `baserow-app/lib/interface/record-editor-core.ts`, `docs/audits/PERMISSION_ENFORCEMENT_VERIFICATION.md`.
+See: `baserow-app/lib/interface/record-editor-core.ts`, [docs/audits/PERMISSION_ENFORCEMENT_VERIFICATION.md](audits/PERMISSION_ENFORCEMENT_VERIFICATION.md), [docs/audits/PERMISSION_ENFORCEMENT_FINAL_HARDENING.md](audits/PERMISSION_ENFORCEMENT_FINAL_HARDENING.md).
 
 ---
 

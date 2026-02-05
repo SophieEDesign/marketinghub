@@ -263,8 +263,18 @@ export function useRecordEditorCore(
     if (!effectiveTableName) return
     // Optional defence-in-depth: only enforce when cascadeContext was provided; do not change successful paths
     if (cascadeContext != null) {
-      if (recordId && !canEditRecords) return
-      if (!recordId && !canCreateRecords) return
+      if (recordId && !canEditRecords) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[record-editor-core] save() early-return: cascadeContext present and !canEditRecords (edit blocked by permissions).')
+        }
+        return
+      }
+      if (!recordId && !canCreateRecords) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[record-editor-core] save() early-return: cascadeContext present and !canCreateRecords (create blocked by permissions).')
+        }
+        return
+      }
     }
     setSaving(true)
     try {
@@ -314,7 +324,12 @@ export function useRecordEditorCore(
     async (opts?: { confirmMessage?: string; skipConfirm?: boolean }) => {
       if (!recordId || !effectiveTableName) return
       // Optional defence-in-depth: only enforce when cascadeContext was provided
-      if (cascadeContext != null && !canDeleteRecords) return
+      if (cascadeContext != null && !canDeleteRecords) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[record-editor-core] deleteRecord() early-return: cascadeContext present and !canDeleteRecords (delete blocked by permissions).')
+        }
+        return
+      }
       if (opts?.skipConfirm !== true) {
         const msg = opts?.confirmMessage ?? 'Are you sure you want to delete this record? This action cannot be undone.'
         if (!confirm(msg)) return

@@ -52,6 +52,24 @@ export default function RecordPanel() {
   const allowEdit = cascadeContext != null ? canEditRecords : true
   const allowDelete = cascadeContext != null ? canDeleteRecords : true
 
+  // Dev-only guardrail: warn when RecordPanel opens without cascadeContext (surfaces call sites that may want to pass context later)
+  const warnedOpenWithoutContextRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'development') return
+    if (!active || cascadeContext != null) {
+      warnedOpenWithoutContextRef.current = null
+      return
+    }
+    const key = `${state.tableId ?? ''}:${state.recordId ?? ''}`
+    if (warnedOpenWithoutContextRef.current === key) return
+    warnedOpenWithoutContextRef.current = key
+    console.warn(
+      '[RecordPanel] Opened without cascadeContext — permissions are permissive (allowEdit/allowDelete true). ' +
+      'Pass cascadeContext from the caller (e.g. block config) to enforce canEditRecords/canDeleteRecords. ' +
+      'See docs/audits/PERMISSION_ENFORCEMENT_FINAL.md.'
+    )
+  }, [active, cascadeContext, state.tableId, state.recordId])
+
   useEffect(() => {
     if (state.isOpen && state.tableId && state.recordId) {
       setFieldsLoaded(false)

@@ -90,3 +90,5 @@
 
 - When `cascadeContext` is null (e.g. core data table/view, or RecordPanel opened from views that do not pass context): core `save()` and `deleteRecord()` do **not** enforce permissions (the `if (cascadeContext != null)` blocks are skipped). RecordPanel sets `allowEdit = true` and `allowDelete = true` when `cascadeContext == null`. So core data flows remain spreadsheet-like and unchanged.
 
+**See also:** [PERMISSION_ENFORCEMENT_FINAL_HARDENING.md](PERMISSION_ENFORCEMENT_FINAL_HARDENING.md) — final hardening audit (no behaviour change).
+
