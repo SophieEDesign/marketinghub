@@ -11,20 +11,21 @@ Each section is one commit + one push. If something breaks after a section, reve
 **Done (on branch `revert-to-7fec709`):**
 
 
-| Section | What was applied                                                                                                                                                                                                            |
-| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **1**   | BlockConfig types (image field comment). HorizontalGroupedView already used `const` — no change.                                                                                                                            |
-| **2**   | ViewFilterInput, ViewFilterGroupInput, `dbFiltersToFilterTree` accepts partial data. (No `parseFilterValue` — not in this codebase.)                                                                                        |
-| **3**   | computeLookupValues: `getLookupDisplayValue()` helper for when metadata field name ≠ DB column. (No RLS migrations or full retry logic.)                                                                                    |
-| **12**  | Navigation progress bar: new `NavigationProgress.tsx`, CSS in globals.css, added to root layout.                                                                                                                            |
-| **6**   | Filter dialog, CSV, filter/grid view error handling (AbortError, retry, BlockRenderer useMemo, useGridData retry, computeLookupValues, lib/data 500 retry, CSVImportPanel ignore + defaultValuesForAll).                    |
-| **9**   | Filter groups AND/OR and filter UI (FilterTree in useGridData, is_any_of/is_not_any_of types and evaluation, FilterDialog condition_type, field-operators, evaluateFilterTree is_any_of).                                   |
-| **10**  | Click to add row (lib/data evaluateFilterTree, AirtableGridView new-row, GridView click row).                                                                                                                               |
-| **11**  | BlockAppearanceWrapper and appearance flow (getAppearanceClasses → "", fixed padding, hasAppearanceSettings without container/spacing).                                                                                     |
-| **14**  | LookupFieldPicker and FieldBuilderModal display modes (linked_field_display_mode 'list', FieldAppearanceSettings list option).                                                                                              |
-| **15**  | Interface builder, block settings, grouping labels, Canvas (linkedFields UUID casing, groupTree lookup/raw, HorizontalGroupedCanvasModal settings dialog, HorizontalGroupedView onBlockSettingsClick, defaultBlockH, toId). |
-| **7**   | Modal, navigation, FieldBuilderModal (getOptionValueToLabelMap in select-options, KanbanView groupValueToLabel + displayName + groupingFieldName label match; HorizontalGroupedCanvasModal/NavigationDiagnostics layout already present). |
+| Section | What was applied                                                                                                                                                                                                                                            |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1**   | BlockConfig types (image field comment). HorizontalGroupedView already used `const` — no change.                                                                                                                                                            |
+| **2**   | ViewFilterInput, ViewFilterGroupInput, `dbFiltersToFilterTree` accepts partial data. (No `parseFilterValue` — not in this codebase.)                                                                                                                        |
+| **3**   | computeLookupValues: `getLookupDisplayValue()` helper for when metadata field name ≠ DB column. (No RLS migrations or full retry logic.)                                                                                                                    |
+| **12**  | Navigation progress bar: new `NavigationProgress.tsx`, CSS in globals.css, added to root layout.                                                                                                                                                            |
+| **6**   | Filter dialog, CSV, filter/grid view error handling (AbortError, retry, BlockRenderer useMemo, useGridData retry, computeLookupValues, lib/data 500 retry, CSVImportPanel ignore + defaultValuesForAll).                                                    |
+| **9**   | Filter groups AND/OR and filter UI (FilterTree in useGridData, is_any_of/is_not_any_of types and evaluation, FilterDialog condition_type, field-operators, evaluateFilterTree is_any_of).                                                                   |
+| **10**  | Click to add row (lib/data evaluateFilterTree, AirtableGridView new-row, GridView click row).                                                                                                                                                               |
+| **11**  | BlockAppearanceWrapper and appearance flow (getAppearanceClasses → "", fixed padding, hasAppearanceSettings without container/spacing).                                                                                                                     |
+| **14**  | LookupFieldPicker and FieldBuilderModal display modes (linked_field_display_mode 'list', FieldAppearanceSettings list option).                                                                                                                              |
+| **15**  | Interface builder, block settings, grouping labels, Canvas (linkedFields UUID casing, groupTree lookup/raw, HorizontalGroupedCanvasModal settings dialog, HorizontalGroupedView onBlockSettingsClick, defaultBlockH, toId).                                 |
+| **7**   | Modal, navigation, FieldBuilderModal (getOptionValueToLabelMap in select-options, KanbanView groupValueToLabel + displayName + groupingFieldName label match; HorizontalGroupedCanvasModal/NavigationDiagnostics layout already present).                   |
 | **13**  | Modal layout and layout settings (canvas-layout-defaults.ts, MODAL_CANVAS_LAYOUT_CONSTRAINTS, Canvas CANVAS_LAYOUT_DEFAULTS + sync skip + resize compact, ModalCanvas/ModalLayoutEditor shared defaults + layoutSettings, RecordModal layoutSettings prop). |
+| **5**   | GridView formatting and error handling (ErrLike type and type-safe error message/code extraction in GridView). |
 
 
 **Skipped / not applicable:**
@@ -36,12 +37,7 @@ Each section is one commit + one push. If something breaks after a section, reve
 | **8**   | ViewPage has no getViews/debug block to refactor.                                                        |
 
 
-**Left to do (in order):**
-
-
-| #   | Section                                | Risk       |
-| --- | -------------------------------------- | ---------- |
-| 5   | GridView formatting and error handling | Medium     |
+**Left to do (in order):** None.
 
 
 **Not in plan (per your choices):** Cap-aware pagination, CoreDataViewTabs, context menu/sidebar, duplicate CalendarView import.

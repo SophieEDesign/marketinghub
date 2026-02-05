@@ -1906,11 +1906,13 @@ export default function GridView({
           raw: error,
         })
         // Check if table doesn't exist - check multiple error patterns
-        const errorMessage = (error as any)?.message || ''
+        type ErrLike = { code?: string; message?: string }
+        const errObj = error as ErrLike | null | undefined
+        const errorMessage = errObj?.message ?? ''
         // IMPORTANT: be strict here. "column ... does not exist" is NOT a missing table.
         const isTableNotFound =
-          error.code === "42P01" ||
-          error.code === "PGRST205" ||
+          (errObj?.code === "42P01") ||
+          (errObj?.code === "PGRST205") ||
           (typeof errorMessage === 'string' && (
             errorMessage.includes("Could not find the table") ||
             /relation\s+.+\s+does not exist/i.test(errorMessage)
