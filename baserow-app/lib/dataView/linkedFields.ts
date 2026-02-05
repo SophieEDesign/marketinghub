@@ -58,6 +58,7 @@ export function getDisplayFieldNameForLinkedTable(params: {
   if (!displayFieldName && targetFields) {
     const asTableFields: TableField[] = targetFields.map((f) => ({
       ...f,
+      type: f.type as TableField['type'],
       table_id: '',
       position: 0,
       created_at: '',
