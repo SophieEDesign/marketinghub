@@ -96,18 +96,20 @@ export default function NavigationDiagnostics() {
     }
 
     // Run diagnostics on pathname change
-    // Only show detailed diagnostics if there's an issue, otherwise just a summary
-    const runDiagnostics = (isDelayedCheck = false) => {
+    // Sidebar lives in WorkspaceShell (page-level), so it may mount after root layout — allow time for it.
+    const runDiagnostics = (checkKind: 'immediate' | 'short' | 'final') => {
       const sidebarCheck = document.querySelector('[data-sidebar]')
       if (!sidebarCheck) {
-        // During navigation transitions, sidebar might be temporarily unmounted
-        // Only show error if this is a delayed check (after navigation should have completed)
-        if (!isDelayedCheck) {
-          // Skip immediate check during navigation - will check again after delay
+        // Skip immediate check; sidebar often isn't in DOM yet (page-level layout).
+        if (checkKind === 'immediate') return
+        if (checkKind === 'short') {
+          // After 1s: might still be loading — don't treat as critical yet
+          console.log("🔍 Navigation Diagnostics: Sidebar not yet found (may still be loading)")
           return
         }
+        // checkKind === 'final': after 2.5s, treat as missing
         console.group("🔍 Navigation Diagnostics - ISSUES DETECTED")
-        console.error("❌ CRITICAL: Sidebar not found! Looking for [data-sidebar] attribute")
+        console.warn("⚠️ Sidebar not found after load. Looking for [data-sidebar] attribute")
         // Try to find sidebar by other means
         const possibleSidebars = document.querySelectorAll('[class*="sidebar"], [class*="Sidebar"], aside')
         console.log("🔍 Possible sidebar elements found:", Array.from(possibleSidebars).map(el => ({
@@ -295,14 +297,15 @@ export default function NavigationDiagnostics() {
       console.groupEnd()
     }
 
-    // Run after a delay to allow navigation to complete and sidebar to mount
-    // First check is delayed to avoid false positives during navigation transitions
-    const timeout1 = setTimeout(() => runDiagnostics(false), 100)
-    const timeout2 = setTimeout(() => runDiagnostics(true), 1000)
+    // Run after delays so page-level sidebar (WorkspaceShell) has time to mount
+    const t1 = setTimeout(() => runDiagnostics('immediate'), 100)
+    const t2 = setTimeout(() => runDiagnostics('short'), 1000)
+    const t3 = setTimeout(() => runDiagnostics('final'), 2500)
 
     return () => {
-      clearTimeout(timeout1)
-      clearTimeout(timeout2)
+      clearTimeout(t1)
+      clearTimeout(t2)
+      clearTimeout(t3)
     }
   }, [pathname, enabled])
 
@@ -310,11 +313,8 @@ export default function NavigationDiagnostics() {
   useEffect(() => {
     if (!enabled) return
 
-    // First, verify sidebar exists
-    const sidebarExists = document.querySelector('[data-sidebar]')
-    if (!sidebarExists) {
-      console.error("❌ Sidebar not found! Click detection may not work.")
-    }
+    // Sidebar is in page-level layout (WorkspaceShell) — it may not exist at effect run time.
+    // Click detection still works once the sidebar is in the DOM; no error needed here.
 
     const handleClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement

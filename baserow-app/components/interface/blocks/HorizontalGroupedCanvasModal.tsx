@@ -106,14 +106,15 @@ export default function HorizontalGroupedCanvasModal({
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full flex flex-col p-0">
-        <DialogHeader className="px-6 pt-6 pb-4 border-b">
+        <DialogHeader className="flex-shrink-0 px-6 pt-6 pb-4 border-b">
           <DialogTitle>Edit record card layout</DialogTitle>
           <DialogDescription>
             Drag blocks to rearrange; use the corner handle to resize. Changes save automatically.
           </DialogDescription>
         </DialogHeader>
         
-        <div className="flex-1 overflow-hidden min-h-0">
+        {/* Scrollable content - same behavior as record view right panel, modal does not interfere with interface */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
           <HorizontalGroupedView
             tableId={tableId}
             viewId={block.id}
@@ -159,7 +160,7 @@ export default function HorizontalGroupedCanvasModal({
           )
         })()}
 
-        <div className="px-6 py-4 border-t flex justify-end gap-2">
+        <div className="flex-shrink-0 px-6 py-4 border-t flex justify-end gap-2">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
