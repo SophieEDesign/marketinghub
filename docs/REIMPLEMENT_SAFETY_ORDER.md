@@ -259,6 +259,6 @@ Repeat for Section 2, 3, etc., using the section commit messages in this doc.
 
 - Cap-aware pagination / row limits (7950a21078, fbd0129de1, etc.)
 - CoreDataViewTabs (7b6f395fbc)
-- Context menu / sidebar (790afa16a6)
+- Context menu / sidebar (790afa16a6) — leave as removed for now
 - Duplicate CalendarView import (4828eb91e3)
 

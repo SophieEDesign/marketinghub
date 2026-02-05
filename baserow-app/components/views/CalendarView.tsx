@@ -28,7 +28,7 @@ import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
 import CalendarDateRangeControls from "@/components/views/calendar/CalendarDateRangeControls"
 import TimelineFieldValue from "@/components/views/TimelineFieldValue"
 import { isAbortError } from "@/lib/api/error-handling"
-import { resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
+import { getLinkedFieldValueFromRow, linkedValueToIds, resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
 import { normalizeUuid } from "@/lib/utils/ids"
 import type { HighlightRule } from "@/lib/interface/types"
 import { evaluateHighlightRules, getFormattingStyle } from "@/lib/conditional-formatting/evaluator"
@@ -770,17 +770,6 @@ export default function CalendarView({
   useEffect(() => {
     let cancelled = false
 
-    const collectIds = (raw: unknown): string[] => {
-      if (raw == null) return []
-      if (Array.isArray(raw)) return raw.flatMap(collectIds)
-      if (typeof raw === "object") {
-        if (raw && "id" in raw) return [String((raw as any).id)]
-        return []
-      }
-      const s = String(raw).trim()
-      return s ? [s] : []
-    }
-
     async function load() {
       const idsToResolve = new Map<string, { field: LinkedField; ids: Set<string> }>()
 
@@ -790,7 +779,6 @@ export default function CalendarView({
         return loadedTableFields.find((f: TableField) => f.name === trimmed || f.id === trimmed) || null
       }
 
-      // Calendar cards are driven by `fieldIds` (fields to show in cards/table).
       for (const fid of Array.isArray(fieldIds) ? fieldIds : []) {
         const f = resolveFieldObj(fid)
         if (!f || f.type !== "link_to_table") continue
@@ -803,9 +791,9 @@ export default function CalendarView({
       }
 
       for (const row of Array.isArray(filteredRows) ? filteredRows : []) {
-        const data = (row as any)?.data || {}
         for (const { field, ids } of idsToResolve.values()) {
-          for (const id of collectIds(data[field.name])) ids.add(id)
+          const fieldValue = getLinkedFieldValueFromRow(row as { data?: Record<string, unknown> }, field)
+          for (const id of linkedValueToIds(fieldValue)) ids.add(id)
         }
       }
 

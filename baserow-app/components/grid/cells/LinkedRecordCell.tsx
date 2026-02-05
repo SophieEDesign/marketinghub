@@ -10,6 +10,7 @@ import { toPostgrestColumn } from "@/lib/supabase/postgrest"
 import RecordModal from "@/components/calendar/RecordModal"
 import { createLookupFieldConfig } from "@/lib/fields/linkedFieldConfig"
 
+/** Stored and UI shapes for a linked field; aligned with getLinkedFieldValueFromRow normalization. */
 type LinkedValue =
   | string
   | { id: string; value?: string; label?: string; name?: string }

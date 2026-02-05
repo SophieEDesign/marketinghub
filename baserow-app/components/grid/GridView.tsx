@@ -59,7 +59,7 @@ import type { GroupRule } from "@/lib/grouping/types"
 import { isAbortError } from "@/lib/api/error-handling"
 import { normalizeUuid } from "@/lib/utils/ids"
 import type { LinkedField } from "@/types/fields"
-import { resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
+import { getLinkedFieldValueFromRow, linkedValueToIds, resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
 import { debugLog, debugWarn, debugError } from "@/lib/interface/debug-flags"
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
 import {
@@ -152,17 +152,6 @@ function arrayShallowEqual(a: string[], b: string[]): boolean {
     if (a[i] !== b[i]) return false
   }
   return true
-}
-
-function collectLinkedIds(raw: unknown): string[] {
-  if (raw == null) return []
-  if (Array.isArray(raw)) return raw.flatMap(collectLinkedIds)
-  if (typeof raw === "object") {
-    if (raw && "id" in raw) return [String((raw as { id: unknown }).id)]
-    return []
-  }
-  const s = String(raw).trim()
-  return s ? [s] : []
 }
 
 function extractCurlyFieldRefs(formula: string): string[] {
@@ -2666,7 +2655,8 @@ export default function GridView({
       for (const f of groupedLinkFields) {
         const ids = new Set<string>()
         for (const row of asArray<Record<string, any>>(filteredRows)) {
-          for (const id of collectLinkedIds((row as any)?.[f.name])) ids.add(id)
+          const fieldValue = getLinkedFieldValueFromRow(row, f)
+          for (const id of linkedValueToIds(fieldValue)) ids.add(id)
         }
         if (ids.size === 0) continue
         const map = await resolveLinkedFieldDisplayMap(f, Array.from(ids))

@@ -1,14 +1,27 @@
 /**
  * Linked Field Utilities
- * 
+ *
  * Helper functions for resolving linked field values between IDs and display names.
  * Used for copy/paste operations where users work with display names but we store IDs.
  */
 
 import { createClient } from '@/lib/supabase/client'
-import type { TableField, LinkedField } from '@/types/fields'
+import type { FieldOptions, LinkedField } from '@/types/fields'
 import { getPrimaryFieldName } from '@/lib/fields/primary'
 import { toPostgrestColumn } from '@/lib/supabase/postgrest'
+
+/** Row shape from tables select (supabase_table, primary_field_name). */
+export interface TargetTableRow {
+  supabase_table: string
+  primary_field_name?: string | null
+}
+
+/** Row shape from table_fields select (id, name, type). */
+export interface TargetFieldRow {
+  id: string
+  name: string
+  type: string
+}
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 function isUuid(v: unknown): v is string {
@@ -16,8 +29,151 @@ function isUuid(v: unknown): v is string {
 }
 
 /**
+ * Determine which field name to use for display labels for a linked table.
+ * Fallback order: 1) table primary field, 2) linked_field_id, 3) first text-like field, 4) null (use IDs).
+ */
+export function getDisplayFieldNameForLinkedTable(params: {
+  targetTable: TargetTableRow
+  targetFields: TargetFieldRow[] | null
+  linkedFieldId?: string | null
+}): string | null {
+  const { targetTable, targetFields, linkedFieldId } = params
+  let displayFieldName: string | null = null
+
+  const configuredPrimary =
+    typeof targetTable.primary_field_name === 'string' &&
+    String(targetTable.primary_field_name).trim().length > 0
+      ? String(targetTable.primary_field_name).trim()
+      : null
+
+  if (configuredPrimary === 'id') {
+    displayFieldName = null
+  } else if (configuredPrimary && targetFields) {
+    const safe = toPostgrestColumn(configuredPrimary)
+    if (safe && targetFields.some((f) => f.name === safe)) {
+      displayFieldName = safe
+    }
+  }
+
+  if (!displayFieldName && targetFields) {
+    displayFieldName = getPrimaryFieldName(targetFields)
+  }
+
+  if (!displayFieldName && linkedFieldId && targetFields) {
+    const linkedField = targetFields.find(
+      (f) => f.id === linkedFieldId || f.name === linkedFieldId
+    )
+    if (linkedField) {
+      displayFieldName = linkedField.name
+    }
+  }
+
+  if (!displayFieldName && targetFields) {
+    const textField = targetFields.find((f) =>
+      ['text', 'long_text', 'email', 'url'].includes(f.type)
+    )
+    if (textField) {
+      displayFieldName = textField.name
+    }
+  }
+
+  return displayFieldName
+}
+
+/** Field row from table_fields used in sync (id, name, type, options, table_id). */
+interface LinkFieldRow {
+  id: string
+  name: string
+  type: string
+  options?: FieldOptions | null
+  table_id: string
+}
+
+/** Table row from tables used in sync (id, supabase_table). */
+interface TableRowForSync {
+  id: string
+  supabase_table: string
+}
+
+/**
+ * Safely read a linked-field value from a record (string, string[], or null).
+ * Used when reading from Supabase select to avoid any-typed access.
+ */
+function getLinkedFieldValueFromRecord(
+  record: Record<string, unknown>,
+  fieldName: string
+): string | string[] | null {
+  const v = record[fieldName]
+  if (v === null || v === undefined) return null
+  if (typeof v === 'string') return v
+  if (Array.isArray(v)) return v
+  return null
+}
+
+/**
+ * Canonical stored value for a linked field: single ID, multiple IDs, or empty.
+ * Row data may also contain legacy/UI shapes (e.g. { id: string } or mixed arrays);
+ * use getLinkedFieldValueFromRow to normalize for resolution.
+ */
+export type LinkedFieldStoredValue = string | string[] | null
+
+/**
+ * Read and normalize a linked field value from a row (by field name or id).
+ * Handles stored shape (string | string[]), legacy/UI shapes (object with id, or array of same).
+ * Supports both row shapes: row.data[fieldName] or flat row[fieldName].
+ * Returns null when missing or empty.
+ */
+export function getLinkedFieldValueFromRow(
+  row: { data?: Record<string, unknown> } & Record<string, unknown>,
+  field: LinkedField
+): LinkedFieldStoredValue | null {
+  const data = row.data ?? row
+  const raw =
+    data[field.name] ??
+    (field.id ? data[field.id] : undefined)
+
+  if (raw === null || raw === undefined) {
+    return null
+  }
+
+  if (typeof raw === 'string') {
+    const s = raw.trim()
+    return s.length > 0 ? s : null
+  }
+
+  if (Array.isArray(raw)) {
+    const ids: string[] = []
+    for (const v of raw) {
+      if (typeof v === 'string' && v.trim()) {
+        ids.push(v.trim())
+      } else if (v && typeof v === 'object' && 'id' in v && v.id != null) {
+        ids.push(String(v.id))
+      }
+    }
+    if (ids.length === 0) return null
+    return ids
+  }
+
+  if (typeof raw === 'object' && raw !== null && 'id' in raw && raw.id != null) {
+    return String(raw.id)
+  }
+
+  return null
+}
+
+/**
+ * Flatten a stored linked value to an array of ID strings for resolution.
+ */
+export function linkedValueToIds(value: LinkedFieldStoredValue | null): string[] {
+  if (value == null) return []
+  if (Array.isArray(value)) return value.filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
+  const s = typeof value === 'string' ? value.trim() : ''
+  return s ? [s] : []
+}
+
+/**
  * Resolve a linked field value to display labels
- * 
+ *
  * @param field - Linked field definition
  * @param value - Stored value (UUID string or string[] for multi-link)
  * @returns Display label(s) - comma-separated string for multi-link
@@ -37,7 +193,6 @@ export async function resolveLinkedFieldDisplay(
 
   const supabase = createClient()
 
-  // Get target table info
   const { data: targetTable, error: tableError } = await supabase
     .from('tables')
     .select('supabase_table, primary_field_name')
@@ -49,62 +204,25 @@ export async function resolveLinkedFieldDisplay(
     return String(value)
   }
 
-  // Determine which field to use for display
-  // Explicit fallback order:
-  // 1. Table's primary field (core data)
-  // 2. linked_field_id (if set)
-  // 3. First text-like field
-  // 4. Finally ID display
+  const tableRow: TargetTableRow = {
+    supabase_table: targetTable.supabase_table,
+    primary_field_name: targetTable.primary_field_name ?? null,
+  }
+
   const { data: targetFields } = await supabase
     .from('table_fields')
     .select('id, name, type')
     .eq('table_id', linkedTableId)
     .order('position', { ascending: true })
 
-  const linkedFieldId = field.options?.linked_field_id
+  const fieldRows: TargetFieldRow[] = Array.isArray(targetFields) ? targetFields : []
 
-  let displayFieldName: string | null = null
+  const displayFieldName = getDisplayFieldNameForLinkedTable({
+    targetTable: tableRow,
+    targetFields: fieldRows.length > 0 ? fieldRows : null,
+    linkedFieldId: field.options?.linked_field_id ?? null,
+  })
 
-  // 1. Table's primary field
-  const configuredPrimary =
-    typeof (targetTable as any)?.primary_field_name === 'string' &&
-    String((targetTable as any).primary_field_name).trim().length > 0
-      ? String((targetTable as any).primary_field_name).trim()
-      : null
-
-  if (configuredPrimary === 'id') {
-    displayFieldName = null
-  } else if (configuredPrimary) {
-    const safe = toPostgrestColumn(configuredPrimary)
-    if (safe && targetFields?.some((f: any) => f.name === safe)) {
-      displayFieldName = safe
-    }
-  }
-
-  if (!displayFieldName) {
-    displayFieldName = getPrimaryFieldName(targetFields as any)
-  }
-
-  // 2. linked_field_id (if set)
-  if (!displayFieldName && linkedFieldId && targetFields) {
-    // linked_field_id can be either a field ID or field name
-    const linkedField = targetFields.find(f => f.id === linkedFieldId || f.name === linkedFieldId)
-    if (linkedField) {
-      displayFieldName = linkedField.name
-    }
-  }
-
-  // 3. First text-like field
-  if (!displayFieldName && targetFields) {
-    const textField = targetFields.find(f =>
-      ['text', 'long_text', 'email', 'url'].includes(f.type)
-    )
-    if (textField) {
-      displayFieldName = textField.name
-    }
-  }
-
-  // If still no display field, we'll just show IDs
   if (!displayFieldName) {
     return Array.isArray(value) ? value.join(', ') : String(value)
   }
@@ -137,10 +255,13 @@ export async function resolveLinkedFieldDisplay(
     return Array.isArray(value) ? value.join(', ') : String(value)
   }
 
-  // Map IDs to display values
-  const displayMap = new Map(
-    records.map((r: any) => [r.id, r[displayFieldName!] || ''])
-  )
+  const displayMap = new Map<string, string>()
+  for (const r of records as Record<string, unknown>[]) {
+    const id = r?.id != null ? String(r.id) : ''
+    if (!id) continue
+    const label = r[displayFieldName] != null ? String(r[displayFieldName]) : ''
+    displayMap.set(id, label || '')
+  }
 
   const labels = uuidIds.map(id => displayMap.get(id) || id)
   // Append any legacy (non-UUID) values we couldn't resolve.
@@ -185,44 +306,24 @@ export async function resolveLinkedFieldDisplayMap(
     return out
   }
 
+  const tableRow: TargetTableRow = {
+    supabase_table: targetTable.supabase_table,
+    primary_field_name: targetTable.primary_field_name ?? null,
+  }
+
   const { data: targetFields } = await supabase
     .from('table_fields')
     .select('id, name, type')
     .eq('table_id', linkedTableId)
     .order('position', { ascending: true })
 
-  const linkedFieldId = field.options?.linked_field_id
+  const fieldRows: TargetFieldRow[] = Array.isArray(targetFields) ? targetFields : []
 
-  let displayFieldName: string | null = null
-
-  const configuredPrimary =
-    typeof (targetTable as any)?.primary_field_name === 'string' &&
-    String((targetTable as any).primary_field_name).trim().length > 0
-      ? String((targetTable as any).primary_field_name).trim()
-      : null
-
-  if (configuredPrimary === 'id') {
-    displayFieldName = null
-  } else if (configuredPrimary) {
-    const safe = toPostgrestColumn(configuredPrimary)
-    if (safe && targetFields?.some((f: any) => f.name === safe)) {
-      displayFieldName = safe
-    }
-  }
-
-  if (!displayFieldName) {
-    displayFieldName = getPrimaryFieldName(targetFields as any)
-  }
-
-  if (!displayFieldName && linkedFieldId && targetFields) {
-    const linkedField = (targetFields as any[]).find((f) => f.id === linkedFieldId || f.name === linkedFieldId)
-    if (linkedField) displayFieldName = String(linkedField.name)
-  }
-
-  if (!displayFieldName && targetFields) {
-    const textField = (targetFields as any[]).find((f) => ['text', 'long_text', 'email', 'url'].includes(String(f.type)))
-    if (textField) displayFieldName = String(textField.name)
-  }
+  const displayFieldName = getDisplayFieldNameForLinkedTable({
+    targetTable: tableRow,
+    targetFields: fieldRows.length > 0 ? fieldRows : null,
+    linkedFieldId: field.options?.linked_field_id ?? null,
+  })
 
   if (!displayFieldName) {
     for (const id of unique) out.set(id, id)
@@ -247,15 +348,14 @@ export async function resolveLinkedFieldDisplayMap(
       .in('id', chunk)
 
     if (recordsError || !Array.isArray(records)) {
-      // Fallback: keep IDs as labels if query fails.
       for (const id of chunk) if (!out.has(id)) out.set(id, id)
       continue
     }
 
-    for (const r of records as any[]) {
-      const id = String(r?.id ?? '')
+    for (const r of records as Record<string, unknown>[]) {
+      const id = r?.id != null ? String(r.id) : ''
       if (!id) continue
-      const label = r?.[displayFieldName] != null ? String(r[displayFieldName]) : ''
+      const label = r[displayFieldName] != null ? String(r[displayFieldName]) : ''
       out.set(id, label || id)
       if (isUuid(id)) out.set(id.toLowerCase(), label || id)
     }
@@ -295,10 +395,9 @@ export async function resolvePastedLinkedValue(
 
   const supabase = createClient()
 
-  // Get target table info
   const { data: targetTable, error: tableError } = await supabase
     .from('tables')
-    .select('supabase_table')
+    .select('supabase_table, primary_field_name')
     .eq('id', linkedTableId)
     .single()
 
@@ -309,40 +408,44 @@ export async function resolvePastedLinkedValue(
     }
   }
 
-  // Get target table fields to determine search fields
+  const tableRow: TargetTableRow = {
+    supabase_table: targetTable.supabase_table,
+    primary_field_name: targetTable.primary_field_name ?? null,
+  }
+
   const { data: targetFields } = await supabase
     .from('table_fields')
-    .select('name, type')
+    .select('id, name, type')
     .eq('table_id', linkedTableId)
     .order('position', { ascending: true })
 
-  if (!targetFields || targetFields.length === 0) {
+  const fieldRows: TargetFieldRow[] = Array.isArray(targetFields) ? targetFields : []
+
+  if (fieldRows.length === 0) {
     return {
       ids: null,
       errors: ['Target table has no fields'],
     }
   }
 
-  // Determine search fields using same fallback order as display resolution
-  // 1. Table's primary field
-  // 2. All text-like fields
-  // 3. All fields as last resort
+  const displayFieldName = getDisplayFieldNameForLinkedTable({
+    targetTable: tableRow,
+    targetFields: fieldRows,
+    linkedFieldId: field.options?.linked_field_id ?? null,
+  })
+
   const searchFields: string[] = []
-
-  const primaryName = getPrimaryFieldName(targetFields as any)
-  if (primaryName) {
-    searchFields.push(primaryName)
+  if (displayFieldName) {
+    searchFields.push(displayFieldName)
   }
-
-  // Use all text-like fields for search
-  const textFields = targetFields.filter(f =>
+  const textFields = fieldRows.filter((f) =>
     ['text', 'long_text', 'email', 'url'].includes(f.type)
   )
-  searchFields.push(...textFields.map(f => f.name))
-
-  // If no search fields found, fall back to all fields
+  for (const f of textFields) {
+    if (!searchFields.includes(f.name)) searchFields.push(f.name)
+  }
   if (searchFields.length === 0) {
-    searchFields.push(...targetFields.map(f => f.name))
+    searchFields.push(...fieldRows.map((f) => f.name))
   }
 
   // Parse pasted text (comma or newline separated)
@@ -363,9 +466,7 @@ export async function resolvePastedLinkedValue(
   const resolvedIds: string[] = []
 
   for (const term of searchTerms) {
-    // First, check if it's already a UUID
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-    if (uuidRegex.test(term)) {
+    if (isUuid(term)) {
       // Verify the ID exists in target table
       const { data: record } = await supabase
         .from(targetTable.supabase_table)
@@ -510,34 +611,24 @@ export async function syncLinkedFieldBidirectional(
   }
 
   if (updatedField.type !== 'link_to_table') {
-    // Not a linked field, nothing to sync
     return
   }
 
-  const updatedFieldOptions = (updatedField.options || {}) as any
+  const updatedFieldOptions: FieldOptions = (updatedField.options || {}) as FieldOptions
   const linkedFieldId = updatedFieldOptions?.linked_field_id
 
-  // Determine sync direction:
-  // - If updatedField has a linked_field_id, it's a reciprocal field → sync back to source
-  // - If updatedField has linked_table_id but no linked_field_id, it's a source field → sync forward to reciprocal
-  // - If updatedField has both, check which one points to the other to determine direction
-
   let isReciprocalField = false
-  let sourceField: any = null
-  let reciprocalField: any = null
-  let sourceTable: any = null
-  let targetTable: any = null
-  let sourceFieldName_final: string
-  let reciprocalFieldName: string
+  let sourceField: LinkFieldRow
+  let reciprocalField: LinkFieldRow
   let sourceTableName_final: string
   let targetTableName: string
+  let sourceFieldName_final: string
+  let reciprocalFieldName: string
 
   if (linkedFieldId) {
-    // This field is a reciprocal field - sync back to source
     isReciprocalField = true
-    reciprocalField = updatedField
-    
-    // Find the source field (the one this reciprocal points to)
+    reciprocalField = updatedField as LinkFieldRow
+
     const { data: sourceFieldData, error: sourceFieldError } = await supabase
       .from('table_fields')
       .select('id, name, type, options, table_id')
@@ -554,17 +645,16 @@ export async function syncLinkedFieldBidirectional(
       return
     }
 
-    sourceField = sourceFieldData
-    const sourceFieldOptions = (sourceField.options || {}) as any
+    sourceField = sourceFieldData as LinkFieldRow
+    const sourceFieldOptions: FieldOptions = (sourceField.options || {}) as FieldOptions
     const sourceTableId_final = sourceField.table_id
-    const targetTableId = (sourceFieldOptions?.linked_table_id) as string
+    const targetTableId = sourceFieldOptions?.linked_table_id
 
-    if (!targetTableId) {
+    if (!targetTableId || typeof targetTableId !== 'string') {
       console.warn('[syncLinkedFieldBidirectional] Source field has no linked_table_id')
       return
     }
 
-    // Get table info
     const { data: sourceTableData, error: sourceTableError } = await supabase
       .from('tables')
       .select('id, supabase_table')
@@ -582,33 +672,26 @@ export async function syncLinkedFieldBidirectional(
       return
     }
 
-    sourceTable = sourceTableData
-    targetTable = targetTableData
+    const sourceTable = sourceTableData as TableRowForSync
+    const targetTable = targetTableData as TableRowForSync
     sourceFieldName_final = sourceField.name
     reciprocalFieldName = reciprocalField.name
     sourceTableName_final = sourceTable.supabase_table
     targetTableName = targetTable.supabase_table
-
-    // For reverse sync: sourceRecordId is in the target table, we need to update the source table
-    // The newValue/oldValue are IDs in the target table that should point to records in the source table
   } else {
-    // This field is a source field - sync forward to reciprocal
     isReciprocalField = false
-    sourceField = updatedField
-    const sourceFieldOptions = (sourceField.options || {}) as any
+    sourceField = updatedField as LinkFieldRow
+    const sourceFieldOptions: FieldOptions = (sourceField.options || {}) as FieldOptions
     const linkedTableId = sourceFieldOptions?.linked_table_id
 
     if (!linkedTableId) {
-      // No target table configured
       return
     }
 
     if (!linkedFieldId) {
-      // No reciprocal field configured - this is a one-way link
       return
     }
 
-    // Fetch reciprocal field metadata
     const { data: reciprocalFieldData, error: reciprocalFieldError } = await supabase
       .from('table_fields')
       .select('id, name, type, options, table_id')
@@ -625,9 +708,8 @@ export async function syncLinkedFieldBidirectional(
       return
     }
 
-    reciprocalField = reciprocalFieldData
+    reciprocalField = reciprocalFieldData as LinkFieldRow
 
-    // Get target table info
     const { data: targetTableData, error: targetTableError } = await supabase
       .from('tables')
       .select('id, supabase_table')
@@ -639,15 +721,14 @@ export async function syncLinkedFieldBidirectional(
       return
     }
 
-    targetTable = targetTableData
+    const targetTable = targetTableData as TableRowForSync
     sourceFieldName_final = sourceField.name
     reciprocalFieldName = reciprocalField.name
     sourceTableName_final = sourceTableName
     targetTableName = targetTable.supabase_table
   }
 
-  // Determine if multi-link based on source field options
-  const sourceFieldOptions = (sourceField.options || {}) as any
+  const sourceFieldOptions: FieldOptions = (sourceField.options || {}) as FieldOptions
   const sourceIsMulti = 
     sourceFieldOptions?.relationship_type === 'one-to-many' ||
     sourceFieldOptions?.relationship_type === 'many-to-many' ||
@@ -715,7 +796,10 @@ export async function syncLinkedFieldBidirectional(
             continue
           }
 
-          const currentValue = (sourceRecord as Record<string, any>)[sourceFieldName_final]
+          const currentValue = getLinkedFieldValueFromRecord(
+            sourceRecord as Record<string, unknown>,
+            sourceFieldName_final
+          )
           const currentArray = normalizeToArray(currentValue)
 
           // Add sourceRecordId (from target table) if not already present
@@ -758,7 +842,10 @@ export async function syncLinkedFieldBidirectional(
             continue
           }
 
-          const currentValue = (sourceRecord as Record<string, any>)[sourceFieldName_final]
+          const currentValue = getLinkedFieldValueFromRecord(
+            sourceRecord as Record<string, unknown>,
+            sourceFieldName_final
+          )
           const currentArray = normalizeToArray(currentValue)
 
           // Remove sourceRecordId (from target table) if present
@@ -838,7 +925,10 @@ export async function syncLinkedFieldBidirectional(
             continue
           }
 
-          const currentValue = (targetRecord as Record<string, any>)[reciprocalFieldName]
+          const currentValue = getLinkedFieldValueFromRecord(
+            targetRecord as Record<string, unknown>,
+            reciprocalFieldName
+          )
           const currentArray = normalizeToArray(currentValue)
 
           // Add sourceRecordId if not already present
@@ -879,7 +969,10 @@ export async function syncLinkedFieldBidirectional(
             continue
           }
 
-          const currentValue = (targetRecord as Record<string, any>)[reciprocalFieldName]
+          const currentValue = getLinkedFieldValueFromRecord(
+            targetRecord as Record<string, unknown>,
+            reciprocalFieldName
+          )
           const currentArray = normalizeToArray(currentValue)
 
           // Remove sourceRecordId if present

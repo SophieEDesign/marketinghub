@@ -3,9 +3,24 @@
 import type { TableField } from "@/types/fields"
 import { ChoicePill, ChoicePillList } from "@/components/fields/ChoicePill"
 
+/** Linked record reference: stored ID or UI shape with id/label. */
+type LinkedRecordRef = string | { id: string; label?: string; value?: string; name?: string }
+
+/** Value shapes this component can render (all field types). */
+type FieldValue =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | string[]
+  | LinkedRecordRef
+  | LinkedRecordRef[]
+  | Date
+
 interface TimelineFieldValueProps {
   field: TableField
-  value: any
+  value: FieldValue
   compact?: boolean // For compact card display
   /** Optional map for resolving link_to_table UUIDs -> display labels */
   valueLabelMap?: Record<string, string>
@@ -70,9 +85,9 @@ export default function TimelineFieldValue({
 
     return (
       <div className="flex flex-wrap gap-1">
-        {linkedRecords.slice(0, compact ? 1 : 3).map((record: any, idx: number) => {
+        {linkedRecords.slice(0, compact ? 1 : 3).map((record: LinkedRecordRef, idx: number) => {
           const id = typeof record === "string" ? record : record?.id
-          const fallbackLabel = typeof record === "string" ? record : record?.label || record?.id || "Linked"
+          const fallbackLabel = typeof record === "string" ? record : record?.label ?? record?.id ?? "Linked"
           const label =
             typeof id === "string" && id.trim() && valueLabelMap?.[id.trim()]
               ? valueLabelMap[id.trim()]

@@ -10,7 +10,7 @@ import { buildGroupTree } from "@/lib/grouping/groupTree"
 import type { GroupRule } from "@/lib/grouping/types"
 import { toPostgrestColumn } from "@/lib/supabase/postgrest"
 import { normalizeUuid } from "@/lib/utils/ids"
-import { resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
+import { getLinkedFieldValueFromRow, linkedValueToIds, resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
 import type { LinkedField } from "@/types/fields"
 import EmptyState from "@/components/empty-states/EmptyState"
 import { Button } from "@/components/ui/button"
@@ -198,27 +198,12 @@ export default function HorizontalGroupedView({
         return
       }
 
-      function toId(v: unknown): string | null {
-        if (v == null || v === '') return null
-        if (typeof v === 'string') return v.trim() || null
-        if (typeof v === 'object' && v && 'id' in v) return String((v as { id: unknown }).id).trim() || null
-        return String(v).trim() || null
-      }
-
       const next: Record<string, Record<string, string>> = {}
       for (const f of groupedLinkFields) {
         const ids = new Set<string>()
         for (const row of filteredRows) {
-          const value = (row as any)?.[f.name] ?? (row as any)?.[(f as any).id]
-          if (Array.isArray(value)) {
-            value.forEach((v: unknown) => {
-              const id = toId(v)
-              if (id) ids.add(id)
-            })
-          } else if (value !== undefined && value !== null) {
-            const id = toId(value)
-            if (id) ids.add(id)
-          }
+          const fieldValue = getLinkedFieldValueFromRow(row as Record<string, unknown>, f)
+          for (const id of linkedValueToIds(fieldValue)) ids.add(id)
         }
         if (ids.size === 0) continue
         const map = await resolveLinkedFieldDisplayMap(f, Array.from(ids))

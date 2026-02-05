@@ -24,7 +24,7 @@ import { buildGroupTree, flattenGroupTree } from "@/lib/grouping/groupTree"
 import type { GroupRule } from "@/lib/grouping/types"
 import { isAbortError } from "@/lib/api/error-handling"
 import type { LinkedField } from "@/types/fields"
-import { resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
+import { getLinkedFieldValueFromRow, linkedValueToIds, resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
 import { normalizeUuid } from "@/lib/utils/ids"
 import { isUserField, getUserDisplayNames } from "@/lib/users/userDisplay"
 import type { HighlightRule } from "@/lib/interface/types"
@@ -182,6 +182,16 @@ export default function ListView({
     })).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))))
   }, [sorts])
 
+  // Key from currentFilters so load-rows effect runs when user saves in filter dialog (local state update)
+  const currentFiltersKey = useMemo(() => {
+    return JSON.stringify(currentFilters.map(f => ({
+      field: f.field,
+      operator: f.operator,
+      value: f.value,
+      value2: f.value2,
+    })).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))))
+  }, [currentFilters])
+
   useEffect(() => {
     setCurrentFilters(filters)
   }, [filtersKey, filters])
@@ -203,7 +213,7 @@ export default function ListView({
 
     loadRows()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableId, supabaseTableName, filtersKey, sortsKey, reloadKey])
+  }, [tableId, supabaseTableName, filtersKey, currentFiltersKey, sortsKey, reloadKey])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -381,17 +391,6 @@ export default function ListView({
   useEffect(() => {
     let cancelled = false
 
-    const collectIds = (raw: any): string[] => {
-      if (raw == null) return []
-      if (Array.isArray(raw)) return raw.flatMap(collectIds)
-      if (typeof raw === 'object') {
-        if (raw && 'id' in raw) return [String((raw as any).id)]
-        return []
-      }
-      const s = String(raw).trim()
-      return s ? [s] : []
-    }
-
     async function load() {
       const rules = Array.isArray(effectiveGroupRules) ? effectiveGroupRules : []
       if (rules.length === 0) {
@@ -423,7 +422,8 @@ export default function ListView({
       for (const f of groupedLinkFields) {
         const ids = new Set<string>()
         for (const row of Array.isArray(filteredRows) ? filteredRows : []) {
-          for (const id of collectIds((row as any)?.[f.name])) ids.add(id)
+          const fieldValue = getLinkedFieldValueFromRow(row as Record<string, unknown>, f)
+          for (const id of linkedValueToIds(fieldValue)) ids.add(id)
         }
         if (ids.size === 0) continue
         const map = await resolveLinkedFieldDisplayMap(f, Array.from(ids))

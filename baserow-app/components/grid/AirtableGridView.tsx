@@ -41,7 +41,7 @@ import type { GroupRule } from '@/lib/grouping/types'
 import { normalizeUuid } from '@/lib/utils/ids'
 import { isAbortError } from '@/lib/api/error-handling'
 import type { LinkedField } from '@/types/fields'
-import { resolveLinkedFieldDisplayMap } from '@/lib/dataView/linkedFields'
+import { getLinkedFieldValueFromRow, linkedValueToIds, resolveLinkedFieldDisplayMap } from '@/lib/dataView/linkedFields'
 import FillHandle from './FillHandle'
 import CellContextMenu from './CellContextMenu'
 import { formatCellValue } from '@/lib/dataView/clipboard'
@@ -957,17 +957,6 @@ export default function AirtableGridView({
   useEffect(() => {
     let cancelled = false
 
-    const collectIds = (raw: any): string[] => {
-      if (raw == null) return []
-      if (Array.isArray(raw)) return raw.flatMap(collectIds)
-      if (typeof raw === 'object') {
-        if (raw && 'id' in raw) return [String((raw as any).id)]
-        return []
-      }
-      const s = String(raw).trim()
-      return s ? [s] : []
-    }
-
     async function load() {
       const rules = Array.isArray(effectiveGroupRules) ? effectiveGroupRules : []
       if (rules.length === 0) {
@@ -998,7 +987,8 @@ export default function AirtableGridView({
       for (const f of groupedLinkFields) {
         const ids = new Set<string>()
         for (const row of asArray<GridRow>(filteredRows)) {
-          for (const id of collectIds((row as any)?.[f.name])) ids.add(id)
+          const fieldValue = getLinkedFieldValueFromRow(row, f)
+          for (const id of linkedValueToIds(fieldValue)) ids.add(id)
         }
         if (ids.size === 0) continue
         const map = await resolveLinkedFieldDisplayMap(f, Array.from(ids))

@@ -1,6 +1,6 @@
 "use client"
 
-import React from "react"
+import React, { useMemo } from "react"
 import type { PageBlock } from "@/lib/interface/types"
 import GridBlock from "./GridBlock"
 import type { FilterConfig } from "@/lib/interface/filters"
@@ -21,6 +21,9 @@ interface CalendarBlockProps {
  * CalendarBlock - Wrapper around GridBlock with view_type='calendar'
  * Displays data in a calendar view.
  * Memoized to prevent excessive re-renders and React error #185.
+ * CRITICAL: calendarBlock must be memoized so GridBlock/CalendarView receive a stable
+ * reference; a new object every render caused "Maximum update depth exceeded" when
+ * opening the record modal.
  */
 function CalendarBlock({
   block,
@@ -32,14 +35,22 @@ function CalendarBlock({
   onRecordClick,
   pageShowAddRecord = false,
 }: CalendarBlockProps) {
-  // Create a modified block config with view_type='calendar'
-  const calendarBlock: PageBlock = {
+  // Memoize so GridBlock (and CalendarView/RecordModal) don't get new props every render.
+  const calendarBlock = useMemo<PageBlock>(() => ({
     ...block,
     config: {
       ...block.config,
       view_type: 'calendar',
     },
-  }
+  }), [
+    block.id,
+    block.type,
+    block.x,
+    block.y,
+    block.w,
+    block.h,
+    JSON.stringify(block.config),
+  ])
 
   return (
     <GridBlock

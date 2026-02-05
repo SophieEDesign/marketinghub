@@ -14,7 +14,7 @@ import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { CellFactory } from "@/components/grid/CellFactory"
 import { buildGroupTree } from "@/lib/grouping/groupTree"
 import type { GroupedNode } from "@/lib/grouping/types"
-import { resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
+import { getLinkedFieldValueFromRow, linkedValueToIds, resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
 import { Button } from "@/components/ui/button"
 import EmptyState from "@/components/empty-states/EmptyState"
 import type { HighlightRule } from "@/lib/interface/types"
@@ -314,17 +314,6 @@ export default function GalleryView({
   useEffect(() => {
     let cancelled = false
 
-    const collectIds = (raw: any): string[] => {
-      if (raw == null) return []
-      if (Array.isArray(raw)) return raw.flatMap(collectIds)
-      if (typeof raw === "object") {
-        if (raw && "id" in raw) return [String((raw as any).id)]
-        return []
-      }
-      const s = String(raw).trim()
-      return s ? [s] : []
-    }
-
     async function load() {
       if (!effectiveGroupByField) {
         setGroupValueLabelMaps({})
@@ -344,8 +333,8 @@ export default function GalleryView({
       const linkField = fieldObj as LinkedField
       const ids = new Set<string>()
       for (const r of Array.isArray(filteredRows) ? filteredRows : []) {
-        const raw = (r as any)?.data?.[linkField.name]
-        for (const id of collectIds(raw)) ids.add(id)
+        const fieldValue = getLinkedFieldValueFromRow(r as { data?: Record<string, unknown> }, linkField)
+        for (const id of linkedValueToIds(fieldValue)) ids.add(id)
       }
 
       if (ids.size === 0) {

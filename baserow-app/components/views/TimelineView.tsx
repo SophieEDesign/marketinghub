@@ -19,7 +19,7 @@ import {
   getTextColorForBackground,
   SEMANTIC_COLORS,
 } from "@/lib/field-colors"
-import { resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
+import { getLinkedFieldValueFromRow, linkedValueToIds, resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
 import { normalizeUuid } from "@/lib/utils/ids"
 import { sanitizeFieldName } from "@/lib/fields/validation"
 import { resolveSystemFieldAlias } from "@/lib/fields/systemFieldAliases"
@@ -626,17 +626,6 @@ export default function TimelineView({
   useEffect(() => {
     let cancelled = false
 
-    const collectIds = (raw: any): string[] => {
-      if (raw == null) return []
-      if (Array.isArray(raw)) return raw.flatMap(collectIds)
-      if (typeof raw === "object") {
-        if (raw && "id" in raw) return [String((raw as any).id)]
-        return []
-      }
-      const s = String(raw).trim()
-      return s ? [s] : []
-    }
-
     async function load() {
       const wanted = new Map<string, LinkedField>()
       const addIfLinked = (f: TableField | null | undefined) => {
@@ -658,9 +647,8 @@ export default function TimelineView({
       for (const f of wanted.values()) {
         const ids = new Set<string>()
         for (const row of Array.isArray(filteredRows) ? filteredRows : []) {
-          // Try both field name and field id when collecting IDs
-          const fieldValue = (row as any)?.data?.[f.name] ?? ((f as any).id ? (row as any)?.data?.[(f as any).id] : null)
-          for (const id of collectIds(fieldValue)) ids.add(id)
+          const fieldValue = getLinkedFieldValueFromRow(row as { data?: Record<string, unknown> }, f)
+          for (const id of linkedValueToIds(fieldValue)) ids.add(id)
         }
         if (ids.size === 0) continue
         const map = await resolveLinkedFieldDisplayMap(f, Array.from(ids))
