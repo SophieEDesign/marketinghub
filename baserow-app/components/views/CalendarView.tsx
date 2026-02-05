@@ -1626,7 +1626,7 @@ export default function CalendarView({
     const fullTooltip = [titleLine, ...cardLines].join("\n")
 
     return (
-      <div className="flex items-center gap-1.5 h-full min-w-0 px-1.5 py-1" title={fullTooltip}>
+      <div className="flex items-center gap-1.5 h-full min-h-[2.5rem] min-w-0 px-1.5 py-1" title={fullTooltip}>
         {image && (
           <div
             className={`flex-shrink-0 w-4 h-4 rounded overflow-hidden bg-gray-100 ${
@@ -1643,7 +1643,7 @@ export default function CalendarView({
             />
           </div>
         )}
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 overflow-hidden">
           <div className="flex flex-col gap-0.5 min-w-0 leading-tight">
             <div className="truncate text-xs font-medium">
               {titleField ? (
