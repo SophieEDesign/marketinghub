@@ -7,7 +7,7 @@ import { ChoicePill, ChoicePillList } from "@/components/fields/ChoicePill"
 type LinkedRecordRef = string | { id: string; label?: string; value?: string; name?: string }
 
 /** Value shapes this component can render (all field types). */
-type FieldValue =
+export type FieldValue =
   | string
   | number
   | boolean
@@ -85,7 +85,7 @@ export default function TimelineFieldValue({
 
     return (
       <div className="flex flex-wrap gap-1">
-        {linkedRecords.slice(0, compact ? 1 : 3).map((record: LinkedRecordRef, idx: number) => {
+        {(linkedRecords as LinkedRecordRef[]).slice(0, compact ? 1 : 3).map((record: LinkedRecordRef, idx: number) => {
           const id = typeof record === "string" ? record : record?.id
           const fallbackLabel = typeof record === "string" ? record : record?.label ?? record?.id ?? "Linked"
           const label =
@@ -131,7 +131,12 @@ export default function TimelineFieldValue({
   // Date
   if (field.type === "date") {
     try {
-      const date = value instanceof Date ? value : new Date(value)
+      const date =
+        value instanceof Date
+          ? value
+          : typeof value === "string" || typeof value === "number"
+            ? new Date(value)
+            : new Date(String(value))
       if (!isNaN(date.getTime())) {
         return (
           <span className="text-xs text-gray-700">

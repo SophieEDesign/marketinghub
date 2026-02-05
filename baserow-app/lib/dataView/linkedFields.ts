@@ -6,7 +6,7 @@
  */
 
 import { createClient } from '@/lib/supabase/client'
-import type { FieldOptions, LinkedField } from '@/types/fields'
+import type { FieldOptions, LinkedField, TableField } from '@/types/fields'
 import { getPrimaryFieldName } from '@/lib/fields/primary'
 import { toPostgrestColumn } from '@/lib/supabase/postgrest'
 
@@ -56,7 +56,13 @@ export function getDisplayFieldNameForLinkedTable(params: {
   }
 
   if (!displayFieldName && targetFields) {
-    displayFieldName = getPrimaryFieldName(targetFields)
+    const asTableFields: TableField[] = targetFields.map((f) => ({
+      ...f,
+      table_id: '',
+      position: 0,
+      created_at: '',
+    }))
+    displayFieldName = getPrimaryFieldName(asTableFields)
   }
 
   if (!displayFieldName && linkedFieldId && targetFields) {
@@ -256,7 +262,7 @@ export async function resolveLinkedFieldDisplay(
   }
 
   const displayMap = new Map<string, string>()
-  for (const r of records as Record<string, unknown>[]) {
+  for (const r of records as unknown as Record<string, unknown>[]) {
     const id = r?.id != null ? String(r.id) : ''
     if (!id) continue
     const label = r[displayFieldName] != null ? String(r[displayFieldName]) : ''
@@ -352,7 +358,7 @@ export async function resolveLinkedFieldDisplayMap(
       continue
     }
 
-    for (const r of records as Record<string, unknown>[]) {
+    for (const r of records as unknown as Record<string, unknown>[]) {
       const id = r?.id != null ? String(r.id) : ''
       if (!id) continue
       const label = r[displayFieldName] != null ? String(r[displayFieldName]) : ''
@@ -797,7 +803,7 @@ export async function syncLinkedFieldBidirectional(
           }
 
           const currentValue = getLinkedFieldValueFromRecord(
-            sourceRecord as Record<string, unknown>,
+            sourceRecord as unknown as Record<string, unknown>,
             sourceFieldName_final
           )
           const currentArray = normalizeToArray(currentValue)
@@ -843,7 +849,7 @@ export async function syncLinkedFieldBidirectional(
           }
 
           const currentValue = getLinkedFieldValueFromRecord(
-            sourceRecord as Record<string, unknown>,
+            sourceRecord as unknown as Record<string, unknown>,
             sourceFieldName_final
           )
           const currentArray = normalizeToArray(currentValue)
@@ -926,7 +932,7 @@ export async function syncLinkedFieldBidirectional(
           }
 
           const currentValue = getLinkedFieldValueFromRecord(
-            targetRecord as Record<string, unknown>,
+            targetRecord as unknown as Record<string, unknown>,
             reciprocalFieldName
           )
           const currentArray = normalizeToArray(currentValue)
@@ -970,7 +976,7 @@ export async function syncLinkedFieldBidirectional(
           }
 
           const currentValue = getLinkedFieldValueFromRecord(
-            targetRecord as Record<string, unknown>,
+            targetRecord as unknown as Record<string, unknown>,
             reciprocalFieldName
           )
           const currentArray = normalizeToArray(currentValue)

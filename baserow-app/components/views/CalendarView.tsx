@@ -26,7 +26,7 @@ import RecordModal from "@/components/calendar/RecordModal"
 import { isDebugEnabled, debugLog, debugWarn, debugError } from '@/lib/interface/debug-flags'
 import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
 import CalendarDateRangeControls from "@/components/views/calendar/CalendarDateRangeControls"
-import TimelineFieldValue from "@/components/views/TimelineFieldValue"
+import TimelineFieldValue, { type FieldValue } from "@/components/views/TimelineFieldValue"
 import { isAbortError } from "@/lib/api/error-handling"
 import { getLinkedFieldValueFromRow, linkedValueToIds, resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
 import { normalizeUuid } from "@/lib/utils/ids"
@@ -1646,7 +1646,7 @@ export default function CalendarView({
                 {f?.field ? (
                   <TimelineFieldValue
                     field={f.field as TableField}
-                    value={f.value}
+                    value={f.value as FieldValue}
                     valueLabelMap={stableLinkedValueLabelMaps[f.field.name] || stableLinkedValueLabelMaps[f.field.id]}
                     compact={true}
                   />
