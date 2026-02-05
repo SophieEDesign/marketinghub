@@ -8,23 +8,30 @@ import type { ViewFilter, ViewFilterGroup } from '@/types/database'
 import type { FilterTree, FilterGroup, FilterCondition } from './canonical-model'
 import { conditionsToFilterTree } from './canonical-model'
 
+/** Minimal filter shape needed for tree conversion (id/view_id/created_at not used) */
+export type ViewFilterInput = Omit<ViewFilter, 'id' | 'view_id' | 'created_at'>
+
+/** Minimal group shape needed for tree conversion (view_id/created_at etc. not used) */
+export type ViewFilterGroupInput = Omit<ViewFilterGroup, 'view_id' | 'created_at' | 'updated_at' | 'created_by' | 'updated_by'>
+
 /**
  * Convert database filters and groups to canonical filter tree
  * 
  * This is the main conversion function used throughout the app.
  * Handles field_name as field_id (field names are used as identifiers in filters).
+ * Accepts ViewFilterInput / ViewFilterGroupInput so callers can pass partial data (e.g. from view state without id/view_id).
  */
 export function dbFiltersToFilterTree(
-  filters: ViewFilter[],
-  groups: ViewFilterGroup[]
+  filters: ViewFilterInput[],
+  groups: ViewFilterGroupInput[]
 ): FilterTree {
   if (filters.length === 0) {
     return null
   }
   
   // Organize filters by group
-  const filtersByGroup = new Map<string | null, ViewFilter[]>()
-  const ungroupedFilters: ViewFilter[] = []
+  const filtersByGroup = new Map<string | null, ViewFilterInput[]>()
+  const ungroupedFilters: ViewFilterInput[] = []
   
   for (const filter of filters) {
     if (filter.filter_group_id) {
