@@ -5,19 +5,87 @@
 
 ---
 
+## What's done vs what's left (summary)
+
+**Done:**  
+- ViewPage type fixes (TS1005, type aliases, unknown catch).  
+- ListView filter normalisation (`normalizeFilter` in useState).  
+- CalendarBlock `React.memo`.  
+- **Section 1:** BlockConfig types; HorizontalGroupedView already had `const`.  
+- **Section 2:** Filter converters type safety (ViewFilterInput, ViewFilterGroupInput).  
+- **Section 3:** computeLookupValues `getLookupDisplayValue()` helper.  
+- **Section 12:** Navigation progress bar (NavigationProgress.tsx + layout + CSS).
+
+**Skipped:**  
+- Section 4 (linkedFields — different file structure).  
+- Section 8 (ViewPage debug — no getViews/debug block).  
+- Duplicate CalendarView import (not present at 7fec709).
+
+**Left to do (see [REIMPLEMENT_SAFETY_ORDER.md](REIMPLEMENT_SAFETY_ORDER.md) for section order):**  
+Sections 5, 6, 7, 9, 10, 11, 13, 14, 15 (GridView, filter dialog/CSV, modal/FieldBuilderModal, filter groups, click to add row, BlockAppearanceWrapper, modal layout, LookupFieldPicker/FieldBuilderModal display modes, interface builder/Canvas).
+
+**Not in plan:** Cap-aware pagination, CoreDataViewTabs, context menu/sidebar.
+
+---
+
+## In simple terms: what to implement
+
+### Part 1 — Fix things that are broken or fragile (do these first)
+
+- **GridView** — Clean up formatting and make error handling safer so the grid doesn’t crash or behave oddly when something goes wrong.
+- **Filters** — Make filter code type-safe: how filter values are parsed (including JSON arrays), and how database filters are turned into the internal filter tree, including when data is missing or partial.
+- **Linked records** — Safer handling of linked-record data and types so linked fields don’t cause type or runtime errors.
+- **Lookups** — Safer lookup value computation (FieldBlock and computeLookupValues): better error handling and type casting; RLS migration if needed.
+- **Filter dialog & CSV import** — Better error handling in the filter UI and CSV import so bad data doesn’t break the app.
+- **Filter and grid views** — General error-handling improvements so filters and grid views fail gracefully.
+- **Linked-fields helpers** — Clearer, more consistent linked-fields logic (no new behaviour, just cleaner code).
+- **HorizontalGroupedView** — Clearer variable names and structure (no new behaviour).
+- **Filter components** — Stronger types and operator handling so filters work correctly with different operators.
+- **Modals and navigation** — Better error handling and layout behaviour in modal and navigation diagnostics.
+- **FieldBuilderModal** — Normalise select options so dropdowns and option lists behave consistently.
+- **ViewPage debug logging** — Clearer, type-safe debug logging on the view page.
+
+*(Already done: ViewPage type fixes so the view page builds; ListView filter normalisation so filters are always in the right shape; CalendarBlock wrapped in React.memo to fix React error #185. Skip: duplicate CalendarView import — not present at 7fec709.)*
+
+---
+
+### Part 2 — New behaviour (choose what you want, after Part 1)
+
+- **Pagination / row limits** — Respect server row limits and add cap-aware pagination so you don’t hit “too many rows” errors; consistent limits (e.g. 2000) and explicit limits in grid and views.
+- **Data loading** — Better data loading: consistent ordering and pagination across List, Calendar, Gallery, Kanban, Timeline, HorizontalGrouped; paginated fetching in useGridData and views.
+- **Filter logic** — Richer filter handling in useGridData and converters; filter groups (AND/OR) in Airtable-style components.
+- **Kanban** — Better Kanban behaviour and layout sync; optional Kanban card settings dialog.
+- **Record limit and grouping** — Explicit record limit in the grid view and grouping support in the non-grid wrapper.
+- **“Click to add” row** — Add a row by clicking in the grid (Airtable-style).
+- **ViewPage & NonGridViewWrapper** — Better data and filter handling when switching between grid and non-grid views.
+- **Interface builder / Canvas** — Better block settings, grouping labels, and editing in HorizontalGroupedView and Canvas; modal layout and layout settings.
+- **LookupFieldPicker & FieldBuilderModal** — New display modes and clearer option handling.
+- **BlockConfig** — Clearer BlockConfig types (e.g. image field usage; remove deprecated color field comments).
+- **Advanced settings & grid appearance** — Permission handling and clearer layout for advanced and grid-appearance settings.
+- **Context menu & sidebar** — Improved context menu and sidebar in grid components.
+- **Navigation progress bar** — Progress bar and better field display when navigating.
+- **Modal layout** — More consistent modal layout and constraints.
+- **BlockAppearanceWrapper** — Simpler appearance settings flow.
+- **Filter UI** — Richer filter UI and behaviour across components.
+- **Core Data tabs** — Tabs on the view page to switch between “Core Data” and other views (CoreDataViewTabs).
+
+**New files you might add when doing Part 2:**  
+CoreDataViewTabs, NavigationProgress, Calendar/Timeline options dialog, Kanban card settings dialog, filters API route, debug-log helper, Supabase migrations (filter groups, RLS, list view type, kanban config, etc.), and docs (row limits, data access).
+
+---
+
 ## Part 1: Error fixing (current features) — implement first
 
 These fix bugs, type errors, build failures, or improve error handling in existing code. Apply in this order (oldest first) to minimize conflicts.
 
 | Order | Commit     | Summary | Notes |
 | ----- | ---------- | ------- | ----- |
-| 1     | 4828eb91e3 | Remove duplicate import of POSTGREST_DEFAULT_MAX_ROWS in CalendarView | Lint/cleanup |
-| 2     | 358b21a0fd | fix(tsx): resolve TS1005 by using type aliases instead of inline object assertions | ViewPage build fix |
-| 3     | 55fb7a7e31 | fix(tsx): use double type assertion to fix TS1005 in view page | ViewPage build fix |
-| 4     | 480a3887dd | Refactor type assertions in ViewPage for improved type safety | Type safety |
+| 1     | 4828eb91e3 | Remove duplicate import of POSTGREST_DEFAULT_MAX_ROWS in CalendarView | Lint/cleanup — **skip** (no duplicate at 7fec709) |
+| 2–4   | 358b21a0fd, 55fb7a7e31, 480a3887dd | fix(tsx): TS1005 + type assertions in ViewPage | **Applied** (type aliases, unknown catch) |
 | 5     | 0b99a01d96 | Fix formatting issues and enhance error handling in GridView and related components | Error handling |
 | 6     | 16405d4dc7 | Refactor error handling in GridView for improved type safety | Type safety |
-| 7     | 5136e0c519 | fix(ListView): normalize filters to FilterConfig[] for typecheck/build | ListView build fix |
+| 7     | 5136e0c519 | fix(ListView): normalize filters to FilterConfig[] for typecheck/build | **Applied** (normalizeFilter in useState) |
+| 17    | 0028c78ca0 | Memoize CalendarBlock to prevent excessive re-renders and React error #185 | **Applied** (React.memo) |
 | 8     | 8bf5d953b8 | Update parseFilterValue function to improve type safety and handling of JSON array strings | Filter type safety |
 | 9     | 95f73f7cb3 | Refactor dbFiltersToFilterTree to accept partial filter data and improve type safety | Filter type safety |
 | 10    | 4a9efe35b2 | Update dbFiltersToFilterTree to accept ViewFilterGroupInput for improved type safety | Filter type safety |
@@ -40,9 +108,11 @@ These fix bugs, type errors, build failures, or improve error handling in existi
 
 ---
 
-## Part 2: New features — reimplement after error fixing
+## Part 2: New features — reimplement after error fixing **(pause: for you to choose)**
 
-Apply after Part 1 is done and tests pass. Order is approximate (oldest first); some depend on others.
+**Leave this section for now.** After Part 1 (error fixing) is done and tests pass, you choose which of these to reimplement and in what order. The list below is for reference only; no need to apply until you decide.
+
+Apply when ready. Order is approximate (oldest first); some depend on others.
 
 | Order | Commit     | Summary |
 | ----- | ---------- | ------- |
@@ -93,4 +163,10 @@ git cherry-pick 4828eb91e3 358b21a0fd 55fb7a7e31 480a3887dd 0b99a01d96 16405d4dc
 # ... continue with remaining Part 1 commits; resolve conflicts as needed
 ```
 
-**New features (Part 2):** After Part 1 is complete and verified, cherry-pick Part 2 commits in order (or apply in logical groups and test).
+If cherry-pick fails (e.g. `index.lock`, permission denied on `.git/objects`), run the above in a terminal **outside** the IDE and with OneDrive sync paused for this folder, or apply each commit’s changes manually:
+
+- `git show <commit> -- <file>` to see the diff, then edit the file to match.
+
+**Commit 4828eb91e3 (CalendarView):** On 7fec709 there is no duplicate `POSTGREST_DEFAULT_MAX_ROWS` import; no change needed. Skip or resolve any conflict by keeping HEAD.
+
+**New features (Part 2):** Paused — for you to choose after error fixing. When ready, pick which Part 2 items to reimplement, then cherry-pick or apply in the order you prefer.

@@ -1,5 +1,6 @@
 "use client"
 
+import React from "react"
 import type { PageBlock } from "@/lib/interface/types"
 import GridBlock from "./GridBlock"
 import type { FilterConfig } from "@/lib/interface/filters"
@@ -18,9 +19,10 @@ interface CalendarBlockProps {
 
 /**
  * CalendarBlock - Wrapper around GridBlock with view_type='calendar'
- * Displays data in a calendar view
+ * Displays data in a calendar view.
+ * Memoized to prevent excessive re-renders and React error #185.
  */
-export default function CalendarBlock({
+function CalendarBlock({
   block,
   isEditing = false,
   pageTableId = null,
@@ -52,3 +54,5 @@ export default function CalendarBlock({
     />
   )
 }
+
+export default React.memo(CalendarBlock)

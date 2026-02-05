@@ -80,22 +80,47 @@ export default function FilterDialog({
       if (!viewUuid) {
         throw new Error("Invalid viewId (expected UUID).")
       }
-      // Load filter groups
-      const { data: groups, error: groupsError } = await supabase
+      // Load filter groups (optional: table may not exist or RLS may return 500)
+      let groups: { id: string; view_id: string; condition_type: string; order_index: number }[] = []
+      let { data: groupsData, error: groupsError } = await supabase
         .from("view_filter_groups")
         .select("*")
         .eq("view_id", viewUuid)
         .order("order_index", { ascending: true })
 
-      if (groupsError) throw groupsError
+      if (groupsError && ((groupsError as { code?: string; status?: number })?.code === "42703" || (groupsError as { status?: number })?.status === 500)) {
+        // order_index missing or table/RLS issue: retry without order
+        const retry = await supabase
+          .from("view_filter_groups")
+          .select("*")
+          .eq("view_id", viewUuid)
+        if (!retry.error && retry.data) {
+          groupsData = retry.data.sort((a: { order_index?: number }, b: { order_index?: number }) => (a.order_index ?? 0) - (b.order_index ?? 0))
+          groupsError = null
+        }
+      }
+      if (!groupsError && groupsData) {
+        groups = Array.isArray(groupsData) ? groupsData : []
+      }
+      // If view_filter_groups fails, continue with empty groups
 
-      // Load all filters
-      const { data: allFilters, error: filtersError } = await supabase
+      // Load all filters (fallback without order_index if column missing)
+      let allFilters: unknown[] | null = null
+      let filtersError: unknown = null
+      let res = await supabase
         .from("view_filters")
         .select("*")
         .eq("view_id", viewUuid)
         .order("order_index", { ascending: true })
-
+      allFilters = res.data
+      filtersError = res.error
+      if (filtersError && ((filtersError as { code?: string; status?: number })?.code === "42703" || (filtersError as { status?: number })?.status === 500)) {
+        res = await supabase.from("view_filters").select("*").eq("view_id", viewUuid)
+        if (!res.error && res.data) {
+          allFilters = Array.isArray(res.data) ? res.data.sort((a: { order_index?: number }, b: { order_index?: number }) => (a.order_index ?? 0) - (b.order_index ?? 0)) : []
+          filtersError = null
+        }
+      }
       if (filtersError) throw filtersError
 
       // Organize filters into groups
@@ -105,8 +130,10 @@ export default function FilterDialog({
       // Initialize groups
       if (groups) {
         groups.forEach((group) => {
+          const conditionType: FilterConditionType = group.condition_type === 'OR' ? 'OR' : 'AND'
           groupsMap.set(group.id, {
             ...group,
+            condition_type: conditionType,
             filters: [],
           })
         })

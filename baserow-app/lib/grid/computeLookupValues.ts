@@ -122,23 +122,85 @@ export async function computeLookupValues(
       const idList = Array.from(allIds)
       const idToValue = new Map<string, unknown>()
 
+      const is400 = (err: { message?: string; status?: number; code?: string } | null) =>
+        err != null &&
+        ((err as { status?: number }).status === 400 ||
+          (err as { code?: string }).code === "PGRST116" ||
+          String((err as { message?: string }).message ?? "").includes("400"))
+
+      const isUuid = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
+
+      const rowIdKey = (row: Record<string, unknown>) =>
+        row.id != null ? row.id : (row.record_id != null ? row.record_id : null)
+
       // Fetch in batches to avoid PostgREST URL limits
       for (let i = 0; i < idList.length; i += BATCH_SIZE) {
         const chunk = idList.slice(i, i + BATCH_SIZE)
-        const { data: lookupRows, error: fetchErr } = await supabase
-          .from(lookupTableName)
-          .select(`id, ${resultFieldName}`)
-          .in('id', chunk)
+        let lookupRows: unknown[] | null = null
+        let fetchErr: { message?: string; status?: number; code?: string } | null = null
+
+        if (chunk.length === 1 && isUuid(chunk[0])) {
+          // Use Supabase client so UUID filter is serialized correctly.
+          const tryId = async (selectCols: string) => {
+            const r = await supabase
+              .from(lookupTableName)
+              .select(selectCols)
+              .eq("id", chunk[0])
+              .maybeSingle()
+            return { data: r.data, error: r.error }
+          }
+          let res = await tryId(`id, ${resultFieldName}`)
+          let singleRow = res.data as Record<string, unknown> | null
+          let singleErr = res.error as { message?: string; status?: number } | null
+          if (is400(singleErr) && !singleRow) {
+            res = await tryId("id")
+            if (!res.error && res.data) {
+              singleRow = res.data as Record<string, unknown>
+              singleErr = null
+            }
+          }
+          if (is400(singleErr) && !singleRow) {
+            const byRecordId = await supabase
+              .from(lookupTableName)
+              .select("*")
+              .eq("record_id", chunk[0])
+              .maybeSingle()
+            if (!byRecordId.error && byRecordId.data) {
+              singleRow = byRecordId.data as Record<string, unknown>
+              singleErr = null
+            }
+          }
+          lookupRows = singleRow != null ? [singleRow] : []
+          fetchErr = singleErr
+        } else {
+          const res = await supabase
+            .from(lookupTableName)
+            .select(`id, ${resultFieldName}`)
+            .in("id", chunk)
+          lookupRows = res.data
+          fetchErr = res.error
+          if (is400(fetchErr as { message?: string; status?: number } | null) && lookupRows == null) {
+            let retry = await supabase.from(lookupTableName).select("id").in("id", chunk)
+            if (retry.error && (retry.error as { code?: string })?.code === "42703") {
+              retry = await supabase.from(lookupTableName).select("*").in("record_id", chunk)
+            }
+            if (!retry.error && retry.data) {
+              lookupRows = retry.data
+              fetchErr = null
+            }
+          }
+        }
 
         if (fetchErr) {
-          if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-            console.warn('[computeLookupValues] Error fetching lookup rows:', fetchErr)
+          if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
+            console.warn("[computeLookupValues] Error fetching lookup rows:", fetchErr)
           }
           break
         }
         for (const r of asArray(lookupRows)) {
-          const row = r as unknown as { id: string } & Record<string, unknown>
-          const id = row.id
+          const row = r as unknown as Record<string, unknown>
+          const idVal = rowIdKey(row)
+          const id = idVal != null ? String(idVal) : null
           const val = getLookupDisplayValue(row, resultFieldName) ?? (id != null ? id : undefined)
           if (id != null) idToValue.set(id, val)
         }

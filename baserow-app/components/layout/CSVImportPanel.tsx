@@ -172,6 +172,7 @@ export default function CSVImportPanel({
   const [tableFields, setTableFields] = useState<TableField[]>([])
   const [fieldMappings, setFieldMappings] = useState<Record<string, string>>({})
   const [newFields, setNewFields] = useState<Record<string, FieldType>>({})
+  const [defaultValuesForAll, setDefaultValuesForAll] = useState<Record<string, string>>({})
   const [importedCount, setImportedCount] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [showSummary, setShowSummary] = useState(false)
@@ -823,8 +824,11 @@ export default function CSVImportPanel({
         }
       })
       
-      // Build comprehensive field mapping: merge original mappings, auto-mapped fields, and created fields
-      const allFieldMappings: Record<string, string> = { ...fieldMappings, ...autoMappedFields }
+      // Build comprehensive field mapping: merge original mappings, auto-mapped fields, and created fields (exclude "ignore")
+      const allFieldMappings: Record<string, string> = {}
+      for (const [k, v] of Object.entries({ ...fieldMappings, ...autoMappedFields })) {
+        if (v && v !== "ignore") allFieldMappings[k] = v
+      }
       
       // Add created field names to mappings
       Object.entries(createdFieldNames).forEach(([csvHeader, fieldName]) => {
@@ -840,8 +844,10 @@ export default function CSVImportPanel({
 
       // Use already parsed CSV data (allRows was created above)
 
-      // Check for unmapped headers (warn but don't block - they'll be skipped)
+      // Check for unmapped headers (warn but don't block - they'll be skipped; "ignore" is intentional)
       const unmappedHeaders = csvHeaders.filter(header => {
+        const mapping = allFieldMappings[header] ?? fieldMappings[header]
+        if (mapping === "ignore") return false
         return !allFieldMappings[header] && !newFields[header]
       })
 
@@ -984,6 +990,27 @@ export default function CSVImportPanel({
           // Field names are sanitized when created, so they match column names
           mappedRow[fieldNameToUse] = value
           fieldsAdded++
+        })
+
+        // Apply "set value for all rows" overrides
+        Object.entries(defaultValuesForAll).forEach(([fieldName, strVal]) => {
+          if (strVal === "") return
+          const field = fieldMap.get(fieldName)
+          if (!field) return
+          let value: unknown = strVal
+          if (field.type === "number" || field.type === "currency" || field.type === "percent") {
+            value = parseFloat(strVal) || 0
+          } else if (field.type === "checkbox") {
+            value = (String(strVal).toLowerCase() === "true" || strVal === "1" || String(strVal).toLowerCase() === "yes")
+          } else if (field.type === "date") {
+            const date = parseDateFromCSV(String(strVal))
+            value = date ? date.toISOString() : null
+          } else if (field.type === "multi_select") {
+            value = String(strVal).split(/[,;]/).map((p: string) => p.trim()).filter(Boolean)
+          } else {
+            value = String(strVal).trim()
+          }
+          mappedRow[fieldName] = value
         })
         
         // Log first few rows for debugging
@@ -1280,13 +1307,20 @@ export default function CSVImportPanel({
                           if (!newFields[csvHeader]) {
                             handleNewFieldType(csvHeader, "text")
                           }
+                        } else if (value === "ignore") {
+                          setFieldMappings((prev) => ({ ...prev, [csvHeader]: "ignore" }))
+                          setNewFields((prev) => {
+                            const next = { ...prev }
+                            delete next[csvHeader]
+                            return next
+                          })
                         } else {
                           // Map to existing field - clear new field type
                           handleMappingChange(csvHeader, value)
                           setNewFields((prev) => {
-                            const newFields = { ...prev }
-                            delete newFields[csvHeader]
-                            return newFields
+                            const next = { ...prev }
+                            delete next[csvHeader]
+                            return next
                           })
                         }
                       }}
@@ -1295,6 +1329,7 @@ export default function CSVImportPanel({
                         <SelectValue placeholder="Select or create field" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="ignore">Don&apos;t import</SelectItem>
                         <SelectItem value="new">+ Create new field</SelectItem>
                         {tableFields.map((field) => (
                           <SelectItem key={field.id} value={field.name}>
@@ -1341,6 +1376,46 @@ export default function CSVImportPanel({
             })}
           </div>
 
+          <div className="space-y-2">
+            <Label className="text-sm text-gray-700">Optional: set same value for every row</Label>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select
+                value={Object.keys(defaultValuesForAll)[0] ?? ""}
+                onValueChange={(fieldName) => {
+                  if (!fieldName) {
+                    setDefaultValuesForAll({})
+                    return
+                  }
+                  const current = Object.keys(defaultValuesForAll)[0]
+                  const currentVal = current ? defaultValuesForAll[current] ?? "" : ""
+                  setDefaultValuesForAll(fieldName ? { [fieldName]: currentVal } : {})
+                }}
+              >
+                <SelectTrigger className="h-8 w-[180px]">
+                  <SelectValue placeholder="Select field" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">None</SelectItem>
+                  {tableFields.map((f) => (
+                    <SelectItem key={f.id} value={f.name}>
+                      {getFieldDisplayName(f)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                type="text"
+                className="flex h-8 w-[180px] rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm"
+                placeholder="Value for all rows"
+                value={Object.keys(defaultValuesForAll).length ? (Object.values(defaultValuesForAll)[0] ?? "") : ""}
+                onChange={(e) => {
+                  const fieldName = Object.keys(defaultValuesForAll)[0]
+                  if (fieldName) setDefaultValuesForAll({ [fieldName]: e.target.value })
+                }}
+              />
+            </div>
+          </div>
+
           <Button
             onClick={() => setStep("preview")}
             className="w-full"
@@ -1368,22 +1443,20 @@ export default function CSVImportPanel({
                   <tr>
                     {csvHeaders.map((header) => {
                       const mappedField = fieldMappings[header]
+                      const isIgnored = mappedField === "ignore"
                       const newFieldType = newFields[header]
-                      const fieldTypeLabel = mappedField 
-                        ? tableFields.find(f => f.name === mappedField)?.type 
+                      const fieldTypeLabel = (mappedField && !isIgnored)
+                        ? tableFields.find(f => f.name === mappedField)?.type
                         : newFieldType
                         ? FIELD_TYPES.find(t => t.type === newFieldType)?.label || newFieldType
                         : null
-                      
                       return (
                         <th key={header} className="px-2 py-2 text-left font-medium text-gray-700">
                           <div className="flex flex-col">
-                            <span>{mappedField ? formatFieldNameForDisplay(mappedField) : header}</span>
-                            {fieldTypeLabel && (
-                              <span className="text-xs font-normal text-gray-500 mt-0.5">
-                                {mappedField ? `(${fieldTypeLabel})` : `New: ${fieldTypeLabel}`}
-                              </span>
-                            )}
+                            <span>{isIgnored ? header : (mappedField ? formatFieldNameForDisplay(mappedField) : header)}</span>
+                            <span className="text-xs font-normal text-gray-500 mt-0.5">
+                              {isIgnored ? "Don't import" : fieldTypeLabel ? (mappedField ? `(${fieldTypeLabel})` : `New: ${fieldTypeLabel}`) : null}
+                            </span>
                           </div>
                         </th>
                       )
@@ -1450,6 +1523,7 @@ export default function CSVImportPanel({
                 setCsvRows([])
                 setFieldMappings({})
                 setNewFields({})
+                setDefaultValuesForAll({})
                 setImportedCount(0)
                 setError(null)
                 if (fileInputRef.current) {

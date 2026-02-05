@@ -5,6 +5,8 @@ export type ViewType = 'grid' | 'form' | 'kanban' | 'calendar' | 'timeline' | 'g
 export type FilterType =
   | 'equal'
   | 'not_equal'
+  | 'is_any_of'
+  | 'is_not_any_of'
   | 'contains'
   | 'not_contains'
   | 'is_empty'

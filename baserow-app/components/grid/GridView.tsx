@@ -3770,6 +3770,37 @@ export default function GridView({
                   )
                 })
               )}
+              {/* Spreadsheet-style: click last row to add a record */}
+              {filteredRows.length > 0 && allowInlineCreate && !isEditing && (
+                <tr
+                  className="border-b border-gray-200 bg-gray-50/50 hover:bg-gray-100/70 transition-colors cursor-pointer"
+                  onClick={handleAddRow}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      handleAddRow()
+                    }
+                  }}
+                  aria-label="Add record"
+                >
+                  <td
+                    colSpan={
+                      1 +
+                      safeVisibleFields.length +
+                      (enableRecordOpen && allowOpenRecord ? 1 : 0) +
+                      (imageField ? 1 : 0)
+                    }
+                    className="px-4 py-2 text-gray-500 hover:text-gray-700 text-sm font-medium"
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <Plus className="h-4 w-4 shrink-0" />
+                      Click to add a record
+                    </span>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

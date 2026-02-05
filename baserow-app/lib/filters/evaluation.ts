@@ -259,6 +259,18 @@ function applyCondition(
         return query.neq(fieldName, value === true || value === 'true')
       }
       return query.neq(fieldName, value)
+
+    case 'is_any_of': {
+      const arr = Array.isArray(value) ? value : value != null ? [value] : []
+      if (arr.length === 0) return query
+      return query.in(fieldName, arr)
+    }
+
+    case 'is_not_any_of': {
+      const arr = Array.isArray(value) ? value : value != null ? [value] : []
+      if (arr.length === 0) return query
+      return query.not(fieldName, 'in', arr)
+    }
       
     case 'contains':
       if (fieldType === 'multi_select') {
@@ -532,6 +544,16 @@ export function evaluateFilterTree(
         return String(fieldValue) === String(value)
       case 'not_equal':
         return String(fieldValue) !== String(value)
+      case 'is_any_of': {
+        const arr = Array.isArray(value) ? value : value != null ? [value] : []
+        const fv = fieldValue != null ? String(fieldValue) : ''
+        return arr.some((v: unknown) => String(v) === fv)
+      }
+      case 'is_not_any_of': {
+        const arr = Array.isArray(value) ? value : value != null ? [value] : []
+        const fv = fieldValue != null ? String(fieldValue) : ''
+        return !arr.some((v: unknown) => String(v) === fv)
+      }
       case 'contains':
         return String(fieldValue || '').toLowerCase().includes(String(value || '').toLowerCase())
       case 'not_contains':

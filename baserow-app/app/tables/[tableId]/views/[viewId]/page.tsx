@@ -12,6 +12,10 @@ import { Button } from "@/components/ui/button"
 import type { View } from "@/types/database"
 import { normalizeUuid } from "@/lib/utils/ids"
 
+// Type aliases for Promise.allSettled results to avoid TS1005 inline assertion issues
+type ViewFilterRow = { id?: string; field_name: string; operator: string; value: unknown }
+type ViewSortRow = { id?: string; field_name: string; direction: string; order_index?: number }
+
 export default async function ViewPage({
   params,
 }: {
@@ -113,10 +117,10 @@ export default async function ViewPage({
 
     const viewFields = viewFieldsRes.status === 'fulfilled' && !viewFieldsRes.value.error ? (viewFieldsRes.value.data || []) : []
     const viewFilters = viewFiltersRes.status === 'fulfilled' && !viewFiltersRes.value.error 
-      ? (viewFiltersRes.value.data || []).map((f: any) => ({ ...f, view_id: viewId })) 
+      ? ((viewFiltersRes.value.data || []) as ViewFilterRow[]).map((f) => ({ ...f, view_id: viewId })) 
       : []
     const viewSorts = viewSortsRes.status === 'fulfilled' && !viewSortsRes.value.error 
-      ? (viewSortsRes.value.data || []).map((s: any) => ({ ...s, view_id: viewId })) 
+      ? ((viewSortsRes.value.data || []) as ViewSortRow[]).map((s) => ({ ...s, view_id: viewId })) 
       : []
     const tableFields = tableFieldsRes.status === 'fulfilled' && !tableFieldsRes.value.error ? (tableFieldsRes.value.data || []) : []
     
@@ -132,7 +136,7 @@ export default async function ViewPage({
 
     // For horizontal_grouped views, get group field and rules from settings
     const horizontalGroupedGroupField = view.type === "horizontal_grouped" ? groupBy : undefined
-    const horizontalGroupedGroupRules = view.type === "horizontal_grouped" ? (groupByRules as any) : undefined
+    const horizontalGroupedGroupRules = view.type === "horizontal_grouped" ? groupByRules : undefined
 
     return (
       <WorkspaceShellWrapper title={view.name}>
@@ -179,10 +183,11 @@ export default async function ViewPage({
         )}
       </WorkspaceShellWrapper>
     )
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Don't catch redirect errors - let Next.js handle them
     // Next.js redirect() throws an error with digest property
-    if (error?.digest?.startsWith('NEXT_REDIRECT') || error?.message?.includes('NEXT_REDIRECT')) {
+    const err = error as { digest?: string; message?: string }
+    if (err?.digest?.startsWith?.('NEXT_REDIRECT') || err?.message?.includes?.('NEXT_REDIRECT')) {
       throw error // Re-throw redirect errors so Next.js can handle them
     }
     

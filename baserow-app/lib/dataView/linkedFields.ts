@@ -257,10 +257,14 @@ export async function resolveLinkedFieldDisplayMap(
       if (!id) continue
       const label = r?.[displayFieldName] != null ? String(r[displayFieldName]) : ''
       out.set(id, label || id)
+      if (isUuid(id)) out.set(id.toLowerCase(), label || id)
     }
 
     // Ensure any missing IDs still get a fallback label.
-    for (const id of chunk) if (!out.has(id)) out.set(id, id)
+    for (const id of chunk) {
+      if (!out.has(id)) out.set(id, id)
+      if (isUuid(id) && !out.has(id.toLowerCase())) out.set(id.toLowerCase(), id)
+    }
   }
 
   return out

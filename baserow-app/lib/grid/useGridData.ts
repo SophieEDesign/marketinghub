@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase/client'
 import type { TableField } from '@/types/fields'
 import { asArray } from '@/lib/utils/asArray'
 import { applyFiltersToQuery, type FilterConfig } from '@/lib/interface/filters'
+import type { FilterTree } from '@/lib/filters/canonical-model'
 import { buildSelectClause, toPostgrestColumn } from '@/lib/supabase/postgrest'
 import { isAbortError } from '@/lib/api/error-handling'
 import { useToast } from '@/components/ui/use-toast'
@@ -33,7 +34,8 @@ export interface UseGridDataOptions {
   /** Optional: enables server-side schema self-heal for this table */
   tableId?: string
   fields?: TableField[]
-  filters?: FilterConfig[]
+  /** Flat filters (AND) or filter tree (supports OR groups from view_filter_groups) */
+  filters?: FilterConfig[] | FilterTree
   sorts?: Array<{ field: string; direction: 'asc' | 'desc' }>
   limit?: number
   /** Optional: callback for error notifications (e.g., toast) */
@@ -76,6 +78,8 @@ export function useGridData({
   
   // Prevent concurrent loads that could cause memory issues
   const isLoadingRef = useRef(false)
+  // Retry once on AbortError (e.g. React Strict Mode or navigation) so records still show
+  const abortRetryScheduledRef = useRef(false)
 
   // Cache physical columns to prevent PostgREST 400s when metadata drifts from schema.
   // (E.g. selecting/filtering on a column that doesn't exist in the physical table.)
@@ -118,12 +122,14 @@ export function useGridData({
           if (typeof window !== 'undefined' && (process.env.NODE_ENV === 'development' || localStorage.getItem('DEBUG_GRID_DATA') === '1')) {
             console.log('[useGridData] Physical columns loaded:', Array.from(physicalColumnsRef.current))
           }
-        } else if (colsError) {
+        } else if (colsError && !isAbortError(colsError)) {
           console.warn('[useGridData] Error loading physical columns:', colsError)
         }
       } catch (error) {
-        // Non-fatal: if RPC isn't available or times out, we fall back to best-effort behaviour.
-        console.warn('[useGridData] Could not load physical columns (RPC may not be available or timed out):', error)
+        // Non-fatal: if RPC isn't available, times out, or was aborted, we fall back to best-effort behaviour.
+        if (!isAbortError(error)) {
+          console.warn('[useGridData] Could not load physical columns (RPC may not be available or timed out):', error)
+        }
         physicalColumnsRef.current = null
       }
     },
@@ -325,6 +331,7 @@ export function useGridData({
     }
 
     isLoadingRef.current = true
+    abortRetryScheduledRef.current = false
     setLoading(true)
     setError(null)
 
@@ -415,29 +422,30 @@ export function useGridData({
 
         let query = supabase.from(tableName).select(selectClause)
 
-      // Apply filters using shared unified filter engine (supports date operators, selects, etc.)
-        const safeFilterConfigs = asArray<FilterConfig>(currentFilters as FilterConfig[]).filter(
-        (f) => !!f && typeof (f as FilterConfig).field === 'string' && typeof (f as FilterConfig).operator === 'string'
-      )
-      if (safeFilterConfigs.length > 0) {
-        // If we know the physical columns, skip filters on missing columns.
-        const filteredConfigs = physicalCols
-          ? safeFilterConfigs.filter((f) => {
-              const col = toPostgrestColumn((f as any).field)
-              return !!col && physicalCols.has(col)
-            })
-          : safeFilterConfigs
-              // Best-effort: also skip learned-missing columns even if we don't have physicalCols.
-              .filter((f) => !learnedMissing.has(String((f as any).field)))
-
+      // Apply filters: support both flat FilterConfig[] and FilterTree (from view_filter_groups)
+        const isFilterTree = currentFilters && typeof currentFilters === 'object' && !Array.isArray(currentFilters) && 'operator' in (currentFilters as object)
         const normalizedFields = safeFields.map((f) => ({
           name: f.name,
           type: f.type,
           id: f.id,
           options: (f as any).options,
         }))
-          query = applyFiltersToQuery(query, filteredConfigs, normalizedFields as any)
-      }
+        if (isFilterTree) {
+          query = applyFiltersToQuery(query, currentFilters as FilterTree, normalizedFields as any)
+        } else {
+          const safeFilterConfigs = asArray<FilterConfig>(currentFilters as FilterConfig[]).filter(
+            (f) => !!f && typeof (f as FilterConfig).field === 'string' && typeof (f as FilterConfig).operator === 'string'
+          )
+          if (safeFilterConfigs.length > 0) {
+            const filteredConfigs = physicalCols
+              ? safeFilterConfigs.filter((f) => {
+                  const col = toPostgrestColumn((f as any).field)
+                  return !!col && physicalCols.has(col)
+                })
+              : safeFilterConfigs.filter((f) => !learnedMissing.has(String((f as any).field)))
+            query = applyFiltersToQuery(query, filteredConfigs, normalizedFields as any)
+          }
+        }
 
       // Apply sorts
         currentSorts.forEach((sort) => {
@@ -468,6 +476,7 @@ export function useGridData({
 
         // Enhanced debugging for core data loading issues
         if (typeof window !== 'undefined' && (process.env.NODE_ENV === 'development' || localStorage.getItem('DEBUG_GRID_DATA') === '1')) {
+          const filtersCount = isFilterTree ? 'tree' : (asArray<FilterConfig>(currentFilters as FilterConfig[]).filter((f) => !!f && typeof (f as FilterConfig).field === 'string').length)
           console.log('[useGridData] Query result:', {
             tableName,
             tableId,
@@ -481,7 +490,7 @@ export function useGridData({
               hint: (queryError as any)?.hint,
             } : null,
             selectClause,
-            filtersCount: safeFilterConfigs.length,
+            filtersCount,
             sortsCount: currentSorts.length,
             fieldsCount: existingPhysicalFieldNames.length,
           })
@@ -532,7 +541,7 @@ export function useGridData({
               tableName,
               tableId,
               selectClause,
-              filters: safeFilterConfigs,
+              filters: isFilterTree ? '(filter tree)' : currentFilters,
               sorts: currentSorts,
               hint: 'Checking if data exists in table_rows (JSONB storage) instead...',
             })
@@ -579,6 +588,11 @@ export function useGridData({
       clearTimeout(timeoutId)
       if (isAbortError(err)) {
         isLoadingRef.current = false
+        // Retry once so initial load recovers from spurious aborts (e.g. React Strict Mode, navigation)
+        if (!abortRetryScheduledRef.current) {
+          abortRetryScheduledRef.current = true
+          setTimeout(() => loadData(), 100)
+        }
         return
       }
       const errorMessage = (err as { message?: string })?.message || 'Failed to load data'

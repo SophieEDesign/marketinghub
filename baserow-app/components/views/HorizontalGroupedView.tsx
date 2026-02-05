@@ -53,6 +53,7 @@ interface HorizontalGroupedViewProps {
   recordFields?: FieldConfig[] // Configured fields to show in record canvas
   isEditing?: boolean // Whether canvas is in edit mode
   onBlockUpdate?: (blocks: PageBlock[]) => void | Promise<void> // Callback when blocks are updated
+  onBlockSettingsClick?: (blockId: string) => void // Called when user clicks gear on a block (e.g. to open field appearance in modal)
   storedLayout?: PageBlock[] | null // Stored layout from block config
   highlightRules?: HighlightRule[] // Conditional formatting rules
 }
@@ -73,6 +74,7 @@ export default function HorizontalGroupedView({
   recordFields = [],
   isEditing = false,
   onBlockUpdate,
+  onBlockSettingsClick,
   storedLayout: storedLayoutProp,
   highlightRules = [],
 }: HorizontalGroupedViewProps) {
@@ -122,6 +124,10 @@ export default function HorizontalGroupedView({
           // Default sort by created_at
           query = query.order('created_at', { ascending: false })
         }
+
+        // Explicit limit so we don't rely on Supabase default (often 20–30); show all rows up to a safe cap
+        const ROWS_LIMIT = 2000
+        query = query.limit(ROWS_LIMIT)
 
         const { data, error } = await query
 
@@ -192,21 +198,32 @@ export default function HorizontalGroupedView({
         return
       }
 
+      function toId(v: unknown): string | null {
+        if (v == null || v === '') return null
+        if (typeof v === 'string') return v.trim() || null
+        if (typeof v === 'object' && v && 'id' in v) return String((v as { id: unknown }).id).trim() || null
+        return String(v).trim() || null
+      }
+
       const next: Record<string, Record<string, string>> = {}
       for (const f of groupedLinkFields) {
         const ids = new Set<string>()
         for (const row of filteredRows) {
-          const value = (row as any)?.[f.name]
+          const value = (row as any)?.[f.name] ?? (row as any)?.[(f as any).id]
           if (Array.isArray(value)) {
-            value.forEach((id: string) => ids.add(String(id)))
-          } else if (value) {
-            ids.add(String(value))
+            value.forEach((v: unknown) => {
+              const id = toId(v)
+              if (id) ids.add(id)
+            })
+          } else if (value !== undefined && value !== null) {
+            const id = toId(value)
+            if (id) ids.add(id)
           }
         }
         if (ids.size === 0) continue
         const map = await resolveLinkedFieldDisplayMap(f, Array.from(ids))
         next[f.name] = Object.fromEntries(map.entries())
-        next[(f as any).id] = next[f.name]
+        if ((f as any).id) next[(f as any).id] = next[f.name]
       }
 
       if (!cancelled) setGroupValueLabelMaps(next)
@@ -312,6 +329,10 @@ export default function HorizontalGroupedView({
     return null
   }, [effectiveGroupRules, tableFields])
 
+  const defaultBlockH = useCallback((field: TableField) => {
+    return field.type === 'link_to_table' || field.type === 'lookup' ? 3 : 2
+  }, [])
+
   // Create field blocks from recordFields configuration
   // Merge stored layout with record_fields: layout is source of truth for position, record_fields for which fields exist.
   // New fields in record_fields get a block added; fields removed from record_fields are removed from layout.
@@ -374,7 +395,7 @@ export default function HorizontalGroupedView({
           x: col === 0 ? 0 : 6,
           y,
           w: 6,
-          h: 2,
+          h: defaultBlockH(field),
           config: {
             field_id: field.id,
             field_name: field.name,
@@ -399,7 +420,7 @@ export default function HorizontalGroupedView({
         x: index % 2 === 0 ? 0 : 6,
         y: Math.floor(index / 2) * 2,
         w: 6,
-        h: 2,
+        h: defaultBlockH(field),
         config: {
           field_id: field.id,
           field_name: field.name,
@@ -420,7 +441,7 @@ export default function HorizontalGroupedView({
         x: (fieldConfig as any).x ?? (index % 2 === 0 ? 0 : 6),
         y: (fieldConfig as any).y ?? Math.floor(index / 2) * 2,
         w: (fieldConfig as any).w ?? 6,
-        h: (fieldConfig as any).h ?? 2,
+        h: (fieldConfig as any).h ?? defaultBlockH(field),
         config: {
           field_id: field.id,
           field_name: field.name,
@@ -431,7 +452,7 @@ export default function HorizontalGroupedView({
         created_at: new Date().toISOString(),
       }
     }).filter(Boolean) as PageBlock[]
-  }, [recordFields, tableFields, tableId, viewId])
+  }, [recordFields, tableFields, tableId, viewId, defaultBlockH])
 
   // Store layout template (shared across all records)
   // Load from stored layout if available (from block config)
@@ -756,6 +777,7 @@ export default function HorizontalGroupedView({
                                 : undefined
                             }
                             onBlockDelete={canEditThisRecord ? handleBlockDelete : undefined}
+                            onBlockSettingsClick={canEditThisRecord ? onBlockSettingsClick : undefined}
                             pageTableId={tableId}
                             pageId={viewId || `view-${tableId}`}
                             recordId={recordId}

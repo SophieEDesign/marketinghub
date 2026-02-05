@@ -107,11 +107,22 @@ export default function BlockRenderer({
     // Only merge recordId for record blocks (not table_id for grid/form)
     record_id: safeConfig.record_id || recordId || undefined,
   }
-  
-  const safeBlock: PageBlock = {
+
+  // CRITICAL: Memoize safeBlock so block components receive a stable reference.
+  // New object every render caused React #185 (maximum update depth) in CalendarBlock/GridBlock.
+  const safeBlock = useMemo<PageBlock>(() => ({
     ...block,
     config: mergedConfig,
-  }
+  }), [
+    block.id,
+    block.type,
+    block.x,
+    block.y,
+    block.w,
+    block.h,
+    recordId ?? '',
+    JSON.stringify(block.config),
+  ])
 
   const handleUpdate = (updates: Partial<PageBlock["config"]>) => {
     if (onUpdate) {

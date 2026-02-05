@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Check } from "lucide-react"
 import HorizontalGroupedView from "@/components/views/HorizontalGroupedView"
+import FieldAppearanceSettings from "@/components/interface/settings/FieldAppearanceSettings"
 import type { PageBlock } from "@/lib/interface/types"
 import type { FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
@@ -56,6 +57,7 @@ export default function HorizontalGroupedCanvasModal({
 }: HorizontalGroupedCanvasModalProps) {
   const [isSaving, setIsSaving] = useState(false)
   const [currentLayout, setCurrentLayout] = useState<PageBlock[]>(storedLayout || [])
+  const [settingsBlockId, setSettingsBlockId] = useState<string | null>(null)
 
   // Update current layout when storedLayout changes
   useEffect(() => {
@@ -71,6 +73,24 @@ export default function HorizontalGroupedCanvasModal({
     // Auto-save to parent
     await onSave(blocks)
   }, [onSave])
+
+  const handleBlockSettingsClick = useCallback((blockId: string) => {
+    setSettingsBlockId(blockId)
+  }, [])
+
+  const handleFieldAppearanceUpdate = useCallback(
+    (updates: Partial<PageBlock["config"]>) => {
+      if (!settingsBlockId) return
+      setCurrentLayout((prev) => {
+        const next = prev.map((b) =>
+          b.id === settingsBlockId ? { ...b, config: { ...b.config, ...updates } } : b
+        )
+        onSave(next)
+        return next
+      })
+    },
+    [settingsBlockId, onSave]
+  )
 
   // Handle close - just close, layout is already saved
   const handleClose = useCallback((open: boolean) => {
@@ -107,10 +127,37 @@ export default function HorizontalGroupedCanvasModal({
             recordFields={recordFields}
             isEditing={true}
             onBlockUpdate={handleLayoutUpdate}
+            onBlockSettingsClick={handleBlockSettingsClick}
             storedLayout={currentLayout}
             highlightRules={highlightRules}
           />
         </div>
+
+        {settingsBlockId && (() => {
+          const settingsBlock = currentLayout.find((b) => b.id === settingsBlockId)
+          if (!settingsBlock?.config) return null
+          return (
+            <Dialog open={!!settingsBlockId} onOpenChange={(open) => !open && setSettingsBlockId(null)}>
+              <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Field block settings</DialogTitle>
+                  <DialogDescription>
+                    Configure how this field appears on the card (label, linked records display, etc.).
+                  </DialogDescription>
+                </DialogHeader>
+                <FieldAppearanceSettings
+                  config={settingsBlock.config}
+                  onUpdate={handleFieldAppearanceUpdate}
+                />
+                <div className="flex justify-end pt-2">
+                  <Button variant="outline" onClick={() => setSettingsBlockId(null)}>
+                    Close
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )
+        })()}
 
         <div className="px-6 py-4 border-t flex justify-end gap-2">
           <Button

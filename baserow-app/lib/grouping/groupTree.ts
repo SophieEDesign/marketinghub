@@ -90,6 +90,11 @@ function parseDateValue(v: any): Date | null {
   return Number.isNaN(d.getTime()) ? null : d
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+function looksLikeUuid(s: string): boolean {
+  return typeof s === 'string' && UUID_RE.test(s.trim())
+}
+
 function selectSortIndex(field: TableField, valueLabel: string): number | null {
   const opts = (field as any)?.options?.selectOptions as any[] | undefined
   if (!Array.isArray(opts) || opts.length === 0) return null
@@ -141,7 +146,9 @@ function getGroupKeysForValue(ctx: GroupContext, rule: GroupRule, field: TableFi
       if (!maps) return null
       const byName = maps[field.name]
       const byId = maps[(field as any)?.id]
-      return (byName?.[key] ?? byId?.[key] ?? null) as string | null
+      const lookup = (m: Record<string, string> | undefined) =>
+        m?.[key] ?? (looksLikeUuid(key) ? m?.[key.toLowerCase()] : undefined)
+      return (lookup(byName as Record<string, string>) ?? lookup(byId as Record<string, string>) ?? null) as string | null
     })()
 
     const label = String(resolvedFromMap ?? rawKey).trim()
@@ -262,8 +269,8 @@ function buildNodesAtLevel<TItem extends Record<string, any>>(
   const buckets = new Map<string, { key: GroupKey; items: TItem[] }>()
 
   for (const item of items) {
-    // Access the field value using the field name (not ID) to match data structure
-    const raw = (item as any)?.[fieldNameForData]
+    // Access the field value by name first, then by id (row may be keyed by either)
+    const raw = (item as any)?.[fieldNameForData] ?? (field ? (item as any)?.[(field as any).id] : undefined)
     
     // Debug: Log if field is missing in data (only for nested levels to avoid spam)
     if (ruleIndex > 0 && raw === undefined && items.length > 0 && items.indexOf(item) === 0) {

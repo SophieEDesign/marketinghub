@@ -9,7 +9,7 @@ import { formatDateUK } from "@/lib/utils"
 import type { TableField } from "@/types/fields"
 import { renderPill, renderPills } from "@/lib/ui/pills"
 import { sortLabelsByManualOrder } from "@/lib/fields/select-options"
-import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
+import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig, normalizeFilter } from "@/lib/interface/filters"
 import { sortRowsByFieldType, shouldUseClientSideSorting, type ViewSort } from "@/lib/sorting/fieldTypeAwareSort"
 import type { FilterType } from "@/types/database"
 import { ChevronDown, ChevronRight, Filter, Group, MapPin, MoreHorizontal, Plus, Database } from "lucide-react"
@@ -29,6 +29,7 @@ import { normalizeUuid } from "@/lib/utils/ids"
 import { isUserField, getUserDisplayNames } from "@/lib/users/userDisplay"
 import type { HighlightRule } from "@/lib/interface/types"
 import { evaluateHighlightRules, getFormattingStyle } from "@/lib/conditional-formatting/evaluator"
+import { getFieldDisplayName } from "@/lib/fields/display"
 
 // PostgREST expects unquoted identifiers in order clauses; see `lib/supabase/postgrest`.
 
@@ -111,7 +112,9 @@ export default function ListView({
   const [groupDialogOpen, setGroupDialogOpen] = useState(false)
   const [filterDialogOpen, setFilterDialogOpen] = useState(false)
   const [currentGroupBy, setCurrentGroupBy] = useState<string | undefined>(groupBy)
-  const [currentFilters, setCurrentFilters] = useState<FilterConfig[]>(filters)
+  const [currentFilters, setCurrentFilters] = useState<FilterConfig[]>(() =>
+    Array.isArray(filters) ? filters.map((f) => normalizeFilter(f as Parameters<typeof normalizeFilter>[0])) : []
+  )
   const [groupValueLabelMaps, setGroupValueLabelMaps] = useState<Record<string, Record<string, string>>>({})
   const [userDisplayNames, setUserDisplayNames] = useState<Map<string, string>>(new Map())
 
@@ -275,6 +278,10 @@ export default function ListView({
       } else if (sorts.length === 0) {
         query = query.order('created_at', { ascending: false })
       }
+
+      // Explicit limit so we don't rely on Supabase default (often 20–30); show all rows up to a safe cap
+      const ROWS_LIMIT = 2000
+      query = query.limit(ROWS_LIMIT)
 
       const { data, error } = await query
 
@@ -941,7 +948,7 @@ export default function ListView({
                   if (!text || text === '—') return null
                   return (
                     <span key={`meta:${field.name}`} className="truncate">
-                      <span className="text-gray-400">{field.name}:</span> {text}
+                      <span className="text-gray-400">{getFieldDisplayName(field)}:</span> {text}
                     </span>
                   )
                 })}

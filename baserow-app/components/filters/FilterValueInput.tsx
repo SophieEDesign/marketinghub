@@ -111,11 +111,11 @@ export default function FilterValueInput({
               <div className="flex items-center gap-2">
                 <span
                   className="inline-block w-3 h-3 rounded-full flex-shrink-0"
-                  style={{
+                    style={{
                     backgroundColor: normalizeHexColor(
                       resolveChoiceColor(
                         value as string,
-                        field.type,
+                        field.type as 'single_select' | 'multi_select',
                         field.options,
                         field.type === 'single_select'
                       )

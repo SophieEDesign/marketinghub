@@ -6,7 +6,50 @@ Each section is one commit + one push. If something breaks after a section, reve
 
 ---
 
-## Section 1 — Clarity only (no behaviour change)
+## Status: what's done vs what's left
+
+**Done (on branch `revert-to-7fec709`):**
+
+
+| Section | What was applied                                                                                                                         |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **1**   | BlockConfig types (image field comment). HorizontalGroupedView already used `const` — no change.                                         |
+| **2**   | ViewFilterInput, ViewFilterGroupInput, `dbFiltersToFilterTree` accepts partial data. (No `parseFilterValue` — not in this codebase.)     |
+| **3**   | computeLookupValues: `getLookupDisplayValue()` helper for when metadata field name ≠ DB column. (No RLS migrations or full retry logic.) |
+| **12**  | Navigation progress bar: new `NavigationProgress.tsx`, CSS in globals.css, added to root layout.                                         |
+| **6**   | Filter dialog, CSV, filter/grid view error handling (AbortError, retry, BlockRenderer useMemo, useGridData retry, computeLookupValues, lib/data 500 retry, CSVImportPanel ignore + defaultValuesForAll). |
+| **9**   | Filter groups AND/OR and filter UI (FilterTree in useGridData, is_any_of/is_not_any_of types and evaluation, FilterDialog condition_type, field-operators, evaluateFilterTree is_any_of). |
+| **10**  | Click to add row (lib/data evaluateFilterTree, AirtableGridView new-row, GridView click row). |
+| **11**  | BlockAppearanceWrapper and appearance flow (getAppearanceClasses → "", fixed padding, hasAppearanceSettings without container/spacing). |
+| **14**  | LookupFieldPicker and FieldBuilderModal display modes (linked_field_display_mode 'list', FieldAppearanceSettings list option). |
+| **15**  | Interface builder, block settings, grouping labels, Canvas (linkedFields UUID casing, groupTree lookup/raw, HorizontalGroupedCanvasModal settings dialog, HorizontalGroupedView onBlockSettingsClick, defaultBlockH, toId). |
+
+
+**Skipped / not applicable:**
+
+
+| Section | Reason                                                                                                   |
+| ------- | -------------------------------------------------------------------------------------------------------- |
+| **4**   | linkedFields: current file has different structure (no `useIdOnlyForDisplay` / `badDisplayColumnCache`). |
+| **8**   | ViewPage has no getViews/debug block to refactor.                                                        |
+
+
+**Left to do (in order):**
+
+
+| #   | Section                                    | Risk       |
+| --- | ------------------------------------------ | ---------- |
+| 5   | GridView formatting and error handling     | Medium     |
+| 7   | Modal, navigation, FieldBuilderModal        | Low–medium |
+| 13  | Modal layout and layout settings            | Low–medium |
+
+
+**Not in plan (per your choices):** Cap-aware pagination, CoreDataViewTabs, context menu/sidebar, duplicate CalendarView import.
+
+---
+
+## Section 1 — Clarity only (no behaviour change) — DONE
+
 **Risk: lowest.** Variable names and types only.
 
 - **c94881472a** Refactor variable declarations in HorizontalGroupedView
@@ -17,7 +60,8 @@ Each section is one commit + one push. If something breaks after a section, reve
 
 ---
 
-## Section 2 — Filter converters type safety
+## Section 2 — Filter converters type safety — DONE
+
 **Risk: low.** Filter parsing and dbFiltersToFilterTree accept partial/typed input.
 
 - **8bf5d953b8** parseFilterValue type safety and JSON array strings
@@ -29,7 +73,8 @@ Each section is one commit + one push. If something breaks after a section, reve
 
 ---
 
-## Section 3 — computeLookupValues error handling and RLS
+## Section 3 — computeLookupValues error handling and RLS — DONE (partial)
+
 **Risk: low.** Lookup logic and optional RLS migration.
 
 - **8d3287c32d** Type casting in computeLookupValues + RLS migration
@@ -41,7 +86,8 @@ Each section is one commit + one push. If something breaks after a section, reve
 
 ---
 
-## Section 4 — linkedFields and linked records
+## Section 4 — linkedFields and linked records — SKIPPED (different file structure)
+
 **Risk: low.** Linked-fields helpers and linked-record types.
 
 - **474f1a9d7c** linkedFields functions clarity and consistency
@@ -53,6 +99,7 @@ Each section is one commit + one push. If something breaks after a section, reve
 ---
 
 ## Section 5 — GridView formatting and error handling
+
 **Risk: medium.** Grid behaviour and error paths.
 
 - **0b99a01d96** GridView formatting and error handling
@@ -64,6 +111,7 @@ Each section is one commit + one push. If something breaks after a section, reve
 ---
 
 ## Section 6 — Filter dialog, CSV, filter/grid view error handling
+
 **Risk: medium.** Filter UI and CSV import.
 
 - **7e1d0179cf** Filter and CSV import error handling and mapping
@@ -76,6 +124,7 @@ Each section is one commit + one push. If something breaks after a section, reve
 ---
 
 ## Section 7 — Modal, navigation, FieldBuilderModal
+
 **Risk: low–medium.** Modals and field builder.
 
 - **9c73c1b825** Modal and navigation diagnostics layout and error handling
@@ -86,7 +135,8 @@ Each section is one commit + one push. If something breaks after a section, reve
 
 ---
 
-## Section 8 — ViewPage debug logging
+## Section 8 — ViewPage debug logging — SKIPPED (no getViews/debug block in current ViewPage)
+
 **Risk: low.** Logging only.
 
 - **b544322d66** ViewPage debug logging clarity and type safety
@@ -97,6 +147,7 @@ Each section is one commit + one push. If something breaks after a section, reve
 ---
 
 ## Section 9 — Filter groups (AND/OR) and filter UI
+
 **Risk: medium.** Filter groups and filter components.
 
 - **53d2ab973b** View filter groups in Airtable components
@@ -109,6 +160,7 @@ Each section is one commit + one push. If something breaks after a section, reve
 ---
 
 ## Section 10 — Click to add row
+
 **Risk: medium.** New grid behaviour.
 
 - **7877563827** AirtableGridView and GridView “click to add” row
@@ -119,6 +171,7 @@ Each section is one commit + one push. If something breaks after a section, reve
 ---
 
 ## Section 11 — BlockAppearanceWrapper
+
 **Risk: low.** Appearance settings flow.
 
 - **7050d387a5** BlockAppearanceWrapper and appearance settings
@@ -129,6 +182,7 @@ Each section is one commit + one push. If something breaks after a section, reve
 ---
 
 ## Section 12 — Navigation progress bar
+
 **Risk: low.** New UI component.
 
 - **188bc43096** Navigation progress bar and field display
@@ -139,6 +193,7 @@ Each section is one commit + one push. If something breaks after a section, reve
 ---
 
 ## Section 13 — Modal layout and layout settings
+
 **Risk: low–medium.** Modal and layout consistency.
 
 - **5e96696a8c** Modal layout consistency and constraints
@@ -150,6 +205,7 @@ Each section is one commit + one push. If something breaks after a section, reve
 ---
 
 ## Section 14 — LookupFieldPicker and FieldBuilderModal display modes
+
 **Risk: low.** Picker and modal display options.
 
 - **27b49a58aa** LookupFieldPicker and FieldBuilderModal display modes and option handling
@@ -160,6 +216,7 @@ Each section is one commit + one push. If something breaks after a section, reve
 ---
 
 ## Section 15 — Interface builder, block settings, grouping labels, Canvas
+
 **Risk: medium.** Builder and Canvas behaviour.
 
 - **b368554baf** HorizontalGroupedCanvasModal and HorizontalGroupedView block settings
@@ -175,8 +232,8 @@ Each section is one commit + one push. If something breaks after a section, reve
 ## If something breaks
 
 - **Revert the last section:**  
-  `git revert HEAD --no-edit` then push, or  
-  `git reset --hard HEAD~1` then force-push if you haven't shared the branch yet.
+`git revert HEAD --no-edit` then push, or  
+`git reset --hard HEAD~1` then force-push if you haven't shared the branch yet.
 - **Stop** and fix or drop that section before continuing.
 
 ---
@@ -187,16 +244,16 @@ Git in the IDE can hit lock errors (e.g. `HEAD.lock`). Run these in a **terminal
 
 After each section is applied (by cherry-pick or by hand):
 
-1. **Remove locks:**  
-   `Remove-Item .git/index.lock, .git/HEAD.lock -Force -ErrorAction SilentlyContinue`
-2. **Stage only that section's files**, e.g.:  
-   `git add baserow-app/lib/interface/types.ts docs/REIMPLEMENT_SAFETY_ORDER.md`
-3. **Commit:**  
-   `git commit -m "chore: reimplement Section 1 - BlockConfig types, safety-order doc"`
-4. **Push:**  
-   `git push origin revert-to-7fec709`
-5. **Test.** If anything breaks, revert that commit and push:  
-   `git revert HEAD --no-edit` then `git push origin revert-to-7fec709`
+1. **Remove locks:**
+  `Remove-Item .git/index.lock, .git/HEAD.lock -Force -ErrorAction SilentlyContinue`
+2. **Stage only that section's files**, e.g.:
+  `git add baserow-app/lib/interface/types.ts docs/REIMPLEMENT_SAFETY_ORDER.md`
+3. **Commit:**
+  `git commit -m "chore: reimplement Section 1 - BlockConfig types, safety-order doc"`
+4. **Push:**
+  `git push origin revert-to-7fec709`
+5. **Test.** If anything breaks, revert that commit and push:
+  `git revert HEAD --no-edit` then `git push origin revert-to-7fec709`
 
 Repeat for Section 2, 3, etc., using the section commit messages in this doc.
 
@@ -208,3 +265,4 @@ Repeat for Section 2, 3, etc., using the section commit messages in this doc.
 - CoreDataViewTabs (7b6f395fbc)
 - Context menu / sidebar (790afa16a6)
 - Duplicate CalendarView import (4828eb91e3)
+

@@ -16,6 +16,7 @@ import type { FilterTree } from "@/lib/filters/canonical-model"
 import { dbFiltersToFilterTree, filterTreeToDbFormat } from "@/lib/filters/converters"
 import FilterBuilder from "./FilterBuilder"
 import { normalizeUuid } from "@/lib/utils/ids"
+import { isAbortError } from "@/lib/api/error-handling"
 
 interface UnifiedFilterDialogProps {
   isOpen: boolean
@@ -65,29 +66,56 @@ export default function UnifiedFilterDialog({
         throw new Error("Invalid viewId (expected UUID).")
       }
       
-      // Load filter groups
-      const { data: groups, error: groupsError } = await supabase
+      // Load filter groups (optional: table may not exist or RLS may return 500)
+      let groups: ViewFilterGroup[] = []
+      let { data: groupsData, error: groupsError } = await supabase
         .from("view_filter_groups")
         .select("*")
         .eq("view_id", viewUuid)
         .order("order_index", { ascending: true })
 
-      if (groupsError) throw groupsError
+      if (groupsError && (groupsError as { code?: string })?.code === "42703") {
+        // order_index column missing: retry without order and sort in JS
+        const retry = await supabase
+          .from("view_filter_groups")
+          .select("*")
+          .eq("view_id", viewUuid)
+        if (!retry.error && retry.data) {
+          groupsData = retry.data.sort((a: { order_index?: number }, b: { order_index?: number }) => (a.order_index ?? 0) - (b.order_index ?? 0))
+          groupsError = null
+        }
+      }
+      if (!groupsError && groupsData) {
+        groups = Array.isArray(groupsData) ? (groupsData as ViewFilterGroup[]) : []
+      }
+      // If view_filter_groups fails (500, missing table, etc.), continue with empty groups
 
       // Load all filters
-      const { data: allFilters, error: filtersError } = await supabase
+      let allFilters: unknown[] | null = null
+      let filtersError: unknown = null
+      let res = await supabase
         .from("view_filters")
         .select("*")
         .eq("view_id", viewUuid)
         .order("order_index", { ascending: true })
-
+      allFilters = res.data
+      filtersError = res.error
+      if (filtersError && ((filtersError as { code?: string; status?: number })?.code === "42703" || (filtersError as { status?: number })?.status === 500)) {
+        res = await supabase.from("view_filters").select("*").eq("view_id", viewUuid)
+        if (!res.error && res.data) {
+          allFilters = Array.isArray(res.data) ? res.data.sort((a: { order_index?: number }, b: { order_index?: number }) => (a.order_index ?? 0) - (b.order_index ?? 0)) : []
+          filtersError = null
+        }
+      }
       if (filtersError) throw filtersError
 
       // Convert to canonical filter tree
-      const tree = dbFiltersToFilterTree(allFilters || [], groups || [])
+      const tree = dbFiltersToFilterTree(allFilters || [], groups)
       setFilterTree(tree)
     } catch (error) {
-      console.error("Error loading filters:", error)
+      if (!isAbortError(error)) {
+        console.error("Error loading filters:", error)
+      }
       // Fallback to empty tree
       setFilterTree(null)
     } finally {

@@ -39,6 +39,7 @@ import type { FilterConfig } from '@/lib/interface/filters'
 import { buildGroupTree, flattenGroupTree } from '@/lib/grouping/groupTree'
 import type { GroupRule } from '@/lib/grouping/types'
 import { normalizeUuid } from '@/lib/utils/ids'
+import { isAbortError } from '@/lib/api/error-handling'
 import type { LinkedField } from '@/types/fields'
 import { resolveLinkedFieldDisplayMap } from '@/lib/dataView/linkedFields'
 import FillHandle from './FillHandle'
@@ -557,7 +558,9 @@ export default function AirtableGridView({
           .maybeSingle()
 
         if (error && error.code !== 'PGRST116') {
-          console.error('Error loading grid view settings:', error)
+          if (!isAbortError(error as unknown)) {
+            console.error('Error loading grid view settings:', error)
+          }
           // Fallback to localStorage
           loadFromLocalStorage()
           return
@@ -636,7 +639,9 @@ export default function AirtableGridView({
           return hasChanges ? newWidths : prev
         })
       } catch (error) {
-        console.error('Error loading grid view settings:', error)
+        if (!isAbortError(error)) {
+          console.error('Error loading grid view settings:', error)
+        }
         loadFromLocalStorage()
       }
     }
@@ -1072,11 +1077,16 @@ export default function AirtableGridView({
     setLastSelectedIndex(null)
   }
 
-  // Build render items (groups + rows or just rows)
+  // Build render items (groups + rows or just rows) + optional "click to add" row (spreadsheet-style)
   const renderItems = useMemo(() => {
+    let base: Array<
+      | { type: 'group'; node: any; level: number }
+      | { type: 'row'; data: GridRow; level: number; groupPathKey: string }
+      | { type: 'new-row' }
+    >
     if (groupModel && groupModel.rootGroups.length > 0) {
       const flat = flattenGroupTree<GridRow>(groupModel.rootGroups, collapsedGroups)
-      return flat.map((it) => {
+      base = flat.map((it) => {
         if (it.type === 'group') {
           return { type: 'group' as const, node: it.node, level: it.level }
         }
@@ -1087,14 +1097,20 @@ export default function AirtableGridView({
           groupPathKey: it.groupPathKey,
         }
       })
+    } else {
+      base = asArray<GridRow>(filteredRows).map((row) => ({ type: 'row' as const, data: row, level: 0, groupPathKey: '' }))
     }
-    return asArray<GridRow>(filteredRows).map((row) => ({ type: 'row' as const, data: row, level: 0, groupPathKey: '' }))
-  }, [collapsedGroups, filteredRows, groupModel])
+    if (editable) {
+      base = [...base, { type: 'new-row' as const }]
+    }
+    return base
+  }, [collapsedGroups, filteredRows, groupModel, editable])
 
   // Virtualization calculations
   const GROUP_HEADER_HEIGHT = 40
   const getItemHeight = (item: (typeof renderItems)[number]) => {
     if (item.type === 'group') return GROUP_HEADER_HEIGHT
+    if (item.type === 'new-row') return ROW_HEIGHT
     return getEffectiveRowHeight(item.data?.id)
   }
   
@@ -1819,6 +1835,33 @@ export default function AirtableGridView({
           {/* Virtualized items */}
           <div style={{ height: offsetTop }} />
           {visibleItems.map((item, idx) => {
+            if (item.type === 'new-row') {
+              return (
+                <div
+                  key="new-row"
+                  className="flex border-b border-gray-200 bg-gray-50/50 hover:bg-gray-100/70 transition-colors cursor-pointer items-center"
+                  style={{ height: ROW_HEIGHT }}
+                  onClick={() => createNewRow()}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      createNewRow()
+                    }
+                  }}
+                  aria-label="Add record"
+                >
+                  <div
+                    className="flex items-center gap-2 px-4 text-gray-500 hover:text-gray-700"
+                    style={{ paddingLeft: OPEN_RECORD_COLUMN_WIDTH + FROZEN_COLUMN_WIDTH * 2 }}
+                  >
+                    <Plus className="h-4 w-4 shrink-0" />
+                    <span className="text-sm font-medium">Click to add a record</span>
+                  </div>
+                </div>
+              )
+            }
             if (item.type === 'group') {
               const node = item.node
               const isCollapsed = collapsedGroups.has(node.pathKey)

@@ -228,7 +228,7 @@ export default function FieldAppearanceSettings({
             <Label htmlFor="linked-field-display-mode">Display Mode</Label>
             <Select
               value={linkedFieldDisplayMode}
-              onValueChange={(value: 'compact' | 'inline' | 'expanded') => {
+              onValueChange={(value: 'compact' | 'inline' | 'expanded' | 'list') => {
                 onUpdate({
                   appearance: {
                     ...appearance,
@@ -243,12 +243,14 @@ export default function FieldAppearanceSettings({
               <SelectContent>
                 <SelectItem value="compact">Compact (pills only)</SelectItem>
                 <SelectItem value="inline">Inline list</SelectItem>
+                <SelectItem value="list">List (vertical, full labels)</SelectItem>
                 <SelectItem value="expanded">Expanded (embedded records)</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-gray-500">
               {linkedFieldDisplayMode === 'compact' && "Shows linked records as compact pills (matches Grid cell behavior)"}
               {linkedFieldDisplayMode === 'inline' && "Shows linked records as pills in a list format with better wrapping"}
+              {linkedFieldDisplayMode === 'list' && "Shows linked records in a vertical list, one per line with full labels"}
               {linkedFieldDisplayMode === 'expanded' && "Shows embedded Airtable-style record cards (future enhancement)"}
             </p>
           </div>

@@ -63,6 +63,8 @@ export function getOperatorsForFieldType(fieldType: string): OperatorOption[] {
       return [
         { value: 'equal', label: 'Is', requiresValue: true },
         { value: 'not_equal', label: 'Is not', requiresValue: true },
+        { value: 'is_any_of', label: 'Is any of', requiresValue: true, supportsMultiValue: true },
+        { value: 'is_not_any_of', label: 'Is not any of', requiresValue: true, supportsMultiValue: true },
         { value: 'is_empty', label: 'Is empty', requiresValue: false },
         { value: 'is_not_empty', label: 'Is not empty', requiresValue: false },
       ]
@@ -71,6 +73,8 @@ export function getOperatorsForFieldType(fieldType: string): OperatorOption[] {
       return [
         { value: 'equal', label: 'Contains', requiresValue: true },
         { value: 'not_equal', label: 'Does not contain', requiresValue: true },
+        { value: 'is_any_of', label: 'Contains any of', requiresValue: true, supportsMultiValue: true },
+        { value: 'is_not_any_of', label: 'Does not contain any of', requiresValue: true, supportsMultiValue: true },
         { value: 'is_empty', label: 'Is empty', requiresValue: false },
         { value: 'is_not_empty', label: 'Is not empty', requiresValue: false },
       ]

@@ -177,9 +177,10 @@ export default function CSVImportModal({
   const [file, setFile] = useState<File | null>(null)
   const [parsedData, setParsedData] = useState<ParsedCSV | null>(null)
   const [tableFields, setTableFields] = useState<TableField[]>([])
-  const [fieldMappings, setFieldMappings] = useState<Record<string, string>>({}) // CSV column -> field name
+  const [fieldMappings, setFieldMappings] = useState<Record<string, string>>({}) // CSV column -> field name (or "ignore")
   const [newFieldTypes, setNewFieldTypes] = useState<Record<string, FieldType>>({}) // CSV column -> field type
   const [linkTableOptions, setLinkTableOptions] = useState<Record<string, string>>({}) // CSV column -> linked_table_id
+  const [defaultValuesForAll, setDefaultValuesForAll] = useState<Record<string, string>>({}) // field name -> value to set for every imported row
   const [availableTables, setAvailableTables] = useState<Array<{ id: string; name: string }>>([])
   const [error, setError] = useState<string | null>(null)
   const [progress, setProgress] = useState("")
@@ -510,11 +511,12 @@ export default function CSVImportModal({
       return
     }
 
-    // Validate that at least one column is mapped
-    const mappedColumns = parsedData.columns.filter(col => 
-      fieldMappings[col.name] || newFieldTypes[col.name]
-    )
-    
+    // Validate that at least one column is mapped (ignore "ignore" option)
+    const mappedColumns = parsedData.columns.filter(col => {
+      const mapping = fieldMappings[col.name]
+      return (mapping && mapping !== 'ignore') || newFieldTypes[col.name]
+    })
+
     if (mappedColumns.length === 0) {
       setError('Please map at least one CSV column to a field before importing.')
       return
@@ -537,7 +539,10 @@ export default function CSVImportModal({
       const freshTableFields = freshFieldsData.fields || []
       setTableFields(freshTableFields)
       
-      const columnMappings: Record<string, string> = { ...fieldMappings } // CSV column name -> field name
+      // CSV column name -> field name (exclude "ignore" so those columns are skipped)
+      const columnMappings: Record<string, string> = Object.fromEntries(
+        Object.entries(fieldMappings).filter(([, v]) => v && v !== 'ignore')
+      )
       const fieldsToCreate: Array<{ name: string; type: FieldType; options?: any }> = []
 
       // Collect fields that need to be created (from newFieldTypes)
@@ -923,6 +928,27 @@ export default function CSVImportModal({
             mappedRow[fieldName] = value
           })
 
+          // Apply "set value for all rows" overrides (e.g. set Category for every imported row)
+          Object.entries(defaultValuesForAll).forEach(([fieldName, strVal]) => {
+            if (strVal === '') return
+            const field = fieldMap.get(fieldName)
+            if (!field) return
+            let value: unknown = strVal
+            if (field.type === "number" || field.type === "currency" || field.type === "percent") {
+              value = parseFloat(strVal) || 0
+            } else if (field.type === "checkbox") {
+              value = (String(strVal).toLowerCase() === "true" || strVal === "1" || String(strVal).toLowerCase() === "yes")
+            } else if (field.type === "date") {
+              const date = parseDateFromCSV(String(strVal))
+              value = date ? date.toISOString() : null
+            } else if (field.type === "multi_select") {
+              value = String(strVal).split(/[,;]/).map((p: string) => p.trim()).filter(Boolean)
+            } else {
+              value = String(strVal).trim()
+            }
+            mappedRow[fieldName] = value
+          })
+
           return mappedRow
         })
         .filter(row => Object.keys(row).length > 0)
@@ -1234,6 +1260,13 @@ export default function CSVImportModal({
                                   [col.name]: mapCSVTypeToFieldType(col.type)
                                 }))
                               }
+                            } else if (value === "ignore") {
+                              setFieldMappings((prev) => ({ ...prev, [col.name]: "ignore" }))
+                              setNewFieldTypes((prev) => {
+                                const newTypes = { ...prev }
+                                delete newTypes[col.name]
+                                return newTypes
+                              })
                             } else {
                               // Map to existing field - clear new field type
                               setFieldMappings((prev) => ({
@@ -1252,6 +1285,7 @@ export default function CSVImportModal({
                             <SelectValue placeholder="Select or create field" />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="ignore">Don&apos;t import</SelectItem>
                             <SelectItem value="new">+ Create new field</SelectItem>
                             {tableFields.map((field) => (
                               <SelectItem key={field.id} value={field.name}>
@@ -1347,6 +1381,46 @@ export default function CSVImportModal({
                 })}
               </div>
 
+              <div className="space-y-2">
+                <Label className="text-sm text-gray-700">Optional: set same value for every row</Label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Select
+                    value={Object.keys(defaultValuesForAll)[0] ?? ""}
+                    onValueChange={(fieldName) => {
+                      if (!fieldName) {
+                        setDefaultValuesForAll({})
+                        return
+                      }
+                      const current = Object.keys(defaultValuesForAll)[0]
+                      const currentVal = current ? defaultValuesForAll[current] ?? "" : ""
+                      setDefaultValuesForAll(fieldName ? { [fieldName]: currentVal } : {})
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-[180px]">
+                      <SelectValue placeholder="Select field" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">None</SelectItem>
+                      {tableFields.map((f) => (
+                        <SelectItem key={f.id} value={f.name}>
+                          {getFieldDisplayName(f)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <input
+                    type="text"
+                    className="flex h-8 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring w-[180px]"
+                    placeholder="Value for all rows"
+                    value={Object.keys(defaultValuesForAll).length ? (Object.values(defaultValuesForAll)[0] ?? "") : ""}
+                    onChange={(e) => {
+                      const fieldName = Object.keys(defaultValuesForAll)[0]
+                      if (fieldName) setDefaultValuesForAll({ [fieldName]: e.target.value })
+                    }}
+                  />
+                </div>
+              </div>
+
               <div className="flex gap-2">
                 <Button
                   variant="outline"
@@ -1356,6 +1430,7 @@ export default function CSVImportModal({
                     setFieldMappings({})
                     setNewFieldTypes({})
                     setLinkTableOptions({})
+                    setDefaultValuesForAll({})
                     setStatus('idle')
                     setError(null)
                   }}
@@ -1389,23 +1464,25 @@ export default function CSVImportModal({
                         <tr>
                           {parsedData.columns.map((col) => {
                             const mappedField = fieldMappings[col.name]
+                            const isIgnored = mappedField === "ignore"
                             const newFieldType = newFieldTypes[col.name]
-                            const fieldTypeLabel = mappedField 
-                              ? tableFields.find(f => f.name === mappedField)?.type 
+                            const fieldTypeLabel = (mappedField && !isIgnored)
+                              ? tableFields.find(f => f.name === mappedField)?.type
                               : newFieldType
                                 ? FIELD_TYPES.find(t => t.type === newFieldType)?.label || newFieldType
                                 : null
-                            
                             return (
                               <th key={col.name} className="px-4 py-2 text-left font-semibold text-gray-700 bg-gray-50 whitespace-nowrap">
                                 <div className="flex flex-col">
                                   <span>{col.name}</span>
                                   <span className="text-xs font-normal text-gray-500">
-                                    {mappedField 
-                                      ? `→ ${mappedField} (${fieldTypeLabel || 'unknown'})`
-                                      : newFieldType
-                                        ? `→ New field: ${fieldTypeLabel || newFieldType}`
-                                        : `→ Skipped (unmapped)`}
+                                    {isIgnored
+                                      ? "→ Don't import"
+                                      : mappedField
+                                        ? `→ ${mappedField} (${fieldTypeLabel || "unknown"})`
+                                        : newFieldType
+                                          ? `→ New field: ${fieldTypeLabel || newFieldType}`
+                                          : "→ Skipped (unmapped)"}
                                   </span>
                                 </div>
                               </th>
@@ -1459,7 +1536,7 @@ export default function CSVImportModal({
                 </Button>
                 <Button
                   onClick={handleImport}
-                  disabled={parsedData.rows.length === 0 || parsedData.columns.filter(col => fieldMappings[col.name] || newFieldTypes[col.name]).length === 0}
+                  disabled={parsedData.rows.length === 0 || parsedData.columns.filter(col => { const m = fieldMappings[col.name]; return (m && m !== "ignore") || newFieldTypes[col.name]; }).length === 0}
                   className="flex-1"
                 >
                   Import {parsedData.rows.length} Rows

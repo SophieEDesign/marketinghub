@@ -1,7 +1,7 @@
 import { createServerSupabaseClient } from './supabase'
 import type { ViewFilter, ViewSort, ViewField, ViewFilterGroup } from '@/types/database'
 import { dbFiltersToFilterTree } from '@/lib/filters/converters'
-import { applyFiltersToQuery } from '@/lib/filters/evaluation'
+import { applyFiltersToQuery, evaluateFilterTree } from '@/lib/filters/evaluation'
 
 export interface LoadRowsOptions {
   tableId: string
@@ -48,15 +48,19 @@ export async function loadRows(options: LoadRowsOptions) {
   // Only load metadata if not provided AND viewId is present
   if (viewId && (!providedFilters || !providedSorts || !providedVisibleFields)) {
     // CRITICAL: Serialize requests instead of Promise.all to avoid connection exhaustion
-    // Load filter groups first
-    const groupsRes = await supabase
+    // Load filter groups first (table may not exist or RLS may return 500 - use empty groups)
+    let groupsRes = await supabase
       .from('view_filter_groups')
       .select('*')
       .eq('view_id', viewId)
       .order('order_index', { ascending: true })
-    
+
+    if (groupsRes.error && (groupsRes.error as { code?: string; status?: number })?.status === 500) {
+      const retry = await supabase.from('view_filter_groups').select('*').eq('view_id', viewId)
+      if (!retry.error && retry.data) groupsRes = retry
+    }
     if (!providedFilters) {
-      filterGroups = groupsRes.data || []
+      filterGroups = groupsRes.data ?? []
     }
 
     // Load filters
@@ -185,14 +189,13 @@ export async function loadRows(options: LoadRowsOptions) {
     }
   })
 
-  // Apply filters to the extracted rows (client-side filtering for JSONB data)
-  // Note: This is a simplified approach - for production, consider server-side JSONB filtering
+  // Apply filters to the extracted rows (in-memory evaluation for table_rows JSONB data)
   let filteredRows = rows
   if (filters.length > 0 || filterGroups.length > 0) {
     const filterTree = dbFiltersToFilterTree(filters, filterGroups)
-    // For now, we'll return all rows and let the client handle filtering
-    // TODO: Implement proper JSONB filtering in Supabase query
-    filteredRows = rows
+    if (filterTree) {
+      filteredRows = rows.filter((row) => evaluateFilterTree(row, filterTree))
+    }
   }
 
   return {
