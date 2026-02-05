@@ -25,7 +25,6 @@ import GroupBySelector from "./shared/GroupBySelector"
 import NestedGroupBySelector from "./shared/NestedGroupBySelector"
 import type { GroupRule } from "@/lib/grouping/types"
 import SortSelector from "./shared/SortSelector"
-import FieldPicker from "./shared/FieldPicker"
 import ModalLayoutEditor from "./ModalLayoutEditor"
 import { useState } from "react"
 
@@ -443,15 +442,7 @@ export default function GridDataSettings({
             />
           </div>
 
-          {/* Fields Section - Airtable Style */}
-          <FieldPicker
-            selectedFields={Array.isArray(config.visible_fields) ? config.visible_fields : []}
-            onChange={(next) => onUpdate({ visible_fields: next })}
-            fields={fields}
-            mode="full"
-            label="Fields"
-            showPasteList={false}
-          />
+          {/* Card/visible fields: use "Fields to Show on Cards/Table" at top of panel */}
         </>
       )}
 
@@ -582,23 +573,14 @@ export default function GridDataSettings({
             />
           </div>
 
-          {/* Card Fields (Timeline) */}
+          {/* Card fields explanation - uses Fields to Show on Cards/Table above */}
           <div className="space-y-3 pt-2 border-t border-gray-200">
             <Label className="text-sm font-semibold">Card fields</Label>
             <p className="text-xs text-gray-500">
-              Timeline cards use the ordered <span className="font-medium">Fields to Show on Cards/Table</span> selection.
+              Timeline cards use the ordered <span className="font-medium">Fields to Show on Cards/Table</span> selection above.
               Only the first <span className="font-medium">3</span> non-date fields are shown on each card to keep lanes compact.
             </p>
           </div>
-
-          {/* Fields Section - Airtable Style */}
-          <FieldPicker
-            selectedFields={Array.isArray(config.visible_fields) ? config.visible_fields : []}
-            onChange={(next) => onUpdate({ visible_fields: next })}
-            fields={fields}
-            mode="full"
-            label="Fields"
-          />
         </>
       )}
 
@@ -1002,17 +984,7 @@ export default function GridDataSettings({
             </>
           )}
 
-          {/* Fields Section - Airtable Style */}
-          <div className="space-y-3 pt-2 border-t border-gray-200">
-            <Label className="text-sm font-semibold">Fields</Label>
-            <FieldPicker
-              selectedFields={Array.isArray(config.visible_fields) ? config.visible_fields : []}
-              onChange={(next) => onUpdate({ visible_fields: next })}
-              fields={fields}
-              mode="full"
-              label="Fields"
-            />
-          </div>
+          {/* Visible fields: use "Fields to Show on Cards/Table" at top of panel */}
         </>
       )}
     </div>
