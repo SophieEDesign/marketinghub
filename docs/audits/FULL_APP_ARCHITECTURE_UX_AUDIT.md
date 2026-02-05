@@ -1,314 +1,377 @@
 # Full App Architecture & UX Audit
 
-**Goal:** One system, one truth, one editing model.
+**Goal:** One system. One truth. One editing model.
+
+**Important:** This is an **AUDIT ONLY** — no refactors, no implementation, no behavioural changes.
 
 **Date:** February 2025
 
 ---
 
-## 0. Audit Principles (Locked In)
+## 🔒 Core Constraints (Do Not Violate)
 
-These principles guide every decision and every flag in this audit.
-
-| Principle | Short |
-|-----------|--------|
-| **One source of truth per concept** | No duplicated definitions; one canonical place. |
-| **One editing experience per entity type** | Block editing, record editing, filter editing: one model each. |
-| **One visual language per interaction** | Shared spacing, chrome, layout tokens. |
-| **No special-case UI paths unless explicitly justified** | Avoid "this one component" fixes. |
-| **Blocks describe content, not behaviour** | Config = what to show; behaviour comes from type + engine. |
-| **Editors reflect the live view as closely as possible** | Edit in context; no "settings panel" that looks unrelated. |
-
-**Rule:** The audit flags every place these are violated.
+- Do not break anything that currently works  
+- No behavioural changes  
+- No refactors  
+- No renaming  
+- No moving files  
+- This audit strictly **maps**, **identifies duplication**, and **flags inconsistencies**
 
 ---
 
-## 1. Sources of Truth Audit
+## 🧭 Locked Principles (Non-Negotiable)
 
-### 1.1 Blocks — Ownership & Duplication
+These principles define the intended system. The audit flags every place they are violated.
 
-**Where is the canonical definition of a block?**
-
-- **Schema / default config:** Largely in one place: `lib/interface/registry.ts` (`BLOCK_REGISTRY` + `defaultConfig` per type) and `lib/interface/types.ts` (`BlockConfig`). `lib/core-data/block-defaults.ts` correctly delegates to the registry.  
-- **Editable settings:** Split. **Data** and **appearance** settings are in `components/interface/settings/blockSettingsRegistry.tsx` (`DATA_SETTINGS_RENDERERS`, `APPEARANCE_SETTINGS_RENDERERS`) — one component per block type. So “what can be edited” is defined there, not derived from the block definition.  
-- **Appearance:** `lib/interface/appearance-utils.ts` maps appearance config to classes; `BlockAppearanceWrapper` applies them. Container/spacing from appearance was intentionally removed (fixed `p-4` in wrapper).  
-- **Behaviour:** Implemented per block in `components/interface/blocks/*.tsx` and dispatched by `components/interface/BlockRenderer.tsx` (single switch on `block.type`).
-
-**Duplication and red flags**
-
-| Issue | Location | Violation |
-|-------|----------|-----------|
-| **Two block systems** | `components/interface/BlockRenderer.tsx` (PageBlock, page_blocks) vs `components/blocks/BlockRenderer.tsx` (ViewBlock, view_blocks) | Two sources of truth for “block”. ViewBlock uses different types (text, image, chart, kpi, html, embed, table, automation) and is used only by `components/views/InterfacePage.tsx` for table view pages (`/tables/[tableId]/views/[viewId]`). |
-| **Block config shape** | `BlockConfig` in `types.ts` is a large union; `block-config-types.ts` adds discriminated unions and validation. Defaults live in registry; validation in block-validator + assertBlockConfig. | Schema is “one place” but spread across types, registry, and validator — no single file that defines “block X = this schema + these defaults + this validation”. |
-| **Settings not derived from block definition** | blockSettingsRegistry maps block type → Data/Appearance renderers. Registry has `applicableSettings` / `excludedSettings` but settings UI does not drive from it. | Which settings exist is duplicated: registry says what applies; settings panel has its own mapping. |
-| **Inline config merging in BlockRenderer** | BlockRenderer merges `recordId`, builds `fieldBlockConfig` for field blocks (e.g. `allow_inline_edit`). | Behaviour-affecting config is patched at render time rather than coming from a single config shape. |
-
-**Target state (not yet met)**
-
-- A block is defined once (type, schema, default config, editable settings, validation).
-- All renderers (Canvas, ModalCanvas, ModalLayoutEditor) consume that definition.
-- All editors edit the same schema; no render-time-only patches for “who can edit”.
+| # | Principle |
+|---|-----------|
+| 1 | **One source of truth per concept** |
+| 2 | **Fields behave identically everywhere** |
+| 3 | **Blocks describe content, not behaviour** |
+| 4 | **One Record Editor** |
+| 5 | **One Create Record experience** |
+| 6 | **Same filters, same fields, same UI primitives everywhere** |
+| 7 | **Context changes shell, not logic** |
+| 8 | **Permissions cascade correctly (field > block > page)** |
 
 ---
 
-### 1.2 Filters & Conditions
+## 🔒 Inline Editing (Explicitly Preserved)
 
-**How many filter systems exist?**
+Inline editing of field values is intentional and must remain.
 
-- **Views:** DB tables `ViewFilter`, `ViewFilterGroup`; converted to canonical model via `lib/filters/converters.ts` (`dbFiltersToFilterTree`).  
-- **Blocks:** Block-level filters in `BlockConfig.filters` (flat); Filter blocks emit state; merged in `lib/interface/filters.ts` and converted to `FilterTree` for evaluation.  
-- **Interfaces:** Page/block filters flow through same merge and evaluation.  
-- **Automations:** Use `FilterTree` from `lib/filters/canonical-model.ts`; `evaluate-conditions.ts` and `condition-formula.ts` consume it.
+Inline editing:
 
-**Are operators, condition groups, AND/OR consistent?**
+- edits values only
+- uses the same field renderer
+- respects field permissions
+- saves via the same record pipeline
 
-- **Canonical model:** One schema in `lib/filters/canonical-model.ts` (`FilterTree`, `FilterGroup`, `FilterCondition`, `FilterOperator`, `GroupOperator`).  
-- **Representations:** Views use DB format → converted to FilterTree. Blocks use `FilterConfig` (flat) in `lib/interface/filters.ts` → converted to FilterTree. Automations use FilterTree directly.  
-- So: one evaluation engine, one condition schema; multiple input shapes (DB, FilterConfig, FilterTree).
+Inline editing is allowed in:
 
-**Red flags**
+- grid cells
+- cards (kanban / calendar / timeline)
+- record editor
+- field blocks
+
+Inline editing must not be confused with:
+
+- layout editing
+- block configuration
+- record creation
+
+Creating a record always escalates to the Record Editor (create mode).
+
+**Audit instruction:** Do not flag inline editing as a problem unless it violates consistency, permissions, or field behaviour.
+
+---
+
+## 🔒 Core Data Mental Model
+
+Core Data should be treated as a spreadsheet-style data surface.
+
+This includes:
+
+- fast inline editing
+- dense layout
+- keyboard-friendly interaction
+- minimal chrome
+
+These behaviours are intentional and should not be flagged as inconsistencies with Interfaces or Pages.
+
+Interfaces are curated experiences; Core Data is a power-user data surface.
+
+**Audit instruction:** Do not recommend removing or softening spreadsheet-like behaviours in Core Data.
+
+---
+
+## 🧱 System Model (INTENDED)
+
+Used as the evaluation framework for the current codebase.
+
+```
+┌──────────────────────────┐
+│        CORE DATA         │
+│ Tables, Fields,          │
+│ Field settings, Records  │
+└─────────────▲────────────┘
+              │ canonical read-only
+┌─────────────┴────────────┐
+│        INTERFACES         │
+│ Navigation, Pages (Canvas) │
+│ Page permissions          │
+└─────────────▲────────────┘
+              │ same canvas engine
+┌─────────────┴────────────┐
+│          CANVAS          │
+│ Layout, Block placement  │
+│ Appearance tokens        │
+└─────────────▲────────────┘
+┌─────────────┴────────────────────────────┐
+│                 BLOCKS                     │
+│ Data / Record / Visual blocks              │
+│ Embedded OR full-page                     │
+└─────────────▲────────────────────────────┘
+┌─────────────┴────────────┐
+│       RECORD EDITOR       │
+│ One editor only          │
+│ Modes: view / edit / create │
+│ Same fields, validation, permissions      │
+│ Shells: modal / full-page │
+└──────────────────────────┘
+```
+
+**Blocks:** Blocks may be embedded in a canvas or marked fullPage: true. Full-page blocks occupy the entire page and disallow other blocks.
+
+---
+
+## 1. Where Is the Single Source of Truth?
+
+### 1.1 Blocks
+
+| Question | Answer |
+|----------|--------|
+| **Where is the single source of truth for blocks?** | **There is no single source.** Block definition is split across: (1) `lib/interface/registry.ts` (type, label, icon, dimensions, `defaultConfig`), (2) `lib/interface/types.ts` (`BlockConfig` union), (3) `lib/interface/block-config-types.ts` (discriminated configs + validation), (4) `lib/interface/block-validator.ts` and `assertBlockConfig.ts`, (5) `components/interface/settings/blockSettingsRegistry.tsx` (which Data/Appearance settings render per type). Settings UI is **not** derived from registry’s `applicableSettings` / `excludedSettings`. |
+| **Additional:** | A **second block system** exists: `components/blocks/BlockRenderer.tsx` uses `ViewBlock` and `view_blocks` table (types: text, image, chart, kpi, html, embed, table, automation). Used only by `components/views/InterfacePage.tsx` for route `tables/[tableId]/views/[viewId]`. So “blocks” have two sources of truth: PageBlock + interface/BlockRenderer vs ViewBlock + blocks/BlockRenderer. |
+
+### 1.2 Fields
+
+| Question | Answer |
+|----------|--------|
+| **Where is the single source of truth for fields?** | **Core Data:** Field definitions, types, validation, select options, linked relationships come from the database (e.g. `table_fields`, table metadata). That is the intended source. |
+| **Violation:** | Field **behaviour** and **rendering** are not unified. Different components render/edit fields: `FieldEditor`, `RecordFields`, `InlineFieldEditor`, grid/card cell renderers, FormBlock, FieldBlock, RecordPanel, RecordModal(s), RecordDrawer, RecordReview left column. Same field type can be rendered or validated differently depending on context (grid vs record editor vs field block vs form). |
+
+### 1.3 Filters
+
+| Question | Answer |
+|----------|--------|
+| **Where is the single source of truth for filters?** | **Canonical model:** `lib/filters/canonical-model.ts` defines `FilterTree`, `FilterGroup`, `FilterCondition`, `FilterOperator`, `GroupOperator`. Evaluation is in `lib/filters/evaluation.ts`. So **one engine, one schema** for evaluation. |
+| **Violation:** | **Inputs** are not single: views use DB format (ViewFilter, ViewFilterGroup) converted via `lib/filters/converters.ts`; blocks use `FilterConfig` (flat) in `lib/interface/filters.ts` converted to FilterTree; automations use FilterTree directly. **Filter UI** differs by feature: FilterDialog, UnifiedFilterDialog, FilterBuilder, QuickFilterBar, BlockFilterEditor, FilterBlockSettings — not one shared primitive set. |
+
+### 1.4 Record editing
+
+| Question | Answer |
+|----------|--------|
+| **Where is the single source of truth for record editing?** | **There is no single Record Editor.** Multiple implementations: (1) `components/grid/RecordModal.tsx`, (2) `components/calendar/RecordModal.tsx`, (3) `components/records/RecordPanel.tsx`, (4) `components/grid/RecordDrawer.tsx`, (5) record review left column in `RecordReviewLeftColumn.tsx` (custom field list), (6) `RecordDetailsPanel.tsx`, (7) inline editing in grid/cards. When modal layout is used, both RecordModals use `ModalCanvas` + `BlockRenderer`; when not, grid RecordModal uses `RecordFields`, calendar RecordModal uses `FieldEditor` — different content components and different props. |
+
+---
+
+## 2. Where Are Concepts Duplicated?
+
+### 2.1 Map of Duplicated Concepts
+
+| Concept | Location(s) | Notes |
+|---------|------------|--------|
+| **Block definition** | `registry.ts`, `types.ts`, `block-config-types.ts`, `block-validator.ts`, `assertBlockConfig.ts`, `blockSettingsRegistry.tsx` | Schema, defaults, validation, and “what settings to show” are in different places; not one canonical definition. |
+| **Block rendering** | `components/interface/BlockRenderer.tsx` (PageBlock), `components/blocks/BlockRenderer.tsx` (ViewBlock) | Two renderers, two block types, two storage models (page_blocks vs view_blocks). |
+| **Record modal** | `components/grid/RecordModal.tsx`, `components/calendar/RecordModal.tsx` | Different props (e.g. isOpen vs open, tableName vs tableFields), different fallback content (RecordFields vs FieldEditor). |
+| **Record content (field list)** | `RecordFields`, `FieldEditor`, RecordReview left column custom list, FormBlock | Same “show/edit fields of a record” intent implemented in multiple ways. |
+| **Create record** | (1) `CreateRecordModal` (single primary field + API) used in RecordReviewLeftColumn; (2) `RecordModal` (calendar) with `recordId=null`, `initialData`, `onSave` used from FieldBlock, InlineFieldEditor, FieldEditor, LinkedRecordCell, ListView; (3) Grid “add row” / view-specific create (GridView, ListView, KanbanView, CalendarView, TimelineView) | More than one create-record implementation and form. |
+| **Filter format** | `FilterConfig` (flat) in `lib/interface/filters.ts`, `FilterTree` in `lib/filters/canonical-model.ts`, DB ViewFilter/ViewFilterGroup | One evaluation model; multiple input formats and UIs. |
+| **Layout defaults** | `lib/interface/canvas-layout-defaults.ts` (Canvas vs Modal defaults) | Single file but two layouts (main canvas vs modal); modal cannot add blocks and is edited in a separate ModalLayoutEditor dialog. |
+| **Linked / lookup display** | `linked_field_display_mode` in types (compact \| inline \| expanded \| list); FieldBlock and FieldAppearanceSettings use all four; InlineFieldEditor only compact \| inline \| expanded | Schema allows `list`; one consumer does not support it. |
+
+### 2.2 Two Components Solving the Same Problem Differently
+
+| Problem | Component A | Component B | Difference |
+|---------|-------------|-------------|------------|
+| Open/edit record | Grid: `grid/RecordModal` | Calendar/List/FieldBlock/etc.: `calendar/RecordModal` | Different APIs and fallback content (RecordFields vs FieldEditor). |
+| Show record fields | `RecordFields` | `FieldEditor` (+ sectioning) | Different structure and props; used in different shells. |
+| Create record (modal) | `CreateRecordModal` (one field, then API) | `RecordModal` (calendar) with null recordId + initialData | Different flows and form surface. |
+| Block layout (record modal) | `ModalCanvas` (view-only) | `ModalLayoutEditor` (edit in dialog) | Same blocks rendered, but editing is in a separate dialog, not in the same shell. |
+| Filter UI | FilterDialog, FilterBuilder, QuickFilterBar | BlockFilterEditor, FilterBlockSettings | Different entry points and possibly different condition UIs. |
+
+---
+
+## 3. Where Do UI Shells Differ But Logic Should Not?
+
+| Area | Shell(s) | Observation |
+|------|----------|-------------|
+| **Record open** | RecordPanel (side panel), RecordModal (dialog), RecordDrawer (drawer) | Same intent “open this record”; different shells and different content components (RecordFields vs FieldEditor vs modal layout). Logic (which fields, validation, permissions) should be one; today it is split. |
+| **Create record** | CreateRecordModal (minimal), RecordModal (full form), grid/list/kanban/calendar “add” (inline or view-specific) | Create record is not “Record Editor in create mode” everywhere; multiple flows and forms. |
+| **Edit block** | Canvas (resize, move, add block) + SettingsPanel (config) vs inline in some blocks (Text, Field) vs ModalLayoutEditor (modal layout only) | “Edit” means different things: layout, config, or content, with different entry points and UIs. |
+| **Filter** | View filter UI, Filter block UI, Automation condition UI | Same canonical filter model; UIs are built separately, so behaviour could diverge. |
+
+---
+
+## 4. Where Are Fields Rendered Differently?
+
+| Context | Component(s) | Note |
+|---------|--------------|------|
+| Grid cells | Cell renderers in AirtableGridView / GridView (e.g. LinkedRecordCell, LookupCell) | Cell-specific rendering and interaction. |
+| Cards (Kanban, Gallery, List, etc.) | View-specific card body (e.g. ListView, KanbanView, GalleryView) | Different layout and which fields are shown. |
+| Record editor (panel) | RecordPanel → RecordFields | Uses RecordFields. |
+| Record editor (grid modal) | grid/RecordModal → RecordFields or ModalCanvas | RecordFields when no modal_layout. |
+| Record editor (calendar modal) | calendar/RecordModal → FieldEditor or ModalCanvas | FieldEditor when no modal_layout; supports sectioning. |
+| Field block | FieldBlock → FieldEditor or inline display | Single field; can open RecordModal for linked create. |
+| Form block | FormBlock | Form-specific field rendering. |
+| Record review left column | RecordReviewLeftColumn | Custom list with its own spacing and grouping. |
+
+**Conclusion:** Fields do **not** behave identically everywhere. Rendering and editing paths depend on context (grid vs card vs record modal vs field block vs form vs record review).
+
+---
+
+## 5. Linked Fields & Lookups — Inconsistencies
 
 | Issue | Detail |
 |-------|--------|
-| **Two input formats** | FilterConfig (flat, field/operator/value) vs FilterTree (groups, AND/OR). Conversion is explicit but UIs differ: view filter UI vs Filter block UI vs automation condition UI. |
-| **Filter UI differs by context** | FilterDialog, UnifiedFilterDialog, FilterBuilder, QuickFilterBar, BlockFilterEditor, FilterBlockSettings — not all necessarily use the same condition component set. |
-| **Legacy applyFiltersToQuery** | `lib/interface/filters.ts` has `applyFiltersToQuery` marked deprecated in favour of `lib/filters/evaluation`; both paths exist. |
-
-**Target state (partially met)**
-
-- One filter engine and one condition schema (canonical model).  
-- Many UIs can consume it; goal is one shared filter UI primitive set for building views, blocks, and automations.
+| **Display modes** | Types allow `linked_field_display_mode`: `'compact' | 'inline' | 'expanded' | 'list'`. InlineFieldEditor only supports `compact | inline | expanded`. So `list` is not supported everywhere. |
+| **Where configurable** | FieldAppearanceSettings (field block); not consistently exposed per view or per grid/card. |
+| **Create new record** | Linked fields support “add new record” in several places (FieldEditor, InlineFieldEditor, LinkedRecordCell, FieldBlock) via opening RecordModal (calendar) or similar; CreateRecordModal (RecordReview) is a different, minimal flow. Experience is not one “same experience everywhere.” |
+| **Bidirectional / read-only** | Lookups are derived and read-only in the data model; linked relationships are stored. Audit does not trace full bidirectional behaviour in UI; multiple components touch linked/lookup behaviour. |
 
 ---
 
-## 2. Editing Models Audit
+## 6. Where Does “Edit” Mean Different Things?
 
-### 2.1 Canvas vs Modal vs Inline
+| Context | What “edit” does |
+|---------|-------------------|
+| **Canvas (page)** | Select block, resize/move, add block, open SettingsPanel for config. |
+| **Block inline** | TextBlock / FieldBlock: edit content or value in place; some open modal for create/linked. |
+| **Record modal** | Edit record fields; if modal_layout, layout is fixed (no add block in modal). |
+| **Modal layout** | Edit which blocks appear in record modal and their positions — in **ModalLayoutEditor** dialog, not in the modal itself. |
+| **Record panel** | Edit record via RecordFields in side panel. |
+| **Grid/cards** | Inline cell edit vs open record in panel/modal/drawer. |
 
-**What does “editing” mean in each context?**
-
-| Context | What is edited | Authority |
-|---------|----------------|-----------|
-| **Canvas (InterfaceBuilder)** | Layout (x,y,w,h), add/remove blocks, block config via SettingsPanel | Layout + block config. |
-| **Block edit (e.g. TextBlock, FieldBlock)** | Inline content or field value; some blocks open Settings or modals. | Block config or record data. |
-| **Record modal** | Record fields; layout if modal_layout is used (ModalCanvas). | Record data; modal layout is block-level config. |
-| **ModalLayoutEditor** | Which blocks appear in record modal and their positions (field, text, divider, image only). | Same modal_layout as used by RecordModal/ModalCanvas. |
-
-**Problems identified**
-
-- **Canvas editor vs block editor:** Clicking a block can select for layout vs open settings vs inline-edit. Multiple entry points; behaviour varies by block type.  
-- **Edit modal disconnected from live view:** Record modals use either a simple field list (RecordFields) or ModalCanvas. ModalCanvas uses the same BlockRenderer and BlockAppearanceWrapper but with `isEditing={false}`, no drag/resize, no add block. So “live” modal layout matches what you see, but the *editor* for that layout (ModalLayoutEditor) is a separate dialog with its own preview — not in-place.  
-- **Modal layout ≠ canvas layout:** Modal uses `MODAL_CANVAS_LAYOUT_DEFAULTS` (e.g. margin [0,0], 8 cols) and `MODAL_CANVAS_LAYOUT_CONSTRAINTS`; main Canvas uses `CANVAS_LAYOUT_DEFAULTS` (margin [10,10], 12 cols). Shared file `canvas-layout-defaults.ts` keeps numbers in one place but the *experience* (no add block in modal, no resize in modal) differs.  
-- **Can’t add blocks in modal:** In ModalCanvas you only see the blocks already in modal_layout; there is no “add block” in the modal itself. Adding/removing blocks is only in ModalLayoutEditor.
-
-**Red flags**
-
-- Multiple edit entry points with different rules (click block → settings vs inline vs nothing).  
-- Modals that look like the live view in content but are edited in a separate “layout editor” dialog.  
-- Editors that feel like “settings panels” (SettingsPanel, ModalLayoutEditor) rather than editing in the same shell as the live view.
-
-**Target state**
-
-- One editing shell; same layout logic, same blocks, same controls.  
-- Context (page vs record modal) determines what is editable, not a different UI or different rules.
+So “edit” varies by context: structure (canvas), config (settings panel), content (inline block), record data (modal/panel/drawer), or modal layout (separate dialog).
 
 ---
 
-### 2.2 Record Modals & Record Editors
+## 7. Where Would Changing One Setting Not Propagate?
 
-**How many record editors exist?**
-
-| Editor | Location | Used by | Layout |
-|--------|----------|--------|--------|
-| **RecordModal (grid)** | `components/grid/RecordModal.tsx` | GridView | RecordFields or ModalCanvas (if modal_layout). Props: isOpen, tableName, modalFields, modalLayout. |
-| **RecordModal (calendar)** | `components/calendar/RecordModal.tsx` | CalendarView, ListView, FieldBlock, InlineFieldEditor, etc. | FieldEditor + ModalCanvas (if modal_layout). Props: open, tableFields, modalFields, modalLayout, showFieldSections, initialData, onSave. |
-| **RecordPanel** | `components/records/RecordPanel.tsx` | Side panel (WorkspaceShell) | RecordFields only (no block layout). |
-| **RecordDrawer** | `components/grid/RecordDrawer.tsx` | AirtableKanbanView | Own layout. |
-| **Record review left column** | `components/interface/RecordReviewLeftColumn.tsx` | RecordReviewPage | Custom field list / grouping, not BlockRenderer. |
-| **RecordDetailsPanel** | `components/interface/RecordDetailsPanel.tsx` | — | RecordFields. |
-| **CreateRecordModal** | `components/records/CreateRecordModal.tsx` | RecordReviewLeftColumn | Create flow. |
-
-**Are field layouts consistent?**
-
-- **No.** When no modal_layout: grid RecordModal uses RecordFields; calendar RecordModal uses FieldEditor (with sectioning). RecordPanel and RecordDetailsPanel use RecordFields. Record review left column uses its own list and spacing (e.g. `w-80`, `p-4`, `paddingLeft: 12 + level * 16`).  
-- **With modal_layout:** Both RecordModals use ModalCanvas + BlockRenderer; layout is consistent for that path, but the two RecordModal components have different APIs and different fallbacks (RecordFields vs FieldEditor).
-
-**Red flags**
-
-- **Two RecordModal components** with different props and different default content (RecordFields vs FieldEditor).  
-- **Spacing/layout:** Left sidebar and field groups use local classes/values (e.g. `p-4`, `gap-2`, `w-80`) rather than shared tokens.  
-- **Different record editors look like different products** (panel vs drawer vs modal vs left column).
-
-**Target state**
-
-- One record editor system; configurable layout, consistent feel.  
-- One modal/drawer/panel shell that can show either simple field list or block-based layout from one config.
+| Setting | Defined / used where | Risk |
+|---------|----------------------|------|
+| **Block defaults** | Registry `defaultConfig`; block-defaults.ts uses it. New blocks must be added to registry + BlockRenderer + blockSettingsRegistry. | Adding a block type: if one of these is missed, defaults or settings or rendering break. |
+| **Applicable settings (block)** | Registry `applicableSettings` / `excludedSettings`; blockSettingsRegistry maps type → Data/Appearance renderers independently. | Changing “which settings this block has” in registry does not auto-update settings panel. |
+| **Filter operators** | canonical-model FilterOperator; field-operators; each filter UI may have its own list. | Adding an operator in one place might not appear in all UIs. |
+| **Record action permissions** | page-config record_actions; record-actions.ts; block permissions in block-permissions.ts; page-level pageEditable / editableFieldNames passed into blocks. | Field > block > page cascade is not clearly implemented as a single hierarchy; changing permission in one layer may not be respected everywhere. |
+| **Modal layout** | Stored in block config (e.g. record block) `modal_layout`; used by both RecordModals and edited in ModalLayoutEditor. | If one RecordModal reads modal_layout differently from the other, behaviour diverges. |
 
 ---
 
-## 3. UI & Appearance Unification
+## 8. Red Flags (Explicit Call-Outs)
 
-**Are paddings, gaps, borders consistent?**
+These are the explicit red flags from the audit brief; every one is present.
 
-- **Block chrome:** `BlockAppearanceWrapper` uses fixed `contentPadding = 'p-4'`; container styling from appearance was removed (`getAppearanceClasses` returns `""`). So block-level spacing is not driven by tokens.  
-- **Record / left column:** `RecordReviewLeftColumn` uses `w-80`, `p-4`, `px-4 py-3`, inline `paddingLeft: 12 + level * 16`.  
-- **Modals / dialogs:** Various DialogContent and layout classes; no single spacing system.  
-- **Canvas:** `canvas-layout-defaults.ts` defines margin and row height; good for grid, not for general “spacing tokens”.
-
-**Red flags**
-
-- Hardcoded spacing per component (p-4, gap-2, etc.).  
-- No shared spacing tokens or layout primitives for record containers, sidebars, field groups, block chrome, modal chrome.  
-- Visual tweaks done locally; no single place to change “all record sidebars” or “all block padding”.
-
-**Target state**
-
-- Shared spacing tokens and layout primitives; predictable visual rhythm everywhere.
+| Red flag | Status | Where |
+|----------|--------|--------|
+| **More than one Record Modal / Record Editor** | ✅ Yes | grid/RecordModal, calendar/RecordModal, RecordPanel, RecordDrawer, RecordReview left column, RecordDetailsPanel; multiple content components (RecordFields, FieldEditor, custom list). |
+| **More than one Create Record flow** | ✅ Yes | CreateRecordModal (RecordReview); RecordModal (calendar) with create mode; grid/list/kanban/calendar/view-specific “add record” flows. |
+| **Field behaviour branching by context** | ✅ Yes | Different components and behaviour in grid, cards, record editor, field block, form, record review. |
+| **Block settings defined in multiple places** | ✅ Yes | Registry (defaults, applicableSettings), blockSettingsRegistry (Data/Appearance renderers), and per-block settings components. |
+| **Separate block systems** | ✅ Yes | PageBlock + interface/BlockRenderer (pages) vs ViewBlock + blocks/BlockRenderer (view_blocks, table view page). |
+| **Filters implemented differently by feature** | ✅ Yes | One evaluation engine; view filters, block filters, and automation conditions use different input formats and UIs. |
+| **Spacing / appearance hardcoded per component** | ✅ Yes | e.g. BlockAppearanceWrapper `p-4`; RecordReviewLeftColumn `w-80`, `p-4`, `paddingLeft: 12 + level * 16`; various dialogs and panels. |
+| **Inline “special cases” for individual blocks or views** | ✅ Yes | BlockRenderer merges recordId and builds fieldBlockConfig for field blocks; view-specific create record and open-record behaviour; block-specific settings. |
 
 ---
 
-## 4. Linked Records
+## 9. Canonical Rules — Audit Against Intended Model
 
-**How many display modes exist for linked records?**
+### 9.1 Core Data
 
-- In types: `appearance.linked_field_display_mode`: `'compact' | 'inline' | 'expanded' | 'list'` (FieldBlock, FieldAppearanceSettings).  
-- InlineFieldEditor: `displayMode?: 'compact' | 'inline' | 'expanded'` — no `'list'`.  
-- So: config allows four modes; one consumer only supports three.
+| Rule | Status | Note |
+|------|--------|------|
+| Single source for field definitions, select options, linked/lookup relationships | ✅ Intended source is DB/Core Data | Field **behaviour** and rendering are not unified across the app. |
+| Fields behave the same in grid, cards, record editor, field blocks | ❌ Violated | Different rendering and editing paths per context. |
 
-**Are they configurable per field, per view, per block?**
+### 9.2 Pages
 
-- Configurable per **field block** (appearance) and in FieldAppearanceSettings. Not consistently exposed per view or per generic “linked record field” in grid/cards.
+| Rule | Status | Note |
+|------|--------|------|
+| Only one page type: Canvas | ❌ Violated | Page types: `content`, `record_view`, `record_review` (lib/interface/page-types.ts). Record view pages exist as separate concepts. |
+| “Record view pages” should not exist as separate concept | ❌ Violated | record_view and record_review are explicit page types with their own definitions and layout (e.g. RecordReviewPage with fixed left column). |
+| Full-page data views = blocks with fullPage: true | ❌ Not implemented | Full-page views are not modelled as “block with fullPage: true”; they are views/pages. |
+| If page has full-page block, no other blocks allowed | N/A | fullPage block concept not present. |
 
-**Red flags**
+### 9.3 Blocks
 
-- Linked records can look different in grid vs field block vs inline editor.  
-- Display mode option `'list'` exists in schema but not in InlineFieldEditor.  
-- No single “linked record field” component with one data model + one display mode + one interaction model used everywhere.
+| Rule | Status | Note |
+|------|--------|------|
+| One canonical definition, one config schema, one settings model | ❌ Violated | Definition split across registry, types, block-config-types, validator, blockSettingsRegistry. Two block systems (PageBlock vs ViewBlock). |
+| Shared settings (filters, fields, appearance) from one place | ❌ Violated | Filters: shared engine, multiple input/UIs. Appearance: appearance-utils + BlockAppearanceWrapper; settings from blockSettingsRegistry. |
+| Editing a block’s settings should affect all instances of that block type | ⚠️ Partially | Config is per block instance; no single “template” that all instances share. Changing one block’s settings does not change others. |
 
-**Target state (Airtable-inspired)**
+### 9.4 Record Editor & Create Record
 
-- Linked record field has: one data model, one display mode (configurable), one interaction model — consistent across blocks and views.
+| Rule | Status | Note |
+|------|--------|------|
+| Exactly one Record Editor | ❌ Violated | Multiple record editors (two RecordModals, RecordPanel, RecordDrawer, RecordReview left column, etc.). |
+| Create record = Record Editor in create mode | ❌ Violated | CreateRecordModal is a different, minimal form; other create flows use RecordModal or view-specific add. |
+| Two shells only: Modal and Full page | ❌ Violated | Modal, full page, side panel, drawer all used; logic and content components differ. |
+| Editor, fields, validation, layout identical everywhere | ❌ Violated | Different content components and layouts. |
+| More than one create-record implementation or form? | ✅ Yes | CreateRecordModal; RecordModal create mode; view-specific add (grid, list, kanban, calendar, timeline). |
 
----
+### 9.5 Linked & Lookup
 
-## 5. Interaction Model & Entry Points
+| Rule | Status | Note |
+|------|--------|------|
+| Bidirectional; same behaviour everywhere | ⚠️ Partial | Lookups read-only; linked stored. Behaviour and display modes not fully consistent. |
+| Lookup derived, read-only | ✅ Reflected in model | Display/editing paths vary by context. |
+| Display modes consistent and fully supported everywhere | ❌ Violated | `list` in schema not supported in InlineFieldEditor. |
 
-**How many ways can a user “edit” something?**
+### 9.6 Filters
 
-- **Page/canvas:** Enter edit mode → resize/move blocks, click block → SettingsPanel, add block via FloatingBlockPicker.  
-- **Block:** Click to select; some blocks have inline edit (Text, Field), some open modal (e.g. create record).  
-- **Record:** Click row/card → RecordPanel or RecordModal (or RecordDrawer in Kanban). In record: edit fields inline or in modal.  
-- **Filter:** View filter UI, Filter block UI, automation condition UI.  
-- **Modal layout:** Open ModalLayoutEditor from block/page settings → edit modal layout in dialog.
+| Rule | Status | Note |
+|------|--------|------|
+| One canonical filter model, one evaluation engine | ✅ Met | canonical-model.ts + evaluation. |
+| UI differences must not imply behavioural differences | ⚠️ At risk | Multiple UIs (view, block, automation); conversion layers could diverge. |
 
-**Red flags**
+### 9.7 Permissions
 
-- Many ways to do the same thing (e.g. open record: panel vs modal vs drawer depending on view).  
-- Context switching without clarity (editing layout in one place, record in another, filter in another).  
-- Users may be unsure “where” they are editing (page vs block vs record).
-
-**Target state**
-
-- Clear modes: View → Edit → Configure; not mixed unintentionally.  
-- Consistent “open record” and “edit record” entry points across views.
-
----
-
-## 6. Developer Experience
-
-**If you add a new block, how many files do you touch?**
-
-- **Minimum:** registry (type, label, icon, dimensions, defaultConfig), types (BlockConfig if new keys), BlockRenderer (case + import), blockSettingsRegistry (Data + Appearance renderers), and the new block component. Optional: block-config-types, block-validator, assertBlockConfig.  
-- So: at least **4–5 files**; up to **7+** if you want full validation and typed config.
-
-**If you change a setting, how many components break?**
-
-- Changing a **block default** in registry is safe (block-defaults uses it).  
-- Adding a **new appearance option** touches types, appearance-utils (if new class mapping), BlockAppearanceWrapper (if new behaviour), and possibly blockSettingsRegistry.  
-- So: one conceptual change can require edits in several places.
-
-**Can a developer tell where truth lives?**
-
-- **Blocks:** Truth is split: registry (defaults), types (schema), blockSettingsRegistry (what to show in settings), BlockRenderer (what to render).  
-- **Filters:** Truth is in canonical-model; converters and filters.ts are the bridges.  
-- **Record editors:** No single “record editor” module; multiple components own different parts.
-
-**Red flags**
-
-- Same setting defined or implied in multiple places (e.g. applicableSettings in registry vs which tabs/settings exist in blockSettingsRegistry).  
-- “Just tweak this one component” fixes that don’t align with a single source of truth.  
-- Refactoring is risky because behaviour is spread across many files.
-
-**Target state**
-
-- Predictable architecture: one place per concept.  
-- Adding a block or a setting has a clear, minimal checklist.  
-- Safe refactors because truth is explicit and localised.
+| Rule | Status | Note |
+|------|--------|------|
+| Field > block > page; more specific overrides more general | ⚠️ Partially | Block permissions in block-permissions.ts (mode, allowInlineCreate, etc.); record_actions (create/delete) at page/config level; record-actions.ts for canCreateRecord/canDeleteRecord. No single documented cascade; field-level permissions (e.g. required, read-only per field) not audited here as a single hierarchy. |
 
 ---
 
-## 7. Final Output
+## 10. List of Inconsistencies
 
-### 7.1 Duplicated Concepts
-
-| Concept | Duplicated in / as |
-|--------|---------------------|
-| **Blocks** | Two systems: PageBlock + interface/BlockRenderer (pages) vs ViewBlock + blocks/BlockRenderer (table view pages). |
-| **Block schema/defaults** | Registry + types + block-config-types + block-validator; settings UI in blockSettingsRegistry not derived from registry. |
-| **Editors** | SettingsPanel (block config), ModalLayoutEditor (modal layout), various block-inline editors. |
-| **Filters** | FilterConfig (flat) vs FilterTree (canonical); view filters vs block filters vs automation conditions — one engine, multiple input UIs. |
-| **Record views** | grid/RecordModal, calendar/RecordModal, RecordPanel, RecordDrawer, RecordReview left column, RecordDetailsPanel, CreateRecordModal. |
-
-### 7.2 Conflicting Editing Models
-
-| Conflict | Description |
-|----------|-------------|
-| **Canvas vs modal** | Canvas: resize, add block, settings. Modal: view-only layout; editing modal layout is in ModalLayoutEditor dialog, not in-context. |
-| **Canvas vs inline** | Some blocks support inline edit (text, field); others only settings or modal. No single rule for “click = edit content” vs “click = select for layout”. |
-| **Record: panel vs modal vs drawer** | Same “open record” intent, different UX (side panel, dialog, drawer) depending on view. |
-| **Record modal content** | With modal_layout: BlockRenderer + ModalCanvas. Without: grid uses RecordFields, calendar uses FieldEditor — different fallbacks. |
-
-### 7.3 UI Inconsistencies
-
-| Area | Issue |
-|------|--------|
-| **Spacing** | Hardcoded p-4, gap-2, px-4 py-3, w-80, etc.; no shared tokens. |
-| **Layout** | Canvas margin [10,10], modal margin [0,0]; shared defaults file but different “feel”. |
-| **Chrome** | Block header/padding fixed in BlockAppearanceWrapper; record sidebars and modals each do their own. |
-| **Field groups** | RecordFields vs FieldEditor vs RecordReview left column each structure fields differently. |
-
-### 7.4 Missing or Inconsistent Configuration
-
-| Item | Gap |
-|------|-----|
-| **Linked record display** | `list` mode in schema not supported in InlineFieldEditor; display mode not consistently configurable per view. |
-| **Editor layout** | No single “record editor layout” config that drives panel, modal, and drawer from one place. |
-| **Filter UI** | One engine, multiple UIs; no single “filter condition” component set for views, blocks, and automations. |
-
-### 7.5 One-Sentence Problem Statements
-
-1. **Blocks are defined in multiple places (registry, types, settings registry, two BlockRenderers) and edited inconsistently.**  
-2. **Two block systems exist (PageBlock vs ViewBlock) with different types and storage.**  
-3. **Filters have one engine and one canonical schema but multiple input formats and UIs (views, blocks, automations).**  
-4. **Record editing is split across two RecordModal components, RecordPanel, RecordDrawer, and record review left column with different layouts and APIs.**  
-5. **Modal layout is edited in a separate dialog (ModalLayoutEditor), not in the same shell as the live record modal.**  
-6. **Canvas editing (layout + settings) and block inline editing and record editing have different entry points and rules.**  
-7. **Spacing and chrome are hardcoded per component; there are no shared layout/spacing tokens.**  
-8. **Linked record display mode is not fully consistent (e.g. `list` in schema but not in InlineFieldEditor).**  
-9. **Adding a new block or a new setting requires touching many files with no single checklist.**
+1. **Two block systems:** PageBlock (pages) vs ViewBlock (view_blocks) with different types and renderers.  
+2. **Block definition split:** Registry, types, block-config-types, validator, assertBlockConfig, blockSettingsRegistry — no single canonical definition.  
+3. **Two RecordModal components** with different APIs and fallback content (RecordFields vs FieldEditor).  
+4. **Multiple record content components:** RecordFields, FieldEditor, RecordReview left column custom list.  
+5. **More than one Create Record flow:** CreateRecordModal, RecordModal create mode, view-specific add flows.  
+6. **Filter input formats and UIs:** FilterConfig vs FilterTree vs DB filters; multiple filter UIs.  
+7. **“Edit” means different things** by context (layout, config, content, record data, modal layout).  
+8. **Modal layout** edited in a separate ModalLayoutEditor dialog, not in the same shell as the record modal.  
+9. **Fields rendered differently** in grid, cards, record editor, field block, form, record review.  
+10. **Linked field display mode** `list` in schema but not supported in InlineFieldEditor.  
+11. **Record view page types** exist (record_view, record_review) although intended model is “only Canvas.”  
+12. **Spacing and appearance** hardcoded per component; no shared tokens.  
+13. **Applicable block settings** in registry not driving settings UI.  
+14. **Permission cascade** (field > block > page) not implemented as one documented hierarchy.
 
 ---
 
-## 8. Recommended Next Steps
+## 11. Safe Consolidation Opportunities
 
-1. **Unify block definition:** Single block schema (type + config shape + defaults + validation + applicable settings); registry as source; settings UI and BlockRenderer consume it.  
-2. **Resolve two block systems:** Decide whether ViewBlock/view_blocks is legacy or a separate product; if legacy, plan migration to PageBlock/page_blocks and one BlockRenderer.  
-3. **One record editor shell:** Single component (or small set) for “show/edit record” with configurable layout (field list or modal_layout); reuse for panel, modal, and drawer.  
-4. **One filter UI primitive set:** Shared condition/group components for view filters, filter blocks, and automation conditions.  
-5. **Unified editing shell:** Same layout and block set for canvas and record modal; context (page vs record) only gates what’s editable, not how it looks.  
-6. **Design system:** Introduce spacing and layout tokens; refactor block chrome, record containers, and modals to use them.  
-7. **Document “add a block” and “add a setting” checklists** so DX is predictable and refactors are safe.
+These are **opportunities** to move toward one system/one truth/one editing model. They are listed for planning only; **no refactor or implementation** is implied. The audit does not propose how to implement them.
+
+| # | Opportunity | Rationale |
+|---|-------------|------------|
+| 1 | **Document and centralise “where truth lives”** for blocks, fields, filters, record editing | No code or behaviour change; reduces risk that one change misses a duplicate. |
+| 2 | **Single checklist for “add a new block type”** (and “add a new setting”) | Documentation only; makes it explicit which files must be touched so nothing is missed. |
+| 3 | **Align filter UIs** on one set of condition/group primitives | Would reduce risk of behavioural divergence; implementation would be a later phase. |
+| 4 | **Unify RecordModal API and fallback content** | Two components could be aligned (same props, same content component when no modal_layout) without yet merging into one component. |
+| 5 | **Drive block settings UI from registry** (e.g. applicableSettings) | Would make “which settings this block has” come from one place; requires design so existing behaviour is preserved. |
+| 6 | **Introduce shared spacing/layout tokens** and document usage | New tokens and gradual adoption; no requirement to change all components at once. |
+| 7 | **Clarify or implement permission cascade** (field > block > page) in one place | Document or refactor so all layers read from one hierarchy; behaviour unchanged. |
+| 8 | **Support `list` linked_field_display_mode** in InlineFieldEditor | Single missing option; aligns with schema. |
+| 9 | **Resolve role of ViewBlock system** | Decide whether view_blocks/InterfacePage (table view page) is legacy or separate product; then document or plan convergence. |
+| 10 | **One create-record entry point** (e.g. “Record Editor in create mode”) | Design only: define single flow and shells; implementation later. |
 
 ---
 
-*Audit performed against the codebase under `baserow-app/` and related `lib/`, `types/`, and `docs/`.*
+## 12. What This Audit Does Not Do
+
+- **Does not** propose refactors.  
+- **Does not** write or change code.  
+- **Does not** rename or move files.  
+- **Does not** change behaviour.  
+
+This audit **only** maps the current state, identifies duplication, flags inconsistencies against the locked principles and intended system model, and lists safe consolidation opportunities for future review and implementation.
+
+---
+
+*Audit performed against the codebase under `baserow-app/`, `lib/`, `types/`, and related docs. No code or behaviour was modified.*

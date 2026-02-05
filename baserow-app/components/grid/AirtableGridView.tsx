@@ -2155,6 +2155,21 @@ export default function AirtableGridView({
         </div>
       </div>
 
+      {/* Add record bar at bottom (always visible so users can add a row without scrolling) */}
+      {editable && (
+        <div className="flex-shrink-0 border-t border-gray-200 bg-white px-4 py-2">
+          <button
+            type="button"
+            onClick={() => createNewRow()}
+            className="px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-md transition-colors flex items-center gap-2"
+            aria-label="Add record"
+          >
+            <Plus className="h-4 w-4" />
+            Add record
+          </button>
+        </div>
+      )}
+
       {/* Bulk Action Bar */}
       <BulkActionBar
         selectedCount={selectedRowIds.size}
