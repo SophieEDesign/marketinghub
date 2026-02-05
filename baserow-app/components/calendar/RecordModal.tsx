@@ -1,8 +1,7 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { ArrowLeft, Save, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import {
   Dialog,
   DialogContent,
@@ -18,13 +17,15 @@ import { isAbortError } from '@/lib/api/error-handling'
 import ModalCanvas from '@/components/interface/ModalCanvas'
 import type { BlockConfig } from '@/lib/interface/types'
 import { sectionAndSortFields } from '@/lib/fields/sectioning'
+import { useRecordEditorCore } from '@/lib/interface/record-editor-core'
 
 export interface RecordModalProps {
   open: boolean
   onClose: () => void
   tableId: string
   recordId: string | null
-  tableFields: TableField[]
+  /** When omitted, the record editor core will fetch fields from the API */
+  tableFields?: TableField[]
   modalFields?: string[] // Fields to show in modal (if empty, show all)
   initialData?: Record<string, any> // Initial data for creating new records
   onSave?: (createdRecordId?: string | null) => void // Callback with created record ID for new records
@@ -44,7 +45,7 @@ export default function RecordModal({
   onClose,
   tableId,
   recordId,
-  tableFields,
+  tableFields = [],
   modalFields = [],
   initialData,
   onSave,
@@ -53,13 +54,39 @@ export default function RecordModal({
   modalLayout,
   showFieldSections = false,
 }: RecordModalProps) {
-  const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [formData, setFormData] = useState<Record<string, any>>({})
-  const [supabaseTableName, setSupabaseTableName] = useState<string | null>(supabaseTableNameProp || null)
   const { toast } = useToast()
   const { role: userRole } = useUserRole()
+
+  const core = useRecordEditorCore({
+    tableId,
+    recordId,
+    supabaseTableName: supabaseTableNameProp,
+    tableFields,
+    modalFields,
+    initialData,
+    active: open,
+    onSave: (createdId) => {
+      onSave?.(createdId)
+      onClose()
+    },
+    onDeleted: async () => {
+      toast({ title: 'Record deleted', description: 'The record has been deleted.' })
+      await onDeleted?.()
+      onClose()
+    },
+  })
+
+  const {
+    loading,
+    formData,
+    fields: filteredFields,
+    effectiveTableName,
+    saving,
+    deleting,
+    save,
+    deleteRecord,
+    handleFieldChange,
+  } = core
 
   // Load collapsed sections state from localStorage
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
@@ -75,7 +102,6 @@ export default function RecordModal({
     return new Set()
   })
 
-  // Persist collapsed sections state to localStorage
   useEffect(() => {
     if (typeof window === "undefined") return
     try {
@@ -100,162 +126,20 @@ export default function RecordModal({
     })
   }
 
-  // Use prop directly if available, otherwise use state
-  const effectiveTableName = supabaseTableNameProp || supabaseTableName
-
-  const loadTableInfo = useCallback(async () => {
-    if (!tableId) return
-    
-    try {
-      const supabase = createClient()
-      // Sanitize tableId (remove any suffix after colon)
-      const sanitizedTableId = tableId.split(':')[0]
-      const { data: table, error } = await supabase
-        .from('tables')
-        .select('supabase_table')
-        .eq('id', sanitizedTableId)
-        .single()
-      
-      if (error) {
-        if (!isAbortError(error)) {
-          console.error('Error loading table info:', error)
-        }
-      } else if (table) {
-        setSupabaseTableName(table.supabase_table)
-      }
-    } catch (error) {
-      if (!isAbortError(error)) {
-        console.error('Error loading table info:', error)
-      }
-    }
-  }, [tableId])
-
-  const loadRecord = useCallback(async () => {
-    if (!recordId || !effectiveTableName) return
-
-    setLoading(true)
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from(effectiveTableName)
-        .select('*')
-        .eq('id', recordId)
-        .single()
-
-      if (error) {
-        if (!isAbortError(error)) {
-          console.error('Error loading record:', error)
-        }
-      } else if (data) {
-        setFormData(data)
-      }
-    } catch (error) {
-      if (!isAbortError(error)) {
-        console.error('Error loading record:', error)
-      }
-    } finally {
-      setLoading(false)
-    }
-  }, [recordId, effectiveTableName])
-
-  // Update supabaseTableName when prop changes (for fallback when prop is removed)
-  useEffect(() => {
-    if (supabaseTableNameProp) {
-      setSupabaseTableName(supabaseTableNameProp)
-    }
-  }, [supabaseTableNameProp])
-
-  // Load table info when modal opens (only if not provided as prop)
-  useEffect(() => {
-    if (open && tableId && !supabaseTableNameProp) {
-      loadTableInfo()
-    } else if (!open) {
-      // Reset state when modal closes
-      if (!supabaseTableNameProp) {
-        setSupabaseTableName(null)
-      }
-      setFormData({})
-    }
-  }, [open, tableId, supabaseTableNameProp, loadTableInfo])
-
-  // Load record data when table name is available, or initialize with initialData for new records
-  useEffect(() => {
-    if (open && effectiveTableName) {
-      if (recordId) {
-        loadRecord()
-      } else if (initialData) {
-        // Initialize form data with initialData for new records
-        setFormData(initialData)
-      } else {
-        setFormData({})
-      }
-    }
-  }, [open, recordId, effectiveTableName, loadRecord, initialData])
-
   async function handleSave() {
-    if (!effectiveTableName) return
-
-    setSaving(true)
     try {
-      const supabase = createClient()
-      
-      if (recordId) {
-        // Update existing record
-        const { error } = await supabase
-          .from(effectiveTableName)
-          .update(formData)
-          .eq('id', recordId)
-
-        if (error) {
-          if (!isAbortError(error)) {
-            console.error('Error saving record:', error)
-            const message = (error as any)?.message || 'Unknown error'
-            const code = (error as any)?.code ? ` (code: ${(error as any).code})` : ''
-            alert(`Failed to save record${code}: ${message}`)
-          }
-          return
-        }
-      } else {
-        // Create new record
-        const { data, error } = await supabase
-          .from(effectiveTableName)
-          .insert(formData)
-          .select()
-          .single()
-
-        if (error) {
-          if (!isAbortError(error)) {
-            console.error('Error creating record:', error)
-            const message = (error as any)?.message || 'Unknown error'
-            const code = (error as any)?.code ? ` (code: ${(error as any).code})` : ''
-            alert(`Failed to create record${code}: ${message}`)
-          }
-          return
-        }
-
-        // Pass the created record ID to onSave callback
-        const createdRecordId = data?.id || null
-        onSave?.(createdRecordId)
-        onClose()
-        return
+      await save()
+      if (recordId) onClose()
+    } catch (e: any) {
+      if (!isAbortError(e)) {
+        const message = e?.message || 'Unknown error'
+        const code = e?.code ? ` (code: ${e.code})` : ''
+        alert(`Failed to save record${code}: ${message}`)
       }
-
-      onSave?.()
-      onClose()
-    } catch (error) {
-      if (!isAbortError(error)) {
-        console.error('Error saving record:', error)
-        alert('Failed to save record. Please try again.')
-      }
-    } finally {
-      setSaving(false)
     }
   }
 
   async function handleDelete() {
-    if (!recordId) return
-    if (!effectiveTableName) return
-
     if (userRole !== 'admin') {
       toast({
         variant: 'destructive',
@@ -264,39 +148,19 @@ export default function RecordModal({
       })
       return
     }
-
-    if (!confirm('Are you sure you want to delete this record? This action cannot be undone.')) {
-      return
-    }
-
-    setDeleting(true)
     try {
-      const supabase = createClient()
-      const { error } = await supabase.from(effectiveTableName).delete().eq('id', recordId)
-      if (error) throw error
-
-      toast({
-        title: 'Record deleted',
-        description: 'The record has been deleted.',
+      await deleteRecord({
+        confirmMessage: 'Are you sure you want to delete this record? This action cannot be undone.',
       })
-      await onDeleted?.()
-      onClose()
-    } catch (error: any) {
-      if (!isAbortError(error)) {
-        console.error('Error deleting record:', error)
+    } catch (e: any) {
+      if (!isAbortError(e)) {
         toast({
           variant: 'destructive',
           title: 'Failed to delete record',
-          description: error?.message || 'Please try again',
+          description: e?.message || 'Please try again',
         })
       }
-    } finally {
-      setDeleting(false)
     }
-  }
-
-  function handleFieldChange(fieldName: string, value: any) {
-    setFormData((prev) => ({ ...prev, [fieldName]: value }))
   }
 
   // Memoize blocks for ModalCanvas - must be at top level (before early return)
@@ -321,23 +185,7 @@ export default function RecordModal({
     })) as any[]
   }, [modalLayout?.blocks, tableFields])
 
-  // Filter and section fields for simple list mode
-  const filteredFields = useMemo(() => {
-    return tableFields.filter((field) => {
-      // Always exclude system fields
-      if (!field || field.name === 'id' || field.name === 'created_at' || field.name === 'updated_at') {
-        return false
-      }
-      // If modalFields is specified and not empty, only show those fields
-      if (modalFields.length > 0) {
-        return modalFields.includes(field.name)
-      }
-      // Otherwise show all fields
-      return true
-    })
-  }, [tableFields, modalFields])
-
-  // Section fields if showFieldSections is enabled
+  // Section fields if showFieldSections is enabled (filteredFields from core)
   const sectionedFields = useMemo(() => {
     if (!showFieldSections) return null
     return sectionAndSortFields(filteredFields)

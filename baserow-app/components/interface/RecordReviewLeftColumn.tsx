@@ -20,7 +20,7 @@ import { Plus, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import CreateRecordModal from "@/components/records/CreateRecordModal"
+import RecordModal from "@/components/calendar/RecordModal"
 import { useToast } from "@/components/ui/use-toast"
 import { formatDateUK } from "@/lib/utils"
 import { resolveChoiceColor, normalizeHexColor, getTextColorForBackground } from "@/lib/field-colors"
@@ -854,20 +854,30 @@ export default function RecordReviewLeftColumn({
         </div>
       </div>
 
-      {/* Create record modal (record_view only) */}
-      {isRecordView && (
-        <CreateRecordModal
+      {/* Create record: same Record Editor (create mode) as elsewhere */}
+      {isRecordView && tableId && (
+        <RecordModal
           open={createModalOpen}
-          onOpenChange={setCreateModalOpen}
-          tableName={tableName || undefined}
-          primaryFieldLabel={canPrefillPrimaryCreateField ? primaryCreateField?.name : null}
-          primaryFieldPlaceholder={
-            canPrefillPrimaryCreateField && primaryCreateField?.name
-              ? `Enter ${primaryCreateField.name}`
-              : undefined
-          }
-          isSaving={creating}
-          onCreate={handleCreateRecord}
+          onClose={() => setCreateModalOpen(false)}
+          tableId={tableId}
+          recordId={null}
+          tableFields={fields}
+          supabaseTableName={supabaseTableName}
+          onSave={async (createdId) => {
+            if (!createdId) return
+            setCreating(true)
+            try {
+              setSearchQuery("")
+              if (supabaseTableName) await loadRecords(supabaseTableName)
+              onRecordSelect(String(createdId))
+              toast({
+                title: "Record created",
+                description: "Your new record has been created.",
+              })
+            } finally {
+              setCreating(false)
+            }
+          }}
         />
       )}
 

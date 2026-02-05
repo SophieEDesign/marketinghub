@@ -36,6 +36,25 @@ These principles define the intended system. The audit flags every place they ar
 
 ---
 
+## 🔒 Field Labels vs Internal Identifiers
+
+User-facing UI must use field labels, not internal field IDs or raw column names.
+
+Examples:
+
+- ✅ Content Name
+- ❌ content_name
+- ❌ contentName
+- ❌ field UUIDs or IDs
+
+Field labels come from Core Data field definitions and are the canonical display value.
+
+Internal names/IDs may be used internally for storage, queries, and logic, but must not leak into UI.
+
+**Audit instruction:** Flag any UI surface where internal field identifiers are shown instead of field labels.
+
+---
+
 ## 🔒 Inline Editing (Explicitly Preserved)
 
 Inline editing of field values is intentional and must remain.

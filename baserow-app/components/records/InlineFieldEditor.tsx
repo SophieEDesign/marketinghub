@@ -38,7 +38,7 @@ interface InlineFieldEditorProps {
   tableId?: string // For attachment uploads
   recordId?: string // For attachment uploads
   tableName?: string // For attachment uploads (supabase table name)
-  displayMode?: 'compact' | 'inline' | 'expanded' // Display mode for linked fields (default: 'compact')
+  displayMode?: 'compact' | 'inline' | 'expanded' | 'list' // Display mode for linked fields (default: 'compact'); 'list' shows as vertical list (same as expanded)
 }
 
 export default function InlineFieldEditor({
@@ -246,7 +246,7 @@ export default function InlineFieldEditor({
               placeholder="No linked records"
               onRecordClick={onLinkedRecordClick}
               isLookupField={true}
-              compact={displayMode === 'compact'}
+              compact={displayMode === 'compact' || displayMode === 'inline'}
             />
           ) : (
             <div className={readOnlyBoxClassName}>
@@ -258,6 +258,7 @@ export default function InlineFieldEditor({
     }
 
     // LINKED FIELDS (editable) - Show as editable with clear affordances
+    // list and expanded both use non-compact (vertical list) display
     return (
       <>
         <div className={containerClassName} onPaste={handlePaste}>
@@ -275,7 +276,7 @@ export default function InlineFieldEditor({
               onRecordClick={onLinkedRecordClick}
               onCreateRecord={lookupConfig.allowCreate ? handleCreateRecord : undefined}
               isLookupField={false}
-              compact={displayMode === 'compact'}
+              compact={displayMode === 'compact' || displayMode === 'inline'}
             />
           ) : (
             <div className={readOnlyBoxClassName}>

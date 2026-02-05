@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { X } from "lucide-react"
 import {
   Dialog,
@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/dialog"
 import { createClient } from "@/lib/supabase/client"
 import RecordFields from "@/components/records/RecordFields"
-import type { TableField } from "@/types/fields"
 import { useToast } from "@/components/ui/use-toast"
 import { useUserRole } from "@/lib/hooks/useUserRole"
 import { Trash2 } from "lucide-react"
@@ -19,6 +18,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
 import ModalCanvas from "@/components/interface/ModalCanvas"
 import type { BlockConfig } from "@/lib/interface/types"
 import { useMemo } from "react"
+import { useRecordEditorCore } from "@/lib/interface/record-editor-core"
 
 interface RecordModalProps {
   isOpen: boolean
@@ -41,147 +41,61 @@ export default function RecordModal({
   modalFields,
   modalLayout,
 }: RecordModalProps) {
-  const [record, setRecord] = useState<Record<string, any> | null>(null)
-  const [fields, setFields] = useState<TableField[]>([])
-  const [loading, setLoading] = useState(false)
-  const [deleting, setDeleting] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const supabase = createClient()
   const { toast } = useToast()
   const { role: userRole } = useUserRole()
 
-  function normalizeUpdateValue(fieldName: string, value: any): any {
-    // Avoid sending `undefined` to PostgREST.
-    const v: any = value === undefined ? null : value
+  const core = useRecordEditorCore({
+    tableId,
+    recordId,
+    supabaseTableName: tableName,
+    modalFields: modalFields ?? [],
+    active: isOpen,
+    onDeleted: async () => {
+      toast({ title: "Record deleted", description: "The record has been deleted." })
+      await onDeleted?.()
+      onClose()
+    },
+  })
 
-    const field = fields.find((f) => f?.name === fieldName)
-    if (!field) return v
-
-    if (field.type !== "link_to_table") return v
-
-    const toId = (x: any): string | null => {
-      if (x == null || x === "") return null
-      if (typeof x === "string") return x
-      if (typeof x === "object" && x && "id" in x) return String((x as any).id)
-      return String(x)
-    }
-
-    const relationshipType = (field.options as any)?.relationship_type as
-      | "one-to-one"
-      | "one-to-many"
-      | "many-to-many"
-      | undefined
-    const maxSelections = (field.options as any)?.max_selections as number | undefined
-    const isMulti =
-      relationshipType === "one-to-many" ||
-      relationshipType === "many-to-many" ||
-      (typeof maxSelections === "number" && maxSelections > 1)
-
-    if (isMulti) {
-      if (v == null) return null
-      if (Array.isArray(v)) return v.map(toId).filter(Boolean)
-      const id = toId(v)
-      return id ? [id] : null
-    }
-
-    // Single-link: always normalize to a single UUID (or null).
-    if (Array.isArray(v)) return toId(v[0])
-    return toId(v)
-  }
-
-  useEffect(() => {
-    if (isOpen && recordId && tableName) {
-      // Avoid flashing stale data while the next record loads.
-      setRecord(null)
-      setLoading(true)
-      loadRecord()
-      loadFields()
-    } else {
-      setRecord(null)
-    }
-  }, [isOpen, recordId, tableName])
-
-  async function loadRecord() {
-    if (!recordId || !tableName) return
-
-    setLoading(true)
-    try {
-      const { data, error } = await supabase
-        .from(tableName)
-        .select("*")
-        .eq("id", recordId)
-        .single()
-
-      if (error) {
-        if (!isAbortError(error)) {
-          console.error("Error loading record:", error)
-        }
-      } else {
-        setRecord(data)
-      }
-    } catch (error) {
-      if (!isAbortError(error)) {
-        console.error("Error loading record:", error)
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function loadFields() {
-    try {
-      const response = await fetch(`/api/tables/${tableId}/fields`)
-      const data = await response.json()
-      if (data.fields) {
-        // Filter fields if modalFields is specified
-        let filteredFields = data.fields
-        if (modalFields && modalFields.length > 0) {
-          filteredFields = data.fields.filter((f: TableField) =>
-            modalFields.includes(f.name) || modalFields.includes(f.id)
-          )
-        }
-        setFields(filteredFields)
-      }
-    } catch (error) {
-      if (!isAbortError(error)) {
-        console.error("Error loading fields:", error)
-      }
-    }
-  }
+  const {
+    loading,
+    formData: record,
+    setFormData,
+    fields,
+    effectiveTableName: tableNameFromCore,
+    deleting,
+    normalizeUpdateValue,
+    deleteRecord,
+  } = core
 
   async function handleFieldChange(fieldName: string, value: any) {
-    if (!record || !tableName) return
+    if (!record || !tableNameFromCore) return
 
     try {
       const normalizedValue = normalizeUpdateValue(fieldName, value)
       let finalSavedValue: any = normalizedValue
 
       const doUpdate = async (val: any) => {
-        return await supabase.from(tableName).update({ [fieldName]: val }).eq("id", recordId)
+        return await supabase.from(tableNameFromCore).update({ [fieldName]: val }).eq("id", recordId)
       }
 
       let { error } = await doUpdate(finalSavedValue)
 
-      // Compatibility rescue for uuid[] column type mismatch (code 42804):
-      // Some columns are physically uuid[] but the field is configured as single-link,
-      // so we normalize to a single UUID. When that happens, Postgres throws 42804.
+      // Compatibility rescue for uuid[] column type mismatch (code 42804)
       if (
         error?.code === '42804' &&
         !Array.isArray(finalSavedValue) &&
         String(error?.message || '').toLowerCase().includes('uuid[]') &&
         String(error?.message || '').toLowerCase().includes('uuid')
       ) {
-        // Column is uuid[] but we're trying to save a single UUID - wrap it in an array
         const wrappedValue = finalSavedValue != null ? [finalSavedValue] : null
         const retry = await doUpdate(wrappedValue)
         error = retry.error
-        if (!retry.error) {
-          finalSavedValue = wrappedValue
-          console.log(`[RecordModal] Auto-corrected: wrapped single UUID in array for uuid[] column "${fieldName}"`)
-        }
+        if (!retry.error) finalSavedValue = wrappedValue
       }
 
-      // See `useGridData.updateCell` for rationale (uuid vs uuid[] mismatch for linked fields)
       if (
         error?.code === "22P02" &&
         Array.isArray(finalSavedValue) &&
@@ -195,15 +109,10 @@ export default function RecordModal({
       }
 
       if (error) {
-        if (!isAbortError(error)) {
-          console.error("Error updating field:", error)
-          throw error
-        }
+        if (!isAbortError(error)) throw error
         return
       }
-
-      // Update local state
-      setRecord((prev) => (prev ? { ...prev, [fieldName]: finalSavedValue } : null))
+      setFormData((prev) => (prev ? { ...prev, [fieldName]: finalSavedValue } : prev))
     } catch (error) {
       if (!isAbortError(error)) {
         console.error("Error updating field:", error)
@@ -212,7 +121,7 @@ export default function RecordModal({
   }
 
   async function handleDeleteRecord() {
-    if (!tableName || !recordId) return
+    if (!tableNameFromCore || !recordId) return
     if (userRole !== 'admin') {
       toast({
         variant: "destructive",
@@ -221,35 +130,22 @@ export default function RecordModal({
       })
       return
     }
-
     setShowDeleteConfirm(true)
   }
 
   async function confirmDelete() {
-    if (!tableName || !recordId) return
-
-    setDeleting(true)
     try {
-      const { error } = await supabase.from(tableName).delete().eq("id", recordId)
-      if (error) throw error
-
-      toast({
-        title: "Record deleted",
-        description: "The record has been deleted.",
+      await deleteRecord({
+        confirmMessage: "Are you sure you want to delete this record? This action cannot be undone.",
       })
-      await onDeleted?.()
-      onClose()
     } catch (error: any) {
       if (!isAbortError(error)) {
-        console.error("Error deleting record:", error)
         toast({
           variant: "destructive",
           title: "Failed to delete record",
           description: error.message || "Please try again",
         })
       }
-    } finally {
-      setDeleting(false)
     }
   }
 
@@ -309,7 +205,7 @@ export default function RecordModal({
         <div className="mt-4">
           {loading ? (
             <div className="text-center py-8 text-gray-500">Loading...</div>
-          ) : record ? (
+          ) : record && Object.keys(record).length > 0 ? (
             <>
               {/* Use custom layout if available, otherwise fall back to simple field list */}
               {modalLayout?.blocks && modalLayout.blocks.length > 0 ? (
@@ -318,7 +214,7 @@ export default function RecordModal({
                     blocks={modalBlocks}
                     tableId={tableId}
                     recordId={recordId}
-                    tableName={tableName}
+                    tableName={tableNameFromCore || tableName}
                     tableFields={fields}
                     pageEditable={userRole === 'admin'}
                     editableFieldNames={fields.map(f => f.name)}
@@ -329,12 +225,12 @@ export default function RecordModal({
               ) : (
                 <RecordFields
                   fields={fields}
-                  formData={record}
+                  formData={record || {}}
                   onFieldChange={handleFieldChange}
                   fieldGroups={{}}
                   tableId={tableId}
                   recordId={recordId}
-                  tableName={tableName}
+                  tableName={tableNameFromCore || tableName}
                   isFieldEditable={() => true}
                 />
               )}

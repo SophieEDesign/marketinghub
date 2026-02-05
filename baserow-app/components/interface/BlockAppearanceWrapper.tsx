@@ -2,6 +2,7 @@
 
 import type { PageBlock } from "@/lib/interface/types"
 import { getAppearanceClasses, getAccentColor, getTitleSizeClass, getTitleAlignClass, getHeaderBarClasses } from "@/lib/interface/appearance-utils"
+import { BLOCK_CONTENT_PADDING, BLOCK_HEADER_PADDING } from "@/lib/interface/spacing-tokens"
 import { cn } from "@/lib/utils"
 
 interface BlockAppearanceWrapperProps {
@@ -54,16 +55,14 @@ export default function BlockAppearanceWrapper({
     return <>{children}</>
   }
 
-  // Padding/spacing UI removed; use fixed default so legacy config does not drive styling
-  const contentPadding = 'p-4'
-
   return (
     <div className={cn(containerClasses, accentBorder, className, "w-full flex flex-col min-h-0")}>
       {/* Header with title */}
       {showTitle && (
         <>
           <div className={cn(
-            "px-4 py-3 flex-shrink-0",
+            BLOCK_HEADER_PADDING,
+            "flex-shrink-0",
             getHeaderBarClasses(appearance)
           )}>
             <h3 className={cn(
@@ -84,7 +83,7 @@ export default function BlockAppearanceWrapper({
       )}
 
       {/* Block content with fixed padding */}
-      <div className={cn("flex-1 min-h-0", contentPadding)}>
+      <div className={cn("flex-1 min-h-0", BLOCK_CONTENT_PADDING)}>
         {children}
       </div>
     </div>

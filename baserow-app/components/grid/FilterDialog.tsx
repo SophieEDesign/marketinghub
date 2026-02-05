@@ -28,6 +28,7 @@ import {
   normalizeHexColor,
 } from "@/lib/field-colors"
 import { normalizeUuid } from "@/lib/utils/ids"
+import { getOperatorsForFieldType } from "@/lib/filters/filter-ui-primitives"
 
 interface FilterDialogProps {
   isOpen: boolean
@@ -165,64 +166,6 @@ export default function FilterDialog({
       }))
       setUngroupedFilters(localFilters)
       setFilterGroups([])
-    }
-  }
-
-  function getOperatorsForFieldType(fieldType: string) {
-    switch (fieldType) {
-      case "text":
-      case "long_text":
-        return [
-          { value: "contains", label: "Contains" },
-          { value: "not_contains", label: "Does not contain" },
-          { value: "equal", label: "Equals" },
-          { value: "not_equal", label: "Does not equal" },
-          { value: "is_empty", label: "Is empty" },
-          { value: "is_not_empty", label: "Is not empty" },
-        ]
-      case "number":
-      case "currency":
-      case "percent":
-        return [
-          { value: "equal", label: "Equals" },
-          { value: "not_equal", label: "Does not equal" },
-          { value: "greater_than", label: "Greater than" },
-          { value: "greater_than_or_equal", label: "Greater than or equal" },
-          { value: "less_than", label: "Less than" },
-          { value: "less_than_or_equal", label: "Less than or equal" },
-          { value: "is_empty", label: "Is empty" },
-          { value: "is_not_empty", label: "Is not empty" },
-        ]
-      case "date":
-        return [
-          { value: "date_equal", label: "Is" },
-          { value: "date_before", label: "Before" },
-          { value: "date_after", label: "After" },
-          { value: "date_on_or_before", label: "On or before" },
-          { value: "date_on_or_after", label: "On or after" },
-          { value: "is_empty", label: "Is empty" },
-          { value: "is_not_empty", label: "Is not empty" },
-        ]
-      case "single_select":
-      case "multi_select":
-        return [
-          { value: "equal", label: "Is" },
-          { value: "not_equal", label: "Is not" },
-          { value: "is_empty", label: "Is empty" },
-          { value: "is_not_empty", label: "Is not empty" },
-        ]
-      case "checkbox":
-        return [
-          { value: "equal", label: "Is checked" },
-          { value: "not_equal", label: "Is unchecked" },
-        ]
-      default:
-        return [
-          { value: "equal", label: "Equals" },
-          { value: "not_equal", label: "Does not equal" },
-          { value: "is_empty", label: "Is empty" },
-          { value: "is_not_empty", label: "Is not empty" },
-        ]
     }
   }
 
