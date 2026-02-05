@@ -183,8 +183,7 @@ export interface BlockConfig {
     // Record opening settings
     enable_record_open?: boolean // Enable/disable record opening (default: true)
     record_open_style?: 'side_panel' | 'modal' // How to open records (default: 'side_panel' for desktop)
-    // Color and image fields for table/kanban/timeline/calendar blocks
-    color_field?: string // Field name/ID to use for row/card colors (single-select field)
+    // Image field for table/kanban/timeline/gallery blocks (color_field is generic, above)
     image_field?: string // Field name/ID to use for row/card images
     fit_image_size?: boolean // Whether to fit image to container size
     // Text block specific
