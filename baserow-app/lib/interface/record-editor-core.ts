@@ -6,10 +6,24 @@
  * Additive only; existing shells keep their props and behaviour.
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { isAbortError } from '@/lib/api/error-handling'
 import type { TableField } from '@/types/fields'
+import type { PageConfig } from '@/lib/interface/page-config'
+import type { BlockConfig } from '@/lib/interface/types'
+import { useUserRole } from '@/lib/hooks/useUserRole'
+import {
+  canEditRecords as cascadeCanEditRecords,
+  canCreateRecord as cascadeCanCreateRecord,
+  canDeleteRecord as cascadeCanDeleteRecord,
+} from '@/lib/interface/permission-cascade'
+
+/** Optional context for permission cascade (read-only; core does not enforce). */
+export interface RecordEditorCascadeContext {
+  pageConfig?: PageConfig | null
+  blockConfig?: BlockConfig | null
+}
 
 export interface RecordEditorCoreOptions {
   tableId: string
@@ -26,6 +40,8 @@ export interface RecordEditorCoreOptions {
   active?: boolean
   onSave?: (createdRecordId?: string | null) => void
   onDeleted?: () => void | Promise<void>
+  /** Optional: permission cascade context; when provided, core computes canEdit/canDelete/canCreate (exposed only, not enforced). */
+  cascadeContext?: RecordEditorCascadeContext | null
 }
 
 export interface RecordEditorCoreResult {
@@ -42,6 +58,10 @@ export interface RecordEditorCoreResult {
   handleFieldChange: (fieldName: string, value: any) => void
   /** Normalize value for link_to_table before save/update (shared with grid modal behaviour) */
   normalizeUpdateValue: (fieldName: string, value: any) => any
+  /** Permission cascade (read-only). Not used by core for save/delete yet. */
+  canEditRecords: boolean
+  canDeleteRecords: boolean
+  canCreateRecords: boolean
 }
 
 function normalizeLinkValue(
@@ -89,7 +109,28 @@ export function useRecordEditorCore(
     active = true,
     onSave,
     onDeleted,
+    cascadeContext,
   } = options
+
+  const { role: userRole } = useUserRole()
+
+  const cascadeContextForHelpers = useMemo(
+    () => (cascadeContext?.blockConfig != null ? { blockConfig: cascadeContext.blockConfig } : undefined),
+    [cascadeContext?.blockConfig]
+  )
+
+  const canEditRecords = useMemo(
+    () => cascadeCanEditRecords(cascadeContextForHelpers),
+    [cascadeContextForHelpers]
+  )
+  const canCreateRecords = useMemo(
+    () => cascadeCanCreateRecord(userRole, cascadeContext?.pageConfig, cascadeContextForHelpers),
+    [userRole, cascadeContext?.pageConfig, cascadeContextForHelpers]
+  )
+  const canDeleteRecords = useMemo(
+    () => cascadeCanDeleteRecord(userRole, cascadeContext?.pageConfig, cascadeContextForHelpers),
+    [userRole, cascadeContext?.pageConfig, cascadeContextForHelpers]
+  )
 
   const [effectiveTableName, setEffectiveTableName] = useState<string | null>(
     supabaseTableNameProp ?? null
@@ -291,5 +332,8 @@ export function useRecordEditorCore(
     deleteRecord,
     handleFieldChange,
     normalizeUpdateValue,
+    canEditRecords,
+    canDeleteRecords,
+    canCreateRecords,
   }
 }

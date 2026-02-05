@@ -279,12 +279,14 @@ export default function AirtableGridView({
     setSorts(standardizedSorts)
   }, [standardizedSorts])
 
+  // Use local sorts so column-header sort triggers refetch; menu sort updates viewSorts -> standardizedSorts -> syncs to sorts
+  const sortsForData = useMemo(() => sorts.map(s => ({ field: s.field, direction: s.direction })), [sorts])
   const { rows: allRows, loading, error, updateCell, refresh, retry, insertRow, physicalColumns } = useGridData({
     tableName,
     tableId: tableIdState || tableId,
     fields,
     filters: standardizedFilters,
-    sorts: standardizedSorts,
+    sorts: sortsForData,
     onError: (err, message) => handleError(err, "Grid Error", message),
   })
 
