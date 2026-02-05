@@ -601,7 +601,10 @@ export default function PageDisplaySettingsPanel({
     return null
   }
 
-  // Record View pages use special page-level settings
+  // NOTE: record_view and record_review intentionally share the same shell.
+  // They differ only by left-column configuration and settings UX.
+  // See docs/architecture/PAGE_TYPE_CONSOLIDATION.md
+  // Record-centric pages use special page-level settings
   if (isRecordReviewPage(currentPage.page_type)) {
     return (
       <Sheet open={isOpen} onOpenChange={onClose}>

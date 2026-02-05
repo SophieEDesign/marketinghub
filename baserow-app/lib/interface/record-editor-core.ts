@@ -4,6 +4,11 @@
  * Record editor core — shared logic for load/save/delete and field normalization.
  * No UI; shells (RecordModal, RecordPanel, RecordDrawer) delegate to this and keep their UI.
  * Additive only; existing shells keep their props and behaviour.
+ *
+ * PERMISSION ENFORCEMENT INVARIANT (see docs/PERMISSION_ENFORCEMENT_INVARIANT.md):
+ * - When cascadeContext is provided, record mutation is governed exclusively by canEditRecords,
+ *   canCreateRecords, and canDeleteRecords, enforced in both UI and core (save/delete below).
+ * - When cascadeContext is not provided, core-data behaviour remains unchanged (no gating).
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
@@ -40,7 +45,7 @@ export interface RecordEditorCoreOptions {
   active?: boolean
   onSave?: (createdRecordId?: string | null) => void
   onDeleted?: () => void | Promise<void>
-  /** Optional: permission cascade context; when provided, core computes canEdit/canDelete/canCreate (exposed only, not enforced). */
+  /** Optional: permission cascade context; when provided, core enforces canEdit/canCreate/canDelete in save() and deleteRecord(). */
   cascadeContext?: RecordEditorCascadeContext | null
 }
 
@@ -58,7 +63,7 @@ export interface RecordEditorCoreResult {
   handleFieldChange: (fieldName: string, value: any) => void
   /** Normalize value for link_to_table before save/update (shared with grid modal behaviour) */
   normalizeUpdateValue: (fieldName: string, value: any) => any
-  /** Permission cascade (read-only). Not used by core for save/delete yet. */
+  /** Permission cascade; when cascadeContext was provided, shells must enforce these in UI and core gates save/delete. */
   canEditRecords: boolean
   canDeleteRecords: boolean
   canCreateRecords: boolean

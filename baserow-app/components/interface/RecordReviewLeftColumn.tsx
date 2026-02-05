@@ -96,9 +96,12 @@ export default function RecordReviewLeftColumn({
   }, [deletedRecordId])
 
   // Get settings based on page type
+  // NOTE: record_view and record_review intentionally share the same shell.
+  // They differ only by left-column configuration and settings UX.
+  // See docs/architecture/PAGE_TYPE_CONSOLIDATION.md
   const isRecordView = pageType === 'record_view'
   const isRecordReview = pageType === 'record_review'
-  
+
   // For record_review: full field list configuration
   const visibleFieldIds = isRecordReview ? (leftPanelSettings?.visibleFieldIds || []) : []
   const fieldOrder = isRecordReview ? (leftPanelSettings?.fieldOrder || []) : []

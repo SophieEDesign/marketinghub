@@ -1066,9 +1066,9 @@ function InterfacePageClientInternal({
   const isViewer = searchParams?.get("view") === "true"
   const isRecordView = page?.page_type === 'record_view'
   const isRecordReview = page?.page_type === 'record_review'
-  
-  // Both record_view and record_review use the RecordReviewPage layout
-  // record_view is legacy, record_review is the new corrected model
+  // NOTE: record_view and record_review intentionally share the same shell.
+  // They differ only by left-column configuration and settings UX.
+  // See docs/architecture/PAGE_TYPE_CONSOLIDATION.md
   const useRecordReviewLayout = isRecordReview || isRecordView
   
   // Check if page has a valid anchor

@@ -102,7 +102,10 @@ export default async function PagePage({
   // CRITICAL: Only redirect if page doesn't exist or is not accessible
   // DO NOT redirect on render errors (missing blocks, data errors, etc.)
   // Those should be shown on the page itself
-  // Hide RecordPanel for record_review pages since they have their own record detail panel
+  // NOTE: record_view and record_review intentionally share the same shell.
+  // They differ only by left-column configuration and settings UX.
+  // See docs/architecture/PAGE_TYPE_CONSOLIDATION.md
+  // Hide RecordPanel for record-centric pages since they have their own record detail panel
   const hideRecordPanel = page ? isRecordReviewPage(page.page_type as any) : false
   
   if (isDev && page) {

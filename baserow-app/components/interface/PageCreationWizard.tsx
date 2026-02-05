@@ -736,9 +736,12 @@ export default function PageCreationWizard({
   )
 
   const renderAnchorStep = () => {
+    // NOTE: record_view and record_review intentionally share the same shell.
+    // They differ only by left-column configuration and settings UX.
+    // See docs/architecture/PAGE_TYPE_CONSOLIDATION.md
     const isRecordPage = pageType ? isRecordViewPage(pageType as PageType) : false
 
-    // Record View pages: Show table selection with filter/sort/group options
+    // Record-centric pages: Show table selection with filter/sort/group options
     if (isRecordPage) {
       return (
         <div className="space-y-4">

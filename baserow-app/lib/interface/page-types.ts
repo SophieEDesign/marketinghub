@@ -83,7 +83,9 @@ export function validatePageConfig(
 /**
  * Check if a page type is a record view page (record-based)
  * Record view pages inject recordId context into blocks
- * Supports both record_view (legacy) and record_review (new) types
+ * NOTE: record_view and record_review intentionally share the same shell.
+ * They differ only by left-column configuration and settings UX.
+ * See docs/architecture/PAGE_TYPE_CONSOLIDATION.md
  */
 export function isRecordViewPage(pageType: PageType): boolean {
   return pageType === 'record_view' || pageType === 'record_review'
@@ -91,7 +93,9 @@ export function isRecordViewPage(pageType: PageType): boolean {
 
 /**
  * Check if a page type is a record review page (fixed left column + right canvas)
- * Both record_view and record_review use the same layout
+ * NOTE: record_view and record_review intentionally share the same shell.
+ * They differ only by left-column configuration and settings UX.
+ * See docs/architecture/PAGE_TYPE_CONSOLIDATION.md
  */
 export function isRecordReviewPage(pageType: PageType): boolean {
   return pageType === 'record_review' || pageType === 'record_view'

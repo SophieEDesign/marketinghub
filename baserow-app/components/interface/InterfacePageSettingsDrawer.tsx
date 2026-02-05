@@ -516,6 +516,7 @@ export default function InterfacePageSettingsDrawer({
               </div>
             </div>
 
+            {/* NOTE: record_view and record_review share the same shell; differ by left-column config and settings UX. See docs/architecture/PAGE_TYPE_CONSOLIDATION.md */}
             {/* Record Review Left Panel Settings (full field list) */}
             {pageType === 'record_review' && baseTable && leftPanelSettings !== null && (
               <div className="pt-4 border-t space-y-4">
