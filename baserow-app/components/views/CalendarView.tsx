@@ -32,6 +32,10 @@ import { resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
 import { normalizeUuid } from "@/lib/utils/ids"
 import type { HighlightRule } from "@/lib/interface/types"
 import { evaluateHighlightRules, getFormattingStyle } from "@/lib/conditional-formatting/evaluator"
+<<<<<<< HEAD
+=======
+import { POSTGREST_DEFAULT_MAX_ROWS } from "@/lib/postgrest-defaults"
+>>>>>>> 4828eb91e3 (Remove duplicate import of POSTGREST_DEFAULT_MAX_ROWS in CalendarView component)
 
 interface CalendarViewProps {
   tableId: string
