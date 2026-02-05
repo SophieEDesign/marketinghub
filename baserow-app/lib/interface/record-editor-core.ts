@@ -38,7 +38,7 @@ export interface RecordEditorCoreResult {
   deleting: boolean
   isCreateMode: boolean
   save: () => Promise<void>
-  deleteRecord: (options?: { confirmMessage?: string }) => Promise<void>
+  deleteRecord: (options?: { confirmMessage?: string; skipConfirm?: boolean }) => Promise<void>
   handleFieldChange: (fieldName: string, value: any) => void
   /** Normalize value for link_to_table before save/update (shared with grid modal behaviour) */
   normalizeUpdateValue: (fieldName: string, value: any) => any

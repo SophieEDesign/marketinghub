@@ -10,6 +10,8 @@ import RecordHeader from "./RecordHeader"
 import RecordFields from "./RecordFields"
 import RecordActivity from "./RecordActivity"
 import type { TableField } from "@/types/fields"
+import { useRecordEditorCore } from "@/lib/interface/record-editor-core"
+import { isAbortError } from "@/lib/api/error-handling"
 
 const MIN_WIDTH = 320
 const MAX_WIDTH = 1200
@@ -19,39 +21,54 @@ export default function RecordPanel() {
   const { state, closeRecord, setWidth, togglePin, toggleFullscreen, goBack, navigateToLinkedRecord } = useRecordPanel()
   const { toast } = useToast()
   const router = useRouter()
-  const [record, setRecord] = useState<Record<string, any> | null>(null)
   const [fields, setFields] = useState<TableField[]>([])
-  const [recordLoading, setRecordLoading] = useState(false)
   const [fieldsLoading, setFieldsLoading] = useState(false)
-  const [recordLoaded, setRecordLoaded] = useState(false)
   const [fieldsLoaded, setFieldsLoaded] = useState(false)
-  const [formData, setFormData] = useState<Record<string, any>>({})
   const [fieldGroups, setFieldGroups] = useState<Record<string, string[]>>({}) // fieldName -> groupName
   const resizeRef = useRef<HTMLDivElement>(null)
   const isResizingRef = useRef(false)
   const resizeCleanupRef = useRef<null | (() => void)>(null)
 
+  const active = Boolean(state.isOpen && state.tableId && state.recordId)
+  const core = useRecordEditorCore({
+    tableId: state.tableId ?? "",
+    recordId: state.recordId,
+    supabaseTableName: state.tableName ?? undefined,
+    modalFields: state.modalFields ?? [],
+    active,
+    onDeleted: () => {
+      toast({
+        title: "Record deleted",
+        description: "The record has been removed.",
+      })
+      closeRecord()
+    },
+  })
+
+  const { loading: recordLoading, formData, setFormData, deleteRecord } = core
+
   useEffect(() => {
     if (state.isOpen && state.tableId && state.recordId) {
-      setRecordLoaded(false)
       setFieldsLoaded(false)
-      loadRecord()
       loadFields()
       loadFieldGroups()
     } else {
-      setRecord(null)
-      setFormData({})
       setFields([])
-      setRecordLoaded(false)
       setFieldsLoaded(false)
     }
   }, [state.isOpen, state.tableId, state.recordId, state.modalFields])
 
+  // When core finished loading but formData is empty (e.g. 404), treat as record not found
   useEffect(() => {
-    if (record) {
-      setFormData({ ...record })
+    if (active && state.recordId && !recordLoading && Object.keys(formData).length === 0) {
+      toast({
+        title: "Record not found",
+        description: "This record may have been deleted.",
+        variant: "destructive",
+      })
+      closeRecord()
     }
-  }, [record])
+  }, [active, state.recordId, recordLoading, formData, closeRecord, toast])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -81,11 +98,8 @@ export default function RecordPanel() {
     }
   }, [])
 
-  async function loadRecord() {
-    if (!state.tableId || !state.recordId || !state.tableName) return
-
-    setRecordLoading(true)
-    setRecordLoaded(false)
+  const refetchRecord = useCallback(async () => {
+    if (!state.recordId || !state.tableName) return
     try {
       const supabase = createClient()
       const { data, error } = await supabase
@@ -93,34 +107,11 @@ export default function RecordPanel() {
         .select("*")
         .eq("id", state.recordId)
         .single()
-
-      if (error) {
-        if (error.code === "PGRST116") {
-          // Record not found
-        toast({
-          title: "Record not found",
-          description: "This record may have been deleted.",
-          variant: "destructive",
-        })
-          closeRecord()
-        } else {
-          throw error
-        }
-      } else {
-        setRecord(data)
-      }
-    } catch (error: any) {
-      console.error("Error loading record:", error)
-      toast({
-        title: "Failed to load record",
-        description: error.message || "Please try again",
-        variant: "destructive",
-      })
-    } finally {
-      setRecordLoading(false)
-      setRecordLoaded(true)
+      if (!error && data) setFormData(data)
+    } catch (e) {
+      if (!isAbortError(e)) console.error("Error refetching record:", e)
     }
-  }
+  }, [state.recordId, state.tableName, setFormData])
 
   async function loadFields() {
     if (!state.tableId) return
@@ -189,7 +180,6 @@ export default function RecordPanel() {
 
     // Optimistic local update
     setFormData((prev) => ({ ...prev, [fieldName]: value }))
-    setRecord((prev) => (prev ? { ...prev, [fieldName]: value } : prev))
 
     try {
       const supabase = createClient()
@@ -206,44 +196,27 @@ export default function RecordPanel() {
         description: error.message || "Please try again",
         variant: "destructive",
       })
-      // Revert by reloading record from server
-      loadRecord()
+      await refetchRecord()
     }
-  }, [state.recordId, state.tableName, toast])
+  }, [state.recordId, state.tableName, toast, setFormData, refetchRecord])
 
   const handleDelete = useCallback(async () => {
     if (!state.recordId || !state.tableName) return
-
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this record? This action cannot be undone."
-    )
-    if (!confirmed) return
-
     try {
-      const supabase = createClient()
-      const { error } = await supabase
-        .from(state.tableName)
-        .delete()
-        .eq("id", state.recordId)
-
-      if (error) {
-        throw error
-      }
-
-      toast({
-        title: "Record deleted",
-        description: "The record has been removed.",
+      await deleteRecord({
+        confirmMessage: "Are you sure you want to delete this record? This action cannot be undone.",
       })
-      closeRecord()
     } catch (error: any) {
-      console.error("Error deleting record:", error)
-      toast({
-        title: "Failed to delete record",
-        description: error.message || "Please try again",
-        variant: "destructive",
-      })
+      if (!isAbortError(error)) {
+        console.error("Error deleting record:", error)
+        toast({
+          title: "Failed to delete record",
+          description: error.message || "Please try again",
+          variant: "destructive",
+        })
+      }
     }
-  }, [state.recordId, state.tableName, closeRecord, toast])
+  }, [state.recordId, state.tableName, deleteRecord, toast])
 
   const handleCopyLink = useCallback(() => {
     const url = `${window.location.origin}/tables/${state.tableId}/records/${state.recordId}`
@@ -255,11 +228,11 @@ export default function RecordPanel() {
   }, [state.tableId, state.recordId, toast])
 
   const handleDuplicate = useCallback(async () => {
-    if (!state.tableName || !record) return
+    if (!state.tableName || !formData || Object.keys(formData).length === 0) return
 
     try {
       const supabase = createClient()
-      const { id, created_at, updated_at, ...recordData } = record
+      const { id, created_at, updated_at, ...recordData } = formData
       const { data, error } = await supabase
         .from(state.tableName)
         .insert([recordData])
@@ -287,7 +260,7 @@ export default function RecordPanel() {
         variant: "destructive",
       })
     }
-  }, [state.tableName, record, state.tableId])
+  }, [state.tableName, formData, state.tableId, navigateToLinkedRecord, toast])
 
   // Handle back button - go back to the view we came from (core data, interface, etc.)
   const handleBack = useCallback(() => {
@@ -302,7 +275,8 @@ export default function RecordPanel() {
 
   if (!state.isOpen) return null
 
-  const headerLoading = !recordLoaded || !fieldsLoaded || recordLoading || fieldsLoading
+  const headerLoading = recordLoading || !fieldsLoaded || fieldsLoading
+  const hasRecord = formData && Object.keys(formData).length > 0
 
   const panelWidth = state.isFullscreen ? "100%" : `${state.width}px`
   // Show back button if in fullscreen (to go to core data) or if there's history
@@ -369,7 +343,7 @@ export default function RecordPanel() {
 
         {/* Header */}
         <RecordHeader
-          record={record}
+          record={hasRecord ? formData : null}
           tableName={state.tableName || ""}
           fields={fields}
           formData={formData}
@@ -453,7 +427,7 @@ export default function RecordPanel() {
                 <div className="h-10 w-full bg-gray-200 rounded animate-pulse" />
               </div>
             </div>
-          ) : !record ? (
+          ) : !hasRecord ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
                 <p className="text-sm text-gray-500 mb-2">Record not found</p>
@@ -475,7 +449,7 @@ export default function RecordPanel() {
 
               {/* Activity Section */}
               <RecordActivity
-                record={record}
+                record={formData}
                 tableId={state.tableId || ""}
               />
             </div>
