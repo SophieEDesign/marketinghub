@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { format } from "date-fns"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import TimelineEventCard from "./TimelineEventCard"
 import { Plus, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from "lucide-react"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
 import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
@@ -12,7 +12,6 @@ import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { TableRow } from "@/types/database"
 import type { LinkedField, TableField } from "@/types/fields"
 import { isAbortError } from "@/lib/api/error-handling"
-import TimelineFieldValue from "./TimelineFieldValue"
 import {
   resolveChoiceColor,
   normalizeHexColor,
@@ -1629,92 +1628,28 @@ export default function TimelineView({
                     >
                       {groupEvents.map((event, eventIndex) => {
                         const { left, width } = getEventPosition(event)
-                        const isDragging = draggingEvent === event.id
-                        const isResizing = resizingEvent?.id === event.id
-                        
                         return (
-                          <div
+                          <TimelineEventCard
                             key={event.id}
-                            className="absolute group"
-                            style={{
-                              left: `${left}px`,
-                              width: `${width}px`,
-                              top: `${eventIndex * laneLayout.stackGapPx}px`,
-                            }}
-                          >
-                            <Card
-                              className={`${rowSizeSpacing.cardHeight} shadow-sm transition-all ${
-                                event.color ? `border-l-4` : ""
-                              } ${isDragging || isResizing ? 'opacity-75' : ''} ${
-                                draggingEvent || resizingEvent ? 'cursor-grabbing' : 'cursor-pointer'
-                              }`}
-                              style={{
-                                borderLeftColor: event.color,
-                                backgroundColor: event.color ? `${event.color}15` : "white",
-                                outline: selectedEventId === event.rowId ? '2px solid rgba(96, 165, 250, 0.4)' : 'none',
-                                outlineOffset: selectedEventId === event.rowId ? '2px' : '0',
-                              }}
-                              onMouseDown={(e) => handleDragStart(event, e)}
-                              onClick={(e) => handleEventSelect(event, e)}
-                            >
-                              <CardContent className={`${rowSizeSpacing.cardPadding} h-full flex flex-col relative gap-1`}>
-                                {/* Image if configured */}
-                                {event.image && (
-                                  <div className={`flex-shrink-0 w-6 h-6 rounded overflow-hidden bg-gray-100 ${fitImageSize ? 'object-contain' : 'object-cover'}`}>
-                                    <img
-                                      src={event.image}
-                                      alt=""
-                                      className={`w-full h-full ${fitImageSize ? 'object-contain' : 'object-cover'}`}
-                                      onError={(e) => {
-                                        (e.target as HTMLImageElement).style.display = 'none'
-                                      }}
-                                    />
-                                  </div>
-                                )}
-                                
-                                {/* Resize handle - left */}
-                                <div
-                                  className="absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-blue-300/50 opacity-0 group-hover:opacity-100 transition-opacity z-10 rounded-l"
-                                  onMouseDown={(e) => handleResizeStart(event, 'start', e)}
-                                  style={{ marginLeft: '-3px' }}
-                                  title="Drag to resize start date"
-                                  data-timeline-resize="true"
-                                />
-                                
-                                {/* Title */}
-                                {/* NOTE: Don't use flex-1 here; it can consume all height and hide field values below. */}
-                                <div className={`text-xs font-medium leading-tight ${wrapTitle ? 'break-words' : 'truncate'}`}>
-                                  {event.title}
-                                </div>
-
-                                {/* Card fields */}
-                                {resolvedCardFields.cardFields.length > 0 && (
-                                  <div className="flex flex-wrap gap-1 mt-0.5">
-                                    {resolvedCardFields.cardFields.slice(0, 3).map((field) => {
-                                      const value = event.rowData[field.name]
-                                      return (
-                                        <TimelineFieldValue
-                                          key={field.id}
-                                          field={field}
-                                          value={value}
-                                          valueLabelMap={linkedValueLabelMaps[field.name] || linkedValueLabelMaps[field.id]}
-                                          compact={true}
-                                        />
-                                      )
-                                    })}
-                                  </div>
-                                )}
-                                
-                                {/* Resize handle - right */}
-                                <div
-                                  className="absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-blue-300/50 opacity-0 group-hover:opacity-100 transition-opacity z-10 rounded-r"
-                                  onMouseDown={(e) => handleResizeStart(event, 'end', e)}
-                                  style={{ marginRight: '-3px' }}
-                                  title="Drag to resize end date"
-                                />
-                              </CardContent>
-                            </Card>
-                          </div>
+                            event={event}
+                            left={left}
+                            width={width}
+                            top={eventIndex * laneLayout.stackGapPx}
+                            rowSizeSpacing={rowSizeSpacing}
+                            wrapTitle={wrapTitle}
+                            resolvedCardFields={resolvedCardFields}
+                            linkedValueLabelMaps={linkedValueLabelMaps}
+                            tableFields={tableFields}
+                            highlightRules={highlightRules}
+                            fitImageSize={fitImageSize}
+                            selectedEventId={selectedEventId}
+                            isDragging={draggingEvent === event.id}
+                            isResizing={resizingEvent?.id === event.id}
+                            draggingOrResizingAny={!!(draggingEvent || resizingEvent)}
+                            onDragStart={(e) => handleDragStart(event, e)}
+                            onSelect={(e) => handleEventSelect(event, e)}
+                            onResizeStart={(edge, e) => handleResizeStart(event, edge, e)}
+                          />
                         )
                       })}
                     </div>
@@ -1725,104 +1660,28 @@ export default function TimelineView({
               // Render ungrouped events
               visibleEvents.map((event, index) => {
                 const { left, width } = getEventPosition(event)
-                const isDragging = draggingEvent === event.id
-                const isResizing = resizingEvent?.id === event.id
-                
-                // Evaluate conditional formatting rules for timeline events
-                const matchingRule = highlightRules && highlightRules.length > 0
-                  ? evaluateHighlightRules(highlightRules, event.rowData, tableFields)
-                  : null
-                
-                // Get formatting style for row-level rules
-                const rowFormattingStyle = matchingRule && matchingRule.scope !== 'cell'
-                  ? getFormattingStyle(matchingRule)
-                  : {}
-                
                 return (
-                  <div
+                  <TimelineEventCard
                     key={event.id}
-                    className="absolute group"
-                    style={{
-                      left: `${left}px`,
-                      width: `${width}px`,
-                      top: `${index * laneLayout.stackGapPx}px`,
-                    }}
-                  >
-                    <Card
-                      className={`${rowSizeSpacing.cardHeight} shadow-sm transition-all ${
-                        event.color ? `border-l-4` : ""
-                      } ${isDragging || isResizing ? 'opacity-75' : ''} ${
-                        draggingEvent || resizingEvent ? 'cursor-grabbing' : 'cursor-pointer'
-                      }`}
-                      style={{
-                        borderLeftColor: event.color,
-                        backgroundColor: event.color ? `${event.color}15` : "white",
-                        outline: selectedEventId === event.rowId ? '2px solid rgba(96, 165, 250, 0.4)' : 'none',
-                        outlineOffset: selectedEventId === event.rowId ? '2px' : '0',
-                        ...rowFormattingStyle,
-                      }}
-                      onMouseDown={(e) => handleDragStart(event, e)}
-                      onClick={(e) => handleEventSelect(event, e)}
-                    >
-                      <CardContent className={`${rowSizeSpacing.cardPadding} h-full flex flex-col relative gap-1`}>
-                        {/* Image if configured */}
-                        {event.image && (
-                          <div className={`flex-shrink-0 w-6 h-6 rounded overflow-hidden bg-gray-100 ${fitImageSize ? 'object-contain' : 'object-cover'}`}>
-                            <img
-                              src={event.image}
-                              alt=""
-                              className={`w-full h-full ${fitImageSize ? 'object-contain' : 'object-cover'}`}
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).style.display = 'none'
-                              }}
-                            />
-                          </div>
-                        )}
-                        
-                        {/* Resize handle - left */}
-                        <div
-                          className="absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-blue-300/50 opacity-0 group-hover:opacity-100 transition-opacity z-10 rounded-l"
-                          onMouseDown={(e) => handleResizeStart(event, 'start', e)}
-                          style={{ marginLeft: '-3px' }}
-                          title="Drag to resize start date"
-                          data-timeline-resize="true"
-                        />
-                        
-                        {/* Title */}
-                        {/* NOTE: Don't use flex-1 here; it can consume all height and hide field values below. */}
-                        <div className={`text-xs font-medium leading-tight ${wrapTitle ? 'break-words' : 'truncate'}`}>
-                          {event.title}
-                        </div>
-
-                        {/* Card fields */}
-                        {resolvedCardFields.cardFields.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-0.5">
-                            {resolvedCardFields.cardFields.slice(0, 3).map((field) => {
-                              const value = event.rowData[field.name]
-                              return (
-                                <TimelineFieldValue
-                                  key={field.id}
-                                  field={field}
-                                  value={value}
-                                  valueLabelMap={linkedValueLabelMaps[field.name] || linkedValueLabelMaps[field.id]}
-                                  compact={true}
-                                />
-                              )
-                            })}
-                          </div>
-                        )}
-                        
-                        {/* Resize handle - right */}
-                        <div
-                          className="absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-blue-300/50 opacity-0 group-hover:opacity-100 transition-opacity z-10 rounded-r"
-                          onMouseDown={(e) => handleResizeStart(event, 'end', e)}
-                          style={{ marginRight: '-3px' }}
-                          title="Drag to resize end date"
-                          data-timeline-resize="true"
-                        />
-                      </CardContent>
-                    </Card>
-                  </div>
+                    event={event}
+                    left={left}
+                    width={width}
+                    top={index * laneLayout.stackGapPx}
+                    rowSizeSpacing={rowSizeSpacing}
+                    wrapTitle={wrapTitle}
+                    resolvedCardFields={resolvedCardFields}
+                    linkedValueLabelMaps={linkedValueLabelMaps}
+                    tableFields={tableFields}
+                    highlightRules={highlightRules}
+                    fitImageSize={fitImageSize}
+                    selectedEventId={selectedEventId}
+                    isDragging={draggingEvent === event.id}
+                    isResizing={resizingEvent?.id === event.id}
+                    draggingOrResizingAny={!!(draggingEvent || resizingEvent)}
+                    onDragStart={(e) => handleDragStart(event, e)}
+                    onSelect={(e) => handleEventSelect(event, e)}
+                    onResizeStart={(edge, e) => handleResizeStart(event, edge, e)}
+                  />
                 )
               })
             )}
