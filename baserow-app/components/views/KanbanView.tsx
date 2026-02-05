@@ -13,6 +13,7 @@ import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { CellFactory } from "@/components/grid/CellFactory"
 import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
 import { isAbortError } from "@/lib/api/error-handling"
+import { getOptionValueToLabelMap } from "@/lib/fields/select-options"
 import EmptyState from "@/components/empty-states/EmptyState"
 import type { HighlightRule } from "@/lib/interface/types"
 import { evaluateHighlightRules, getFormattingStyle } from "@/lib/conditional-formatting/evaluator"
@@ -62,12 +63,13 @@ export default function KanbanView({
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
 
-  // IMPORTANT: config may provide field IDs, but row data keys are field NAMES (supabase columns).
+  // IMPORTANT: config may provide field IDs or display names; row data keys are field NAMES (supabase columns).
   const groupingFieldName = useMemo(() => {
     const raw = typeof groupingFieldId === "string" ? groupingFieldId.trim() : ""
     if (!raw) return ""
-    const match = (Array.isArray(tableFields) ? tableFields : []).find(
-      (f: any) => f && (f.name === raw || f.id === raw)
+    const arr = Array.isArray(tableFields) ? tableFields : []
+    const match = arr.find(
+      (f: any) => f && (f.name === raw || f.id === raw || (f.label && String(f.label).trim() === raw))
     )
     return (match?.name as string) || raw
   }, [groupingFieldId, tableFields])
@@ -91,6 +93,22 @@ export default function KanbanView({
     )
     return (match?.name as string) || raw
   }, [imageField, tableFields])
+
+  // Resolve group value (option id or label as stored in DB) to display label for column header.
+  // Uses raw options when present so DB-stored UUIDs map to labels correctly.
+  const groupValueToLabel = useMemo(() => {
+    const arr = Array.isArray(tableFields) ? tableFields : []
+    const field = arr.find(
+      (f: any) => f && (f.name === groupingFieldName || f.id === groupingFieldName)
+    ) as TableField | undefined
+    if (!field || (field.type !== "single_select" && field.type !== "multi_select")) {
+      return new Map<string, string>()
+    }
+    const map = getOptionValueToLabelMap(field.type, field.options)
+    map.set("Uncategorized", "Uncategorized")
+    map.set("—", "—")
+    return map
+  }, [tableFields, groupingFieldName])
 
   // Filter rows by search query
   const filteredRows = useMemo(() => {
@@ -358,10 +376,12 @@ export default function KanbanView({
   return (
     <div className="w-full h-full overflow-x-auto bg-gray-50">
       <div className="flex gap-4 min-w-max p-6">
-        {groups.map((groupName) => (
+        {groups.map((groupName) => {
+          const displayName = groupValueToLabel.get(groupName) ?? groupName
+          return (
           <div key={groupName} className="flex-shrink-0 w-80">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 mb-3">
-              <h3 className="text-sm font-semibold text-gray-900">{groupName}</h3>
+              <h3 className="text-sm font-semibold text-gray-900">{displayName}</h3>
               <p className="text-xs text-gray-500 mt-0.5">{groupedRows[groupName].length} items</p>
             </div>
             <div className="space-y-2">
@@ -480,7 +500,8 @@ export default function KanbanView({
               </Button>
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )

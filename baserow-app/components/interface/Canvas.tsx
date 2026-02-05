@@ -39,6 +39,7 @@ import type { PageBlock, LayoutItem, BlockType } from "@/lib/interface/types"
 import { useFilterState } from "@/lib/interface/filter-state"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import { dbBlockToPageBlock } from "@/lib/interface/layout-mapping"
+import { CANVAS_LAYOUT_DEFAULTS } from "@/lib/interface/canvas-layout-defaults"
 import { debugLog, debugWarn, isDebugEnabled } from "@/lib/interface/debug-flags"
 import { usePageAggregates } from "@/lib/dashboard/usePageAggregates"
 
@@ -94,7 +95,7 @@ export default function Canvas({
   selectedBlockId,
   selectedBlockIds,
   onBlockSelect,
-  layoutSettings = { cols: 12, rowHeight: 30, margin: [10, 10] },
+  layoutSettings = CANVAS_LAYOUT_DEFAULTS,
   primaryTableId,
   layoutTemplate,
   interfaceDescription,
@@ -451,6 +452,20 @@ export default function Canvas({
     
     // Sync when block IDs changed, layout is empty (first load), or positions changed (e.g. move to top/bottom)
     const shouldSync = blockIdsChanged || layoutIsEmpty || blocksLayoutChanged
+    
+    // Skip overwriting layout when we just applied a user change (resize/drag) - prevents pushed-down
+    // or compacted layout from being overwritten by a subsequent sync from blocks with stale positions
+    const syncOnlyFromBlocksChange = shouldSync && !blockIdsChanged && !layoutIsEmpty && blocksLayoutChanged
+    if (syncOnlyFromBlocksChange && layoutVersionRef.current > 0) {
+      layoutVersionRef.current = 0
+      if (process.env.NODE_ENV === 'development') {
+        debugLog('LAYOUT', '[Canvas] Skipping sync - layout came from recent user change (layoutVersionRef)', {
+          pageId,
+          layoutVersion: layoutVersionRef.current,
+        })
+      }
+      return
+    }
     
     if (process.env.NODE_ENV === 'development') {
       debugLog('LAYOUT', '[Canvas] Layout sync check', {
@@ -1531,11 +1546,11 @@ export default function Canvas({
   // CRITICAL: This is a CONSTANT - never depends on props that could differ between edit/public
   // CRITICAL: This hook MUST be called before any early returns (React Hooks rules)
   const GRID_CONFIG = useMemo(() => {
-    // Use layoutSettings if provided, otherwise use defaults
+    // Use layoutSettings if provided, otherwise use shared defaults
     // CRITICAL: These defaults must be the same in edit and public view
-    const cols = layoutSettings?.cols || 12
-    const rowHeight = layoutSettings?.rowHeight || 30
-    const margin = layoutSettings?.margin || [10, 10]
+    const cols = layoutSettings?.cols ?? CANVAS_LAYOUT_DEFAULTS.cols
+    const rowHeight = layoutSettings?.rowHeight ?? CANVAS_LAYOUT_DEFAULTS.rowHeight
+    const margin = layoutSettings?.margin ?? CANVAS_LAYOUT_DEFAULTS.margin
     
     return {
       cols: { lg: cols, md: 10, sm: 6, xs: 4, xxs: 2 },
@@ -1953,9 +1968,13 @@ export default function Canvas({
                 if (process.env.NODE_ENV === 'development') {
                   console.log('[Canvas] Pushed blocks down after resize grow', { blockId, newHeight })
                 }
+              } else if (newHeight < previousHeight) {
+                // Block shrunk - compact vertically to close gaps (stacks close gaps)
+                finalLayout = compactLayoutVertically(finalLayout, blocks)
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('[Canvas] Compacted layout after resize shrink', { blockId, newHeight })
+                }
               }
-              // When block shrinks, keep blocks below in their current position (don't move them up)
-              // This allows gaps to remain, giving user control over spacing
               
               // Persist final layout (user resize always persists)
               applyUserLayoutChange(finalLayout)

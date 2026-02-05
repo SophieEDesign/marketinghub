@@ -148,6 +148,35 @@ export function applyAlphabetiseMode(labels: string[], mode: SelectAlphabetiseMo
   return [...labels].sort((a, b) => dir * String(a).localeCompare(String(b), undefined, { sensitivity: 'base' }))
 }
 
+/**
+ * Build a map from stored value (option id, value, or label) to display label.
+ * Prefers raw selectOptions/select_options so real UUIDs from the DB are preserved.
+ * Use this for kanban column headers and anywhere we need to show a label from a stored id/value.
+ */
+export function getOptionValueToLabelMap(
+  fieldType: 'single_select' | 'multi_select',
+  fieldOptions?: FieldOptions | null
+): Map<string, string> {
+  const map = new Map<string, string>()
+  const raw = getSelectOptionsRaw(fieldOptions)
+  if (raw.length > 0) {
+    for (const o of raw) {
+      const anyO = o as any
+      const id = String(anyO?.id ?? anyO?.value ?? '').trim()
+      const label = String(anyO?.label ?? anyO?.value ?? '').trim()
+      if (id) map.set(id, label || id)
+      if (label && id !== label) map.set(label, label)
+    }
+    return map
+  }
+  const { selectOptions } = normalizeSelectOptionsForUi(fieldType, fieldOptions)
+  for (const o of selectOptions) {
+    map.set(o.id, o.label)
+    if (o.id !== o.label) map.set(o.label, o.label)
+  }
+  return map
+}
+
 export function getSelectOptionColorMap(fieldOptions?: FieldOptions | null): Record<string, string> {
   const opts: FieldOptions = fieldOptions || {}
   const { selectOptions } = normalizeSelectOptionsForUi('single_select', opts as any) // type irrelevant for colors
