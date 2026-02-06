@@ -29,6 +29,16 @@ export interface BlockDefinition {
    * Used to prevent invalid configurations.
    */
   excludedSettings?: string[]
+  /**
+   * Block can be the single full-page block on a content page.
+   * When true, user can set "Full-page mode" and page renders without grid.
+   */
+  supportsFullPage?: boolean
+  /**
+   * When adding this block type (e.g. on empty page), suggest full-page by default.
+   * Only applies when supportsFullPage is true.
+   */
+  defaultFullPage?: boolean
 }
 
 export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
@@ -44,6 +54,8 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       title: 'Table View',
       table_id: '',
     },
+    supportsFullPage: true,
+    defaultFullPage: false,
   },
   form: {
     type: 'form',
@@ -288,6 +300,8 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       table_id: '',
       view_type: 'calendar',
     },
+    supportsFullPage: true,
+    defaultFullPage: false,
   },
   multi_calendar: {
     type: 'multi_calendar',
@@ -315,6 +329,8 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       table_id: '',
       view_type: 'kanban',
     },
+    supportsFullPage: true,
+    defaultFullPage: false,
   },
   timeline: {
     type: 'timeline',
@@ -329,6 +345,8 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       table_id: '',
       view_type: 'timeline',
     },
+    supportsFullPage: true,
+    defaultFullPage: false,
   },
   multi_timeline: {
     type: 'multi_timeline',
@@ -356,6 +374,8 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       table_id: '',
       view_type: 'list', // List view type
     },
+    supportsFullPage: true,
+    defaultFullPage: false,
     applicableSettings: {
       fields: true,
       filters: true,
@@ -411,6 +431,8 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       allowClear: true,
       selectionMode: 'single',
     },
+    supportsFullPage: true,
+    defaultFullPage: true,
   },
 }
 

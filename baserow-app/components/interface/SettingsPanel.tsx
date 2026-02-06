@@ -15,6 +15,7 @@ import {
   markUserInteraction,
 } from "@/lib/interface/editor-safety"
 import AdvancedSettings from "./settings/AdvancedSettings"
+import FullPageLayoutSettings from "./settings/FullPageLayoutSettings"
 import { BLOCK_REGISTRY } from "@/lib/interface/registry"
 import {
   renderBlockAppearanceSettings,
@@ -441,6 +442,13 @@ export default function SettingsPanel({
           
           <TabsContent value="data" className="mt-0 space-y-6">
             {renderDataSettings()}
+            {block && BLOCK_REGISTRY[block.type]?.supportsFullPage && (
+              <FullPageLayoutSettings
+                block={block}
+                allBlocks={allBlocks}
+                onUpdate={updateConfig}
+              />
+            )}
           </TabsContent>
 
           <TabsContent value="appearance" className="mt-0 space-y-6">

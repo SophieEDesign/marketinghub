@@ -49,6 +49,8 @@ export type ViewType = 'grid' | 'kanban' | 'calendar' | 'gallery' | 'timeline' |
 
 /** Canonical config for blocks. See docs/architecture/BLOCK_SYSTEM_CANONICAL.md */
 export interface BlockConfig {
+  /** When true, this block is the single full-page block (content page only). Stored in config; no DB column. */
+  is_full_page?: boolean
   title?: string
   table_id?: string
   view_id?: string

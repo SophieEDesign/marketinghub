@@ -80,6 +80,8 @@ interface CanvasProps {
   editableFieldNames?: string[] // Field-level editable list (for field blocks)
   pageShowFieldNames?: boolean // Page-level: show field names on field blocks (default true)
   editingBlockCanvasId?: string | null // ID of block whose canvas is being edited
+  /** When set and this is the only block, canvas uses full-page layout (no grid, no drag/resize). Read-only for layout: do not call onLayoutChange. */
+  fullPageBlockId?: string | null
 }
 
 export default function Canvas({
@@ -113,6 +115,7 @@ export default function Canvas({
   editableFieldNames = [],
   pageShowFieldNames = true,
   editingBlockCanvasId = null,
+  fullPageBlockId = null,
 }: CanvasProps) {
   // Get filters from filter blocks for this block
   const { getFiltersForBlock, getFilterTreeForBlock } = useFilterState()
@@ -1678,6 +1681,13 @@ export default function Canvas({
     }
   }, [shouldLogLayout, layout, blocks.length, pageId, isEditing])
 
+  // Full-page mode: exactly one block with is_full_page, no grid, no drag/resize.
+  // Read-only guard: we do NOT call onLayoutChange or attach any layout-mutating handlers.
+  const isFullPageMode = Boolean(
+    fullPageBlockId && blocks.length === 1 && blocks[0].id === fullPageBlockId
+  )
+  const fullPageBlock = isFullPageMode ? blocks[0] : null
+
   return (
     <ErrorBoundary>
       {/* CRITICAL: Canvas wrapper must have min-width: 0 to prevent flex collapse */}
@@ -1686,6 +1696,109 @@ export default function Canvas({
       {/* No cached heights, no min-height persistence, no delayed updates */}
       {/* Add padding-bottom to ensure bottom blocks aren't cut off by taskbar */}
       <div ref={containerRef} className="w-full h-full min-w-0 relative" style={{ paddingBottom: isEditing ? '80px' : '80px' }}>
+        {isFullPageMode && fullPageBlock ? (
+          /* Full-page container: no grid, no drag/resize. Do not call onLayoutChange. */
+          <div className="absolute inset-0 flex flex-col min-h-0">
+            <div
+              className={`flex-1 min-h-0 flex flex-col relative ${
+                isEditing
+                  ? `group bg-white border-2 border-dashed border-gray-200 rounded-lg ${
+                      selectedBlockId === fullPageBlock.id ? "ring-2 ring-blue-500 border-blue-500" : ""
+                    }`
+                  : "bg-transparent border-0"
+              }`}
+              onClick={(e) => {
+                if (isEditing) {
+                  const target = e.target as HTMLElement
+                  const isEditorContent = target.closest(".ql-editor") || target.closest("textarea") || target.closest("input") ||
+                    target.closest('[contenteditable="true"]') || target.closest("button") || target.closest(".ql-toolbar") ||
+                    target.closest('[role="textbox"]') || target.closest(".ql-container") || target.closest(".ql-snow")
+                  if (!isEditorContent && onBlockSelect) onBlockSelect(fullPageBlock.id, false)
+                  else if (!isEditorContent) onBlockClick?.(fullPageBlock.id)
+                }
+              }}
+            >
+              {isEditing && (
+                <div className={`absolute top-2 right-2 z-20 flex items-center gap-1.5 ${selectedBlockId === fullPageBlock.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onBlockClick?.(fullPageBlock.id)
+                      onBlockSettingsClick?.(fullPageBlock.id)
+                    }}
+                    className="p-1.5 rounded-md shadow-sm bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"
+                    title="Configure block"
+                    aria-label="Configure block"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </button>
+                  {onBlockDuplicate && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onBlockDuplicate(fullPageBlock.id) }}
+                      className="p-1.5 rounded-md shadow-sm bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"
+                      title="Duplicate block"
+                      aria-label="Duplicate block"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    </button>
+                  )}
+                  {onBlockDelete && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onBlockDelete(fullPageBlock.id) }}
+                      className="p-1.5 rounded-md shadow-sm bg-white text-red-600 border border-red-300 hover:bg-red-50"
+                      title="Delete block"
+                      aria-label="Delete block"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              )}
+              <div className="flex-1 min-h-0 w-full h-full overflow-auto rounded-lg">
+                <BlockAppearanceWrapper block={fullPageBlock} className={isEditing ? "pointer-events-auto" : ""}>
+                  <div className="h-full w-full">
+                    <BlockRenderer
+                      block={fullPageBlock}
+                      isEditing={isEditing && !fullPageBlock.config?.locked}
+                      onUpdate={onBlockUpdate}
+                      isLocked={fullPageBlock.config?.locked || false}
+                      pageTableId={pageTableId}
+                      pageId={pageId}
+                      recordId={recordId}
+                      recordTableId={recordTableId}
+                      mode={mode}
+                      filters={getFiltersForBlock(fullPageBlock.id)}
+                      filterTree={getFilterTreeForBlock(fullPageBlock.id) as FilterTree}
+                      onRecordClick={onRecordClick}
+                      onRecordContextChange={onRecordContextChange}
+                      aggregateData={aggregateData[fullPageBlock.id]}
+                      pageShowAddRecord={pageShowAddRecord}
+                      pageEditable={pageEditable}
+                      editableFieldNames={editableFieldNames}
+                      pageShowFieldNames={pageShowFieldNames}
+                      hideEditButton={topTwoFieldBlockIds.has(fullPageBlock.id)}
+                      allBlocks={blocks}
+                      onEphemeralHeightDelta={() => {}}
+                      rowHeight={Number(layoutSettings?.rowHeight) || 30}
+                      isEditingCanvas={editingBlockCanvasId === fullPageBlock.id}
+                    />
+                  </div>
+                </BlockAppearanceWrapper>
+              </div>
+            </div>
+          </div>
+        ) : (
+        <>
         {/* Grid overlay */}
         {isEditing && showGridOverlay && containerRef.current && (() => {
           const cols = layoutSettings?.cols || 12
@@ -2475,6 +2588,8 @@ export default function Canvas({
             )
           })}
         </ResponsiveGridLayout>
+        </>
+        )}
       </div>
     </ErrorBoundary>
   )

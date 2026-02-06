@@ -106,6 +106,9 @@ export default function InterfaceBuilder({
   const hasInitializedRef = useRef<boolean>(false)
   const prevPageIdRef = useRef<string>(page.id)
   
+  // Ref: have we resolved multiple full-page blocks for this page (invariant: at most one is_full_page)
+  const resolvedFullPageRef = useRef<string | null>(null)
+
   // Reset initialization flag and hydration state ONLY when pageId changes (navigation to different page)
   useEffect(() => {
     if (prevPageIdRef.current !== page.id) {
@@ -114,6 +117,7 @@ export default function InterfaceBuilder({
       latestLayoutRef.current = null // Reset layout ref on page change
       lastSavedLayoutRef.current = null // Reset saved layout hash on page change
       setHasHydrated(false) // Reset hydration lock on page change
+      resolvedFullPageRef.current = null // Allow full-page resolution to run for new page
     }
   }, [page.id])
   
@@ -817,7 +821,18 @@ export default function InterfaceBuilder({
   const handleAddBlock = useCallback(
     async (type: BlockType) => {
       const def = BLOCK_REGISTRY[type]
-      
+
+      // If page already has a full-page block, prevent adding a second block
+      const currentFullPageBlock = blocks.find((b) => b.config?.is_full_page === true)
+      if (currentFullPageBlock && blocks.length >= 1) {
+        toast({
+          variant: "default",
+          title: "Full-page mode is on",
+          description: "Turn off full-page mode for the current block in block settings to add more blocks.",
+        })
+        return
+      }
+
       // Prefer position in current viewport so user doesn't have to scroll to find the new block
       const rowHeight = page.settings?.layout?.rowHeight ?? 30
       const marginY = (page.settings?.layout?.margin && Array.isArray(page.settings.layout.margin))
@@ -826,14 +841,15 @@ export default function InterfaceBuilder({
       const rowPx = rowHeight + marginY
       const scrollTop = canvasScrollContainerRef.current?.scrollTop ?? 0
       const preferredY = rowPx > 0 ? scrollTop / rowPx : undefined
-      
+
       const position = findNextAvailablePosition(def.defaultWidth, def.defaultHeight, blocks, preferredY)
+      const wasEmpty = blocks.length === 0
 
       try {
         // Use createBlockWithDefaults to get proper defaults
         const { createBlockWithDefaults } = await import('@/lib/core-data/block-defaults')
         const defaultConfig = createBlockWithDefaults(type)
-        
+
         const response = await fetch(`/api/pages/${page.id}/blocks`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -861,6 +877,18 @@ export default function InterfaceBuilder({
 
         setBlocks((prev) => [...prev, block])
         setSelectedBlockId(block.id)
+
+        // When adding the first block and type supports full-page, prompt to use as full-page view
+        if (wasEmpty && def.supportsFullPage) {
+          const defaultYes = def.defaultFullPage === true
+          const message = defaultYes
+            ? "Use this block as a full-page view? (You can change this in block settings.)"
+            : "Use this block as a full-page view?"
+          const useFullPage = window.confirm(message)
+          if (useFullPage) {
+            await handleBlockUpdate(block.id, { ...(block.config || {}), is_full_page: true })
+          }
+        }
       } catch (error: any) {
         console.error("Failed to create block:", error)
         toast({
@@ -870,7 +898,7 @@ export default function InterfaceBuilder({
         })
       }
     },
-    [page.id, page.settings, blocks, toast, findNextAvailablePosition]
+    [page.id, page.settings, blocks, toast, findNextAvailablePosition, handleBlockUpdate]
   )
 
   const handleDeleteBlock = useCallback(
@@ -1163,6 +1191,37 @@ export default function InterfaceBuilder({
       }
     }
   }, [undoRedoLayoutState, saveLayout])
+
+  // Full-page invariant: at most one block may have config.is_full_page === true.
+  // If multiple do (e.g. legacy data or bug), resolve to the most recently edited and clear the others.
+  useEffect(() => {
+    const fullPageBlocks = blocks.filter((b) => b.config?.is_full_page === true)
+    if (fullPageBlocks.length <= 1) return
+    if (resolvedFullPageRef.current === page.id) return
+    resolvedFullPageRef.current = page.id
+    const sorted = [...fullPageBlocks].sort((a, b) => {
+      const aAt = a.updated_at || a.created_at || ''
+      const bAt = b.updated_at || b.created_at || ''
+      return bAt.localeCompare(aAt)
+    })
+    const keeper = sorted[0]
+    const others = sorted.slice(1)
+    void (async () => {
+      for (const b of others) {
+        try {
+          await handleBlockUpdate(b.id, { ...(b.config ?? {}), is_full_page: false })
+        } catch (e) {
+          console.error('[InterfaceBuilder] Failed to clear is_full_page on block', b.id, e)
+        }
+      }
+    })()
+  }, [blocks, page.id, handleBlockUpdate])
+
+  // Derive full-page block for canvas: only when exactly one block and it has is_full_page.
+  const fullPageBlockId = useMemo(() => {
+    const fullPageBlock = blocks.find((b) => b.config?.is_full_page === true)
+    return fullPageBlock && blocks.length === 1 ? fullPageBlock.id : null
+  }, [blocks])
   
   // Keyboard shortcuts
   useEffect(() => {
@@ -1433,6 +1492,7 @@ export default function InterfaceBuilder({
               editableFieldNames={editableFieldNames}
               pageShowFieldNames={(page as any).config?.show_field_names !== false}
               editingBlockCanvasId={editingBlockCanvasId}
+              fullPageBlockId={fullPageBlockId}
             />
             )}
           </FilterStateProvider>

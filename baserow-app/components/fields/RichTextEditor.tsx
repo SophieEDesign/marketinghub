@@ -28,6 +28,15 @@ import {
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 
+/** Escape HTML so pasted plain text is inserted safely (no schema stripping). */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
 interface RichTextEditorProps {
   value: string | null
   onChange: (value: string) => void
@@ -53,6 +62,7 @@ export default function RichTextEditor({
   minHeight = '180px',
   showToolbar = true,
 }: RichTextEditorProps) {
+  const editorRef = useRef<ReturnType<typeof useEditor> | null>(null)
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -80,6 +90,20 @@ export default function RichTextEditor({
       attributes: {
         class: 'prose prose-sm max-w-none focus:outline-none px-3 py-2 min-h-[60px]',
         style: `min-height: ${minHeight};`,
+      },
+      // Paste as plain text so full content (e.g. long emails) is preserved; otherwise
+      // TipTap's HTML parser strips email HTML to a few schema-allowed nodes and truncates.
+      handlePaste: (view, event) => {
+        const plain = event.clipboardData?.getData('text/plain')
+        if (plain != null && plain !== '' && editorRef.current) {
+          const html = plain
+            .split(/\r?\n/)
+            .map((line) => `<p>${escapeHtml(line)}</p>`)
+            .join('')
+          editorRef.current.chain().focus().insertContent(html).run()
+          return true
+        }
+        return false
       },
     },
     onUpdate: ({ editor }) => {
@@ -116,6 +140,10 @@ export default function RichTextEditor({
       editor.setEditable(editable)
     }
   }, [editor, editable])
+
+  useEffect(() => {
+    editorRef.current = editor
+  }, [editor])
 
   if (!editor) {
     return (
