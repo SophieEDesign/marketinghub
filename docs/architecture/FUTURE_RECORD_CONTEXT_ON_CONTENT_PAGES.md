@@ -1,6 +1,7 @@
 # Future Capability: Record Context on Content Pages
 
-**Status:** Design only — not implemented
+**Status:** Design only — not implemented.  
+**Role:** Canonical **future design goal** from the Page Type Consolidation decision (record-centric experience achievable via Content page + Record List block + Record context when prioritised).
 
 This document defines a future capability that would allow content pages to hold a shared, ephemeral record context, enabling blocks on a content page to react to a single selected record in the same way they do on record_view and record_review pages.
 

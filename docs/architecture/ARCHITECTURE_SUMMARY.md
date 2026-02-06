@@ -1,5 +1,7 @@
 # Unified Canvas + Blocks Architecture - Simple Summary
 
+**Canonical reference for blocks, storage, and rendering paths:** [BLOCK_AND_PAGE_ARCHITECTURE.md](BLOCK_AND_PAGE_ARCHITECTURE.md)
+
 ## Core Concept
 
 **Three layers: Data → Pages → Blocks**

@@ -1,7 +1,7 @@
 /**
  * Discriminated Union Types for Block Configs
- * Each block type has its own config shape for better type safety
- * 
+ * Canonical config schema extension for block types (see docs/architecture/BLOCK_SYSTEM_CANONICAL.md).
+ * Each block type has its own config shape for better type safety.
  * NOTE: These types extend the base BlockConfig from types.ts to provide
  * type narrowing and validation, while avoiding duplication.
  */
@@ -115,6 +115,12 @@ export type BlockConfigUnion =
   | (ActionBlockConfig & { _type: 'action' })
   | (LinkPreviewBlockConfig & { _type: 'link_preview' })
   | (FilterBlockConfig & { _type: 'filter' })
+
+/** Block types that have typed config in BlockConfigUnion (for drift detection). */
+export const BLOCK_CONFIG_UNION_TYPES = [
+  'grid', 'form', 'record', 'chart', 'kpi', 'text', 'image', 'gallery',
+  'divider', 'button', 'action', 'link_preview', 'filter',
+] as const
 
 /**
  * Type guard functions for runtime validation

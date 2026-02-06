@@ -15,6 +15,12 @@ The schema appears structurally sound with proper foreign key relationships, but
 
 ---
 
+## Deprecated / unused tables
+
+- **`page_blocks`** — Unused. Block storage uses **`view_blocks`** only. No application code reads or writes `page_blocks`. Do not use for new features. See [BLOCK_SYSTEM_CANONICAL.md](architecture/BLOCK_SYSTEM_CANONICAL.md) (Block System: Canonical Definition and Consumer Paths).
+
+---
+
 ## 1. Duplicate/Versioned Tables ⚠️
 
 The schema contains multiple versions of the same logical tables, suggesting migrations or table recreations:

@@ -1,6 +1,6 @@
 # Page Type Consolidation: Record-Centric Pages
 
-**Status:** Canonical architecture / product decision.  
+**Status:** Canonical architecture / product decision. **Decision status: LOCKED.**  
 **Audience:** Engineers, product, and anyone asking “why do we have two page types?”
 
 ---
@@ -16,7 +16,7 @@ They differ only by:
 
 Both are **first-class, supported page types**. They are **not deprecated**.
 
-**Content pages** do not yet support page-level record context. That is a separate consideration.
+**Content pages** do not yet support page-level record context. That is a separate consideration (see [FUTURE_RECORD_CONTEXT_ON_CONTENT_PAGES.md](FUTURE_RECORD_CONTEXT_ON_CONTENT_PAGES.md)). If record page types were ever deprecated, migration options are documented in [RECORD_PAGE_MIGRATION_PATH.md](RECORD_PAGE_MIGRATION_PATH.md).
 
 ---
 
@@ -40,4 +40,4 @@ This doc exists to:
 | **Status** | Both first-class; neither deprecated. |
 | **Content pages** | No page-level record context yet. |
 
-Where code branches on `record_view` vs `record_review`, the intent is configuration and settings behaviour, not a different product or layout concept.
+Where code branches on `record_view` vs `record_review`, the intent is configuration and settings behaviour, not a different product or layout concept. **In short: same shell, different config.**

@@ -1,5 +1,7 @@
 # Unified Canvas + Blocks Architecture - Implementation Summary
 
+**Canonical reference for blocks, storage, and rendering paths:** [BLOCK_AND_PAGE_ARCHITECTURE.md](BLOCK_AND_PAGE_ARCHITECTURE.md)
+
 ## Overview
 
 Successfully implemented the unified Canvas + Blocks architecture that eliminates page-type complexity. All pages now use Canvas as the single rendering and persistence model.

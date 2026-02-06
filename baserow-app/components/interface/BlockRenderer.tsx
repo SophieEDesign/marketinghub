@@ -1,9 +1,13 @@
 "use client"
+/**
+ * Canonical block renderer (PageBlock). For the parallel ViewBlock path see components/blocks/BlockRenderer.tsx (adapter candidate).
+ * See docs/architecture/BLOCK_SYSTEM_CANONICAL.md.
+ */
 
 import type { PageBlock, BlockType, ViewType } from "@/lib/interface/types"
 import { normalizeBlockConfig, isBlockConfigComplete } from "@/lib/interface/block-validator"
 import { assertBlockConfig, shouldShowBlockSetupUI } from "@/lib/interface/assertBlockConfig"
-import { useMemo } from "react"
+import { useMemo, useEffect } from "react"
 import dynamic from "next/dynamic"
 import GridBlock from "./blocks/GridBlock"
 import FormBlock from "./blocks/FormBlock"
@@ -43,9 +47,11 @@ import type { FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import LazyBlockWrapper from "./LazyBlockWrapper"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
+import { runBlockDriftChecks } from "@/lib/interface/block-drift"
 
 // Module-level Set to track warned blocks across all component instances
 const warnedBlocks = new Set<string>()
+let blockDriftChecksRun = false
 
 interface BlockRendererProps {
   block: PageBlock
@@ -95,6 +101,11 @@ export default function BlockRenderer({
   isEditingCanvas = false,
 }: BlockRendererProps) {
   const diagnosticsEnabled = process.env.NODE_ENV === 'development'
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'development' || blockDriftChecksRun) return
+    blockDriftChecksRun = true
+    runBlockDriftChecks()
+  }, [])
 
   // Normalize config to prevent crashes
   const safeConfig = normalizeBlockConfig(block.type, block.config)

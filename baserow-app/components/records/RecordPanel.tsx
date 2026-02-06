@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { X, Pin, PinOff, Maximize2, Minimize2, Copy, Trash2, Copy as CopyIcon, ChevronLeft } from "lucide-react"
+import { X, Pin, PinOff, Maximize2, Minimize2, Copy, Trash2, Copy as CopyIcon, ChevronLeft, Pencil, Check } from "lucide-react"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/components/ui/use-toast"
@@ -12,6 +12,7 @@ import RecordActivity from "./RecordActivity"
 import type { TableField } from "@/types/fields"
 import { useRecordEditorCore } from "@/lib/interface/record-editor-core"
 import { isAbortError } from "@/lib/api/error-handling"
+import { useUserRole } from "@/lib/hooks/useUserRole"
 
 const MIN_WIDTH = 320
 const MAX_WIDTH = 1200
@@ -21,10 +22,12 @@ export default function RecordPanel() {
   const { state, closeRecord, setWidth, togglePin, toggleFullscreen, goBack, navigateToLinkedRecord } = useRecordPanel()
   const { toast } = useToast()
   const router = useRouter()
+  const { role } = useUserRole()
   const [fields, setFields] = useState<TableField[]>([])
   const [fieldsLoading, setFieldsLoading] = useState(false)
   const [fieldsLoaded, setFieldsLoaded] = useState(false)
   const [fieldGroups, setFieldGroups] = useState<Record<string, string[]>>({}) // fieldName -> groupName
+  const [isPanelEditing, setIsPanelEditing] = useState(false)
   const resizeRef = useRef<HTMLDivElement>(null)
   const isResizingRef = useRef(false)
   const resizeCleanupRef = useRef<null | (() => void)>(null)
@@ -51,6 +54,13 @@ export default function RecordPanel() {
   // Only enforce permission flags when cascadeContext was provided (preserve current behaviour when opened from core data)
   const allowEdit = cascadeContext != null ? canEditRecords : true
   const allowDelete = cascadeContext != null ? canDeleteRecords : true
+
+  useEffect(() => {
+    if (!state.isOpen) setIsPanelEditing(false)
+  }, [state.isOpen])
+
+  const canShowEditButton = role === "admin" || allowEdit
+  const effectiveAllowEdit = canShowEditButton && isPanelEditing
 
   // Dev-only guardrail: warn when RecordPanel opens without cascadeContext (surfaces call sites that may want to pass context later)
   const warnedOpenWithoutContextRef = useRef<string | null>(null)
@@ -199,7 +209,7 @@ export default function RecordPanel() {
   }
 
   const handleFieldChange = useCallback(async (fieldName: string, value: any) => {
-    if (!state.recordId || !state.tableName || !allowEdit) return
+    if (!state.recordId || !state.tableName || !effectiveAllowEdit) return
 
     // Optimistic local update
     setFormData((prev) => ({ ...prev, [fieldName]: value }))
@@ -221,7 +231,7 @@ export default function RecordPanel() {
       })
       await refetchRecord()
     }
-  }, [state.recordId, state.tableName, toast, setFormData, refetchRecord, allowEdit])
+  }, [state.recordId, state.tableName, toast, setFormData, refetchRecord, effectiveAllowEdit])
 
   const handleDelete = useCallback(async () => {
     if (!state.recordId || !state.tableName) return
@@ -386,7 +396,7 @@ export default function RecordPanel() {
           saving={false}
           hasChanges={false}
           loading={headerLoading}
-          canEdit={allowEdit}
+          canEdit={effectiveAllowEdit}
           canDelete={allowDelete}
         />
 
@@ -404,6 +414,31 @@ export default function RecordPanel() {
             )}
           </div>
           <div className="flex items-center gap-1">
+            {canShowEditButton && (
+              <button
+                type="button"
+                onClick={() => setIsPanelEditing((v) => !v)}
+                className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-sm font-medium transition-colors ${
+                  isPanelEditing
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                    : "bg-white border border-gray-200 hover:bg-gray-100 text-gray-700"
+                }`}
+                aria-label={isPanelEditing ? "Done editing" : "Edit record"}
+                title={isPanelEditing ? "Done editing" : "Edit record"}
+              >
+                {isPanelEditing ? (
+                  <>
+                    <Check className="h-3.5 w-3.5" />
+                    Done
+                  </>
+                ) : (
+                  <>
+                    <Pencil className="h-3.5 w-3.5" />
+                    Edit
+                  </>
+                )}
+              </button>
+            )}
             <button
               onClick={handleCopyLink}
               className="p-1.5 hover:bg-gray-200 rounded transition-colors"
@@ -478,7 +513,7 @@ export default function RecordPanel() {
                 tableId={state.tableId || ""}
                 recordId={state.recordId || ""}
                 tableName={state.tableName || undefined}
-                isFieldEditable={() => allowEdit}
+                isFieldEditable={() => effectiveAllowEdit}
               />
 
               {/* Activity Section */}

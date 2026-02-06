@@ -59,8 +59,7 @@ type DataRenderer = (ctx: DataSettingsCtx) => ReactNode
 type AppearanceRenderer = (ctx: AppearanceSettingsCtx) => ReactNode
 
 /**
- * Central registry for block settings rendering.
- *
+ * Canonical settings registry for block data and appearance (see docs/architecture/BLOCK_SYSTEM_CANONICAL.md).
  * Goal: keep `SettingsPanel.tsx` thin and stable; adding/updating block settings
  * should only require changes here (plus the settings component itself).
  */
@@ -330,6 +329,10 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
     </>
   ),
 }
+
+/** Exported for block-drift detection (dev-only). Canonical registry keys. */
+export const REGISTERED_DATA_BLOCK_TYPES: BlockType[] = Object.keys(DATA_SETTINGS_RENDERERS) as BlockType[]
+export const REGISTERED_APPEARANCE_BLOCK_TYPES: BlockType[] = Object.keys(APPEARANCE_SETTINGS_RENDERERS) as BlockType[]
 
 export function renderBlockDataSettings(
   blockType: BlockType | undefined,

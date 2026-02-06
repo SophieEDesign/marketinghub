@@ -5,7 +5,9 @@
 
 ## Overview
 
-This migration addresses critical schema integrity issues identified in the schema quick check. It is designed to be run safely in a transaction with rollback capability.
+This migration addresses critical schema integrity issues identified in the schema quick check.
+
+**Note:** The table `page_blocks` is unused; block storage uses `view_blocks` only. See [BLOCK_SYSTEM_CANONICAL.md](architecture/BLOCK_SYSTEM_CANONICAL.md). Do not add new references to `page_blocks`. It is designed to be run safely in a transaction with rollback capability.
 
 ## What This Migration Does
 

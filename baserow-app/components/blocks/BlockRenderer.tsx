@@ -1,4 +1,8 @@
 "use client"
+/**
+ * Parallel ViewBlock path; future adapter candidate. Canonical renderer is components/interface/BlockRenderer.tsx (PageBlock).
+ * See docs/architecture/BLOCK_SYSTEM_CANONICAL.md.
+ */
 
 import { Responsive, WidthProvider } from "react-grid-layout"
 import "react-grid-layout/css/styles.css"
@@ -71,3 +75,8 @@ export default function BlockRenderer({ blocks, onLayoutChange }: BlockRendererP
     </ResponsiveGridLayout>
   )
 }
+
+/** Block types handled by this parallel renderer (for drift detection). See docs/architecture/BLOCK_SYSTEM_CANONICAL.md */
+export const PARALLEL_BLOCK_TYPES = [
+  'text', 'image', 'chart', 'kpi', 'html', 'embed', 'table', 'automation',
+] as const

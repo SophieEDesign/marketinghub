@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo } from 'react'
-import { ArrowLeft, Save, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Save, Trash2, ChevronDown, ChevronRight, Pencil, Check } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -17,6 +17,7 @@ import ModalCanvas from '@/components/interface/ModalCanvas'
 import type { BlockConfig } from '@/lib/interface/types'
 import { sectionAndSortFields } from '@/lib/fields/sectioning'
 import { useRecordEditorCore, type RecordEditorCascadeContext } from '@/lib/interface/record-editor-core'
+import { useUserRole } from '@/lib/hooks/useUserRole'
 
 export interface RecordModalProps {
   open: boolean
@@ -57,6 +58,12 @@ export default function RecordModal({
   cascadeContext,
 }: RecordModalProps) {
   const { toast } = useToast()
+  const { role } = useUserRole()
+  const [isModalEditing, setIsModalEditing] = useState(false)
+
+  useEffect(() => {
+    if (!open) setIsModalEditing(false)
+  }, [open])
 
   const core = useRecordEditorCore({
     tableId,
@@ -94,6 +101,13 @@ export default function RecordModal({
   } = core
 
   const canSave = recordId ? canEditRecords : canCreateRecords
+
+  // View mode: show Edit button and gate editing on isModalEditing. Create mode: always editable when canCreateRecords.
+  const isViewMode = recordId != null
+  const canShowEditButton = isViewMode && (role === 'admin' || canEditRecords)
+  const effectiveEditable = isViewMode
+    ? canShowEditButton && isModalEditing
+    : canCreateRecords
 
   // Load collapsed sections state from localStorage
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
@@ -219,6 +233,29 @@ export default function RecordModal({
             </DialogTitle>
           </div>
           <div className="flex items-center gap-2">
+            {canShowEditButton && (
+              <Button
+                type="button"
+                variant={isModalEditing ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setIsModalEditing((v) => !v)}
+                className="inline-flex items-center gap-1.5"
+                aria-label={isModalEditing ? 'Done editing' : 'Edit record'}
+                title={isModalEditing ? 'Done editing' : 'Edit record'}
+              >
+                {isModalEditing ? (
+                  <>
+                    <Check className="h-4 w-4" />
+                    Done
+                  </>
+                ) : (
+                  <>
+                    <Pencil className="h-4 w-4" />
+                    Edit
+                  </>
+                )}
+              </Button>
+            )}
             <Button
               variant="destructive"
               onClick={handleDelete}
@@ -234,8 +271,8 @@ export default function RecordModal({
             </Button>
             <Button
               onClick={handleSave}
-              disabled={saving || loading || !canSave}
-              title={!canSave ? (recordId ? "You don't have permission to edit this record" : "You don't have permission to create records") : undefined}
+              disabled={saving || loading || !(recordId ? (canSave && effectiveEditable) : canSave)}
+              title={!canSave ? (recordId ? "You don't have permission to edit this record" : "You don't have permission to create records") : recordId && !effectiveEditable ? "Click Edit to make changes" : undefined}
               aria-disabled={saving || loading || !canSave}
             >
               <Save className="mr-2 h-4 w-4" />
@@ -261,7 +298,7 @@ export default function RecordModal({
                     recordId={recordId}
                     tableName={effectiveTableName || ''}
                     tableFields={tableFields}
-                    pageEditable={canEditRecords}
+                    pageEditable={effectiveEditable}
                     editableFieldNames={tableFields.map(f => f.name)}
                     onFieldChange={handleFieldChange}
                     layoutSettings={modalLayout?.layoutSettings}
@@ -302,7 +339,7 @@ export default function RecordModal({
                                 required={field.required || false}
                                 recordId={recordId || undefined}
                                 tableName={effectiveTableName || undefined}
-                                isReadOnly={!canEditRecords}
+                                isReadOnly={!effectiveEditable}
                               />
                             )
                           })}
@@ -324,7 +361,7 @@ export default function RecordModal({
                       required={field.required || false}
                       recordId={recordId || undefined}
                       tableName={effectiveTableName || undefined}
-                      isReadOnly={!canEditRecords}
+                      isReadOnly={!effectiveEditable}
                     />
                   )
                 })

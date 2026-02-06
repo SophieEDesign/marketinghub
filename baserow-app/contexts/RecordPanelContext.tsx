@@ -50,6 +50,9 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
   })
 
   const openRecord = useCallback((tableId: string, recordId: string, tableName: string, modalFields?: string[], modalLayout?: BlockConfig['modal_layout'], cascadeContext?: RecordEditorCascadeContext | null) => {
+    if (process.env.NODE_ENV === 'development' && cascadeContext === undefined) {
+      console.warn('[RecordPanel] Opened without cascadeContext; block-level permissions will not be enforced.')
+    }
     setState((prev) => ({
       ...prev,
       isOpen: true,

@@ -26,6 +26,7 @@ export type BlockType =
 export type ChartType = 'bar' | 'line' | 'pie' | 'area' | 'stacked_bar'
 export type AggregateType = 'count' | 'sum' | 'avg' | 'min' | 'max'
 
+/** Canonical block model for the interface. See docs/architecture/BLOCK_SYSTEM_CANONICAL.md */
 export interface PageBlock {
   id: string
   page_id: string
@@ -42,6 +43,7 @@ export interface PageBlock {
 
 export type ViewType = 'grid' | 'kanban' | 'calendar' | 'gallery' | 'timeline' | 'form' | 'horizontal_grouped' | 'list'
 
+/** Canonical config for blocks. See docs/architecture/BLOCK_SYSTEM_CANONICAL.md */
 export interface BlockConfig {
   title?: string
   table_id?: string

@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { X } from "lucide-react"
+import { useState, useEffect, useMemo } from "react"
+import { X, Pencil, Check } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -16,8 +16,8 @@ import { isAbortError } from "@/lib/api/error-handling"
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
 import ModalCanvas from "@/components/interface/ModalCanvas"
 import type { BlockConfig } from "@/lib/interface/types"
-import { useMemo } from "react"
 import { useRecordEditorCore, type RecordEditorCascadeContext } from "@/lib/interface/record-editor-core"
+import { useUserRole } from "@/lib/hooks/useUserRole"
 
 interface RecordModalProps {
   isOpen: boolean
@@ -44,8 +44,14 @@ export default function RecordModal({
   cascadeContext,
 }: RecordModalProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [isModalEditing, setIsModalEditing] = useState(false)
   const supabase = createClient()
   const { toast } = useToast()
+  const { role } = useUserRole()
+
+  useEffect(() => {
+    if (!isOpen) setIsModalEditing(false)
+  }, [isOpen])
 
   const core = useRecordEditorCore({
     tableId,
@@ -74,8 +80,11 @@ export default function RecordModal({
     canDeleteRecords,
   } = core
 
+  const canShowEditButton = role === "admin" || canEditRecords
+  const effectiveEditable = canShowEditButton && isModalEditing
+
   async function handleFieldChange(fieldName: string, value: any) {
-    if (!record || !tableNameFromCore || !canEditRecords) return
+    if (!record || !tableNameFromCore || !effectiveEditable) return
 
     try {
       const normalizedValue = normalizeUpdateValue(fieldName, value)
@@ -184,6 +193,31 @@ export default function RecordModal({
           <div className="flex items-center justify-between gap-3">
             <DialogTitle>Record Details</DialogTitle>
             <div className="flex items-center gap-2">
+              {canShowEditButton && (
+                <button
+                  type="button"
+                  onClick={() => setIsModalEditing((v) => !v)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    isModalEditing
+                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                      : "bg-muted hover:bg-muted/80 text-muted-foreground"
+                  }`}
+                  aria-label={isModalEditing ? "Done editing" : "Edit record"}
+                  title={isModalEditing ? "Done editing" : "Edit record"}
+                >
+                  {isModalEditing ? (
+                    <>
+                      <Check className="h-4 w-4" />
+                      Done
+                    </>
+                  ) : (
+                    <>
+                      <Pencil className="h-4 w-4" />
+                      Edit
+                    </>
+                  )}
+                </button>
+              )}
               <button
                 onClick={handleDeleteRecord}
                 disabled={deleting || loading || !canDeleteRecords}
@@ -219,7 +253,7 @@ export default function RecordModal({
                     recordId={recordId}
                     tableName={tableNameFromCore || tableName}
                     tableFields={fields}
-                    pageEditable={canEditRecords}
+                    pageEditable={effectiveEditable}
                     editableFieldNames={fields.map(f => f.name)}
                     onFieldChange={handleFieldChange}
                     layoutSettings={modalLayout.layoutSettings}
@@ -234,7 +268,7 @@ export default function RecordModal({
                   tableId={tableId}
                   recordId={recordId}
                   tableName={tableNameFromCore || tableName}
-                  isFieldEditable={() => canEditRecords}
+                  isFieldEditable={() => effectiveEditable}
                 />
               )}
 
