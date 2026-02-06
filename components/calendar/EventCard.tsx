@@ -98,15 +98,16 @@ export default function EventCard({
         {fieldItems.length > 0 && (
           <div
             className={cn(
-              'grid grid-cols-3 gap-x-1.5 gap-y-0.5',
+              'flex flex-wrap items-center gap-x-1.5 gap-y-0.5',
               'text-[10px] leading-tight text-white/95',
-              compact && 'grid-cols-3 gap-x-1 gap-y-0.5 text-[9px]'
+              compact && 'gap-x-1 text-[9px]'
             )}
           >
-            {fieldItems.map(({ fieldName, displayValue }) => (
-              <div key={fieldName} className="min-w-0 truncate">
+            {fieldItems.map(({ fieldName, displayValue }, i) => (
+              <span key={fieldName} className="min-w-0 truncate inline-flex items-center">
+                {i > 0 && <span className="text-white/60 mx-0.5">·</span>}
                 <span className="text-white/80">{fieldName}:</span> <span>{displayValue}</span>
-              </div>
+              </span>
             ))}
           </div>
         )}

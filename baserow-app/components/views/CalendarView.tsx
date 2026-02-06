@@ -1663,22 +1663,25 @@ export default function CalendarView({
                 String(eventInfo.event.title || "Untitled")
               )}
             </div>
-            {cardFields.slice(0, 2).map((f: { field: TableField; value: unknown }, idx: number) => {
-              return (
-              <div key={`${eventInfo.event.id}-cf-${idx}`} className="truncate text-[10px] opacity-90">
-                {f?.field ? (
-                  <TimelineFieldValue
-                    field={f.field as TableField}
-                    value={f.value as FieldValue}
-                    valueLabelMap={stableLinkedValueLabelMaps[f.field.name] || stableLinkedValueLabelMaps[f.field.id]}
-                    compact={true}
-                  />
-                ) : (
-                  String(f?.value || "")
-                )}
+            {cardFields.length > 0 && (
+              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px] opacity-90 min-w-0">
+                {cardFields.slice(0, 2).map((f: { field: TableField; value: unknown }, idx: number) => (
+                  <span key={`${eventInfo.event.id}-cf-${idx}`} className="truncate inline-flex items-center shrink-0 max-w-full">
+                    {idx > 0 && <span className="text-gray-500 mr-1">·</span>}
+                    {f?.field ? (
+                      <TimelineFieldValue
+                        field={f.field as TableField}
+                        value={f.value as FieldValue}
+                        valueLabelMap={stableLinkedValueLabelMaps[f.field.name] || stableLinkedValueLabelMaps[f.field.id]}
+                        compact={true}
+                      />
+                    ) : (
+                      String(f?.value || "")
+                    )}
+                  </span>
+                ))}
               </div>
-            )
-            })}
+            )}
           </div>
         </div>
       </div>

@@ -132,19 +132,21 @@ export default function TimelineEventCard({
           </div>
 
           {resolvedCardFields.cardFields.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-0.5 min-w-0">
-              {resolvedCardFields.cardFields.slice(0, 3).map((field) => {
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 min-w-0">
+              {resolvedCardFields.cardFields.slice(0, 3).map((field, idx) => {
                 const value = event.rowData[field.name]
                 return (
-                  <TimelineFieldValue
-                    key={field.id}
-                    field={field}
-                    value={value}
-                    valueLabelMap={
-                      linkedValueLabelMaps[field.name] || linkedValueLabelMaps[field.id]
-                    }
-                    compact={true}
-                  />
+                  <span key={field.id} className="inline-flex items-center shrink-0">
+                    {idx > 0 && <span className="text-gray-400 mr-0.5 text-[10px]">·</span>}
+                    <TimelineFieldValue
+                      field={field}
+                      value={value}
+                      valueLabelMap={
+                        linkedValueLabelMaps[field.name] || linkedValueLabelMaps[field.id]
+                      }
+                      compact={true}
+                    />
+                  </span>
                 )
               })}
             </div>

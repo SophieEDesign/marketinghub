@@ -59,9 +59,6 @@ interface TextBlockProps {
  */
 export default function TextBlock({ block, isEditing = false, onUpdate }: TextBlockProps) {
   const { config } = block
-  // #region agent log
-  const debugRenderCountRef = useRef(0)
-  // #endregion
   
   // Prevent toolbar interactions from stealing focus/selection from TipTap.
   // Without this, clicks can clear the selection before commands run, making the toolbar feel "broken".
@@ -170,13 +167,10 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   const onUpdateRef = useRef(onUpdate)
   const blockIdRef = useRef(block.id)
   const editorRef = useRef<ReturnType<typeof useEditor> | null>(null)
+  const handleSaveContentRef = useRef<((json: any) => void) | null>(null)
   readOnlyRef.current = readOnly
   onUpdateRef.current = onUpdate
   blockIdRef.current = block.id
-  // #region agent log
-  debugRenderCountRef.current += 1
-  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TextBlock.tsx:render',message:'TextBlock render',data:{blockId:block.id,renderCount:debugRenderCountRef.current},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'F'})}).catch(()=>{});
-  // #endregion
 
   // Track block.id to detect when to rehydrate (only on block ID change)
   const previousBlockIdRef = useRef<string>(block.id)
@@ -249,117 +243,75 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
    * Content is initialized from config.content_json and rehydrated when config changes
    * CRITICAL: Editor must be editable when effectiveIsEditing=true (isEditing=true AND not viewer mode)
    */
-  // Primitive values for editorProps so we can memoize and avoid new object every render
-  const textColorStyle = config?.appearance?.text_color ? `color: ${config.appearance.text_color};` : ''
-  const editorProps = useMemo(
+  // CRITICAL: Stable config so useEditor is only run once (prevents React #185 re-render loop).
+  // All dynamic values are read via refs so the config reference never changes.
+  const editorConfig = useMemo(
     () => ({
-      attributes: {
-        class: 'focus:outline-none w-full h-full min-h-0',
-        'data-placeholder': isEditing ? 'Start typing…' : '',
-        tabindex: isEditing ? '0' : '-1',
-        style: textColorStyle,
+      extensions: TEXT_BLOCK_EXTENSIONS,
+      content: EMPTY_DOC,
+      editable: true,
+      editorProps: {
+        attributes: {
+          class: 'focus:outline-none w-full h-full min-h-0',
+          'data-placeholder': '',
+          tabindex: '-1',
+          style: '',
+        },
+        handleKeyDown: (_view: unknown, event: KeyboardEvent) => {
+          if (!readOnlyRef.current) event.stopPropagation()
+          const ed = editorRef.current
+          if ((event.metaKey || event.ctrlKey) && event.key === 'b') {
+            event.preventDefault()
+            ed?.chain().focus().toggleBold().run()
+            return true
+          }
+          if ((event.metaKey || event.ctrlKey) && event.key === 'i') {
+            event.preventDefault()
+            ed?.chain().focus().toggleItalic().run()
+            return true
+          }
+          if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
+            event.preventDefault()
+            const url = window.prompt('Enter URL:')
+            if (url) ed?.chain().focus().setLink({ href: url }).run()
+            return true
+          }
+          return false
+        },
       },
-      handleKeyDown: (_view: unknown, event: KeyboardEvent) => {
-        if (!readOnlyRef.current) {
-          event.stopPropagation()
+      onFocus: () => {
+        if (blurTimeoutRef.current) {
+          clearTimeout(blurTimeoutRef.current)
+          blurTimeoutRef.current = null
         }
+        setIsFocused(true)
+        if (!readOnlyRef.current) setIsBlockEditing(true)
+      },
+      onBlur: ({ event }: { event: FocusEvent }) => {
+        const relatedTarget = (event as FocusEvent).relatedTarget as HTMLElement
+        if (toolbarRef.current?.contains(relatedTarget)) return
         const ed = editorRef.current
-        if ((event.metaKey || event.ctrlKey) && event.key === 'b') {
-          event.preventDefault()
-          ed?.chain().focus().toggleBold().run()
-          return true
+        if (!readOnlyRef.current && onUpdateRef.current && ed) {
+          const json = ed.getJSON()
+          const currentJsonStr = JSON.stringify(json)
+          if (currentJsonStr !== lastSavedContentRef.current) handleSaveContentRef.current?.(json)
         }
-        if ((event.metaKey || event.ctrlKey) && event.key === 'i') {
-          event.preventDefault()
-          ed?.chain().focus().toggleItalic().run()
-          return true
-        }
-        if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
-          event.preventDefault()
-          const url = window.prompt('Enter URL:')
-          if (url) ed?.chain().focus().setLink({ href: url }).run()
-          return true
-        }
-        return false
+        blurTimeoutRef.current = setTimeout(() => {
+          setIsFocused(false)
+          setIsBlockEditing(false)
+        }, 150)
+      },
+      onUpdate: ({ editor: ed }: { editor: { getJSON: () => any } }) => {
+        if (!onUpdateRef.current || readOnlyRef.current) return
+        setSaveStatus("saving")
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+        saveTimeoutRef.current = setTimeout(() => handleSaveContentRef.current?.(ed.getJSON()), 1000)
       },
     }),
-    [isEditing, textColorStyle]
+    []
   )
 
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TextBlock.tsx:beforeUseEditor',message:'TextBlock before useEditor',data:{blockId:block.id},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'F'})}).catch(()=>{});
-  // #endregion
-  const editor = useEditor({
-    extensions: TEXT_BLOCK_EXTENSIONS,
-    content: initialContent,
-    editable: true,
-    editorProps,
-    onFocus: () => {
-      if (blurTimeoutRef.current) {
-        clearTimeout(blurTimeoutRef.current)
-        blurTimeoutRef.current = null
-      }
-      setIsFocused(true)
-      // Enter block editing mode when editor receives focus (only if editable)
-      if (!readOnly) {
-        setIsBlockEditing(true)
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`[TextBlock] editor init: blockId=${block.id}`, {
-            isEditing,
-            isViewer,
-            readOnly,
-            effectiveIsEditing: !readOnly,
-          })
-        }
-      }
-    },
-    onBlur: ({ event }) => {
-      const relatedTarget = (event as FocusEvent).relatedTarget as HTMLElement
-      if (toolbarRef.current && toolbarRef.current.contains(relatedTarget)) {
-        return
-      }
-      
-      // Save on blur if content changed
-      // CRITICAL: Use cached serialized content for comparison to avoid JSON.stringify in hot path
-      if (!readOnly && onUpdate && editor) {
-        const json = editor.getJSON()
-        // Cache serialized content in a ref for comparison
-        // This avoids repeated JSON.stringify calls during typing
-        const currentJsonStr = JSON.stringify(json)
-        
-        // Only save if content actually changed
-        if (currentJsonStr !== lastSavedContentRef.current) {
-          handleSaveContent(json)
-        }
-      }
-      
-      blurTimeoutRef.current = setTimeout(() => {
-        setIsFocused(false)
-        // Exit block editing mode when editor loses focus
-        setIsBlockEditing(false)
-      }, 150)
-    },
-    onUpdate: ({ editor }) => {
-      // Debounced save - only when in edit mode (not read-only)
-      if (!onUpdate || readOnly) return
-
-      setSaveStatus("saving")
-
-      // Clear existing timeout
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current)
-      }
-
-      // Debounce: 1000ms (within 800-1200ms range)
-      saveTimeoutRef.current = setTimeout(() => {
-        const json = editor.getJSON()
-        handleSaveContent(json)
-      }, 1000)
-    },
-  })
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TextBlock.tsx:afterUseEditor',message:'TextBlock after useEditor',data:{blockId:block.id,hasEditor:!!editor},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'F'})}).catch(()=>{});
-  // #endregion
+  const editor = useEditor(editorConfig)
 
   // Keep editorRef current so editorProps.handleKeyDown (memoized) can access it
   useEffect(() => {
@@ -436,6 +388,10 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       setSaveStatus("idle")
     }, 2000)
   }, [block.id, onUpdate, editor])
+
+  useEffect(() => {
+    handleSaveContentRef.current = handleSaveContent
+  }, [handleSaveContent])
 
   /**
    * CRITICAL: Only set content on first mount or when block ID changes

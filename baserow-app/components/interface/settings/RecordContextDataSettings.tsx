@@ -20,6 +20,7 @@ import ViewSelector from "./shared/ViewSelector"
 import BlockFilterEditor from "./BlockFilterEditor"
 import SortSelector from "./shared/SortSelector"
 import NestedGroupBySelector from "./shared/NestedGroupBySelector"
+import CardFieldsSelector from "./shared/CardFieldsSelector"
 
 interface RecordContextDataSettingsProps {
   config: BlockConfig
@@ -47,7 +48,6 @@ export default function RecordContextDataSettings({
   }, [config.table_id])
 
   const displayMode = (config.displayMode ?? (config as any).display_mode ?? "list") as DisplayMode
-  const allowClear = config.allowClear ?? (config as any).allow_clear ?? true
 
   const handleTableChange = async (tableId: string) => {
     setSelectedTableId(tableId)
@@ -79,6 +79,19 @@ export default function RecordContextDataSettings({
           views={views}
           tableId={config.table_id}
         />
+      )}
+
+      {hasTableAndFields && (
+        <div className="space-y-2 border-t pt-4">
+          <CardFieldsSelector
+            value={Array.isArray(config.visible_fields) ? config.visible_fields : []}
+            onChange={(fieldNames) => onUpdate({ visible_fields: fieldNames })}
+            fields={fields}
+            label="Fields to show on canvas"
+            description="Choose which fields appear in the record list. Order determines display."
+            required={false}
+          />
+        </div>
       )}
 
       <div className="space-y-2">
@@ -470,18 +483,6 @@ export default function RecordContextDataSettings({
         </p>
       </div>
 
-      <div className="flex items-center justify-between gap-2 border-t pt-4">
-        <Label htmlFor="record-context-allow-clear" className="flex-1">
-          Allow clear selection
-        </Label>
-        <Switch
-          id="record-context-allow-clear"
-          checked={allowClear}
-          onCheckedChange={(checked) =>
-            onUpdate({ allowClear: checked, allow_clear: checked })
-          }
-        />
-      </div>
     </div>
   )
 }

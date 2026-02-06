@@ -9,7 +9,7 @@ import type { FilterTree } from "@/lib/filters/canonical-model"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { X, Search, Plus } from "lucide-react"
+import { Search, Plus, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 
@@ -38,7 +38,6 @@ export default function RecordContextBlock({
   const config = block.config || {}
   const tableId = config.table_id ?? (config as any).tableId ?? pageTableId ?? null
   const displayMode = config.displayMode ?? (config as any).display_mode ?? "list"
-  const allowClear = config.allowClear ?? (config as any).allow_clear ?? true
   const showSearch = config.show_search !== false
   const showAddRecord = (config as any).show_add_record === true
 
@@ -59,6 +58,7 @@ export default function RecordContextBlock({
   const listImageField = config.list_image_field ?? (config as any).image_field
   const listPillFields = config.list_pill_fields || []
   const listMetaFields = config.list_meta_fields || []
+  const visibleFields = Array.isArray(config.visible_fields) ? config.visible_fields : []
 
   useEffect(() => {
     if (!tableId) {
@@ -122,10 +122,12 @@ export default function RecordContextBlock({
       const firstText = fieldList.find((f) => f.type === "text" || f.type === "long_text" || f.type === "single_line_text")
       const titleKey = (listTitleField && fieldList.some((f) => f.name === listTitleField))
         ? listTitleField
-        : (firstText?.name ?? "id")
+        : visibleFields.length > 0 && fieldList.some((f) => f.name === visibleFields[0])
+          ? visibleFields[0]
+          : (firstText?.name ?? "id")
       setTitleField(titleKey)
 
-      const allCols = [
+      const cardCols = [
         "id",
         titleKey,
         ...listSubtitleFields,
@@ -133,7 +135,11 @@ export default function RecordContextBlock({
         ...listPillFields,
         ...listMetaFields,
       ]
-      const selectCols = [...new Set(allCols)].filter((c) => c === "id" || fieldList.some((f) => f.name === c))
+      const visibleCols = visibleFields.length > 0
+        ? visibleFields.filter((c) => fieldList.some((f) => f.name === c))
+        : cardCols.slice(1)
+      const allCols = ["id", ...new Set([...visibleCols, ...cardCols.slice(1)])]
+      const selectCols = allCols.filter((c) => c === "id" || fieldList.some((f) => f.name === c))
 
       let query = supabase
         .from(resolved.supabase_table)
@@ -178,6 +184,7 @@ export default function RecordContextBlock({
     listImageField,
     JSON.stringify(listPillFields),
     JSON.stringify(listMetaFields),
+    JSON.stringify(visibleFields),
     refreshTrigger,
   ])
 
@@ -194,11 +201,6 @@ export default function RecordContextBlock({
   const handleSelect = (record: { id: string }) => {
     if (!table || !onRecordContextChange) return
     onRecordContextChange({ tableId: table.id, recordId: record.id })
-  }
-
-  const handleClear = () => {
-    if (!onRecordContextChange) return
-    onRecordContextChange(null)
   }
 
   const handleAddNew = async () => {
@@ -227,6 +229,38 @@ export default function RecordContextBlock({
 
   const selectedInThisBlock = table && recordTableId === table.id && recordId
 
+  useEffect(() => {
+    if (!table || !onRecordContextChange || filteredRecords.length === 0) return
+    const hasSelection = recordTableId === table.id && recordId && filteredRecords.some((r) => r.id === recordId)
+    if (!hasSelection) {
+      onRecordContextChange({ tableId: table.id, recordId: filteredRecords[0].id })
+    }
+  }, [table?.id, filteredRecords, recordId, recordTableId, onRecordContextChange])
+
+  const handleDelete = async () => {
+    if (!table || !recordId || recordTableId !== table.id || !onRecordContextChange) return
+    const supabase = createClient()
+    try {
+      const { error } = await supabase.from(table.supabase_table).delete().eq("id", recordId)
+      if (error) throw error
+      setRefreshTrigger((c) => c + 1)
+      const remaining = filteredRecords.filter((r) => r.id !== recordId)
+      if (remaining.length > 0) {
+        onRecordContextChange({ tableId: table.id, recordId: remaining[0].id })
+        toast({ title: "Record deleted", description: "Selecting next record." })
+      } else {
+        onRecordContextChange(null)
+        toast({ title: "Record deleted", description: "No more records." })
+      }
+    } catch (e: any) {
+      toast({
+        variant: "destructive",
+        title: "Could not delete record",
+        description: e?.message ?? "You may not have permission.",
+      })
+    }
+  }
+
   if (!tableId) {
     return (
       <div className="h-full flex items-center justify-center text-muted-foreground text-sm p-4 rounded-md border border-dashed">
@@ -251,9 +285,20 @@ export default function RecordContextBlock({
     )
   }
 
+  const formatCellValue = (v: unknown): string => {
+    if (v == null) return ""
+    if (typeof v === "string") return v.trim()
+    if (typeof v === "number" || typeof v === "boolean") return String(v)
+    if (Array.isArray(v)) return v.map(formatCellValue).filter(Boolean).join(", ")
+    if (typeof v === "object" && v !== null && "value" in (v as object)) return formatCellValue((v as { value: unknown }).value)
+    return String(v)
+  }
+
   const getLabel = (record: { id: string; [k: string]: unknown }) => {
-    if (titleField && record[titleField] != null && String(record[titleField]).trim() !== "") {
-      return String(record[titleField])
+    if (titleField) {
+      const raw = record[titleField]
+      const s = formatCellValue(raw)
+      if (s) return s
     }
     return record.id
   }
@@ -261,14 +306,14 @@ export default function RecordContextBlock({
   const getSubtitle = (record: { id: string; [k: string]: unknown }) => {
     if (!listSubtitleFields.length) return null
     const parts = listSubtitleFields
-      .map((name) => record[name])
-      .filter((v) => v != null && String(v).trim() !== "")
+      .map((name) => formatCellValue(record[name]))
+      .filter((s) => s !== "")
     return parts.length ? parts.join(" · ") : null
   }
 
   return (
     <div className="h-full w-full flex flex-col gap-2 p-2 rounded-md border bg-card">
-      {(showSearch || showAddRecord) && (
+      {(showSearch || showAddRecord || selectedInThisBlock) && (
         <div className="flex items-center gap-2 flex-shrink-0">
           {showSearch && (
             <div className="relative flex-1 min-w-0">
@@ -289,24 +334,23 @@ export default function RecordContextBlock({
               size="icon"
               className="h-9 w-9 flex-shrink-0"
               onClick={handleAddNew}
+              title="Add new record"
             >
               <Plus className="h-4 w-4" />
             </Button>
           )}
-        </div>
-      )}
-      {allowClear && selectedInThisBlock && (
-        <div className="flex items-center justify-end flex-shrink-0">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={handleClear}
-            className="gap-1"
-          >
-            <X className="h-4 w-4" />
-            Clear selection
-          </Button>
+          {selectedInThisBlock && (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 flex-shrink-0 text-destructive hover:text-destructive"
+              onClick={handleDelete}
+              title="Delete record"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       )}
       <div
