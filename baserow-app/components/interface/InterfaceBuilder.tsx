@@ -11,7 +11,7 @@ import FloatingBlockPicker from "./FloatingBlockPicker"
 import SettingsPanel from "./SettingsPanel"
 import PageSettingsDrawer from "./PageSettingsDrawer"
 import HorizontalGroupedCanvasModal from "./blocks/HorizontalGroupedCanvasModal"
-import type { PageBlock, LayoutItem, Page } from "@/lib/interface/types"
+import type { PageBlock, LayoutItem, Page, RecordContext } from "@/lib/interface/types"
 import { BLOCK_REGISTRY } from "@/lib/interface/registry"
 import type { BlockType } from "@/lib/interface/types"
 import { useToast } from "@/components/ui/use-toast"
@@ -45,8 +45,10 @@ interface InterfaceBuilderProps {
   hideHeader?: boolean
   pageTableId?: string | null // Table ID from the page
   recordId?: string | null // Record ID for record review pages
+  recordTableId?: string | null // Table ID of the record in context (content pages with Record Context Block)
   mode?: 'view' | 'edit' | 'review' // Record review mode: view (no editing), edit (full editing), review (content editing without layout)
   onRecordClick?: (recordId: string) => void // Callback for record clicks (for RecordReview integration)
+  onRecordContextChange?: (context: RecordContext) => void // Content pages: set/clear page-level record context
   pageEditable?: boolean // Page-level editability (for field blocks)
   editableFieldNames?: string[] // Field-level editable list (for field blocks)
 }
@@ -60,8 +62,10 @@ export default function InterfaceBuilder({
   hideHeader = false,
   pageTableId = null,
   recordId = null,
+  recordTableId = null,
   mode = 'view', // Default to view mode
   onRecordClick,
+  onRecordContextChange,
   pageEditable,
   editableFieldNames = [],
 }: InterfaceBuilderProps) {
@@ -1418,8 +1422,10 @@ export default function InterfaceBuilder({
               pageTableId={pageTableId}
               pageId={page.id}
               recordId={recordId}
+              recordTableId={recordTableId}
               mode={mode}
               onRecordClick={onRecordClick}
+              onRecordContextChange={onRecordContextChange}
               pageShowAddRecord={
                 (page.settings?.show_add_record ?? (page.settings as any)?.showAddRecord) === true
               }

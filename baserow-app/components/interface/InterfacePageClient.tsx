@@ -16,6 +16,7 @@ import dynamic from "next/dynamic"
 import { createClient } from "@/lib/supabase/client"
 import { formatDateUK } from "@/lib/utils"
 import type { InterfacePage } from "@/lib/interface/page-types-only"
+import type { RecordContext } from "@/lib/interface/types"
 import { hasPageAnchor, getPageAnchor } from "@/lib/interface/page-utils"
 import PageRenderer from "./PageRenderer"
 import PageSetupState from "./PageSetupState"
@@ -70,6 +71,9 @@ function InterfacePageClientInternal({
   const [displaySettingsOpen, setDisplaySettingsOpen] = useState(false)
   const [dataLoading, setDataLoading] = useState(false)
   const [pageTableId, setPageTableId] = useState<string | null>(null)
+
+  // Content pages only: ephemeral record context (never persisted). Not used for record_review/record_view.
+  const [recordContext, setRecordContext] = useState<RecordContext>(null)
   
   // Track previous pageId to reset blocks when page changes
   // CRITICAL: Use ref to track actual pageId changes, not effect dependencies
@@ -1320,8 +1324,10 @@ function InterfacePageClientInternal({
                     isViewer={isViewer || !isBlockEditing}
                     hideHeader={true}
                     pageTableId={pageTableId}
-                    recordId={isRecordView ? (page.config?.record_id || null) : null}
-                    mode={isRecordView ? (isBlockEditing ? 'edit' : 'view') : 'view'}
+                    recordId={recordContext?.recordId ?? null}
+                    recordTableId={recordContext?.tableId ?? null}
+                    onRecordContextChange={setRecordContext}
+                    mode="view"
                   />
                 </div>
               ) : null

@@ -396,6 +396,22 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       field_id: '',
     },
   },
+  record_context: {
+    type: 'record_context',
+    label: 'Record selector',
+    icon: 'List',
+    defaultWidth: 6,
+    defaultHeight: 4,
+    minWidth: 2,
+    minHeight: 2,
+    defaultConfig: {
+      title: 'Select record',
+      table_id: '',
+      displayMode: 'list',
+      allowClear: true,
+      selectionMode: 'single',
+    },
+  },
 }
 
 export function getBlockDefinition(type: BlockType): BlockDefinition {

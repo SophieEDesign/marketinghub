@@ -4,7 +4,7 @@
  * See docs/architecture/BLOCK_SYSTEM_CANONICAL.md.
  */
 
-import type { PageBlock, BlockType, ViewType } from "@/lib/interface/types"
+import type { PageBlock, BlockType, ViewType, RecordContext } from "@/lib/interface/types"
 import { normalizeBlockConfig, isBlockConfigComplete } from "@/lib/interface/block-validator"
 import { assertBlockConfig, shouldShowBlockSetupUI } from "@/lib/interface/assertBlockConfig"
 import { useMemo, useEffect } from "react"
@@ -42,6 +42,7 @@ import GalleryBlock from "./blocks/GalleryBlock"
 import ListBlock from "./blocks/ListBlock"
 import NumberBlock from "./blocks/NumberBlock"
 import HorizontalGroupedBlock from "./blocks/HorizontalGroupedBlock"
+import RecordContextBlock from "./blocks/RecordContextBlock"
 import { ErrorBoundary } from "./ErrorBoundary"
 import type { FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
@@ -61,10 +62,12 @@ interface BlockRendererProps {
   pageTableId?: string | null // Table ID from the page
   pageId?: string | null // Page ID
   recordId?: string | null // Record ID for record review pages
+  recordTableId?: string | null // Table ID of the record in context (content pages with Record Context Block)
   mode?: 'view' | 'edit' | 'review' // Record review mode: view (no editing), edit (full editing), review (content editing without layout)
   filters?: FilterConfig[] // Filters from filter blocks (for data blocks)
   filterTree?: FilterTree // Canonical filter tree from filter blocks (supports groups/OR)
   onRecordClick?: (recordId: string, tableId?: string) => void // Callback for record clicks (for RecordReview integration)
+  onRecordContextChange?: (context: RecordContext) => void // Content pages: set/clear page-level record context
   aggregateData?: { data: any; error: string | null; isLoading: boolean } // Pre-fetched aggregate data for KPI blocks
   pageShowAddRecord?: boolean // Page-level default for "Add record" buttons in data blocks
   pageEditable?: boolean // Page-level editability (for field blocks)
@@ -85,10 +88,12 @@ export default function BlockRenderer({
   pageTableId = null,
   pageId = null,
   recordId = null,
+  recordTableId = null,
   mode = 'view', // Default to view mode
   filters = [],
   filterTree = null,
   onRecordClick,
+  onRecordContextChange,
   aggregateData,
   pageShowAddRecord = false,
   pageEditable,
@@ -109,7 +114,10 @@ export default function BlockRenderer({
 
   // Normalize config to prevent crashes
   const safeConfig = normalizeBlockConfig(block.type, block.config)
-  
+
+  // Table for "current record" context: when recordTableId is set (content page with Record Context Block), use it; else page table
+  const recordContextTableId = recordTableId ?? pageTableId
+
   // Merge page context into block config
   // Grid and Form blocks MUST have table_id configured - no fallback
   // Record blocks can use page recordId
@@ -250,8 +258,20 @@ export default function BlockRenderer({
         // Disable lazy loading in edit mode so users can see all blocks immediately
         return (
           <LazyBlockWrapper enabled={!isEditing}>
-            <RecordBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} recordId={recordId} />
+            <RecordBlock block={safeBlock} isEditing={canEdit} pageTableId={recordContextTableId} pageId={pageId} recordId={recordId} />
           </LazyBlockWrapper>
+        )
+
+      case "record_context":
+        return (
+          <RecordContextBlock
+            block={safeBlock}
+            isEditing={canEdit}
+            pageTableId={pageTableId}
+            recordId={recordId}
+            recordTableId={recordTableId}
+            onRecordContextChange={onRecordContextChange}
+          />
         )
 
       case "chart":
@@ -285,12 +305,12 @@ export default function BlockRenderer({
           ...safeBlock,
           config: fieldBlockConfig,
         }
-        return <FieldBlock block={fieldBlockWithConfig} isEditing={canEdit} pageTableId={pageTableId} recordId={recordId} pageShowFieldNames={pageShowFieldNames} hideEditButton={hideEditButton} />
+        return <FieldBlock block={fieldBlockWithConfig} isEditing={canEdit} pageTableId={recordContextTableId} recordId={recordId} pageShowFieldNames={pageShowFieldNames} hideEditButton={hideEditButton} />
 
       case "field_section":
         // Field section block displays all fields from a section (group_name)
         // Respect page-level editability similar to field blocks
-        return <FieldSectionBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} recordId={recordId} pageShowFieldNames={pageShowFieldNames} hideEditButton={hideEditButton} />
+        return <FieldSectionBlock block={safeBlock} isEditing={canEdit} pageTableId={recordContextTableId} recordId={recordId} pageShowFieldNames={pageShowFieldNames} hideEditButton={hideEditButton} />
 
       case "text":
         // Lazy-load TextBlock to improve initial page load performance

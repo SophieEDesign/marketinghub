@@ -1,3 +1,6 @@
+/** Ephemeral page-level record context (content pages). Never persisted. */
+export type RecordContext = { tableId: string; recordId: string } | null
+
 export type BlockType =
   | 'grid'
   | 'form'
@@ -22,6 +25,7 @@ export type BlockType =
   | 'list'
   | 'number'
   | 'horizontal_grouped'
+  | 'record_context'
 
 export type ChartType = 'bar' | 'line' | 'pie' | 'area' | 'stacked_bar'
 export type AggregateType = 'count' | 'sum' | 'avg' | 'min' | 'max'

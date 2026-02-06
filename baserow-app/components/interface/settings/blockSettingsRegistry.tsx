@@ -31,6 +31,7 @@ import FieldAppearanceSettings from "./FieldAppearanceSettings"
 import ButtonDataSettings from "./ButtonDataSettings"
 import ButtonAppearanceSettings from "./ButtonAppearanceSettings"
 import HorizontalGroupedDataSettings from "./HorizontalGroupedDataSettings"
+import RecordContextDataSettings from "./RecordContextDataSettings"
 import CommonAppearanceSettings from "./CommonAppearanceSettings"
 
 export type DataSettingsCtx = {
@@ -91,6 +92,7 @@ const DATA_SETTINGS_RENDERERS: Partial<Record<BlockType, DataRenderer>> = {
   timeline: (ctx) => <GridDataSettings {...ctx} />,
   gallery: (ctx) => <GridDataSettings {...ctx} />,
   horizontal_grouped: (ctx) => <HorizontalGroupedDataSettings {...ctx} />,
+  record_context: (ctx) => <RecordContextDataSettings {...ctx} />,
 }
 
 const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRenderer>> = {
@@ -319,6 +321,16 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
     </>
   ),
   horizontal_grouped: (ctx) => (
+    <>
+      <CommonAppearanceSettings
+        config={ctx.config}
+        onUpdate={ctx.onUpdateAppearance}
+        blockType={ctx.blockType}
+        fields={ctx.fields}
+      />
+    </>
+  ),
+  record_context: (ctx) => (
     <>
       <CommonAppearanceSettings
         config={ctx.config}

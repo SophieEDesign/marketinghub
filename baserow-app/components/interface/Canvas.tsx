@@ -35,7 +35,7 @@ import "react-resizable/css/styles.css"
 import BlockRenderer from "./BlockRenderer"
 import BlockAppearanceWrapper from "./BlockAppearanceWrapper"
 import { ErrorBoundary } from "./ErrorBoundary"
-import type { PageBlock, LayoutItem, BlockType } from "@/lib/interface/types"
+import type { PageBlock, LayoutItem, BlockType, RecordContext } from "@/lib/interface/types"
 import { useFilterState } from "@/lib/interface/filter-state"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import { dbBlockToPageBlock } from "@/lib/interface/layout-mapping"
@@ -71,8 +71,10 @@ interface CanvasProps {
   pageTableId?: string | null // Table ID from the page
   pageId?: string | null // Page ID
   recordId?: string | null // Record ID for record review pages
+  recordTableId?: string | null // Table ID of the record in context (content pages with Record Context Block)
   mode?: 'view' | 'edit' | 'review' // Record review mode: view (no editing), edit (full editing), review (content editing without layout)
   onRecordClick?: (recordId: string) => void // Callback for record clicks (for RecordReview integration)
+  onRecordContextChange?: (context: RecordContext) => void // Content pages: set/clear page-level record context
   pageShowAddRecord?: boolean // Page-level default for showing "Add record" buttons in data blocks
   pageEditable?: boolean // Page-level editability (for field blocks)
   editableFieldNames?: string[] // Field-level editable list (for field blocks)
@@ -102,8 +104,10 @@ export default function Canvas({
   pageTableId = null,
   pageId = null,
   recordId = null,
+  recordTableId = null,
   mode = 'view', // Default to view mode
   onRecordClick,
+  onRecordContextChange,
   pageShowAddRecord = false,
   pageEditable,
   editableFieldNames = [],
@@ -2447,10 +2451,12 @@ export default function Canvas({
                     pageTableId={pageTableId}
                     pageId={pageId}
                     recordId={recordId}
+                    recordTableId={recordTableId}
                     mode={mode}
                     filters={getFiltersForBlock(block.id)}
                     filterTree={getFilterTreeForBlock(block.id) as FilterTree}
                     onRecordClick={onRecordClick}
+                    onRecordContextChange={onRecordContextChange}
                     aggregateData={aggregateData[block.id]}
                     pageShowAddRecord={pageShowAddRecord}
                     pageEditable={pageEditable}

@@ -97,6 +97,15 @@ export interface LinkPreviewBlockConfig extends BaseBlockConfig {
 // Note: table_id, target_blocks, allowed_fields, allowed_operators, filters are already in BlockConfig
 export type FilterBlockConfig = BaseBlockConfig
 
+// Record Context Block Config (context setter only; no record_id in config)
+export interface RecordContextBlockConfig extends BaseBlockConfig {
+  table_id: string // Required - which table to list records from
+  view_id?: string
+  displayMode: 'list' | 'grid' | 'compact'
+  allowClear: boolean
+  selectionMode: 'single'
+}
+
 /**
  * Discriminated Union of all block configs
  * Use this with block.type to get proper type narrowing
@@ -115,11 +124,12 @@ export type BlockConfigUnion =
   | (ActionBlockConfig & { _type: 'action' })
   | (LinkPreviewBlockConfig & { _type: 'link_preview' })
   | (FilterBlockConfig & { _type: 'filter' })
+  | (RecordContextBlockConfig & { _type: 'record_context' })
 
 /** Block types that have typed config in BlockConfigUnion (for drift detection). */
 export const BLOCK_CONFIG_UNION_TYPES = [
   'grid', 'form', 'record', 'chart', 'kpi', 'text', 'image', 'gallery',
-  'divider', 'button', 'action', 'link_preview', 'filter',
+  'divider', 'button', 'action', 'link_preview', 'filter', 'record_context',
 ] as const
 
 /**
@@ -159,6 +169,10 @@ export function isTextBlockConfig(config: any): config is TextBlockConfig {
 
 export function isFilterBlockConfig(config: any): config is FilterBlockConfig {
   // Filter block has no required fields - it can start empty
+  return config !== null && config !== undefined && typeof config === 'object'
+}
+
+export function isRecordContextBlockConfig(config: any): config is RecordContextBlockConfig {
   return config !== null && config !== undefined && typeof config === 'object'
 }
 
@@ -310,6 +324,13 @@ export function validateBlockConfig(
       // Field block requires field_id
       if (!config.field_id) {
         errors.push('Field block requires field_id')
+      }
+      break
+
+    case 'record_context':
+      // Record context block requires table_id; no record_id in config
+      if (!resolveLegacyTableId(config)) {
+        errors.push('Record context block requires table_id')
       }
       break
 

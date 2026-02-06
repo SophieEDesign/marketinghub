@@ -34,6 +34,7 @@ const iconMap: Record<BlockType, React.ElementType> = {
   list: List,
   number: Hash,
   horizontal_grouped: Columns,
+  record_context: List,
 }
 
 interface FloatingBlockPickerProps {
