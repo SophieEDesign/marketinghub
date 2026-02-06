@@ -1059,6 +1059,19 @@ function InterfacePageClientInternal({
     }
   }, [])
 
+  // Full-page content: suppress workspace main scroll (Airtable-style). MUST be before early returns (React Hooks rule).
+  const mainScroll = useMainScroll()
+  useEffect(() => {
+    if (!mainScroll) return
+    const isRecordView = page?.page_type === 'record_view'
+    const isRecordReview = page?.page_type === 'record_review'
+    const useRecordReviewLayout = isRecordReview || isRecordView
+    const isContentPage = !useRecordReviewLayout
+    const isFullPage =
+      isContentPage && blocks.length === 1 && blocks[0]?.config?.is_full_page === true
+    mainScroll.setSuppressMainScroll(!!isFullPage)
+  }, [mainScroll, page?.page_type, blocks])
+
   // ALWAYS render UI - never return null or redirect
   if (loading && !page) {
     return <div className="h-screen flex items-center justify-center">Loading interface page...</div>
@@ -1076,16 +1089,6 @@ function InterfacePageClientInternal({
   // See docs/architecture/PAGE_TYPE_CONSOLIDATION.md
   const useRecordReviewLayout = isRecordReview || isRecordView
 
-  // Full-page content page: suppress workspace main scroll so page/canvas never scroll (Airtable-style).
-  const mainScroll = useMainScroll()
-  useEffect(() => {
-    if (!mainScroll) return
-    const isContentPage = !useRecordReviewLayout
-    const isFullPage =
-      isContentPage && blocks.length === 1 && blocks[0]?.config?.is_full_page === true
-    mainScroll.setSuppressMainScroll(!!isFullPage)
-  }, [mainScroll, useRecordReviewLayout, blocks])
-  
   // Check if page has a valid anchor
   const pageHasAnchor = page ? hasPageAnchor(page) : false
   const pageAnchor = page ? getPageAnchor(page) : null

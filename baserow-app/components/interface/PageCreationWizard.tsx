@@ -25,7 +25,7 @@ import {
 import { createClient } from "@/lib/supabase/client"
 import { PageType, PAGE_TYPE_DEFINITIONS, getRequiredAnchorType, isRecordViewPage } from "@/lib/interface/page-types"
 import { createRecordReviewTwoColumnLayout } from "@/lib/interface/record-review-layout"
-import { FileCheck, BookOpen } from "lucide-react"
+import { BookOpen } from "lucide-react"
 import FieldPickerModal from "./FieldPickerModal"
 import { IconPicker } from "@/components/ui/icon-picker"
 
@@ -714,7 +714,8 @@ export default function PageCreationWizard({
 
   const renderPurposeStep = () => (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
+      {/* record_review is legacy; prevent new creation. Existing pages remain supported. */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <button
           onClick={() => handlePurposeSelect('content')}
           className="p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 text-left transition-colors"
@@ -722,14 +723,6 @@ export default function PageCreationWizard({
           <BookOpen className="h-6 w-6 mb-2 text-gray-600" />
           <h3 className="font-semibold">Content Page</h3>
           <p className="text-sm text-gray-500">Docs, links, resources, information</p>
-        </button>
-        <button
-          onClick={() => handlePurposeSelect('record')}
-          className="p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 text-left transition-colors"
-        >
-          <FileCheck className="h-6 w-6 mb-2 text-gray-600" />
-          <h3 className="font-semibold">Record Review</h3>
-          <p className="text-sm text-gray-500">Browse & Review Records</p>
         </button>
       </div>
     </div>

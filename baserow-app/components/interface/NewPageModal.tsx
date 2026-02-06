@@ -310,11 +310,9 @@ export default function NewPageModal({ open, onOpenChange, defaultGroupId }: New
     onOpenChange(false)
   }
 
-  // Filter to only allow content and record_review page types
-  // All other page types (dashboard, form, view) are now implemented as blocks
-  const allowedPageTypes = pageTypes.filter(t => 
-    t.type === 'content' || t.type === 'record_review'
-  )
+  // record_review is legacy; prevent new creation. Existing pages remain supported.
+  // All other page types (dashboard, form, view) are now implemented as blocks.
+  const allowedPageTypes = pageTypes.filter(t => t.type === 'content')
   
   // Group page types by category, but only show allowed types
   const groupedTypes = PAGE_TYPE_CATEGORIES.map(category => ({
