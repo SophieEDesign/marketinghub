@@ -436,6 +436,9 @@ export default function Canvas({
    * Ephemeral expansion doesn't affect persistent layout, so no sync needed
    */
   useEffect(() => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:layoutSyncEffect',message:'Layout sync effect RUN',data:{blocksLen:blocks.length,layoutLen:layout.length,pageId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     // Don't sync if no blocks
     if (blocks.length === 0) {
       if (previousBlockIdsRef.current !== "") {
@@ -488,6 +491,9 @@ export default function Canvas({
     }
     
     if (shouldSync) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:layoutSyncSetLayout',message:'Layout sync calling setLayout',data:{blocksLen:blocks.length,pageId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       // Hydrate from blocks prop - always use persistent h from DB
       const newLayout: Layout[] = blocks.map((block) => {
         const layout = dbBlockToPageBlock({
@@ -1288,6 +1294,9 @@ export default function Canvas({
    */
   const handleLayoutChange = useCallback(
     (newLayout: Layout[]) => {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:handleLayoutChange',message:'Canvas handleLayoutChange called',data:{layoutLen:newLayout?.length,isEditing},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       // Ignore when not in edit mode
       if (!isEditing) {
         if (isFirstLayoutChangeRef.current) {
@@ -1371,6 +1380,9 @@ export default function Canvas({
   // Trigger compaction when blocks are deleted (block count decreases)
   const previousBlockCountRef = useRef<number>(blocks.length)
   useEffect(() => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:blockDeletedEffect',message:'Block-deleted effect RUN',data:{blocksLen:blocks.length,layoutLen:layout.length,prevCount:previousBlockCountRef.current,isEditing},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
     const blockCountDecreased = blocks.length < previousBlockCountRef.current
     
     if (blockCountDecreased && isEditing && layout.length > 0) {
@@ -1691,7 +1703,6 @@ export default function Canvas({
   const fullPageBlock = isFullPageMode ? blocks[0] : null
   const fullPageDef = fullPageBlock ? getBlockDefinition(fullPageBlock.type) : null
   const isRail = fullPageDef?.fullPageLayout === "rail"
-  const railWidth = (isRail && fullPageDef?.fullPageMaxWidth) ?? 360
   const showPreview =
     fullPageDef?.supportsRecordPreview === true &&
     recordId != null &&
@@ -1724,7 +1735,7 @@ export default function Canvas({
                 {/* Left rail */}
                 <div
                   className="h-full overflow-hidden border-r flex flex-col"
-                  style={{ width: railWidth }}
+                  style={{ width: fullPageDef?.fullPageMaxWidth ?? 360 }}
                 >
                   <div
                     className={`flex-1 min-h-0 flex flex-col relative overflow-hidden ${
