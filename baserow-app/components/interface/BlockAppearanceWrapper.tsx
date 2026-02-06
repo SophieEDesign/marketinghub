@@ -11,6 +11,8 @@ interface BlockAppearanceWrapperProps {
   className?: string
   /** When true (full-page mode), strip all chrome: no border, radius, shadow, padding, background. Block reads as the page. */
   isFullPage?: boolean
+  /** When true with isFullPage, block is a rail (fixed width); parent constrains width. */
+  isRail?: boolean
 }
 
 export default function BlockAppearanceWrapper({
@@ -18,6 +20,7 @@ export default function BlockAppearanceWrapper({
   children,
   className,
   isFullPage = false,
+  isRail = false,
 }: BlockAppearanceWrapperProps) {
   // Full-page: transparent dimensionless wrapper; no block chrome. Single scroll context = block internal content.
   if (isFullPage) {

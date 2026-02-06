@@ -34,8 +34,10 @@ import "react-grid-layout/css/styles.css"
 import "react-resizable/css/styles.css"
 import BlockRenderer from "./BlockRenderer"
 import BlockAppearanceWrapper from "./BlockAppearanceWrapper"
+import RecordPreviewSurface from "./record-preview/RecordPreviewSurface"
 import { ErrorBoundary } from "./ErrorBoundary"
 import type { PageBlock, LayoutItem, BlockType, RecordContext } from "@/lib/interface/types"
+import { getBlockDefinition } from "@/lib/interface/registry"
 import { useFilterState } from "@/lib/interface/filter-state"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import { dbBlockToPageBlock } from "@/lib/interface/layout-mapping"
@@ -1687,6 +1689,20 @@ export default function Canvas({
     fullPageBlockId && blocks.length === 1 && blocks[0].id === fullPageBlockId
   )
   const fullPageBlock = isFullPageMode ? blocks[0] : null
+  const fullPageDef = fullPageBlock ? getBlockDefinition(fullPageBlock.type) : null
+  const isRail = fullPageDef?.fullPageLayout === "rail"
+  const railWidth = (isRail && fullPageDef?.fullPageMaxWidth) ?? 360
+  const showPreview =
+    fullPageDef?.supportsRecordPreview === true &&
+    recordId != null &&
+    recordTableId != null
+
+  if (
+    fullPageBlock?.type === "record_context" &&
+    fullPageDef?.fullPageLayout !== "rail"
+  ) {
+    console.warn("[Canvas] record_context must use rail layout")
+  }
 
   return (
     <ErrorBoundary>
@@ -1701,105 +1717,224 @@ export default function Canvas({
         style={isFullPageMode ? undefined : { paddingBottom: isEditing ? "80px" : "80px" }}
       >
         {isFullPageMode && fullPageBlock ? (
-          /* Full-page: fixed viewport, no chrome, no scroll on wrapper. Single scroll context = block internal content. */
+          /* Full-page: fixed viewport, no chrome, no scroll on wrapper. Rail = left fixed-width + right (preview or empty); fill = single column. */
           <div className="absolute inset-0 flex flex-col min-h-0 overflow-hidden">
-            <div
-              className={`flex-1 min-h-0 flex flex-col relative overflow-hidden ${
-                isEditing
-                  ? `group ${selectedBlockId === fullPageBlock.id ? "ring-2 ring-blue-500 ring-inset" : ""}`
-                  : ""
-              }`}
-              onClick={(e) => {
-                if (isEditing) {
-                  const target = e.target as HTMLElement
-                  const isEditorContent = target.closest(".ql-editor") || target.closest("textarea") || target.closest("input") ||
-                    target.closest('[contenteditable="true"]') || target.closest("button") || target.closest(".ql-toolbar") ||
-                    target.closest('[role="textbox"]') || target.closest(".ql-container") || target.closest(".ql-snow")
-                  if (!isEditorContent && onBlockSelect) onBlockSelect(fullPageBlock.id, false)
-                  else if (!isEditorContent) onBlockClick?.(fullPageBlock.id)
-                }
-              }}
-            >
-              {isEditing && (
-                <div className={`absolute top-2 right-2 z-20 flex items-center gap-1.5 ${selectedBlockId === fullPageBlock.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
-                  <button
-                    type="button"
+            {isRail ? (
+              <div className="flex h-full w-full overflow-hidden">
+                {/* Left rail */}
+                <div
+                  className="h-full overflow-hidden border-r flex flex-col"
+                  style={{ width: railWidth }}
+                >
+                  <div
+                    className={`flex-1 min-h-0 flex flex-col relative overflow-hidden ${
+                      isEditing
+                        ? `group ${selectedBlockId === fullPageBlock.id ? "ring-2 ring-blue-500 ring-inset" : ""}`
+                        : ""
+                    }`}
                     onClick={(e) => {
-                      e.stopPropagation()
-                      onBlockClick?.(fullPageBlock.id)
-                      onBlockSettingsClick?.(fullPageBlock.id)
+                      if (isEditing) {
+                        const target = e.target as HTMLElement
+                        const isEditorContent = target.closest(".ql-editor") || target.closest("textarea") || target.closest("input") ||
+                          target.closest('[contenteditable="true"]') || target.closest("button") || target.closest(".ql-toolbar") ||
+                          target.closest('[role="textbox"]') || target.closest(".ql-container") || target.closest(".ql-snow")
+                        if (!isEditorContent && onBlockSelect) onBlockSelect(fullPageBlock.id, false)
+                        else if (!isEditorContent) onBlockClick?.(fullPageBlock.id)
+                      }
                     }}
-                    className="p-1.5 rounded-md shadow-sm bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"
-                    title="Configure block"
-                    aria-label="Configure block"
                   >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </button>
-                  {onBlockDuplicate && (
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); onBlockDuplicate(fullPageBlock.id) }}
-                      className="p-1.5 rounded-md shadow-sm bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"
-                      title="Duplicate block"
-                      aria-label="Duplicate block"
-                    >
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
-                    </button>
-                  )}
-                  {onBlockDelete && (
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); onBlockDelete(fullPageBlock.id) }}
-                      className="p-1.5 rounded-md shadow-sm bg-white text-red-600 border border-red-300 hover:bg-red-50"
-                      title="Delete block"
-                      aria-label="Delete block"
-                    >
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
+                    {isEditing && (
+                      <div className={`absolute top-2 right-2 z-20 flex items-center gap-1.5 ${selectedBlockId === fullPageBlock.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onBlockClick?.(fullPageBlock.id)
+                            onBlockSettingsClick?.(fullPageBlock.id)
+                          }}
+                          className="p-1.5 rounded-md shadow-sm bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"
+                          title="Configure block"
+                          aria-label="Configure block"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                        </button>
+                        {onBlockDuplicate && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); onBlockDuplicate(fullPageBlock.id) }}
+                            className="p-1.5 rounded-md shadow-sm bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"
+                            title="Duplicate block"
+                            aria-label="Duplicate block"
+                          >
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                          </button>
+                        )}
+                        {onBlockDelete && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); onBlockDelete(fullPageBlock.id) }}
+                            className="p-1.5 rounded-md shadow-sm bg-white text-red-600 border border-red-300 hover:bg-red-50"
+                            title="Delete block"
+                            aria-label="Delete block"
+                          >
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    <div className="flex-1 min-h-0 w-full h-full overflow-hidden">
+                      <BlockAppearanceWrapper block={fullPageBlock} isFullPage isRail className={isEditing ? "pointer-events-auto" : ""}>
+                        <div className="h-full w-full overflow-hidden">
+                          <BlockRenderer
+                            block={fullPageBlock}
+                            isEditing={isEditing && !fullPageBlock.config?.locked}
+                            onUpdate={onBlockUpdate}
+                            isLocked={fullPageBlock.config?.locked || false}
+                            pageTableId={pageTableId}
+                            pageId={pageId}
+                            recordId={recordId}
+                            recordTableId={recordTableId}
+                            mode={mode}
+                            filters={getFiltersForBlock(fullPageBlock.id)}
+                            filterTree={getFilterTreeForBlock(fullPageBlock.id) as FilterTree}
+                            onRecordClick={onRecordClick}
+                            onRecordContextChange={onRecordContextChange}
+                            aggregateData={aggregateData[fullPageBlock.id]}
+                            pageShowAddRecord={pageShowAddRecord}
+                            pageEditable={pageEditable}
+                            editableFieldNames={editableFieldNames}
+                            pageShowFieldNames={pageShowFieldNames}
+                            hideEditButton={topTwoFieldBlockIds.has(fullPageBlock.id)}
+                            allBlocks={blocks}
+                            onEphemeralHeightDelta={() => {}}
+                            rowHeight={Number(layoutSettings?.rowHeight) || 30}
+                            isEditingCanvas={editingBlockCanvasId === fullPageBlock.id}
+                            isFullPage
+                          />
+                        </div>
+                      </BlockAppearanceWrapper>
+                    </div>
+                  </div>
+                </div>
+                {/* Right: preview surface or empty */}
+                <div className="flex-1 min-w-0 h-full overflow-hidden">
+                  {showPreview ? (
+                    <RecordPreviewSurface
+                      tableId={recordTableId!}
+                      recordId={recordId!}
+                      pageId={pageId}
+                      isEditing={isEditing}
+                    />
+                  ) : (
+                    <div className="flex-1 h-full bg-background" />
                   )}
                 </div>
-              )}
-              {/* Block wrapper: no scroll, no chrome. Scroll lives only inside block internal content (e.g. grid rows). */}
-              <div className="flex-1 min-h-0 w-full h-full overflow-hidden">
-                <BlockAppearanceWrapper block={fullPageBlock} isFullPage className={isEditing ? "pointer-events-auto" : ""}>
-                  <div className="h-full w-full overflow-hidden">
-                    <BlockRenderer
-                      block={fullPageBlock}
-                      isEditing={isEditing && !fullPageBlock.config?.locked}
-                      onUpdate={onBlockUpdate}
-                      isLocked={fullPageBlock.config?.locked || false}
-                      pageTableId={pageTableId}
-                      pageId={pageId}
-                      recordId={recordId}
-                      recordTableId={recordTableId}
-                      mode={mode}
-                      filters={getFiltersForBlock(fullPageBlock.id)}
-                      filterTree={getFilterTreeForBlock(fullPageBlock.id) as FilterTree}
-                      onRecordClick={onRecordClick}
-                      onRecordContextChange={onRecordContextChange}
-                      aggregateData={aggregateData[fullPageBlock.id]}
-                      pageShowAddRecord={pageShowAddRecord}
-                      pageEditable={pageEditable}
-                      editableFieldNames={editableFieldNames}
-                      pageShowFieldNames={pageShowFieldNames}
-                      hideEditButton={topTwoFieldBlockIds.has(fullPageBlock.id)}
-                      allBlocks={blocks}
-                      onEphemeralHeightDelta={() => {}}
-                      rowHeight={Number(layoutSettings?.rowHeight) || 30}
-                      isEditingCanvas={editingBlockCanvasId === fullPageBlock.id}
-                      isFullPage
-                    />
-                  </div>
-                </BlockAppearanceWrapper>
               </div>
-            </div>
+            ) : (
+              <div
+                className={`flex-1 min-h-0 flex flex-col relative overflow-hidden ${
+                  isEditing
+                    ? `group ${selectedBlockId === fullPageBlock.id ? "ring-2 ring-blue-500 ring-inset" : ""}`
+                    : ""
+                }`}
+                onClick={(e) => {
+                  if (isEditing) {
+                    const target = e.target as HTMLElement
+                    const isEditorContent = target.closest(".ql-editor") || target.closest("textarea") || target.closest("input") ||
+                      target.closest('[contenteditable="true"]') || target.closest("button") || target.closest(".ql-toolbar") ||
+                      target.closest('[role="textbox"]') || target.closest(".ql-container") || target.closest(".ql-snow")
+                    if (!isEditorContent && onBlockSelect) onBlockSelect(fullPageBlock.id, false)
+                    else if (!isEditorContent) onBlockClick?.(fullPageBlock.id)
+                  }
+                }}
+              >
+                {isEditing && (
+                  <div className={`absolute top-2 right-2 z-20 flex items-center gap-1.5 ${selectedBlockId === fullPageBlock.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onBlockClick?.(fullPageBlock.id)
+                        onBlockSettingsClick?.(fullPageBlock.id)
+                      }}
+                      className="p-1.5 rounded-md shadow-sm bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"
+                      title="Configure block"
+                      aria-label="Configure block"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    </button>
+                    {onBlockDuplicate && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onBlockDuplicate(fullPageBlock.id) }}
+                        className="p-1.5 rounded-md shadow-sm bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"
+                        title="Duplicate block"
+                        aria-label="Duplicate block"
+                      >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      </button>
+                    )}
+                    {onBlockDelete && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onBlockDelete(fullPageBlock.id) }}
+                        className="p-1.5 rounded-md shadow-sm bg-white text-red-600 border border-red-300 hover:bg-red-50"
+                        title="Delete block"
+                        aria-label="Delete block"
+                      >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                )}
+                <div className="flex-1 min-h-0 w-full h-full overflow-hidden">
+                  <BlockAppearanceWrapper block={fullPageBlock} isFullPage className={isEditing ? "pointer-events-auto" : ""}>
+                    <div className="h-full w-full overflow-hidden">
+                      <BlockRenderer
+                        block={fullPageBlock}
+                        isEditing={isEditing && !fullPageBlock.config?.locked}
+                        onUpdate={onBlockUpdate}
+                        isLocked={fullPageBlock.config?.locked || false}
+                        pageTableId={pageTableId}
+                        pageId={pageId}
+                        recordId={recordId}
+                        recordTableId={recordTableId}
+                        mode={mode}
+                        filters={getFiltersForBlock(fullPageBlock.id)}
+                        filterTree={getFilterTreeForBlock(fullPageBlock.id) as FilterTree}
+                        onRecordClick={onRecordClick}
+                        onRecordContextChange={onRecordContextChange}
+                        aggregateData={aggregateData[fullPageBlock.id]}
+                        pageShowAddRecord={pageShowAddRecord}
+                        pageEditable={pageEditable}
+                        editableFieldNames={editableFieldNames}
+                        pageShowFieldNames={pageShowFieldNames}
+                        hideEditButton={topTwoFieldBlockIds.has(fullPageBlock.id)}
+                        allBlocks={blocks}
+                        onEphemeralHeightDelta={() => {}}
+                        rowHeight={Number(layoutSettings?.rowHeight) || 30}
+                        isEditingCanvas={editingBlockCanvasId === fullPageBlock.id}
+                        isFullPage
+                      />
+                    </div>
+                  </BlockAppearanceWrapper>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
         <>

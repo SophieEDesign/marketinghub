@@ -36,6 +36,14 @@ import { createClient } from "@/lib/supabase/client"
 import type { FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 
+function isBlockEligibleForFullPage(block: PageBlock): boolean {
+  if (!block.config?.is_full_page) return false
+  if (block.type === 'record_context') {
+    return Boolean(block.config?.table_id)
+  }
+  return true
+}
+
 interface InterfaceBuilderProps {
   page: Page
   initialBlocks: PageBlock[]
@@ -822,8 +830,10 @@ export default function InterfaceBuilder({
     async (type: BlockType) => {
       const def = BLOCK_REGISTRY[type]
 
-      // If page already has a full-page block, prevent adding a second block
-      const currentFullPageBlock = blocks.find((b) => b.config?.is_full_page === true)
+      // If page already has an eligible full-page block, prevent adding a second block
+      const currentFullPageBlock = blocks.find(
+        (b) => b.config?.is_full_page === true && isBlockEligibleForFullPage(b)
+      )
       if (currentFullPageBlock && blocks.length >= 1) {
         toast({
           variant: "default",
@@ -878,8 +888,8 @@ export default function InterfaceBuilder({
         setBlocks((prev) => [...prev, block])
         setSelectedBlockId(block.id)
 
-        // When adding the first block and type supports full-page, prompt to use as full-page view
-        if (wasEmpty && def.supportsFullPage) {
+        // When adding the first block and type supports full-page, prompt to use as full-page view only if block is eligible (e.g. record_context needs table_id)
+        if (wasEmpty && def.supportsFullPage && isBlockEligibleForFullPage(block)) {
           const defaultYes = def.defaultFullPage === true
           const message = defaultYes
             ? "Use this block as a full-page view? (You can change this in block settings.)"
@@ -1192,10 +1202,25 @@ export default function InterfaceBuilder({
     }
   }, [undoRedoLayoutState, saveLayout])
 
-  // Full-page invariant: at most one block may have config.is_full_page === true.
+  // Corrective pass: clear is_full_page on invalid record_context (no table_id) so page never locks on invalid config.
+  useEffect(() => {
+    blocks.forEach((block) => {
+      if (
+        block.type === 'record_context' &&
+        block.config?.is_full_page === true &&
+        !block.config?.table_id
+      ) {
+        handleBlockUpdate(block.id, { ...block.config, is_full_page: false })
+      }
+    })
+  }, [blocks, handleBlockUpdate])
+
+  // Full-page invariant: at most one block may have config.is_full_page === true (among eligible blocks).
   // If multiple do (e.g. legacy data or bug), resolve to the most recently edited and clear the others.
   useEffect(() => {
-    const fullPageBlocks = blocks.filter((b) => b.config?.is_full_page === true)
+    const fullPageBlocks = blocks.filter(
+      (b) => b.config?.is_full_page === true && isBlockEligibleForFullPage(b)
+    )
     if (fullPageBlocks.length <= 1) return
     if (resolvedFullPageRef.current === page.id) return
     resolvedFullPageRef.current = page.id
@@ -1204,7 +1229,6 @@ export default function InterfaceBuilder({
       const bAt = b.updated_at || b.created_at || ''
       return bAt.localeCompare(aAt)
     })
-    const keeper = sorted[0]
     const others = sorted.slice(1)
     void (async () => {
       for (const b of others) {
@@ -1217,10 +1241,14 @@ export default function InterfaceBuilder({
     })()
   }, [blocks, page.id, handleBlockUpdate])
 
-  // Derive full-page block for canvas: only when exactly one block and it has is_full_page.
+  // Derive full-page block for canvas: only when exactly one block and it has is_full_page and is eligible.
   const fullPageBlockId = useMemo(() => {
-    const fullPageBlock = blocks.find((b) => b.config?.is_full_page === true)
-    return fullPageBlock && blocks.length === 1 ? fullPageBlock.id : null
+    const eligibleFullPageBlocks = blocks.filter(
+      (b) => b.config?.is_full_page === true && isBlockEligibleForFullPage(b)
+    )
+    return eligibleFullPageBlocks.length === 1 && blocks.length === 1
+      ? eligibleFullPageBlocks[0].id
+      : null
   }, [blocks])
   
   // Keyboard shortcuts

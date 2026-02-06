@@ -24,9 +24,12 @@ export default function FullPageLayoutSettings({
   const isFullPage = block.config?.is_full_page === true
   const otherBlocksCount = allBlocks.filter((b) => b.id !== block.id).length
   const canTurnOnFullPage = otherBlocksCount === 0
+  const isValidForFullPage =
+    block.type !== 'record_context' || Boolean(block.config?.table_id)
 
   const handleToggle = (checked: boolean) => {
     if (checked && !canTurnOnFullPage) return
+    if (checked && !isValidForFullPage) return
     onUpdate({ is_full_page: checked })
   }
 
@@ -40,12 +43,16 @@ export default function FullPageLayoutSettings({
           id="full-page-mode"
           checked={isFullPage}
           onCheckedChange={handleToggle}
-          disabled={!isFullPage && !canTurnOnFullPage}
+          disabled={(!isFullPage && !canTurnOnFullPage) || !isValidForFullPage}
         />
       </div>
       {isFullPage ? (
         <p className="text-xs text-muted-foreground">
           This block fills the entire page. Turn off to use the grid and add more blocks.
+        </p>
+      ) : !isValidForFullPage ? (
+        <p className="text-xs text-muted-foreground">
+          Select a table to enable full-page mode.
         </p>
       ) : !canTurnOnFullPage ? (
         <p className="text-xs text-amber-700">

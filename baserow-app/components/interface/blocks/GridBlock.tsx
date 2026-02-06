@@ -1091,17 +1091,12 @@ export default function GridBlock({
         const showUnifiedCalendarHeader = viewType === "calendar"
         if (!showUnifiedCalendarHeader) return null
         const hasAnyDateField = (safeTableFields || []).some((f) => f && f.type === "date")
-        const compactBar = isFullPage
+        // Compact toolbar for all calendar blocks (full-page and normal)
+        const compactBar = true
 
         return (
-          <div
-            className={
-              compactBar
-                ? "flex items-center gap-3 flex-shrink-0 py-2 px-2 border-b border-gray-200/80 bg-white/95 min-h-0"
-                : "mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3"
-            }
-          >
-            <div className={compactBar ? "flex items-center gap-2 flex-1 min-w-0" : "flex items-center justify-between gap-3 flex-wrap"}>
+          <div className="flex items-center gap-3 flex-shrink-0 py-2 px-2 border-b border-gray-200/80 bg-white/95 min-h-0">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
               {showQuickFilters && (
                 <QuickFilterBar
                   storageKey={`mh:quickFilters:${pageId || "page"}:${block.id}`}
@@ -1124,21 +1119,21 @@ export default function GridBlock({
                       : null
                   }
                   compact={compactBar}
-                  fromSettingsPresetOnly={compactBar}
+                  fromSettingsPresetOnly={isFullPage}
                 />
               )}
 
               {showAddRecord && (
                 <Button
                   type="button"
-                  size={compactBar ? "sm" : "sm"}
+                  size="sm"
                   variant="outline"
                   onClick={handleAddRecord}
                   disabled={isAddRecordDisabled}
                   title={!canCreateRecord ? "Adding records is disabled for this block" : "Add a new record"}
-                  className={compactBar ? "h-8 text-xs flex-shrink-0" : "bg-white"}
+                  className="h-8 text-xs flex-shrink-0"
                 >
-                  <Plus className={compactBar ? "h-3.5 w-3 mr-1.5" : "h-4 w-4 mr-2"} />
+                  <Plus className="h-3.5 w-3 mr-1.5" />
                   Add record
                 </Button>
               )}

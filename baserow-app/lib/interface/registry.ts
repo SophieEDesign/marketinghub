@@ -39,6 +39,22 @@ export interface BlockDefinition {
    * Only applies when supportsFullPage is true.
    */
   defaultFullPage?: boolean
+  /**
+   * When in full-page mode, how this block uses width.
+   * - 'fill': block fills the viewport (grid, list, calendar, kanban).
+   * - 'rail': fixed-width left rail; does not stretch (e.g. record selector).
+   * Omit or undefined = 'fill'.
+   */
+  fullPageLayout?: 'fill' | 'rail'
+  /** When fullPageLayout === 'rail', max width in px. Ignored for 'fill'. */
+  fullPageMaxWidth?: number
+  /**
+   * When in rail full-page mode, this block can show a right-hand record preview driven by page record context.
+   * Only controller blocks should set this.
+   */
+  supportsRecordPreview?: boolean
+  /** When true and supportsRecordPreview, show preview by default when context is set. */
+  defaultRecordPreview?: boolean
 }
 
 export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
@@ -433,6 +449,10 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
     },
     supportsFullPage: true,
     defaultFullPage: true,
+    fullPageLayout: 'rail',
+    fullPageMaxWidth: 360,
+    supportsRecordPreview: true,
+    defaultRecordPreview: true,
   },
 }
 
