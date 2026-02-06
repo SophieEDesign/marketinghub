@@ -666,14 +666,14 @@ export default function GridDataSettings({
                       <SelectContent>
                         <SelectItem value="__none__">None</SelectItem>
                         {textFields.map((field) => (
-                          <SelectItem key={field.id} value={field.name}>
-                            {field.name}
+                          <SelectItem key={field.id} value={getFieldDisplayName(field)}>
+                            {getFieldDisplayName(field)}
                           </SelectItem>
                         ))}
                         {/* Fallback: show all fields if no text fields */}
                         {textFields.length === 0 && allFields.map((field) => (
-                          <SelectItem key={field.id} value={field.name}>
-                            {field.name}
+                          <SelectItem key={field.id} value={getFieldDisplayName(field)}>
+                            {getFieldDisplayName(field)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -703,8 +703,8 @@ export default function GridDataSettings({
                             <SelectContent>
                               <SelectItem value="__none__">None</SelectItem>
                               {getAvailableSubtitleFields().map((f) => (
-                                <SelectItem key={f.id} value={f.name}>
-                                  {f.name}
+                                <SelectItem key={f.id} value={getFieldDisplayName(f)}>
+                                  {getFieldDisplayName(f)}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -731,8 +731,8 @@ export default function GridDataSettings({
                         </SelectTrigger>
                         <SelectContent>
                           {getAvailableSubtitleFields().map((field) => (
-                            <SelectItem key={field.id} value={field.name}>
-                              {field.name}
+                            <SelectItem key={field.id} value={getFieldDisplayName(field)}>
+                              {getFieldDisplayName(field)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -753,8 +753,8 @@ export default function GridDataSettings({
                       <SelectContent>
                         <SelectItem value="__none__">None</SelectItem>
                         {attachmentFields.map((field) => (
-                          <SelectItem key={field.id} value={field.name}>
-                            {field.name}
+                          <SelectItem key={field.id} value={getFieldDisplayName(field)}>
+                            {getFieldDisplayName(field)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -784,8 +784,8 @@ export default function GridDataSettings({
                             <SelectContent>
                               <SelectItem value="__none__">None</SelectItem>
                               {selectFields.map((f) => (
-                                <SelectItem key={f.id} value={f.name}>
-                                  {f.name}
+                                <SelectItem key={f.id} value={getFieldDisplayName(f)}>
+                                  {getFieldDisplayName(f)}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -811,8 +811,8 @@ export default function GridDataSettings({
                       </SelectTrigger>
                       <SelectContent>
                         {getAvailablePillFields().map((field) => (
-                          <SelectItem key={field.id} value={field.name}>
-                            {field.name}
+                          <SelectItem key={field.id} value={getFieldDisplayName(field)}>
+                            {getFieldDisplayName(field)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -842,8 +842,8 @@ export default function GridDataSettings({
                             <SelectContent>
                               <SelectItem value="__none__">None</SelectItem>
                               {[...dateFields, ...numberFields].map((f) => (
-                                <SelectItem key={f.id} value={f.name}>
-                                  {f.name}
+                                <SelectItem key={f.id} value={getFieldDisplayName(f)}>
+                                  {getFieldDisplayName(f)}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -869,8 +869,8 @@ export default function GridDataSettings({
                       </SelectTrigger>
                       <SelectContent>
                         {getAvailableMetaFields().map((field) => (
-                          <SelectItem key={field.id} value={field.name}>
-                            {field.name}
+                          <SelectItem key={field.id} value={getFieldDisplayName(field)}>
+                            {getFieldDisplayName(field)}
                           </SelectItem>
                         ))}
                       </SelectContent>

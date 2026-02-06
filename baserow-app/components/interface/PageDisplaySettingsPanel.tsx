@@ -25,6 +25,7 @@ import { createClient } from "@/lib/supabase/client"
 import type { InterfacePage } from "@/lib/interface/page-types-only"
 import { getPageTypeDefinition, validatePageAnchor, isRecordReviewPage } from "@/lib/interface/page-types"
 import RecordViewPageSettings from "./settings/RecordViewPageSettings"
+import { getFieldDisplayName } from "@/lib/fields/display"
 
 interface PageDisplaySettingsPanelProps {
   page: InterfacePage | null
@@ -739,7 +740,7 @@ export default function PageDisplaySettingsPanel({
                           <SelectContent>
                             {tableFields.map((field) => (
                               <SelectItem key={field.id} value={field.name}>
-                                {field.name}
+                                {getFieldDisplayName(field)}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -810,8 +811,8 @@ export default function PageDisplaySettingsPanel({
                     {tableFields
                       .filter((f) => f.type === "single_select" || f.type === "multi_select")
                       .map((field) => (
-                        <SelectItem key={field.id} value={field.name}>
-                          {field.name} ({field.type})
+<SelectItem key={field.id} value={field.name}>
+                                {getFieldDisplayName(field)} ({field.type})
                         </SelectItem>
                       ))}
                   </SelectContent>
@@ -851,7 +852,7 @@ export default function PageDisplaySettingsPanel({
                           <SelectContent>
                             {tableFields.map((field) => (
                               <SelectItem key={field.id} value={field.name}>
-                                {field.name}
+                                {getFieldDisplayName(field)}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -926,7 +927,7 @@ export default function PageDisplaySettingsPanel({
                         .filter((f) => ['single_select', 'multi_select'].includes(f.type))
                         .map((field) => (
                           <SelectItem key={field.id} value={field.name}>
-                            {field.name}
+                            {getFieldDisplayName(field)}
                           </SelectItem>
                         ))}
                     </SelectContent>
@@ -954,7 +955,7 @@ export default function PageDisplaySettingsPanel({
                           .filter((f) => f.type === 'date')
                           .map((field) => (
                             <SelectItem key={field.id} value={field.name}>
-                              {field.name}
+                              {getFieldDisplayName(field)}
                             </SelectItem>
                           ))}
                       </SelectContent>
@@ -980,7 +981,7 @@ export default function PageDisplaySettingsPanel({
                           .filter((f) => f.type === 'date')
                           .map((field) => (
                             <SelectItem key={field.id} value={field.name}>
-                              {field.name}
+                              {getFieldDisplayName(field)}
                             </SelectItem>
                           ))}
                       </SelectContent>
@@ -1019,7 +1020,7 @@ export default function PageDisplaySettingsPanel({
                                 className="rounded border-gray-300"
                                 disabled={!selectedTableId || tableFields.length === 0}
                               />
-                              <span className="text-sm text-gray-700">{field.name}</span>
+                              <span className="text-sm text-gray-700">{getFieldDisplayName(field)}</span>
                               <span className="text-xs text-gray-400">({field.type})</span>
                             </label>
                           )
@@ -1096,7 +1097,7 @@ export default function PageDisplaySettingsPanel({
                         .filter((f) => f.type === 'single_select' || f.type === 'multi_select')
                         .map((field) => (
                           <SelectItem key={field.id} value={field.name}>
-                            {field.name}
+                            {getFieldDisplayName(field)}
                           </SelectItem>
                         ))}
                     </SelectContent>
@@ -1135,7 +1136,7 @@ export default function PageDisplaySettingsPanel({
                               }}
                               className="rounded border-gray-300"
                             />
-                            <span className="text-sm text-gray-700">{field.name}</span>
+                            <span className="text-sm text-gray-700">{getFieldDisplayName(field)}</span>
                             <span className="text-xs text-gray-400">({field.type})</span>
                           </label>
                         )
@@ -1202,7 +1203,7 @@ export default function PageDisplaySettingsPanel({
                               }}
                               className="rounded border-gray-300"
                             />
-                            <span className="text-sm text-gray-700">{field.name}</span>
+                            <span className="text-sm text-gray-700">{getFieldDisplayName(field)}</span>
                             <span className="text-xs text-gray-400">({field.type})</span>
                           </label>
                         )

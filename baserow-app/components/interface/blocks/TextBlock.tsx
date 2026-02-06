@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { useEditor, EditorContent } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
 import Link from "@tiptap/extension-link"
@@ -93,6 +93,11 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   // No fallbacks, no other sources
   const contentJson = config?.content_json
 
+  // CRITICAL: Stable empty doc reference so useEditor doesn't get a new object every render.
+  // TipTap useEditor can re-create the editor when content option reference changes, causing
+  // effect loops (setState in selection effect) and React error #185 (maximum update depth).
+  const EMPTY_DOC = useMemo(() => ({ type: 'doc' as const, content: [] as const }), [])
+
   // Backward compatibility: older text blocks may still store HTML/text in legacy keys.
   // We only use this to initialize/render when `content_json` is missing.
   // All edits still persist to `content_json`.
@@ -182,6 +187,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   /**
    * Get initial content for editor
    * Prefer config.content_json, but support legacy HTML/text for backward compatibility.
+   * CRITICAL: Returns stable EMPTY_DOC reference for empty state to prevent useEditor recreate loop.
    */
   const getInitialContent = useCallback(() => {
     // If content_json exists and is valid TipTap JSON, use it
@@ -194,12 +200,18 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       return legacyContent
     }
     
-    // Empty state - no content_json or invalid format
-    return {
-      type: 'doc',
-      content: []
-    }
-  }, [contentJson, legacyContent])
+    // Empty state - use stable reference to prevent useEditor from re-creating every render
+    return EMPTY_DOC
+  }, [contentJson, legacyContent, EMPTY_DOC])
+
+  /**
+   * Stable initial content for useEditor. Prevents React #185: useEditor re-creates when
+   * content option is a new object each render, which re-runs effects (e.g. setHasSelection) in a loop.
+   */
+  const initialContent = useMemo(
+    () => (isConfigLoading ? EMPTY_DOC : getInitialContent()),
+    [isConfigLoading, getInitialContent, EMPTY_DOC]
+  )
 
   /**
    * TipTap Editor Instance
@@ -228,9 +240,8 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       TextStyle,
       Color,
     ],
-    // Initialize with empty content if config is loading, otherwise use actual content
-    // Content will be set via setContent when config loads (handled in useEffect)
-    content: isConfigLoading ? { type: 'doc', content: [] } : getInitialContent(),
+    // Stable reference so TipTap does not re-create editor every render (prevents update loop)
+    content: initialContent,
     editable: true, // Editor must exist; actual editability is controlled via editor.setEditable(!readOnly)
     editorProps: {
       attributes: {
@@ -334,6 +345,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   })
 
   // Track selection state so we can show toolbar on text selection (not just focus)
+  // Defer initial update to avoid setState during effect (can contribute to update loops)
   useEffect(() => {
     if (!editor) return
 
@@ -341,12 +353,13 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       setHasSelection(!editor.state.selection.empty)
     }
 
-    update()
+    const id = requestAnimationFrame(() => update())
     editor.on('selectionUpdate', update)
     editor.on('focus', update)
     editor.on('blur', update)
 
     return () => {
+      cancelAnimationFrame(id)
       editor.off('selectionUpdate', update)
       editor.off('focus', update)
       editor.off('blur', update)

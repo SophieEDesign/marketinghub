@@ -29,6 +29,7 @@ import {
 } from "@/lib/field-colors"
 import { normalizeUuid } from "@/lib/utils/ids"
 import { getOperatorsForFieldType } from "@/lib/filters/filter-ui-primitives"
+import { getFieldDisplayName } from "@/lib/fields/display"
 
 interface FilterDialogProps {
   isOpen: boolean
@@ -429,7 +430,7 @@ export default function FilterDialog({
                                   <SelectContent>
                                     {tableFields.map((field) => (
                                       <SelectItem key={field.id} value={field.name}>
-                                        {field.name}
+                                        {getFieldDisplayName(field)}
                                       </SelectItem>
                                     ))}
                                   </SelectContent>
@@ -616,7 +617,7 @@ export default function FilterDialog({
                               <SelectContent>
                                 {tableFields.map((field) => (
                                   <SelectItem key={field.id} value={field.name}>
-                                    {field.name}
+                                    {getFieldDisplayName(field)}
                                   </SelectItem>
                                 ))}
                               </SelectContent>

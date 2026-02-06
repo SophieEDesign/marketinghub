@@ -37,6 +37,7 @@ import { sortRowsByFieldType, shouldUseClientSideSorting } from "@/lib/sorting/f
 import { resolveChoiceColor, normalizeHexColor, resolveFieldColor } from '@/lib/field-colors'
 import type { HighlightRule } from '@/lib/interface/types'
 import { evaluateHighlightRules, getFormattingStyle } from '@/lib/conditional-formatting/evaluator'
+import { getFieldDisplayName } from "@/lib/fields/display"
 
 // Helper to convert hex color to RGB
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
@@ -384,7 +385,7 @@ function DraggableColumnHeader({
           }
         >
           <span className="truncate font-medium">
-            {fieldName || 'Unknown Field'}
+            {tableField ? getFieldDisplayName(tableField) : (fieldName || 'Unknown Field')}
           </span>
           {isVirtual && (
             <span className="ml-1 text-xs text-gray-400 flex-shrink-0" title="Formula field">(fx)</span>
@@ -3238,17 +3239,16 @@ export default function GridView({
                   if (it.type === 'group') {
                     const node = it.node
                     const isCollapsed = collapsedGroups.has(node.pathKey)
+                    // Get group-by field for color support and label
+                    const groupByField = node.rule.type === 'field'
+                      ? safeTableFields.find(f => f && (f.name === node.rule.field || f.id === node.rule.field))
+                      : null
                     const ruleLabel =
                       node.rule.type === 'date'
                         ? node.rule.granularity === 'year'
                           ? 'Year'
                           : 'Month'
-                        : node.rule.field
-                    
-                    // Get group-by field for color support
-                    const groupByField = node.rule.type === 'field' 
-                      ? safeTableFields.find(f => f && (f.name === node.rule.field || f.id === node.rule.field))
-                      : null
+                        : (groupByField ? getFieldDisplayName(groupByField) : node.rule.field)
                     
                     // Get color for section header if group-by field is single_select
                     let sectionColor: string | null = null

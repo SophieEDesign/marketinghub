@@ -36,7 +36,7 @@ interface HorizontalGroupedCanvasModalProps {
 }
 
 /**
- * Modal for editing the canvas layout of a horizontal grouped block
+ * Modal for editing the canvas layout of a Tabs block
  * Opens when "Edit layout" is clicked in block settings
  */
 export default function HorizontalGroupedCanvasModal({

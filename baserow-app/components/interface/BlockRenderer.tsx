@@ -77,7 +77,7 @@ interface BlockRendererProps {
   allBlocks?: PageBlock[] // All blocks on the page (for FilterBlock connection awareness)
   onEphemeralHeightDelta?: (blockId: string, deltaPx: number) => void // Callback for ephemeral height changes (collapsible expansion)
   rowHeight?: number // Row height in pixels (for height calculation)
-  isEditingCanvas?: boolean // Whether this block's internal canvas is being edited (for horizontal_grouped blocks)
+  isEditingCanvas?: boolean // Whether this block's internal canvas is being edited (for Tabs blocks)
   /** When true, block is the single full-page block; no chrome, scroll owned by block internal content only */
   isFullPage?: boolean
 }
@@ -480,7 +480,7 @@ export default function BlockRenderer({
         )
 
       case "horizontal_grouped":
-        // Horizontal Grouped block - displays records grouped by field in tabs
+        // Tabs block - displays records grouped by field in tabs
         return (
           <LazyBlockWrapper enabled={!isEditing}>
             <HorizontalGroupedBlock

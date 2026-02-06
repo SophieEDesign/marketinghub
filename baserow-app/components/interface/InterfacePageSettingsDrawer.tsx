@@ -33,6 +33,7 @@ import { createClient } from "@/lib/supabase/client"
 import type { InterfacePage } from "@/lib/interface/page-types-only"
 import { PAGE_TYPE_DEFINITIONS, isRecordReviewPage } from "@/lib/interface/page-types"
 import RecordReviewLeftPanelSettings from "./RecordReviewLeftPanelSettings"
+import { getFieldDisplayName } from "@/lib/fields/display"
 import RecordViewLeftPanelSettings from "./RecordViewLeftPanelSettings"
 
 interface InterfacePageSettingsDrawerProps {
@@ -599,7 +600,7 @@ export default function InterfacePageSettingsDrawer({
                               }}
                               className="rounded"
                             />
-                            <span className="text-gray-700">{field.name}</span>
+                            <span className="text-gray-700">{getFieldDisplayName(field)}</span>
                             <span className="text-xs text-gray-500">({field.type})</span>
                           </label>
                         ))}

@@ -404,14 +404,14 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
   },
   horizontal_grouped: {
     type: 'horizontal_grouped',
-    label: 'Horizontal Grouped',
+    label: 'Tabs',
     icon: 'LayoutGrid',
     defaultWidth: 12,
     defaultHeight: 8,
     minWidth: 6,
     minHeight: 6,
     defaultConfig: {
-      title: 'Horizontal Grouped View',
+      title: 'Tabs View',
       table_id: '',
       group_by_field: '',
     },

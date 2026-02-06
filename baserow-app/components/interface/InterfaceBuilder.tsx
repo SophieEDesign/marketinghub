@@ -241,9 +241,9 @@ export default function InterfaceBuilder({
   const [isSaving, setIsSaving] = useState(false)
   const [pageSettingsOpen, setPageSettingsOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState<Page>(page)
-  // Track which block's internal canvas is being edited (for horizontal_grouped blocks)
+  // Track which block's internal canvas is being edited (for Tabs blocks)
   const [editingBlockCanvasId, setEditingBlockCanvasId] = useState<string | null>(null)
-  // Track modal state for horizontal_grouped canvas editing
+  // Track modal state for Tabs block canvas editing
   const [canvasModalOpen, setCanvasModalOpen] = useState(false)
   const [canvasModalBlock, setCanvasModalBlock] = useState<PageBlock | null>(null)
   const [canvasModalData, setCanvasModalData] = useState<{
@@ -1559,7 +1559,7 @@ export default function InterfaceBuilder({
           onLock={handleLockBlock}
           editingBlockCanvasId={editingBlockCanvasId}
           onEditBlockCanvas={async (blockId) => {
-            // For horizontal_grouped blocks, open modal instead of inline editing
+            // For Tabs blocks, open modal instead of inline editing
             const block = blocks.find(b => b.id === blockId)
             if (block?.type === 'horizontal_grouped') {
               const tableId = block.config?.table_id || pageTableId
@@ -1633,7 +1633,7 @@ export default function InterfaceBuilder({
         onPageUpdate={handlePageUpdate}
       />
 
-      {/* Horizontal Grouped Canvas Modal */}
+      {/* Tabs block canvas modal */}
       {canvasModalOpen && canvasModalBlock && canvasModalData && (
         <HorizontalGroupedCanvasModal
           open={canvasModalOpen}

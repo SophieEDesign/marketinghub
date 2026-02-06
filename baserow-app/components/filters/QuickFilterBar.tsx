@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { getManualChoiceLabels } from "@/lib/fields/select-options"
+import { getFieldDisplayName } from "@/lib/fields/display"
 
 type QuickableFieldType = "single_select" | "multi_select"
 
@@ -225,9 +226,9 @@ export default function QuickFilterBar({
               <button
                 type="button"
                 className="inline-flex items-center gap-2 rounded-full border bg-white px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
-                aria-label={`Filter by ${field.name}`}
+                aria-label={`Filter by ${getFieldDisplayName(field)}`}
               >
-                <span className="font-medium">{field.name}</span>
+                <span className="font-medium">{getFieldDisplayName(field)}</span>
                 <span className="text-gray-500">
                   {operatorLabel(type, item.operator)}{" "}
                   <span className="text-gray-700">{valueLabel}</span>
@@ -248,7 +249,7 @@ export default function QuickFilterBar({
             </PopoverTrigger>
             <PopoverContent align="start" className="w-72 p-3">
               <div className="space-y-3">
-                <div className="text-xs font-medium text-gray-700">{field.name}</div>
+                <div className="text-xs font-medium text-gray-700">{getFieldDisplayName(field)}</div>
 
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
@@ -343,7 +344,7 @@ export default function QuickFilterBar({
                     ])
                   }}
                 >
-                  {f.name}
+                  {getFieldDisplayName(f)}
                 </button>
               ))}
             </div>

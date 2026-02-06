@@ -524,7 +524,7 @@ export default function SettingsPanel({
       ? "grid"
       : block?.type) as BlockType | undefined
 
-    // For horizontal_grouped blocks, pass canvas editing callbacks
+    // For Tabs blocks, pass canvas editing callbacks
     const additionalProps = normalizedBlockType === 'horizontal_grouped' ? {
       onEditCanvas: () => {
         if (block && onEditBlockCanvas) {

@@ -63,7 +63,7 @@ BEGIN
         WHEN 'list' THEN
           normalized_config := normalized_config || '{"title": "List View"}'::jsonb;
         WHEN 'horizontal_grouped' THEN
-          normalized_config := normalized_config || '{"title": "Horizontal Grouped View"}'::jsonb;
+          normalized_config := normalized_config || '{"title": "Tabs View"}'::jsonb;
         WHEN 'number' THEN
           normalized_config := normalized_config || '{"title": "Number"}'::jsonb;
         ELSE

@@ -23,7 +23,7 @@ interface HorizontalGroupedBlockProps {
 }
 
 /**
- * HorizontalGroupedBlock - Displays records grouped by a field in horizontal tabs
+ * Tabs block - Displays records grouped by a field in horizontal tabs
  * Each tab shows records from that group in a card format
  */
 export default function HorizontalGroupedBlock({

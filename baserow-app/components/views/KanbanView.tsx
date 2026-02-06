@@ -400,27 +400,60 @@ export default function KanbanView({
                   ? getFormattingStyle(matchingRule)
                   : {}
                 
-                return (
+                return (() => {
+                  const cardFieldIds = (Array.isArray(fieldIds) ? fieldIds : [])
+                    .filter((fid) => fid !== groupingFieldId)
+                    .slice(0, 5)
+                  const cardFields = cardFieldIds
+                    .map((fieldId) => (Array.isArray(tableFields) ? tableFields : []).find(
+                      (f: any) => f?.name === fieldId || f?.id === fieldId
+                    ) as TableField | undefined)
+                    .filter((f): f is TableField => !!f)
+                  const titleField = cardFields[0]
+                  const otherFields = cardFields.slice(1)
+                  const pillMetaFields = otherFields.length >= 2 ? otherFields.slice(0, -1) : otherFields
+                  const footerField = otherFields.length >= 2 ? otherFields[otherFields.length - 1] : null
+                  const data = row.data || {}
+
+                  return (
                 <Card 
                   key={row.id} 
-                  className={`hover:shadow-md transition-shadow bg-white border-gray-200 rounded-lg cursor-default ${
+                  className={`hover:shadow-md transition-shadow bg-white border-gray-200 rounded-lg cursor-default min-w-0 ${
                     selectedCardId === String(row.id) ? "ring-1 ring-blue-400/40 bg-blue-50/30" : ""
                   }`}
                   style={{ ...borderColor, ...rowFormattingStyle }}
                   onClick={() => setSelectedCardId(String(row.id))}
                   onDoubleClick={() => handleOpenRecord(String(row.id))}
                 >
-                  <CardContent className="p-4">
-                    <div className="space-y-2">
-                      {/* Row open control */}
-                      <div className="flex items-start justify-end">
+                  <CardContent className="p-3 min-w-0">
+                    <div className="space-y-2 min-w-0">
+                      {/* Title row: primary value only + open button (Airtable-style) */}
+                      <div className="flex items-start gap-1.5 min-w-0">
+                        {titleField && (
+                          <div
+                            className="flex-1 min-w-0 line-clamp-3 overflow-hidden font-semibold text-sm text-gray-900 leading-tight"
+                            onClick={(e) => e.stopPropagation()}
+                            onDoubleClick={(e) => e.stopPropagation()}
+                          >
+                            <CellFactory
+                              field={titleField}
+                              value={data[titleField.name]}
+                              rowId={String(row.id)}
+                              tableName={supabaseTableName || ""}
+                              editable={!titleField.options?.read_only && titleField.type !== "formula" && titleField.type !== "lookup" && !!supabaseTableName}
+                              wrapText={true}
+                              rowHeight={undefined}
+                              onSave={(value) => handleCellSave(String(row.id), titleField.name, value)}
+                            />
+                          </div>
+                        )}
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation()
                             handleOpenRecord(String(row.id))
                           }}
-                          className="w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
+                          className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
                           title="Open record"
                           aria-label="Open record"
                         >
@@ -430,7 +463,7 @@ export default function KanbanView({
 
                       {/* Image if configured */}
                       {cardImage && (
-                        <div className={`w-full ${fitImageSize ? 'h-auto' : 'h-32'} rounded overflow-hidden bg-gray-100 mb-2`}>
+                        <div className={`w-full min-w-0 ${fitImageSize ? 'h-auto' : 'h-32'} rounded overflow-hidden bg-gray-100`}>
                           <img
                             src={cardImage}
                             alt=""
@@ -441,45 +474,50 @@ export default function KanbanView({
                           />
                         </div>
                       )}
-                      {(Array.isArray(fieldIds) ? fieldIds : [])
-                        .filter((fid) => fid !== groupingFieldId)
-                        .slice(0, 3)
-                        .map((fieldId) => {
-                          const fieldObj = (Array.isArray(tableFields) ? tableFields : []).find(
-                            (f: any) => f?.name === fieldId || f?.id === fieldId
-                          ) as TableField | undefined
-                          if (!fieldObj) return null
-                          const fieldName = fieldObj.name
-                          const isVirtual = fieldObj.type === "formula" || fieldObj.type === "lookup"
-                          return (
-                            <div
-                              key={fieldId}
-                              className="text-sm"
-                              onClick={(e) => e.stopPropagation()}
-                              onDoubleClick={(e) => e.stopPropagation()}
-                            >
-                              <div className="text-gray-500 font-medium text-xs uppercase tracking-wide">
-                                {fieldObj.name}:
-                              </div>
-                              <div className="text-gray-900">
+
+                      {/* Pills / meta: values only, no labels */}
+                      {pillMetaFields.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 min-w-0" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+                          {pillMetaFields.map((fieldObj) => {
+                            const isVirtual = fieldObj.type === "formula" || fieldObj.type === "lookup"
+                            return (
+                              <div key={fieldObj.id ?? fieldObj.name} className="min-w-0 max-w-full">
                                 <CellFactory
                                   field={fieldObj}
-                                  value={(row.data || {})[fieldName]}
+                                  value={data[fieldObj.name]}
                                   rowId={String(row.id)}
                                   tableName={supabaseTableName || ""}
                                   editable={!fieldObj.options?.read_only && !isVirtual && !!supabaseTableName}
                                   wrapText={true}
-                                  rowHeight={32}
-                                  onSave={(value) => handleCellSave(String(row.id), fieldName, value)}
+                                  rowHeight={22}
+                                  onSave={(value) => handleCellSave(String(row.id), fieldObj.name, value)}
                                 />
                               </div>
-                            </div>
-                          )
-                        })}
+                            )
+                          })}
+                        </div>
+                      )}
+
+                      {/* Footer: optional last field as subtle meta */}
+                      {footerField && (
+                        <div className="border-t border-gray-100 pt-1.5 mt-0.5 text-xs text-gray-500 min-w-0" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+                          <CellFactory
+                            field={footerField}
+                            value={data[footerField.name]}
+                            rowId={String(row.id)}
+                            tableName={supabaseTableName || ""}
+                            editable={!footerField.options?.read_only && footerField.type !== "formula" && footerField.type !== "lookup" && !!supabaseTableName}
+                            wrapText={true}
+                            rowHeight={20}
+                            onSave={(value) => handleCellSave(String(row.id), footerField.name, value)}
+                          />
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
-                )
+                  );
+                })();
               })}
               <Button
                 variant="ghost"

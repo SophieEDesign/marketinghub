@@ -31,7 +31,7 @@ This document compares block defaults defined in two places:
 | timeline | `{ title: 'Timeline', table_id: '', view_type: 'timeline' }` | `{ table_id: '', view_type: 'timeline' }` | ✅ Yes | Registry has title, validator doesn't |
 | multi_timeline | `{ title: 'Multi Timeline', sources: [] }` | `{ sources: [] }` | ✅ Yes | Registry has title, validator doesn't |
 | list | `{ title: 'List View', table_id: '' }` | `{ table_id: '', view_type: 'grid' }` | ✅ Yes | Registry has title, validator has view_type |
-| horizontal_grouped | `{ title: 'Horizontal Grouped View', table_id: '', group_by_field: '' }` | `{ table_id: '', group_by_field: '' }` | ✅ Yes | Registry has title, validator doesn't |
+| horizontal_grouped | `{ title: 'Tabs View', table_id: '', group_by_field: '' }` | `{ table_id: '', group_by_field: '' }` | ✅ Yes | Registry has title, validator doesn't |
 | number | `{ title: 'Number', table_id: '', field_id: '' }` | `{ table_id: '', field_id: '' }` | ✅ Yes | Registry has title, validator doesn't |
 
 ## Conflicts Identified

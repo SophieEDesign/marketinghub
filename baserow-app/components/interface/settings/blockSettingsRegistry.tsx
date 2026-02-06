@@ -43,9 +43,9 @@ export type DataSettingsCtx = {
   onTableChange: (tableId: string) => Promise<void>
   pageTableId?: string | null
   allBlocks?: PageBlock[]
-  onEditCanvas?: () => void // For horizontal_grouped blocks
-  isEditingCanvas?: boolean // For horizontal_grouped blocks
-  onExitBlockCanvas?: () => void // For horizontal_grouped blocks
+  onEditCanvas?: () => void // For Tabs blocks
+  isEditingCanvas?: boolean // For Tabs blocks
+  onExitBlockCanvas?: () => void // For Tabs blocks
 }
 
 export type AppearanceSettingsCtx = {
