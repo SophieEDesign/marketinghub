@@ -554,6 +554,7 @@ export default function AutomationBuilder({
           actionGroups={actionGroups}
           tableFields={tableFields}
           onUpdateTrigger={setTriggerConfig}
+          onUpdateTriggerType={setTriggerType}
           onUpdateAction={updateAction}
           onUpdateGroup={updateGroup}
           onClose={() => setSelectedItem(null)}

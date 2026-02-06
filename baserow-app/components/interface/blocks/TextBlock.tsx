@@ -24,6 +24,20 @@ import {
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
+// Stable extensions array so useEditor doesn't see a new reference every render (prevents React #185)
+const TEXT_BLOCK_EXTENSIONS = [
+  StarterKit.configure({
+    heading: { levels: [1, 2, 3] },
+    codeBlock: { HTMLAttributes: { class: 'code-block' } },
+  }),
+  Link.configure({
+    openOnClick: false,
+    HTMLAttributes: { class: 'text-blue-600 underline hover:text-blue-800' },
+  }),
+  TextStyle,
+  Color,
+]
+
 interface TextBlockProps {
   block: PageBlock
   isEditing?: boolean
@@ -147,6 +161,15 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   const toolbarRef = useRef<HTMLDivElement>(null)
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastSavedContentRef = useRef<string>("") // Track last saved content to prevent duplicate saves
+
+  // Refs for useEditor callbacks so config can be stable (prevents editor recreate → React #185)
+  const readOnlyRef = useRef(readOnly)
+  const onUpdateRef = useRef(onUpdate)
+  const blockIdRef = useRef(block.id)
+  const editorRef = useRef<ReturnType<typeof useEditor> | null>(null)
+  readOnlyRef.current = readOnly
+  onUpdateRef.current = onUpdate
+  blockIdRef.current = block.id
   
   // Track block.id to detect when to rehydrate (only on block ID change)
   const previousBlockIdRef = useRef<string>(block.id)
@@ -219,67 +242,48 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
    * Content is initialized from config.content_json and rehydrated when config changes
    * CRITICAL: Editor must be editable when effectiveIsEditing=true (isEditing=true AND not viewer mode)
    */
-  const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        heading: {
-          levels: [1, 2, 3],
-        },
-        codeBlock: {
-          HTMLAttributes: {
-            class: 'code-block',
-          },
-        },
-      }),
-      Link.configure({
-        openOnClick: false,
-        HTMLAttributes: {
-          class: 'text-blue-600 underline hover:text-blue-800',
-        },
-      }),
-      TextStyle,
-      Color,
-    ],
-    // Stable reference so TipTap does not re-create editor every render (prevents update loop)
-    content: initialContent,
-    editable: true, // Editor must exist; actual editability is controlled via editor.setEditable(!readOnly)
-    editorProps: {
+  // Primitive values for editorProps so we can memoize and avoid new object every render
+  const textColorStyle = config?.appearance?.text_color ? `color: ${config.appearance.text_color};` : ''
+  const editorProps = useMemo(
+    () => ({
       attributes: {
-        // Keep typography/layout on the wrapper element. ProseMirror should just fill the available space.
         class: 'focus:outline-none w-full h-full min-h-0',
         'data-placeholder': isEditing ? 'Start typing…' : '',
         tabindex: isEditing ? '0' : '-1',
-        style: config?.appearance?.text_color 
-          ? `color: ${config.appearance.text_color};` 
-          : '',
+        style: textColorStyle,
       },
-      handleKeyDown: (view, event) => {
-        // While editing a text block, editor keyboard input must not leak to the grid/page.
-        // This disables InterfaceBuilder/Canvas shortcuts while the editor is focused.
-        if (!readOnly) {
+      handleKeyDown: (_view: unknown, event: KeyboardEvent) => {
+        if (!readOnlyRef.current) {
           event.stopPropagation()
         }
+        const ed = editorRef.current
         if ((event.metaKey || event.ctrlKey) && event.key === 'b') {
           event.preventDefault()
-          editor?.chain().focus().toggleBold().run()
+          ed?.chain().focus().toggleBold().run()
           return true
         }
         if ((event.metaKey || event.ctrlKey) && event.key === 'i') {
           event.preventDefault()
-          editor?.chain().focus().toggleItalic().run()
+          ed?.chain().focus().toggleItalic().run()
           return true
         }
         if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
           event.preventDefault()
           const url = window.prompt('Enter URL:')
-          if (url) {
-            editor?.chain().focus().setLink({ href: url }).run()
-          }
+          if (url) ed?.chain().focus().setLink({ href: url }).run()
           return true
         }
         return false
       },
-    },
+    }),
+    [isEditing, textColorStyle]
+  )
+
+  const editor = useEditor({
+    extensions: TEXT_BLOCK_EXTENSIONS,
+    content: initialContent,
+    editable: true,
+    editorProps,
     onFocus: () => {
       if (blurTimeoutRef.current) {
         clearTimeout(blurTimeoutRef.current)
@@ -343,6 +347,12 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       }, 1000)
     },
   })
+
+  // Keep editorRef current so editorProps.handleKeyDown (memoized) can access it
+  useEffect(() => {
+    editorRef.current = editor
+    return () => { editorRef.current = null }
+  }, [editor])
 
   // Track selection state so we can show toolbar on text selection (not just focus)
   // Defer initial update to avoid setState during effect (can contribute to update loops)

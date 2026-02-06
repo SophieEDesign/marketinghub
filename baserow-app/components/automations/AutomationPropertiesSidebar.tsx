@@ -11,6 +11,15 @@ import VariablePicker from "./VariablePicker"
 import { generateConditionSummary } from "@/lib/automations/condition-formula"
 import { isEmptyFilterTree } from "@/lib/filters/canonical-model"
 
+const TRIGGER_OPTIONS: { value: TriggerType; label: string }[] = [
+  { value: 'row_created', label: 'When a record is created' },
+  { value: 'row_updated', label: 'When a record is updated' },
+  { value: 'row_deleted', label: 'When a record is deleted' },
+  { value: 'schedule', label: 'On a schedule' },
+  { value: 'webhook', label: 'When webhook is called' },
+  { value: 'condition', label: 'When conditions match' },
+]
+
 interface AutomationPropertiesSidebarProps {
   selectedItem: { type: 'trigger' | 'action' | 'group', id: string | number } | null
   triggerType: TriggerType
@@ -18,6 +27,7 @@ interface AutomationPropertiesSidebarProps {
   actionGroups: ActionGroup[]
   tableFields: TableField[]
   onUpdateTrigger: (config: TriggerConfig) => void
+  onUpdateTriggerType?: (type: TriggerType) => void
   onUpdateAction: (groupIndex: number, actionIndex: number, updates: Partial<ActionConfig>) => void
   onUpdateGroup: (groupIndex: number, updates: Partial<ActionGroup>) => void
   onClose: () => void
@@ -42,6 +52,7 @@ export default function AutomationPropertiesSidebar({
   actionGroups,
   tableFields,
   onUpdateTrigger,
+  onUpdateTriggerType,
   onUpdateAction,
   onUpdateGroup,
   onClose,
@@ -88,14 +99,27 @@ export default function AutomationPropertiesSidebar({
       <div className="space-y-4">
         <div>
           <Label>Trigger Type</Label>
-          <div className="mt-1 text-sm text-gray-600">
-            {triggerType === 'row_created' && 'When a record is created'}
-            {triggerType === 'row_updated' && 'When a record is updated'}
-            {triggerType === 'row_deleted' && 'When a record is deleted'}
-            {triggerType === 'schedule' && 'On a schedule'}
-            {triggerType === 'webhook' && 'When webhook is called'}
-            {triggerType === 'condition' && 'When conditions match'}
-          </div>
+          {onUpdateTriggerType ? (
+            <Select
+              value={triggerType}
+              onValueChange={(value) => onUpdateTriggerType(value as TriggerType)}
+            >
+              <SelectTrigger className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TRIGGER_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <div className="mt-1 text-sm text-gray-600">
+              {TRIGGER_OPTIONS.find((o) => o.value === triggerType)?.label ?? triggerType}
+            </div>
+          )}
         </div>
         {/* Trigger-specific config would go here */}
       </div>
