@@ -132,6 +132,10 @@ interface GridViewProps {
   onHeightChange?: (height: number) => void
   /** Conditional formatting rules */
   highlightRules?: HighlightRule[]
+  /** When provided, RecordModal can save modal layout (in-modal edit). */
+  onModalLayoutSave?: (modalLayout: import("@/lib/interface/types").BlockConfig["modal_layout"]) => void
+  /** When true, show "Edit layout" in record modal. */
+  canEditLayout?: boolean
 }
 
 const ITEMS_PER_PAGE = 100
@@ -563,6 +567,8 @@ export default function GridView({
   onGroupByChange,
   onHeightChange,
   highlightRules = [],
+  onModalLayoutSave,
+  canEditLayout = false,
 }: GridViewProps) {
   const { openRecord } = useRecordPanel()
   const isMobile = useIsMobile()
@@ -3854,6 +3860,8 @@ export default function GridView({
           modalFields={modalFields}
           modalLayout={modalLayout}
           cascadeContext={cascadeContext}
+          canEditLayout={canEditLayout}
+          onLayoutSave={onModalLayoutSave}
         />
       )}
     </div>

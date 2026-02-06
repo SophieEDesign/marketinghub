@@ -220,6 +220,7 @@ export default function BlockRenderer({
               pageShowAddRecord={pageShowAddRecord}
               onEphemeralHeightDelta={onEphemeralHeightDelta}
               rowHeight={rowHeight}
+              isFullPage={isFullPage}
             />
           </LazyBlockWrapper>
         )
@@ -359,6 +360,9 @@ export default function BlockRenderer({
               filterTree={filterTree}
               onRecordClick={onRecordClick}
               pageShowAddRecord={pageShowAddRecord}
+              onModalLayoutSave={onUpdate ? (layout) => onUpdate(block.id, { modal_layout: layout }) : undefined}
+              canEditLayout={canEdit}
+              isFullPage={isFullPage}
             />
           </LazyBlockWrapper>
         )
@@ -470,6 +474,7 @@ export default function BlockRenderer({
               pageShowAddRecord={pageShowAddRecord}
               onEphemeralHeightDelta={onEphemeralHeightDelta}
               rowHeight={rowHeight}
+              isFullPage={isFullPage}
             />
           </LazyBlockWrapper>
         )

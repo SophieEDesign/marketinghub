@@ -57,6 +57,10 @@ interface CalendarViewProps {
   showDateRangeControls?: boolean
   /** Conditional formatting rules */
   highlightRules?: HighlightRule[]
+  /** When provided, RecordModal can save modal layout (in-modal edit). */
+  onModalLayoutSave?: (modalLayout: import("@/lib/interface/types").BlockConfig["modal_layout"]) => void
+  /** When true, show "Edit layout" in record modal. */
+  canEditLayout?: boolean
 }
 
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -92,6 +96,8 @@ export default function CalendarView({
   onDateToChange,
   showDateRangeControls = true,
   highlightRules = [],
+  onModalLayoutSave,
+  canEditLayout = false,
 }: CalendarViewProps) {
   const viewUuid = useMemo(() => normalizeUuid(viewId), [viewId])
   // Ensure fieldIds is always an array (defensive check for any edge cases)
@@ -1921,10 +1927,13 @@ export default function CalendarView({
           onClose={() => setSelectedRecordId(null)}
           tableId={resolvedTableId}
           modalFields={Array.isArray(blockConfig?.modal_fields) ? blockConfig.modal_fields : []}
+          modalLayout={blockConfig?.modal_layout}
           recordId={selectedRecordId}
           tableFields={Array.isArray(loadedTableFields) ? loadedTableFields : []}
           supabaseTableName={supabaseTableName}
           cascadeContext={blockConfig ? { blockConfig } : undefined}
+          canEditLayout={canEditLayout}
+          onLayoutSave={onModalLayoutSave}
           onSave={() => {
             // Reload rows after save
             if (resolvedTableId && supabaseTableName) {
@@ -1947,10 +1956,13 @@ export default function CalendarView({
           onClose={() => setCreateRecordDate(null)}
           tableId={resolvedTableId}
           modalFields={Array.isArray(blockConfig?.modal_fields) ? blockConfig.modal_fields : []}
+          modalLayout={blockConfig?.modal_layout}
           recordId={null}
           tableFields={Array.isArray(loadedTableFields) ? loadedTableFields : []}
           supabaseTableName={supabaseTableName}
           cascadeContext={blockConfig ? { blockConfig } : undefined}
+          canEditLayout={canEditLayout}
+          onLayoutSave={onModalLayoutSave}
           initialData={(() => {
             // Pre-fill the date field(s) based on the clicked date
             const initial: Record<string, any> = {}

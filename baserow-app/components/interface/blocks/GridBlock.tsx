@@ -43,6 +43,12 @@ interface GridBlockProps {
   pageShowAddRecord?: boolean // Page-level default for showing Add record
   onEphemeralHeightDelta?: (blockId: string, deltaPx: number) => void // Callback for ephemeral height changes (collapsible expansion)
   rowHeight?: number // Row height in pixels (for height calculation)
+  /** When provided, RecordModal can save modal layout changes (in-modal edit). */
+  onModalLayoutSave?: (modalLayout: import("@/lib/interface/types").BlockConfig["modal_layout"]) => void
+  /** When true, show "Edit layout" in record modal. */
+  canEditLayout?: boolean
+  /** When true (full-page calendar), use compact Airtable-style top bar and date range from block settings. */
+  isFullPage?: boolean
 }
 
 export default function GridBlock({
@@ -57,6 +63,9 @@ export default function GridBlock({
   pageShowAddRecord = false,
   onEphemeralHeightDelta,
   rowHeight = 30,
+  onModalLayoutSave,
+  canEditLayout = false,
+  isFullPage = false,
 }: GridBlockProps) {
   const { config } = block
   
@@ -671,8 +680,8 @@ export default function GridBlock({
             tableFields={tableFields}
             filters={allFilters}
             filterTree={filterTree}
-            blockConfig={config} // Pass block config so CalendarView can read date_field from page settings
-            onRecordClick={onRecordClick} // CRITICAL: Pass onRecordClick for RecordReview integration
+            blockConfig={config}
+            onRecordClick={onRecordClick}
             colorField={appearance.color_field}
             imageField={appearance.image_field}
             fitImageSize={appearance.fit_image_size}
@@ -683,6 +692,8 @@ export default function GridBlock({
             onDateToChange={setCalendarDateTo}
             showDateRangeControls={false}
             highlightRules={config.highlight_rules}
+            onModalLayoutSave={onModalLayoutSave}
+            canEditLayout={canEditLayout}
           />
         )
       }
@@ -1033,6 +1044,8 @@ export default function GridBlock({
             blockLevelSettings={blockLevelSettings}
             onHeightChange={isGrouped ? handleHeightChange : undefined}
             rowHeightPixels={rowHeight}
+            onModalLayoutSave={onModalLayoutSave}
+            canEditLayout={canEditLayout}
           />
         )
     }
@@ -1078,10 +1091,17 @@ export default function GridBlock({
         const showUnifiedCalendarHeader = viewType === "calendar"
         if (!showUnifiedCalendarHeader) return null
         const hasAnyDateField = (safeTableFields || []).some((f) => f && f.type === "date")
+        const compactBar = isFullPage
 
         return (
-          <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div
+            className={
+              compactBar
+                ? "flex items-center gap-3 flex-shrink-0 py-2 px-2 border-b border-gray-200/80 bg-white/95 min-h-0"
+                : "mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3"
+            }
+          >
+            <div className={compactBar ? "flex items-center gap-2 flex-1 min-w-0" : "flex items-center justify-between gap-3 flex-wrap"}>
               {showQuickFilters && (
                 <QuickFilterBar
                   storageKey={`mh:quickFilters:${pageId || "page"}:${block.id}`}
@@ -1091,35 +1111,38 @@ export default function GridBlock({
                 />
               )}
 
+              {hasAnyDateField && (
+                <CalendarDateRangeControls
+                  dateFrom={calendarDateFrom}
+                  dateTo={calendarDateTo}
+                  onDateFromChange={setCalendarDateFrom}
+                  onDateToChange={setCalendarDateTo}
+                  disabled={false}
+                  defaultPreset={
+                    config?.default_date_range_preset && config.default_date_range_preset !== "none"
+                      ? (config.default_date_range_preset as "today" | "thisWeek" | "thisMonth" | "nextWeek" | "nextMonth" | "custom")
+                      : null
+                  }
+                  compact={compactBar}
+                  fromSettingsPresetOnly={compactBar}
+                />
+              )}
+
               {showAddRecord && (
                 <Button
                   type="button"
-                  size="sm"
+                  size={compactBar ? "sm" : "sm"}
                   variant="outline"
                   onClick={handleAddRecord}
                   disabled={isAddRecordDisabled}
                   title={!canCreateRecord ? "Adding records is disabled for this block" : "Add a new record"}
-                  className="bg-white"
+                  className={compactBar ? "h-8 text-xs flex-shrink-0" : "bg-white"}
                 >
-                  <Plus className="h-4 w-4 mr-2" />
+                  <Plus className={compactBar ? "h-3.5 w-3 mr-1.5" : "h-4 w-4 mr-2"} />
                   Add record
                 </Button>
               )}
             </div>
-
-            {/* Date Range (calendar-only) */}
-            {hasAnyDateField && (
-              <CalendarDateRangeControls
-                dateFrom={calendarDateFrom}
-                dateTo={calendarDateTo}
-                onDateFromChange={setCalendarDateFrom}
-                onDateToChange={setCalendarDateTo}
-                disabled={false}
-                defaultPreset={config?.default_date_range_preset && config.default_date_range_preset !== 'none' 
-                  ? (config.default_date_range_preset as 'today' | 'thisWeek' | 'thisMonth' | 'nextWeek' | 'nextMonth' | 'custom')
-                  : null}
-              />
-            )}
           </div>
         )
       })()}
@@ -1151,7 +1174,8 @@ export default function GridBlock({
         />
       )}
 
-      <div className="flex-1 min-h-0">
+      {/* Scroll lives here in full-page mode so table/calendar fills viewport and content scrolls inside */}
+      <div className="flex-1 min-h-0 overflow-auto">
         {renderView()}
       </div>
     </div>

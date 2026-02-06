@@ -85,9 +85,12 @@ export default function ModalCanvas({
   }, [blocks, mode, cols])
 
   // Edit mode: handle layout change from drag — reorder blocks by y, normalize to single column, call onLayoutChange
+  // Responsive react-grid-layout may pass (layout, allLayouts); we need the layout array.
   const handleLayoutChange = useCallback(
-    (newLayout: Layout[]) => {
-      if (mode !== "edit" || !onLayoutChange || newLayout.length === 0) return
+    (layoutOrAll: Layout[] | Record<string, Layout[]>) => {
+      if (mode !== "edit" || !onLayoutChange) return
+      const newLayout = Array.isArray(layoutOrAll) ? layoutOrAll : (layoutOrAll.lg ?? Object.values(layoutOrAll)[0] ?? [])
+      if (newLayout.length === 0) return
       const sorted = [...newLayout].sort((a, b) => a.y - b.y)
       const reorderedBlocks: PageBlock[] = sorted.map((item, index) => {
         const block = blocks.find((b) => b.id === item.i)

@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect, useMemo } from 'react'
-import { ArrowLeft, Save, Trash2, ChevronDown, ChevronRight, Pencil, Check } from 'lucide-react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { ArrowLeft, Save, Trash2, ChevronDown, ChevronRight, Pencil, Check, LayoutGrid } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -14,7 +14,7 @@ import FieldEditor from '@/components/fields/FieldEditor'
 import { useToast } from '@/components/ui/use-toast'
 import { isAbortError } from '@/lib/api/error-handling'
 import ModalCanvas from '@/components/interface/ModalCanvas'
-import type { BlockConfig } from '@/lib/interface/types'
+import type { BlockConfig, PageBlock } from '@/lib/interface/types'
 import { sectionAndSortFields } from '@/lib/fields/sectioning'
 import { useRecordEditorCore, type RecordEditorCascadeContext } from '@/lib/interface/record-editor-core'
 import { useUserRole } from '@/lib/hooks/useUserRole'
@@ -35,6 +35,10 @@ export interface RecordModalProps {
   showFieldSections?: boolean // Optional: show fields grouped by sections (default: false)
   /** Optional: when provided, permission flags from cascade are applied (edit/create/delete). */
   cascadeContext?: RecordEditorCascadeContext | null
+  /** When true, show "Edit layout" in header; requires onLayoutSave when using custom modal layout. */
+  canEditLayout?: boolean
+  /** Called when user saves layout in edit mode (Done). */
+  onLayoutSave?: (modalLayout: BlockConfig['modal_layout']) => void
 }
 
 const DEFAULT_SECTION_NAME = "General"
@@ -56,13 +60,21 @@ export default function RecordModal({
   modalLayout,
   showFieldSections = false,
   cascadeContext,
+  canEditLayout = false,
+  onLayoutSave,
 }: RecordModalProps) {
   const { toast } = useToast()
   const { role } = useUserRole()
   const [isModalEditing, setIsModalEditing] = useState(false)
+  const [isEditingLayout, setIsEditingLayout] = useState(false)
+  const [draftBlocks, setDraftBlocks] = useState<PageBlock[] | null>(null)
 
   useEffect(() => {
-    if (!open) setIsModalEditing(false)
+    if (!open) {
+      setIsModalEditing(false)
+      setIsEditingLayout(false)
+      setDraftBlocks(null)
+    }
   }, [open])
 
   const core = useRecordEditorCore({
@@ -203,8 +215,78 @@ export default function RecordModal({
           : undefined,
         field_name: block.fieldName,
       },
-    })) as any[]
+    })) as PageBlock[]
   }, [modalLayout?.blocks, tableFields])
+
+  const hasCustomLayout = Boolean(modalLayout?.blocks && modalLayout.blocks.length > 0)
+  const showEditLayoutButton = canEditLayout && hasCustomLayout && onLayoutSave && !isEditingLayout
+  const blocksForCanvas = isEditingLayout && draftBlocks !== null ? draftBlocks : modalBlocks
+
+  const handleStartEditLayout = useCallback(() => {
+    setIsEditingLayout(true)
+    setDraftBlocks([...modalBlocks])
+  }, [modalBlocks])
+
+  const handleDoneEditLayout = useCallback(() => {
+    if (!onLayoutSave || draftBlocks === null) return
+    const cols = modalLayout?.layoutSettings?.cols ?? 8
+    const newModalLayout: BlockConfig['modal_layout'] = {
+      blocks: draftBlocks.map((b, index) => ({
+        id: b.id,
+        type: (b.type === 'field' || b.type === 'text' || b.type === 'divider' || b.type === 'image') ? b.type : 'field',
+        fieldName: (b.config as any)?.field_name ?? (b as any).fieldName,
+        x: 0,
+        y: index,
+        w: typeof cols === 'number' ? cols : 8,
+        h: b.h ?? 4,
+        config: b.config,
+      })),
+      layoutSettings: modalLayout?.layoutSettings,
+    }
+    onLayoutSave(newModalLayout)
+    setIsEditingLayout(false)
+    setDraftBlocks(null)
+  }, [onLayoutSave, draftBlocks, modalLayout?.layoutSettings])
+
+  const handleCancelEditLayout = useCallback(() => {
+    setIsEditingLayout(false)
+    setDraftBlocks(null)
+  }, [])
+
+  const handleLayoutChange = useCallback((newBlocks: PageBlock[]) => {
+    setDraftBlocks(newBlocks)
+  }, [])
+
+  const handleRemoveBlock = useCallback((blockId: string) => {
+    setDraftBlocks((prev) => (prev ?? []).filter((b) => b.id !== blockId))
+  }, [])
+
+  const handleAddField = useCallback((insertAfterBlockId: string | null) => {
+    const current = draftBlocks ?? modalBlocks
+    const usedNames = new Set(
+      current.filter((b) => b.type === 'field').map((b) => (b.config as any)?.field_name).filter(Boolean)
+    )
+    const available = tableFields.find((f) => f.name !== 'id' && !usedNames.has(f.name))
+    if (!available) return
+    const newBlock: PageBlock = {
+      id: `field-${available.id}-${Date.now()}`,
+      type: 'field',
+      x: 0,
+      y: current.length,
+      w: 8,
+      h: 4,
+      config: { field_id: available.id, field_name: available.name },
+    } as PageBlock
+    if (insertAfterBlockId === null) {
+      setDraftBlocks([...current, newBlock])
+    } else {
+      const idx = current.findIndex((b) => b.id === insertAfterBlockId)
+      const insertAt = idx < 0 ? current.length : idx + 1
+      const next = [...current]
+      next.splice(insertAt, 0, newBlock)
+      setDraftBlocks(next.map((b, i) => ({ ...b, y: i } as PageBlock)))
+    }
+  }, [draftBlocks, modalBlocks, tableFields])
 
   // Section fields if showFieldSections is enabled (filteredFields from core)
   const sectionedFields = useMemo(() => {
@@ -233,28 +315,48 @@ export default function RecordModal({
             </DialogTitle>
           </div>
           <div className="flex items-center gap-2">
-            {canShowEditButton && (
-              <Button
-                type="button"
-                variant={isModalEditing ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setIsModalEditing((v) => !v)}
-                className="inline-flex items-center gap-1.5"
-                aria-label={isModalEditing ? 'Done editing' : 'Edit record'}
-                title={isModalEditing ? 'Done editing' : 'Edit record'}
-              >
-                {isModalEditing ? (
-                  <>
-                    <Check className="h-4 w-4" />
-                    Done
-                  </>
-                ) : (
-                  <>
-                    <Pencil className="h-4 w-4" />
-                    Edit
-                  </>
+            {isEditingLayout ? (
+              <>
+                <Button type="button" variant="default" size="sm" onClick={handleDoneEditLayout} className="inline-flex items-center gap-1.5" aria-label="Save layout" title="Save layout">
+                  <Check className="h-4 w-4" />
+                  Done
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={handleCancelEditLayout} aria-label="Cancel layout edit" title="Cancel">
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              <>
+                {showEditLayoutButton && (
+                  <Button type="button" variant="outline" size="sm" onClick={handleStartEditLayout} className="inline-flex items-center gap-1.5" aria-label="Edit layout" title="Edit layout">
+                    <LayoutGrid className="h-4 w-4" />
+                    Edit layout
+                  </Button>
                 )}
-              </Button>
+                {canShowEditButton && (
+                  <Button
+                    type="button"
+                    variant={isModalEditing ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setIsModalEditing((v) => !v)}
+                    className="inline-flex items-center gap-1.5"
+                    aria-label={isModalEditing ? 'Done editing' : 'Edit record'}
+                    title={isModalEditing ? 'Done editing' : 'Edit record'}
+                  >
+                    {isModalEditing ? (
+                      <>
+                        <Check className="h-4 w-4" />
+                        Done
+                      </>
+                    ) : (
+                      <>
+                        <Pencil className="h-4 w-4" />
+                        Edit
+                      </>
+                    )}
+                  </Button>
+                )}
+              </>
             )}
             <Button
               variant="destructive"
@@ -290,10 +392,11 @@ export default function RecordModal({
           ) : (
             <div className="space-y-4 py-4">
               {/* Use custom layout if available, otherwise fall back to simple field list */}
-              {modalLayout?.blocks && modalLayout.blocks.length > 0 ? (
+              {hasCustomLayout ? (
                 <div className="min-h-[400px]">
                   <ModalCanvas
-                    blocks={modalBlocks}
+                    mode={isEditingLayout ? 'edit' : 'view'}
+                    blocks={blocksForCanvas}
                     tableId={tableId}
                     recordId={recordId}
                     tableName={effectiveTableName || ''}
@@ -302,6 +405,9 @@ export default function RecordModal({
                     editableFieldNames={tableFields.map(f => f.name)}
                     onFieldChange={handleFieldChange}
                     layoutSettings={modalLayout?.layoutSettings}
+                    onLayoutChange={isEditingLayout ? handleLayoutChange : undefined}
+                    onRemoveBlock={isEditingLayout ? handleRemoveBlock : undefined}
+                    onAddField={isEditingLayout ? handleAddField : undefined}
                   />
                 </div>
               ) : showFieldSections && sectionedFields ? (

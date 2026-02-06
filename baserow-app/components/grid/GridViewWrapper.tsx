@@ -98,6 +98,10 @@ interface GridViewWrapperProps {
   rowHeightPixels?: number
   /** Conditional formatting rules */
   highlightRules?: HighlightRule[]
+  /** When provided, RecordModal can save modal layout (in-modal edit). */
+  onModalLayoutSave?: (modalLayout: import("@/lib/interface/types").BlockConfig["modal_layout"]) => void
+  /** When true, show "Edit layout" in record modal. */
+  canEditLayout?: boolean
 }
 
 export default function GridViewWrapper({
@@ -126,6 +130,8 @@ export default function GridViewWrapper({
   onHeightChange,
   rowHeightPixels = 30,
   highlightRules = [],
+  onModalLayoutSave,
+  canEditLayout = false,
 }: GridViewWrapperProps) {
   // CRITICAL: Normalize all inputs at wrapper entry point
   const safeInitialFilters = asArray<Filter>(initialFilters)
@@ -886,6 +892,8 @@ export default function GridViewWrapper({
           onGroupByChange={handleGroupByChange}
           onHeightChange={onHeightChange}
           highlightRules={highlightRules}
+          onModalLayoutSave={onModalLayoutSave}
+          canEditLayout={canEditLayout}
         />
       </div>
       <FieldBuilderDrawer

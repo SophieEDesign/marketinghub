@@ -1,5 +1,11 @@
 "use client"
 
+/**
+ * DEPRECATED: Primary UX is now in-modal layout editing.
+ * Open a record in the grid/calendar and use "Edit layout" in the record modal to customize layout (WYSIWYG).
+ * This dialog is kept only as a potential fallback (e.g. when no records exist yet). Do not enhance.
+ */
+
 import { useState, useEffect, useMemo, useCallback } from "react"
 import { Responsive, WidthProvider, Layout } from "react-grid-layout"
 import "react-grid-layout/css/styles.css"

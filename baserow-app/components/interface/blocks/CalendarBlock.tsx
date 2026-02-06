@@ -15,6 +15,10 @@ interface CalendarBlockProps {
   filterTree?: FilterTree
   onRecordClick?: (recordId: string, tableId?: string) => void
   pageShowAddRecord?: boolean
+  onModalLayoutSave?: (modalLayout: import("@/lib/interface/types").BlockConfig["modal_layout"]) => void
+  canEditLayout?: boolean
+  /** When true, use compact Airtable-style top bar and date range from block settings */
+  isFullPage?: boolean
 }
 
 /**
@@ -35,6 +39,9 @@ function CalendarBlock({
   filterTree = null,
   onRecordClick,
   pageShowAddRecord = false,
+  onModalLayoutSave,
+  canEditLayout = false,
+  isFullPage = false,
 }: CalendarBlockProps) {
   // Memoize so GridBlock (and CalendarView/RecordModal) don't get new props every render.
   const calendarBlock = useMemo<PageBlock>(() => ({
@@ -63,6 +70,9 @@ function CalendarBlock({
       filterTree={filterTree}
       onRecordClick={onRecordClick}
       pageShowAddRecord={pageShowAddRecord}
+      onModalLayoutSave={onModalLayoutSave}
+      canEditLayout={canEditLayout}
+      isFullPage={isFullPage}
     />
   )
 }
