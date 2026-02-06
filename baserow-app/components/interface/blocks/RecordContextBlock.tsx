@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
-import type { PageBlock } from "@/lib/interface/types"
+import type { PageBlock, BlockFilter } from "@/lib/interface/types"
 import type { RecordContext } from "@/lib/interface/types"
-import { applyFiltersToQuery, normalizeFilter } from "@/lib/interface/filters"
+import { applyFiltersToQuery, normalizeFilter, type FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
 import { Button } from "@/components/ui/button"
@@ -140,7 +140,7 @@ export default function RecordContextBlock({
         .select(selectCols.join(", "))
         .limit(200)
 
-      const filtersToApply = filterTree ?? (blockFilters.length > 0 ? blockFilters.map((f) => normalizeFilter(f)) : null)
+      const filtersToApply = filterTree ?? (blockFilters.length > 0 ? blockFilters.map((f) => normalizeFilter(f as BlockFilter | FilterConfig)) : null)
       if (filtersToApply) {
         query = applyFiltersToQuery(query, filtersToApply, fieldList)
       }
@@ -181,14 +181,14 @@ export default function RecordContextBlock({
     refreshTrigger,
   ])
 
-  const filteredRecords = useMemo(() => {
+  const filteredRecords = useMemo((): { id: string; [k: string]: unknown }[] => {
     if (!searchQuery.trim() || !tableFields.length) return records
     return filterRowsBySearch(
-      records as Record<string, any>[],
-      tableFields as any,
+      records as Record<string, unknown>[],
+      tableFields as Parameters<typeof filterRowsBySearch>[1],
       searchQuery.trim(),
       undefined
-    )
+    ) as { id: string; [k: string]: unknown }[]
   }, [records, tableFields, searchQuery])
 
   const handleSelect = (record: { id: string }) => {
