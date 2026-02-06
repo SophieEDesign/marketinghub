@@ -180,8 +180,9 @@ export default function RecordModal({
     if (!modalLayout?.blocks || modalLayout.blocks.length === 0) {
       return []
     }
-    return modalLayout.blocks.map(block => ({
+    return modalLayout.blocks.map((block, index) => ({
       id: block.id,
+      page_id: '',
       type: block.type,
       x: block.x,
       y: block.y,
@@ -194,6 +195,8 @@ export default function RecordModal({
           : undefined,
         field_name: block.fieldName,
       },
+      order_index: index,
+      created_at: '',
     })) as PageBlock[]
   }, [modalLayout?.blocks, fields])
 
@@ -248,13 +251,16 @@ export default function RecordModal({
     if (!available) return
     const newBlock: PageBlock = {
       id: `field-${available.id}-${Date.now()}`,
+      page_id: '',
       type: 'field',
       x: 0,
       y: current.length,
       w: 8,
       h: 4,
       config: { field_id: available.id, field_name: available.name },
-    } as PageBlock
+      order_index: current.length,
+      created_at: '',
+    }
     if (insertAfterBlockId === null) {
       setDraftBlocks([...current, newBlock])
     } else {
@@ -262,7 +268,7 @@ export default function RecordModal({
       const insertAt = idx < 0 ? current.length : idx + 1
       const next = [...current]
       next.splice(insertAt, 0, newBlock)
-      setDraftBlocks(next.map((b, i) => ({ ...b, y: i } as PageBlock)))
+      setDraftBlocks(next.map((b, i) => ({ ...b, y: i, order_index: i })))
     }
   }, [draftBlocks, modalBlocks, fields])
 

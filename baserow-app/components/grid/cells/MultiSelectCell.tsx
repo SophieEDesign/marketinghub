@@ -39,11 +39,11 @@ export default function MultiSelectCell({
 }: MultiSelectCellProps) {
   const containerStyle: React.CSSProperties = rowHeight ? { height: `${rowHeight}px` } : {}
   // If we don't have fieldId/tableId, fall back to basic display (for backwards compatibility)
+  // Field invariant: no internal scroll; content grows, container (column/list/modal) scrolls.
   if (!fieldId || !tableId) {
-    // Basic fallback - just show the values as pills
     const displayValues = sortLabelsByManualOrder(value || [], "multi_select", fieldOptions)
     return (
-      <div className="w-full px-3 py-1.5 flex items-start flex-wrap gap-1.5 text-sm overflow-y-auto" style={containerStyle}>
+      <div className="w-full px-3 py-1.5 flex items-start flex-wrap gap-1.5 text-sm overflow-visible" style={containerStyle}>
         {displayValues.length > 0 ? (
           <ChoicePillList
             labels={displayValues}
