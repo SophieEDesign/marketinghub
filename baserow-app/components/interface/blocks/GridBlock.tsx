@@ -21,6 +21,7 @@ import { useViewMeta } from "@/hooks/useViewMeta"
 import { debugLog, debugWarn, isDebugEnabled } from "@/lib/interface/debug-flags"
 import { asArray } from "@/lib/utils/asArray"
 import type { TableField } from "@/types/fields"
+import { getFieldDisplayName } from "@/lib/fields/display"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import QuickFilterBar from "@/components/filters/QuickFilterBar"
@@ -388,7 +389,9 @@ export default function GridBlock({
   const safeViewFields = asArray<ViewFieldType>(viewFields)
   const visibleFields = visibleFieldsConfig.length > 0
     ? visibleFieldsConfig.map((fieldName: string) => {
-        const field = safeTableFields.find(f => f.name === fieldName || f.id === fieldName)
+        const field = safeTableFields.find(
+          f => f && (f.name === fieldName || f.id === fieldName || getFieldDisplayName(f) === fieldName)
+        )
         return field ? { field_name: field.name, visible: true, position: 0 } : null
       }).filter(Boolean) as Array<{ field_name: string; visible: boolean; position: number }>
     : safeViewFields.filter(f => f && f.visible)
@@ -747,6 +750,7 @@ export default function GridBlock({
             fitImageSize={appearance.fit_image_size}
             blockConfig={config}
             onRecordClick={onRecordClick}
+            cascadeContext={{ blockConfig: config }}
             reloadKey={refreshKey}
           />
         )

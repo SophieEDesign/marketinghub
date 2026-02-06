@@ -17,6 +17,8 @@ import { getOptionValueToLabelMap } from "@/lib/fields/select-options"
 import EmptyState from "@/components/empty-states/EmptyState"
 import type { HighlightRule } from "@/lib/interface/types"
 import { evaluateHighlightRules, getFormattingStyle } from "@/lib/conditional-formatting/evaluator"
+import { getLinkedFieldValueFromRow, linkedValueToIds, resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
+import type { LinkedField } from "@/types/fields"
 
 interface KanbanViewProps {
   tableId: string
@@ -31,6 +33,8 @@ interface KanbanViewProps {
   fitImageSize?: boolean // Whether to fit image to container size
   blockConfig?: Record<string, any> // Block config for modal_fields
   onRecordClick?: (recordId: string) => void
+  /** Optional: pass to RecordPanel for permission cascade */
+  cascadeContext?: { pageConfig?: any; blockConfig?: any } | null
   /** Bump to force a refetch (e.g. after external record creation). */
   reloadKey?: number
   /** Callback to open block settings (for configuration) */
@@ -52,6 +56,7 @@ export default function KanbanView({
   fitImageSize = false,
   blockConfig = {},
   onRecordClick,
+  cascadeContext = null,
   reloadKey,
   onOpenSettings,
   highlightRules = [],
@@ -62,6 +67,7 @@ export default function KanbanView({
   const [loading, setLoading] = useState(true)
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
+  const [groupValueLabelMaps, setGroupValueLabelMaps] = useState<Record<string, Record<string, string>>>({})
 
   // IMPORTANT: config may provide field IDs or display names; row data keys are field NAMES (supabase columns).
   const groupingFieldName = useMemo(() => {
@@ -95,7 +101,7 @@ export default function KanbanView({
   }, [imageField, tableFields])
 
   // Resolve group value (option id or label as stored in DB) to display label for column header.
-  // Uses raw options when present so DB-stored UUIDs map to labels correctly.
+  // For single_select/multi_select uses options; for link_to_table we use groupValueLabelMaps (loaded in useEffect).
   const groupValueToLabel = useMemo(() => {
     const arr = Array.isArray(tableFields) ? tableFields : []
     const field = arr.find(
@@ -108,6 +114,13 @@ export default function KanbanView({
     map.set("Uncategorized", "Uncategorized")
     map.set("—", "—")
     return map
+  }, [tableFields, groupingFieldName])
+
+  const groupingField = useMemo(() => {
+    const arr = Array.isArray(tableFields) ? tableFields : []
+    return arr.find(
+      (f: any) => f && (f.name === groupingFieldName || f.id === groupingFieldName)
+    ) as TableField | undefined
   }, [tableFields, groupingFieldName])
 
   // Filter rows by search query
@@ -127,6 +140,37 @@ export default function KanbanView({
     // Map back to TableRow format
     return rows.filter((row) => filteredIds.has(row.id))
   }, [rows, tableFields, searchQuery, fieldIds])
+
+  // Resolve linked record (link_to_table) grouping IDs to display labels for column headers.
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      if (!groupingField || groupingField.type !== "link_to_table") {
+        setGroupValueLabelMaps({})
+        return
+      }
+      const linkField = groupingField as LinkedField
+      const ids = new Set<string>()
+      for (const row of Array.isArray(filteredRows) ? filteredRows : []) {
+        const fieldValue = getLinkedFieldValueFromRow(row as { data?: Record<string, unknown> }, linkField)
+        for (const id of linkedValueToIds(fieldValue)) ids.add(id)
+      }
+      if (ids.size === 0) {
+        setGroupValueLabelMaps({})
+        return
+      }
+      const map = await resolveLinkedFieldDisplayMap(linkField, Array.from(ids))
+      const next: Record<string, Record<string, string>> = {
+        [linkField.name]: Object.fromEntries(map.entries()),
+        [(linkField as any).id]: Object.fromEntries(map.entries()),
+      }
+      if (!cancelled) setGroupValueLabelMaps(next)
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [groupingField, filteredRows])
 
   // Helper to get color from color field
   const getCardColor = useCallback((row: TableRow): string | null => {
@@ -244,13 +288,21 @@ export default function KanbanView({
   const canCreateRecord = !isViewOnly && allowInlineCreate
 
   const handleOpenRecord = useCallback((recordId: string) => {
-    if (!supabaseTableName) return
+    const id = recordId != null ? String(recordId).trim() : ""
+    if (!id || !supabaseTableName || !tableId) return
     if (onRecordClick) {
-      onRecordClick(recordId)
+      onRecordClick(id)
       return
     }
-    openRecord(tableId, recordId, supabaseTableName, (blockConfig as any)?.modal_fields)
-  }, [blockConfig, onRecordClick, openRecord, supabaseTableName, tableId])
+    openRecord(
+      tableId,
+      id,
+      supabaseTableName,
+      (blockConfig as any)?.modal_fields,
+      (blockConfig as any)?.modal_layout,
+      cascadeContext ?? undefined
+    )
+  }, [blockConfig, cascadeContext, onRecordClick, openRecord, supabaseTableName, tableId])
 
   const handleCellSave = useCallback(async (rowId: string, fieldName: string, value: any) => {
     if (!supabaseTableName) return
@@ -310,8 +362,19 @@ export default function KanbanView({
 
   function groupRowsByField() {
     const groups: Record<string, TableRow[]> = {}
+    const isLinkField = groupingField?.type === "link_to_table"
     filteredRows.forEach((row) => {
-      const groupValue = (groupingFieldName ? row.data[groupingFieldName] : null) || "Uncategorized"
+      let groupValue: string
+      if (!groupingFieldName) {
+        groupValue = "Uncategorized"
+      } else if (isLinkField && groupingField) {
+        const fieldValue = getLinkedFieldValueFromRow(row as { data?: Record<string, unknown> }, groupingField as LinkedField)
+        const ids = linkedValueToIds(fieldValue)
+        groupValue = ids.length > 0 ? ids[0] : "Uncategorized"
+      } else {
+        const raw = row.data?.[groupingFieldName]
+        groupValue = raw != null && raw !== "" ? String(raw).trim() : "Uncategorized"
+      }
       if (!groups[groupValue]) {
         groups[groupValue] = []
       }
@@ -377,7 +440,10 @@ export default function KanbanView({
     <div className="w-full h-full overflow-x-auto bg-gray-50">
       <div className="flex gap-4 min-w-max p-6">
         {groups.map((groupName) => {
-          const displayName = groupValueToLabel.get(groupName) ?? groupName
+          const displayName =
+            groupValueToLabel.get(groupName) ??
+            groupValueLabelMaps[groupingFieldName]?.[groupName] ??
+            groupName
           return (
           <div key={groupName} className="flex-shrink-0 w-80">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 mb-3">
@@ -423,7 +489,7 @@ export default function KanbanView({
                   }`}
                   style={{ ...borderColor, ...rowFormattingStyle }}
                   onClick={() => setSelectedCardId(String(row.id))}
-                  onDoubleClick={() => handleOpenRecord(String(row.id))}
+                  onDoubleClick={() => row.id != null && handleOpenRecord(String(row.id))}
                 >
                   <CardContent className="p-3 min-w-0">
                     <div className="space-y-2 min-w-0">
@@ -451,7 +517,7 @@ export default function KanbanView({
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation()
-                            handleOpenRecord(String(row.id))
+                            if (row.id != null) handleOpenRecord(String(row.id))
                           }}
                           className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
                           title="Open record"

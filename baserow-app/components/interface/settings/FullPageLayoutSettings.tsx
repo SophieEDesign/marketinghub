@@ -8,7 +8,11 @@ import type { BlockConfig } from "@/lib/interface/types"
 interface FullPageLayoutSettingsProps {
   block: PageBlock
   allBlocks: PageBlock[]
+  /** Draft config from the settings panel (so the toggle reflects unsaved state). */
+  draftConfig?: Partial<BlockConfig> | null
   onUpdate: (updates: Partial<BlockConfig>) => void
+  /** When set, toggling full-page is applied immediately so the canvas updates without clicking Save. */
+  onApplyImmediate?: (updates: Partial<BlockConfig>) => void
 }
 
 /**
@@ -19,18 +23,23 @@ interface FullPageLayoutSettingsProps {
 export default function FullPageLayoutSettings({
   block,
   allBlocks,
+  draftConfig,
   onUpdate,
+  onApplyImmediate,
 }: FullPageLayoutSettingsProps) {
-  const isFullPage = block.config?.is_full_page === true
+  const effectiveConfig = draftConfig ?? block.config
+  const isFullPage = effectiveConfig?.is_full_page === true
   const otherBlocksCount = allBlocks.filter((b) => b.id !== block.id).length
   const canTurnOnFullPage = otherBlocksCount === 0
   const isValidForFullPage =
-    block.type !== 'record_context' || Boolean(block.config?.table_id)
+    block.type !== 'record_context' || Boolean((effectiveConfig ?? block.config)?.table_id)
 
   const handleToggle = (checked: boolean) => {
     if (checked && !canTurnOnFullPage) return
     if (checked && !isValidForFullPage) return
-    onUpdate({ is_full_page: checked })
+    const updates = { is_full_page: checked }
+    onUpdate(updates)
+    onApplyImmediate?.(updates)
   }
 
   return (

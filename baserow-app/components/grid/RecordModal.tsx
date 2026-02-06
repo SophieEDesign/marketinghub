@@ -201,7 +201,8 @@ export default function RecordModal({
   }, [modalLayout?.blocks, fields])
 
   const hasCustomLayout = Boolean(modalLayout?.blocks && modalLayout.blocks.length > 0)
-  const showEditLayoutButton = canEditLayout && hasCustomLayout && onLayoutSave && !isEditingLayout
+  // Show "Edit layout" when we have a custom layout and a save callback; canEditLayout gates actual persistence on Done
+  const showEditLayoutButton = hasCustomLayout && Boolean(onLayoutSave) && !isEditingLayout
   const blocksForCanvas = isEditingLayout && draftBlocks !== null ? draftBlocks : modalBlocks
 
   const handleStartEditLayout = useCallback(() => {
@@ -210,7 +211,7 @@ export default function RecordModal({
   }, [modalBlocks])
 
   const handleDoneEditLayout = useCallback(() => {
-    if (!onLayoutSave || draftBlocks === null) return
+    if (!onLayoutSave || draftBlocks === null || !canEditLayout) return
     const newModalLayout: BlockConfig['modal_layout'] = {
       blocks: draftBlocks.map((b, index) => ({
         id: b.id,
@@ -227,7 +228,7 @@ export default function RecordModal({
     onLayoutSave(newModalLayout)
     setIsEditingLayout(false)
     setDraftBlocks(null)
-  }, [onLayoutSave, draftBlocks, modalLayout?.layoutSettings])
+  }, [onLayoutSave, canEditLayout, draftBlocks, modalLayout?.layoutSettings])
 
   const handleCancelEditLayout = useCallback(() => {
     setIsEditingLayout(false)

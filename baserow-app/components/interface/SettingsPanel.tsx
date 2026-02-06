@@ -446,7 +446,13 @@ export default function SettingsPanel({
               <FullPageLayoutSettings
                 block={block}
                 allBlocks={allBlocks}
+                draftConfig={config}
                 onUpdate={updateConfig}
+                onApplyImmediate={(updates) => {
+                  const merged = { ...(block.config ?? {}), ...config, ...updates }
+                  onSave(block.id, merged)
+                  setConfig(merged)
+                }}
               />
             )}
           </TabsContent>
