@@ -110,7 +110,8 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   // CRITICAL: Stable empty doc reference so useEditor doesn't get a new object every render.
   // TipTap useEditor can re-create the editor when content option reference changes, causing
   // effect loops (setState in selection effect) and React error #185 (maximum update depth).
-  const EMPTY_DOC = useMemo(() => ({ type: 'doc' as const, content: [] as const }), [])
+  // content must be a mutable array (not readonly) for EditorOptions content type.
+  const EMPTY_DOC = useMemo(() => ({ type: 'doc' as const, content: [] }), [])
 
   // Backward compatibility: older text blocks may still store HTML/text in legacy keys.
   // We only use this to initialize/render when `content_json` is missing.
