@@ -1166,7 +1166,7 @@ function InterfacePageClientInternal({
   }
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className={`h-screen flex flex-col ${!useRecordReviewLayout ? "overflow-hidden" : ""}`}>
       {/* Header with Edit Button - Admin Only */}
       {!isViewer && page && isAdmin && (
         <div className="border-b bg-white px-4 py-3 flex items-center justify-between">

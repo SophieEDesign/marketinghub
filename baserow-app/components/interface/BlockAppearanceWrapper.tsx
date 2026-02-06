@@ -9,13 +9,21 @@ interface BlockAppearanceWrapperProps {
   block: PageBlock
   children: React.ReactNode
   className?: string
+  /** When true (full-page mode), strip all chrome: no border, radius, shadow, padding, background. Block reads as the page. */
+  isFullPage?: boolean
 }
 
 export default function BlockAppearanceWrapper({
   block,
   children,
   className,
+  isFullPage = false,
 }: BlockAppearanceWrapperProps) {
+  // Full-page: transparent dimensionless wrapper; no block chrome. Single scroll context = block internal content.
+  if (isFullPage) {
+    return <div className={cn("h-full w-full min-h-0 flex flex-col", className)}>{children}</div>
+  }
+
   const appearance = block.config?.appearance
   const containerClasses = getAppearanceClasses(appearance)
   const accentBorder = appearance?.accent && appearance.accent !== 'none' 

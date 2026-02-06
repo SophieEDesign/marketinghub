@@ -1694,18 +1694,20 @@ export default function Canvas({
       {/* This ensures the grid gets the full available width, not constrained by parent flex containers */}
       {/* CRITICAL: Parent stack uses normal document flow - reflows immediately when child heights change */}
       {/* No cached heights, no min-height persistence, no delayed updates */}
-      {/* Add padding-bottom to ensure bottom blocks aren't cut off by taskbar */}
-      <div ref={containerRef} className="w-full h-full min-w-0 relative" style={{ paddingBottom: isEditing ? '80px' : '80px' }}>
+      {/* Full-page: overflow-hidden (fixed viewport). Normal: allow overflow so canvas scroll container can scroll. */}
+      <div
+        ref={containerRef}
+        className={`w-full h-full min-w-0 relative ${isFullPageMode ? "overflow-hidden" : ""}`}
+        style={isFullPageMode ? undefined : { paddingBottom: isEditing ? "80px" : "80px" }}
+      >
         {isFullPageMode && fullPageBlock ? (
-          /* Full-page container: no grid, no drag/resize. Do not call onLayoutChange. */
-          <div className="absolute inset-0 flex flex-col min-h-0">
+          /* Full-page: fixed viewport, no chrome, no scroll on wrapper. Single scroll context = block internal content. */
+          <div className="absolute inset-0 flex flex-col min-h-0 overflow-hidden">
             <div
-              className={`flex-1 min-h-0 flex flex-col relative ${
+              className={`flex-1 min-h-0 flex flex-col relative overflow-hidden ${
                 isEditing
-                  ? `group bg-white border-2 border-dashed border-gray-200 rounded-lg ${
-                      selectedBlockId === fullPageBlock.id ? "ring-2 ring-blue-500 border-blue-500" : ""
-                    }`
-                  : "bg-transparent border-0"
+                  ? `group ${selectedBlockId === fullPageBlock.id ? "ring-2 ring-blue-500 ring-inset" : ""}`
+                  : ""
               }`}
               onClick={(e) => {
                 if (isEditing) {
@@ -1764,9 +1766,10 @@ export default function Canvas({
                   )}
                 </div>
               )}
-              <div className="flex-1 min-h-0 w-full h-full overflow-auto rounded-lg">
-                <BlockAppearanceWrapper block={fullPageBlock} className={isEditing ? "pointer-events-auto" : ""}>
-                  <div className="h-full w-full">
+              {/* Block wrapper: no scroll, no chrome. Scroll lives only inside block internal content (e.g. grid rows). */}
+              <div className="flex-1 min-h-0 w-full h-full overflow-hidden">
+                <BlockAppearanceWrapper block={fullPageBlock} isFullPage className={isEditing ? "pointer-events-auto" : ""}>
+                  <div className="h-full w-full overflow-hidden">
                     <BlockRenderer
                       block={fullPageBlock}
                       isEditing={isEditing && !fullPageBlock.config?.locked}
@@ -1791,6 +1794,7 @@ export default function Canvas({
                       onEphemeralHeightDelta={() => {}}
                       rowHeight={Number(layoutSettings?.rowHeight) || 30}
                       isEditingCanvas={editingBlockCanvasId === fullPageBlock.id}
+                      isFullPage
                     />
                   </div>
                 </BlockAppearanceWrapper>

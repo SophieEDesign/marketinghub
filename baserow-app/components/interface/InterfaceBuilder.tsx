@@ -1428,8 +1428,11 @@ export default function InterfaceBuilder({
 
         {/* Canvas */}
         {/* CRITICAL: Canvas container must have min-width: 0 to prevent flex collapse */}
-        {/* Without min-width: 0, flex children can overflow and cause grid width issues */}
-        <div ref={canvasScrollContainerRef} className="flex-1 overflow-auto p-4 min-w-0 w-full">
+        {/* Full-page: no scroll, no padding (single scroll context inside block). Normal: overflow-auto p-4. */}
+        <div
+          ref={canvasScrollContainerRef}
+          className={`flex-1 min-w-0 w-full min-h-0 ${fullPageBlockId ? "overflow-hidden p-0" : "overflow-auto p-4"}`}
+        >
           <FilterStateProvider>
             {/* CRITICAL: Hydration lock - never render Canvas until blocks are loaded */}
             {/* This prevents Canvas from committing empty layout state before blocks arrive */}

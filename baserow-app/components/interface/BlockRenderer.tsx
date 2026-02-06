@@ -78,6 +78,8 @@ interface BlockRendererProps {
   onEphemeralHeightDelta?: (blockId: string, deltaPx: number) => void // Callback for ephemeral height changes (collapsible expansion)
   rowHeight?: number // Row height in pixels (for height calculation)
   isEditingCanvas?: boolean // Whether this block's internal canvas is being edited (for horizontal_grouped blocks)
+  /** When true, block is the single full-page block; no chrome, scroll owned by block internal content only */
+  isFullPage?: boolean
 }
 
 export default function BlockRenderer({
@@ -104,6 +106,7 @@ export default function BlockRenderer({
   onEphemeralHeightDelta,
   rowHeight = 30,
   isEditingCanvas = false,
+  isFullPage = false,
 }: BlockRendererProps) {
   const diagnosticsEnabled = process.env.NODE_ENV === 'development'
   useEffect(() => {
