@@ -21,6 +21,7 @@ import BlockFilterEditor from "./BlockFilterEditor"
 import SortSelector from "./shared/SortSelector"
 import NestedGroupBySelector from "./shared/NestedGroupBySelector"
 import CardFieldsSelector from "./shared/CardFieldsSelector"
+import ModalFieldsSelector from "./shared/ModalFieldsSelector"
 
 interface RecordContextDataSettingsProps {
   config: BlockConfig
@@ -91,6 +92,19 @@ export default function RecordContextDataSettings({
             description="Choose which fields appear in the record list. Order determines display."
             required={false}
           />
+        </div>
+      )}
+
+      {hasTableAndFields && (
+        <div className="space-y-2 border-t pt-4">
+          <ModalFieldsSelector
+            value={Array.isArray((config as any).modal_fields) ? (config as any).modal_fields : []}
+            onChange={(fieldNames) => onUpdate({ modal_fields: fieldNames } as any)}
+            fields={fields}
+          />
+          <p className="text-xs text-muted-foreground">
+            Fields shown in the right panel when a record is selected (full-page mode). Leave empty to show all fields. These fields are editable when the page allows editing.
+          </p>
         </div>
       )}
 

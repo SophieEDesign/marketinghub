@@ -1845,6 +1845,8 @@ export default function Canvas({
                       recordId={recordId!}
                       pageId={pageId}
                       isEditing={isEditing}
+                      pageEditable={pageEditable}
+                      blockConfig={fullPageBlock.config}
                     />
                   ) : (
                     <div className="flex-1 h-full bg-background" />
