@@ -4,6 +4,7 @@
  * See docs/architecture/BLOCK_SYSTEM_CANONICAL.md.
  */
 
+import type { BlockType } from './types'
 import { getAllBlockTypes } from './registry'
 import { BLOCK_CONFIG_UNION_TYPES } from './block-config-types'
 import { PARALLEL_BLOCK_TYPES } from '@/components/blocks/BlockRenderer'
@@ -18,7 +19,7 @@ export function runBlockDriftChecks(): void {
     const canonical = getAllBlockTypes()
     const canonicalSet = new Set(canonical)
 
-    const parallelOnly = (PARALLEL_BLOCK_TYPES as readonly string[]).filter((t) => !canonicalSet.has(t))
+    const parallelOnly = (PARALLEL_BLOCK_TYPES as readonly string[]).filter((t) => !canonicalSet.has(t as BlockType))
     if (parallelOnly.length > 0) {
       console.warn(
         `[Block drift] The following types exist in components/blocks/BlockRenderer but not in the canonical interface/BlockRenderer: ${parallelOnly.join(', ')}. See docs/architecture/BLOCK_SYSTEM_CANONICAL.md.`

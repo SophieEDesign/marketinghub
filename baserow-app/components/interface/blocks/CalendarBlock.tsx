@@ -20,6 +20,7 @@ interface CalendarBlockProps {
 /**
  * CalendarBlock - Wrapper around GridBlock with view_type='calendar'
  * Displays data in a calendar view.
+ * Calendar UI tidying (event cards, tooltips, layout) is implemented in CalendarView.
  * Memoized to prevent excessive re-renders and React error #185.
  * CRITICAL: calendarBlock must be memoized so GridBlock/CalendarView receive a stable
  * reference; a new object every render caused "Maximum update depth exceeded" when

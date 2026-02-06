@@ -1645,7 +1645,7 @@ export default function CalendarView({
         )}
         <div className="min-w-0 flex-1 overflow-hidden">
           <div className="flex flex-col gap-0.5 min-w-0 leading-tight">
-            <div className="truncate text-xs font-medium">
+            <div className="line-clamp-2 text-xs font-medium">
               {titleField ? (
                 <TimelineFieldValue
                   field={titleField}
@@ -1888,7 +1888,7 @@ export default function CalendarView({
             moreLinkClick="popover"
             eventDisplay="block"
             eventClassNames={calendarEventClassNames}
-            dayCellClassNames="hover:bg-gray-50 transition-colors"
+            dayCellClassNames="hover:bg-gray-50 transition-colors min-h-[10rem]"
             dayHeaderClassNames="text-sm font-medium text-gray-700 py-2"
             eventTextColor="#1f2937"
             eventBorderColor="transparent"
