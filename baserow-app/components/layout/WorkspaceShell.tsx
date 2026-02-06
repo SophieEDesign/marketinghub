@@ -5,6 +5,7 @@ import AirtableSidebar from "./AirtableSidebar"
 import Topbar from "./Topbar"
 import { RecordPanelProvider } from "@/contexts/RecordPanelContext"
 import RecordPanel from "@/components/records/RecordPanel"
+import { MainScrollProvider, useMainScroll } from "@/contexts/MainScrollContext"
 import { useIsMobile } from "@/hooks/useResponsive"
 import { useBranding } from "@/contexts/BrandingContext"
 import { Button } from "@/components/ui/button"
@@ -93,45 +94,93 @@ export default function WorkspaceShell({
 
   return (
     <RecordPanelProvider>
-      <div className="flex h-screen bg-gray-50">
-        {/* When topbar is hidden (some pages have their own toolbar), still provide a mobile hamburger toggle */}
-        {hideTopbar && isMobile && (
-          <div className="fixed top-3 left-3 z-50 desktop:hidden">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-10 w-10 p-0 bg-white/90 border border-gray-200 shadow"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              aria-label="Toggle sidebar"
-            >
-              <Menu className="h-5 w-5" style={{ color: primaryColor }} />
-            </Button>
-          </div>
-        )}
-
-        <AirtableSidebar
-          interfacePages={interfacePages}
-          interfaceGroups={interfaceGroups}
+      <MainScrollProvider>
+        <WorkspaceShellContent
+          hideTopbar={hideTopbar}
+          isMobile={isMobile}
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+          primaryColor={primaryColor}
+          title={title}
           tables={tables}
           views={views}
+          interfacePages={interfacePages}
+          interfaceGroups={interfaceGroups}
+          dashboards={dashboards}
           userRole={userRole}
-          isOpen={isMobile ? sidebarOpen : undefined}
-          onClose={isMobile ? () => setSidebarOpen(false) : undefined}
-        />
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {!hideTopbar && (
-            <Topbar 
-              title={title} 
-              onSidebarToggle={isMobile ? () => setSidebarOpen(!sidebarOpen) : undefined}
-            />
-          )}
-          <main className="flex-1 overflow-y-auto">
-            {children}
-          </main>
-        </div>
-        {/* Global Record Panel - hidden for pages with their own record detail panel */}
-        {!hideRecordPanel && <RecordPanel />}
-      </div>
+          hideRecordPanel={hideRecordPanel}
+        >
+          {children}
+        </WorkspaceShellContent>
+      </MainScrollProvider>
     </RecordPanelProvider>
+  )
+}
+
+function WorkspaceShellContent({
+  children,
+  title,
+  tables,
+  views,
+  interfacePages,
+  interfaceGroups = [],
+  userRole,
+  hideTopbar = false,
+  hideRecordPanel = false,
+  isMobile,
+  sidebarOpen,
+  setSidebarOpen,
+  primaryColor,
+}: WorkspaceShellProps & {
+  isMobile: boolean
+  sidebarOpen: boolean
+  setSidebarOpen: (v: boolean) => void
+  primaryColor: string
+}) {
+  const mainScroll = useMainScroll()
+  const suppressMainScroll = mainScroll?.suppressMainScroll ?? false
+
+  return (
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
+      {/* When topbar is hidden (some pages have their own toolbar), still provide a mobile hamburger toggle */}
+      {hideTopbar && isMobile && (
+        <div className="fixed top-3 left-3 z-50 desktop:hidden">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-10 w-10 p-0 bg-white/90 border border-gray-200 shadow"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            aria-label="Toggle sidebar"
+          >
+            <Menu className="h-5 w-5" style={{ color: primaryColor }} />
+          </Button>
+        </div>
+      )}
+
+      <AirtableSidebar
+        interfacePages={interfacePages}
+        interfaceGroups={interfaceGroups}
+        tables={tables}
+        views={views}
+        userRole={userRole}
+        isOpen={isMobile ? sidebarOpen : undefined}
+        onClose={isMobile ? () => setSidebarOpen(false) : undefined}
+      />
+      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+        {!hideTopbar && (
+          <Topbar
+            title={title}
+            onSidebarToggle={isMobile ? () => setSidebarOpen(!sidebarOpen) : undefined}
+          />
+        )}
+        <main
+          className={`flex-1 min-h-0 ${suppressMainScroll ? "overflow-hidden" : "overflow-y-auto"}`}
+        >
+          {children}
+        </main>
+      </div>
+      {/* Global Record Panel - hidden for pages with their own record detail panel */}
+      {!hideRecordPanel && <RecordPanel />}
+    </div>
   )
 }

@@ -528,6 +528,7 @@ export default function FieldBlock({
     }
   }
 
+  // INVARIANT: Field blocks must never scroll. Scroll ownership belongs to the record container (modal/panel body) only.
   const content = isAttachmentField ? (
     isEditable ? (
       <InlineFieldEditor
@@ -610,17 +611,17 @@ export default function FieldBlock({
 
   return (
     <>
-      <div className={cn("h-full p-3 flex flex-col min-h-0", FIELD_LABEL_GAP_CLASS)}>
+      <div className={cn("p-3 flex flex-col overflow-visible", FIELD_LABEL_GAP_CLASS)}>
         {showLabel ? (
           <>
             <label className={cn(FIELD_LABEL_CLASS_NO_MARGIN, "flex-shrink-0")}>
               {getFieldDisplayName(field)}
               {field.required && <span className="text-red-500 ml-1">*</span>}
             </label>
-            <div className="flex-1 min-h-0 min-w-0">{content}</div>
+            <div className="min-w-0 overflow-visible">{content}</div>
           </>
         ) : (
-          <div className="flex-1 min-h-0 min-w-0">{content}</div>
+          <div className="min-w-0 overflow-visible">{content}</div>
         )}
       </div>
       

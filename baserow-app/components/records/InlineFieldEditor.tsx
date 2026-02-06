@@ -424,14 +424,14 @@ export default function InlineFieldEditor({
     )
   }
 
-  // Long text — use flex layout so content fills available height (e.g. canvas block)
+  // Long text — field grows with content; no internal scroll (scroll lives on record container only).
   if (field.type === "long_text") {
-    const longTextContainerClass = cn("flex flex-col flex-1 min-h-0", containerClassName)
+    const longTextContainerClass = cn("flex flex-col", containerClassName)
     if (isEditing && !isReadOnly) {
       return (
         <div className={longTextContainerClass}>
           {showLabel && <label className={cn(labelClassName, "flex-shrink-0 flex items-center gap-2")}>{getFieldDisplayName(field)}</label>}
-          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+          <div className="overflow-visible">
             <RichTextEditor
               value={localValue ?? ""}
               onChange={handleChange}
@@ -439,7 +439,7 @@ export default function InlineFieldEditor({
               editable={true}
               showToolbar={true}
               minHeight="240px"
-              className="flex-1 min-h-0"
+              className="overflow-visible"
             />
           </div>
         </div>
@@ -459,7 +459,7 @@ export default function InlineFieldEditor({
           </label>
         )}
         {isReadOnly ? (
-          <div className={cn("flex-1 min-h-0 overflow-auto", readOnlyBoxClassName)}>
+          <div className={cn("overflow-visible", readOnlyBoxClassName)}>
             {value ? (
               <div 
                 className="prose prose-sm max-w-none"
@@ -472,7 +472,7 @@ export default function InlineFieldEditor({
         ) : (
           <div
             onClick={onEditStart}
-            className={cn("flex-1 min-h-0 overflow-auto min-h-[40px]", displayBoxClassName, !value && "bg-white")}
+            className={cn("overflow-visible min-h-[40px]", displayBoxClassName, !value && "bg-white")}
           >
             {value ? (
               <div 

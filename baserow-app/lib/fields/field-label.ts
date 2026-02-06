@@ -3,6 +3,9 @@
  * All field titles (above inputs) should use these so they stay consistent.
  * Stored here so we can add customisation settings later (e.g. workspace/page-level
  * font size, weight, colour, spacing) without scattering overrides.
+ *
+ * Layout invariant: field blocks must never scroll; scroll ownership belongs to the
+ * record container (modal/panel body) only. See docs/architecture/FIELD_SCROLL_INVARIANT.md.
  */
 
 /** Tailwind classes for a field label: small, bold, above the input. */

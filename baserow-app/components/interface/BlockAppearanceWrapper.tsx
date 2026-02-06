@@ -90,8 +90,8 @@ export default function BlockAppearanceWrapper({
         </>
       )}
 
-      {/* Block content with fixed padding */}
-      <div className={cn("flex-1 min-h-0", BLOCK_CONTENT_PADDING)}>
+      {/* Block content with fixed padding. Field blocks: no flex-1 min-h-0 so block grows with content; no internal scroll. */}
+      <div className={cn(block.type === 'field' ? 'overflow-visible' : 'flex-1 min-h-0', BLOCK_CONTENT_PADDING)}>
         {children}
       </div>
     </div>

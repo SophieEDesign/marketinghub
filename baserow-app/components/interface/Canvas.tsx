@@ -2539,9 +2539,10 @@ export default function Canvas({
             {/* Block Content */}
             {/* CRITICAL: No min-height - height must be DERIVED from content */}
             {/* min-h-0 allows flex children to shrink below content size */}
-            {/* In view mode use overflow-auto so saved block sizes are respected but content remains visible (scroll if needed) */}
+            {/* INVARIANT: Field blocks never scroll; only the record container scrolls. */}
+            {/* In view mode use overflow-auto for non-field blocks so saved block sizes are respected; field blocks use overflow-visible. */}
             <div 
-              className={`h-full w-full min-h-0 rounded-lg ${block.config?.locked ? 'pointer-events-none opacity-75' : ''} ${isEditing ? 'overflow-hidden' : 'overflow-auto'}`}
+              className={`h-full w-full min-h-0 rounded-lg ${block.config?.locked ? 'pointer-events-none opacity-75' : ''} ${block.type === 'field' ? 'overflow-visible' : isEditing ? 'overflow-hidden' : 'overflow-auto'}`}
               data-block-id={block.id}
               style={{
                 // CRITICAL: Do NOT set minHeight - height must be DERIVED from content

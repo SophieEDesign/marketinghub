@@ -1276,10 +1276,10 @@ export default function InterfaceBuilder({
   }, [effectiveIsEditing, selectedBlockId, handleDeleteBlock, handleDuplicateBlock, handleExitEditMode, canUndo, canRedo, undoLayout, redoLayout, layoutModifiedByUserRef])
 
   return (
-    <div className="flex h-full w-full bg-gray-50 min-w-0">
+    <div className="flex h-full w-full min-h-0 bg-gray-50 min-w-0">
       {/* Main Canvas - Full width when not editing */}
-      {/* CRITICAL: Container must have min-width: 0 to prevent flex collapse */}
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0 w-full">
+      {/* CRITICAL: min-h-0 so full-page content doesn't force scroll */}
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0 min-h-0 w-full">
         {/* Toolbar / Interface Header */}
         {!hideHeader && (
         <div className="h-auto min-h-[56px] bg-white border-b border-gray-200 flex flex-col px-4 py-2">

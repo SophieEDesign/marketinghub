@@ -23,6 +23,7 @@ import PageSetupState from "./PageSetupState"
 import PageDisplaySettingsPanel from "./PageDisplaySettingsPanel"
 import { getRequiredAnchorType } from "@/lib/interface/page-types"
 import { usePageEditMode, useBlockEditMode } from "@/contexts/EditModeContext"
+import { useMainScroll } from "@/contexts/MainScrollContext"
 import { VIEWS_ENABLED } from "@/lib/featureFlags"
 import { toPostgrestColumn } from "@/lib/supabase/postgrest"
 import { normalizeUuid } from "@/lib/utils/ids"
@@ -1074,6 +1075,16 @@ function InterfacePageClientInternal({
   // They differ only by left-column configuration and settings UX.
   // See docs/architecture/PAGE_TYPE_CONSOLIDATION.md
   const useRecordReviewLayout = isRecordReview || isRecordView
+
+  // Full-page content page: suppress workspace main scroll so page/canvas never scroll (Airtable-style).
+  const mainScroll = useMainScroll()
+  useEffect(() => {
+    if (!mainScroll) return
+    const isContentPage = !useRecordReviewLayout
+    const isFullPage =
+      isContentPage && blocks.length === 1 && blocks[0]?.config?.is_full_page === true
+    mainScroll.setSuppressMainScroll(!!isFullPage)
+  }, [mainScroll, useRecordReviewLayout, blocks])
   
   // Check if page has a valid anchor
   const pageHasAnchor = page ? hasPageAnchor(page) : false
@@ -1268,9 +1279,8 @@ function InterfacePageClientInternal({
       )}
 
       {/* Content Area */}
-      {/* CRITICAL: Container must have min-width: 0 to prevent flex collapse in nested flex layouts */}
-      {/* This ensures content pages get full width, not constrained by parent flex containers */}
-      <div className="flex-1 overflow-hidden min-w-0 w-full">
+      {/* CRITICAL: min-h-0 allows flex child to shrink so full-page content doesn't force page scroll */}
+      <div className="flex-1 overflow-hidden min-w-0 min-h-0 w-full">
         {/* CRITICAL: Always render the same component tree to prevent remount storms */}
         {/* Show loading/error states as overlays, not separate trees */}
         {loading && !page ? (
@@ -1313,7 +1323,7 @@ function InterfacePageClientInternal({
               // This prevents remount storms when switching between edit and view modes
               // CRITICAL: Content pages need full-width container - wrap in div with proper flex constraints
               interfaceBuilderPage ? (
-                <div className="h-full w-full min-w-0 flex flex-col">
+                <div className="h-full w-full min-w-0 min-h-0 flex flex-col overflow-hidden">
                   <InterfaceBuilder
                     key={page.id} // CRITICAL: ONLY page.id - never include mode, isViewer, or recordId
                     page={interfaceBuilderPage}
