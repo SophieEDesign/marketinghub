@@ -106,16 +106,20 @@ function LookupPill({ item, lookupTableId, lookupFieldId, onOpenRecord, lookupTa
         return
       }
 
-      // Search for the record in the lookup table that matches the value
-      // Use type assertion to avoid TypeScript's "excessively deep" error with dynamic table names
+      // Search for the record in the lookup table that matches the value.
+      // When the value is a UUID, it is the linked record's id - query by id on the lookup table.
+      // lookupField.name is the link field's name on the *source* table, not necessarily a column
+      // on the lookup table, so using it here can cause "column does not exist" (e.g. quarterly_themes).
       const tableName = lookupTable.supabase_table as string
-      
-      // Cast supabase client to any to break the type chain and prevent deep type instantiation
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(displayValue).trim())
+      const searchColumn = isUuid ? 'id' : lookupField.name
+      const searchValue = isUuid ? String(displayValue).trim() : displayValue
+
       type QueryResult = { data: Array<{ id: string }> | null; error: any }
       const result = await ((supabase as any)
         .from(tableName)
         .select('id')
-        .eq(lookupField.name, displayValue)
+        .eq(searchColumn, searchValue)
         .limit(1)) as QueryResult
       const { data: records, error: searchError } = result
 
