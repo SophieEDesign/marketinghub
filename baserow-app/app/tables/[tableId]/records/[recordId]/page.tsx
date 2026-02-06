@@ -1,7 +1,10 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { isCoreDataTable } from "@/lib/core-data/is-core-data-table"
+import { getViews } from "@/lib/crud/views"
 import WorkspaceShellWrapper from "@/components/layout/WorkspaceShellWrapper"
 import RecordPageClient from "@/components/records/RecordPageClient"
+import type { View } from "@/types/database"
 
 export default async function RecordPage({
   params,
@@ -31,6 +34,17 @@ export default async function RecordPage({
 
   if (recordError || !record) {
     redirect(`/tables/${tableId}`)
+  }
+
+  // Non-core data tables: open in panel only; redirect to table/view with openRecord param
+  const coreData = await isCoreDataTable(tableId)
+  if (!coreData) {
+    const views = await getViews(tableId).catch(() => [])
+    const defaultView = views.find((v: View) => v.type === "grid") || views[0]
+    if (defaultView?.id) {
+      redirect(`/tables/${tableId}/views/${defaultView.id}?openRecord=${recordId}`)
+    }
+    redirect(`/tables/${tableId}?openRecord=${recordId}`)
   }
 
   return (

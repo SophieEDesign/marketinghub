@@ -18,6 +18,7 @@
 import { useState, useCallback, useMemo } from "react"
 import RecordFieldPanel from "@/components/records/RecordFieldPanel"
 import InterfaceBuilder from "./InterfaceBuilder"
+import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { Page, PageBlock } from "@/lib/interface/types"
 import type { TableField } from "@/types/fields"
 
@@ -62,6 +63,7 @@ export default function RecordView({
   fieldPanelPosition = "top",
   fieldPanelCollapsible = false,
 }: RecordViewProps) {
+  const { openRecordByTableId } = useRecordPanel()
   const [fieldPanelCollapsed, setFieldPanelCollapsed] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
 
@@ -82,15 +84,11 @@ export default function RecordView({
     // This callback can be used for additional side effects if needed
   }, [])
 
-  // Handle linked record click
+  // Handle linked record click (open in panel only)
   const handleLinkedRecordClick = useCallback((linkedTableId: string, linkedRecordId: string) => {
-    // Never open the current record (self-link edge case)
-    if (linkedTableId === tableId && linkedRecordId === recordId) {
-      return
-    }
-    // Navigate to the linked record's record view
-    window.location.href = `/tables/${linkedTableId}/records/${linkedRecordId}`
-  }, [tableId, recordId])
+    if (linkedTableId === tableId && linkedRecordId === recordId) return
+    openRecordByTableId(linkedTableId, linkedRecordId)
+  }, [openRecordByTableId, tableId, recordId])
 
   // Get edit mode from InterfaceBuilder
   const handleEditModeChange = useCallback((editing: boolean) => {

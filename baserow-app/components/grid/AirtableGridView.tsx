@@ -46,6 +46,7 @@ import FillHandle from './FillHandle'
 import CellContextMenu from './CellContextMenu'
 import { formatCellValue } from '@/lib/dataView/clipboard'
 import FieldBuilderModal from './FieldBuilderModal'
+import { getFieldDisplayName } from '@/lib/fields/display'
 
 type Sort = { field: string; direction: 'asc' | 'desc' }
 
@@ -80,6 +81,8 @@ interface AirtableGridViewProps {
   groupByRules?: GroupRule[]
   userRole?: "admin" | "editor" | "viewer" | null
   disableRecordPanel?: boolean // If true, clicking rows won't open record panel
+  /** When true, row click opens full-page record route; when false, opens RecordPanel modal. */
+  isCoreData?: boolean
   onTableFieldsRefresh?: () => void // Refresh field metadata after option updates
   onActionsReady?: (actions: AirtableGridActions) => void
 }
@@ -116,12 +119,14 @@ export default function AirtableGridView({
   groupByRules,
   userRole = "editor",
   disableRecordPanel = false,
+  isCoreData = false,
   onTableFieldsRefresh,
   onActionsReady,
 }: AirtableGridViewProps) {
   const router = useRouter()
   const isMobile = useIsMobile()
   const isTablet = useIsTablet()
+  const { openRecord } = useRecordPanel()
   const [tableIdState, setTableIdState] = useState<string | null>(tableId || null)
   const [showPasteConfirm, setShowPasteConfirm] = useState(false)
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
@@ -180,9 +185,12 @@ export default function AirtableGridView({
   const handleOpenRecord = useCallback((rowId: string) => {
     if (disableRecordPanel) return
     if (!tableIdState || !tableName) return
-    // Core Data (Airtable grid): open record as a full page view.
-    router.push(`/tables/${tableIdState}/records/${rowId}`)
-  }, [disableRecordPanel, router, tableIdState, tableName])
+    if (isCoreData) {
+      router.push(`/tables/${tableIdState}/records/${rowId}`)
+    } else {
+      openRecord(tableIdState, rowId, tableName)
+    }
+  }, [disableRecordPanel, isCoreData, openRecord, router, tableIdState, tableName])
   
   // Map row height from props to internal format
   // On mobile, cap row height to medium for better usability
@@ -1857,12 +1865,15 @@ export default function AirtableGridView({
             if (item.type === 'group') {
               const node = item.node
               const isCollapsed = collapsedGroups.has(node.pathKey)
+              const groupByField = node.rule.type === 'field'
+                ? fields.find((f) => f && (f.name === node.rule.field || f.id === node.rule.field))
+                : null
               const ruleLabel =
                 node.rule.type === 'date'
                   ? node.rule.granularity === 'year'
                     ? 'Year'
                     : 'Month'
-                  : node.rule.field
+                  : (groupByField ? getFieldDisplayName(groupByField) : node.rule.field)
               return (
                 <div
                   key={`group-${node.pathKey}`}

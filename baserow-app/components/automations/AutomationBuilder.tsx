@@ -542,6 +542,7 @@ export default function AutomationBuilder({
             onAddAction={addAction}
             onEditCondition={(groupIndex) => setEditingConditionGroupIndex(groupIndex)}
             onDeleteGroup={deleteGroup}
+            onDeleteAction={deleteAction}
             onShowActionTypePicker={(groupIndex) => setShowActionTypePicker({ groupIndex, buttonRef: null })}
           />
         </div>

@@ -177,6 +177,9 @@ export default function Canvas({
   const dragLastPositionRef = useRef<Map<string, { x: number; y: number }>>(new Map())
   const currentlyDraggingBlockIdRef = useRef<string | null>(null)
   const currentlyResizingBlockIdRef = useRef<string | null>(null)
+  // #region agent log
+  const blocksMapIterationRef = useRef(0)
+  // #endregion
   
   // CRITICAL: Convert pixels to grid units (React Grid Layout height includes margins)
   // This ensures height values from content measurement are correctly converted
@@ -2514,6 +2517,10 @@ export default function Canvas({
           resizeHandles={['se', 'sw', 'ne', 'nw', 'e', 'w', 's', 'n']}
         >
           {blocks.map((block) => {
+            // #region agent log
+            blocksMapIterationRef.current += 1
+            fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:blocks.map',message:'Canvas blocks.map iteration',data:{pageId,blockId:block.id,blockType:block.type,iteration:blocksMapIterationRef.current},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
+            // #endregion
             // Log each block being rendered
             debugLog('LAYOUT', `[Canvas] Rendering block: pageId=${pageId}, blockId=${block.id}, type=${block.type}`, {
               block,

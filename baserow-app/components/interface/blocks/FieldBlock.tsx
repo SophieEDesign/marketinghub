@@ -15,6 +15,7 @@ import { isAbortError } from "@/lib/api/error-handling"
 import { FIELD_LABEL_CLASS_NO_MARGIN, FIELD_LABEL_GAP_CLASS } from "@/lib/fields/field-label"
 import { getFieldDisplayName } from "@/lib/fields/display"
 import { canCreateRecords as blockCanCreateRecords } from "@/lib/interface/block-permissions"
+import { useRecordPanel } from "@/contexts/RecordPanelContext"
 
 interface FieldBlockProps {
   block: PageBlock
@@ -43,6 +44,7 @@ export default function FieldBlock({
   hideEditButton = false
 }: FieldBlockProps) {
   const { config } = block
+  const { openRecordByTableId } = useRecordPanel()
   const fieldId = config?.field_id
   const [field, setField] = useState<TableField | null>(null)
   const [fieldValue, setFieldValue] = useState<any>(null)
@@ -541,11 +543,8 @@ export default function FieldBlock({
         }}
         onEditEnd={() => setIsEditingValue(false)}
         onLinkedRecordClick={(linkedTableId, linkedRecordId) => {
-          // Never open the current record (self-link edge case)
-          if (pageTableId && recordId && linkedTableId === pageTableId && linkedRecordId === recordId) {
-            return
-          }
-          window.location.href = `/tables/${linkedTableId}/records/${linkedRecordId}`
+          if (pageTableId && recordId && linkedTableId === pageTableId && linkedRecordId === recordId) return
+          openRecordByTableId(linkedTableId, linkedRecordId)
         }}
         onAddLinkedRecord={blockCanCreate ? handleAddLinkedRecord : () => {}}
         isReadOnly={false}
@@ -596,11 +595,8 @@ export default function FieldBlock({
       }}
       onEditEnd={() => setIsEditingValue(false)}
       onLinkedRecordClick={(linkedTableId, linkedRecordId) => {
-        // Never open the current record (self-link edge case)
-        if (pageTableId && recordId && linkedTableId === pageTableId && linkedRecordId === recordId) {
-          return
-        }
-        window.location.href = `/tables/${linkedTableId}/records/${linkedRecordId}`
+        if (pageTableId && recordId && linkedTableId === pageTableId && linkedRecordId === recordId) return
+        openRecordByTableId(linkedTableId, linkedRecordId)
       }}
       onAddLinkedRecord={blockCanCreate ? handleAddLinkedRecord : () => {}}
       isReadOnly={!isEditable}

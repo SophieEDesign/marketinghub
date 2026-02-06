@@ -23,6 +23,8 @@ interface RecordPanelState {
 interface RecordPanelContextType {
   state: RecordPanelState
   openRecord: (tableId: string, recordId: string, tableName: string, modalFields?: string[], modalLayout?: BlockConfig['modal_layout'], cascadeContext?: RecordEditorCascadeContext | null) => void
+  /** Fetches table supabase_table by id and opens the record in the panel. Use when only tableId + recordId are available (e.g. linked record click). */
+  openRecordByTableId: (tableId: string, recordId: string) => Promise<void>
   closeRecord: () => void
   setWidth: (width: number) => void
   togglePin: () => void
@@ -109,6 +111,20 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
     }))
   }, [])
 
+  const openRecordByTableId = useCallback(async (tableId: string, recordId: string) => {
+    try {
+      const res = await fetch(`/api/tables/${tableId}`)
+      if (!res.ok) return
+      const { table } = await res.json()
+      const tableName = table?.supabase_table
+      if (tableName) {
+        openRecord(tableId, recordId, tableName)
+      }
+    } catch (err) {
+      console.error('[RecordPanel] openRecordByTableId failed:', err)
+    }
+  }, [openRecord])
+
   const goBack = useCallback(() => {
     setState((prev) => {
       if (prev.history.length <= 1) {
@@ -133,6 +149,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
       value={{
         state,
         openRecord,
+        openRecordByTableId,
         closeRecord,
         setWidth,
         togglePin,

@@ -35,7 +35,7 @@ export default function LinkedRecordCell({
   onSave,
   placeholder = "—",
 }: LinkedRecordCellProps) {
-  const { openRecord } = useRecordPanel()
+  const { openRecord, openRecordByTableId } = useRecordPanel()
   const linkedTableId = field.options?.linked_table_id
   const [linkedTable, setLinkedTable] = useState<{ id: string; supabase_table: string } | null>(null)
 
@@ -109,14 +109,11 @@ export default function LinkedRecordCell({
     if (tableId === field.table_id && recordId === rowId) return
     if (!linkedTableId) return
 
-    // Prefer opening in the record panel when we know the linked table name.
     if (linkedTable?.supabase_table) {
       openRecord(tableId, recordId, linkedTable.supabase_table)
-      return
+    } else {
+      openRecordByTableId(tableId, recordId)
     }
-
-    // Fallback: navigate to the record page.
-    window.location.href = `/tables/${tableId}/records/${recordId}`
   }
 
   const [createRecordModalOpen, setCreateRecordModalOpen] = useState(false)

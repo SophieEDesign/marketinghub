@@ -155,6 +155,7 @@ export default async function ViewPage({
             tableId={tableId}
             viewId={viewId}
             table={table}
+            isCoreData={Boolean((table as { is_core_data?: boolean })?.is_core_data)}
             view={view}
             initialViewFields={viewFields}
             initialViewFilters={viewFilters}

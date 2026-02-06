@@ -29,6 +29,7 @@ import CalendarDateRangeControls from "@/components/views/calendar/CalendarDateR
 import { VIEWS_ENABLED } from "@/lib/featureFlags"
 import { normalizeUuid } from "@/lib/utils/ids"
 import { isAbortError } from "@/lib/api/error-handling"
+import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { startOfWeek, endOfWeek, startOfDay, addWeeks, startOfMonth, endOfMonth, addMonths } from "date-fns"
 import type { GroupRule } from "@/lib/grouping/types"
 
@@ -69,7 +70,8 @@ export default function GridBlock({
   isFullPage = false,
 }: GridBlockProps) {
   const { config } = block
-  
+  const { openRecord: openRecordPanel } = useRecordPanel()
+
   // Track base height (collapsed state) to calculate deltas
   const baseHeightRef = useRef<number | null>(null)
   const previousHeightRef = useRef<number | null>(null)
@@ -983,12 +985,11 @@ export default function GridBlock({
           (config as any)?.gallery_groups_default_collapsed ??
           true
 
-        // Determine if record clicks should be enabled
+        // Determine if record clicks should be enabled (modal only; never full-page from blocks)
         const handleRecordClick = allowOpenRecord
-          ? (onRecordClick || ((recordId) => {
-              // Default: navigate to record page if no callback provided
-              if (tableId) {
-                window.location.href = `/tables/${tableId}/records/${recordId}`
+          ? (onRecordClick || ((clickedRecordId: string) => {
+              if (tableId && table?.supabase_table) {
+                openRecordPanel(tableId, clickedRecordId, table.supabase_table, (config as any).modal_fields, (config as any).modal_layout, { blockConfig: config })
               }
             }))
           : undefined // Disable record clicks if not allowed

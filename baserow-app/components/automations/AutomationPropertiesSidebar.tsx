@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { X, Edit, Play, ChevronDown, ChevronUp } from "lucide-react"
 import type { TriggerType, ActionType, ActionConfig, TriggerConfig, ActionGroup } from "@/lib/automations/types"
 import type { TableField } from "@/types/database"
@@ -59,6 +59,7 @@ export default function AutomationPropertiesSidebar({
 }: AutomationPropertiesSidebarProps) {
   const [showMoreOptions, setShowMoreOptions] = useState(false)
   const [variablePickerOpen, setVariablePickerOpen] = useState<{ field: string; inputRef: HTMLInputElement | null } | null>(null)
+  const conditionBuilderRef = useRef<HTMLDivElement>(null)
 
   if (!selectedItem) {
     return (
@@ -143,14 +144,13 @@ export default function AutomationPropertiesSidebar({
         </div>
 
         {/* Conditions */}
-        <div>
+        <div ref={conditionBuilderRef}>
           <div className="flex items-center justify-between mb-2">
             <Label>Conditions</Label>
             <button
-              onClick={() => {
-                // Edit condition - this would open a modal or inline editor
-              }}
-              className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+              type="button"
+              onClick={() => conditionBuilderRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
             >
               <Edit className="h-3 w-3" />
               Edit conditions
@@ -158,17 +158,15 @@ export default function AutomationPropertiesSidebar({
           </div>
           <div className="p-3 bg-gray-50 border border-gray-200 rounded text-sm">
             <span className="font-medium">If {conditionSummary}</span>
-            {selectedGroup.condition && !isEmptyFilterTree(selectedGroup.condition) && (
-              <div className="mt-2">
-                <AutomationConditionBuilder
-                  filterTree={selectedGroup.condition}
-                  tableFields={tableFields}
-                  onChange={(tree) => {
-                    onUpdateGroup(groupIndex, { condition: tree })
-                  }}
-                />
-              </div>
-            )}
+            <div className="mt-2">
+              <AutomationConditionBuilder
+                filterTree={selectedGroup.condition ?? { operator: 'AND', children: [] }}
+                tableFields={tableFields}
+                onChange={(tree) => {
+                  onUpdateGroup(groupIndex, { condition: tree })
+                }}
+              />
+            </div>
           </div>
         </div>
 

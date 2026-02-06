@@ -59,6 +59,9 @@ interface TextBlockProps {
  */
 export default function TextBlock({ block, isEditing = false, onUpdate }: TextBlockProps) {
   const { config } = block
+  // #region agent log
+  const debugRenderCountRef = useRef(0)
+  // #endregion
   
   // Prevent toolbar interactions from stealing focus/selection from TipTap.
   // Without this, clicks can clear the selection before commands run, making the toolbar feel "broken".
@@ -170,7 +173,11 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   readOnlyRef.current = readOnly
   onUpdateRef.current = onUpdate
   blockIdRef.current = block.id
-  
+  // #region agent log
+  debugRenderCountRef.current += 1
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TextBlock.tsx:render',message:'TextBlock render',data:{blockId:block.id,renderCount:debugRenderCountRef.current},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'F'})}).catch(()=>{});
+  // #endregion
+
   // Track block.id to detect when to rehydrate (only on block ID change)
   const previousBlockIdRef = useRef<string>(block.id)
   const editorInitializedRef = useRef<boolean>(false)
@@ -279,6 +286,9 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     [isEditing, textColorStyle]
   )
 
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TextBlock.tsx:beforeUseEditor',message:'TextBlock before useEditor',data:{blockId:block.id},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'F'})}).catch(()=>{});
+  // #endregion
   const editor = useEditor({
     extensions: TEXT_BLOCK_EXTENSIONS,
     content: initialContent,
@@ -347,6 +357,9 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       }, 1000)
     },
   })
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TextBlock.tsx:afterUseEditor',message:'TextBlock after useEditor',data:{blockId:block.id,hasEditor:!!editor},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'F'})}).catch(()=>{});
+  // #endregion
 
   // Keep editorRef current so editorProps.handleKeyDown (memoized) can access it
   useEffect(() => {

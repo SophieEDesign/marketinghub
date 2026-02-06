@@ -50,6 +50,8 @@ export interface Table {
   created_by?: string
   category?: string
   access_control?: AccessControl
+  /** When true, records may open as full-page routes; otherwise modal only. */
+  is_core_data?: boolean
 }
 
 export interface View {

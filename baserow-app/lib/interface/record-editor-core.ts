@@ -180,12 +180,13 @@ export function useRecordEditorCore(
   }, [tableId, tableFieldsProp])
 
   const loadRecord = useCallback(async () => {
-    if (recordId == null || !effectiveTableName) return
+    const tableToUse = supabaseTableNameProp ?? effectiveTableName
+    if (recordId == null || !tableToUse) return
     setLoading(true)
     try {
       const supabase = createClient()
       const { data, error } = await supabase
-        .from(effectiveTableName)
+        .from(tableToUse)
         .select('*')
         .eq('id', recordId)
         .single()
@@ -197,7 +198,7 @@ export function useRecordEditorCore(
     } finally {
       setLoading(false)
     }
-  }, [recordId, effectiveTableName])
+  }, [recordId, effectiveTableName, supabaseTableNameProp])
 
   useEffect(() => {
     if (supabaseTableNameProp != null) {
@@ -226,15 +227,20 @@ export function useRecordEditorCore(
   }, [active, tableId, tableFieldsProp, loadFields])
 
   useEffect(() => {
-    if (!active || !effectiveTableName) return
+    if (!active) return
     if (recordId) {
-      loadRecord()
+      const tableToUse = supabaseTableNameProp ?? effectiveTableName
+      if (tableToUse) {
+        loadRecord()
+      } else {
+        setLoading(false)
+      }
     } else if (initialData) {
       setFormData(initialData)
     } else {
       setFormData({})
     }
-  }, [active, recordId, effectiveTableName, initialData, loadRecord])
+  }, [active, recordId, effectiveTableName, supabaseTableNameProp, initialData, loadRecord])
 
   const filteredFields = modalFields.length > 0
     ? fields.filter(

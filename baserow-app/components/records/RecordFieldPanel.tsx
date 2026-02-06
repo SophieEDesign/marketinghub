@@ -22,6 +22,7 @@ import { getFieldDisplayName } from "@/lib/fields/display"
 import { FIELD_LABEL_CLASS } from "@/lib/fields/field-label"
 import { isAbortError } from "@/lib/api/error-handling"
 import { syncLinkedFieldBidirectional } from "@/lib/dataView/linkedFields"
+import { useRecordPanel } from "@/contexts/RecordPanelContext"
 
 interface FieldConfig {
   field: string // Field name or ID
@@ -48,6 +49,7 @@ export default function RecordFieldPanel({
   onLinkedRecordClick,
   compact = false,
 }: RecordFieldPanelProps) {
+  const { openRecordByTableId } = useRecordPanel()
   const { toast } = useToast()
   const [recordData, setRecordData] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(false)
@@ -392,11 +394,10 @@ export default function RecordFieldPanel({
       if (onLinkedRecordClick) {
         onLinkedRecordClick(linkedTableId, linkedRecordId)
       } else {
-        // Default: navigate to record page
-        window.location.href = `/tables/${linkedTableId}/records/${linkedRecordId}`
+        openRecordByTableId(linkedTableId, linkedRecordId)
       }
     },
-    [onLinkedRecordClick, tableId, recordId]
+    [onLinkedRecordClick, openRecordByTableId, tableId, recordId]
   )
 
   // Handle add linked record (placeholder)

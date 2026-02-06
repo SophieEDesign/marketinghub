@@ -43,7 +43,7 @@ export default function RecordFields({
   tableName: propTableName,
   showFieldNames = true,
 }: RecordFieldsProps) {
-  const { navigateToLinkedRecord } = useRecordPanel()
+  const { navigateToLinkedRecord, openRecordByTableId } = useRecordPanel()
   const { toast } = useToast()
   const [editingField, setEditingField] = useState<string | null>(null)
   const [tableName, setTableName] = useState<string | undefined>(propTableName)
@@ -163,23 +163,18 @@ export default function RecordFields({
           return
         }
 
-        // If RecordPanel context is available, use it
-        if (navigateToLinkedRecord) {
-          const supabase = createClient()
-          const { data: linkedTable } = await supabase
-            .from("tables")
-            .select("name, supabase_table")
-            .eq("id", linkedTableId)
-            .single()
+        const supabase = createClient()
+        const { data: linkedTable } = await supabase
+          .from("tables")
+          .select("name, supabase_table")
+          .eq("id", linkedTableId)
+          .single()
 
-          if (linkedTable) {
-            navigateToLinkedRecord(linkedTableId, linkedRecordId, linkedTable.supabase_table)
-            return
-          }
+        if (linkedTable && navigateToLinkedRecord) {
+          navigateToLinkedRecord(linkedTableId, linkedRecordId, linkedTable.supabase_table)
+        } else {
+          openRecordByTableId(linkedTableId, linkedRecordId)
         }
-        
-        // Otherwise, navigate to record page
-        window.location.href = `/tables/${linkedTableId}/records/${linkedRecordId}`
       } catch (error: any) {
         console.error("Error navigating to linked record:", error)
         toast({
@@ -189,7 +184,7 @@ export default function RecordFields({
         })
       }
     },
-    [navigateToLinkedRecord, toast]
+    [navigateToLinkedRecord, openRecordByTableId, toast]
   )
 
   const handleAddLinkedRecord = useCallback(

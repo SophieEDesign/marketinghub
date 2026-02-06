@@ -4,9 +4,14 @@ import { useEffect, useState, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { PageBlock } from "@/lib/interface/types"
 import type { RecordContext } from "@/lib/interface/types"
+import { applyFiltersToQuery, normalizeFilter } from "@/lib/interface/filters"
+import type { FilterTree } from "@/lib/filters/canonical-model"
+import { filterRowsBySearch } from "@/lib/search/filterRows"
 import { Button } from "@/components/ui/button"
-import { X } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { X, Search, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useToast } from "@/components/ui/use-toast"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 function isUuidLike(value: string | null | undefined): value is string {
@@ -34,11 +39,26 @@ export default function RecordContextBlock({
   const tableId = config.table_id ?? (config as any).tableId ?? pageTableId ?? null
   const displayMode = config.displayMode ?? (config as any).display_mode ?? "list"
   const allowClear = config.allowClear ?? (config as any).allow_clear ?? true
+  const showSearch = config.show_search !== false
+  const showAddRecord = (config as any).show_add_record === true
 
   const [table, setTable] = useState<{ id: string; supabase_table: string; name?: string | null } | null>(null)
   const [records, setRecords] = useState<{ id: string; [k: string]: unknown }[]>([])
   const [loading, setLoading] = useState(true)
   const [titleField, setTitleField] = useState<string | null>(null)
+  const [tableFields, setTableFields] = useState<{ id: string; name: string; type: string }[]>([])
+  const [searchQuery, setSearchQuery] = useState("")
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const { toast } = useToast()
+
+  const filterTree = (config as any).filter_tree as FilterTree | undefined
+  const blockFilters = (config.filters || []) as Array<{ field: string; operator: string; value: unknown }>
+  const sortsConfig = Array.isArray(config.sorts) ? config.sorts : []
+  const listTitleField = config.list_title_field ?? (config as any).title_field
+  const listSubtitleFields = config.list_subtitle_fields || []
+  const listImageField = config.list_image_field ?? (config as any).image_field
+  const listPillFields = config.list_pill_fields || []
+  const listMetaFields = config.list_meta_fields || []
 
   useEffect(() => {
     if (!tableId) {
@@ -98,16 +118,42 @@ export default function RecordContextBlock({
         .order("position", { ascending: true })
 
       const fieldList = (fields || []) as { id: string; name: string; type: string }[]
+      setTableFields(fieldList)
       const firstText = fieldList.find((f) => f.type === "text" || f.type === "long_text" || f.type === "single_line_text")
-      const titleKey = firstText?.name ?? "id"
+      const titleKey = (listTitleField && fieldList.some((f) => f.name === listTitleField))
+        ? listTitleField
+        : (firstText?.name ?? "id")
       setTitleField(titleKey)
 
-      const selectCols = ["id", titleKey].filter((c) => c === "id" || fieldList.some((f) => f.name === c))
-      const { data: rows } = await supabase
+      const allCols = [
+        "id",
+        titleKey,
+        ...listSubtitleFields,
+        ...(listImageField ? [listImageField] : []),
+        ...listPillFields,
+        ...listMetaFields,
+      ]
+      const selectCols = [...new Set(allCols)].filter((c) => c === "id" || fieldList.some((f) => f.name === c))
+
+      let query = supabase
         .from(resolved.supabase_table)
         .select(selectCols.join(", "))
         .limit(200)
-        .order("id", { ascending: false })
+
+      const filtersToApply = filterTree ?? (blockFilters.length > 0 ? blockFilters.map((f) => normalizeFilter(f)) : null)
+      if (filtersToApply) {
+        query = applyFiltersToQuery(query, filtersToApply, fieldList)
+      }
+
+      if (sortsConfig.length > 0) {
+        const first = sortsConfig[0] as { field: string; direction: "asc" | "desc" }
+        const sortField = fieldList.some((f) => f.name === first.field) ? first.field : "id"
+        query = query.order(sortField, { ascending: first.direction === "asc" })
+      } else {
+        query = query.order("id", { ascending: false })
+      }
+
+      const { data: rows } = await query
 
       if (!cancelled) {
         setRecords((rows as unknown as { id: string; [k: string]: unknown }[]) || [])
@@ -121,7 +167,29 @@ export default function RecordContextBlock({
     return () => {
       cancelled = true
     }
-  }, [tableId])
+  }, [
+    tableId,
+    filterTree ? JSON.stringify(filterTree) : null,
+    blockFilters.length,
+    JSON.stringify(blockFilters),
+    JSON.stringify(sortsConfig),
+    listTitleField,
+    JSON.stringify(listSubtitleFields),
+    listImageField,
+    JSON.stringify(listPillFields),
+    JSON.stringify(listMetaFields),
+    refreshTrigger,
+  ])
+
+  const filteredRecords = useMemo(() => {
+    if (!searchQuery.trim() || !tableFields.length) return records
+    return filterRowsBySearch(
+      records as Record<string, any>[],
+      tableFields as any,
+      searchQuery.trim(),
+      undefined
+    )
+  }, [records, tableFields, searchQuery])
 
   const handleSelect = (record: { id: string }) => {
     if (!table || !onRecordContextChange) return
@@ -131,6 +199,30 @@ export default function RecordContextBlock({
   const handleClear = () => {
     if (!onRecordContextChange) return
     onRecordContextChange(null)
+  }
+
+  const handleAddNew = async () => {
+    if (!table || !onRecordContextChange) return
+    const supabase = createClient()
+    try {
+      const { data: inserted, error } = await supabase
+        .from(table.supabase_table)
+        .insert({})
+        .select("id")
+        .single()
+      if (error) throw error
+      if (inserted?.id) {
+        setRefreshTrigger((c) => c + 1)
+        onRecordContextChange({ tableId: table.id, recordId: inserted.id })
+        toast({ title: "Record created", description: "New record added and selected." })
+      }
+    } catch (e: any) {
+      toast({
+        variant: "destructive",
+        title: "Could not add record",
+        description: e?.message ?? "The table may require fields to be set.",
+      })
+    }
   }
 
   const selectedInThisBlock = table && recordTableId === table.id && recordId
@@ -166,10 +258,45 @@ export default function RecordContextBlock({
     return record.id
   }
 
+  const getSubtitle = (record: { id: string; [k: string]: unknown }) => {
+    if (!listSubtitleFields.length) return null
+    const parts = listSubtitleFields
+      .map((name) => record[name])
+      .filter((v) => v != null && String(v).trim() !== "")
+    return parts.length ? parts.join(" · ") : null
+  }
+
   return (
     <div className="h-full w-full flex flex-col gap-2 p-2 rounded-md border bg-card">
+      {(showSearch || showAddRecord) && (
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {showSearch && (
+            <div className="relative flex-1 min-w-0">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search records..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 h-9"
+              />
+            </div>
+          )}
+          {showAddRecord && (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 flex-shrink-0"
+              onClick={handleAddNew}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      )}
       {allowClear && selectedInThisBlock && (
-        <div className="flex items-center justify-end">
+        <div className="flex items-center justify-end flex-shrink-0">
           <Button
             type="button"
             variant="ghost"
@@ -189,10 +316,12 @@ export default function RecordContextBlock({
           displayMode === "compact" && "flex flex-wrap gap-1"
         )}
       >
-        {records.length === 0 ? (
-          <p className="text-muted-foreground text-sm p-2">No records in this table.</p>
+        {filteredRecords.length === 0 ? (
+          <p className="text-muted-foreground text-sm p-2">
+            {records.length === 0 ? "No records in this table." : "No records match your search."}
+          </p>
         ) : displayMode === "grid" ? (
-          records.map((record) => {
+          filteredRecords.map((record) => {
             const isActive = selectedInThisBlock === record.id
             return (
               <button
@@ -209,7 +338,7 @@ export default function RecordContextBlock({
             )
           })
         ) : displayMode === "compact" ? (
-          records.map((record) => {
+          filteredRecords.map((record) => {
             const isActive = selectedInThisBlock === record.id
             return (
               <button
@@ -227,8 +356,9 @@ export default function RecordContextBlock({
           })
         ) : (
           <ul className="w-full space-y-1">
-            {records.map((record) => {
+            {filteredRecords.map((record) => {
               const isActive = selectedInThisBlock === record.id
+              const subtitle = getSubtitle(record)
               return (
                 <li key={record.id}>
                   <button
@@ -239,7 +369,10 @@ export default function RecordContextBlock({
                       isActive && "ring-2 ring-primary bg-accent"
                     )}
                   >
-                    {getLabel(record)}
+                    <span className="block font-medium">{getLabel(record)}</span>
+                    {subtitle && (
+                      <span className="block text-xs text-muted-foreground mt-0.5">{subtitle}</span>
+                    )}
                   </button>
                 </li>
               )

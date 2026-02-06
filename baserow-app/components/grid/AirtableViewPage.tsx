@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import ViewBuilderToolbar from "./ViewBuilderToolbar"
 import AirtableGridView, { type AirtableGridActions } from "./AirtableGridView"
 import AirtableKanbanView from "./AirtableKanbanView"
@@ -12,6 +12,7 @@ import type { TableField } from "@/types/fields"
 import type { ViewType, FilterType } from "@/types/database"
 import { normalizeUuid } from "@/lib/utils/ids"
 import { isAbortError } from "@/lib/api/error-handling"
+import { useRecordPanel } from "@/contexts/RecordPanelContext"
 
 interface AirtableViewPageProps {
   tableId: string
@@ -21,6 +22,8 @@ interface AirtableViewPageProps {
     name: string
     supabase_table: string
   }
+  /** When true, record row click opens full-page; when false, opens RecordPanel modal. */
+  isCoreData?: boolean
   view: {
     id: string
     name: string
@@ -58,6 +61,7 @@ export default function AirtableViewPage({
   tableId,
   viewId,
   table,
+  isCoreData = false,
   view,
   initialViewFields,
   initialViewFilters,
@@ -67,9 +71,24 @@ export default function AirtableViewPage({
   initialGridSettings,
 }: AirtableViewPageProps) {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const { openRecord } = useRecordPanel()
   const gridActionsRef = useRef<AirtableGridActions | null>(null)
   const handleGridActionsReady = useCallback((actions: AirtableGridActions) => {
     gridActionsRef.current = actions
+  }, [])
+
+  // Deep link: open record in panel when URL has ?openRecord=recordId (e.g. after non-core record redirect)
+  useEffect(() => {
+    const recordId = searchParams.get("openRecord")
+    if (!recordId || !tableId || !table?.supabase_table) return
+    openRecord(tableId, recordId, table.supabase_table)
+    const next = new URLSearchParams(searchParams.toString())
+    next.delete("openRecord")
+    const qs = next.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount for deep-link
   }, [])
 
   const viewUuid = useMemo(() => normalizeUuid(viewId), [viewId])
@@ -391,6 +410,7 @@ export default function AirtableViewPage({
             groupBy={groupBy || undefined}
             userRole={userRole}
             disableRecordPanel={false}
+            isCoreData={isCoreData}
             onActionsReady={handleGridActionsReady}
           />
         ) : view.type === "kanban" ? (

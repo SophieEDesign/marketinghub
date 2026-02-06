@@ -12,6 +12,7 @@ import { resolveSystemFieldAlias } from "@/lib/fields/systemFieldAliases"
 import { useToast } from "@/components/ui/use-toast"
 import { FIELD_LABEL_CLASS_NO_MARGIN, FIELD_LABEL_GAP_CLASS } from "@/lib/fields/field-label"
 import { getFieldDisplayName } from "@/lib/fields/display"
+import { useRecordPanel } from "@/contexts/RecordPanelContext"
 
 interface FieldSectionBlockProps {
   block: PageBlock
@@ -41,6 +42,7 @@ export default function FieldSectionBlock({
   hideEditButton = false
 }: FieldSectionBlockProps) {
   const { config } = block
+  const { openRecordByTableId } = useRecordPanel()
   const sectionName = config?.group_name as string | undefined
   const fieldNames = config?.field_names as string[] | undefined // Optional: filter specific fields
   const defaultCollapsed = config?.collapsed ?? false
@@ -327,11 +329,8 @@ export default function FieldSectionBlock({
                         setEditingField((prev) => (prev === field.id ? null : prev))
                       }}
                       onLinkedRecordClick={(linkedTableId, linkedRecordId) => {
-                        // Never open the current record (self-link edge case)
-                        if (pageTableId && recordId && linkedTableId === pageTableId && linkedRecordId === recordId) {
-                          return
-                        }
-                        window.location.href = `/tables/${linkedTableId}/records/${linkedRecordId}`
+                        if (pageTableId && recordId && linkedTableId === pageTableId && linkedRecordId === recordId) return
+                        openRecordByTableId(linkedTableId, linkedRecordId)
                       }}
                       onAddLinkedRecord={() => {
                         toast({

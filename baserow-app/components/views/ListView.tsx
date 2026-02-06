@@ -1036,17 +1036,20 @@ export default function ListView({
             if (it.type === 'group') {
               const node = it.node
               const isCollapsed = collapsedGroups.has(node.pathKey)
+              const groupFieldForLabel = node.rule.type === 'field'
+                ? tableFields.find((f) => f.name === node.rule.field || f.id === node.rule.field)
+                : null
               const ruleLabel =
                 node.rule.type === 'date'
                   ? node.rule.granularity === 'year'
                     ? 'Year'
                     : 'Month'
-                  : node.rule.field
+                  : (groupFieldForLabel ? getFieldDisplayName(groupFieldForLabel) : node.rule.field)
 
               // Group color - generate for ALL groups
               let groupColor: string | null = null
               if (node.rule.type === 'field') {
-                const groupField = tableFields.find((f) => f.name === node.rule.field || f.id === node.rule.field)
+                const groupField = groupFieldForLabel ?? tableFields.find((f) => f.name === node.rule.field || f.id === node.rule.field)
                 if (groupField && (groupField.type === 'single_select' || groupField.type === 'multi_select')) {
                   // Use field-specific color for select fields
                   groupColor = getPillColor(groupField, node.key)

@@ -1,6 +1,12 @@
 "use client"
 
 import { CheckCircle2, Play, Plus, MoreVertical, Edit, Trash2 } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import type { TriggerType, ActionType, ActionConfig, TriggerConfig, ActionGroup } from "@/lib/automations/types"
 import type { TableField } from "@/types/database"
 import { generateConditionSummary } from "@/lib/automations/condition-formula"
@@ -19,6 +25,7 @@ interface ConditionalWorkflowBuilderProps {
   onAddAction: (groupIndex: number, actionType?: ActionType) => void
   onEditCondition: (groupIndex: number) => void
   onDeleteGroup: (groupIndex: number) => void
+  onDeleteAction?: (groupIndex: number, actionIndex: number) => void
   onShowActionTypePicker?: (groupIndex: number) => void
 }
 
@@ -68,6 +75,7 @@ export default function ConditionalWorkflowBuilder({
   onAddGroup,
   onEditCondition,
   onDeleteGroup,
+  onDeleteAction,
   onShowActionTypePicker,
 }: ConditionalWorkflowBuilderProps) {
   
@@ -191,23 +199,26 @@ export default function ConditionalWorkflowBuilder({
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="font-semibold text-sm mb-1">
-                            {prefix}{' '}
-                            {condition && (
-                              <span>
-                                {condition.split(' ').map((word, i) => {
-                                  const isValue = values.some(v => word.includes(v))
-                                  if (isValue) {
-                                    return (
-                                      <span key={i} className="bg-blue-100 text-blue-700 px-1 rounded">
-                                        {word}
-                                      </span>
-                                    )
-                                  }
-                                  return <span key={i}>{word} </span>
-                                })}
-                              </span>
+                            {condition ? (
+                              <>
+                                {prefix}{' '}
+                                <span>
+                                  {condition.split(' ').map((word, i) => {
+                                    const isValue = values.some(v => word.includes(v))
+                                    if (isValue) {
+                                      return (
+                                        <span key={i} className="bg-blue-100 text-blue-700 px-1 rounded">
+                                          {word}
+                                        </span>
+                                      )
+                                    }
+                                    return <span key={i}>{word} </span>
+                                  })}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-gray-500">Always run</span>
                             )}
-                            {!condition && <span className="text-gray-500">Always run</span>}
                           </div>
                           {group.description && (
                             <div className="text-xs text-gray-500">{group.description}</div>
@@ -263,7 +274,37 @@ export default function ConditionalWorkflowBuilder({
                                     <div className="font-medium text-sm">{ACTION_LABELS[action.type]}</div>
                                     <div className="text-xs text-gray-500">{getActionDescription(action)}</div>
                                   </div>
-                                  <MoreVertical className="h-4 w-4 text-gray-400" />
+                                  {onDeleteAction ? (
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <div
+                                          role="button"
+                                          tabIndex={0}
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="flex-shrink-0 p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 cursor-pointer"
+                                          title="Action options"
+                                        >
+                                          <MoreVertical className="h-4 w-4" />
+                                        </div>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                        <DropdownMenuItem
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            if (confirm("Delete this action?")) {
+                                              onDeleteAction(groupIndex, actionIndex)
+                                            }
+                                          }}
+                                          className="text-red-600 focus:text-red-600"
+                                        >
+                                          <Trash2 className="h-4 w-4 mr-2" />
+                                          Delete action
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  ) : (
+                                    <MoreVertical className="h-4 w-4 text-gray-400" />
+                                  )}
                                 </div>
                               </div>
                             )
