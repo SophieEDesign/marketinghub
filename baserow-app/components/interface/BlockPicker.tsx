@@ -13,6 +13,7 @@ const iconMap: Record<BlockType, React.ElementType> = {
   grid: Grid,
   form: FileText,
   record: FileText,
+  record_context: List,
   chart: BarChart3,
   kpi: TrendingUp,
   text: Type,

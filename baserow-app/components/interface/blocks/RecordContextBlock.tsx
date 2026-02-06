@@ -110,7 +110,7 @@ export default function RecordContextBlock({
         .order("id", { ascending: false })
 
       if (!cancelled) {
-        setRecords((rows as { id: string; [k: string]: unknown }[]) || [])
+        setRecords((rows as unknown as { id: string; [k: string]: unknown }[]) || [])
       }
     }
 

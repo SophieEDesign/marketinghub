@@ -53,8 +53,10 @@ export default function RecordContextDataSettings({
         <TableSelector
           tables={tables}
           value={selectedTableId}
-          onValueChange={handleTableChange}
-          placeholder="Select a table"
+          onChange={(tableId) => {
+            void handleTableChange(tableId)
+          }}
+          label="Table"
         />
       </div>
 
