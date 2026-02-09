@@ -154,16 +154,16 @@ export default function ModalCanvas({
         measureBeforeMount={false}
       >
         {blocks.map((block) => (
-          <div key={block.id} className="block-wrapper">
+          <div key={block.id} className="block-wrapper h-full w-full overflow-hidden flex flex-col min-h-0">
             {isEditMode ? (
-              <div className="flex items-stretch gap-0 border border-gray-200 rounded-md overflow-hidden bg-white">
+              <div className="flex-1 flex items-stretch gap-0 border border-gray-200 rounded-md overflow-hidden bg-white min-h-0">
                 <div
                   className="flex items-center justify-center w-8 flex-shrink-0 bg-gray-50 border-r border-gray-200 cursor-grab active:cursor-grabbing touch-none"
                   title="Drag to reorder"
                 >
                   <GripVertical className="h-4 w-4 text-gray-500" />
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 min-h-0 overflow-y-auto">
                   <ErrorBoundary>
                     <BlockAppearanceWrapper block={block}>
                       <BlockRenderer
@@ -174,6 +174,7 @@ export default function ModalCanvas({
                         pageEditable={pageEditable}
                         editableFieldNames={editableFieldNames}
                         mode="view"
+                        onFieldChange={onFieldChange}
                       />
                     </BlockAppearanceWrapper>
                   </ErrorBoundary>
@@ -194,9 +195,10 @@ export default function ModalCanvas({
                 )}
               </div>
             ) : (
-              <ErrorBoundary>
-                <BlockAppearanceWrapper block={block}>
-                  <BlockRenderer
+              <div className="flex-1 min-h-0 overflow-y-auto">
+                <ErrorBoundary>
+                  <BlockAppearanceWrapper block={block}>
+                    <BlockRenderer
                     block={block}
                     isEditing={false}
                     pageTableId={tableId}
@@ -204,9 +206,11 @@ export default function ModalCanvas({
                     pageEditable={pageEditable}
                     editableFieldNames={editableFieldNames}
                     mode="view"
+                    onFieldChange={onFieldChange}
                   />
                 </BlockAppearanceWrapper>
               </ErrorBoundary>
+              </div>
             )}
           </div>
         ))}

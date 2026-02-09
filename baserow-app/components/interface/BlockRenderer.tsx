@@ -80,6 +80,8 @@ interface BlockRendererProps {
   isEditingCanvas?: boolean // Whether this block's internal canvas is being edited (for Tabs blocks)
   /** When true, block is the single full-page block; no chrome, scroll owned by block internal content only */
   isFullPage?: boolean
+  /** When provided (e.g. from RecordModal), field blocks call this to keep parent formData in sync for Save */
+  onFieldChange?: (fieldName: string, value: any) => void
 }
 
 export default function BlockRenderer({
@@ -107,6 +109,7 @@ export default function BlockRenderer({
   rowHeight = 30,
   isEditingCanvas = false,
   isFullPage = false,
+  onFieldChange,
 }: BlockRendererProps) {
   const diagnosticsEnabled = process.env.NODE_ENV === 'development'
   useEffect(() => {
@@ -309,7 +312,7 @@ export default function BlockRenderer({
           ...safeBlock,
           config: fieldBlockConfig,
         }
-        return <FieldBlock block={fieldBlockWithConfig} isEditing={canEdit} pageTableId={recordContextTableId} recordId={recordId} pageShowFieldNames={pageShowFieldNames} hideEditButton={hideEditButton} />
+        return <FieldBlock block={fieldBlockWithConfig} isEditing={canEdit} pageTableId={recordContextTableId} recordId={recordId} pageShowFieldNames={pageShowFieldNames} hideEditButton={hideEditButton} onFieldChange={onFieldChange} />
 
       case "field_section":
         // Field section block displays all fields from a section (group_name)

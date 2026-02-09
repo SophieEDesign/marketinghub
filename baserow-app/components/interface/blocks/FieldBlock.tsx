@@ -24,6 +24,8 @@ interface FieldBlockProps {
   recordId?: string | null // Record ID from page context (required for field blocks)
   pageShowFieldNames?: boolean // Page-level: show field names on blocks (default true)
   hideEditButton?: boolean // Hide Edit button for top fields (inline editing only)
+  /** When provided (e.g. from RecordModal), call to keep parent formData in sync for Save */
+  onFieldChange?: (fieldName: string, value: any) => void
 }
 
 /**
@@ -41,7 +43,8 @@ export default function FieldBlock({
   pageTableId = null,
   recordId = null,
   pageShowFieldNames = true,
-  hideEditButton = false
+  hideEditButton = false,
+  onFieldChange,
 }: FieldBlockProps) {
   const { config } = block
   const { openRecordByTableId } = useRecordPanel()
@@ -507,6 +510,9 @@ export default function FieldBlock({
       setIsEditingValue(false)
       return
     }
+
+    // Update parent formData immediately so Save button persists this field (no race with async update)
+    onFieldChange?.(field.name, newValue)
 
     try {
       const supabase = createClient()

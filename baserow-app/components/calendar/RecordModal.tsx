@@ -221,7 +221,10 @@ export default function RecordModal({
     })) as PageBlock[]
   }, [modalLayout?.blocks, tableFields])
 
-  const hasCustomLayout = Boolean(modalLayout?.blocks && modalLayout.blocks.length > 0)
+  // Only use a custom modal layout when viewing an existing record.
+  // For new records (no recordId), fall back to the simple field list so users can actually enter values
+  // instead of seeing read-only "No record selected" placeholders from Field blocks.
+  const hasCustomLayout = Boolean(recordId && modalLayout?.blocks && modalLayout.blocks.length > 0)
   // Show "Edit layout" when we have a custom layout and a save callback; canEditLayout gates actual persistence on Done
   const showEditLayoutButton = hasCustomLayout && Boolean(onLayoutSave) && !isEditingLayout
   const blocksForCanvas = isEditingLayout && draftBlocks !== null ? draftBlocks : modalBlocks
