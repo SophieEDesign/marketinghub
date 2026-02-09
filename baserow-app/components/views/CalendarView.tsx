@@ -58,7 +58,7 @@ interface CalendarViewProps {
   /** Conditional formatting rules */
   highlightRules?: HighlightRule[]
   /** When provided, RecordModal can save modal layout (in-modal edit). */
-  onModalLayoutSave?: (modalLayout: import("@/lib/interface/types").BlockConfig["modal_layout"]) => void
+  onModalLayoutSave?: (fieldLayout: import("@/lib/interface/field-layout-utils").FieldLayoutItem[]) => void
   /** When true, show "Edit layout" in record modal. */
   canEditLayout?: boolean
 }

@@ -576,7 +576,7 @@ export default function RecordViewPageSettings({
         visible_in_modal: config.visible, // Default to same as canvas
         visible_in_card: config.visible, // Default to same as canvas
         editable: config.editable,
-        group_name: field?.group_name,
+        group_name: field?.group_name ?? undefined,
       }
     })
     

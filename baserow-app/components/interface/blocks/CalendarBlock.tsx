@@ -17,7 +17,7 @@ interface CalendarBlockProps {
   filterTree?: FilterTree
   onRecordClick?: (recordId: string, tableId?: string) => void
   pageShowAddRecord?: boolean
-  onModalLayoutSave?: (modalLayout: import("@/lib/interface/types").BlockConfig["modal_layout"]) => void
+  onModalLayoutSave?: (fieldLayout: import("@/lib/interface/field-layout-utils").FieldLayoutItem[]) => void
   canEditLayout?: boolean
   /** When true, use compact Airtable-style top bar and date range from block settings */
   isFullPage?: boolean

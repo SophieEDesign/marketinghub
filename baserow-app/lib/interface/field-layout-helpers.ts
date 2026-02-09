@@ -124,7 +124,7 @@ export function convertModalLayoutToFieldLayout(
       visible_in_canvas: false,
       visible_in_card: false,
       editable: true,
-      group_name: field.group_name,
+      group_name: field.group_name ?? undefined,
     })
   })
 
@@ -172,7 +172,7 @@ export function convertModalFieldsToFieldLayout(
       visible_in_canvas: false,
       visible_in_card: false,
       editable: true,
-      group_name: field.group_name,
+      group_name: field.group_name ?? undefined,
     }
   })
 }

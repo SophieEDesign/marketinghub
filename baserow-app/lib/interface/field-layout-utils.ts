@@ -70,7 +70,7 @@ export function convertToFieldLayout(
       visible_in_modal: modalFields.length === 0 || modalFields.includes(fieldName),
       visible_in_card: cardFields.length === 0 || cardFields.includes(fieldName),
       editable: isEditable,
-      group_name: field.group_name,
+      group_name: field.group_name ?? undefined,
     }
 
     fieldLayout.push(layoutItem)
@@ -97,7 +97,7 @@ export function convertToFieldLayout(
       visible_in_modal: modalFields.includes(fieldName),
       visible_in_card: cardFields.includes(fieldName),
       editable: isEditable,
-      group_name: field.group_name,
+      group_name: field.group_name ?? undefined,
     })
   })
 
