@@ -314,17 +314,27 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       },
       onUpdate: ({ editor: ed }: { editor: { getJSON: () => any } }) => {
         // #region agent log
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[TextBlock] onUpdate FIRED: blockId=${blockIdRef.current}, editorInitialized=${editorInitializedRef.current}, readOnly=${readOnlyRef.current}, hasOnUpdate=${!!onUpdateRef.current}`)
+        }
         fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TextBlock.tsx:305',message:'onUpdate callback fired',data:{editorInitialized:editorInitializedRef.current,hasOnUpdate:!!onUpdateRef.current,readOnly:readOnlyRef.current,blockId:blockIdRef.current},timestamp:Date.now()})}).catch(()=>{});
         // #endregion
         // CRITICAL: Prevent onUpdate from firing during initialization to avoid React #185 loop
         // When setContent is called during initialization, TipTap may fire onUpdate even with emitUpdate=false
         if (!onUpdateRef.current || readOnlyRef.current || !editorInitializedRef.current) {
           // #region agent log
+          if (process.env.NODE_ENV === 'development') {
+            const reason = !onUpdateRef.current ? 'noOnUpdate' : readOnlyRef.current ? 'readOnly' : 'notInitialized'
+            console.log(`[TextBlock] onUpdate BLOCKED: reason=${reason}, editorInitialized=${editorInitializedRef.current}`)
+          }
           fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TextBlock.tsx:310',message:'onUpdate blocked',data:{reason:!onUpdateRef.current?'noOnUpdate':readOnlyRef.current?'readOnly':'notInitialized',editorInitialized:editorInitializedRef.current},timestamp:Date.now()})}).catch(()=>{});
           // #endregion
           return
         }
         // #region agent log
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[TextBlock] onUpdate PROCEEDING: blockId=${blockIdRef.current}`)
+        }
         fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TextBlock.tsx:315',message:'onUpdate proceeding',data:{blockId:blockIdRef.current},timestamp:Date.now()})}).catch(()=>{});
         // #endregion
         setSaveStatus("saving")
@@ -340,7 +350,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   // #endregion
   const editor = useEditor(editorConfig)
   // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TextBlock.tsx:321',message:'useEditor returned',data:{blockId:block.id,hasEditor:!!editor,editorId:editor?.id},timestamp:Date.now()})}).catch(()=>{});
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TextBlock.tsx:321',message:'useEditor returned',data:{blockId:block.id,hasEditor:!!editor},timestamp:Date.now()})}).catch(()=>{});
   // #endregion
 
   // Keep editorRef current so editorProps.handleKeyDown (memoized) can access it

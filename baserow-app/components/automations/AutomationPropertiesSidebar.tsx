@@ -84,13 +84,19 @@ export default function AutomationPropertiesSidebar({
     }
   } else if (selectedItem.type === 'action') {
     // Parse action ID format: "groupId-actionIndex"
-    const [groupId, actIdx] = String(selectedItem.id).split('-')
-    groupIndex = actionGroups.findIndex(g => g.id === groupId)
-    if (groupIndex >= 0) {
-      selectedGroup = actionGroups[groupIndex]
-      actionIndex = parseInt(actIdx, 10)
-      if (actionIndex >= 0 && actionIndex < selectedGroup.actions.length) {
-        selectedAction = selectedGroup.actions[actionIndex]
+    // Group IDs contain dashes, so we need to split from the right
+    const idString = String(selectedItem.id)
+    const lastDashIndex = idString.lastIndexOf('-')
+    if (lastDashIndex >= 0) {
+      const groupId = idString.substring(0, lastDashIndex)
+      const actIdx = idString.substring(lastDashIndex + 1)
+      groupIndex = actionGroups.findIndex(g => g.id === groupId)
+      if (groupIndex >= 0) {
+        selectedGroup = actionGroups[groupIndex]
+        actionIndex = parseInt(actIdx, 10)
+        if (actionIndex >= 0 && actionIndex < selectedGroup.actions.length) {
+          selectedAction = selectedGroup.actions[actionIndex]
+        }
       }
     }
   }
