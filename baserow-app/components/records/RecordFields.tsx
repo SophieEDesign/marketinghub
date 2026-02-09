@@ -43,7 +43,7 @@ export default function RecordFields({
   tableName: propTableName,
   showFieldNames = true,
 }: RecordFieldsProps) {
-  const { navigateToLinkedRecord, openRecordByTableId } = useRecordPanel()
+  const { navigateToLinkedRecord, openRecordByTableId, state: recordPanelState } = useRecordPanel()
   const { toast } = useToast()
   const [editingField, setEditingField] = useState<string | null>(null)
   const [tableName, setTableName] = useState<string | undefined>(propTableName)
@@ -170,10 +170,12 @@ export default function RecordFields({
           .eq("id", linkedTableId)
           .single()
 
+        // CRITICAL: Preserve interfaceMode when opening linked records (Airtable-style)
+        const interfaceMode = recordPanelState.interfaceMode ?? 'view'
         if (linkedTable && navigateToLinkedRecord) {
-          navigateToLinkedRecord(linkedTableId, linkedRecordId, linkedTable.supabase_table)
+          navigateToLinkedRecord(linkedTableId, linkedRecordId, linkedTable.supabase_table, interfaceMode)
         } else {
-          openRecordByTableId(linkedTableId, linkedRecordId)
+          openRecordByTableId(linkedTableId, linkedRecordId, interfaceMode)
         }
       } catch (error: any) {
         console.error("Error navigating to linked record:", error)
@@ -184,7 +186,7 @@ export default function RecordFields({
         })
       }
     },
-    [navigateToLinkedRecord, openRecordByTableId, toast]
+    [navigateToLinkedRecord, openRecordByTableId, toast, recordPanelState.interfaceMode]
   )
 
   const handleAddLinkedRecord = useCallback(

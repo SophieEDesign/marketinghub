@@ -5,6 +5,7 @@ import { useUndoRedo } from "@/hooks/useUndoRedo"
 import { Save, Eye, Edit2, Plus, Trash2, Settings, MoreVertical, Undo2, Redo2 } from "lucide-react"
 import { useBranding } from "@/contexts/BrandingContext"
 import { useBlockEditMode } from "@/contexts/EditModeContext"
+import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { FilterStateProvider } from "@/lib/interface/filter-state"
 import Canvas from "./Canvas"
 import FloatingBlockPicker from "./FloatingBlockPicker"
@@ -97,6 +98,12 @@ export default function InterfaceBuilder({
   // Interface mode: single source of truth for edit state (Airtable-style)
   // When interface is in edit mode, all record modals must open in edit mode
   const interfaceMode: 'view' | 'edit' = effectiveIsEditing ? 'edit' : 'view'
+  
+  // CRITICAL: Sync interfaceMode with RecordPanelContext so RecordPanel inherits edit mode
+  const { setInterfaceMode } = useRecordPanel()
+  useEffect(() => {
+    setInterfaceMode(interfaceMode)
+  }, [interfaceMode, setInterfaceMode])
   
   // Aggregate data fetching moved to Canvas (inside FilterStateProvider)
   // This allows access to dynamic filter block filters

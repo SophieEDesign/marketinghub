@@ -35,7 +35,7 @@ export default function LinkedRecordCell({
   onSave,
   placeholder = "—",
 }: LinkedRecordCellProps) {
-  const { openRecord, openRecordByTableId } = useRecordPanel()
+  const { openRecord, openRecordByTableId, state: recordPanelState } = useRecordPanel()
   const linkedTableId = field.options?.linked_table_id
   const [linkedTable, setLinkedTable] = useState<{ id: string; supabase_table: string } | null>(null)
 
@@ -109,10 +109,12 @@ export default function LinkedRecordCell({
     if (tableId === field.table_id && recordId === rowId) return
     if (!linkedTableId) return
 
+    // CRITICAL: Preserve interfaceMode when opening linked records (Airtable-style)
+    const interfaceMode = recordPanelState.interfaceMode ?? 'view'
     if (linkedTable?.supabase_table) {
-      openRecord(tableId, recordId, linkedTable.supabase_table)
+      openRecord(tableId, recordId, linkedTable.supabase_table, undefined, undefined, undefined, interfaceMode)
     } else {
-      openRecordByTableId(tableId, recordId)
+      openRecordByTableId(tableId, recordId, interfaceMode)
     }
   }
 

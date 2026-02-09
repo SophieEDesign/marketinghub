@@ -18,19 +18,23 @@ interface RecordPanelState {
   history: Array<{ tableId: string; recordId: string; tableName: string }> // For breadcrumb navigation
   /** When provided, RecordPanel enforces canEditRecords/canDeleteRecords from cascade. */
   cascadeContext?: RecordEditorCascadeContext | null
+  /** Interface mode: 'view' | 'edit'. When 'edit', RecordPanel opens in edit mode (Airtable-style). */
+  interfaceMode?: 'view' | 'edit'
 }
 
 interface RecordPanelContextType {
   state: RecordPanelState
-  openRecord: (tableId: string, recordId: string, tableName: string, modalFields?: string[], modalLayout?: BlockConfig['modal_layout'], cascadeContext?: RecordEditorCascadeContext | null) => void
+  openRecord: (tableId: string, recordId: string, tableName: string, modalFields?: string[], modalLayout?: BlockConfig['modal_layout'], cascadeContext?: RecordEditorCascadeContext | null, interfaceMode?: 'view' | 'edit') => void
   /** Fetches table supabase_table by id and opens the record in the panel. Use when only tableId + recordId are available (e.g. linked record click). */
-  openRecordByTableId: (tableId: string, recordId: string) => Promise<void>
+  openRecordByTableId: (tableId: string, recordId: string, interfaceMode?: 'view' | 'edit') => Promise<void>
   closeRecord: () => void
   setWidth: (width: number) => void
   togglePin: () => void
   toggleFullscreen: () => void
-  navigateToLinkedRecord: (tableId: string, recordId: string, tableName: string) => void
+  navigateToLinkedRecord: (tableId: string, recordId: string, tableName: string, interfaceMode?: 'view' | 'edit') => void
   goBack: () => void
+  /** Set interface mode for RecordPanel (called by InterfaceBuilder when edit mode changes). */
+  setInterfaceMode: (interfaceMode: 'view' | 'edit') => void
 }
 
 const RecordPanelContext = createContext<RecordPanelContextType | undefined>(undefined)
@@ -49,9 +53,10 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
     isPinned: false,
     isFullscreen: false,
     history: [],
+    interfaceMode: 'view', // Default to view mode
   })
 
-  const openRecord = useCallback((tableId: string, recordId: string, tableName: string, modalFields?: string[], modalLayout?: BlockConfig['modal_layout'], cascadeContext?: RecordEditorCascadeContext | null) => {
+  const openRecord = useCallback((tableId: string, recordId: string, tableName: string, modalFields?: string[], modalLayout?: BlockConfig['modal_layout'], cascadeContext?: RecordEditorCascadeContext | null, interfaceMode?: 'view' | 'edit') => {
     if (process.env.NODE_ENV === 'development' && cascadeContext === undefined) {
       console.warn('[RecordPanel] Opened without cascadeContext; block-level permissions will not be enforced.')
     }
@@ -64,6 +69,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
       modalFields,
       modalLayout,
       cascadeContext,
+      interfaceMode: interfaceMode ?? prev.interfaceMode ?? 'view', // Preserve existing interfaceMode if not provided
       history: prev.isOpen && prev.tableId === tableId && prev.recordId === recordId
         ? prev.history // Don't add to history if same record
         : [...prev.history, { tableId, recordId, tableName }],
@@ -100,30 +106,38 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
     }))
   }, [])
 
-  const navigateToLinkedRecord = useCallback((tableId: string, recordId: string, tableName: string) => {
+  const navigateToLinkedRecord = useCallback((tableId: string, recordId: string, tableName: string, interfaceMode?: 'view' | 'edit') => {
     setState((prev) => ({
       ...prev,
       tableId,
       recordId,
       tableName,
       cascadeContext: undefined, // Clear when navigating; caller can pass again if needed
+      interfaceMode: interfaceMode ?? prev.interfaceMode ?? 'view', // Preserve interfaceMode when navigating
       history: [...prev.history, { tableId, recordId, tableName }],
     }))
   }, [])
 
-  const openRecordByTableId = useCallback(async (tableId: string, recordId: string) => {
+  const openRecordByTableId = useCallback(async (tableId: string, recordId: string, interfaceMode?: 'view' | 'edit') => {
     try {
       const res = await fetch(`/api/tables/${tableId}`)
       if (!res.ok) return
       const { table } = await res.json()
       const tableName = table?.supabase_table
       if (tableName) {
-        openRecord(tableId, recordId, tableName)
+        openRecord(tableId, recordId, tableName, undefined, undefined, undefined, interfaceMode)
       }
     } catch (err) {
       console.error('[RecordPanel] openRecordByTableId failed:', err)
     }
   }, [openRecord])
+
+  const setInterfaceMode = useCallback((interfaceMode: 'view' | 'edit') => {
+    setState((prev) => ({
+      ...prev,
+      interfaceMode,
+    }))
+  }, [])
 
   const goBack = useCallback(() => {
     setState((prev) => {
@@ -156,6 +170,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
         toggleFullscreen,
         navigateToLinkedRecord,
         goBack,
+        setInterfaceMode,
       }}
     >
       {children}

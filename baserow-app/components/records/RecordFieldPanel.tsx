@@ -49,7 +49,7 @@ export default function RecordFieldPanel({
   onLinkedRecordClick,
   compact = false,
 }: RecordFieldPanelProps) {
-  const { openRecordByTableId } = useRecordPanel()
+  const { openRecordByTableId, state: recordPanelState } = useRecordPanel()
   const { toast } = useToast()
   const [recordData, setRecordData] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(false)
@@ -391,13 +391,15 @@ export default function RecordFieldPanel({
       if (linkedTableId === tableId && linkedRecordId === recordId) {
         return
       }
+      // CRITICAL: Preserve interfaceMode when opening linked records (Airtable-style)
+      const interfaceMode = recordPanelState.interfaceMode ?? 'view'
       if (onLinkedRecordClick) {
         onLinkedRecordClick(linkedTableId, linkedRecordId)
       } else {
-        openRecordByTableId(linkedTableId, linkedRecordId)
+        openRecordByTableId(linkedTableId, linkedRecordId, interfaceMode)
       }
     },
-    [onLinkedRecordClick, openRecordByTableId, tableId, recordId]
+    [onLinkedRecordClick, openRecordByTableId, tableId, recordId, recordPanelState.interfaceMode]
   )
 
   // Handle add linked record (placeholder)

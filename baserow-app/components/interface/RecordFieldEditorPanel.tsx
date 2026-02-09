@@ -87,6 +87,32 @@ export default function RecordFieldEditorPanel({
   const [searchQuery, setSearchQuery] = useState("")
   const [localFieldLayout, setLocalFieldLayout] = useState<FieldLayoutItem[]>(fieldLayout)
 
+  // Helper to get the visibility property value based on mode
+  // Returns true if visible, false if hidden, undefined if not set (treat as visible)
+  const getVisibilityProp = (layout: FieldLayoutItem): boolean | undefined => {
+    if (mode === 'modal') {
+      return layout.visible_in_modal
+    } else {
+      return layout.visible_in_canvas
+    }
+  }
+
+  // Check if a field should be visible (treats undefined as visible)
+  const isFieldVisible = (layout: FieldLayoutItem): boolean => {
+    const visibility = getVisibilityProp(layout)
+    // undefined means not explicitly set, so default to visible
+    return visibility !== false
+  }
+
+  // Helper to set the visibility property based on mode
+  const setVisibilityProp = (layout: FieldLayoutItem, visible: boolean): FieldLayoutItem => {
+    if (mode === 'modal') {
+      return { ...layout, visible_in_modal: visible }
+    } else {
+      return { ...layout, visible_in_canvas: visible }
+    }
+  }
+
   // Sync local layout with prop changes
   useEffect(() => {
     setLocalFieldLayout(fieldLayout)
@@ -281,27 +307,41 @@ export default function RecordFieldEditorPanel({
 
   // Get visible fields from layout, filtered by search
   const visibleFields = useMemo(() => {
+    // If no fields provided, return empty
+    if (!allFields || allFields.length === 0) {
+      return []
+    }
+
     const layoutMap = new Map<string, FieldLayoutItem>()
     localFieldLayout.forEach((item) => {
       layoutMap.set(item.field_name, item)
     })
 
     // Get all fields, prioritizing layout order
+    // If a field exists in layout, use it; otherwise create a default visible layout
     const orderedFields = allFields
       .map((field) => {
         const layout = layoutMap.get(field.name)
-        return {
-          field,
-          layout: layout || {
+        if (layout) {
+          // Field exists in layout - use it
+          return { field, layout }
+        } else {
+          // Field not in layout - create default visible layout
+          const defaultLayout: FieldLayoutItem = {
             field_id: field.id,
             field_name: field.name,
             order: allFields.length + allFields.indexOf(field),
-            visible_in_canvas: true,
             editable: pageEditable,
-          },
+          }
+          if (mode === 'modal') {
+            defaultLayout.visible_in_modal = true
+          } else {
+            defaultLayout.visible_in_canvas = true
+          }
+          return { field, layout: defaultLayout }
         }
       })
-      .filter(({ layout }) => layout.visible_in_canvas !== false)
+      .filter(({ layout }) => isFieldVisible(layout))
       .sort((a, b) => a.layout.order - b.layout.order)
 
     // Filter by search query
@@ -315,7 +355,7 @@ export default function RecordFieldEditorPanel({
     }
 
     return orderedFields
-  }, [allFields, localFieldLayout, searchQuery, pageEditable])
+  }, [allFields, localFieldLayout, searchQuery, pageEditable, mode])
 
   // Handle drag end
   const handleDragEnd = (event: DragEndEvent) => {
@@ -350,7 +390,7 @@ export default function RecordFieldEditorPanel({
   const handleVisibilityToggle = (fieldName: string, visible: boolean) => {
     const updated = localFieldLayout.map((item) =>
       item.field_name === fieldName
-        ? { ...item, visible_in_canvas: visible }
+        ? setVisibilityProp(item, visible)
         : item
     )
 
@@ -358,13 +398,13 @@ export default function RecordFieldEditorPanel({
     if (!updated.some((item) => item.field_name === fieldName)) {
       const field = allFields.find((f) => f.name === fieldName)
       if (field) {
-        updated.push({
+        const newItem: FieldLayoutItem = {
           field_id: field.id,
           field_name: field.name,
           order: Math.max(...updated.map((i) => i.order), -1) + 1,
-          visible_in_canvas: visible,
           editable: pageEditable,
-        })
+        }
+        updated.push(setVisibilityProp(newItem, visible))
       }
     }
 
@@ -383,13 +423,14 @@ export default function RecordFieldEditorPanel({
       const field = allFields.find((f) => f.name === fieldName)
       if (field) {
         const existingVisible = visibleFields.find(({ field: f }) => f.name === fieldName)
-        updated.push({
+        const newItem: FieldLayoutItem = {
           field_id: field.id,
           field_name: field.name,
           order: existingVisible?.layout.order ?? Math.max(...updated.map((i) => i.order), -1) + 1,
-          visible_in_canvas: existingVisible?.layout.visible_in_canvas ?? true,
           editable,
-        })
+        }
+        const existingVisibility = existingVisible ? getVisibilityProp(existingVisible.layout) : true
+        updated.push(setVisibilityProp(newItem, existingVisibility !== false))
       }
     }
 
@@ -416,7 +457,7 @@ export default function RecordFieldEditorPanel({
 
     const value = recordData[field.name]
     const isEditable = layout.editable && pageEditable && !field.options?.read_only && field.type !== "formula" && field.type !== "lookup"
-    const isVisible = layout.visible_in_canvas !== false
+    const isVisible = isFieldVisible(layout)
 
     // Check if this is a select field and show a sample color pill
     const sampleChoice = field.options?.choices?.[0]

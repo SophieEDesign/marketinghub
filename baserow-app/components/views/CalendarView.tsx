@@ -1578,6 +1578,7 @@ export default function CalendarView({
 
   // CRITICAL: Ref to prevent infinite loops when getEvents() is called during render
   const isCalculatingEventsRef = useRef(false)
+  const prevDepsRef = useRef<string>('')
   
   // Get events for rendering (hook; declared before early returns)
   const computedCalendarEvents = useMemo(() => {
@@ -1589,16 +1590,38 @@ export default function CalendarView({
       return []
     }
     
+    // Track dependencies to detect what's changing
+    const currentDeps = JSON.stringify({
+      filteredRowsCount: filteredRows?.length || 0,
+      filteredRowsId: filteredRows?.[0]?.id || 'none',
+      searchQuery,
+      filtersKey,
+      resolvedDateFieldId,
+      isValidDateField,
+      loadedTableFieldsKey: loadedTableFieldsKey?.substring(0, 50),
+      fieldIdsLength: fieldIds?.length || 0,
+      colorFieldId: colorField?.id || 'none',
+      imageFieldId: imageField?.id || 'none',
+      fitImageSize,
+      blockConfigEventKey: blockConfigEventKey?.substring(0, 50),
+      viewConfigEventKey: viewConfigEventKey?.substring(0, 50),
+    })
+    
+    if (process.env.NODE_ENV === 'development') {
+      if (prevDepsRef.current && prevDepsRef.current !== currentDeps) {
+        console.log(`[CalendarView] computedCalendarEvents dependencies changed:`, {
+          prev: JSON.parse(prevDepsRef.current),
+          current: JSON.parse(currentDeps),
+        })
+      }
+      prevDepsRef.current = currentDeps
+    }
+    
     isCalculatingEventsRef.current = true
     try {
       // #region agent log
       if (process.env.NODE_ENV === 'development') {
-        console.log(`[CalendarView] computedCalendarEvents useMemo recalculating`, {
-          filteredRowsCount: filteredRows?.length || 0,
-          loadedTableFieldsKey: loadedTableFieldsKey?.substring(0, 50),
-          blockConfigEventKey: blockConfigEventKey?.substring(0, 50),
-          viewConfigEventKey: viewConfigEventKey?.substring(0, 50),
-        })
+        console.log(`[CalendarView] computedCalendarEvents useMemo recalculating`)
       }
       // #endregion
       const events = getEvents()
@@ -1631,31 +1654,76 @@ export default function CalendarView({
   // Make `events` prop stable across unrelated re-renders to avoid FullCalendar internal update loops.
   // We intentionally derive a lightweight signature from stable primitives.
   const calendarEvents = useMemo(() => {
-    const signature = (Array.isArray(computedCalendarEvents) ? computedCalendarEvents : [])
-      .map((e: EventInput) => {
-        const startMs =
-          e?.start instanceof Date ? e.start.getTime() : typeof e?.start === "number" ? e.start : String(e?.start || "")
-        const endMs =
-          e?.end instanceof Date ? e.end.getTime() : typeof e?.end === "number" ? e.end : String(e?.end || "")
-        const bg = String(e?.backgroundColor || "")
-        const title = String(e?.title || "")
-        const id = String(e?.id || "")
-        const image = String(e?.extendedProps?.image || "")
-        const cards = Array.isArray(e?.extendedProps?.cardFields)
-          ? e.extendedProps.cardFields
-              .map((cf: { field?: { id?: string; name?: string }; value?: unknown }) => `${String(cf?.field?.id || cf?.field?.name || "")}=${String(cf?.value ?? "")}`)
-              .join(",")
-          : ""
-        return `${id}|${title}|${startMs}|${endMs}|${bg}|${image}|${cards}`
-      })
-      .join("~")
-
-    if (prevCalendarEventsSignatureRef.current === signature) {
-      return prevCalendarEventsRef.current
+    // CRITICAL: Guard against invalid events that could cause infinite loops
+    if (!Array.isArray(computedCalendarEvents)) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`[CalendarView] computedCalendarEvents is not an array:`, typeof computedCalendarEvents)
+      }
+      return prevCalendarEventsRef.current || []
     }
-    prevCalendarEventsSignatureRef.current = signature
-    prevCalendarEventsRef.current = computedCalendarEvents
-    return computedCalendarEvents
+    
+    try {
+      const signature = computedCalendarEvents
+        .map((e: EventInput, index: number) => {
+          try {
+            // Guard against null/undefined events
+            if (!e || typeof e !== 'object') {
+              if (process.env.NODE_ENV === 'development') {
+                console.warn(`[CalendarView] Invalid event at index ${index}:`, e)
+              }
+              return ''
+            }
+            
+            const startMs =
+              e?.start instanceof Date ? e.start.getTime() : typeof e?.start === "number" ? e.start : String(e?.start || "")
+            const endMs =
+              e?.end instanceof Date ? e.end.getTime() : typeof e?.end === "number" ? e.end : String(e?.end || "")
+            const bg = String(e?.backgroundColor || "")
+            const title = String(e?.title || "")
+            const id = String(e?.id || "")
+            const image = String(e?.extendedProps?.image || "")
+            const cards = Array.isArray(e?.extendedProps?.cardFields)
+              ? e.extendedProps.cardFields
+                  .map((cf: { field?: { id?: string; name?: string }; value?: unknown }) => {
+                    try {
+                      return `${String(cf?.field?.id || cf?.field?.name || "")}=${String(cf?.value ?? "")}`
+                    } catch (err) {
+                      if (process.env.NODE_ENV === 'development') {
+                        console.warn(`[CalendarView] Error processing card field:`, err, cf)
+                      }
+                      return ''
+                    }
+                  })
+                  .filter(Boolean)
+                  .join(",")
+              : ""
+            return `${id}|${title}|${startMs}|${endMs}|${bg}|${image}|${cards}`
+          } catch (err) {
+            if (process.env.NODE_ENV === 'development') {
+              console.error(`[CalendarView] Error processing event at index ${index}:`, err, e)
+            }
+            return ''
+          }
+        })
+        .filter(Boolean) // Remove empty strings from invalid events
+        .join("~")
+
+      if (prevCalendarEventsSignatureRef.current === signature) {
+        return prevCalendarEventsRef.current
+      }
+      prevCalendarEventsSignatureRef.current = signature
+      prevCalendarEventsRef.current = computedCalendarEvents
+      return computedCalendarEvents
+    } catch (err) {
+      // CRITICAL: If signature calculation fails, return previous events to prevent infinite loop
+      if (process.env.NODE_ENV === 'development') {
+        console.error(`[CalendarView] Error calculating calendar events signature:`, err, {
+          eventsCount: computedCalendarEvents.length,
+          sampleEvent: computedCalendarEvents[0]
+        })
+      }
+      return prevCalendarEventsRef.current || []
+    }
   }, [computedCalendarEvents])
 
   // FullCalendar: keep option prop references stable to avoid internal update loops.
@@ -1693,30 +1761,63 @@ export default function CalendarView({
   }, [linkedValueLabelMaps, areLinkedValueMapsEqual])
 
   const calendarEventContent = useCallback((eventInfo: { event: EventInput; timeText?: string }) => {
-    const image = eventInfo.event.extendedProps?.image
-    const fitImageSize = eventInfo.event.extendedProps?.fitImageSize || false
-    const cardFieldsRaw = eventInfo.event.extendedProps?.cardFields
-    const cardFields = Array.isArray(cardFieldsRaw) ? cardFieldsRaw : []
-    const titleField = eventInfo.event.extendedProps?.titleField as TableField | null | undefined
-    const titleValue = (eventInfo.event.extendedProps as any)?.titleValue
-
-    // Rich tooltip: full title + each card field label and value (so truncated text is readable on hover)
-    const titleLine = String(eventInfo.event.title || "Untitled")
-    const cardLines = cardFields.slice(0, 2).map((f: { field: TableField; value: unknown }) => {
-      const label = f?.field?.name ?? "Field"
-      const valueMap = f?.field ? (stableLinkedValueLabelMaps[f.field.name] || stableLinkedValueLabelMaps[f.field.id]) : undefined
-      let valStr = ""
-      if (f?.value !== null && f?.value !== undefined) {
-        if (f?.field?.type === "link_to_table" && Array.isArray(f.value)) {
-          const ids = f.value as string[]
-          valStr = ids.map((id: string) => valueMap?.[id] ?? id).filter(Boolean).join(", ") || String(f.value)
-        } else {
-          valStr = Array.isArray(f.value) ? (f.value as unknown[]).map(String).join(", ") : String(f.value)
+    try {
+      // CRITICAL: Guard against invalid event data that could cause infinite loops
+      if (!eventInfo || !eventInfo.event) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn(`[CalendarView] calendarEventContent called with invalid eventInfo:`, eventInfo)
         }
+        return <div className="p-1 text-xs text-gray-500">Invalid event</div>
       }
-      return `${label}: ${valStr}`
-    })
-    const fullTooltip = [titleLine, ...cardLines].join("\n")
+
+      const image = eventInfo.event.extendedProps?.image
+      const fitImageSize = eventInfo.event.extendedProps?.fitImageSize || false
+      const cardFieldsRaw = eventInfo.event.extendedProps?.cardFields
+      const cardFields = Array.isArray(cardFieldsRaw) ? cardFieldsRaw : []
+      const titleField = eventInfo.event.extendedProps?.titleField as TableField | null | undefined
+      const titleValue = (eventInfo.event.extendedProps as any)?.titleValue
+
+      // Rich tooltip: full title + each card field label and value (so truncated text is readable on hover)
+      const titleLine = String(eventInfo.event.title || "Untitled")
+      const cardLines = cardFields.slice(0, 2).map((f: { field: TableField; value: unknown }, idx: number) => {
+        try {
+          // Guard against invalid field data
+          if (!f || typeof f !== 'object') {
+            if (process.env.NODE_ENV === 'development') {
+              console.warn(`[CalendarView] Invalid card field at index ${idx}:`, f)
+            }
+            return ''
+          }
+          
+          const label = f?.field?.name ?? "Field"
+          const valueMap = f?.field ? (stableLinkedValueLabelMaps[f.field.name] || stableLinkedValueLabelMaps[f.field.id]) : undefined
+          let valStr = ""
+          if (f?.value !== null && f?.value !== undefined) {
+            if (f?.field?.type === "link_to_table" && Array.isArray(f.value)) {
+              const ids = f.value as string[]
+              valStr = ids.map((id: string) => {
+                try {
+                  return valueMap?.[id] ?? id
+                } catch (err) {
+                  if (process.env.NODE_ENV === 'development') {
+                    console.warn(`[CalendarView] Error mapping linked value:`, err, id)
+                  }
+                  return id
+                }
+              }).filter(Boolean).join(", ") || String(f.value)
+            } else {
+              valStr = Array.isArray(f.value) ? (f.value as unknown[]).map(String).join(", ") : String(f.value)
+            }
+          }
+          return `${label}: ${valStr}`
+        } catch (err) {
+          if (process.env.NODE_ENV === 'development') {
+            console.error(`[CalendarView] Error processing card field at index ${idx}:`, err, f)
+          }
+          return ''
+        }
+      }).filter(Boolean) // Remove empty strings from invalid fields
+      const fullTooltip = [titleLine, ...cardLines].join("\n")
 
     return (
       <div className="flex items-center gap-1.5 h-full min-h-[2.5rem] min-w-0 px-1.5 py-1" title={fullTooltip}>
@@ -1752,27 +1853,54 @@ export default function CalendarView({
             </div>
             {cardFields.length > 0 && (
               <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px] opacity-90 min-w-0">
-                {cardFields.slice(0, 2).map((f: { field: TableField; value: unknown }, idx: number) => (
-                  <span key={`${eventInfo.event.id}-cf-${idx}`} className="truncate inline-flex items-center shrink-0 max-w-full">
-                    {idx > 0 && <span className="text-gray-500 mr-1">·</span>}
-                    {f?.field ? (
-                      <TimelineFieldValue
-                        field={f.field as TableField}
-                        value={f.value as FieldValue}
-                        valueLabelMap={stableLinkedValueLabelMaps[f.field.name] || stableLinkedValueLabelMaps[f.field.id]}
-                        compact={true}
-                      />
-                    ) : (
-                      String(f?.value || "")
-                    )}
-                  </span>
-                ))}
+                {cardFields.slice(0, 2).map((f: { field: TableField; value: unknown }, idx: number) => {
+                  try {
+                    // Guard against invalid field data
+                    if (!f || typeof f !== 'object') {
+                      if (process.env.NODE_ENV === 'development') {
+                        console.warn(`[CalendarView] Invalid card field in JSX at index ${idx}:`, f)
+                      }
+                      return null
+                    }
+                    
+                    return (
+                      <span key={`${eventInfo.event.id}-cf-${idx}`} className="truncate inline-flex items-center shrink-0 max-w-full">
+                        {idx > 0 && <span className="text-gray-500 mr-1">·</span>}
+                        {f?.field ? (
+                          <TimelineFieldValue
+                            field={f.field as TableField}
+                            value={f.value as FieldValue}
+                            valueLabelMap={stableLinkedValueLabelMaps[f.field.name] || stableLinkedValueLabelMaps[f.field.id]}
+                            compact={true}
+                          />
+                        ) : (
+                          String(f?.value || "")
+                        )}
+                      </span>
+                    )
+                  } catch (err) {
+                    if (process.env.NODE_ENV === 'development') {
+                      console.error(`[CalendarView] Error rendering card field at index ${idx}:`, err, f)
+                    }
+                    return null
+                  }
+                })}
               </div>
             )}
           </div>
         </div>
       </div>
     )
+    } catch (err) {
+      // CRITICAL: If event content rendering fails, return a safe fallback to prevent infinite loop
+      if (process.env.NODE_ENV === 'development') {
+        console.error(`[CalendarView] Error rendering calendar event content:`, err, {
+          eventId: eventInfo?.event?.id,
+          eventTitle: eventInfo?.event?.title
+        })
+      }
+      return <div className="p-1 text-xs text-gray-500">Error rendering event</div>
+    }
   }, [stableLinkedValueLabelMaps])
 
   const onCalendarEventClick = useCallback(

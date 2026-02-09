@@ -47,7 +47,7 @@ export default function FieldBlock({
   onFieldChange,
 }: FieldBlockProps) {
   const { config } = block
-  const { openRecordByTableId } = useRecordPanel()
+  const { openRecordByTableId, state: recordPanelState } = useRecordPanel()
   const fieldId = config?.field_id
   const [field, setField] = useState<TableField | null>(null)
   const [fieldValue, setFieldValue] = useState<any>(null)
@@ -602,7 +602,9 @@ export default function FieldBlock({
       onEditEnd={() => setIsEditingValue(false)}
       onLinkedRecordClick={(linkedTableId, linkedRecordId) => {
         if (pageTableId && recordId && linkedTableId === pageTableId && linkedRecordId === recordId) return
-        openRecordByTableId(linkedTableId, linkedRecordId)
+        // CRITICAL: Preserve interfaceMode when opening linked records (Airtable-style)
+        const interfaceMode = recordPanelState.interfaceMode ?? 'view'
+        openRecordByTableId(linkedTableId, linkedRecordId, interfaceMode)
       }}
       onAddLinkedRecord={blockCanCreate ? handleAddLinkedRecord : () => {}}
       isReadOnly={!isEditable}

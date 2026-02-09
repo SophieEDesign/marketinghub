@@ -42,7 +42,7 @@ export default function FieldSectionBlock({
   hideEditButton = false
 }: FieldSectionBlockProps) {
   const { config } = block
-  const { openRecordByTableId } = useRecordPanel()
+  const { openRecordByTableId, state: recordPanelState } = useRecordPanel()
   const sectionName = config?.group_name as string | undefined
   const fieldNames = config?.field_names as string[] | undefined // Optional: filter specific fields
   const defaultCollapsed = config?.collapsed ?? false
@@ -330,7 +330,9 @@ export default function FieldSectionBlock({
                       }}
                       onLinkedRecordClick={(linkedTableId, linkedRecordId) => {
                         if (pageTableId && recordId && linkedTableId === pageTableId && linkedRecordId === recordId) return
-                        openRecordByTableId(linkedTableId, linkedRecordId)
+                        // CRITICAL: Preserve interfaceMode when opening linked records (Airtable-style)
+                        const interfaceMode = recordPanelState.interfaceMode ?? 'view'
+                        openRecordByTableId(linkedTableId, linkedRecordId, interfaceMode)
                       }}
                       onAddLinkedRecord={() => {
                         toast({
