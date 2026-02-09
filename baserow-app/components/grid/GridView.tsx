@@ -116,8 +116,9 @@ interface GridViewProps {
   hideEmptyState?: boolean // Hide "No columns configured" UI (for record view contexts)
   enableRecordOpen?: boolean // Enable record opening (default: true)
   recordOpenStyle?: 'side_panel' | 'modal' // How to open records (default: 'side_panel')
-  modalFields?: string[] // Fields to show in modal (if empty, show all)
-  modalLayout?: any // Custom modal layout (BlockConfig['modal_layout'])
+  modalFields?: string[] // Fields to show in modal (deprecated: use field_layout)
+  modalLayout?: any // Custom modal layout (deprecated: use field_layout)
+  fieldLayout?: any // Unified field layout (preferred)
   /** Optional: when provided (e.g. from GridBlock), permission flags are applied in RecordModal/RecordPanel. */
   cascadeContext?: { pageConfig?: any; blockConfig?: any } | null
   onTableFieldsRefresh?: () => void // Refresh tableFields after option updates (select/multi-select)
@@ -566,6 +567,7 @@ export default function GridView({
   recordOpenStyle = 'side_panel',
   modalFields,
   modalLayout,
+  fieldLayout,
   cascadeContext,
   onTableFieldsRefresh,
   reloadKey,
@@ -3876,6 +3878,7 @@ export default function GridView({
           tableName={supabaseTableName}
           modalFields={modalFields}
           modalLayout={modalLayout}
+          fieldLayout={fieldLayout}
           cascadeContext={cascadeContext}
           canEditLayout={canEditLayout}
           onLayoutSave={onModalLayoutSave}

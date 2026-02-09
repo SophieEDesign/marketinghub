@@ -11,12 +11,21 @@ import {
 import { Button } from '@/components/ui/button'
 import type { TableField } from '@/types/fields'
 import FieldEditor from '@/components/fields/FieldEditor'
+import RecordFields from '@/components/records/RecordFields'
+import RecordFieldEditorPanel from '@/components/interface/RecordFieldEditorPanel'
 import { useToast } from '@/components/ui/use-toast'
 import { isAbortError } from '@/lib/api/error-handling'
-import ModalCanvas from '@/components/interface/ModalCanvas'
-import type { BlockConfig, PageBlock } from '@/lib/interface/types'
+import type { BlockConfig } from '@/lib/interface/types'
 import { sectionAndSortFields } from '@/lib/fields/sectioning'
 import { useRecordEditorCore, type RecordEditorCascadeContext } from '@/lib/interface/record-editor-core'
+import type { FieldLayoutItem } from '@/lib/interface/field-layout-utils'
+import {
+  getVisibleFieldsFromLayout,
+  isFieldEditableFromLayout,
+  getFieldGroupsFromLayout,
+  convertModalLayoutToFieldLayout,
+  convertModalFieldsToFieldLayout,
+} from '@/lib/interface/field-layout-helpers'
 
 export interface RecordModalProps {
   open: boolean
@@ -25,19 +34,20 @@ export interface RecordModalProps {
   recordId: string | null
   /** When omitted, the record editor core will fetch fields from the API */
   tableFields?: TableField[]
-  modalFields?: string[] // Fields to show in modal (if empty, show all)
+  modalFields?: string[] // Fields to show in modal (deprecated: use field_layout)
   initialData?: Record<string, any> // Initial data for creating new records
   onSave?: (createdRecordId?: string | null) => void // Callback with created record ID for new records
   onDeleted?: () => void | Promise<void>
   supabaseTableName?: string | null // Optional: if provided, skips table info fetch for faster loading
-  modalLayout?: BlockConfig['modal_layout'] // Custom modal layout
+  modalLayout?: BlockConfig['modal_layout'] // Custom modal layout (deprecated: use field_layout)
+  fieldLayout?: FieldLayoutItem[] // Unified field layout (preferred)
   showFieldSections?: boolean // Optional: show fields grouped by sections (default: false)
   /** Optional: when provided, permission flags from cascade are applied (edit/create/delete). */
   cascadeContext?: RecordEditorCascadeContext | null
-  /** When true, show "Edit layout" in header; requires onLayoutSave when using custom modal layout. */
+  /** When true, show "Edit layout" in header; requires onLayoutSave. */
   canEditLayout?: boolean
-  /** Called when user saves layout in edit mode (Done). */
-  onLayoutSave?: (modalLayout: BlockConfig['modal_layout']) => void
+  /** Called when user saves layout in edit mode (Done). Pass the new field_layout. */
+  onLayoutSave?: (fieldLayout: FieldLayoutItem[]) => void
   /** When true, modal opens directly in layout edit mode */
   initialEditMode?: boolean
 }
@@ -59,6 +69,7 @@ export default function RecordModal({
   onDeleted,
   supabaseTableName: supabaseTableNameProp,
   modalLayout,
+  fieldLayout: propFieldLayout,
   showFieldSections = false,
   cascadeContext,
   canEditLayout = false,
@@ -67,12 +78,12 @@ export default function RecordModal({
 }: RecordModalProps) {
   const { toast } = useToast()
   const [isEditingLayout, setIsEditingLayout] = useState(false)
-  const [draftBlocks, setDraftBlocks] = useState<PageBlock[] | null>(null)
+  const [draftFieldLayout, setDraftFieldLayout] = useState<FieldLayoutItem[] | null>(null)
 
   useEffect(() => {
     if (!open) {
       setIsEditingLayout(false)
-      setDraftBlocks(null)
+      setDraftFieldLayout(null)
     }
   }, [open])
 
@@ -114,6 +125,61 @@ export default function RecordModal({
   const canSave = recordId ? canEditRecords : canCreateRecords
   // Inline editing: editable whenever user has permission (no Edit/View toggle)
   const effectiveEditable = canSave
+
+  // Convert modalLayout/modalFields to field_layout format (backward compatibility)
+  const resolvedFieldLayout = useMemo(() => {
+    if (propFieldLayout && propFieldLayout.length > 0) {
+      return propFieldLayout
+    }
+    
+    // Convert from modalLayout (backward compatibility)
+    if (modalLayout?.blocks && modalLayout.blocks.length > 0) {
+      return convertModalLayoutToFieldLayout(modalLayout, filteredFields)
+    }
+    
+    // Convert from modalFields (backward compatibility)
+    if (modalFields && modalFields.length > 0) {
+      return convertModalFieldsToFieldLayout(modalFields, filteredFields)
+    }
+    
+    // No layout configured - return empty array (will show all fields)
+    return []
+  }, [propFieldLayout, modalLayout, modalFields, filteredFields])
+
+  // Get visible fields from field_layout (only when viewing existing record, not creating)
+  const visibleFields = useMemo(() => {
+    if (!recordId || resolvedFieldLayout.length === 0) {
+      return filteredFields // For new records or no layout, use all filtered fields
+    }
+    return getVisibleFieldsFromLayout(
+      draftFieldLayout ?? resolvedFieldLayout,
+      filteredFields
+    )
+  }, [recordId, draftFieldLayout, resolvedFieldLayout, filteredFields])
+
+  // Get field groups from field_layout
+  const fieldGroups = useMemo(() => {
+    if (!recordId || resolvedFieldLayout.length === 0) {
+      return {} // For new records or no layout, no grouping
+    }
+    return getFieldGroupsFromLayout(
+      draftFieldLayout ?? resolvedFieldLayout,
+      filteredFields
+    )
+  }, [recordId, draftFieldLayout, resolvedFieldLayout, filteredFields])
+
+  // Determine if field is editable
+  const isFieldEditable = useCallback((fieldName: string) => {
+    if (!effectiveEditable) return false
+    if (!recordId || resolvedFieldLayout.length === 0) {
+      return effectiveEditable // For new records or no layout, all fields editable
+    }
+    return isFieldEditableFromLayout(
+      fieldName,
+      draftFieldLayout ?? resolvedFieldLayout,
+      effectiveEditable
+    )
+  }, [effectiveEditable, recordId, draftFieldLayout, resolvedFieldLayout])
 
   // Load collapsed sections state from localStorage
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
@@ -190,115 +256,40 @@ export default function RecordModal({
     }
   }
 
-  // Memoize blocks for ModalCanvas - must be at top level (before early return)
-  const modalBlocks = useMemo(() => {
-    if (!modalLayout?.blocks || modalLayout.blocks.length === 0) {
-      return []
-    }
-    return modalLayout.blocks.map((block, index) => ({
-      id: block.id,
-      page_id: '',
-      type: block.type,
-      x: block.x,
-      y: block.y,
-      w: block.w,
-      h: block.h,
-      config: {
-        ...block.config,
-        field_id: block.type === 'field' 
-          ? tableFields.find(f => f.name === block.fieldName || f.id === block.fieldName)?.id
-          : undefined,
-        field_name: block.fieldName,
-      },
-      order_index: index,
-      created_at: '',
-    })) as PageBlock[]
-  }, [modalLayout?.blocks, tableFields])
-
-  // Only use a custom modal layout when viewing an existing record.
-  // For new records (no recordId), fall back to the simple field list so users can actually enter values
-  // instead of seeing read-only "No record selected" placeholders from Field blocks.
-  const hasCustomLayout = Boolean(recordId && modalLayout?.blocks && modalLayout.blocks.length > 0)
-  // Show "Edit layout" when in edit mode with save callback (allow creating layout from scratch, not just editing existing)
-  const showEditLayoutButton = canEditLayout && Boolean(onLayoutSave) && Boolean(recordId) && !isEditingLayout
-  const blocksForCanvas = isEditingLayout && draftBlocks !== null ? draftBlocks : modalBlocks
+  // Check if we have a custom layout (only for existing records)
+  const hasCustomLayout = Boolean(recordId && resolvedFieldLayout.length > 0)
+  
+  // Show "Edit layout" button only for existing records with layout
+  const showEditLayoutButton = canEditLayout && Boolean(onLayoutSave) && Boolean(recordId) && hasCustomLayout && !isEditingLayout
 
   // Auto-enter edit mode when initialEditMode is true and modal opens
   useEffect(() => {
-    if (open && initialEditMode && hasCustomLayout && !isEditingLayout && modalBlocks.length > 0 && recordId) {
+    if (open && initialEditMode && hasCustomLayout && !isEditingLayout && recordId) {
       setIsEditingLayout(true)
-      setDraftBlocks([...modalBlocks])
+      setDraftFieldLayout([...resolvedFieldLayout])
     }
-  }, [open, initialEditMode, hasCustomLayout, isEditingLayout, modalBlocks, recordId])
+  }, [open, initialEditMode, hasCustomLayout, isEditingLayout, resolvedFieldLayout, recordId])
 
   const handleStartEditLayout = useCallback(() => {
     setIsEditingLayout(true)
-    setDraftBlocks([...modalBlocks])
-  }, [modalBlocks])
+    setDraftFieldLayout([...resolvedFieldLayout])
+  }, [resolvedFieldLayout])
 
   const handleDoneEditLayout = useCallback(() => {
-    if (!onLayoutSave || draftBlocks === null || !canEditLayout) return
-    const cols = modalLayout?.layoutSettings?.cols ?? 8
-    const newModalLayout: BlockConfig['modal_layout'] = {
-      blocks: draftBlocks.map((b, index) => ({
-        id: b.id,
-        type: (b.type === 'field' || b.type === 'text' || b.type === 'divider' || b.type === 'image') ? b.type : 'field',
-        fieldName: (b.config as any)?.field_name ?? (b as any).fieldName,
-        x: 0,
-        y: index,
-        w: typeof cols === 'number' ? cols : 8,
-        h: b.h ?? 4,
-        config: b.config,
-      })),
-      layoutSettings: modalLayout?.layoutSettings,
-    }
-    onLayoutSave(newModalLayout)
+    if (!onLayoutSave || draftFieldLayout === null || !canEditLayout) return
+    onLayoutSave(draftFieldLayout)
     setIsEditingLayout(false)
-    setDraftBlocks(null)
-  }, [onLayoutSave, canEditLayout, draftBlocks, modalLayout?.layoutSettings])
+    setDraftFieldLayout(null)
+  }, [onLayoutSave, canEditLayout, draftFieldLayout])
 
   const handleCancelEditLayout = useCallback(() => {
     setIsEditingLayout(false)
-    setDraftBlocks(null)
+    setDraftFieldLayout(null)
   }, [])
 
-  const handleLayoutChange = useCallback((newBlocks: PageBlock[]) => {
-    setDraftBlocks(newBlocks)
+  const handleFieldLayoutChange = useCallback((newLayout: FieldLayoutItem[]) => {
+    setDraftFieldLayout(newLayout)
   }, [])
-
-  const handleRemoveBlock = useCallback((blockId: string) => {
-    setDraftBlocks((prev) => (prev ?? []).filter((b) => b.id !== blockId))
-  }, [])
-
-  const handleAddField = useCallback((insertAfterBlockId: string | null) => {
-    const current = draftBlocks ?? modalBlocks
-    const usedNames = new Set(
-      current.filter((b) => b.type === 'field').map((b) => (b.config as any)?.field_name).filter(Boolean)
-    )
-    const available = tableFields.find((f) => f.name !== 'id' && !usedNames.has(f.name))
-    if (!available) return
-    const newBlock: PageBlock = {
-      id: `field-${available.id}-${Date.now()}`,
-      page_id: '',
-      type: 'field',
-      x: 0,
-      y: current.length,
-      w: 8,
-      h: 4,
-      config: { field_id: available.id, field_name: available.name },
-      order_index: current.length,
-      created_at: '',
-    }
-    if (insertAfterBlockId === null) {
-      setDraftBlocks([...current, newBlock])
-    } else {
-      const idx = current.findIndex((b) => b.id === insertAfterBlockId)
-      const insertAt = idx < 0 ? current.length : idx + 1
-      const next = [...current]
-      next.splice(insertAt, 0, newBlock)
-      setDraftBlocks(next.map((b, i) => ({ ...b, y: i, order_index: i })))
-    }
-  }, [draftBlocks, modalBlocks, tableFields])
 
   // Section fields if showFieldSections is enabled (filteredFields from core)
   const sectionedFields = useMemo(() => {
@@ -310,7 +301,7 @@ export default function RecordModal({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0">
+      <DialogContent className={isEditingLayout ? "max-w-7xl max-h-[90vh] flex flex-col p-0" : "max-w-2xl max-h-[90vh] flex flex-col p-0"}>
         {/* Sticky top bar with save button */}
         <div className="sticky top-0 z-10 bg-white border-b px-6 py-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -347,16 +338,18 @@ export default function RecordModal({
                 )}
               </>
             )}
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={!recordId || deleting || saving || loading || !canDeleteRecords}
-              title={!canDeleteRecords ? "You don't have permission to delete this record" : "Delete this record"}
-              aria-disabled={!recordId || !canDeleteRecords || deleting || saving || loading}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              {deleting ? 'Deleting…' : 'Delete'}
-            </Button>
+            {recordId && (
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={deleting || saving || loading || !canDeleteRecords}
+                title={!canDeleteRecords ? "You don't have permission to delete this record" : "Delete this record"}
+                aria-disabled={!canDeleteRecords || deleting || saving || loading}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                {deleting ? 'Deleting…' : 'Delete'}
+              </Button>
+            )}
             <Button variant="outline" onClick={onClose} disabled={deleting || saving}>
               Cancel
             </Button>
@@ -373,95 +366,122 @@ export default function RecordModal({
         </div>
 
         {/* Scrollable content area */}
-        <div className="flex-1 overflow-y-auto px-6">
+        <div className={isEditingLayout ? "flex-1 flex overflow-hidden" : "flex-1 overflow-y-auto px-6"}>
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <div className="text-gray-500">Loading...</div>
             </div>
           ) : (
-            <div className="space-y-4 py-4">
-              {/* Use custom layout if available, or layout editor when editing layout (including from scratch) */}
-              {(hasCustomLayout || isEditingLayout) ? (
-                <div className="min-h-[400px]">
-                  <ModalCanvas
-                    mode={isEditingLayout ? 'edit' : 'view'}
-                    blocks={blocksForCanvas}
+            <>
+              {isEditingLayout && recordId ? (
+                // Split view for layout editing (only for existing records)
+                <>
+                  <div className="flex-1 overflow-y-auto px-6 py-4">
+                    <RecordFields
+                      fields={visibleFields}
+                      formData={formData}
+                      onFieldChange={handleFieldChange}
+                      fieldGroups={fieldGroups}
+                      tableId={tableId}
+                      recordId={recordId}
+                      tableName={effectiveTableName || ''}
+                      isFieldEditable={isFieldEditable}
+                    />
+                  </div>
+                  <div className="w-80 border-l overflow-y-auto bg-gray-50">
+                    <RecordFieldEditorPanel
+                      tableId={tableId}
+                      recordId={recordId}
+                      allFields={filteredFields}
+                      fieldLayout={draftFieldLayout ?? resolvedFieldLayout}
+                      onFieldLayoutChange={handleFieldLayoutChange}
+                      onFieldChange={handleFieldChange}
+                      pageEditable={effectiveEditable}
+                      mode="modal"
+                    />
+                  </div>
+                </>
+              ) : hasCustomLayout && recordId ? (
+                // Use RecordFields for existing records with layout
+                <div className="space-y-4 py-4">
+                  <RecordFields
+                    fields={visibleFields}
+                    formData={formData}
+                    onFieldChange={handleFieldChange}
+                    fieldGroups={fieldGroups}
                     tableId={tableId}
                     recordId={recordId}
                     tableName={effectiveTableName || ''}
-                    tableFields={tableFields}
-                    pageEditable={effectiveEditable}
-                    editableFieldNames={tableFields.map(f => f.name)}
-                    onFieldChange={handleFieldChange}
-                    layoutSettings={modalLayout?.layoutSettings}
-                    onLayoutChange={isEditingLayout ? handleLayoutChange : undefined}
-                    onRemoveBlock={isEditingLayout ? handleRemoveBlock : undefined}
-                    onAddField={isEditingLayout ? handleAddField : undefined}
+                    isFieldEditable={isFieldEditable}
                   />
                 </div>
               ) : showFieldSections && sectionedFields ? (
-                // Render with sections
-                sectionedFields.map(([sectionName, sectionFields]) => {
-                  const isCollapsed = collapsedSections.has(sectionName)
-                  return (
-                    <div key={sectionName} className="space-y-2">
-                      <button
-                        type="button"
-                        onClick={() => toggleSection(sectionName)}
-                        className="w-full flex items-center justify-between text-left py-1 -mx-1 px-1 rounded-md hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
-                        aria-expanded={!isCollapsed}
-                        aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${sectionName} section`}
-                      >
-                        <span className="text-sm font-semibold text-gray-900">{sectionName}</span>
-                        <span className="text-gray-400">
-                          {isCollapsed ? (
-                            <ChevronRight className="h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4" />
-                          )}
-                        </span>
-                      </button>
-                      {!isCollapsed && (
-                        <div className="space-y-4 pl-4">
-                          {sectionFields.map((field) => {
-                            const value = formData[field.name]
-                            return (
-                              <FieldEditor
-                                key={field.id}
-                                field={field}
-                                value={value}
-                                onChange={(newValue) => handleFieldChange(field.name, newValue)}
-                                required={field.required || false}
-                                recordId={recordId || undefined}
-                                tableName={effectiveTableName || undefined}
-                                isReadOnly={!effectiveEditable}
-                              />
-                            )
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })
+                // Render with sections (for new records or when sections enabled)
+                <div className="space-y-4 py-4">
+                  {sectionedFields.map(([sectionName, sectionFields]) => {
+                    const isCollapsed = collapsedSections.has(sectionName)
+                    return (
+                      <div key={sectionName} className="space-y-2">
+                        <button
+                          type="button"
+                          onClick={() => toggleSection(sectionName)}
+                          className="w-full flex items-center justify-between text-left py-1 -mx-1 px-1 rounded-md hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
+                          aria-expanded={!isCollapsed}
+                          aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${sectionName} section`}
+                        >
+                          <span className="text-sm font-semibold text-gray-900">{sectionName}</span>
+                          <span className="text-gray-400">
+                            {isCollapsed ? (
+                              <ChevronRight className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                          </span>
+                        </button>
+                        {!isCollapsed && (
+                          <div className="space-y-4 pl-4">
+                            {sectionFields.map((field) => {
+                              const value = formData[field.name]
+                              return (
+                                <FieldEditor
+                                  key={field.id}
+                                  field={field}
+                                  value={value}
+                                  onChange={(newValue) => handleFieldChange(field.name, newValue)}
+                                  required={field.required || false}
+                                  recordId={recordId || undefined}
+                                  tableName={effectiveTableName || undefined}
+                                  isReadOnly={!effectiveEditable}
+                                />
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
               ) : (
-                // Render flat list (default behavior)
-                filteredFields.map((field) => {
-                  const value = formData[field.name]
-                  return (
-                    <FieldEditor
-                      key={field.id}
-                      field={field}
-                      value={value}
-                      onChange={(newValue) => handleFieldChange(field.name, newValue)}
-                      required={field.required || false}
-                      recordId={recordId || undefined}
-                      tableName={effectiveTableName || undefined}
-                      isReadOnly={!effectiveEditable}
-                    />
-                  )
-                })
+                // Render flat list (default behavior for new records)
+                <div className="space-y-4 py-4">
+                  {filteredFields.map((field) => {
+                    const value = formData[field.name]
+                    return (
+                      <FieldEditor
+                        key={field.id}
+                        field={field}
+                        value={value}
+                        onChange={(newValue) => handleFieldChange(field.name, newValue)}
+                        required={field.required || false}
+                        recordId={recordId || undefined}
+                        tableName={effectiveTableName || undefined}
+                        isReadOnly={!effectiveEditable}
+                      />
+                    )
+                  })}
+                </div>
               )}
-            </div>
+            </>
           )}
         </div>
       </DialogContent>

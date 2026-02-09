@@ -65,6 +65,8 @@ interface RecordFieldEditorPanelProps {
   onFieldLayoutChange?: (layout: FieldLayoutItem[]) => void
   onFieldChange?: (fieldName: string, value: any) => void
   pageEditable?: boolean
+  /** Context mode: 'modal' uses visible_in_modal, 'record_review' uses visible_in_canvas */
+  mode?: 'modal' | 'record_review'
 }
 
 export default function RecordFieldEditorPanel({
@@ -75,6 +77,7 @@ export default function RecordFieldEditorPanel({
   onFieldLayoutChange,
   onFieldChange,
   pageEditable = true,
+  mode = 'record_review',
 }: RecordFieldEditorPanelProps) {
   const { openRecordByTableId } = useRecordPanel()
   const { toast } = useToast()
@@ -283,6 +286,9 @@ export default function RecordFieldEditorPanel({
       layoutMap.set(item.field_name, item)
     })
 
+    // Determine visibility flag based on mode
+    const visibilityFlag = mode === 'modal' ? 'visible_in_modal' : 'visible_in_canvas'
+
     // Get all fields, prioritizing layout order
     const orderedFields = allFields
       .map((field) => {
@@ -293,12 +299,19 @@ export default function RecordFieldEditorPanel({
             field_id: field.id,
             field_name: field.name,
             order: allFields.length + allFields.indexOf(field),
-            visible_in_canvas: true,
+            [mode === 'modal' ? 'visible_in_modal' : 'visible_in_canvas']: true,
             editable: pageEditable,
           },
         }
       })
-      .filter(({ layout }) => layout.visible_in_canvas !== false)
+      .filter(({ layout }) => {
+        // Use the appropriate visibility flag based on mode
+        if (mode === 'modal') {
+          return layout.visible_in_modal !== false
+        } else {
+          return layout.visible_in_canvas !== false
+        }
+      })
       .sort((a, b) => a.layout.order - b.layout.order)
 
     // Filter by search query
@@ -345,9 +358,10 @@ export default function RecordFieldEditorPanel({
 
   // Handle field visibility toggle
   const handleVisibilityToggle = (fieldName: string, visible: boolean) => {
+    const visibilityFlag = mode === 'modal' ? 'visible_in_modal' : 'visible_in_canvas'
     const updated = localFieldLayout.map((item) =>
       item.field_name === fieldName
-        ? { ...item, visible_in_canvas: visible }
+        ? { ...item, [visibilityFlag]: visible }
         : item
     )
 
@@ -355,11 +369,12 @@ export default function RecordFieldEditorPanel({
     if (!updated.some((item) => item.field_name === fieldName)) {
       const field = allFields.find((f) => f.name === fieldName)
       if (field) {
+        const visibilityFlag = mode === 'modal' ? 'visible_in_modal' : 'visible_in_canvas'
         updated.push({
           field_id: field.id,
           field_name: field.name,
           order: Math.max(...updated.map((i) => i.order), -1) + 1,
-          visible_in_canvas: visible,
+          [visibilityFlag]: visible,
           editable: pageEditable,
         })
       }
@@ -380,11 +395,12 @@ export default function RecordFieldEditorPanel({
       const field = allFields.find((f) => f.name === fieldName)
       if (field) {
         const existingVisible = visibleFields.find(({ field: f }) => f.name === fieldName)
+        const visibilityFlag = mode === 'modal' ? 'visible_in_modal' : 'visible_in_canvas'
         updated.push({
           field_id: field.id,
           field_name: field.name,
           order: existingVisible?.layout.order ?? Math.max(...updated.map((i) => i.order), -1) + 1,
-          visible_in_canvas: existingVisible?.layout.visible_in_canvas ?? true,
+          [visibilityFlag]: existingVisible?.layout[visibilityFlag] ?? true,
           editable,
         })
       }
@@ -413,7 +429,8 @@ export default function RecordFieldEditorPanel({
 
     const value = recordData[field.name]
     const isEditable = layout.editable && pageEditable && !field.options?.read_only && field.type !== "formula" && field.type !== "lookup"
-    const isVisible = layout.visible_in_canvas !== false
+    const visibilityFlag = mode === 'modal' ? 'visible_in_modal' : 'visible_in_canvas'
+    const isVisible = layout[visibilityFlag] !== false
 
     // Check if this is a select field and show a sample color pill
     const sampleChoice = field.options?.choices?.[0]

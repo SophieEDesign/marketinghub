@@ -47,8 +47,8 @@ interface GridBlockProps {
   pageShowAddRecord?: boolean // Page-level default for showing Add record
   onEphemeralHeightDelta?: (blockId: string, deltaPx: number) => void // Callback for ephemeral height changes (collapsible expansion)
   rowHeight?: number // Row height in pixels (for height calculation)
-  /** When provided, RecordModal can save modal layout changes (in-modal edit). */
-  onModalLayoutSave?: (modalLayout: import("@/lib/interface/types").BlockConfig["modal_layout"]) => void
+  /** When provided, RecordModal can save field layout changes (in-modal edit). */
+  onModalLayoutSave?: (fieldLayout: import("@/lib/interface/field-layout-utils").FieldLayoutItem[]) => void
   /** When true, show "Edit layout" in record modal. */
   canEditLayout?: boolean
   /** When true (full-page calendar), use compact Airtable-style top bar and date range from block settings. */
@@ -1047,6 +1047,7 @@ export default function GridBlock({
             onRecordClick={handleRecordClick}
             modalFields={(config as any).modal_fields}
             modalLayout={(config as any).modal_layout}
+            fieldLayout={(config as any).field_layout}
             cascadeContext={{ blockConfig: config }}
             reloadKey={refreshKey}
             defaultGroupsCollapsed={defaultGroupsCollapsed}

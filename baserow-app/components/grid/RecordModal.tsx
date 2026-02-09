@@ -10,15 +10,22 @@ import {
 } from "@/components/ui/dialog"
 import { createClient } from "@/lib/supabase/client"
 import RecordFields from "@/components/records/RecordFields"
+import RecordFieldEditorPanel from "@/components/interface/RecordFieldEditorPanel"
 import { useToast } from "@/components/ui/use-toast"
 import { Trash2 } from "lucide-react"
 import { isAbortError } from "@/lib/api/error-handling"
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
-import ModalCanvas from "@/components/interface/ModalCanvas"
 import type { BlockConfig } from "@/lib/interface/types"
-import type { PageBlock } from "@/lib/interface/types"
 import { useRecordEditorCore, type RecordEditorCascadeContext } from "@/lib/interface/record-editor-core"
 import { useUserRole } from "@/lib/hooks/useUserRole"
+import type { FieldLayoutItem } from "@/lib/interface/field-layout-utils"
+import {
+  getVisibleFieldsFromLayout,
+  isFieldEditableFromLayout,
+  getFieldGroupsFromLayout,
+  convertModalLayoutToFieldLayout,
+  convertModalFieldsToFieldLayout,
+} from "@/lib/interface/field-layout-helpers"
 
 interface RecordModalProps {
   isOpen: boolean
@@ -27,14 +34,15 @@ interface RecordModalProps {
   tableId: string
   recordId: string
   tableName: string
-  modalFields?: string[] // Fields to show in modal (if empty, show all)
-  modalLayout?: BlockConfig['modal_layout'] // Custom modal layout
+  modalFields?: string[] // Fields to show in modal (deprecated: use field_layout)
+  modalLayout?: BlockConfig['modal_layout'] // Custom modal layout (deprecated: use field_layout)
+  fieldLayout?: FieldLayoutItem[] // Unified field layout (preferred)
   /** Optional: when provided, permission flags from cascade are applied (edit/delete). */
   cascadeContext?: RecordEditorCascadeContext | null
-  /** When true, show "Edit layout" in header; requires onLayoutSave when using custom modal layout. */
+  /** When true, show "Edit layout" in header; requires onLayoutSave. */
   canEditLayout?: boolean
-  /** Called when user saves layout in edit mode (Done). Pass the new modal_layout; parent persists (e.g. via block config). */
-  onLayoutSave?: (modalLayout: BlockConfig['modal_layout']) => void
+  /** Called when user saves layout in edit mode (Done). Pass the new field_layout; parent persists (e.g. via block config). */
+  onLayoutSave?: (fieldLayout: FieldLayoutItem[]) => void
   /** When true, modal opens directly in layout edit mode */
   initialEditMode?: boolean
   /** Interface mode: 'view' | 'edit'. When 'edit', modal opens in layout edit mode (Airtable-style). */
@@ -50,6 +58,7 @@ export default function RecordModal({
   tableName,
   modalFields,
   modalLayout,
+  fieldLayout: propFieldLayout,
   cascadeContext,
   canEditLayout = false,
   onLayoutSave,
@@ -64,7 +73,7 @@ export default function RecordModal({
   // Use useState initializer, not useEffect, to ensure correct initial state
   const shouldEditLayout = interfaceMode === 'edit' || initialEditMode
   const [isEditingLayout, setIsEditingLayout] = useState(shouldEditLayout)
-  const [draftBlocks, setDraftBlocks] = useState<PageBlock[] | null>(null)
+  const [draftFieldLayout, setDraftFieldLayout] = useState<FieldLayoutItem[] | null>(null)
   const supabase = createClient()
   const { toast } = useToast()
   const { role } = useUserRole()
@@ -73,7 +82,7 @@ export default function RecordModal({
     if (!isOpen) {
       setIsModalEditing(false)
       setIsEditingLayout(false)
-      setDraftBlocks(null)
+      setDraftFieldLayout(null)
     }
   }, [isOpen])
 
@@ -106,6 +115,52 @@ export default function RecordModal({
 
   const canShowEditButton = role === "admin" || canEditRecords
   const effectiveEditable = canShowEditButton && isModalEditing
+
+  // Convert modalLayout/modalFields to field_layout format (backward compatibility)
+  const resolvedFieldLayout = useMemo(() => {
+    if (propFieldLayout && propFieldLayout.length > 0) {
+      return propFieldLayout
+    }
+    
+    // Convert from modalLayout (backward compatibility)
+    if (modalLayout?.blocks && modalLayout.blocks.length > 0) {
+      return convertModalLayoutToFieldLayout(modalLayout, fields)
+    }
+    
+    // Convert from modalFields (backward compatibility)
+    if (modalFields && modalFields.length > 0) {
+      return convertModalFieldsToFieldLayout(modalFields, fields)
+    }
+    
+    // No layout configured - return empty array (will show all fields)
+    return []
+  }, [propFieldLayout, modalLayout, modalFields, fields])
+
+  // Get visible fields from field_layout
+  const visibleFields = useMemo(() => {
+    return getVisibleFieldsFromLayout(
+      draftFieldLayout ?? resolvedFieldLayout,
+      fields
+    )
+  }, [draftFieldLayout, resolvedFieldLayout, fields])
+
+  // Get field groups from field_layout
+  const fieldGroups = useMemo(() => {
+    return getFieldGroupsFromLayout(
+      draftFieldLayout ?? resolvedFieldLayout,
+      fields
+    )
+  }, [draftFieldLayout, resolvedFieldLayout, fields])
+
+  // Determine if field is editable
+  const isFieldEditable = useCallback((fieldName: string) => {
+    if (!effectiveEditable) return false
+    return isFieldEditableFromLayout(
+      fieldName,
+      draftFieldLayout ?? resolvedFieldLayout,
+      effectiveEditable
+    )
+  }, [effectiveEditable, draftFieldLayout, resolvedFieldLayout])
 
   async function handleFieldChange(fieldName: string, value: any) {
     if (!record || !tableNameFromCore || !effectiveEditable) return
@@ -186,132 +241,61 @@ export default function RecordModal({
     }
   }
 
-  // Memoize blocks for ModalCanvas - must be at top level (before early return)
-  const modalBlocks = useMemo(() => {
-    if (!modalLayout?.blocks || modalLayout.blocks.length === 0) {
-      return []
-    }
-    return modalLayout.blocks.map((block, index) => ({
-      id: block.id,
-      page_id: '',
-      type: block.type,
-      x: block.x,
-      y: block.y,
-      w: block.w,
-      h: block.h,
-      config: {
-        ...block.config,
-        field_id: block.type === 'field' 
-          ? fields.find(f => f.name === block.fieldName || f.id === block.fieldName)?.id
-          : undefined,
-        field_name: block.fieldName,
-      },
-      order_index: index,
-      created_at: '',
-    })) as PageBlock[]
-  }, [modalLayout?.blocks, fields])
-
-  const hasCustomLayout = Boolean(modalLayout?.blocks && modalLayout.blocks.length > 0)
+  // Check if we have a custom layout
+  const hasCustomLayout = resolvedFieldLayout.length > 0
+  
   // Show "Edit layout" button only when NOT in interface edit mode (Airtable-style)
   // When interfaceMode === 'edit', modal is already in edit mode, so hide the button
-  const showEditLayoutButton = interfaceMode !== 'edit' && hasCustomLayout && Boolean(onLayoutSave) && !isEditingLayout
-  const blocksForCanvas = isEditingLayout && draftBlocks !== null ? draftBlocks : modalBlocks
+  const showEditLayoutButton = interfaceMode !== 'edit' && hasCustomLayout && Boolean(onLayoutSave) && !isEditingLayout && canEditLayout
 
   // Auto-enter edit mode when interfaceMode === 'edit' or initialEditMode is true
-  // Initialize draftBlocks immediately when modal opens in edit mode
+  // Initialize draftFieldLayout immediately when modal opens in edit mode
   useEffect(() => {
-    if (isOpen && shouldEditLayout && modalBlocks.length > 0 && draftBlocks === null) {
+    if (isOpen && shouldEditLayout && resolvedFieldLayout.length > 0 && draftFieldLayout === null) {
       setIsEditingLayout(true)
-      setDraftBlocks([...modalBlocks])
+      setDraftFieldLayout([...resolvedFieldLayout])
     }
-  }, [isOpen, shouldEditLayout, modalBlocks, draftBlocks])
+  }, [isOpen, shouldEditLayout, resolvedFieldLayout, draftFieldLayout])
   
   // Sync edit state when interfaceMode changes while modal is open
   useEffect(() => {
-    if (isOpen && interfaceMode === 'edit' && !isEditingLayout && modalBlocks.length > 0) {
+    if (isOpen && interfaceMode === 'edit' && !isEditingLayout && resolvedFieldLayout.length > 0) {
       setIsEditingLayout(true)
-      setDraftBlocks([...modalBlocks])
+      setDraftFieldLayout([...resolvedFieldLayout])
     } else if (isOpen && interfaceMode === 'view' && isEditingLayout && !initialEditMode) {
       // Exit edit mode when interfaceMode changes to 'view' (unless initialEditMode is set)
       setIsEditingLayout(false)
-      setDraftBlocks(null)
+      setDraftFieldLayout(null)
     }
-  }, [isOpen, interfaceMode, isEditingLayout, modalBlocks, initialEditMode])
+  }, [isOpen, interfaceMode, isEditingLayout, resolvedFieldLayout, initialEditMode])
 
   const handleStartEditLayout = useCallback(() => {
     setIsEditingLayout(true)
-    setDraftBlocks([...modalBlocks])
-  }, [modalBlocks])
+    setDraftFieldLayout([...resolvedFieldLayout])
+  }, [resolvedFieldLayout])
 
   const handleDoneEditLayout = useCallback(() => {
-    if (!onLayoutSave || draftBlocks === null || !canEditLayout) return
-    const newModalLayout: BlockConfig['modal_layout'] = {
-      blocks: draftBlocks.map((b, index) => ({
-        id: b.id,
-        type: (b.type === 'field' || b.type === 'text' || b.type === 'divider' || b.type === 'image') ? b.type : 'field',
-        fieldName: b.config?.field_name ?? (b as any).fieldName,
-        x: 0,
-        y: index,
-        w: modalLayout?.layoutSettings ? (typeof modalLayout.layoutSettings.cols === 'number' ? modalLayout.layoutSettings.cols : 8) : 8,
-        h: b.h ?? 4,
-        config: b.config,
-      })),
-      layoutSettings: modalLayout?.layoutSettings,
-    }
-    onLayoutSave(newModalLayout)
+    if (!onLayoutSave || draftFieldLayout === null || !canEditLayout) return
+    onLayoutSave(draftFieldLayout)
     setIsEditingLayout(false)
-    setDraftBlocks(null)
-  }, [onLayoutSave, canEditLayout, draftBlocks, modalLayout?.layoutSettings])
+    setDraftFieldLayout(null)
+  }, [onLayoutSave, canEditLayout, draftFieldLayout])
 
   const handleCancelEditLayout = useCallback(() => {
     setIsEditingLayout(false)
-    setDraftBlocks(null)
+    setDraftFieldLayout(null)
   }, [])
 
-  const handleLayoutChange = useCallback((newBlocks: PageBlock[]) => {
-    setDraftBlocks(newBlocks)
+  const handleFieldLayoutChange = useCallback((newLayout: FieldLayoutItem[]) => {
+    setDraftFieldLayout(newLayout)
   }, [])
-
-  const handleRemoveBlock = useCallback((blockId: string) => {
-    setDraftBlocks((prev) => (prev ?? []).filter((b) => b.id !== blockId))
-  }, [])
-
-  const handleAddField = useCallback((insertAfterBlockId: string | null) => {
-    const current = draftBlocks ?? modalBlocks
-    const usedNames = new Set(
-      current.filter((b) => b.type === 'field').map((b) => (b.config as any)?.field_name).filter(Boolean)
-    )
-    const available = fields.find((f) => f.name !== 'id' && !usedNames.has(f.name))
-    if (!available) return
-    const newBlock: PageBlock = {
-      id: `field-${available.id}-${Date.now()}`,
-      page_id: '',
-      type: 'field',
-      x: 0,
-      y: current.length,
-      w: 8,
-      h: 4,
-      config: { field_id: available.id, field_name: available.name },
-      order_index: current.length,
-      created_at: '',
-    }
-    if (insertAfterBlockId === null) {
-      setDraftBlocks([...current, newBlock])
-    } else {
-      const idx = current.findIndex((b) => b.id === insertAfterBlockId)
-      const insertAt = idx < 0 ? current.length : idx + 1
-      const next = [...current]
-      next.splice(insertAt, 0, newBlock)
-      setDraftBlocks(next.map((b, i) => ({ ...b, y: i, order_index: i })))
-    }
-  }, [draftBlocks, modalBlocks, fields])
 
   if (!isOpen) return null
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className={isEditingLayout ? "max-w-7xl max-h-[90vh] flex flex-col p-0" : "max-w-4xl max-h-[90vh] overflow-y-auto"}>
+        <DialogHeader className={isEditingLayout ? "px-6 pt-6 pb-4 border-b" : ""}>
           <div className="flex items-center justify-between gap-3">
             <DialogTitle>Record Details</DialogTitle>
             <div className="flex items-center gap-2">
@@ -399,57 +383,69 @@ export default function RecordModal({
             </div>
           </div>
         </DialogHeader>
-        <div className="mt-4">
+        <div className={isEditingLayout ? "flex-1 flex overflow-hidden" : "mt-4"}>
           {loading ? (
             <div className="text-center py-8 text-gray-500">Loading...</div>
           ) : record && Object.keys(record).length > 0 ? (
             <>
-              {/* Use custom layout if available, otherwise fall back to simple field list */}
-              {hasCustomLayout ? (
-                <div className="min-h-[400px]">
-                  <ModalCanvas
-                    mode={isEditingLayout ? "edit" : "view"}
-                    blocks={blocksForCanvas}
+              {isEditingLayout ? (
+                // Split view for layout editing
+                <>
+                  <div className="flex-1 overflow-y-auto px-6 py-4">
+                    <RecordFields
+                      fields={visibleFields}
+                      formData={record || {}}
+                      onFieldChange={handleFieldChange}
+                      fieldGroups={fieldGroups}
+                      tableId={tableId}
+                      recordId={recordId}
+                      tableName={tableNameFromCore || tableName}
+                      isFieldEditable={isFieldEditable}
+                    />
+                  </div>
+                  <div className="w-80 border-l overflow-y-auto bg-gray-50">
+                    <RecordFieldEditorPanel
+                      tableId={tableId}
+                      recordId={recordId}
+                      allFields={fields}
+                      fieldLayout={draftFieldLayout ?? resolvedFieldLayout}
+                      onFieldLayoutChange={handleFieldLayoutChange}
+                      onFieldChange={handleFieldChange}
+                      pageEditable={effectiveEditable}
+                      mode="modal"
+                    />
+                  </div>
+                </>
+              ) : (
+                // Normal view
+                <>
+                  <RecordFields
+                    fields={visibleFields}
+                    formData={record || {}}
+                    onFieldChange={handleFieldChange}
+                    fieldGroups={fieldGroups}
                     tableId={tableId}
                     recordId={recordId}
                     tableName={tableNameFromCore || tableName}
-                    tableFields={fields}
-                    pageEditable={effectiveEditable}
-                    editableFieldNames={fields.map(f => f.name)}
-                    onFieldChange={handleFieldChange}
-                    layoutSettings={modalLayout?.layoutSettings}
-                    onLayoutChange={isEditingLayout ? handleLayoutChange : undefined}
-                    onRemoveBlock={isEditingLayout ? handleRemoveBlock : undefined}
-                    onAddField={isEditingLayout ? handleAddField : undefined}
+                    isFieldEditable={isFieldEditable}
                   />
-                </div>
-              ) : (
-                <RecordFields
-                  fields={fields}
-                  formData={record || {}}
-                  onFieldChange={handleFieldChange}
-                  fieldGroups={{}}
-                  tableId={tableId}
-                  recordId={recordId}
-                  tableName={tableNameFromCore || tableName}
-                  isFieldEditable={() => effectiveEditable}
-                />
-              )}
 
-              {/* Footer actions */}
-              <div className="mt-6 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={handleDeleteRecord}
-                  disabled={deleting || loading || !canDeleteRecords}
-                  className="inline-flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={!canDeleteRecords ? "You don't have permission to delete this record" : "Delete this record"}
-                  aria-disabled={!canDeleteRecords || deleting || loading}
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Delete record
-                </button>
-              </div>
+                  {/* Footer actions */}
+                  <div className="mt-6 flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={handleDeleteRecord}
+                      disabled={deleting || loading || !canDeleteRecords}
+                      className="inline-flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title={!canDeleteRecords ? "You don't have permission to delete this record" : "Delete this record"}
+                      aria-disabled={!canDeleteRecords || deleting || loading}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete record
+                    </button>
+                  </div>
+                </>
+              )}
             </>
           ) : (
             <div className="text-center py-8 text-gray-500">Record not found</div>

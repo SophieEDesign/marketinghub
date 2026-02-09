@@ -372,7 +372,7 @@ export default function BlockRenderer({
               filterTree={filterTree}
               onRecordClick={onRecordClick}
               pageShowAddRecord={pageShowAddRecord}
-              onModalLayoutSave={onUpdate ? (layout) => onUpdate(block.id, { modal_layout: layout }) : undefined}
+              onModalLayoutSave={onUpdate ? (fieldLayout) => onUpdate(block.id, { field_layout: fieldLayout }) : undefined}
               canEditLayout={canEdit}
               isFullPage={isFullPage}
             />

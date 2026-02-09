@@ -63,8 +63,9 @@ interface GridViewWrapperProps {
   onRecordClick?: (recordId: string) => void // Emit recordId on row click
   standardizedFilters?: FilterConfig[] // Standardized filters (preferred over initialFilters)
   filterTree?: FilterTree // Canonical filter tree from filter blocks (supports groups/OR)
-  modalFields?: string[] // Fields to show in modal (if empty, show all)
-  modalLayout?: any // Custom modal layout (BlockConfig['modal_layout'])
+  modalFields?: string[] // Fields to show in modal (deprecated: use field_layout)
+  modalLayout?: any // Custom modal layout (deprecated: use field_layout)
+  fieldLayout?: any // Unified field layout (preferred)
   /** Optional: when provided, permission flags are applied in RecordModal/RecordPanel. */
   cascadeContext?: { pageConfig?: any; blockConfig?: any } | null
   appearance?: {
@@ -98,8 +99,8 @@ interface GridViewWrapperProps {
   rowHeightPixels?: number
   /** Conditional formatting rules */
   highlightRules?: HighlightRule[]
-  /** When provided, RecordModal can save modal layout (in-modal edit). */
-  onModalLayoutSave?: (modalLayout: import("@/lib/interface/types").BlockConfig["modal_layout"]) => void
+  /** When provided, RecordModal can save field layout (in-modal edit). */
+  onModalLayoutSave?: (fieldLayout: import("@/lib/interface/field-layout-utils").FieldLayoutItem[]) => void
   /** When true, show "Edit layout" in record modal. */
   canEditLayout?: boolean
   /** When true, modal opens directly in layout edit mode */
@@ -126,6 +127,7 @@ export default function GridViewWrapper({
   onRecordClick,
   modalFields,
   modalLayout,
+  fieldLayout,
   cascadeContext,
   appearance = {},
   permissions,
@@ -894,6 +896,7 @@ export default function GridViewWrapper({
           recordOpenStyle={appearance.record_open_style || 'side_panel'}
           modalFields={modalFields}
           modalLayout={modalLayout}
+          fieldLayout={fieldLayout}
           cascadeContext={cascadeContext}
           onTableFieldsRefresh={loadFields}
           reloadKey={reloadKey}

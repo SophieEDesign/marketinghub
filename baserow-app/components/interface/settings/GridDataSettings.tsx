@@ -316,38 +316,20 @@ export default function GridDataSettings({
           
           {/* Modal Layout - edited in-context from the record modal */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Modal Layout</Label>
-              {onOpenRecordForLayoutEdit && config.table_id && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    if (config.table_id) {
-                      await onOpenRecordForLayoutEdit(config.table_id)
-                    }
-                  }}
-                  className="gap-1.5"
-                >
-                  <LayoutGrid className="h-4 w-4" />
-                  Edit modal layout
-                </Button>
-              )}
+            <Label>Modal Layout</Label>
+            <div className="text-xs text-gray-500 p-3 bg-gray-50 rounded-md border border-gray-200">
+              <p className="font-medium mb-1">Edit layout in the record modal</p>
+              <p>Open a record and use &quot;Edit layout&quot; in the modal header to customize the layout. Drag and drop fields to reorder them, toggle visibility, and set editability. Changes save when you click Done.</p>
             </div>
-            <p className="text-xs text-gray-500 mt-0.5">
-              {onOpenRecordForLayoutEdit
-                ? "Click &quot;Edit modal layout&quot; to open a record and customize the layout. Drag and drop fields to reorder them."
-                : "Open a record to edit the modal layout. In the record modal, use &quot;Edit layout&quot; to reorder and add or remove fields. Changes save when you click Done."}
-            </p>
-            {config.modal_layout?.blocks && config.modal_layout.blocks.length > 0 && (
+            {((config as any).field_layout && (config as any).field_layout.length > 0) || (config.modal_layout?.blocks && config.modal_layout.blocks.length > 0) ? (
               <p className="text-xs text-gray-500">
-                Custom layout with {config.modal_layout.blocks.length} field{config.modal_layout.blocks.length !== 1 ? 's' : ''}
+                Custom layout configured
               </p>
-            )}
+            ) : null}
           </div>
         </div>
-      )}
+        )
+      })()}
 
       {/* Filters (optional) - For Table, Calendar, Kanban, Timeline, Gallery, and List views */}
       {(currentViewType === 'grid' || currentViewType === 'calendar' || currentViewType === 'kanban' || currentViewType === 'timeline' || currentViewType === 'gallery' || currentViewType === 'list') && config.table_id && fields.length > 0 && (
