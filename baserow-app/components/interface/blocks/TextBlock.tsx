@@ -518,25 +518,18 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   }, [editor, block.id, contentJson, getInitialContent])
 
   /**
-   * Initialize lastSavedContentRef when editor is first created
-   * CRITICAL: Only runs once per block ID
+   * Initialize lastSavedContentRef when editor is first created (no content set yet).
+   * CRITICAL: Do NOT set editorInitializedRef here - only the effect that calls setContent
+   * should set it. Otherwise onUpdate can fire before content is set, causing React #185.
    */
   useEffect(() => {
     if (editor && !editorInitializedRef.current && !isConfigLoading) {
-      // #region agent log
-      // Removed fetch instrumentation - using console.log instead
-      // #endregion
-      // Use cached config content string if available, otherwise stringify current content
       if (cachedConfigContentStrRef.current) {
         lastSavedContentRef.current = cachedConfigContentStrRef.current
       } else {
         const initialContent = editor.getJSON()
         lastSavedContentRef.current = JSON.stringify(initialContent)
       }
-      editorInitializedRef.current = true
-      // #region agent log
-      // Removed fetch instrumentation - using console.log instead
-      // #endregion
     }
   }, [editor, isConfigLoading, block.id])
 

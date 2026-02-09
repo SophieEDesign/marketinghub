@@ -70,22 +70,45 @@ function CalendarBlock({
     configSignature, // Use stable signature instead of JSON.stringify
   ])
 
-  return (
-    <GridBlock
-      block={calendarBlock}
-      isEditing={isEditing}
-      interfaceMode={interfaceMode}
-      pageTableId={pageTableId}
-      pageId={pageId}
-      filters={filters}
-      filterTree={filterTree}
-      onRecordClick={onRecordClick}
-      pageShowAddRecord={pageShowAddRecord}
-      onModalLayoutSave={onModalLayoutSave}
-      canEditLayout={canEditLayout}
-      isFullPage={isFullPage}
-    />
+  // Stable key so GridBlock/CalendarView don't re-mount or re-run effects when only callback/filterTree identity changes
+  const gridBlockKey = useMemo(
+    () => `calendar-${block.id}-${interfaceMode}-${pageId ?? ''}-${(filters?.length ?? 0)}`,
+    [block.id, interfaceMode, pageId, filters?.length]
   )
+
+  // Memoize props object to prevent React #185: avoid passing new object reference every render
+  const gridBlockProps = useMemo(
+    () => ({
+      block: calendarBlock,
+      isEditing,
+      interfaceMode,
+      pageTableId,
+      pageId,
+      filters: filters ?? [],
+      filterTree,
+      onRecordClick,
+      pageShowAddRecord,
+      onModalLayoutSave,
+      canEditLayout,
+      isFullPage,
+    }),
+    [
+      calendarBlock,
+      isEditing,
+      interfaceMode,
+      pageTableId,
+      pageId,
+      filters,
+      filterTree,
+      onRecordClick,
+      pageShowAddRecord,
+      onModalLayoutSave,
+      canEditLayout,
+      isFullPage,
+    ]
+  )
+
+  return <GridBlock key={gridBlockKey} {...gridBlockProps} />
 }
 
 export default React.memo(CalendarBlock)

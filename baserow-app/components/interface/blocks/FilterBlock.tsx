@@ -57,6 +57,8 @@ export default function FilterBlock({
 }: FilterBlockProps) {
   const { config } = block
   const { updateFilterBlock, removeFilterBlock, getAllFilterBlocks } = useFilterState()
+  const updateFilterBlockRef = useRef(updateFilterBlock)
+  updateFilterBlockRef.current = updateFilterBlock
   const [isModalOpen, setIsModalOpen] = useState(false)
   
   // Config: target blocks and allowed fields
@@ -251,19 +253,15 @@ export default function FilterBlock({
   }, [block.id, emittedFilters, effectiveTargetBlocks, config?.title])
 
   // Emit filter state to context whenever filters change.
-  // IMPORTANT: Do not remove the filter block on every update (effect cleanup runs on dependency changes),
-  // otherwise we can create remove/add loops that trigger "maximum update depth exceeded" in React.
-  // CRITICAL: Use emitSignature (stable JSON string) as the only dependency to prevent loops
-  // All other values are captured in the signature, so we don't need them as dependencies
+  // CRITICAL: Depend only on emitSignature and block.id to prevent React #185.
+  // Use ref for updateFilterBlock so context identity changes don't re-run this effect.
   useEffect(() => {
-    if (block.id) {
-      const blockTitle = config?.title || block.id
-      // Use requestAnimationFrame to defer update and prevent synchronous setState loops
-      requestAnimationFrame(() => {
-        updateFilterBlock(block.id, emittedFilters, effectiveTargetBlocks, blockTitle, filterTree, tableId)
-      })
-    }
-  }, [emitSignature, block.id, updateFilterBlock])
+    if (!block.id) return
+    const blockTitle = config?.title || block.id
+    requestAnimationFrame(() => {
+      updateFilterBlockRef.current(block.id, emittedFilters, effectiveTargetBlocks, blockTitle, filterTree, tableId)
+    })
+  }, [emitSignature, block.id])
 
   // Cleanup only on unmount / blockId change.
   useEffect(() => {

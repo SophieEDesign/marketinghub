@@ -820,13 +820,9 @@ export default function GridView({
   // Load column order and widths from grid_view_settings
   // NOTE: upstream props can be recreated each render (new array identities).
   // Use a stable "content key" to avoid an update loop (React error #185).
-  // CRITICAL: Cache the result to prevent recomputation on every render
+  // CRITICAL: Return ref when content unchanged so effect dependency is referentially stable
   const columnSettingsKeyRef = useRef<string>("")
   const columnSettingsKey = useMemo(() => {
-    // IMPORTANT: Make this key order-insensitive.
-    // Some upstream queries can return the same rows in different orders; if we bake that order into
-    // a key used by a setState effect, we can create an infinite render loop (React #185).
-    // CRITICAL: Use requestIdleCallback or defer heavy computations to prevent UI blocking
     const visible = Array.isArray(safeViewFields)
       ? safeViewFields
           .filter((f) => f && typeof f === 'object' && f.visible === true && typeof f.field_name === 'string')
@@ -850,10 +846,8 @@ export default function GridView({
       : []
 
     const key = JSON.stringify({ viewId, visible, fieldsMinimal })
-    // Only update ref if key actually changed
-    if (columnSettingsKeyRef.current !== key) {
-      columnSettingsKeyRef.current = key
-    }
+    if (columnSettingsKeyRef.current === key) return columnSettingsKeyRef.current
+    columnSettingsKeyRef.current = key
     return key
   }, [viewId, safeViewFields, safeTableFields])
 
@@ -2312,13 +2306,21 @@ export default function GridView({
               if (error.code === "42P01" || error.message?.includes("does not exist")) {
                 setTableError(`The table "${supabaseTableName}" does not exist in Supabase.`)
               } else if (error.code === "23502" || error.message?.includes("null value") || error.message?.includes("violates not-null constraint")) {
-                // PostgreSQL NOT NULL constraint violation
                 alert(`Cannot create record: Required fields must have values. Please fill in all required fields.`)
               } else {
                 alert(`Failed to create record: ${error.message || 'Unknown error'}`)
               }
             } else {
               await loadRows()
+              const newId = data?.id != null ? String(data.id) : null
+              if (newId) {
+                setSelectedRowId(newId)
+                requestAnimationFrame(() => {
+                  requestAnimationFrame(() => {
+                    document.querySelector(`[data-row-key="${newId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+                  })
+                })
+              }
             }
           })
           setShowRequiredFieldsConfirm(true)
@@ -2344,6 +2346,15 @@ export default function GridView({
         }
       } else {
         await loadRows()
+        const newId = data?.id != null ? String(data.id) : null
+        if (newId) {
+          setSelectedRowId(newId)
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              document.querySelector(`[data-row-key="${newId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+            })
+          })
+        }
         // Contract: creating a row must NOT auto-open the record.
         // User can open via the dedicated chevron (or optional row double-click).
       }
@@ -3411,7 +3422,7 @@ export default function GridView({
                       className={`border-b border-gray-100 transition-colors ${
                         thisRowId && selectedRowId === thisRowId ? 'bg-blue-50' : 'hover:bg-gray-50/50'
                       } cursor-default`}
-                      style={{ ...borderColor, ...rowFormattingStyleGrouped, height: `${thisRowHeight}px`, minHeight: `${thisRowHeight}px`, maxHeight: `${thisRowHeight}px` }}
+                      style={{ ...borderColor, ...rowFormattingStyleGrouped, height: `${thisRowHeight}px`, minHeight: `${thisRowHeight}px`, maxHeight: `${thisRowHeight}px`, transition: 'height 0.15s ease' }}
                       data-rowid="true"
                       data-row-key={thisRowId || ''}
                       onClick={thisRowId ? () => handleRowSelect(thisRowId) : undefined}
@@ -3616,7 +3627,7 @@ export default function GridView({
                     className={`border-b border-gray-100 transition-colors ${
                       thisRowId && selectedRowId === thisRowId ? 'bg-blue-50' : 'hover:bg-gray-50/50'
                     } cursor-default`}
-                    style={{ ...borderColor, ...rowFormattingStyle, height: `${thisRowHeight}px`, minHeight: `${thisRowHeight}px`, maxHeight: `${thisRowHeight}px` }}
+                    style={{ ...borderColor, ...rowFormattingStyle, height: `${thisRowHeight}px`, minHeight: `${thisRowHeight}px`, maxHeight: `${thisRowHeight}px`, transition: 'height 0.15s ease' }}
                     data-rowid="true"
                     data-row-key={thisRowId || ''}
                     onClick={thisRowId ? () => handleRowSelect(thisRowId) : undefined}

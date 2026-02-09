@@ -79,6 +79,8 @@ function InterfacePageClientInternal({
   // Track previous pageId to reset blocks when page changes
   // CRITICAL: Use ref to track actual pageId changes, not effect dependencies
   const previousPageIdRef = useRef<string | null>(null)
+  // Track route pageId so we can reset and refetch when user navigates to a different page
+  const previousRoutePageIdRef = useRef<string | null>(null)
   
   // CRITICAL: Track if blocks have been loaded to prevent overwrites
   // Track both the loaded state and the pageId to ensure we reset when page changes
@@ -172,6 +174,22 @@ function InterfacePageClientInternal({
     
     resolveTableId()
   }, [page?.id, page?.base_table, page?.saved_view_id])
+
+  // CRITICAL: When route pageId changes (navigation), reset page state so we refetch and remount
+  useEffect(() => {
+    if (previousRoutePageIdRef.current !== null && previousRoutePageIdRef.current !== pageId) {
+      setPage(null)
+      setBlocks([])
+      setLoading(false)
+      pageLoadedRef.current = false
+      initialPageRef.current = null // so loadPage() runs for the new page
+      blocksLoadedRef.current = { pageId: null, loaded: false }
+      previousPageIdRef.current = null
+      exitPageEdit()
+      exitBlockEdit()
+    }
+    previousRoutePageIdRef.current = pageId
+  }, [pageId, exitPageEdit, exitBlockEdit])
 
   useEffect(() => {
     // CRITICAL: Only load if we don't have initial page and haven't loaded yet
@@ -1302,23 +1320,18 @@ function InterfacePageClientInternal({
             </div>
           </div>
         ) : page ? (
-          // CRITICAL: Show loading only while blocks are actively loading
-          // Once loading completes (even if empty or on error), render InterfaceBuilder
-          // Empty blocks is a valid state - a page might have no blocks yet
-          // We should always attempt to render InterfaceBuilder after loading completes
-          blocksLoading ? (
+          // CRITICAL: Remount key = pageId so navigation resets all content state (no stale blocks/edit mode)
+          <div key={pageId} className="h-full w-full min-w-0 min-h-0 flex flex-col overflow-hidden">
+          {blocksLoading ? (
             <div className="h-full flex items-center justify-center">
               <LoadingSpinner size="lg" text="Loading blocks..." />
             </div>
           ) : (
-            // CRITICAL: Always render the same component tree to prevent remounts
             // Record Review pages use RecordReviewPage wrapper (fixed left + right canvas)
             // Content pages use InterfaceBuilder directly with full-width wrapper
-            // But both must use stable keys based ONLY on page.id
-            // Mode, isViewer, recordId must NEVER be in keys
             useRecordReviewLayout ? (
               <RecordReviewPage
-                key={page.id} // CRITICAL: ONLY page.id - never include mode, isViewer, or recordId
+                key={page.id}
                 page={page as any}
                 initialBlocks={memoizedBlocks}
                 isViewer={isViewer || !isBlockEditing}
@@ -1370,7 +1383,8 @@ function InterfacePageClientInternal({
                 </div>
               ) : null
             )
-          )
+          }
+          </div>
         ) : null}
       </div>
 

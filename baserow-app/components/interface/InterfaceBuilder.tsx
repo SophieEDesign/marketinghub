@@ -1561,6 +1561,7 @@ export default function InterfaceBuilder({
               </div>
             ) : (
             <Canvas
+              key={`${page.id}-${interfaceMode}`}
               blocks={blocks}
               isEditing={effectiveIsEditing}
               interfaceMode={interfaceMode}
