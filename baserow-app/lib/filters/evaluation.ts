@@ -10,7 +10,10 @@
 
 import type { FilterTree, FilterGroup, FilterCondition } from './canonical-model'
 import { normalizeFilterTree } from './canonical-model'
-import type { TableField } from '@/types/fields'
+import type { TableField, LinkedField } from '@/types/fields'
+import { createClient } from '@/lib/supabase/client'
+import { getDisplayFieldNameForLinkedTable } from '@/lib/dataView/linkedFields'
+import type { TargetTableRow, TargetFieldRow } from '@/lib/dataView/linkedFields'
 
 type RelativeDateValue = {
   type: 'relative_date'
@@ -222,6 +225,73 @@ function conditionToSupabaseString(condition: FilterCondition): string {
 }
 
 /**
+ * Resolve a filter value for linked fields - convert label to ID if needed
+ */
+async function resolveLinkedFieldFilterValue(
+  field: LinkedField,
+  value: any
+): Promise<any> {
+  if (!value || typeof value !== 'string') return value
+  
+  const linkedTableId = field.options?.linked_table_id
+  if (!linkedTableId) return value
+  
+  // Check if value is already a UUID (ID)
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (UUID_RE.test(value)) {
+    return value // Already an ID
+  }
+  
+  // Value is a label, need to resolve to ID
+  const supabase = createClient()
+  
+  const { data: targetTable, error: tableError } = await supabase
+    .from('tables')
+    .select('supabase_table, primary_field_name')
+    .eq('id', linkedTableId)
+    .single()
+  
+  if (tableError || !targetTable) {
+    return value // Fallback to original value
+  }
+  
+  const { data: targetFields } = await supabase
+    .from('table_fields')
+    .select('id, name, type')
+    .eq('table_id', linkedTableId)
+    .order('position', { ascending: true })
+  
+  const fieldRows: TargetFieldRow[] = Array.isArray(targetFields) ? targetFields : []
+  const tableRow: TargetTableRow = {
+    supabase_table: targetTable.supabase_table,
+    primary_field_name: targetTable.primary_field_name ?? null,
+  }
+  
+  const displayFieldName = getDisplayFieldNameForLinkedTable({
+    targetTable: tableRow,
+    targetFields: fieldRows.length > 0 ? fieldRows : null,
+    linkedFieldId: field.options?.linked_field_id ?? null,
+  })
+  
+  if (!displayFieldName) {
+    return value // Can't resolve without display field
+  }
+  
+  // Search for record with matching label
+  const { data: records, error: recordsError } = await supabase
+    .from(targetTable.supabase_table)
+    .select(`id, ${displayFieldName}`)
+    .ilike(displayFieldName, value)
+    .limit(1)
+  
+  if (recordsError || !records || records.length === 0) {
+    return value // Not found, return original
+  }
+  
+  return records[0]?.id || value
+}
+
+/**
  * Apply a single filter condition to a Supabase query
  * Field-aware: Handles different field types correctly
  */
@@ -248,6 +318,9 @@ function applyCondition(
         // Checkbox: convert boolean to string for Supabase
         return query.eq(fieldName, value === true || value === 'true')
       }
+      // For linked fields, ensure we're comparing IDs, not labels
+      // Note: This is synchronous, so we can't resolve labels here
+      // The filter value should already be an ID when set via LookupFieldPicker
       return query.eq(fieldName, value)
       
     case 'not_equal':
@@ -263,13 +336,29 @@ function applyCondition(
     case 'is_any_of': {
       const arr = Array.isArray(value) ? value : value != null ? [value] : []
       if (arr.length === 0) return query
-      return query.in(fieldName, arr)
+      // For linked fields, values should already be IDs (set via LookupFieldPicker)
+      // Handle comma-separated string from LookupFieldPicker
+      const ids = arr.flatMap(v => {
+        if (typeof v === 'string' && v.includes(',')) {
+          return v.split(',').map(id => id.trim()).filter(Boolean)
+        }
+        return [v]
+      })
+      return query.in(fieldName, ids)
     }
 
     case 'is_not_any_of': {
       const arr = Array.isArray(value) ? value : value != null ? [value] : []
       if (arr.length === 0) return query
-      return query.not(fieldName, 'in', arr)
+      // For linked fields, values should already be IDs (set via LookupFieldPicker)
+      // Handle comma-separated string from LookupFieldPicker
+      const ids = arr.flatMap(v => {
+        if (typeof v === 'string' && v.includes(',')) {
+          return v.split(',').map(id => id.trim()).filter(Boolean)
+        }
+        return [v]
+      })
+      return query.not(fieldName, 'in', ids)
     }
       
     case 'contains':
@@ -541,17 +630,42 @@ export function evaluateFilterTree(
 
     switch (operator) {
       case 'equal':
+        // For linked fields, compare IDs (stored value is ID, filter value should be ID)
         return String(fieldValue) === String(value)
       case 'not_equal':
         return String(fieldValue) !== String(value)
       case 'is_any_of': {
-        const arr = Array.isArray(value) ? value : value != null ? [value] : []
+        // Handle comma-separated string from LookupFieldPicker
+        let arr: any[] = Array.isArray(value) ? value : value != null ? [value] : []
+        // Split comma-separated values
+        arr = arr.flatMap(v => {
+          if (typeof v === 'string' && v.includes(',')) {
+            return v.split(',').map(id => id.trim()).filter(Boolean)
+          }
+          return [v]
+        })
         const fv = fieldValue != null ? String(fieldValue) : ''
+        // For linked fields, fieldValue is an ID (or array of IDs), compare with filter IDs
+        if (Array.isArray(fieldValue)) {
+          return arr.some((v: unknown) => fieldValue.includes(String(v)))
+        }
         return arr.some((v: unknown) => String(v) === fv)
       }
       case 'is_not_any_of': {
-        const arr = Array.isArray(value) ? value : value != null ? [value] : []
+        // Handle comma-separated string from LookupFieldPicker
+        let arr: any[] = Array.isArray(value) ? value : value != null ? [value] : []
+        // Split comma-separated values
+        arr = arr.flatMap(v => {
+          if (typeof v === 'string' && v.includes(',')) {
+            return v.split(',').map(id => id.trim()).filter(Boolean)
+          }
+          return [v]
+        })
         const fv = fieldValue != null ? String(fieldValue) : ''
+        // For linked fields, fieldValue is an ID (or array of IDs), compare with filter IDs
+        if (Array.isArray(fieldValue)) {
+          return !arr.some((v: unknown) => fieldValue.includes(String(v)))
+        }
         return !arr.some((v: unknown) => String(v) === fv)
       }
       case 'contains':

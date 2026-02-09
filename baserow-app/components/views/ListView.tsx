@@ -318,7 +318,7 @@ export default function ListView({
         // Apply client-side sorting if needed (for select fields that sort by sort_index)
         let rowsData = data || []
         if (needsClientSideSort && sorts.length > 0) {
-          rowsData = sortRowsByFieldType(
+          rowsData = await sortRowsByFieldType(
             rowsData,
             sorts.map(s => ({ field_name: s.field_name, direction: s.direction as 'asc' | 'desc' })),
             tableFields

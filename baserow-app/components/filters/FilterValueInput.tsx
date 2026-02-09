@@ -17,6 +17,8 @@ import {
   normalizeHexColor,
 } from "@/lib/field-colors"
 import { getManualChoiceLabels } from "@/lib/fields/select-options"
+import LookupFieldPicker from "@/components/fields/LookupFieldPicker"
+import type { LookupFieldConfig } from "@/components/fields/LookupFieldPicker"
 
 interface FilterValueInputProps {
   field: TableField | null
@@ -381,8 +383,35 @@ export default function FilterValueInput({
     )
   }
 
-  // Linked fields: Show placeholder (record picker to be implemented)
+  // Linked fields: Use LookupFieldPicker
   if (field.type === 'link_to_table') {
+    const linkedTableId = (field.options as any)?.linked_table_id
+    if (linkedTableId) {
+      const lookupConfig: LookupFieldConfig = {
+        lookupTableId: linkedTableId,
+        relationshipType: (field.options as any)?.relationship_type || 'one-to-many',
+        maxSelections: (field.options as any)?.max_selections,
+      }
+      
+      // Parse comma-separated IDs back to array for LookupFieldPicker
+      const pickerValue = typeof value === 'string' && value.includes(',')
+        ? value.split(',').map(id => id.trim()).filter(Boolean)
+        : value || null
+      
+      return (
+        <LookupFieldPicker
+          field={field as any}
+          value={pickerValue}
+          onChange={(val) => {
+            // Store IDs (comma-separated for multi-select)
+            const stringValue = Array.isArray(val) ? val.join(',') : (val || '')
+            onChange(stringValue)
+          }}
+          config={lookupConfig}
+          placeholder={placeholder}
+        />
+      )
+    }
     return (
       <div className={`${controlHeight} flex items-center text-xs text-gray-400 px-3 border border-gray-300 rounded-md ${className}`}>
         Record picker (coming soon)

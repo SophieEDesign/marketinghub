@@ -195,7 +195,7 @@ export default function AirtableKanbanView({
         
         // Apply client-side sorting if needed
         if (needsClientSideSort && viewSorts.length > 0) {
-          rowsData = sortRowsByFieldType(
+          rowsData = await sortRowsByFieldType(
             rowsData,
             viewSorts.map(s => ({ field_name: s.field_name, direction: s.direction as 'asc' | 'desc' })),
             tableFields

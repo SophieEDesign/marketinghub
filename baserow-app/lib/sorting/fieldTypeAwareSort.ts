@@ -8,8 +8,10 @@
  * - Other types: Standard sorting
  */
 
-import type { TableField } from '@/types/fields'
+import type { TableField, LinkedField } from '@/types/fields'
 import { normalizeSelectOptionsForUi } from '@/lib/fields/select-options'
+import { resolveLinkedFieldDisplayMap } from '@/lib/dataView/linkedFields'
+import { linkedValueToIds } from '@/lib/dataView/linkedFields'
 
 export interface ViewSort {
   field_name: string
@@ -27,16 +29,40 @@ function findFieldByName(tableFields: TableField[], fieldName: string): TableFie
 
 /**
  * Sort rows based on field type
+ * Always returns a Promise for consistency (resolves immediately for sync cases)
  */
-export function sortRowsByFieldType(
+export async function sortRowsByFieldType(
   rows: Record<string, any>[],
   sorts: ViewSort[],
   tableFields: TableField[]
-): Record<string, any>[] {
+): Promise<Record<string, any>[]> {
   if (!sorts || sorts.length === 0) {
     return rows
   }
 
+  // Check if any sort requires async resolution (linked/lookup fields)
+  const needsAsync = sorts.some(sort => {
+    const field = findFieldByName(tableFields, sort.field_name)
+    return field && (field.type === 'link_to_table' || field.type === 'lookup')
+  })
+
+  if (needsAsync) {
+    // Async sorting for linked/lookup fields
+    return sortRowsByFieldTypeAsync(rows, sorts, tableFields)
+  }
+
+  // Synchronous sorting for non-linked fields (wrap in Promise for consistency)
+  return Promise.resolve(sortRowsByFieldTypeSync(rows, sorts, tableFields))
+}
+
+/**
+ * Synchronous sorting (for non-linked fields)
+ */
+function sortRowsByFieldTypeSync(
+  rows: Record<string, any>[],
+  sorts: ViewSort[],
+  tableFields: TableField[]
+): Record<string, any>[] {
   // Create a copy to avoid mutating the original
   let sortedRows = [...rows]
 
@@ -81,13 +107,79 @@ export function sortRowsByFieldType(
 }
 
 /**
+ * Async sorting (for linked/lookup fields that need label resolution)
+ */
+async function sortRowsByFieldTypeAsync(
+  rows: Record<string, any>[],
+  sorts: ViewSort[],
+  tableFields: TableField[]
+): Promise<Record<string, any>[]> {
+  // Create a copy to avoid mutating the original
+  let sortedRows = [...rows]
+
+  // Sort the sorts by order_index if available
+  const sortedSorts = [...sorts].sort((a, b) => {
+    const aOrder = (a as any).order_index ?? 0
+    const bOrder = (b as any).order_index ?? 0
+    return aOrder - bOrder
+  })
+
+  // Apply sorts in reverse order
+  for (let i = sortedSorts.length - 1; i >= 0; i--) {
+    const sort = sortedSorts[i]
+    const field = findFieldByName(tableFields, sort.field_name)
+
+    if (!field) {
+      continue
+    }
+
+    // Pre-resolve labels for linked fields
+    let labelMap: Map<string, string> | null = null
+    if (field.type === 'link_to_table') {
+      const linkedField = field as LinkedField
+      const allIds = new Set<string>()
+      for (const row of sortedRows) {
+        const key = Object.prototype.hasOwnProperty.call(row, sort.field_name)
+          ? sort.field_name
+          : field.name
+        const fieldValue = (row as any)[key]
+        const ids = linkedValueToIds(fieldValue)
+        ids.forEach(id => allIds.add(id))
+      }
+      if (allIds.size > 0) {
+        labelMap = await resolveLinkedFieldDisplayMap(linkedField, Array.from(allIds))
+      }
+    }
+
+    sortedRows = sortedRows.sort((a, b) => {
+      const key =
+        Object.prototype.hasOwnProperty.call(a, sort.field_name) ||
+        Object.prototype.hasOwnProperty.call(b, sort.field_name)
+          ? sort.field_name
+          : field.name
+      const comparison = compareValues(
+        (a as any)[key],
+        (b as any)[key],
+        field,
+        sort.direction === 'asc',
+        labelMap
+      )
+      return comparison !== 0 ? comparison : 0
+    })
+  }
+
+  return sortedRows
+}
+
+/**
  * Compare two values based on field type
  */
 function compareValues(
   a: any,
   b: any,
   field: TableField,
-  ascending: boolean
+  ascending: boolean,
+  labelMap?: Map<string, string> | null
 ): number {
   const multiplier = ascending ? 1 : -1
 
@@ -98,6 +190,28 @@ function compareValues(
   }
   if (b === null || b === undefined) {
     return -1 // b is null, a is not - b always goes after (end)
+  }
+
+  // Handle linked fields - sort by display labels, not IDs
+  if (field.type === 'link_to_table' && labelMap) {
+    const linkedField = field as LinkedField
+    const getLabel = (value: any): string => {
+      if (!value) return ''
+      const ids = linkedValueToIds(value)
+      if (ids.length === 0) return ''
+      // Get first ID's label (for multi-link, sort by first linked record)
+      const firstId = ids[0]
+      return labelMap!.get(firstId) || firstId
+    }
+    const aLabel = getLabel(a)
+    const bLabel = getLabel(b)
+    return aLabel.localeCompare(bLabel) * multiplier
+  }
+
+  // Handle lookup fields - sort by computed value (already resolved)
+  if (field.type === 'lookup') {
+    // Lookup fields are computed values, sort as strings
+    return String(a).localeCompare(String(b)) * multiplier
   }
 
   switch (field.type) {
@@ -204,11 +318,13 @@ function compareValues(
 export function requiresClientSideSorting(fieldType: string): boolean {
   // Virtual fields don't exist as physical DB columns (must sort after computing/expanding).
   // Selects also need client-side sorting to respect choice order / first multi value.
+  // Linked fields need client-side sorting to sort by display labels, not IDs.
   return (
     fieldType === 'single_select' ||
     fieldType === 'multi_select' ||
     fieldType === 'formula' ||
-    fieldType === 'lookup'
+    fieldType === 'lookup' ||
+    fieldType === 'link_to_table'
   )
 }
 

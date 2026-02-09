@@ -1825,11 +1825,11 @@ export default function GridView({
             loadBackoffRef.current = { nextAllowedAt: 0, delayMs: 0 }
             retryAttemptsRef.current.delete(supabaseTableName)
             if (retryNeedsClientSideSort && filteredRetrySorts.length > 0) {
-              dataArray = sortRowsByFieldType(
+              dataArray = (await sortRowsByFieldType(
                 dataArray,
                 filteredRetrySorts.map(s => ({ field_name: s.field_name, direction: s.direction as 'asc' | 'desc', order_index: s.order_index })),
                 safeTableFields
-              ).slice(0, ITEMS_PER_PAGE)
+              )).slice(0, ITEMS_PER_PAGE)
             }
             setRows(dataArray)
             setLoading(false)
@@ -2009,7 +2009,7 @@ export default function GridView({
         
         // Apply client-side sorting if needed (for single_select by order, multi_select by first value)
         if (needsClientSideSort && safeViewSorts.length > 0) {
-          computedRows = sortRowsByFieldType(
+          computedRows = await sortRowsByFieldType(
             computedRows,
             safeViewSorts.map(s => ({ field_name: s.field_name, direction: s.direction as 'asc' | 'desc', order_index: s.order_index })),
             safeTableFields
