@@ -284,11 +284,13 @@ async function resolveLinkedFieldFilterValue(
     .ilike(displayFieldName, value)
     .limit(1)
   
-  if (recordsError || !records || records.length === 0) {
+  if (recordsError || !records || !Array.isArray(records) || records.length === 0) {
     return value // Not found, return original
   }
   
-  return records[0]?.id || value
+  const record = records[0] as Record<string, unknown> | null
+  const recordId = record?.id as string | undefined
+  return recordId || value
 }
 
 /**
