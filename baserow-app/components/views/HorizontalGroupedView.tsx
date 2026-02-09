@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
 import type { TableField } from "@/types/fields"
-import { applyFiltersToQuery, type FilterConfig } from "@/lib/interface/filters"
+import { applyFiltersToQuery, stripFilterBlockFilters, type FilterConfig } from "@/lib/interface/filters"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { buildGroupTree } from "@/lib/grouping/groupTree"
 import type { GroupRule } from "@/lib/grouping/types"
@@ -105,9 +105,22 @@ export default function HorizontalGroupedView({
         const supabase = createClient()
         let query = supabase.from(supabaseTableName).select("*")
 
-        // Apply filters
-        if (filters.length > 0) {
-          query = applyFiltersToQuery(query, filters, tableFields)
+        // Apply filter tree first (supports groups/OR), then apply remaining flat filters
+        const normalizedFields = (Array.isArray(tableFields) ? tableFields : []).map((f: any) => ({
+          name: f.name || f.field_name || f.id || f.field_id,
+          id: f.id || f.field_id,
+          type: f.type || f.field_type,
+          options: f.options || f.field_options,
+        }))
+        
+        if (filterTree) {
+          query = applyFiltersToQuery(query, filterTree, normalizedFields)
+        }
+        
+        // Apply remaining filters (after stripping filter block filters if filterTree exists)
+        const baseFilters = filterTree ? stripFilterBlockFilters(filters || []) : (filters || [])
+        if (baseFilters.length > 0) {
+          query = applyFiltersToQuery(query, baseFilters, normalizedFields)
         }
 
         // Apply sorts
@@ -746,16 +759,57 @@ export default function HorizontalGroupedView({
                             onBlockUpdate={
                               canEditThisRecord
                                 ? (blockId, config) => {
+                                    // Find the block being updated to get its field_name
+                                    const updatedBlock = displayBlocks.find(b => b.id === blockId)
+                                    const fieldName = updatedBlock?.config?.field_name
+                                    
+                                    // Deep merge config, especially appearance settings
+                                    const mergeConfig = (existingConfig: any, newConfig: any) => {
+                                      const merged = { ...existingConfig, ...newConfig }
+                                      // Deep merge appearance if both exist
+                                      if (existingConfig?.appearance && newConfig?.appearance) {
+                                        merged.appearance = {
+                                          ...existingConfig.appearance,
+                                          ...newConfig.appearance,
+                                        }
+                                      }
+                                      return merged
+                                    }
+                                    
+                                    if (!fieldName) {
+                                      // Fallback to ID matching if no field_name
+                                      setCurrentBlocks((prev) =>
+                                        prev.map((b) =>
+                                          b.id === blockId ? { ...b, config: mergeConfig(b.config || {}, config) } : b
+                                        )
+                                      )
+                                      setLayoutTemplate((prev) =>
+                                        prev
+                                          ? prev.map((b) =>
+                                              b.id === blockId ? { ...b, config: mergeConfig(b.config || {}, config) } : b
+                                            )
+                                          : null
+                                      )
+                                      return
+                                    }
+                                    
+                                    // Update currentBlocks by blockId (for the specific record)
                                     setCurrentBlocks((prev) =>
                                       prev.map((b) =>
-                                        b.id === blockId ? { ...b, config: { ...b.config, ...config } } : b
+                                        b.id === blockId ? { ...b, config: mergeConfig(b.config || {}, config) } : b
                                       )
                                     )
+                                    
+                                    // Update layoutTemplate by field_name (so all records get the update)
                                     setLayoutTemplate((prev) =>
                                       prev
-                                        ? prev.map((b) =>
-                                            b.id === blockId ? { ...b, config: { ...b.config, ...config } } : b
-                                          )
+                                        ? prev.map((b) => {
+                                            const blockFieldName = b.config?.field_name
+                                            if (blockFieldName === fieldName) {
+                                              return { ...b, config: mergeConfig(b.config || {}, config) }
+                                            }
+                                            return b
+                                          })
                                         : null
                                     )
                                   }

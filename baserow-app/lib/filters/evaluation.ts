@@ -288,7 +288,7 @@ async function resolveLinkedFieldFilterValue(
     return value // Not found, return original
   }
   
-  const record = records[0] as Record<string, unknown> | null
+  const record = records[0] as unknown as Record<string, unknown> | null
   const recordId = record?.id as string | undefined
   return recordId || value
 }
