@@ -5,6 +5,7 @@ import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
 import { ArrowUp, ArrowDown, Lock, Unlock } from "lucide-react"
 import type { PageBlock, BlockConfig } from "@/lib/interface/types"
+import { DATA_VIEW_BLOCK_TYPES } from "@/lib/interface/types"
 import PermissionsSettings from "./PermissionsSettings"
 
 interface AdvancedSettingsProps {
@@ -26,7 +27,8 @@ export default function AdvancedSettings({
 }: AdvancedSettingsProps) {
   const isLocked = config.locked || false
 
-  // Show permissions for all data blocks that support records
+  // Show permissions for data blocks that support records, except data-view blocks
+  // (list, grid, gallery, kanban, calendar, timeline) which get Permissions in the Data tab
   const dataBlockTypes = [
     'grid',
     'list',
@@ -39,7 +41,8 @@ export default function AdvancedSettings({
     'form',
     'record',
   ]
-  const showPermissions = dataBlockTypes.includes(block.type)
+  const showPermissions =
+    dataBlockTypes.includes(block.type) && !DATA_VIEW_BLOCK_TYPES.includes(block.type)
 
   return (
     <div className="space-y-6">

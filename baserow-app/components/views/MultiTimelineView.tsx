@@ -79,6 +79,8 @@ interface MultiTimelineViewProps {
   isEditing?: boolean
   onRecordClick?: (recordId: string, tableId?: string) => void
   pageShowAddRecord?: boolean
+  /** Interface mode: 'view' | 'edit'. When 'edit', record panel opens editable (Airtable-style). */
+  interfaceMode?: 'view' | 'edit'
 }
 
 const SOURCE_COLORS = [
@@ -154,6 +156,7 @@ export default function MultiTimelineView({
   isEditing = false,
   onRecordClick,
   pageShowAddRecord = false,
+  interfaceMode = 'view',
 }: MultiTimelineViewProps) {
   const supabase = useMemo(() => createClient(), [])
   const { openRecord } = useRecordPanel()
@@ -832,7 +835,7 @@ export default function MultiTimelineView({
                             onRecordClick(ev.rowId, ev.tableId)
                             return
                           }
-                          openRecord(ev.tableId, ev.rowId, ev.supabaseTableName, (blockConfig as any)?.modal_fields)
+                          openRecord(ev.tableId, ev.rowId, ev.supabaseTableName, (blockConfig as any)?.modal_fields, (blockConfig as any)?.modal_layout, blockConfig ? { blockConfig } : undefined, interfaceMode)
                         }}
                         onMouseDown={(e) => {
                           if (!canDrag) return

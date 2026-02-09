@@ -86,7 +86,7 @@ export default function RecordModal({
   // P1 FIX: interfaceMode === 'edit' is ABSOLUTE - no manual overrides allowed
   // When interfaceMode === 'edit', editing is forced (derived value, cannot be disabled)
   // When interfaceMode === 'view', allow manual toggle via state
-  const forcedEditMode = resolveRecordEditMode({ interfaceMode, initialEditMode, canEditLayout })
+  const forcedEditMode = resolveRecordEditMode({ interfaceMode, initialEditMode })
   const [manualEditMode, setManualEditMode] = useState(false)
   
   // P1 FIX: When forcedEditMode is true, ignore manualEditMode (no hybrid states)
@@ -283,22 +283,20 @@ export default function RecordModal({
   // When interfaceMode === 'edit', modal is already in edit mode, so hide the button
   const showEditLayoutButton = interfaceMode !== 'edit' && canEditLayout && Boolean(onLayoutSave) && Boolean(recordId) && !isEditingLayout
 
-  // CRITICAL: Initialize draftFieldLayout when entering edit mode
-  // When interfaceMode === 'edit', ALWAYS initialize layout (even if empty)
+  // CRITICAL: Initialize draftFieldLayout when entering edit mode.
+  // Only initialise after table fields are available (never with empty field list due to loading).
   useEffect(() => {
     if (!open) return
     
     if (isEditingLayout && draftFieldLayout === null) {
-      // If there's an existing layout, use it; otherwise create initial layout
       if (resolvedFieldLayout.length > 0) {
         setDraftFieldLayout([...resolvedFieldLayout])
       } else if (filteredFields.length > 0) {
-        // CRITICAL: When interfaceMode === 'edit', initialize layout even if empty
-        // This allows editing layout from scratch
+        // Table fields loaded; create initial layout from full field list
         setDraftFieldLayout(createInitialFieldLayout(filteredFields, 'modal', true))
       }
+      // When filteredFields.length === 0 (still loading), do not set draft; effect will re-run when fields load
     } else if (!isEditingLayout && draftFieldLayout !== null) {
-      // Clear draft when exiting edit mode
       setDraftFieldLayout(null)
     }
   }, [open, isEditingLayout, resolvedFieldLayout, draftFieldLayout, filteredFields])
@@ -455,6 +453,7 @@ export default function RecordModal({
                       onFieldChange={handleFieldChange}
                       pageEditable={effectiveEditable}
                       mode="modal"
+                      interfaceMode={interfaceMode}
                     />
                   </div>
                 </>

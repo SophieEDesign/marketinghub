@@ -1,11 +1,14 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { X, Save, Check } from "lucide-react"
+import { X, Save, Check, ArrowUp, ArrowDown } from "lucide-react"
 import type { PageBlock, BlockConfig, BlockType } from "@/lib/interface/types"
+import { DATA_VIEW_BLOCK_TYPES } from "@/lib/interface/types"
 import type { Table, View, TableField } from "@/types/database"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/components/ui/use-toast"
 
@@ -394,6 +397,7 @@ export default function SettingsPanel({
   }
 
   const blockTypeLabel = block ? BLOCK_REGISTRY[block.type]?.label || block.type : ''
+  const isDataViewBlock = block && DATA_VIEW_BLOCK_TYPES.includes(block.type)
 
   return (
     <div className="fixed inset-y-0 right-0 w-96 bg-white border-l border-gray-200 shadow-xl z-50 flex flex-col">
@@ -415,67 +419,106 @@ export default function SettingsPanel({
         </div>
       </div>
 
-      {/* Tabs - All blocks have three tabs */}
-      <Tabs defaultValue="data" className="flex-1 flex flex-col overflow-hidden">
-        <TabsList className="grid w-full grid-cols-3 border-b border-gray-200 rounded-none h-auto">
-          <TabsTrigger value="data" className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600">
-            Data
-          </TabsTrigger>
-          <TabsTrigger value="appearance" className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600">
-            Appearance
-          </TabsTrigger>
-          <TabsTrigger value="advanced" className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600">
-            Advanced
-          </TabsTrigger>
-        </TabsList>
+      {/* Tabs - Data-view blocks (list, grid, gallery, kanban, calendar, timeline) have two tabs only; others have three */}
+      {(() => {
+        const tabCount = isDataViewBlock ? 2 : 3
+        return (
+          <Tabs defaultValue="data" className="flex-1 flex flex-col overflow-hidden">
+            <TabsList className={`grid w-full border-b border-gray-200 rounded-none h-auto ${tabCount === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+              <TabsTrigger value="data" className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600">
+                Data
+              </TabsTrigger>
+              <TabsTrigger value="appearance" className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600">
+                Appearance
+              </TabsTrigger>
+              {!isDataViewBlock && (
+                <TabsTrigger value="advanced" className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600">
+                  Advanced
+                </TabsTrigger>
+              )}
+            </TabsList>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-6">
-          {/* Validation Errors */}
-          {validationErrors.length > 0 && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-              <p className="text-sm font-semibold text-red-800 mb-1">Configuration Errors</p>
-              <ul className="text-xs text-red-700 list-disc list-inside space-y-1">
-                {validationErrors.map((error, idx) => (
-                  <li key={idx}>{error}</li>
-                ))}
-              </ul>
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-6">
+              {/* Validation Errors */}
+              {validationErrors.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                  <p className="text-sm font-semibold text-red-800 mb-1">Configuration Errors</p>
+                  <ul className="text-xs text-red-700 list-disc list-inside space-y-1">
+                    {validationErrors.map((error, idx) => (
+                      <li key={idx}>{error}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <TabsContent value="data" className="mt-0 space-y-6">
+                {renderDataSettings()}
+                {block && BLOCK_REGISTRY[block.type]?.supportsFullPage && (
+                  <FullPageLayoutSettings
+                    block={block}
+                    allBlocks={allBlocks}
+                    draftConfig={config}
+                    onUpdate={updateConfig}
+                    onApplyImmediate={(updates) => {
+                      const merged = { ...(block.config ?? {}), ...config, ...updates }
+                      onSave(block.id, merged)
+                      setConfig(merged)
+                    }}
+                  />
+                )}
+                {isDataViewBlock && (onMoveToTop || onMoveToBottom || onLock) && (
+                  <div className="border-t border-gray-200 pt-4 space-y-4">
+                    <h3 className="text-sm font-semibold text-gray-900">Block actions</h3>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm text-gray-700">Lock block</Label>
+                      <Switch
+                        checked={!!config.locked}
+                        onCheckedChange={(checked) => {
+                          updateConfig({ locked: checked })
+                          onLock?.(block!.id, checked)
+                        }}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500">Prevent editing in view mode</p>
+                    <div className="flex flex-col gap-2">
+                      {onMoveToTop && (
+                        <Button variant="outline" size="sm" onClick={() => onMoveToTop(block!.id)} className="justify-start">
+                          <ArrowUp className="h-4 w-4 mr-2" />
+                          Move to top
+                        </Button>
+                      )}
+                      {onMoveToBottom && (
+                        <Button variant="outline" size="sm" onClick={() => onMoveToBottom(block!.id)} className="justify-start">
+                          <ArrowDown className="h-4 w-4 mr-2" />
+                          Move to bottom
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="appearance" className="mt-0 space-y-6">
+                {renderAppearanceSettings()}
+              </TabsContent>
+
+              {!isDataViewBlock && (
+                <TabsContent value="advanced" className="mt-0 space-y-6">
+                  <AdvancedSettings
+                    block={block}
+                    config={config}
+                    onUpdate={updateConfig}
+                    onMoveToTop={onMoveToTop}
+                    onMoveToBottom={onMoveToBottom}
+                    onLock={onLock}
+                  />
+                </TabsContent>
+              )}
             </div>
-          )}
-          
-          <TabsContent value="data" className="mt-0 space-y-6">
-            {renderDataSettings()}
-            {block && BLOCK_REGISTRY[block.type]?.supportsFullPage && (
-              <FullPageLayoutSettings
-                block={block}
-                allBlocks={allBlocks}
-                draftConfig={config}
-                onUpdate={updateConfig}
-                onApplyImmediate={(updates) => {
-                  const merged = { ...(block.config ?? {}), ...config, ...updates }
-                  onSave(block.id, merged)
-                  setConfig(merged)
-                }}
-              />
-            )}
-          </TabsContent>
-
-          <TabsContent value="appearance" className="mt-0 space-y-6">
-            {renderAppearanceSettings()}
-          </TabsContent>
-
-          <TabsContent value="advanced" className="mt-0 space-y-6">
-            <AdvancedSettings
-              block={block}
-              config={config}
-              onUpdate={updateConfig}
-              onMoveToTop={onMoveToTop}
-              onMoveToBottom={onMoveToBottom}
-              onLock={onLock}
-            />
-          </TabsContent>
-        </div>
-      </Tabs>
+          </Tabs>
+        )
+      })()}
 
       {/* Footer */}
       <div className="h-16 border-t border-gray-200 flex items-center justify-between px-4">

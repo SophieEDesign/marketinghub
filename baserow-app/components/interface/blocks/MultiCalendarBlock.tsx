@@ -14,6 +14,7 @@ interface MultiCalendarBlockProps {
   filterTree?: FilterTree
   onRecordClick?: (recordId: string, tableId?: string) => void
   pageShowAddRecord?: boolean
+  interfaceMode?: 'view' | 'edit'
 }
 
 /**
@@ -29,6 +30,7 @@ export default function MultiCalendarBlock({
   filterTree = null,
   onRecordClick,
   pageShowAddRecord = false,
+  interfaceMode = 'view',
 }: MultiCalendarBlockProps) {
   // CRITICAL: Prevent hydration mismatch - don't render until mounted
   const [mounted, setMounted] = useState(false)
@@ -111,6 +113,7 @@ export default function MultiCalendarBlock({
       isEditing={isEditing}
       onRecordClick={onRecordClick}
       pageShowAddRecord={pageShowAddRecord}
+      interfaceMode={interfaceMode}
     />
   )
 }

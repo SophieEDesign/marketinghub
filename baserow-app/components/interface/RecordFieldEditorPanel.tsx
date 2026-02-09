@@ -67,6 +67,8 @@ interface RecordFieldEditorPanelProps {
   pageEditable?: boolean
   /** Context mode: 'modal' uses visible_in_modal, 'record_review' uses visible_in_canvas */
   mode?: 'modal' | 'record_review'
+  /** Interface mode: when 'edit', pass to openRecordByTableId so panel opens editable (Airtable-style). */
+  interfaceMode?: 'view' | 'edit'
 }
 
 export default function RecordFieldEditorPanel({
@@ -78,6 +80,7 @@ export default function RecordFieldEditorPanel({
   onFieldChange,
   pageEditable = true,
   mode = 'record_review',
+  interfaceMode = 'view',
 }: RecordFieldEditorPanelProps) {
   const { openRecordByTableId } = useRecordPanel()
   const { toast } = useToast()
@@ -317,9 +320,9 @@ export default function RecordFieldEditorPanel({
       if (linkedTableId === tableId && linkedRecordId === recordId) {
         return
       }
-      openRecordByTableId(linkedTableId, linkedRecordId)
+      openRecordByTableId(linkedTableId, linkedRecordId, interfaceMode)
     },
-    [openRecordByTableId, tableId, recordId]
+    [openRecordByTableId, tableId, recordId, interfaceMode]
   )
 
   // Handle add linked record

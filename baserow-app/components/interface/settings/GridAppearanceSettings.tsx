@@ -10,7 +10,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { TableField } from "@/types/fields"
@@ -18,9 +17,9 @@ import ConditionalFormattingEditor from "./ConditionalFormattingEditor"
 
 interface GridAppearanceSettingsProps {
   config: BlockConfig
-  onUpdate: (updates: Partial<BlockConfig['appearance']>) => void
-  onUpdateConfig?: (updates: Partial<BlockConfig>) => void // For updating highlight_rules
-  fields?: TableField[] // Optional: fields passed from SettingsPanel
+  onUpdate: (updates: Partial<BlockConfig["appearance"]>) => void
+  onUpdateConfig?: (updates: Partial<BlockConfig>) => void
+  fields?: TableField[]
 }
 
 export default function GridAppearanceSettings({
@@ -31,8 +30,7 @@ export default function GridAppearanceSettings({
 }: GridAppearanceSettingsProps) {
   const appearance = config.appearance || {}
   const [fields, setFields] = useState<TableField[]>([])
-  
-  // Use fields prop if provided, otherwise load them
+
   useEffect(() => {
     if (fieldsProp) {
       setFields(fieldsProp)
@@ -40,10 +38,9 @@ export default function GridAppearanceSettings({
       loadFields()
     }
   }, [config.table_id, fieldsProp])
-  
+
   async function loadFields() {
     if (!config.table_id) return
-    
     try {
       const supabase = createClient()
       const { data, error } = await supabase
@@ -51,33 +48,26 @@ export default function GridAppearanceSettings({
         .select("*")
         .eq("table_id", config.table_id)
         .order("position", { ascending: true })
-      
-      if (!error && data) {
-        setFields(data as TableField[])
-      }
+      if (!error && data) setFields(data as TableField[])
     } catch (error) {
       console.error("Error loading fields:", error)
     }
   }
-  
-  // Get single-select fields for color field selector
-  const selectFields = fields.filter(f => 
-    f.type === 'single_select' || f.type === 'multi_select'
-  )
-  
-  // Get attachment/image fields for image field selector
-  const imageFields = fields.filter(f => 
-    f.type === 'attachment' || f.type === 'url' // URL can contain image URLs
-  )
 
-  // Get view type from config to show view-specific settings
-  const viewType = (config as any)?.view_type || 'grid'
+  const selectFields = fields.filter(
+    (f) => f.type === "single_select" || f.type === "multi_select"
+  )
+  const imageFields = fields.filter(
+    (f) => f.type === "attachment" || f.type === "url"
+  )
+  const viewType = (config as any)?.view_type || "grid"
+  const visibleFieldNames = Array.isArray(config.visible_fields) ? config.visible_fields : []
 
   return (
     <div className="space-y-4">
-      {/* Row Height / Density */}
+      {/* Row height - all view types */}
       <div className="space-y-2">
-        <Label>Row Height</Label>
+        <Label>Row height</Label>
         <Select
           value={appearance.row_height || "standard"}
           onValueChange={(value) => onUpdate({ row_height: value })}
@@ -86,297 +76,346 @@ export default function GridAppearanceSettings({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="compact">Compact</SelectItem>
-            <SelectItem value="standard">Standard</SelectItem>
-            <SelectItem value="comfortable">Comfortable</SelectItem>
+            {viewType === "list" ? (
+              <>
+                <SelectItem value="compact">Short</SelectItem>
+                <SelectItem value="standard">Medium</SelectItem>
+                <SelectItem value="comfortable">Tall</SelectItem>
+              </>
+            ) : (
+              <>
+                <SelectItem value="compact">Compact</SelectItem>
+                <SelectItem value="standard">Standard</SelectItem>
+                <SelectItem value="comfortable">Comfortable</SelectItem>
+              </>
+            )}
           </SelectContent>
         </Select>
-        <p className="text-xs text-gray-500">
-          {viewType === 'timeline' || viewType === 'calendar'
-            ? "Control the vertical spacing of rows/lanes and card padding"
-            : "Control the height of rows in the grid view. Applies to all rows in the block."}
-        </p>
       </div>
 
-      {/* Text Wrapping - Only for grid view */}
-      {viewType === 'grid' && (
-        <div className="flex items-center justify-between">
-          <div>
-            <Label htmlFor="wrap-text">Wrap cell text</Label>
-            <p className="text-xs text-gray-500 mt-1">
-              When enabled, text wraps within column width. When disabled, text is single-line with ellipsis.
-            </p>
+      {/* LIST: wrap long cell values, color, show label */}
+      {viewType === "list" && (
+        <>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="list-wrap">Wrap long cell values</Label>
+            <Switch
+              id="list-wrap"
+              checked={appearance.wrap_text || false}
+              onCheckedChange={(checked) => onUpdate({ wrap_text: checked })}
+            />
           </div>
-          <Switch
-            id="wrap-text"
-            checked={appearance.wrap_text || false}
-            onCheckedChange={(checked) => onUpdate({ wrap_text: checked })}
-          />
-        </div>
+        </>
       )}
 
-      {/* Title Wrapping - For Timeline and Calendar */}
-      {(viewType === 'timeline' || viewType === 'calendar') && (
-        <div className="flex items-center justify-between">
-          <div>
-            <Label htmlFor="wrap-title">Wrap title text</Label>
-            <p className="text-xs text-gray-500 mt-1">
-              Allow card titles to wrap to multiple lines instead of truncating
-            </p>
+      {/* GRID: wrap headers, field color, field descriptions, show label */}
+      {viewType === "grid" && (
+        <>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="wrap-headers">Wrap headers</Label>
+            <Switch
+              id="wrap-headers"
+              checked={(appearance as any).wrap_headers || false}
+              onCheckedChange={(checked) => onUpdate({ wrap_headers: checked } as any)}
+            />
           </div>
-          <Switch
-            id="wrap-title"
-            checked={appearance.timeline_wrap_title || appearance.card_wrap_title || false}
-            onCheckedChange={(checked) => onUpdate({ 
-              timeline_wrap_title: checked,
-              card_wrap_title: checked
-            })}
-          />
-        </div>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="grid-field-descriptions">Field descriptions</Label>
+            <Switch
+              id="grid-field-descriptions"
+              checked={(appearance as any).show_field_descriptions || false}
+              onCheckedChange={(checked) =>
+                onUpdate({ show_field_descriptions: checked } as any)
+              }
+            />
+          </div>
+          <div className="border-t pt-4">
+            <ConditionalFormattingEditor
+              rules={config.highlight_rules || []}
+              fields={fields}
+              onRulesChange={(rules) => {
+                if (onUpdateConfig) onUpdateConfig({ highlight_rules: rules })
+              }}
+            />
+          </div>
+        </>
       )}
 
-      {/* Show Toolbar */}
-      <div className="flex items-center justify-between">
-        <div>
-          <Label htmlFor="show-toolbar">Show Toolbar</Label>
-          <p className="text-xs text-gray-500 mt-1">
-            Display filter, search, and sort controls above the grid
-          </p>
-        </div>
-        <Switch
-          id="show-toolbar"
-          checked={appearance.show_toolbar !== false}
-          onCheckedChange={(checked) => onUpdate({ show_toolbar: checked })}
-        />
-      </div>
-
-      {/* Add Record Button */}
-      <div className="flex items-center justify-between">
-        <div>
-          <Label htmlFor="show-add-record">Show &quot;Add record&quot; button</Label>
-          <p className="text-xs text-gray-500 mt-1">
-            Display an add button inside this block (Grid, Calendar, Kanban, Timeline, Gallery, List)
-          </p>
-        </div>
-        <Switch
-          id="show-add-record"
-          checked={(appearance as any).show_add_record === true}
-          onCheckedChange={(checked) => onUpdate({ show_add_record: checked } as any)}
-        />
-      </div>
-
-      {/* Show Search */}
-      <div className="flex items-center justify-between">
-        <div>
-          <Label htmlFor="show-search">Show Search</Label>
-          <p className="text-xs text-gray-500 mt-1">
-            Display search bar in the toolbar
-          </p>
-        </div>
-        <Switch
-          id="show-search"
-          checked={appearance.show_search !== false}
-          onCheckedChange={(checked) => onUpdate({ show_search: checked })}
-        />
-      </div>
-
-      {/* Show Filter */}
-      <div className="flex items-center justify-between">
-        <div>
-          <Label htmlFor="show-filter">Show Filter</Label>
-          <p className="text-xs text-gray-500 mt-1">
-            Display filter button and controls in the toolbar
-          </p>
-        </div>
-        <Switch
-          id="show-filter"
-          checked={appearance.show_filter !== false}
-          onCheckedChange={(checked) => onUpdate({ show_filter: checked })}
-        />
-      </div>
-
-      {/* Show Sort */}
-      <div className="flex items-center justify-between">
-        <div>
-          <Label htmlFor="show-sort">Show Sort</Label>
-          <p className="text-xs text-gray-500 mt-1">
-            Display sort controls in the toolbar
-          </p>
-        </div>
-        <Switch
-          id="show-sort"
-          checked={appearance.show_sort !== false}
-          onCheckedChange={(checked) => onUpdate({ show_sort: checked })}
-        />
-      </div>
-
-      {/* Appearance Section */}
-      <div className="border-t pt-4 mt-4 space-y-4">
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Appearance</h3>
-          <p className="text-xs text-gray-500 mb-4">Configure colors and images for rows, cards, and events</p>
-        </div>
-
-        {/* Calendar card fields */}
-        {viewType === "calendar" && (
-          <div className="space-y-3">
-            <div>
-              <Label>Calendar card fields</Label>
-              <p className="text-xs text-gray-500 mt-1">
-                Calendar cards use the ordered <span className="font-medium">Fields to Show on Cards/Table</span> selection.
-                Only the first <span className="font-medium">3</span> fields are shown on each event to keep cards compact.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Image Field */}
-        <div className="space-y-2">
-          <Label>{viewType === 'gallery' ? 'Cover image field *' : 'Image field'}</Label>
-          <div className="relative">
+      {/* GALLERY: image field, fit image size, title field, rows per page, display field names, color, show label */}
+      {viewType === "gallery" && (
+        <>
+          <div className="space-y-2">
+            <Label>Cover image field *</Label>
             <Select
               value={appearance.image_field || "__none__"}
-              onValueChange={(value) => onUpdate({ image_field: value === "__none__" ? undefined : value })}
+              onValueChange={(v) => onUpdate({ image_field: v === "__none__" ? undefined : v })}
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger>
                 <SelectValue placeholder="Select image field..." />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">None</SelectItem>
-                {imageFields.map((field) => (
-                  <SelectItem key={field.id} value={field.name}>
-                    {field.name}
-                  </SelectItem>
+                {imageFields.map((f) => (
+                  <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {appearance.image_field && (
-              <button
-                onClick={() => onUpdate({ image_field: undefined })}
-                className="absolute right-8 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded"
-                type="button"
-              >
-                <X className="h-3 w-3 text-gray-400" />
-              </button>
+            {!appearance.image_field && (
+              <p className="text-xs text-amber-600">Gallery needs a cover image field.</p>
             )}
           </div>
-          {viewType === 'gallery' && !appearance.image_field && (
-            <p className="text-xs text-amber-600">
-              Gallery view needs a cover image field. Select an attachment or URL field.
-            </p>
-          )}
           {appearance.image_field && (
             <div className="flex items-center justify-between">
-              <Label htmlFor="fit-image-size" className="text-xs text-gray-600">
-                Fit image size
-              </Label>
+              <Label>Fit image size</Label>
               <Switch
-                id="fit-image-size"
                 checked={appearance.fit_image_size || false}
-                onCheckedChange={(checked) => onUpdate({ fit_image_size: checked })}
+                onCheckedChange={(c) => onUpdate({ fit_image_size: c })}
               />
             </div>
           )}
-        </div>
-
-        {/* Color Field */}
-        <div className="space-y-2">
-          <Label>Color</Label>
-          <div className="relative">
-            <Select
-              value={appearance.color_field || "__none__"}
-              onValueChange={(value) => onUpdate({ color_field: value === "__none__" ? undefined : value })}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select color field..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">None</SelectItem>
-                {selectFields.map((field) => (
-                  <SelectItem key={field.id} value={field.name}>
-                    {field.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {appearance.color_field && (
-              <button
-                onClick={() => onUpdate({ color_field: undefined })}
-                className="absolute right-8 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded"
-                type="button"
-              >
-                <X className="h-3 w-3 text-gray-400" />
-              </button>
-            )}
-          </div>
-          <p className="text-xs text-gray-500">
-            Use colors from single-select field choices. Colors will be applied to rows, cards, or events.
-          </p>
-        </div>
-      </div>
-
-      {/* Record Opening Section - Only for grid view */}
-      {viewType === 'grid' && (
-        <div className="border-t pt-4 mt-4 space-y-4">
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Record Opening</h3>
-            <p className="text-xs text-gray-500 mb-4">Configure how users can open records from the table</p>
-          </div>
-
-          {/* Enable Record Opening */}
-          <div className="flex items-center justify-between">
-            <div>
-              <Label htmlFor="enable-record-open">Enable record opening</Label>
-              <p className="text-xs text-gray-500 mt-1">
-                Show a control to open records. When disabled, records cannot be opened from this table.
-              </p>
-            </div>
-            <Switch
-              id="enable-record-open"
-              checked={appearance.enable_record_open !== false}
-              onCheckedChange={(checked) => onUpdate({ enable_record_open: checked })}
-            />
-          </div>
-
-          {/* Record Open Style - Only show if enabled */}
-          {appearance.enable_record_open !== false && (
+          {visibleFieldNames.length > 0 && (
             <div className="space-y-2">
-              <Label>Open style</Label>
+              <Label>Title field (card title)</Label>
               <Select
-                value={appearance.record_open_style || "side_panel"}
-                onValueChange={(value) => onUpdate({ record_open_style: value as 'side_panel' | 'modal' })}
+                value={appearance.gallery_title_field || visibleFieldNames[0] || "__first__"}
+                onValueChange={(v) =>
+                  onUpdate({ gallery_title_field: v === "__first__" ? undefined : v } as any)
+                }
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="side_panel">Side panel</SelectItem>
-                  <SelectItem value="modal">Modal</SelectItem>
+                  <SelectItem value="__first__">First field in list</SelectItem>
+                  {visibleFieldNames.map((name) => (
+                    <SelectItem key={name} value={name}>{name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-gray-500">
-                {appearance.record_open_style === 'modal'
-                  ? "Records open in a full-screen modal overlay"
-                  : "Records open in a side panel (desktop) or modal (mobile)"}
-              </p>
             </div>
           )}
+          <div className="space-y-2">
+            <Label>Rows per page</Label>
+            <Select
+              value={String((appearance as any).gallery_rows_per_page || "12")}
+              onValueChange={(v) =>
+                onUpdate({ gallery_rows_per_page: v === "12" ? undefined : parseInt(v, 10) } as any)
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="6">6</SelectItem>
+                <SelectItem value="12">12</SelectItem>
+                <SelectItem value="24">24</SelectItem>
+                <SelectItem value="48">48</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center justify-between">
+            <Label>Display field names</Label>
+            <Switch
+              checked={(appearance as any).gallery_display_field_names !== false}
+              onCheckedChange={(c) =>
+                onUpdate({ gallery_display_field_names: c } as any)
+              }
+            />
+          </div>
+        </>
+      )}
+
+      {/* KANBAN: image field, fit image size, wrap long values, hide empty stacks, color, show label */}
+      {viewType === "kanban" && (
+        <>
+          <div className="space-y-2">
+            <Label>Image field</Label>
+            <Select
+              value={appearance.image_field || "__none__"}
+              onValueChange={(v) => onUpdate({ image_field: v === "__none__" ? undefined : v })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">None</SelectItem>
+                {imageFields.map((f) => (
+                  <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {appearance.image_field && (
+            <div className="flex items-center justify-between">
+              <Label>Fit image size</Label>
+              <Switch
+                checked={appearance.fit_image_size || false}
+                onCheckedChange={(c) => onUpdate({ fit_image_size: c })}
+              />
+            </div>
+          )}
+          <div className="flex items-center justify-between">
+            <Label>Wrap long values</Label>
+            <Switch
+              checked={appearance.wrap_text || false}
+              onCheckedChange={(c) => onUpdate({ wrap_text: c })}
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <Label>Hide empty stacks</Label>
+            <Switch
+              checked={(appearance as any).kanban_hide_empty_stacks || false}
+              onCheckedChange={(c) =>
+                onUpdate({ kanban_hide_empty_stacks: c } as any)
+              }
+            />
+          </div>
+        </>
+      )}
+
+      {/* CALENDAR: image field, preview field count, color, show label */}
+      {viewType === "calendar" && (
+        <>
+          <div className="space-y-2">
+            <Label>Image field</Label>
+            <Select
+              value={appearance.image_field || "__none__"}
+              onValueChange={(v) => onUpdate({ image_field: v === "__none__" ? undefined : v })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">None</SelectItem>
+                {imageFields.map((f) => (
+                  <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Preview field count</Label>
+            <Select
+              value={String((appearance as any).calendar_preview_field_count ?? "10")}
+              onValueChange={(v) =>
+                onUpdate({ calendar_preview_field_count: v === "10" ? undefined : parseInt(v, 10) } as any)
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[3, 5, 10, 15, 20].map((n) => (
+                  <SelectItem key={n} value={String(n)}>{n} visible fields</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </>
+      )}
+
+      {/* TIMELINE: image field, layout, record height/width, stack labels vertically, wrap labels, color, show label */}
+      {viewType === "timeline" && (
+        <>
+          <div className="space-y-2">
+            <Label>Image field</Label>
+            <Select
+              value={appearance.image_field || "__none__"}
+              onValueChange={(v) => onUpdate({ image_field: v === "__none__" ? undefined : v })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">None</SelectItem>
+                {imageFields.map((f) => (
+                  <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Layout</Label>
+            <Select
+              value={(appearance as any).timeline_layout || "stacked"}
+              onValueChange={(v) =>
+                onUpdate({ timeline_layout: v as "stacked" | "lanes" } as any)
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="stacked">Stacked</SelectItem>
+                <SelectItem value="lanes">Lanes</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center justify-between">
+            <Label>Stack labels vertically</Label>
+            <Switch
+              checked={(appearance as any).timeline_stack_labels_vertical || false}
+              onCheckedChange={(c) =>
+                onUpdate({ timeline_stack_labels_vertical: c } as any)
+              }
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <Label>Wrap labels</Label>
+            <Switch
+              checked={appearance.timeline_wrap_title || appearance.card_wrap_title || false}
+              onCheckedChange={(c) =>
+                onUpdate({ timeline_wrap_title: c, card_wrap_title: c })
+              }
+            />
+          </div>
+        </>
+      )}
+
+      {/* Grid-only: wrap cell text (legacy) */}
+      {viewType === "grid" && (
+        <div className="flex items-center justify-between">
+          <Label htmlFor="wrap-text">Wrap cell text</Label>
+          <Switch
+            id="wrap-text"
+            checked={appearance.wrap_text || false}
+            onCheckedChange={(c) => onUpdate({ wrap_text: c })}
+          />
         </div>
       )}
 
-      {/* Conditional Formatting Section */}
-      <div className="border-t pt-4 mt-4">
-        <ConditionalFormattingEditor
-          rules={config.highlight_rules || []}
-          fields={fields}
-          onRulesChange={(rules) => {
-            if (onUpdateConfig) {
-              onUpdateConfig({ highlight_rules: rules })
-            }
-          }}
+      {/* Color - all view types */}
+      <div className="border-t pt-4 space-y-2">
+        <Label>Color</Label>
+        <Select
+          value={appearance.color_field || "__none__"}
+          onValueChange={(v) => onUpdate({ color_field: v === "__none__" ? undefined : v })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select color field..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">None</SelectItem>
+            {selectFields.map((f) => (
+              <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-gray-500">
+          Use colors from single-select field. Applied to rows, cards, or events.
+        </p>
+      </div>
+
+      {/* Show label - all (block title/labels) */}
+      <div className="flex items-center justify-between">
+        <Label htmlFor="show-label">Show label</Label>
+        <Switch
+          id="show-label"
+          checked={appearance.showTitle !== false && (appearance as any).show_title !== false}
+          onCheckedChange={(c) =>
+            onUpdate({ showTitle: c, show_title: c } as any)
+          }
         />
       </div>
     </div>
   )
 }
-

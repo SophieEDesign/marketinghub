@@ -41,6 +41,8 @@ interface KanbanViewProps {
   onOpenSettings?: () => void
   /** Conditional formatting rules */
   highlightRules?: HighlightRule[]
+  /** Interface mode: 'view' | 'edit'. When 'edit', record panel opens editable (Airtable-style). */
+  interfaceMode?: 'view' | 'edit'
 }
 
 export default function KanbanView({ 
@@ -60,6 +62,7 @@ export default function KanbanView({
   reloadKey,
   onOpenSettings,
   highlightRules = [],
+  interfaceMode = 'view',
 }: KanbanViewProps) {
   // All hooks must be at the top level, before any conditional returns
   const { openRecord } = useRecordPanel()
@@ -300,9 +303,10 @@ export default function KanbanView({
       supabaseTableName,
       (blockConfig as any)?.modal_fields,
       (blockConfig as any)?.modal_layout,
-      cascadeContext ?? undefined
+      cascadeContext ?? undefined,
+      interfaceMode
     )
-  }, [blockConfig, cascadeContext, onRecordClick, openRecord, supabaseTableName, tableId])
+  }, [blockConfig, cascadeContext, onRecordClick, openRecord, supabaseTableName, tableId, interfaceMode])
 
   const handleCellSave = useCallback(async (rowId: string, fieldName: string, value: any) => {
     if (!supabaseTableName) return

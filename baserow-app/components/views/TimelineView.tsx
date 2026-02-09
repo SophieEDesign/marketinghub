@@ -56,6 +56,8 @@ interface TimelineViewProps {
   reloadKey?: number
   /** Conditional formatting rules */
   highlightRules?: HighlightRule[]
+  /** Interface mode: 'view' | 'edit'. When 'edit', record panel opens editable (Airtable-style). */
+  interfaceMode?: 'view' | 'edit'
 }
 
 type ZoomLevel = "day" | "week" | "month" | "quarter" | "year"
@@ -96,6 +98,7 @@ export default function TimelineView({
   rowSize = 'medium',
   reloadKey,
   highlightRules = [],
+  interfaceMode = 'view',
 }: TimelineViewProps) {
   const supabase = useMemo(() => createClient(), [])
   const viewUuid = useMemo(() => normalizeUuid(viewId), [viewId])
@@ -1140,8 +1143,8 @@ export default function TimelineView({
       onRecordClick(rowId)
       return
     }
-    openRecord(tableId, rowId, supabaseTableName, (blockConfig as any)?.modal_fields)
-  }, [blockConfig, onRecordClick, openRecord, supabaseTableName, tableId])
+    openRecord(tableId, rowId, supabaseTableName, (blockConfig as any)?.modal_fields, (blockConfig as any)?.modal_layout, blockConfig ? { blockConfig } : undefined, interfaceMode)
+  }, [blockConfig, onRecordClick, openRecord, supabaseTableName, tableId, interfaceMode])
 
   const handleEventSelect = useCallback((event: TimelineEvent, e: React.MouseEvent) => {
     // Don't open/select if we're resizing/dragging.

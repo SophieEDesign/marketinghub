@@ -47,6 +47,8 @@ interface GalleryViewProps {
   rowHeight?: number
   /** Conditional formatting rules */
   highlightRules?: HighlightRule[]
+  /** Interface mode: 'view' | 'edit'. When 'edit', record panel opens editable (Airtable-style). */
+  interfaceMode?: 'view' | 'edit'
 }
 
 export default function GalleryView({
@@ -68,6 +70,7 @@ export default function GalleryView({
   onHeightChange,
   rowHeight = 30,
   highlightRules = [],
+  interfaceMode = 'view',
 }: GalleryViewProps) {
   const { openRecord } = useRecordPanel()
   const [rows, setRows] = useState<TableRow[]>([])
@@ -444,8 +447,8 @@ export default function GalleryView({
       return
     }
     if (!supabaseTableName) return
-    openRecord(tableId, recordId, supabaseTableName)
-  }, [onRecordClick, openRecord, supabaseTableName, tableId])
+    openRecord(tableId, recordId, supabaseTableName, undefined, undefined, undefined, interfaceMode)
+  }, [onRecordClick, openRecord, supabaseTableName, tableId, interfaceMode])
 
   const handleCellSave = useCallback(async (rowId: string, fieldName: string, value: any) => {
     if (!supabaseTableName) return

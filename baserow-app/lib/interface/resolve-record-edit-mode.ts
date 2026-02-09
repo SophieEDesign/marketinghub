@@ -11,11 +11,9 @@
 export function resolveRecordEditMode({
   interfaceMode,
   initialEditMode,
-  canEditLayout,
 }: {
   interfaceMode?: 'view' | 'edit'
   initialEditMode?: boolean
-  canEditLayout?: boolean
 }): boolean {
   // Rule 1: interfaceMode === 'edit' is ABSOLUTE
   if (interfaceMode === 'edit') {

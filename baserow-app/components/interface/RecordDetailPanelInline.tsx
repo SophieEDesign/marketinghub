@@ -66,7 +66,7 @@ export default function RecordDetailPanelInline({
   // P1 FIX: interfaceMode === 'edit' is ABSOLUTE - no manual overrides allowed
   // When interfaceMode === 'edit', editing is forced (derived value, cannot be disabled)
   // When interfaceMode === 'view', allow manual toggle via state
-  const forcedEditMode = resolveRecordEditMode({ interfaceMode, initialEditMode: false, canEditLayout })
+  const forcedEditMode = resolveRecordEditMode({ interfaceMode, initialEditMode: false })
   const [manualEditMode, setManualEditMode] = useState(false)
   
   // P1 FIX: When forcedEditMode is true, ignore manualEditMode (no hybrid states)

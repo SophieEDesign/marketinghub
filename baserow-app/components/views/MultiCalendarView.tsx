@@ -69,6 +69,8 @@ interface MultiCalendarViewProps {
   isEditing?: boolean
   onRecordClick?: (recordId: string, tableId?: string) => void
   pageShowAddRecord?: boolean
+  /** Interface mode: 'view' | 'edit'. When 'edit', record panel opens editable (Airtable-style). */
+  interfaceMode?: 'view' | 'edit'
 }
 
 const SOURCE_COLORS = [
@@ -158,6 +160,7 @@ export default function MultiCalendarView({
   isEditing = false,
   onRecordClick,
   pageShowAddRecord = false,
+  interfaceMode = 'view',
 }: MultiCalendarViewProps) {
   const supabase = useMemo(() => createClient(), [])
   const { openRecord } = useRecordPanel()
@@ -678,9 +681,9 @@ export default function MultiCalendarView({
         onRecordClick(recordId, tableId)
         return
       }
-      openRecord(tableId, recordId, tableName, (blockConfig as any)?.modal_fields)
+      openRecord(tableId, recordId, tableName, (blockConfig as any)?.modal_fields, (blockConfig as any)?.modal_layout, blockConfig ? { blockConfig } : undefined, interfaceMode)
     },
-    [blockConfig, onRecordClick, openRecord]
+    [blockConfig, onRecordClick, openRecord, interfaceMode]
   )
 
   const onCalendarDateClick = useCallback(

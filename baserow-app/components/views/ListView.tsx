@@ -70,6 +70,8 @@ interface ListViewProps {
   highlightRules?: HighlightRule[]
   /** Optional: when provided, permission flags are applied in RecordModal. */
   cascadeContext?: { pageConfig?: any; blockConfig?: any } | null
+  /** Interface mode: 'view' | 'edit'. When 'edit', record panel opens editable (Airtable-style). */
+  interfaceMode?: 'view' | 'edit'
 }
 
 export default function ListView({
@@ -99,6 +101,7 @@ export default function ListView({
   rowHeight = 30,
   highlightRules = [],
   cascadeContext,
+  interfaceMode = 'view',
 }: ListViewProps) {
   const { openRecord } = useRecordPanel()
   const isMobile = useIsMobile()
@@ -157,9 +160,9 @@ export default function ListView({
     }
     const effectiveTableName = tableName || supabaseTableName
     if (tableId && effectiveTableName) {
-      openRecord(tableId, recordId, effectiveTableName)
+      openRecord(tableId, recordId, effectiveTableName, undefined, undefined, cascadeContext ?? undefined, interfaceMode)
     }
-  }, [onRecordClick, openRecord, supabaseTableName, tableId, tableName])
+  }, [onRecordClick, openRecord, supabaseTableName, tableId, tableName, cascadeContext, interfaceMode])
 
   // Update currentGroupBy when groupBy prop changes
   useEffect(() => {

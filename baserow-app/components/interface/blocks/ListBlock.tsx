@@ -247,12 +247,34 @@ export default function ListBlock({
 
   const isLoading = loading || metaLoading
 
-  // Get list-specific field configuration (must be declared before any early return)
-  const titleField = config.list_title_field || config.title_field || ""
-  const subtitleFields = config.list_subtitle_fields || []
-  const imageField = config.list_image_field || config.image_field || ""
-  const pillFields = config.list_pill_fields || []
-  const metaFields = config.list_meta_fields || []
+  // Single source of truth: visible_fields. Derive list row from it (Airtable parity).
+  const visibleFields = Array.isArray(config.visible_fields) ? config.visible_fields : []
+  const titleField =
+    config.list_title_field ||
+    config.title_field ||
+    visibleFields[0] ||
+    safeTableFields.find((f) => f.name !== "id" && (f.type === "text" || f.type === "long_text"))?.name ||
+    safeTableFields.find((f) => f.name !== "id")?.name ||
+    ""
+  const restVisible = visibleFields.filter((f) => f !== titleField)
+  const subtitleFields =
+    restVisible.length > 0 ? restVisible.slice(0, 3) : (config.list_subtitle_fields || [])
+  const imageField =
+    config.list_image_field || (config.appearance as any)?.image_field || config.image_field || ""
+  const pillFields =
+    visibleFields.length > 0
+      ? visibleFields.filter((fn) => {
+          const f = safeTableFields.find((x) => x.name === fn || x.id === fn)
+          return f && (f.type === "single_select" || f.type === "multi_select")
+        })
+      : (config.list_pill_fields || [])
+  const metaFields =
+    visibleFields.length > 0
+      ? visibleFields.filter((fn) => {
+          const f = safeTableFields.find((x) => x.name === fn || x.id === fn)
+          return f && ["date", "number", "percent", "currency"].includes(f.type as string)
+        })
+      : (config.list_meta_fields || [])
 
   // Apply appearance settings (must be declared before any early return)
   const appearance = config.appearance || {}
@@ -264,10 +286,12 @@ export default function ListBlock({
     padding: appearance.padding !== undefined ? `${appearance.padding}px` : "16px",
   }
 
+  // Add record button: when Appearance toggle was removed, default to Data > Permissions (allowInlineCreate)
   const blockShowAddRecord = (appearance as any).show_add_record
-  const showAddRecord =
-    blockShowAddRecord === true || (blockShowAddRecord == null && pageShowAddRecord)
   const permissions = config.permissions || {}
+  const showAddRecord =
+    blockShowAddRecord === true ||
+    (blockShowAddRecord == null && (pageShowAddRecord || (permissions.allowInlineCreate ?? true)))
   const isViewOnly = permissions.mode === "view"
   const allowInlineCreate = permissions.allowInlineCreate ?? true
   const canCreateRecord = !isViewOnly && allowInlineCreate
@@ -352,20 +376,27 @@ export default function ListBlock({
     )
   }
 
-  // Check if title field is configured
-  if (!titleField && !isEditing) {
+  // Title: from override, first visible field, or table default (single source of truth)
+  const effectiveTitleField =
+    titleField ||
+    visibleFields[0] ||
+    safeTableFields.find((f) => f.name !== "id" && (f.type === "text" || f.type === "long_text"))?.name ||
+    safeTableFields.find((f) => f.name !== "id")?.name
+  if (!effectiveTitleField && !isEditing) {
     return (
       <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
         <div className="text-center">
           <p className="mb-2">List view requires a title field</p>
-          <p className="text-xs text-gray-400">Configure the title field in block settings.</p>
+          <p className="text-xs text-gray-400">Add fields in the Data tab or set a title field override.</p>
         </div>
       </div>
     )
   }
 
-  // Get modal fields from config
-  const modalFields = (config as any)?.modal_fields as string[] | undefined
+  // Modal uses same field set as Data (single source of truth)
+  const modalFields = (config.visible_fields?.length ? config.visible_fields : (config as any)?.modal_fields) as
+    | string[]
+    | undefined
 
   return (
     <div className="h-full w-full overflow-auto" style={blockStyle}>
@@ -437,7 +468,7 @@ export default function ListBlock({
         onRecordClick={onRecordClick}
         showAddRecord={showAddRecord}
         canCreateRecord={canCreateRecord}
-        titleField={titleField}
+        titleField={effectiveTitleField || titleField}
         subtitleFields={subtitleFields}
         imageField={imageField}
         pillFields={pillFields}

@@ -1,9 +1,11 @@
 /**
  * Field Layout Utilities
- * 
- * Helper functions for converting between old field configuration formats
- * (visible_fields, editable_fields, modal_fields, card_fields) and the
- * new unified field_layout format.
+ *
+ * Single source of truth for data-view blocks: config.visible_fields (or detail_fields).
+ * Modal and card field sets are derived from this list; modal_layout only reorders/groupes within it.
+ *
+ * Converts between old formats (visible_fields, editable_fields, modal_fields, card_fields)
+ * and the unified field_layout format.
  */
 
 import type { PageConfig } from './page-config'

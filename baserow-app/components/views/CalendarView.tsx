@@ -63,6 +63,8 @@ interface CalendarViewProps {
   canEditLayout?: boolean
   /** Interface mode: 'view' | 'edit'. When 'edit', all record modals open in edit mode (Airtable-style). */
   interfaceMode?: 'view' | 'edit'
+  /** Optional block id for record modal remount key. */
+  blockId?: string | null
 }
 
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -101,6 +103,7 @@ export default function CalendarView({
   onModalLayoutSave,
   canEditLayout = false,
   interfaceMode = 'view',
+  blockId = null,
 }: CalendarViewProps) {
   const viewUuid = useMemo(() => normalizeUuid(viewId), [viewId])
   // Ensure fieldIds is always an array (defensive check for any edge cases)
@@ -2175,9 +2178,11 @@ export default function CalendarView({
       </div>
 
       {/* Record Modal for Editing */}
-      {selectedRecordId && resolvedTableId && (
+      {selectedRecordId && resolvedTableId && (() => {
+        const layoutSig = Array.isArray(blockConfig?.field_layout) ? blockConfig.field_layout.length : (blockConfig?.modal_layout?.blocks?.length ?? 0)
+        return (
         <RecordModal
-          key={`record-modal-${selectedRecordId}-${interfaceMode}`}
+          key={`record-modal-${blockId ?? resolvedTableId}-${selectedRecordId}-${interfaceMode}-${layoutSig}`}
           open={selectedRecordId !== null}
           onClose={() => setSelectedRecordId(null)}
           tableId={resolvedTableId}
@@ -2203,12 +2208,13 @@ export default function CalendarView({
             }
           }}
         />
-      )}
+        )
+      })()}
 
       {/* Record Modal for Creating New Record */}
       {canCreateRecord && createRecordDate && resolvedTableId && resolvedDateFieldId && (
         <RecordModal
-          key={`record-modal-create-${interfaceMode}`}
+          key={`record-modal-create-${blockId ?? resolvedTableId}-${interfaceMode}-${Array.isArray(blockConfig?.field_layout) ? blockConfig.field_layout.length : (blockConfig?.modal_layout?.blocks?.length ?? 0)}`}
           open={createRecordDate !== null}
           onClose={() => setCreateRecordDate(null)}
           tableId={resolvedTableId}

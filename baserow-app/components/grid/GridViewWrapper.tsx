@@ -109,6 +109,8 @@ interface GridViewWrapperProps {
   openRecordInEditMode?: string | null
   /** Interface mode: 'view' | 'edit'. When 'edit', all record modals open in edit mode (Airtable-style). */
   interfaceMode?: 'view' | 'edit'
+  /** Optional block id for record modal remount key. */
+  blockId?: string | null
 }
 
 export default function GridViewWrapper({
@@ -143,6 +145,7 @@ export default function GridViewWrapper({
   initialModalEditMode = false,
   openRecordInEditMode = null,
   interfaceMode = 'view',
+  blockId = null,
 }: GridViewWrapperProps) {
   // CRITICAL: Normalize all inputs at wrapper entry point
   const safeInitialFilters = asArray<Filter>(initialFilters)
@@ -884,6 +887,7 @@ export default function GridViewWrapper({
         onEditField={isEditing ? handleEditField : undefined}
         isEditing={isEditing}
         interfaceMode={interfaceMode}
+        blockId={blockId}
         onRecordClick={onRecordClick}
           rowHeight={rowHeight}
           wrapText={wrapText}

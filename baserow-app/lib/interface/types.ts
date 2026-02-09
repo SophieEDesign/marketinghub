@@ -47,7 +47,25 @@ export interface PageBlock {
 
 export type ViewType = 'grid' | 'kanban' | 'calendar' | 'gallery' | 'timeline' | 'form' | 'horizontal_grouped' | 'list'
 
-/** Canonical config for blocks. See docs/architecture/BLOCK_SYSTEM_CANONICAL.md */
+/** Block types that use the two-tab Data/Appearance model (Airtable parity). No Advanced tab. */
+export const DATA_VIEW_BLOCK_TYPES: BlockType[] = [
+  'list',
+  'grid',
+  'gallery',
+  'kanban',
+  'calendar',
+  'timeline',
+]
+
+/**
+ * Canonical config for blocks. See docs/architecture/BLOCK_SYSTEM_CANONICAL.md
+ *
+ * Airtable parity (data-view blocks: list, grid, gallery, kanban, calendar, timeline):
+ * - visible_fields is the single source of truth for which fields appear in list rows, grid columns,
+ *   gallery cards, calendar previews, kanban cards. If empty, blocks fall back to title field only.
+ * - modal_layout (order, groups, visibility) is scoped to the same set; no separate modal field list.
+ * - Data tab: Source, Permissions, Filter, Sort, Group, Fields. Appearance tab: view-type-specific only.
+ */
 export interface BlockConfig {
   /** When true, this block is the single full-page block (content page only). Stored in config; no DB column. */
   is_full_page?: boolean
@@ -56,7 +74,10 @@ export interface BlockConfig {
   view_id?: string
   view_type?: ViewType // View type for grid blocks (grid, kanban, calendar, gallery, timeline)
   record_id?: string
+  /** Alias for visible_fields; prefer visible_fields for data-view blocks. */
   fields?: string[]
+  /** Canonical visible field names (single source of truth for data-view blocks). */
+  visible_fields?: string[]
   filters?: BlockFilter[]
   sorts?: BlockSort[]
   group_by?: string

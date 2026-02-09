@@ -430,6 +430,11 @@ export default function GridBlock({
     })
   }
 
+  // Modal uses same field set as Data (single source of truth)
+  const modalFieldsForRecord = (visibleFieldsConfig.length > 0
+    ? visibleFieldsConfig
+    : (config as any).modal_fields) as string[] | undefined
+
   // Convert merged filters to legacy format for GridViewWrapper (backward compatibility)
   const activeFilters = allFilters.map((f, idx) => ({
     id: f.field || `filter-${idx}`,
@@ -470,9 +475,12 @@ export default function GridBlock({
   // Titles should be explicit: appearance.title (preferred) or config.title (legacy).
   const blockTitle = appearance.title || config.title
 
+  // Add record button: when Appearance toggle was removed, default to Data > Permissions (allowInlineCreate)
   const blockShowAddRecord = (appearance as any).show_add_record
+  const allowInlineCreateFromPerms = (config.permissions?.allowInlineCreate ?? true)
   const showAddRecord =
-    blockShowAddRecord === true || (blockShowAddRecord == null && pageShowAddRecord)
+    blockShowAddRecord === true ||
+    (blockShowAddRecord == null && (pageShowAddRecord || allowInlineCreateFromPerms))
 
   // Toolbar visibility: keep edit mode WYSIWYG (match live view).
   const showToolbar = appearance.show_toolbar !== false
@@ -719,6 +727,7 @@ export default function GridBlock({
             onModalLayoutSave={onModalLayoutSave}
             canEditLayout={canEditLayout}
             interfaceMode={interfaceMode}
+            blockId={block.id}
           />
         )
       }
@@ -774,6 +783,7 @@ export default function GridBlock({
             onRecordClick={onRecordClick}
             cascadeContext={{ blockConfig: config }}
             reloadKey={refreshKey}
+            interfaceMode={interfaceMode}
           />
         )
       }
@@ -831,6 +841,7 @@ export default function GridBlock({
             wrapTitle={appearance.timeline_wrap_title || appearance.card_wrap_title}
             rowSize={appearance.row_height as 'compact' | 'medium' | 'comfortable' || 'medium'}
             highlightRules={config.highlight_rules}
+            interfaceMode={interfaceMode}
           />
         )
       }
@@ -872,6 +883,7 @@ export default function GridBlock({
             fitImageSize={appearance.fit_image_size}
             reloadKey={refreshKey}
             highlightRules={config.highlight_rules}
+            interfaceMode={interfaceMode}
           />
         )
       }
@@ -968,10 +980,12 @@ export default function GridBlock({
             imageField={imageField}
             pillFields={pillFields}
             metaFields={metaFields}
-            modalFields={(config as any).modal_fields}
+            modalFields={modalFieldsForRecord}
             reloadKey={refreshKey}
             onHeightChange={isGrouped ? handleHeightChange : undefined}
             rowHeight={rowHeight}
+            cascadeContext={{ blockConfig: config }}
+            interfaceMode={interfaceMode}
           />
         )
       }
@@ -1009,7 +1023,7 @@ export default function GridBlock({
         const handleRecordClick = allowOpenRecord
           ? (onRecordClick || ((clickedRecordId: string) => {
               if (tableId && table?.supabase_table) {
-                openRecordPanel(tableId, clickedRecordId, table.supabase_table, (config as any).modal_fields, (config as any).modal_layout, { blockConfig: config })
+                openRecordPanel(tableId, clickedRecordId, table.supabase_table, modalFieldsForRecord, (config as any).modal_layout, { blockConfig: config })
               }
             }))
           : undefined // Disable record clicks if not allowed
@@ -1046,7 +1060,7 @@ export default function GridBlock({
             isEditing={isEditing}
             interfaceMode={interfaceMode}
             onRecordClick={handleRecordClick}
-            modalFields={(config as any).modal_fields}
+            modalFields={modalFieldsForRecord}
             modalLayout={(config as any).modal_layout}
             fieldLayout={(config as any).field_layout}
             cascadeContext={{ blockConfig: config }}
@@ -1073,6 +1087,7 @@ export default function GridBlock({
             rowHeightPixels={rowHeight}
             onModalLayoutSave={onModalLayoutSave}
             canEditLayout={canEditLayout}
+            blockId={block.id}
             openRecordInEditMode={
               openRecordInEditModeForBlock &&
               openRecordInEditModeForBlock.blockId === block.id &&

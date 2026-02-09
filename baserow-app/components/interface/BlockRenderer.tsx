@@ -54,6 +54,12 @@ import { runBlockDriftChecks } from "@/lib/interface/block-drift"
 const warnedBlocks = new Set<string>()
 let blockDriftChecksRun = false
 
+/**
+ * Block field visibility (visible_fields, field_layout columns) is view-level only:
+ * it controls which columns appear in the list/grid/calendar. It does NOT control
+ * record layout, modal layout, card schema, or editability. If a record exists, it
+ * must render and be openable regardless of layout configuration.
+ */
 interface BlockRendererProps {
   block: PageBlock
   isEditing?: boolean
@@ -390,6 +396,7 @@ export default function BlockRenderer({
               filterTree={filterTree}
               onRecordClick={onRecordClick}
               pageShowAddRecord={pageShowAddRecord}
+              interfaceMode={interfaceMode}
             />
           </LazyBlockWrapper>
         )
@@ -439,6 +446,7 @@ export default function BlockRenderer({
               filterTree={filterTree}
               onRecordClick={onRecordClick}
               pageShowAddRecord={pageShowAddRecord}
+              interfaceMode={interfaceMode}
             />
           </LazyBlockWrapper>
         )

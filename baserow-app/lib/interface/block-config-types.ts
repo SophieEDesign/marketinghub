@@ -286,7 +286,8 @@ export function validateBlockConfig(
     case 'gallery':
     case 'timeline':
     case 'list':
-      // These blocks are wrappers around GridBlock, so they need table_id
+      // Data-view blocks (Airtable parity): table_id required; visible_fields is the canonical
+      // source for which fields to show (when empty, blocks fall back to title field only).
       if (!resolveLegacyTableId(config)) {
         errors.push(`${blockType} block requires table_id`)
       }

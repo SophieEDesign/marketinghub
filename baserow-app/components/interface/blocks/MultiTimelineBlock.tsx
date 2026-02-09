@@ -13,6 +13,7 @@ interface MultiTimelineBlockProps {
   filterTree?: FilterTree
   onRecordClick?: (recordId: string, tableId?: string) => void
   pageShowAddRecord?: boolean
+  interfaceMode?: 'view' | 'edit'
 }
 
 /**
@@ -28,6 +29,7 @@ export default function MultiTimelineBlock({
   filterTree = null,
   onRecordClick,
   pageShowAddRecord = false,
+  interfaceMode = 'view',
 }: MultiTimelineBlockProps) {
   const rawSources = Array.isArray((block.config as any)?.sources)
     ? ((block.config as any).sources as any[])
@@ -69,6 +71,7 @@ export default function MultiTimelineBlock({
       isEditing={isEditing}
       onRecordClick={onRecordClick}
       pageShowAddRecord={pageShowAddRecord}
+      interfaceMode={interfaceMode}
     />
   )
 }
