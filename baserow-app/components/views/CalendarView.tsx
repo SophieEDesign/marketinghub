@@ -1430,7 +1430,9 @@ export default function CalendarView({
           })() : undefined)
 
           // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:1432',message:'Event construction',data:{rowId:row.id,hasStart:!!parsedStartDay,hasEnd:!!parsedEndExclusive,isMultiDay:parsedEndExclusive && parsedEndExclusive.getTime() > parsedStartDay.getTime() + 86400000},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[CalendarView] Event construction', { rowId: row.id, hasStart: !!parsedStartDay, hasEnd: !!parsedEndExclusive, isMultiDay: parsedEndExclusive && parsedEndExclusive.getTime() > parsedStartDay.getTime() + 86400000 })
+          }
           // #endregion
           
           return {
@@ -1912,7 +1914,9 @@ export default function CalendarView({
   const onCalendarEventClick = useCallback(
     (info: EventClickArg) => {
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:1906',message:'Event click handler entry',data:{eventId:info.event.id,hasExtendedProps:!!info.event.extendedProps,extendedPropsRecordId:info.event.extendedProps?.recordId,extendedPropsRowId:info.event.extendedProps?.rowId,hasStart:!!info.event.start,hasEnd:!!info.event.end,isMultiDay:info.event.end && info.event.start && new Date(info.event.end).getTime() > new Date(info.event.start).getTime() + 86400000},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[CalendarView] Event click handler entry', { eventId: info.event.id, hasExtendedProps: !!info.event.extendedProps, extendedPropsRecordId: info.event.extendedProps?.recordId, extendedPropsRowId: info.event.extendedProps?.rowId, hasStart: !!info.event.start, hasEnd: !!info.event.end, isMultiDay: info.event.end && info.event.start && new Date(info.event.end).getTime() > new Date(info.event.start).getTime() + 86400000 })
+      }
       // #endregion
       
       // CRITICAL: Calendar events ≠ records. Always read recordId from extendedProps.
@@ -1921,7 +1925,9 @@ export default function CalendarView({
       const recordId = info.event.extendedProps?.recordId || info.event.extendedProps?.rowId || info.event.id
       
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:1912',message:'RecordId resolved',data:{recordId,source:info.event.extendedProps?.recordId?'extendedProps.recordId':info.event.extendedProps?.rowId?'extendedProps.rowId':'event.id',eventId:info.event.id},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[CalendarView] RecordId resolved', { recordId, source: info.event.extendedProps?.recordId ? 'extendedProps.recordId' : info.event.extendedProps?.rowId ? 'extendedProps.rowId' : 'event.id', eventId: info.event.id })
+      }
       // #endregion
       
       // CRITICAL: Guard against missing recordId to prevent crashes
@@ -1935,7 +1941,9 @@ export default function CalendarView({
         })
         debugWarn('CALENDAR', "[Calendar] Event clicked but no recordId found", { event: info.event })
         // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:1920',message:'Missing recordId guard triggered',data:{eventId:info.event.id,eventTitle:info.event.title},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[CalendarView] Missing recordId guard triggered', { eventId: info.event.id, eventTitle: info.event.title })
+        }
         // #endregion
         return // Do not attempt to open record modal
       }

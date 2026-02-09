@@ -1335,7 +1335,8 @@ function InterfacePageClientInternal({
                         }
                         const updated = await res.json()
                         setPage(updated)
-                        await handlePageUpdate()
+                        // Don't call handlePageUpdate - setPage(updated) triggers re-render with new field_layout
+                        // immediately; no extra refetch needed. Cards and right panel will update via props.
                       }
                     : undefined
                 }

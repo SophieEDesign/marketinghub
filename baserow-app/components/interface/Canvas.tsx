@@ -450,7 +450,9 @@ export default function Canvas({
    */
   useEffect(() => {
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:layoutSyncEffect',message:'Layout sync effect RUN',data:{blocksLen:blocks.length,layoutLen:layout.length,pageId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[Canvas] Layout sync effect RUN', { blocksLen: blocks.length, layoutLen: layout.length, pageId })
+    }
     // #endregion
     // Don't sync if no blocks
     if (blocks.length === 0) {
@@ -505,7 +507,9 @@ export default function Canvas({
     
     if (shouldSync) {
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:layoutSyncSetLayout',message:'Layout sync calling setLayout',data:{blocksLen:blocks.length,pageId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Canvas] Layout sync calling setLayout', { blocksLen: blocks.length, pageId })
+      }
       // #endregion
       // Hydrate from blocks prop - always use persistent h from DB
       const newLayout: Layout[] = blocks.map((block) => {
@@ -1308,7 +1312,9 @@ export default function Canvas({
   const handleLayoutChange = useCallback(
     (newLayout: Layout[]) => {
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:handleLayoutChange',message:'Canvas handleLayoutChange called',data:{layoutLen:newLayout?.length,isEditing},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Canvas] handleLayoutChange called', { layoutLen: newLayout?.length, isEditing })
+      }
       // #endregion
       // Ignore when not in edit mode
       if (!isEditing) {
@@ -1394,7 +1400,9 @@ export default function Canvas({
   const previousBlockCountRef = useRef<number>(blocks.length)
   useEffect(() => {
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:blockDeletedEffect',message:'Block-deleted effect RUN',data:{blocksLen:blocks.length,layoutLen:layout.length,prevCount:previousBlockCountRef.current,isEditing},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[Canvas] Block-deleted effect RUN', { blocksLen: blocks.length, layoutLen: layout.length, prevCount: previousBlockCountRef.current, isEditing })
+    }
     // #endregion
     const blockCountDecreased = blocks.length < previousBlockCountRef.current
     
@@ -2534,7 +2542,9 @@ export default function Canvas({
           {blocks.map((block) => {
             // #region agent log
             blocksMapIterationRef.current += 1
-            fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:blocks.map',message:'Canvas blocks.map iteration',data:{pageId,blockId:block.id,blockType:block.type,iteration:blocksMapIterationRef.current},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[Canvas] blocks.map iteration', { pageId, blockId: block.id, blockType: block.type, iteration: blocksMapIterationRef.current })
+            }
             // #endregion
             // Log each block being rendered
             debugLog('LAYOUT', `[Canvas] Rendering block: pageId=${pageId}, blockId=${block.id}, type=${block.type}`, {

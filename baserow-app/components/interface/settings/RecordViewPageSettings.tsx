@@ -754,7 +754,7 @@ export default function RecordViewPageSettings({
               </div>
               <p className="text-xs text-gray-500">
                 Select which fields appear in the detail panel and card preview. Drag to reorder, and set
-                editability per field.
+                editability per field. On the page, use Edit interface to fine-tune the layout.
               </p>
 
               {/* Visible Fields List - Drag and Drop with Grouping */}

@@ -729,6 +729,7 @@ export default function RecordReviewLeftColumn({
       const titleField = cardFields[0] ?? null
       const secondaryFields = cardFields.slice(1)
       const titleValue = titleField ? (record[titleField.name] || "Untitled") : "Untitled"
+      const hasCardFields = cardFields.length > 0
 
       return (
         <button
@@ -760,13 +761,14 @@ export default function RecordReviewLeftColumn({
           )}
 
           <div className="min-w-0 flex-1">
-            {/* Title (first field) */}
-            <div className="text-sm font-medium text-gray-900 truncate">
-              {String(titleValue || "Untitled")}
-            </div>
-
-            {/* Secondary fields (from field_layout or legacy field_1, field_2) */}
-            {secondaryFields.map((field) => {
+            {/* Title (first field) or empty state */}
+            {hasCardFields ? (
+              <>
+                <div className="text-sm font-medium text-gray-900 truncate">
+                  {String(titleValue || "Untitled")}
+                </div>
+                {/* Secondary fields (from field_layout or legacy field_1, field_2) */}
+                {secondaryFields.map((field) => {
               const value = record[field.name]
               if (value === null || value === undefined || value === "") return null
               return (
@@ -775,6 +777,12 @@ export default function RecordReviewLeftColumn({
                 </div>
               )
             })}
+              </>
+            ) : (
+              <div className="text-sm text-gray-500 italic">
+                No card fields configured
+              </div>
+            )}
           </div>
         </button>
       )

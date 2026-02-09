@@ -72,6 +72,8 @@ export default function RecordDetailPanelInline({
     return getVisibleFieldsFromLayout(resolvedFieldLayout, fields, "canvas")
   }, [resolvedFieldLayout, fields])
 
+  const hasVisibleFields = visibleFields.length > 0
+
   const fieldGroups = useMemo(() => {
     return getFieldGroupsFromLayout(resolvedFieldLayout, fields, "canvas")
   }, [resolvedFieldLayout, fields])
@@ -311,7 +313,7 @@ export default function RecordDetailPanelInline({
               />
             </div>
           </>
-        ) : (
+        ) : hasVisibleFields ? (
           <div className="flex-1 overflow-y-auto px-6 py-4">
             <RecordFields
               fields={visibleFields}
@@ -323,6 +325,15 @@ export default function RecordDetailPanelInline({
               tableName={tableName || ""}
               isFieldEditable={isFieldEditable}
             />
+          </div>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 text-center text-gray-500">
+            <p className="text-sm font-medium">No fields in layout</p>
+            <p className="text-xs mt-1">
+              {canEditLayout
+                ? "Click Edit interface to add and arrange fields in the detail panel."
+                : "Ask an admin to configure the detail panel layout in Settings."}
+            </p>
           </div>
         )}
       </div>

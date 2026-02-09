@@ -523,7 +523,9 @@ export default function InterfaceBuilder({
   const handleLayoutChange = useCallback(
     (layout: LayoutItem[]) => {
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:handleLayoutChange',message:'InterfaceBuilder handleLayoutChange called',data:{layoutLen:layout?.length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[InterfaceBuilder] handleLayoutChange called', { layoutLen: layout?.length })
+      }
       // #endregion
       // Only save in edit mode - view mode never mutates layout
       if (!effectiveIsEditing) return
@@ -729,7 +731,9 @@ export default function InterfaceBuilder({
   const handleBlockUpdate = useCallback(
     async (blockId: string, configPatch: Partial<PageBlock["config"]>) => {
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:handleBlockUpdate',message:'InterfaceBuilder handleBlockUpdate called',data:{blockId,keys:Object.keys(configPatch||{})},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[InterfaceBuilder] handleBlockUpdate called', { blockId, keys: Object.keys(configPatch || {}) })
+      }
       // #endregion
       // 1) Optimistic in-place update (does not remount TipTap)
       // This preserves the same array length, same objects for other blocks,

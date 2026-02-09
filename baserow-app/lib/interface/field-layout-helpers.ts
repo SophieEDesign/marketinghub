@@ -51,12 +51,14 @@ export function getVisibleFieldsFromLayout(
     }
   })
 
-  // For modal/canvas: add any fields that exist in allFields but not in field_layout
-  // (for backward compatibility when new fields are added)
-  // For card: do NOT add - card preview should only show explicitly configured fields
+  // For modal/canvas: add fields that exist in allFields but are NOT in field_layout at all
+  // (backward compat when new fields are added to the table)
+  // Fields explicitly in layout with visible_*: false must NOT be added
+  // For card: do NOT add - card preview shows only explicitly configured fields
   if (context !== 'card') {
+    const layoutFieldNames = new Set(fieldLayout.map((item) => item.field_name))
     allFields.forEach((field) => {
-      if (!processedFieldNames.has(field.name)) {
+      if (!layoutFieldNames.has(field.name) && !processedFieldNames.has(field.name)) {
         visibleFields.push(field)
       }
     })
