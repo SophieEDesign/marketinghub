@@ -1383,7 +1383,7 @@ function InterfacePageClientInternal({
                 </div>
               ) : null
             )
-          }
+          )}
           </div>
         ) : null}
       </div>
