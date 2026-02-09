@@ -9,6 +9,8 @@ import type { FilterTree } from "@/lib/filters/canonical-model"
 interface CalendarBlockProps {
   block: PageBlock
   isEditing?: boolean
+  /** Interface mode: 'view' | 'edit'. When 'edit', all record modals open in edit mode (Airtable-style). */
+  interfaceMode?: 'view' | 'edit'
   pageTableId?: string | null
   pageId?: string | null
   filters?: FilterConfig[]
@@ -33,6 +35,7 @@ interface CalendarBlockProps {
 function CalendarBlock({
   block,
   isEditing = false,
+  interfaceMode = 'view',
   pageTableId = null,
   pageId = null,
   filters = [],
@@ -64,6 +67,7 @@ function CalendarBlock({
     <GridBlock
       block={calendarBlock}
       isEditing={isEditing}
+      interfaceMode={interfaceMode}
       pageTableId={pageTableId}
       pageId={pageId}
       filters={filters}

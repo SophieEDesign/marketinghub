@@ -36,6 +36,8 @@ import type { GroupRule } from "@/lib/grouping/types"
 interface GridBlockProps {
   block: PageBlock
   isEditing?: boolean
+  /** Interface mode: 'view' | 'edit'. When 'edit', all record modals open in edit mode (Airtable-style). */
+  interfaceMode?: 'view' | 'edit'
   pageTableId?: string | null // Table ID from the page
   pageId?: string | null // Page ID
   recordId?: string | null // Record ID for record review pages (used to detect record context)
@@ -58,6 +60,7 @@ interface GridBlockProps {
 export default function GridBlock({
   block,
   isEditing = false,
+  interfaceMode = 'view',
   pageTableId = null,
   pageId = null,
   recordId = null,
@@ -1040,6 +1043,7 @@ export default function GridBlock({
             initialGroupByRules={groupByRulesFromConfig}
             initialTableFields={tableFields}
             isEditing={isEditing}
+            interfaceMode={interfaceMode}
             onRecordClick={handleRecordClick}
             modalFields={(config as any).modal_fields}
             modalLayout={(config as any).modal_layout}

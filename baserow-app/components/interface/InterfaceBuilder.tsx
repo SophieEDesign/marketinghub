@@ -94,6 +94,10 @@ export default function InterfaceBuilder({
   // Override edit mode if viewer mode is forced
   const effectiveIsEditing = isViewer ? false : isEditing
   
+  // Interface mode: single source of truth for edit state (Airtable-style)
+  // When interface is in edit mode, all record modals must open in edit mode
+  const interfaceMode: 'view' | 'edit' = effectiveIsEditing ? 'edit' : 'view'
+  
   // Aggregate data fetching moved to Canvas (inside FilterStateProvider)
   // This allows access to dynamic filter block filters
   
@@ -1533,6 +1537,7 @@ export default function InterfaceBuilder({
             <Canvas
               blocks={blocks}
               isEditing={effectiveIsEditing}
+              interfaceMode={interfaceMode}
               onLayoutChange={handleLayoutChange}
               onBlockUpdate={handleBlockUpdate}
               onBlockClick={setSelectedBlockId}

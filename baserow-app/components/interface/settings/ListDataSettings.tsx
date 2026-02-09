@@ -475,8 +475,45 @@ export default function ListDataSettings({
       {config.table_id && fields.length > 0 && (
         <div className="space-y-2 border-t pt-4">
           <ModalFieldsSelector
-            value={(config as any).modal_fields || []}
-            onChange={(fieldNames) => onUpdate({ modal_fields: fieldNames } as any)}
+            value={(() => {
+              // Read from field_layout if available, otherwise use old format
+              const fieldLayout = (config as any).field_layout || []
+              if (fieldLayout.length > 0) {
+                return fieldLayout.filter((item: any) => item.visible_in_modal !== false).map((item: any) => item.field_name)
+              }
+              return (config as any).modal_fields || []
+            })()}
+            onChange={async (fieldNames) => {
+              // Update field_layout if it exists, otherwise update old format
+              const fieldLayout = (config as any).field_layout || []
+              if (fieldLayout.length > 0) {
+                const updatedLayout = fieldLayout.map((item: any) => ({
+                  ...item,
+                  visible_in_modal: fieldNames.includes(item.field_name),
+                }))
+                // Add any new fields
+                fieldNames.forEach((fieldName: string) => {
+                  if (!updatedLayout.some((item: any) => item.field_name === fieldName)) {
+                    const field = fields.find((f: any) => f.name === fieldName)
+                    if (field) {
+                      updatedLayout.push({
+                        field_id: field.id,
+                        field_name: field.name,
+                        order: updatedLayout.length,
+                        visible_in_card: true,
+                        visible_in_modal: true,
+                        visible_in_canvas: true,
+                        editable: true,
+                        group_name: field.group_name,
+                      })
+                    }
+                  }
+                })
+                await onUpdate({ field_layout: updatedLayout, modal_fields: fieldNames } as any)
+              } else {
+                await onUpdate({ modal_fields: fieldNames } as any)
+              }
+            }}
             fields={fields}
             label="Fields to Show in Record Modal"
             description="Choose which fields appear when creating or editing a record. Leave empty to show all fields."

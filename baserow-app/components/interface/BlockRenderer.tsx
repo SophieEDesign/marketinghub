@@ -57,6 +57,8 @@ let blockDriftChecksRun = false
 interface BlockRendererProps {
   block: PageBlock
   isEditing?: boolean
+  /** Interface mode: 'view' | 'edit'. When 'edit', all record modals open in edit mode (Airtable-style). */
+  interfaceMode?: 'view' | 'edit'
   onUpdate?: (blockId: string, config: Partial<PageBlock["config"]>) => void
   isLocked?: boolean
   pageTableId?: string | null // Table ID from the page
@@ -87,6 +89,7 @@ interface BlockRendererProps {
 export default function BlockRenderer({
   block,
   isEditing = false,
+  interfaceMode = 'view',
   onUpdate,
   isLocked = false,
   pageTableId = null,
@@ -217,6 +220,7 @@ export default function BlockRenderer({
             <GridBlock
               block={safeBlock}
               isEditing={canEdit}
+              interfaceMode={interfaceMode}
               pageTableId={pageTableId}
               pageId={pageId}
               recordId={recordId}
@@ -361,6 +365,7 @@ export default function BlockRenderer({
             <CalendarBlock
               block={safeBlock}
               isEditing={canEdit}
+              interfaceMode={interfaceMode}
               pageTableId={pageTableId}
               pageId={pageId}
               filters={filters}
@@ -472,6 +477,7 @@ export default function BlockRenderer({
               key={block.id}
               block={listBlockAsGrid}
               isEditing={canEdit}
+              interfaceMode={interfaceMode}
               pageTableId={pageTableId}
               pageId={pageId}
               recordId={recordId}

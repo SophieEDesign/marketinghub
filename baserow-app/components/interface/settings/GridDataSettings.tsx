@@ -223,23 +223,96 @@ export default function GridDataSettings({
       </div>
 
       {/* Fields to Show on Cards/Table - Required */}
-      {config.table_id && fields.length > 0 && (
-        <CardFieldsSelector
-          value={Array.isArray(config.visible_fields) ? config.visible_fields : []}
-          onChange={(fieldNames) => onUpdate({ visible_fields: fieldNames })}
-          fields={fields}
-          required={true}
-        />
-      )}
+      {config.table_id && fields.length > 0 && (() => {
+        // Read from field_layout if available, otherwise use old format
+        const fieldLayout = (config as any).field_layout || []
+        const cardFields = fieldLayout.length > 0
+          ? fieldLayout.filter((item: any) => item.visible_in_card !== false).map((item: any) => item.field_name)
+          : (Array.isArray(config.visible_fields) ? config.visible_fields : [])
+        
+        return (
+          <CardFieldsSelector
+            value={cardFields}
+            onChange={async (fieldNames) => {
+              // Update field_layout if it exists, otherwise update old format
+              if (fieldLayout.length > 0) {
+                const updatedLayout = fieldLayout.map((item: any) => ({
+                  ...item,
+                  visible_in_card: fieldNames.includes(item.field_name),
+                }))
+                // Add any new fields
+                fieldNames.forEach((fieldName: string) => {
+                  if (!updatedLayout.some((item: any) => item.field_name === fieldName)) {
+                    const field = fields.find(f => f.name === fieldName)
+                    if (field) {
+                      updatedLayout.push({
+                        field_id: field.id,
+                        field_name: field.name,
+                        order: updatedLayout.length,
+                        visible_in_card: true,
+                        visible_in_modal: true,
+                        visible_in_canvas: true,
+                        editable: true,
+                        group_name: field.group_name,
+                      })
+                    }
+                  }
+                })
+                await onUpdate({ field_layout: updatedLayout, visible_fields: fieldNames } as any)
+              } else {
+                await onUpdate({ visible_fields: fieldNames })
+              }
+            }}
+            fields={fields}
+            required={true}
+          />
+        )
+      })()}
 
       {/* Fields to Show in Modal */}
-      {config.table_id && fields.length > 0 && (
-        <div className="pt-4 border-t border-gray-200 space-y-4">
-          <ModalFieldsSelector
-            value={Array.isArray((config as any).modal_fields) ? (config as any).modal_fields : []}
-            onChange={(fieldNames) => onUpdate({ modal_fields: fieldNames } as any)}
-            fields={fields}
-          />
+      {config.table_id && fields.length > 0 && (() => {
+        // Read from field_layout if available, otherwise use old format
+        const fieldLayout = (config as any).field_layout || []
+        const modalFields = fieldLayout.length > 0
+          ? fieldLayout.filter((item: any) => item.visible_in_modal !== false).map((item: any) => item.field_name)
+          : (Array.isArray((config as any).modal_fields) ? (config as any).modal_fields : [])
+        
+        return (
+          <div className="pt-4 border-t border-gray-200 space-y-4">
+            <ModalFieldsSelector
+              value={modalFields}
+              onChange={async (fieldNames) => {
+                // Update field_layout if it exists, otherwise update old format
+                if (fieldLayout.length > 0) {
+                  const updatedLayout = fieldLayout.map((item: any) => ({
+                    ...item,
+                    visible_in_modal: fieldNames.includes(item.field_name),
+                  }))
+                  // Add any new fields
+                  fieldNames.forEach((fieldName: string) => {
+                    if (!updatedLayout.some((item: any) => item.field_name === fieldName)) {
+                      const field = fields.find(f => f.name === fieldName)
+                      if (field) {
+                        updatedLayout.push({
+                          field_id: field.id,
+                          field_name: field.name,
+                          order: updatedLayout.length,
+                          visible_in_card: true,
+                          visible_in_modal: true,
+                          visible_in_canvas: true,
+                          editable: true,
+                          group_name: field.group_name,
+                        })
+                      }
+                    }
+                  })
+                  await onUpdate({ field_layout: updatedLayout, modal_fields: fieldNames } as any)
+                } else {
+                  await onUpdate({ modal_fields: fieldNames } as any)
+                }
+              }}
+              fields={fields}
+            />
           
           {/* Modal Layout - edited in-context from the record modal */}
           <div className="space-y-2">

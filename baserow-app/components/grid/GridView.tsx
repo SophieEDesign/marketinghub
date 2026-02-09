@@ -141,6 +141,8 @@ interface GridViewProps {
   initialModalEditMode?: boolean
   /** Record ID to open in edit mode. When set, opens that record with initialModalEditMode=true */
   openRecordInEditMode?: string | null
+  /** Interface mode: 'view' | 'edit'. When 'edit', all record modals open in edit mode (Airtable-style). */
+  interfaceMode?: 'view' | 'edit'
 }
 
 const ITEMS_PER_PAGE = 100
@@ -576,6 +578,7 @@ export default function GridView({
   canEditLayout = false,
   initialModalEditMode = false,
   openRecordInEditMode = null,
+  interfaceMode = 'view',
 }: GridViewProps) {
   const { openRecord } = useRecordPanel()
   const isMobile = useIsMobile()
@@ -3865,6 +3868,7 @@ export default function GridView({
       {/* Record Modal (when recordOpenStyle is 'modal') */}
       {recordOpenStyle === 'modal' && (
         <RecordModal
+          key={`record-modal-${modalRecordId}-${interfaceMode}`}
           isOpen={!!modalRecordId}
           onClose={() => setModalRecordId(null)}
           tableId={tableId}
@@ -3876,6 +3880,7 @@ export default function GridView({
           canEditLayout={canEditLayout}
           onLayoutSave={onModalLayoutSave}
           initialEditMode={initialModalEditMode || !!openRecordInEditMode}
+          interfaceMode={interfaceMode}
         />
       )}
     </div>

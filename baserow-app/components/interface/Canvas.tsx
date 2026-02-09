@@ -50,6 +50,8 @@ const ResponsiveGridLayout = WidthProvider(Responsive)
 interface CanvasProps {
   blocks: PageBlock[]
   isEditing: boolean
+  /** Interface mode: 'view' | 'edit'. When 'edit', all record modals open in edit mode (Airtable-style). */
+  interfaceMode?: 'view' | 'edit'
   onLayoutChange?: (layout: LayoutItem[]) => void
   onBlockUpdate?: (blockId: string, config: Partial<PageBlock["config"]>) => void
   onBlockClick?: (blockId: string) => void
@@ -91,6 +93,7 @@ interface CanvasProps {
 export default function Canvas({
   blocks,
   isEditing,
+  interfaceMode = 'view',
   onLayoutChange,
   onBlockUpdate,
   onBlockClick,
@@ -1816,6 +1819,7 @@ export default function Canvas({
                           <BlockRenderer
                             block={fullPageBlock}
                             isEditing={isEditing && !fullPageBlock.config?.locked}
+                            interfaceMode={interfaceMode}
                             onUpdate={onBlockUpdate}
                             isLocked={fullPageBlock.config?.locked || false}
                             pageTableId={pageTableId}
@@ -1931,6 +1935,7 @@ export default function Canvas({
                       <BlockRenderer
                         block={fullPageBlock}
                         isEditing={isEditing && !fullPageBlock.config?.locked}
+                        interfaceMode={interfaceMode}
                         onUpdate={onBlockUpdate}
                         isLocked={fullPageBlock.config?.locked || false}
                         pageTableId={pageTableId}
@@ -2727,6 +2732,7 @@ export default function Canvas({
                   <BlockRenderer
                     block={block}
                     isEditing={isEditing && !block.config?.locked}
+                    interfaceMode={interfaceMode}
                     onUpdate={onBlockUpdate}
                     isLocked={block.config?.locked || false}
                     pageTableId={pageTableId}

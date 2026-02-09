@@ -53,11 +53,23 @@ export interface PageConfig {
   
   // Record View specific (page-level settings)
   table_id?: string // Source table for Record View (page-level)
-  visible_fields?: string[] // Fields visible in structured field list (page-level)
-  editable_fields?: string[] // Fields that are editable (page-level, subset of visible_fields)
+  visible_fields?: string[] // Fields visible in structured field list (page-level) - DEPRECATED: use field_layout
+  editable_fields?: string[] // Fields that are editable (page-level, subset of visible_fields) - DEPRECATED: use field_layout
   show_field_list?: boolean // Toggle to show/hide structured field list (page-level)
   show_blocks_section?: boolean // Toggle to show/hide blocks section (page-level)
   show_field_names?: boolean // Toggle to show/hide field names on blocks (page-level; default true)
+  
+  // Unified field layout configuration (replaces modal_fields, card_fields, visible_fields)
+  field_layout?: Array<{
+    field_id: string
+    field_name: string
+    order: number
+    visible_in_modal?: boolean
+    visible_in_card?: boolean
+    visible_in_canvas?: boolean
+    editable: boolean
+    group_name?: string
+  }>
 
   /**
    * Record actions permissions for record-based pages (record_view / record_review).

@@ -26,12 +26,14 @@ import InterfaceBuilder from './InterfaceBuilder'
 import { useBlockEditMode } from '@/contexts/EditModeContext'
 import { applySearchToFilters, type FilterConfig } from '@/lib/interface/filters'
 import RecordDetailsPanel from './RecordDetailsPanel'
+import RecordFieldEditorPanel from './RecordFieldEditorPanel'
 import { useToast } from '@/components/ui/use-toast'
 import { debugLog, debugWarn, debugError, isDebugEnabled } from '@/lib/interface/debug-flags'
 import { evaluateFilterTree } from '@/lib/filters/evaluation'
 import { filterConfigsToFilterTree } from '@/lib/filters/converters'
 import type { FilterTree } from '@/lib/filters/canonical-model'
 import { resolveChoiceColor, normalizeHexColor, getTextColorForBackground } from '@/lib/field-colors'
+import { convertToFieldLayout, convertFromFieldLayout, type FieldLayoutItem } from '@/lib/interface/field-layout-utils'
 
 interface RecordReviewViewProps {
   page: InterfacePage
@@ -666,6 +668,45 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   // Layout toggles (page-level)
   const showFieldList = config.show_field_list !== false // Default to true
 
+  // Convert old config format to field_layout (with backward compatibility)
+  const fieldLayout = useMemo(() => {
+    if (config.field_layout && Array.isArray(config.field_layout) && config.field_layout.length > 0) {
+      return config.field_layout as FieldLayoutItem[]
+    }
+    // Convert from old format
+    return convertToFieldLayout(config, tableFields)
+  }, [config.field_layout, config, tableFields])
+
+  // Handle field layout changes
+  const handleFieldLayoutChange = useCallback(async (newLayout: FieldLayoutItem[]) => {
+    try {
+      const supabase = createClient()
+      const oldConfig = convertFromFieldLayout(newLayout)
+      const newConfig = {
+        ...config,
+        field_layout: newLayout,
+        // Keep old fields for backward compatibility
+        visible_fields: oldConfig.visible_fields,
+        editable_fields: oldConfig.editable_fields,
+      }
+      
+      await supabase
+        .from('interface_pages')
+        .update({ config: newConfig })
+        .eq('id', page.id)
+      
+      // Trigger page refresh
+      window.location.reload()
+    } catch (error) {
+      console.error('Error updating field layout:', error)
+      toast({
+        title: "Failed to update field layout",
+        description: "Please try again",
+        variant: "destructive",
+      })
+    }
+  }, [config, page.id, toast])
+
   // CRITICAL: Memoize InterfaceBuilder page props to prevent remounts
   // Creating new objects on every render causes component remounts and canvas resets
   const recordReviewPage = useMemo(() => ({
@@ -1080,43 +1121,19 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
         </div>
       </div>
 
-      {/* Right Panel - Record Details (Fields + Blocks combined) */}
+      {/* Right Panel - Full Field Editor (Airtable-style) */}
       {showFieldList && (
-        <RecordDetailsPanel
-          record={selectedRecord}
-          tableId={pageTableId || ''}
-          recordId={selectedRecordId}
-          tableName={tableName}
-          fields={tableFields}
-          formData={formData}
-          fieldGroups={fieldGroups}
-          visibleFields={visibleFields}
-          pageEditable={pageEditable}
-          editableFieldNames={editableFieldNames}
-          titleField={config.title_field}
-          onFieldChange={handleFieldChange}
-          onRecordDelete={handleRecordDelete}
-          onRecordDuplicate={handleRecordDuplicate}
-          loading={!selectedRecord && selectedRecordId !== null}
-          blocks={loadedBlocks.filter(block => {
-            // Only show blocks in the right column (x >= 4) or all blocks if no position constraint
-            // Exclude record blocks (we use field blocks instead)
-            // Field blocks and other blocks (text, related lists, etc.) should all be shown
-            if (block.type === 'record') return false
-            return block.x >= 4 || block.x === undefined || block.x === null
-          })}
-          page={recordReviewPage}
-          pageTableId={pageTableId}
-          isEditing={isEditing}
-          onRecordClick={(recordId) => {
-            debugLog('RECORD', 'Record clicked from block', {
-              recordId,
-              previousRecordId: selectedRecordId,
-            })
-            setSelectedRecordId(recordId)
-          }}
-          blocksLoading={blocksLoading}
-        />
+        <div className="w-96 border-l border-gray-200 bg-white flex flex-col">
+          <RecordFieldEditorPanel
+            tableId={pageTableId || ''}
+            recordId={selectedRecordId}
+            allFields={tableFields}
+            fieldLayout={fieldLayout}
+            onFieldLayoutChange={handleFieldLayoutChange}
+            onFieldChange={handleFieldChange}
+            pageEditable={pageEditable}
+          />
+        </div>
       )}
     </div>
   )

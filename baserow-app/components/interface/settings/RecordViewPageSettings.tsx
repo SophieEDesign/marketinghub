@@ -40,6 +40,7 @@ import { filterConfigsToFilterTree } from "@/lib/filters/converters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import NestedGroupBySelector from "./shared/NestedGroupBySelector"
 import type { GroupRule } from "@/lib/grouping/types"
+import { convertToFieldLayout, convertFromFieldLayout, type FieldLayoutItem } from "@/lib/interface/field-layout-utils"
 import {
   DndContext,
   closestCenter,
@@ -137,24 +138,31 @@ export default function RecordViewPageSettings({
     setLeftPanelField2(leftPanel.field_2 || "")
   }, [config.left_panel, config.title_field])
   
-  // Parse field configurations from config
+  // Parse field configurations from config (supports both old and new format)
   const fieldConfigs = useCallback((): FieldConfig[] => {
-    const visibleFields = config.visible_fields || config.detail_fields || []
-    const editableFields = config.editable_fields || []
+    // Use field_layout if available, otherwise convert from old format
+    let fieldLayout: FieldLayoutItem[] = []
     
-    // Build map of configured fields
+    if (config.field_layout && Array.isArray(config.field_layout) && config.field_layout.length > 0) {
+      fieldLayout = config.field_layout as FieldLayoutItem[]
+    } else {
+      // Convert from old format
+      fieldLayout = convertToFieldLayout(config, fields)
+    }
+    
+    // Convert to FieldConfig format for UI
     const fieldMap = new Map<string, FieldConfig>()
     
-    visibleFields.forEach((fieldName: string, index: number) => {
-      fieldMap.set(fieldName, {
-        field: fieldName,
-        visible: true,
-        editable: editableFields.includes(fieldName),
-        order: index,
+    fieldLayout.forEach((layoutItem) => {
+      fieldMap.set(layoutItem.field_name, {
+        field: layoutItem.field_name,
+        visible: layoutItem.visible_in_canvas !== false,
+        editable: layoutItem.editable,
+        order: layoutItem.order,
       })
     })
     
-    // Add all other fields as hidden
+    // Add any fields that aren't in the layout yet
     fields.forEach((field) => {
       if (!fieldMap.has(field.name)) {
         fieldMap.set(field.name, {
@@ -167,7 +175,7 @@ export default function RecordViewPageSettings({
     })
     
     return Array.from(fieldMap.values()).sort((a, b) => a.order - b.order)
-  }, [config.visible_fields, config.detail_fields, config.editable_fields, fields])
+  }, [config.field_layout, config, fields])
 
   const [fieldConfigList, setFieldConfigList] = useState<FieldConfig[]>([])
 
@@ -557,23 +565,33 @@ export default function RecordViewPageSettings({
   }
 
   const saveFieldConfigs = async (configs: FieldConfig[]) => {
-    const visibleFields = configs
-      .filter((f) => f.visible)
-      .sort((a, b) => a.order - b.order)
-      .map((f) => f.field)
+    // Convert FieldConfig[] to FieldLayoutItem[]
+    const fieldLayout: FieldLayoutItem[] = configs.map((config, index) => {
+      const field = fields.find(f => f.name === config.field)
+      return {
+        field_id: field?.id || '',
+        field_name: config.field,
+        order: config.visible ? config.order : (fields.length + index),
+        visible_in_canvas: config.visible,
+        visible_in_modal: config.visible, // Default to same as canvas
+        visible_in_card: config.visible, // Default to same as canvas
+        editable: config.editable,
+        group_name: field?.group_name,
+      }
+    })
     
-    const editableFields = configs
-      .filter((f) => f.visible && f.editable)
-      .map((f) => f.field)
+    // Convert back to old format for backward compatibility
+    const oldConfig = convertFromFieldLayout(fieldLayout)
     
     await onUpdate({
-      visible_fields: visibleFields,
-      editable_fields: editableFields,
-      detail_fields: visibleFields, // Keep for backward compatibility
+      field_layout: fieldLayout,
+      visible_fields: oldConfig.visible_fields,
+      editable_fields: oldConfig.editable_fields,
+      detail_fields: oldConfig.visible_fields, // Keep for backward compatibility
     })
     
     // Auto-create field blocks for visible fields
-    await createFieldBlocksFromNames(visibleFields)
+    await createFieldBlocksFromNames(oldConfig.visible_fields)
   }
 
   const visibleFieldConfigs = fieldConfigList.filter((f) => f.visible)

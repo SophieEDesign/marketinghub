@@ -37,6 +37,8 @@ interface RecordModalProps {
   onLayoutSave?: (modalLayout: BlockConfig['modal_layout']) => void
   /** When true, modal opens directly in layout edit mode */
   initialEditMode?: boolean
+  /** Interface mode: 'view' | 'edit'. When 'edit', modal opens in layout edit mode (Airtable-style). */
+  interfaceMode?: 'view' | 'edit'
 }
 
 export default function RecordModal({
@@ -52,10 +54,16 @@ export default function RecordModal({
   canEditLayout = false,
   onLayoutSave,
   initialEditMode = false,
+  interfaceMode = 'view',
 }: RecordModalProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isModalEditing, setIsModalEditing] = useState(false)
-  const [isEditingLayout, setIsEditingLayout] = useState(false)
+  
+  // CRITICAL: Initialize layout edit state from interfaceMode (Airtable-style)
+  // When interface is in edit mode, modal MUST open in edit mode immediately
+  // Use useState initializer, not useEffect, to ensure correct initial state
+  const shouldEditLayout = interfaceMode === 'edit' || initialEditMode
+  const [isEditingLayout, setIsEditingLayout] = useState(shouldEditLayout)
   const [draftBlocks, setDraftBlocks] = useState<PageBlock[] | null>(null)
   const supabase = createClient()
   const { toast } = useToast()
@@ -204,17 +212,31 @@ export default function RecordModal({
   }, [modalLayout?.blocks, fields])
 
   const hasCustomLayout = Boolean(modalLayout?.blocks && modalLayout.blocks.length > 0)
-  // Show "Edit layout" when we have a custom layout and a save callback; canEditLayout gates actual persistence on Done
-  const showEditLayoutButton = hasCustomLayout && Boolean(onLayoutSave) && !isEditingLayout
+  // Show "Edit layout" button only when NOT in interface edit mode (Airtable-style)
+  // When interfaceMode === 'edit', modal is already in edit mode, so hide the button
+  const showEditLayoutButton = interfaceMode !== 'edit' && hasCustomLayout && Boolean(onLayoutSave) && !isEditingLayout
   const blocksForCanvas = isEditingLayout && draftBlocks !== null ? draftBlocks : modalBlocks
 
-  // Auto-enter edit mode when initialEditMode is true and modal opens
+  // Auto-enter edit mode when interfaceMode === 'edit' or initialEditMode is true
+  // Initialize draftBlocks immediately when modal opens in edit mode
   useEffect(() => {
-    if (isOpen && initialEditMode && hasCustomLayout && !isEditingLayout && modalBlocks.length > 0) {
+    if (isOpen && shouldEditLayout && modalBlocks.length > 0 && draftBlocks === null) {
       setIsEditingLayout(true)
       setDraftBlocks([...modalBlocks])
     }
-  }, [isOpen, initialEditMode, hasCustomLayout, isEditingLayout, modalBlocks])
+  }, [isOpen, shouldEditLayout, modalBlocks, draftBlocks])
+  
+  // Sync edit state when interfaceMode changes while modal is open
+  useEffect(() => {
+    if (isOpen && interfaceMode === 'edit' && !isEditingLayout && modalBlocks.length > 0) {
+      setIsEditingLayout(true)
+      setDraftBlocks([...modalBlocks])
+    } else if (isOpen && interfaceMode === 'view' && isEditingLayout && !initialEditMode) {
+      // Exit edit mode when interfaceMode changes to 'view' (unless initialEditMode is set)
+      setIsEditingLayout(false)
+      setDraftBlocks(null)
+    }
+  }, [isOpen, interfaceMode, isEditingLayout, modalBlocks, initialEditMode])
 
   const handleStartEditLayout = useCallback(() => {
     setIsEditingLayout(true)
