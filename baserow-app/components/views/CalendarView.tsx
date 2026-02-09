@@ -1016,6 +1016,13 @@ export default function CalendarView({
   }, [supabaseTableName, resolvedDateFieldId, blockConfig, viewConfig, loadedTableFields, startField, endField])
 
   function getEvents(): EventInput[] {
+    // #region agent log
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[CalendarView] getEvents() called`)
+    }
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:1018',message:'getEvents called',data:{filteredRowsCount:filteredRows?.length || 0,resolvedDateFieldId,isValidDateField},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    
     // Use resolved date field from config or fallback
     const effectiveDateField = dateField
     const effectiveDateFieldId = resolvedDateFieldId
@@ -1029,6 +1036,9 @@ export default function CalendarView({
         blockConfig,
         viewConfig
       })
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:1024',message:'getEvents returning empty - invalid date field',data:{resolvedDateFieldId,isValidDateField},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       return []
     }
     
@@ -1072,6 +1082,13 @@ export default function CalendarView({
         ? loadedTableFields.find((f: TableField) => (f.name === blockFromField || f.id === blockFromField) && f.type === 'date')
         : null
       
+      // #region agent log
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[CalendarView] Date field resolution - FROM: blockFromField=${blockFromField}, resolvedFromField=${resolvedFromField?.name || 'null'}, startField=${startField?.name || 'null'}`)
+      }
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:1070',message:'Date FROM field resolution',data:{blockFromField,resolvedFromFieldName:resolvedFromField?.name,startFieldName:startField?.name,viewConfigStartField:viewConfig?.calendar_start_field},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+      
       // Auto-detect date_from field if not configured (look for fields named "date_from", "from_date", "start_date", etc.)
       let autoDetectedFromField: TableField | null = null
       if (!resolvedFromField && !startField && !viewConfig?.calendar_start_field) {
@@ -1095,6 +1112,13 @@ export default function CalendarView({
         ? loadedTableFields.find((f: TableField) => (f.name === blockToField || f.id === blockToField) && f.type === 'date')
         : null
       
+      // #region agent log
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[CalendarView] Date field resolution - TO: blockToField=${blockToField}, resolvedToField=${resolvedToField?.name || 'null'}, endField=${endField?.name || 'null'}`)
+      }
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:1093',message:'Date TO field resolution',data:{blockToField,resolvedToFieldName:resolvedToField?.name,endFieldName:endField?.name,viewConfigEndField:viewConfig?.calendar_end_field},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+      
       // Auto-detect date_to field if not configured (look for fields named "date_to", "to_date", "end_date", etc.)
       let autoDetectedToField: TableField | null = null
       if (!resolvedToField && !endField && !viewConfig?.calendar_end_field) {
@@ -1110,6 +1134,13 @@ export default function CalendarView({
       }
       
       const actualToFieldName = resolvedToField?.name || endField?.name || viewConfig?.calendar_end_field || autoDetectedToField?.name || null
+      
+      // #region agent log
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[CalendarView] Final date field names: actualFromFieldName=${actualFromFieldName}, actualToFieldName=${actualToFieldName}`)
+      }
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:1112',message:'Final date field names resolved',data:{actualFromFieldName,actualToFieldName,actualFieldName},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       
       if (typeof process !== 'undefined' && process.env.NODE_ENV === 'development' && filteredRows.length > 0) {
         debugLog('CALENDAR', 'Calendar: Date field resolution', {
@@ -1524,7 +1555,19 @@ export default function CalendarView({
   ])
 
   // Get events for rendering (hook; declared before early returns)
-  const computedCalendarEvents = useMemo(() => getEvents(), [
+  const computedCalendarEvents = useMemo(() => {
+    // #region agent log
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[CalendarView] computedCalendarEvents useMemo recalculating`)
+    }
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:1527',message:'computedCalendarEvents useMemo recalculating',data:{filteredRowsCount:filteredRows?.length || 0,loadedTableFieldsKey,blockConfigEventKey,viewConfigEventKey},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    const events = getEvents()
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:1530',message:'computedCalendarEvents useMemo completed',data:{eventsCount:events?.length || 0},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    return events
+  }, [
     // Data that affects which rows become events
     filteredRows,
     searchQuery,
