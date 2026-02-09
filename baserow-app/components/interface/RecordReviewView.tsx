@@ -165,8 +165,20 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   const leftPanelImageField = config.left_panel?.image_field
   
   // Get preview fields from config, or fallback to auto-detection
-  // Priority: left_panel settings (title_field, field_1, field_2) > config.preview_fields > auto-detect
+  // Priority: field_layout (visible_in_card) > left_panel settings (title_field, field_1, field_2) > config.preview_fields > auto-detect
   const previewFields = useMemo(() => {
+    // First, try to get from field_layout with visible_in_card flag
+    if (fieldLayout && fieldLayout.length > 0) {
+      const cardFields = fieldLayout
+        .filter((item) => item.visible_in_card !== false)
+        .sort((a, b) => a.order - b.order)
+        .map((item) => item.field_name)
+      
+      if (cardFields.length > 0) {
+        return cardFields
+      }
+    }
+    
     // Use left panel configured fields if available
     const leftPanelTitle = config.left_panel?.title_field || config.title_field
     const leftPanelField1 = config.left_panel?.field_1
@@ -202,7 +214,7 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     )
     
     return statusField ? [nameField, statusField] : [nameField]
-  }, [config.left_panel?.title_field, config.left_panel?.field_1, config.left_panel?.field_2, config.title_field, config.preview_fields, columns])
+  }, [fieldLayout, config.left_panel?.title_field, config.left_panel?.field_1, config.left_panel?.field_2, config.title_field, config.preview_fields, columns])
   
   // Get group field for grouping - use left_panel.group_by or config.group_by_field
   const groupField = useMemo(() => {

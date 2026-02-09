@@ -25,6 +25,7 @@ import {
   getFieldGroupsFromLayout,
   convertModalLayoutToFieldLayout,
   convertModalFieldsToFieldLayout,
+  createInitialFieldLayout,
 } from "@/lib/interface/field-layout-helpers"
 
 interface RecordModalProps {
@@ -241,12 +242,10 @@ export default function RecordModal({
     }
   }
 
-  // Check if we have a custom layout
-  const hasCustomLayout = resolvedFieldLayout.length > 0
-  
   // Show "Edit layout" button only when NOT in interface edit mode (Airtable-style)
   // When interfaceMode === 'edit', modal is already in edit mode, so hide the button
-  const showEditLayoutButton = interfaceMode !== 'edit' && hasCustomLayout && Boolean(onLayoutSave) && !isEditingLayout && canEditLayout
+  // Allow editing even when there's no existing layout (user can create one)
+  const showEditLayoutButton = interfaceMode !== 'edit' && Boolean(onLayoutSave) && !isEditingLayout && canEditLayout
 
   // Auto-enter edit mode when interfaceMode === 'edit' or initialEditMode is true
   // Initialize draftFieldLayout immediately when modal opens in edit mode
@@ -271,8 +270,13 @@ export default function RecordModal({
 
   const handleStartEditLayout = useCallback(() => {
     setIsEditingLayout(true)
-    setDraftFieldLayout([...resolvedFieldLayout])
-  }, [resolvedFieldLayout])
+    // If there's no existing layout, initialize with all fields visible
+    if (resolvedFieldLayout.length === 0) {
+      setDraftFieldLayout(createInitialFieldLayout(fields, 'modal', effectiveEditable))
+    } else {
+      setDraftFieldLayout([...resolvedFieldLayout])
+    }
+  }, [resolvedFieldLayout, fields, effectiveEditable])
 
   const handleDoneEditLayout = useCallback(() => {
     if (!onLayoutSave || draftFieldLayout === null || !canEditLayout) return

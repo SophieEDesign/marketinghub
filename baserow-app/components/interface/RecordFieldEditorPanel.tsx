@@ -286,9 +286,6 @@ export default function RecordFieldEditorPanel({
       layoutMap.set(item.field_name, item)
     })
 
-    // Determine visibility flag based on mode
-    const visibilityFlag = mode === 'modal' ? 'visible_in_modal' : 'visible_in_canvas'
-
     // Get all fields, prioritizing layout order
     const orderedFields = allFields
       .map((field) => {
@@ -299,19 +296,12 @@ export default function RecordFieldEditorPanel({
             field_id: field.id,
             field_name: field.name,
             order: allFields.length + allFields.indexOf(field),
-            [mode === 'modal' ? 'visible_in_modal' : 'visible_in_canvas']: true,
+            visible_in_canvas: true,
             editable: pageEditable,
           },
         }
       })
-      .filter(({ layout }) => {
-        // Use the appropriate visibility flag based on mode
-        if (mode === 'modal') {
-          return layout.visible_in_modal !== false
-        } else {
-          return layout.visible_in_canvas !== false
-        }
-      })
+      .filter(({ layout }) => layout.visible_in_canvas !== false)
       .sort((a, b) => a.layout.order - b.layout.order)
 
     // Filter by search query
@@ -358,10 +348,9 @@ export default function RecordFieldEditorPanel({
 
   // Handle field visibility toggle
   const handleVisibilityToggle = (fieldName: string, visible: boolean) => {
-    const visibilityFlag = mode === 'modal' ? 'visible_in_modal' : 'visible_in_canvas'
     const updated = localFieldLayout.map((item) =>
       item.field_name === fieldName
-        ? { ...item, [visibilityFlag]: visible }
+        ? { ...item, visible_in_canvas: visible }
         : item
     )
 
@@ -369,12 +358,11 @@ export default function RecordFieldEditorPanel({
     if (!updated.some((item) => item.field_name === fieldName)) {
       const field = allFields.find((f) => f.name === fieldName)
       if (field) {
-        const visibilityFlag = mode === 'modal' ? 'visible_in_modal' : 'visible_in_canvas'
         updated.push({
           field_id: field.id,
           field_name: field.name,
           order: Math.max(...updated.map((i) => i.order), -1) + 1,
-          [visibilityFlag]: visible,
+          visible_in_canvas: visible,
           editable: pageEditable,
         })
       }
@@ -395,12 +383,11 @@ export default function RecordFieldEditorPanel({
       const field = allFields.find((f) => f.name === fieldName)
       if (field) {
         const existingVisible = visibleFields.find(({ field: f }) => f.name === fieldName)
-        const visibilityFlag = mode === 'modal' ? 'visible_in_modal' : 'visible_in_canvas'
         updated.push({
           field_id: field.id,
           field_name: field.name,
           order: existingVisible?.layout.order ?? Math.max(...updated.map((i) => i.order), -1) + 1,
-          [visibilityFlag]: existingVisible?.layout[visibilityFlag] ?? true,
+          visible_in_canvas: existingVisible?.layout.visible_in_canvas ?? true,
           editable,
         })
       }
@@ -429,8 +416,7 @@ export default function RecordFieldEditorPanel({
 
     const value = recordData[field.name]
     const isEditable = layout.editable && pageEditable && !field.options?.read_only && field.type !== "formula" && field.type !== "lookup"
-    const visibilityFlag = mode === 'modal' ? 'visible_in_modal' : 'visible_in_canvas'
-    const isVisible = layout[visibilityFlag] !== false
+    const isVisible = layout.visible_in_canvas !== false
 
     // Check if this is a select field and show a sample color pill
     const sampleChoice = field.options?.choices?.[0]

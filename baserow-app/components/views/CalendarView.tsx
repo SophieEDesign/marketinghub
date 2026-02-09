@@ -1016,13 +1016,6 @@ export default function CalendarView({
   }, [supabaseTableName, resolvedDateFieldId, blockConfig, viewConfig, loadedTableFields, startField, endField])
 
   function getEvents(): EventInput[] {
-    // #region agent log
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[CalendarView] getEvents() called`)
-    }
-    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:1018',message:'getEvents called',data:{filteredRowsCount:filteredRows?.length || 0,resolvedDateFieldId,isValidDateField},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-    
     // Use resolved date field from config or fallback
     const effectiveDateField = dateField
     const effectiveDateFieldId = resolvedDateFieldId
@@ -1036,9 +1029,6 @@ export default function CalendarView({
         blockConfig,
         viewConfig
       })
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:1024',message:'getEvents returning empty - invalid date field',data:{resolvedDateFieldId,isValidDateField},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       return []
     }
     
@@ -1086,7 +1076,6 @@ export default function CalendarView({
       if (process.env.NODE_ENV === 'development') {
         console.log(`[CalendarView] Date field resolution - FROM: blockFromField=${blockFromField}, resolvedFromField=${resolvedFromField?.name || 'null'}, startField=${startField?.name || 'null'}`)
       }
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:1070',message:'Date FROM field resolution',data:{blockFromField,resolvedFromFieldName:resolvedFromField?.name,startFieldName:startField?.name,viewConfigStartField:viewConfig?.calendar_start_field},timestamp:Date.now()})}).catch(()=>{});
       // #endregion
       
       // Auto-detect date_from field if not configured (look for fields named "date_from", "from_date", "start_date", etc.)
@@ -1116,7 +1105,6 @@ export default function CalendarView({
       if (process.env.NODE_ENV === 'development') {
         console.log(`[CalendarView] Date field resolution - TO: blockToField=${blockToField}, resolvedToField=${resolvedToField?.name || 'null'}, endField=${endField?.name || 'null'}`)
       }
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:1093',message:'Date TO field resolution',data:{blockToField,resolvedToFieldName:resolvedToField?.name,endFieldName:endField?.name,viewConfigEndField:viewConfig?.calendar_end_field},timestamp:Date.now()})}).catch(()=>{});
       // #endregion
       
       // Auto-detect date_to field if not configured (look for fields named "date_to", "to_date", "end_date", etc.)
@@ -1138,9 +1126,28 @@ export default function CalendarView({
       // #region agent log
       if (process.env.NODE_ENV === 'development') {
         console.log(`[CalendarView] Final date field names: actualFromFieldName=${actualFromFieldName}, actualToFieldName=${actualToFieldName}`)
+        // Warn if date fields are configured but invalid
+        if (blockFromField && !resolvedFromField && !startField && !viewConfig?.calendar_start_field && !autoDetectedFromField) {
+          console.warn(`[CalendarView] Configured FROM date field "${blockFromField}" not found in table fields`)
+        }
+        if (blockToField && !resolvedToField && !endField && !viewConfig?.calendar_end_field && !autoDetectedToField) {
+          console.warn(`[CalendarView] Configured TO date field "${blockToField}" not found in table fields`)
+        }
       }
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:1112',message:'Final date field names resolved',data:{actualFromFieldName,actualToFieldName,actualFieldName},timestamp:Date.now()})}).catch(()=>{});
       // #endregion
+      
+      // CRITICAL: If both date fields are configured but invalid, return empty events to prevent infinite loop
+      // This prevents React #185 when calendar tries to resolve invalid date fields repeatedly
+      if (blockFromField && !actualFromFieldName && blockToField && !actualToFieldName) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn(`[CalendarView] Both date fields are invalid - returning empty events to prevent loop`, {
+            blockFromField,
+            blockToField,
+            loadedTableFieldsCount: loadedTableFields.length
+          })
+        }
+        return []
+      }
       
       if (typeof process !== 'undefined' && process.env.NODE_ENV === 'development' && filteredRows.length > 0) {
         debugLog('CALENDAR', 'Calendar: Date field resolution', {
@@ -1524,6 +1531,7 @@ export default function CalendarView({
   // FullCalendar can get into internal update loops if `events` changes identity on
   // unrelated parent re-renders (especially when event objects contain new Date instances).
   // Memoize to only regenerate when the underlying data/config that affects events changes.
+  // CRITICAL: Use JSON.stringify of blockConfig to create stable key even if object reference changes
   const blockConfigEventKey = useMemo(() => {
     const bc: Record<string, unknown> = blockConfig || {}
     return JSON.stringify({
@@ -1538,7 +1546,18 @@ export default function CalendarView({
       calendar_date_field: bc?.calendar_date_field ?? null,
       date_field: bc?.date_field ?? null,
     })
-  }, [blockConfig])
+  }, [
+    blockConfig?.date_from,
+    blockConfig?.date_to,
+    blockConfig?.from_date_field,
+    blockConfig?.to_date_field,
+    blockConfig?.start_date_field,
+    blockConfig?.end_date_field,
+    blockConfig?.calendar_start_field,
+    blockConfig?.calendar_end_field,
+    blockConfig?.calendar_date_field,
+    blockConfig?.date_field,
+  ])
 
   const viewConfigEventKey = useMemo(() => {
     return JSON.stringify({
@@ -1554,19 +1573,41 @@ export default function CalendarView({
     viewConfig?.calendar_color_field,
   ])
 
+  // CRITICAL: Ref to prevent infinite loops when getEvents() is called during render
+  const isCalculatingEventsRef = useRef(false)
+  
   // Get events for rendering (hook; declared before early returns)
   const computedCalendarEvents = useMemo(() => {
-    // #region agent log
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[CalendarView] computedCalendarEvents useMemo recalculating`)
+    // Guard against concurrent calculations
+    if (isCalculatingEventsRef.current) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`[CalendarView] getEvents() called concurrently - returning empty to prevent loop`)
+      }
+      return []
     }
-    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:1527',message:'computedCalendarEvents useMemo recalculating',data:{filteredRowsCount:filteredRows?.length || 0,loadedTableFieldsKey,blockConfigEventKey,viewConfigEventKey},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-    const events = getEvents()
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:1530',message:'computedCalendarEvents useMemo completed',data:{eventsCount:events?.length || 0},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-    return events
+    
+    isCalculatingEventsRef.current = true
+    try {
+      // #region agent log
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[CalendarView] computedCalendarEvents useMemo recalculating`, {
+          filteredRowsCount: filteredRows?.length || 0,
+          loadedTableFieldsKey: loadedTableFieldsKey?.substring(0, 50),
+          blockConfigEventKey: blockConfigEventKey?.substring(0, 50),
+          viewConfigEventKey: viewConfigEventKey?.substring(0, 50),
+        })
+      }
+      // #endregion
+      const events = getEvents()
+      // #region agent log
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[CalendarView] computedCalendarEvents useMemo completed`, { eventsCount: events?.length || 0 })
+      }
+      // #endregion
+      return events
+    } finally {
+      isCalculatingEventsRef.current = false
+    }
   }, [
     // Data that affects which rows become events
     filteredRows,

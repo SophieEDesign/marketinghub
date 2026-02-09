@@ -25,6 +25,7 @@ import {
   getFieldGroupsFromLayout,
   convertModalLayoutToFieldLayout,
   convertModalFieldsToFieldLayout,
+  createInitialFieldLayout,
 } from '@/lib/interface/field-layout-helpers'
 
 export interface RecordModalProps {
@@ -256,24 +257,32 @@ export default function RecordModal({
     }
   }
 
-  // Check if we have a custom layout (only for existing records)
-  const hasCustomLayout = Boolean(recordId && resolvedFieldLayout.length > 0)
-  
-  // Show "Edit layout" button only for existing records with layout
-  const showEditLayoutButton = canEditLayout && Boolean(onLayoutSave) && Boolean(recordId) && hasCustomLayout && !isEditingLayout
+  // Show "Edit layout" button for existing records
+  // Allow editing even when there's no existing layout (user can create one)
+  const showEditLayoutButton = canEditLayout && Boolean(onLayoutSave) && Boolean(recordId) && !isEditingLayout
 
   // Auto-enter edit mode when initialEditMode is true and modal opens
   useEffect(() => {
-    if (open && initialEditMode && hasCustomLayout && !isEditingLayout && recordId) {
+    if (open && initialEditMode && !isEditingLayout && recordId) {
       setIsEditingLayout(true)
-      setDraftFieldLayout([...resolvedFieldLayout])
+      // If there's no existing layout, initialize with all fields visible
+      if (resolvedFieldLayout.length === 0) {
+        setDraftFieldLayout(createInitialFieldLayout(filteredFields, 'modal', effectiveEditable))
+      } else {
+        setDraftFieldLayout([...resolvedFieldLayout])
+      }
     }
-  }, [open, initialEditMode, hasCustomLayout, isEditingLayout, resolvedFieldLayout, recordId])
+  }, [open, initialEditMode, isEditingLayout, resolvedFieldLayout, recordId, filteredFields, effectiveEditable])
 
   const handleStartEditLayout = useCallback(() => {
     setIsEditingLayout(true)
-    setDraftFieldLayout([...resolvedFieldLayout])
-  }, [resolvedFieldLayout])
+    // If there's no existing layout, initialize with all fields visible
+    if (resolvedFieldLayout.length === 0) {
+      setDraftFieldLayout(createInitialFieldLayout(filteredFields, 'modal', effectiveEditable))
+    } else {
+      setDraftFieldLayout([...resolvedFieldLayout])
+    }
+  }, [resolvedFieldLayout, filteredFields, effectiveEditable])
 
   const handleDoneEditLayout = useCallback(() => {
     if (!onLayoutSave || draftFieldLayout === null || !canEditLayout) return

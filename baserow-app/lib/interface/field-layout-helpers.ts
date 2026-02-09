@@ -225,3 +225,24 @@ export function getFieldGroupsFromLayout(
 
   return groups
 }
+
+/**
+ * Create initial field_layout from all fields
+ * Used when starting layout editing with no existing layout
+ */
+export function createInitialFieldLayout(
+  allFields: TableField[],
+  mode: 'modal' | 'record_review' = 'modal',
+  pageEditable: boolean = true
+): FieldLayoutItem[] {
+  return allFields.map((field, index) => ({
+    field_id: field.id,
+    field_name: field.name,
+    order: index,
+    visible_in_modal: mode === 'modal' ? true : undefined,
+    visible_in_canvas: mode === 'record_review' ? true : undefined,
+    visible_in_card: false,
+    editable: pageEditable,
+    group_name: field.group_name ?? undefined,
+  }))
+}
