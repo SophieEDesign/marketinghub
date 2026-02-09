@@ -47,6 +47,13 @@ function CalendarBlock({
   isFullPage = false,
 }: CalendarBlockProps) {
   // Memoize so GridBlock (and CalendarView/RecordModal) don't get new props every render.
+  // CRITICAL: Extract config values to prevent JSON.stringify from causing re-renders
+  // JSON.stringify creates a new string every render even if config hasn't changed
+  const configSignature = useMemo(() => {
+    const cfg = block.config || {}
+    return `${block.id}-${cfg.view_type || ''}-${cfg.table_id || ''}-${cfg.start_date_field || ''}-${cfg.end_date_field || ''}`
+  }, [block.id, block.config?.view_type, block.config?.table_id, block.config?.start_date_field, block.config?.end_date_field])
+  
   const calendarBlock = useMemo<PageBlock>(() => ({
     ...block,
     config: {
@@ -60,7 +67,7 @@ function CalendarBlock({
     block.y,
     block.w,
     block.h,
-    JSON.stringify(block.config),
+    configSignature, // Use stable signature instead of JSON.stringify
   ])
 
   return (

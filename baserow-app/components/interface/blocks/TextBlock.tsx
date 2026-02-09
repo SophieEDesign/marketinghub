@@ -337,9 +337,13 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         }
         // Removed fetch instrumentation - using console.log instead
         // #endregion
-        setSaveStatus("saving")
-        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
-        saveTimeoutRef.current = setTimeout(() => handleSaveContentRef.current?.(ed.getJSON()), 1000)
+        // CRITICAL: Use requestAnimationFrame to defer setState and prevent React #185
+        // This ensures setState doesn't happen synchronously during the update callback
+        requestAnimationFrame(() => {
+          setSaveStatus("saving")
+          if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+          saveTimeoutRef.current = setTimeout(() => handleSaveContentRef.current?.(ed.getJSON()), 1000)
+        })
       },
     }),
     []
@@ -360,21 +364,40 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   }, [editor])
 
   // Track selection state so we can show toolbar on text selection (not just focus)
-  // Defer initial update to avoid setState during effect (can contribute to update loops)
+  // CRITICAL: Debounce selection updates to prevent React #185 (maximum update depth)
+  // Use ref to track previous state and only update when actually changed
+  const prevSelectionEmptyRef = useRef<boolean>(true)
   useEffect(() => {
     if (!editor) return
 
+    let rafId: number | null = null
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+
     const update = () => {
-      setHasSelection(!editor.state.selection.empty)
+      const isEmpty = editor.state.selection.empty
+      // Only update state if selection state actually changed
+      if (prevSelectionEmptyRef.current !== isEmpty) {
+        prevSelectionEmptyRef.current = isEmpty
+        // Debounce state update to prevent rapid-fire updates
+        if (timeoutId) clearTimeout(timeoutId)
+        timeoutId = setTimeout(() => {
+          setHasSelection(!isEmpty)
+        }, 50)
+      }
     }
 
-    const id = requestAnimationFrame(() => update())
+    // Use requestAnimationFrame to defer initial update
+    rafId = requestAnimationFrame(() => {
+      update()
+    })
+    
     editor.on('selectionUpdate', update)
     editor.on('focus', update)
     editor.on('blur', update)
 
     return () => {
-      cancelAnimationFrame(id)
+      if (rafId !== null) cancelAnimationFrame(rafId)
+      if (timeoutId !== null) clearTimeout(timeoutId)
       editor.off('selectionUpdate', update)
       editor.off('focus', update)
       editor.off('blur', update)

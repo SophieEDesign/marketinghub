@@ -253,12 +253,17 @@ export default function FilterBlock({
   // Emit filter state to context whenever filters change.
   // IMPORTANT: Do not remove the filter block on every update (effect cleanup runs on dependency changes),
   // otherwise we can create remove/add loops that trigger "maximum update depth exceeded" in React.
+  // CRITICAL: Use emitSignature (stable JSON string) as the only dependency to prevent loops
+  // All other values are captured in the signature, so we don't need them as dependencies
   useEffect(() => {
     if (block.id) {
       const blockTitle = config?.title || block.id
-      updateFilterBlock(block.id, emittedFilters, effectiveTargetBlocks, blockTitle, filterTree, tableId)
+      // Use requestAnimationFrame to defer update and prevent synchronous setState loops
+      requestAnimationFrame(() => {
+        updateFilterBlock(block.id, emittedFilters, effectiveTargetBlocks, blockTitle, filterTree, tableId)
+      })
     }
-  }, [emitSignature, block.id, updateFilterBlock, filterTree, tableId, effectiveTargetBlocks, emittedFilters, config?.title])
+  }, [emitSignature, block.id, updateFilterBlock])
 
   // Cleanup only on unmount / blockId change.
   useEffect(() => {
@@ -270,25 +275,35 @@ export default function FilterBlock({
   }, [block.id, removeFilterBlock])
 
   // Persist filter tree to config when it changes (debounced)
+  // CRITICAL: Use ref to track previous filter tree string to prevent unnecessary updates
+  const prevFilterTreeForSaveRef = useRef<string>("")
   useEffect(() => {
     if (!onUpdate) return
     // CRITICAL: In view mode, user changes must never persist to the interface/view config.
     // Advanced filter editing is builder-only.
     if (!isEditing) return
     
+    // Only save if filter tree actually changed
+    const filterTreeStr = JSON.stringify(filterTree)
+    if (filterTreeStr === prevFilterTreeForSaveRef.current) return
+    prevFilterTreeForSaveRef.current = filterTreeStr
+    
     const timeoutId = setTimeout(() => {
       const normalized = normalizeFilterTree(filterTree)
       const flatForLegacy = normalized ? flattenFilterTree(normalized) : []
-      onUpdate(block.id, { 
-        filter_tree: filterTree,
-        default_filters: filterTree,
-        // Keep legacy filters for backward compatibility (AND-only semantics).
-        // NOTE: OR is not representable in the legacy flat list, so consumers must prefer `filter_tree`.
-        filters: flatForLegacy.map(c => ({
-          field: c.field_id,
-          operator: c.operator as any,
-          value: c.value,
-        })),
+      // Use requestAnimationFrame to defer onUpdate and prevent synchronous setState loops
+      requestAnimationFrame(() => {
+        onUpdate(block.id, { 
+          filter_tree: filterTree,
+          default_filters: filterTree,
+          // Keep legacy filters for backward compatibility (AND-only semantics).
+          // NOTE: OR is not representable in the legacy flat list, so consumers must prefer `filter_tree`.
+          filters: flatForLegacy.map(c => ({
+            field: c.field_id,
+            operator: c.operator as any,
+            value: c.value,
+          })),
+        })
       })
     }, 1000)
     

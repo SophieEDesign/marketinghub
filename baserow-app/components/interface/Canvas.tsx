@@ -201,9 +201,27 @@ export default function Canvas({
   }, [layoutSettings?.rowHeight, layoutSettings?.margin])
   
   // Helper to notify parent of layout changes (user actions only)
+  // CRITICAL: Debounce layout change notifications to prevent UI blocking and React #185
+  const layoutChangeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingLayoutChangeRef = useRef<LayoutItem[] | null>(null)
   const notifyLayoutChange = useCallback((layoutItems: LayoutItem[]) => {
     if (!onLayoutChange) return
-    onLayoutChange(layoutItems)
+    // Store pending change
+    pendingLayoutChangeRef.current = layoutItems
+    // Clear existing timeout
+    if (layoutChangeTimeoutRef.current) {
+      clearTimeout(layoutChangeTimeoutRef.current)
+    }
+    // Debounce notification to prevent rapid-fire updates
+    layoutChangeTimeoutRef.current = setTimeout(() => {
+      if (pendingLayoutChangeRef.current) {
+        // Use requestAnimationFrame to defer setState and prevent synchronous updates
+        requestAnimationFrame(() => {
+          onLayoutChange(pendingLayoutChangeRef.current!)
+          pendingLayoutChangeRef.current = null
+        })
+      }
+    }, 100)
   }, [onLayoutChange])
   
   // ============================================================================
@@ -420,6 +438,12 @@ export default function Canvas({
       previousBlockIdsRef.current = ""
       layoutVersionRef.current = 0
       isFirstLayoutChangeRef.current = true
+      // Clear pending layout changes when page changes
+      if (layoutChangeTimeoutRef.current) {
+        clearTimeout(layoutChangeTimeoutRef.current)
+        layoutChangeTimeoutRef.current = null
+      }
+      pendingLayoutChangeRef.current = null
       setLayout([])
       setEphemeralDeltas(new Map())
       debugLog('LAYOUT', '[Canvas] Page changed - resetting state', {
@@ -428,6 +452,15 @@ export default function Canvas({
       })
     }
   }, [pageId])
+  
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (layoutChangeTimeoutRef.current) {
+        clearTimeout(layoutChangeTimeoutRef.current)
+      }
+    }
+  }, [])
   
   // Lifecycle logging
   useEffect(() => {
@@ -552,9 +585,12 @@ export default function Canvas({
         }
       })
       
-      setLayout(newLayout)
-      previousBlockIdsRef.current = currentBlockIds
-      previousBlocksLayoutSignatureRef.current = blocksLayoutSignature
+      // CRITICAL: Use requestAnimationFrame to defer setLayout and prevent synchronous setState loops
+      requestAnimationFrame(() => {
+        setLayout(newLayout)
+        previousBlockIdsRef.current = currentBlockIds
+        previousBlocksLayoutSignatureRef.current = blocksLayoutSignature
+      })
       
       if (process.env.NODE_ENV === 'development') {
         debugLog('LAYOUT', '[Canvas] Layout synced from blocks', {

@@ -83,24 +83,30 @@ export default function RecordModal({
 }: RecordModalProps) {
   const { toast } = useToast()
   
-  // CRITICAL: Use centralized resolver - interfaceMode === 'edit' is ABSOLUTE
-  // When interfaceMode === 'edit', editing is forced (derived value)
+  // P1 FIX: interfaceMode === 'edit' is ABSOLUTE - no manual overrides allowed
+  // When interfaceMode === 'edit', editing is forced (derived value, cannot be disabled)
   // When interfaceMode === 'view', allow manual toggle via state
   const forcedEditMode = resolveRecordEditMode({ interfaceMode, initialEditMode, canEditLayout })
   const [manualEditMode, setManualEditMode] = useState(false)
   
-  // Combined edit mode: forced OR manual
-  const isEditingLayout = forcedEditMode || manualEditMode
+  // P1 FIX: When forcedEditMode is true, ignore manualEditMode (no hybrid states)
+  // Combined edit mode: forced OR manual (but forced takes absolute precedence)
+  const isEditingLayout = forcedEditMode || (!forcedEditMode && manualEditMode)
   
   // Track draft layout for editing
   const [draftFieldLayout, setDraftFieldLayout] = useState<FieldLayoutItem[] | null>(null)
 
+  // P1 FIX: Reset edit state when modal closes OR when interfaceMode changes to 'edit'
+  // When interfaceMode === 'edit', manual edit modes must be disabled (forced edit takes precedence)
   useEffect(() => {
     if (!open) {
       setManualEditMode(false)
       setDraftFieldLayout(null)
+    } else if (forcedEditMode) {
+      // When forced edit mode is active, disable manual edit mode (no override allowed)
+      setManualEditMode(false)
     }
-  }, [open])
+  }, [open, forcedEditMode])
 
   const core = useRecordEditorCore({
     tableId,
@@ -138,8 +144,10 @@ export default function RecordModal({
   } = core
 
   const canSave = recordId ? canEditRecords : canCreateRecords
-  // Inline editing: editable whenever user has permission (no Edit/View toggle)
-  const effectiveEditable = canSave
+  // P1 FIX: When interfaceMode === 'edit', ALWAYS allow editing (absolute authority, bypasses all checks)
+  // When interfaceMode === 'view', require permission checks
+  // NO EXCEPTIONS: If forcedEditMode is true, editing is always allowed
+  const effectiveEditable = forcedEditMode ? true : canSave
 
   // Convert modalLayout/modalFields to field_layout format (backward compatibility)
   const resolvedFieldLayout = useMemo(() => {

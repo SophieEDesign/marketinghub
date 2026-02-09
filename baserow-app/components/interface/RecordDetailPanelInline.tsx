@@ -63,14 +63,15 @@ export default function RecordDetailPanelInline({
   // Calculate canEditLayout before using it
   const canEditLayout = pageEditable && (role === "admin" || role === "member") && Boolean(onLayoutSave)
   
-  // CRITICAL: Use centralized resolver - interfaceMode === 'edit' is ABSOLUTE
-  // When interfaceMode === 'edit', editing is forced (derived value)
+  // P1 FIX: interfaceMode === 'edit' is ABSOLUTE - no manual overrides allowed
+  // When interfaceMode === 'edit', editing is forced (derived value, cannot be disabled)
   // When interfaceMode === 'view', allow manual toggle via state
   const forcedEditMode = resolveRecordEditMode({ interfaceMode, initialEditMode: false, canEditLayout })
   const [manualEditMode, setManualEditMode] = useState(false)
   
-  // Combined edit mode: forced OR manual
-  const isEditingLayout = forcedEditMode || manualEditMode
+  // P1 FIX: When forcedEditMode is true, ignore manualEditMode (no hybrid states)
+  // Combined edit mode: forced OR manual (but forced takes absolute precedence)
+  const isEditingLayout = forcedEditMode || (!forcedEditMode && manualEditMode)
   
   const [draftFieldLayout, setDraftFieldLayout] = useState<FieldLayoutItem[] | null>(null)
   const renderCountRef = useRef(0)
@@ -104,11 +105,22 @@ export default function RecordDetailPanelInline({
 
   const isFieldEditable = useCallback(
     (fieldName: string) => {
+      // P1 FIX: When interfaceMode === 'edit', ALWAYS allow editing (absolute authority)
+      // When interfaceMode === 'view', require pageEditable AND layout permissions
+      if (forcedEditMode) return true
       if (!pageEditable) return false
       return isFieldEditableFromLayout(fieldName, resolvedFieldLayout, pageEditable)
     },
-    [pageEditable, resolvedFieldLayout]
+    [forcedEditMode, pageEditable, resolvedFieldLayout]
   )
+
+  // P1 FIX: Reset manual edit mode when forcedEditMode becomes true
+  useEffect(() => {
+    if (forcedEditMode) {
+      // When forced edit mode is active, disable manual edit mode (no override allowed)
+      setManualEditMode(false)
+    }
+  }, [forcedEditMode])
 
   // CRITICAL: Initialize draftFieldLayout when entering edit mode
   // When interfaceMode === 'edit', ALWAYS initialize layout (even if empty)

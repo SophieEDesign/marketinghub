@@ -166,21 +166,26 @@ function WorkspaceShellContent({
         isOpen={isMobile ? sidebarOpen : undefined}
         onClose={isMobile ? () => setSidebarOpen(false) : undefined}
       />
-      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-        {!hideTopbar && (
-          <Topbar
-            title={title}
-            onSidebarToggle={isMobile ? () => setSidebarOpen(!sidebarOpen) : undefined}
-          />
-        )}
-        <main
-          className={`flex-1 min-h-0 ${suppressMainScroll ? "overflow-hidden" : "overflow-y-auto"}`}
-        >
-          {children}
-        </main>
+      {/* P2 FIX: Main content area + RecordPanel in flex row for inline canvas layout */}
+      <div className="flex-1 flex flex-row overflow-hidden min-h-0 gap-0">
+        {/* Main content - resizes when panel opens */}
+        <div className="flex-1 flex flex-col overflow-hidden min-h-0 min-w-0">
+          {!hideTopbar && (
+            <Topbar
+              title={title}
+              onSidebarToggle={isMobile ? () => setSidebarOpen(!sidebarOpen) : undefined}
+            />
+          )}
+          <main
+            className={`flex-1 min-h-0 ${suppressMainScroll ? "overflow-hidden" : "overflow-y-auto"}`}
+          >
+            {children}
+          </main>
+        </div>
+        {/* P2 FIX: Record Panel as inline canvas - participates in flex layout */}
+        {/* Global Record Panel - hidden for pages with their own record detail panel */}
+        {!hideRecordPanel && <RecordPanel />}
       </div>
-      {/* Global Record Panel - hidden for pages with their own record detail panel */}
-      {!hideRecordPanel && <RecordPanel />}
     </div>
   )
 }

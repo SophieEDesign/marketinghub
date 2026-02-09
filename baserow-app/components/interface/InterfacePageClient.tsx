@@ -91,6 +91,7 @@ function InterfacePageClientInternal({
   // This ensures previous page's edit mode doesn't leak to the new page
   // DO NOT clear blocks for: edit mode toggles, viewer mode, saveLayout reloads, block updates, forceReload
   // Only clear for actual navigation (pageId changes)
+  // CRITICAL: Use requestAnimationFrame to defer state updates and prevent cascading re-renders
   useEffect(() => {
     const currentPageId = page?.id || null
     
@@ -99,18 +100,21 @@ function InterfacePageClientInternal({
       // Page actually changed - mark as not loaded but DO NOT clear blocks
       // CRITICAL: Keep current blocks until new load completes to prevent flicker
       // Blocks will be replaced in one setState when new page loads
-      console.log(`[loadBlocks] Page changed — keeping blocks until new load: oldPageId=${previousPageIdRef.current}, newPageId=${currentPageId}`, {
-        previousBlocksCount: blocks.length,
-        previousBlockIds: blocks.map(b => b.id),
+      // CRITICAL: Defer state updates to prevent synchronous setState loops
+      requestAnimationFrame(() => {
+        console.log(`[loadBlocks] Page changed — keeping blocks until new load: oldPageId=${previousPageIdRef.current}, newPageId=${currentPageId}`, {
+          previousBlocksCount: blocks.length,
+          previousBlockIds: blocks.map(b => b.id),
+        })
+        // DO NOT call setBlocks([]) - this causes flicker
+        blocksLoadedRef.current = { pageId: currentPageId || '', loaded: false }
+        
+        // CRITICAL: Exit edit modes when navigating to a different page
+        // The EditModeContext should handle this, but we ensure it here as well
+        // This prevents edit mode from leaking between pages
+        exitPageEdit()
+        exitBlockEdit()
       })
-      // DO NOT call setBlocks([]) - this causes flicker
-      blocksLoadedRef.current = { pageId: currentPageId || '', loaded: false }
-      
-      // CRITICAL: Exit edit modes when navigating to a different page
-      // The EditModeContext should handle this, but we ensure it here as well
-      // This prevents edit mode from leaking between pages
-      exitPageEdit()
-      exitBlockEdit()
     } else if (previousPageIdRef.current === null && currentPageId) {
       // First load - just set the ref, don't clear blocks
       if (process.env.NODE_ENV === 'development') {
@@ -127,7 +131,7 @@ function InterfacePageClientInternal({
     if (currentPageId) {
       previousPageIdRef.current = currentPageId
     }
-  }, [page?.id, exitPageEdit, exitBlockEdit])
+  }, [page?.id, exitPageEdit, exitBlockEdit, blocks.length])
   
   // Inline title editing state
   const [isEditingTitle, setIsEditingTitle] = useState(false)

@@ -70,14 +70,15 @@ export default function RecordModal({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isModalEditing, setIsModalEditing] = useState(false)
   
-  // CRITICAL: Use centralized resolver - interfaceMode === 'edit' is ABSOLUTE
-  // When interfaceMode === 'edit', editing is forced (derived value)
+  // P1 FIX: interfaceMode === 'edit' is ABSOLUTE - no manual overrides allowed
+  // When interfaceMode === 'edit', editing is forced (derived value, cannot be disabled)
   // When interfaceMode === 'view', allow manual toggle via state
   const forcedEditMode = resolveRecordEditMode({ interfaceMode, initialEditMode, canEditLayout })
   const [manualEditMode, setManualEditMode] = useState(false)
   
-  // Combined edit mode: forced OR manual
-  const isEditingLayout = forcedEditMode || manualEditMode
+  // P1 FIX: When forcedEditMode is true, ignore manualEditMode (no hybrid states)
+  // Combined edit mode: forced OR manual (but forced takes absolute precedence)
+  const isEditingLayout = forcedEditMode || (!forcedEditMode && manualEditMode)
   
   // Track draft layout for editing
   const [draftFieldLayout, setDraftFieldLayout] = useState<FieldLayoutItem[] | null>(null)
@@ -85,13 +86,19 @@ export default function RecordModal({
   const { toast } = useToast()
   const { role } = useUserRole()
 
+  // P1 FIX: Reset edit state when modal closes OR when interfaceMode changes to 'edit'
+  // When interfaceMode === 'edit', manual edit modes must be disabled (forced edit takes precedence)
   useEffect(() => {
     if (!isOpen) {
       setIsModalEditing(false)
       setManualEditMode(false)
       setDraftFieldLayout(null)
+    } else if (forcedEditMode) {
+      // When forced edit mode is active, enable editing and disable manual toggles
+      setIsModalEditing(true)
+      setManualEditMode(false)
     }
-  }, [isOpen])
+  }, [isOpen, forcedEditMode])
 
   const core = useRecordEditorCore({
     tableId,
@@ -121,7 +128,10 @@ export default function RecordModal({
   } = core
 
   const canShowEditButton = role === "admin" || canEditRecords
-  const effectiveEditable = canShowEditButton && isModalEditing
+  // P1 FIX: When interfaceMode === 'edit', ALWAYS allow editing (absolute authority, bypasses all checks)
+  // When interfaceMode === 'view', require manual toggle via isModalEditing AND permission checks
+  // NO EXCEPTIONS: If forcedEditMode is true, editing is always allowed
+  const effectiveEditable = forcedEditMode ? true : (canShowEditButton && isModalEditing)
 
   // Convert modalLayout/modalFields to field_layout format (backward compatibility)
   const resolvedFieldLayout = useMemo(() => {
@@ -362,10 +372,17 @@ export default function RecordModal({
                       Edit layout
                     </button>
                   )}
-                  {canShowEditButton && (
+                  {/* P1 FIX: Show Edit button ONLY when NOT in interface edit mode (Airtable-style) */}
+                  {/* When interfaceMode === 'edit', modal is already editable, so hide the button */}
+                  {canShowEditButton && !forcedEditMode && (
                     <button
                       type="button"
-                      onClick={() => setIsModalEditing((v) => !v)}
+                      onClick={() => {
+                        // P1 FIX: Prevent toggling if forcedEditMode becomes true during click
+                        if (!forcedEditMode) {
+                          setIsModalEditing((v) => !v)
+                        }
+                      }}
                       className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors ${
                         isModalEditing
                           ? "bg-primary text-primary-foreground hover:bg-primary/90"
@@ -373,6 +390,7 @@ export default function RecordModal({
                       }`}
                       aria-label={isModalEditing ? "Done editing" : "Edit record"}
                       title={isModalEditing ? "Done editing" : "Edit record"}
+                      disabled={forcedEditMode}
                     >
                       {isModalEditing ? (
                         <>

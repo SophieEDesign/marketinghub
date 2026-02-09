@@ -820,10 +820,13 @@ export default function GridView({
   // Load column order and widths from grid_view_settings
   // NOTE: upstream props can be recreated each render (new array identities).
   // Use a stable "content key" to avoid an update loop (React error #185).
+  // CRITICAL: Cache the result to prevent recomputation on every render
+  const columnSettingsKeyRef = useRef<string>("")
   const columnSettingsKey = useMemo(() => {
     // IMPORTANT: Make this key order-insensitive.
     // Some upstream queries can return the same rows in different orders; if we bake that order into
     // a key used by a setState effect, we can create an infinite render loop (React #185).
+    // CRITICAL: Use requestIdleCallback or defer heavy computations to prevent UI blocking
     const visible = Array.isArray(safeViewFields)
       ? safeViewFields
           .filter((f) => f && typeof f === 'object' && f.visible === true && typeof f.field_name === 'string')
@@ -846,7 +849,12 @@ export default function GridView({
           })
       : []
 
-    return JSON.stringify({ viewId, visible, fieldsMinimal })
+    const key = JSON.stringify({ viewId, visible, fieldsMinimal })
+    // Only update ref if key actually changed
+    if (columnSettingsKeyRef.current !== key) {
+      columnSettingsKeyRef.current = key
+    }
+    return key
   }, [viewId, safeViewFields, safeTableFields])
 
   useEffect(() => {

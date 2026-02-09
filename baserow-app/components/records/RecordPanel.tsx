@@ -14,6 +14,7 @@ import { useRecordEditorCore } from "@/lib/interface/record-editor-core"
 import { isAbortError } from "@/lib/api/error-handling"
 import { useUserRole } from "@/lib/hooks/useUserRole"
 import { resolveRecordEditMode } from "@/lib/interface/resolve-record-edit-mode"
+import { useIsMobile } from "@/hooks/useResponsive"
 
 const MIN_WIDTH = 320
 const MAX_WIDTH = 1200
@@ -24,20 +25,22 @@ export default function RecordPanel() {
   const { toast } = useToast()
   const router = useRouter()
   const { role } = useUserRole()
+  const isMobile = useIsMobile()
   const [fields, setFields] = useState<TableField[]>([])
   const [fieldsLoading, setFieldsLoading] = useState(false)
   const [fieldsLoaded, setFieldsLoaded] = useState(false)
   const [fieldGroups, setFieldGroups] = useState<Record<string, string[]>>({}) // fieldName -> groupName
   
-  // CRITICAL: Use centralized resolver - interfaceMode === 'edit' is ABSOLUTE
-  // When interfaceMode === 'edit', editing is forced (derived value)
+  // P1 FIX: interfaceMode === 'edit' is ABSOLUTE - no manual overrides allowed
+  // When interfaceMode === 'edit', editing is forced (derived value, cannot be disabled)
   // When interfaceMode === 'view', allow manual toggle via state
   const interfaceMode = state.interfaceMode ?? 'view'
   const forcedEditMode = resolveRecordEditMode({ interfaceMode, initialEditMode: false })
   const [manualEditMode, setManualEditMode] = useState(false)
   
-  // Combined edit mode: forced OR manual
-  const isPanelEditing = forcedEditMode || manualEditMode
+  // P1 FIX: When forcedEditMode is true, ignore manualEditMode (no hybrid states)
+  // Combined edit mode: forced OR manual (but forced takes absolute precedence)
+  const isPanelEditing = forcedEditMode || (!forcedEditMode && manualEditMode)
   
   const resizeRef = useRef<HTMLDivElement>(null)
   const isResizingRef = useRef(false)
@@ -66,12 +69,16 @@ export default function RecordPanel() {
   const allowEdit = cascadeContext != null ? canEditRecords : true
   const allowDelete = cascadeContext != null ? canDeleteRecords : true
 
-  // Reset manual edit state when panel closes
+  // P1 FIX: Reset manual edit state when panel closes OR when interfaceMode changes to 'edit'
+  // When interfaceMode === 'edit', manualEditMode must be disabled (forced edit takes precedence)
   useEffect(() => {
     if (!state.isOpen) {
       setManualEditMode(false)
+    } else if (forcedEditMode) {
+      // When forced edit mode is active, disable manual edit mode (no override allowed)
+      setManualEditMode(false)
     }
-  }, [state.isOpen])
+  }, [state.isOpen, forcedEditMode])
 
   // Log edit mode state on panel open for debugging
   useEffect(() => {
@@ -86,8 +93,9 @@ export default function RecordPanel() {
   }, [state.isOpen, interfaceMode, isPanelEditing, forcedEditMode, state.recordId])
 
   const canShowEditButton = role === "admin" || allowEdit
-  // CRITICAL: When interfaceMode === 'edit', ALWAYS allow editing (bypass permission checks)
-  // When interfaceMode === 'view', require manual toggle via isPanelEditing
+  // P1 FIX: When interfaceMode === 'edit', ALWAYS allow editing (absolute authority, bypasses all checks)
+  // When interfaceMode === 'view', require manual toggle via isPanelEditing AND permission checks
+  // NO EXCEPTIONS: If forcedEditMode is true, editing is always allowed
   const effectiveAllowEdit = forcedEditMode ? true : (canShowEditButton && isPanelEditing && allowEdit)
 
   // Dev-only guardrail: warn when RecordPanel opens without cascadeContext (surfaces call sites that may want to pass context later)
@@ -332,9 +340,9 @@ export default function RecordPanel() {
         description: "A copy of this record has been created.",
         variant: "success",
       })
-      // Open the new record
+      // P1 FIX: Open the new record, preserving interfaceMode (linked records inherit edit mode)
       if (data?.id && state.tableId && state.tableName) {
-        navigateToLinkedRecord(state.tableId, data.id, state.tableName)
+        navigateToLinkedRecord(state.tableId, data.id, state.tableName, interfaceMode)
       }
     } catch (error: any) {
       console.error("Error duplicating record:", error)
@@ -357,7 +365,9 @@ export default function RecordPanel() {
     }
   }, [state.isFullscreen, router, goBack])
 
-  if (!state.isOpen) return null
+  // P2 FIX: Don't render if not open (but keep in DOM for flex layout participation)
+  // On mobile or fullscreen, use overlay behavior; otherwise use inline flex layout
+  const useOverlayLayout = isMobile || state.isFullscreen
 
   const headerLoading = recordLoading || !fieldsLoaded || fieldsLoading
   const hasRecord = formData && Object.keys(formData).length > 0
@@ -366,30 +376,39 @@ export default function RecordPanel() {
   // Show back button if in fullscreen (to go to core data) or if there's history
   const canGoBack = state.isFullscreen || state.history.length > 1
 
+  // P2 FIX: On mobile/fullscreen, return null when closed (overlay behavior)
+  // On desktop inline mode, always render but with width 0 when closed
+  if (!state.isOpen && useOverlayLayout) return null
+
   return (
     <>
-      {/* Backdrop - only show if not pinned and not fullscreen */}
-      {!state.isPinned && !state.isFullscreen && (
+      {/* P2 FIX: Backdrop - only show on mobile or when fullscreen (overlay mode) */}
+      {useOverlayLayout && !state.isPinned && state.isOpen && (
         <div
           className="fixed inset-0 bg-black/20 z-40 transition-opacity"
           onClick={closeRecord}
         />
       )}
 
-      {/* Panel */}
+      {/* P2 FIX: Panel - inline flex layout on desktop, fixed overlay on mobile/fullscreen */}
       {/* CRITICAL: Remount key includes interfaceMode to force remount when edit context changes */}
       <div
         key={`record-panel-${state.recordId}-${interfaceMode}`}
-        className={`fixed right-0 top-0 h-full bg-white shadow-xl z-50 flex flex-col transition-all duration-300 ease-out ${
-          state.isFullscreen ? "" : ""
-        }`}
+        className={`${
+          useOverlayLayout
+            ? "fixed right-0 top-0 h-full z-50"
+            : "flex-shrink-0 border-l border-gray-200"
+        } bg-white shadow-xl flex flex-col transition-all duration-300 ease-out`}
         style={{
-          width: panelWidth,
-          transform: state.isOpen ? "translateX(0)" : "translateX(100%)",
+          width: state.isOpen ? panelWidth : "0px",
+          transform: useOverlayLayout && !state.isOpen ? "translateX(100%)" : "none",
+          minWidth: !useOverlayLayout && state.isOpen ? `${state.width}px` : undefined,
+          maxWidth: !useOverlayLayout && state.isOpen ? `${state.width}px` : undefined,
+          overflow: state.isOpen ? undefined : "hidden",
         }}
       >
-        {/* Resize Handle */}
-        {!state.isFullscreen && (
+        {/* P2 FIX: Resize Handle - only show in inline mode (not fullscreen, not mobile) */}
+        {!state.isFullscreen && !isMobile && state.isOpen && (
           <div
             ref={resizeRef}
             className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 transition-colors z-10"
@@ -406,6 +425,7 @@ export default function RecordPanel() {
 
               const handleMouseMove = (ev: MouseEvent) => {
                 if (!isResizingRef.current) return
+                // P2 FIX: Calculate width from right edge of viewport
                 const raw = window.innerWidth - ev.clientX
                 const clamped = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, raw))
                 setWidth(clamped)
@@ -459,12 +479,18 @@ export default function RecordPanel() {
             )}
           </div>
           <div className="flex items-center gap-1">
-            {/* Show Edit button only when NOT in interface edit mode (Airtable-style) */}
+            {/* P1 FIX: Show Edit button ONLY when NOT in interface edit mode (Airtable-style) */}
             {/* When interfaceMode === 'edit', panel is already editable, so hide the button */}
+            {/* Edit button is hidden when forcedEditMode is true - no manual override allowed */}
             {canShowEditButton && !forcedEditMode && (
               <button
                 type="button"
-                onClick={() => setManualEditMode((v) => !v)}
+                onClick={() => {
+                  // P1 FIX: Prevent toggling if forcedEditMode becomes true during click
+                  if (!forcedEditMode) {
+                    setManualEditMode((v) => !v)
+                  }
+                }}
                 className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-sm font-medium transition-colors ${
                   isPanelEditing
                     ? "bg-primary text-primary-foreground hover:bg-primary/90"
@@ -472,6 +498,7 @@ export default function RecordPanel() {
                 }`}
                 aria-label={isPanelEditing ? "Done editing" : "Edit record"}
                 title={isPanelEditing ? "Done editing" : "Edit record"}
+                disabled={forcedEditMode}
               >
                 {isPanelEditing ? (
                   <>
