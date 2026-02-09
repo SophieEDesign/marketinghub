@@ -25,6 +25,10 @@ interface FilterBlockState {
   filterTree?: FilterTree
   targetBlocks: string[] | 'all'
   /**
+   * Table ID of the filter block (for table compatibility checking when targetBlocks === 'all').
+   */
+  tableId?: string | null
+  /**
    * A stable signature of the emitted filter payload.
    * Used to avoid provider update loops when callers re-emit equivalent values.
    */
@@ -39,9 +43,9 @@ export interface FilterConfigWithSource extends FilterConfig {
 
 interface FilterStateContextValue {
   // Get filters for a specific block (from all filter blocks that target it)
-  getFiltersForBlock: (blockId: string) => FilterConfigWithSource[]
+  getFiltersForBlock: (blockId: string, blockTableId?: string | null) => FilterConfigWithSource[]
   // Get canonical filter tree for a specific block (from all filter blocks that target it)
-  getFilterTreeForBlock: (blockId: string) => FilterTree
+  getFilterTreeForBlock: (blockId: string, blockTableId?: string | null) => FilterTree
   // Get filter block info for a specific block ID
   getFilterBlockInfo: (blockId: string) => { blockId: string; title?: string } | null
   // Update filter block state
@@ -50,7 +54,8 @@ interface FilterStateContextValue {
     filters: FilterConfig[],
     targetBlocks: string[] | 'all',
     blockTitle?: string,
-    filterTree?: FilterTree
+    filterTree?: FilterTree,
+    tableId?: string | null
   ) => void
   // Remove filter block state
   removeFilterBlock: (blockId: string) => void
@@ -68,19 +73,34 @@ export function FilterStateProvider({ children }: { children: ReactNode }) {
     blockId: string,
     filters: FilterConfig[],
     targetBlocks: string[] | 'all',
-    filterTree?: FilterTree
+    filterTree?: FilterTree,
+    tableId?: string | null
   ) => {
     // IMPORTANT: We assume caller maintains stable order; this is sufficient to detect "no-op" re-emits.
     // This is intentionally cheap and avoids deep-equality footguns.
-    return JSON.stringify({ blockId, filters, targetBlocks, filterTree })
+    return JSON.stringify({ blockId, filters, targetBlocks, filterTree, tableId })
   }, [])
 
-  const getFiltersForBlock = useCallback((blockId: string): FilterConfigWithSource[] => {
+  const getFiltersForBlock = useCallback((blockId: string, blockTableId?: string | null): FilterConfigWithSource[] => {
     const filters: FilterConfigWithSource[] = []
     
     // Collect filters from all filter blocks that target this block
     for (const [filterBlockId, state] of filterBlocks.entries()) {
-      if (state.targetBlocks === 'all' || state.targetBlocks.includes(blockId)) {
+      let shouldApply = false
+      
+      if (state.targetBlocks === 'all') {
+        // When targetBlocks is 'all', check table compatibility if table IDs are available
+        if (state.tableId && blockTableId) {
+          shouldApply = state.tableId === blockTableId
+        } else {
+          // If table IDs aren't available, apply to all blocks (backward compatibility)
+          shouldApply = true
+        }
+      } else if (Array.isArray(state.targetBlocks)) {
+        shouldApply = state.targetBlocks.includes(blockId)
+      }
+      
+      if (shouldApply) {
         const blockTitle = filterBlockTitles.get(filterBlockId)
         // Merge filters (avoid duplicates by field)
         for (const filter of state.filters) {
@@ -103,11 +123,25 @@ export function FilterStateProvider({ children }: { children: ReactNode }) {
     return filters
   }, [filterBlocks, filterBlockTitles])
 
-  const getFilterTreeForBlock = useCallback((blockId: string): FilterTree => {
+  const getFilterTreeForBlock = useCallback((blockId: string, blockTableId?: string | null): FilterTree => {
     const trees: FilterTree[] = []
 
     for (const [, state] of filterBlocks.entries()) {
-      if (state.targetBlocks === 'all' || state.targetBlocks.includes(blockId)) {
+      let shouldApply = false
+      
+      if (state.targetBlocks === 'all') {
+        // When targetBlocks is 'all', check table compatibility if table IDs are available
+        if (state.tableId && blockTableId) {
+          shouldApply = state.tableId === blockTableId
+        } else {
+          // If table IDs aren't available, apply to all blocks (backward compatibility)
+          shouldApply = true
+        }
+      } else if (Array.isArray(state.targetBlocks)) {
+        shouldApply = state.targetBlocks.includes(blockId)
+      }
+      
+      if (shouldApply) {
         const tree = state.filterTree ?? filterConfigsToFilterTree(state.filters || [], 'AND')
         if (tree) trees.push(tree)
       }
@@ -127,16 +161,17 @@ export function FilterStateProvider({ children }: { children: ReactNode }) {
     filters: FilterConfig[],
     targetBlocks: string[] | 'all',
     blockTitle?: string,
-    filterTree?: FilterTree
+    filterTree?: FilterTree,
+    tableId?: string | null
   ) => {
-    const signature = computeSignature(blockId, filters, targetBlocks, filterTree)
+    const signature = computeSignature(blockId, filters, targetBlocks, filterTree, tableId)
     setFilterBlocks(prev => {
       const existing = prev.get(blockId)
       if (existing?.signature === signature) {
         return prev
       }
       const next = new Map(prev)
-      next.set(blockId, { blockId, filters, targetBlocks, signature, filterTree })
+      next.set(blockId, { blockId, filters, targetBlocks, signature, filterTree, tableId })
       return next
     })
     if (blockTitle !== undefined) {

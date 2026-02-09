@@ -110,7 +110,10 @@ export default function BlockRenderer({
   isEditingCanvas = false,
   isFullPage = false,
   onFieldChange,
-}: BlockRendererProps) {
+  openRecordInEditModeForBlock,
+}: BlockRendererProps & {
+  openRecordInEditModeForBlock?: { blockId: string; recordId: string; tableId: string } | null
+}) {
   const diagnosticsEnabled = process.env.NODE_ENV === 'development'
   useEffect(() => {
     if (process.env.NODE_ENV !== 'development' || blockDriftChecksRun) return
@@ -224,6 +227,7 @@ export default function BlockRenderer({
               onEphemeralHeightDelta={onEphemeralHeightDelta}
               rowHeight={rowHeight}
               isFullPage={isFullPage}
+              openRecordInEditModeForBlock={openRecordInEditModeForBlock}
             />
           </LazyBlockWrapper>
         )
@@ -478,6 +482,7 @@ export default function BlockRenderer({
               onEphemeralHeightDelta={onEphemeralHeightDelta}
               rowHeight={rowHeight}
               isFullPage={isFullPage}
+              openRecordInEditModeForBlock={openRecordInEditModeForBlock}
             />
           </LazyBlockWrapper>
         )

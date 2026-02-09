@@ -137,6 +137,10 @@ interface GridViewProps {
   onModalLayoutSave?: (modalLayout: import("@/lib/interface/types").BlockConfig["modal_layout"]) => void
   /** When true, show "Edit layout" in record modal. */
   canEditLayout?: boolean
+  /** When true, modal opens directly in layout edit mode */
+  initialModalEditMode?: boolean
+  /** Record ID to open in edit mode. When set, opens that record with initialModalEditMode=true */
+  openRecordInEditMode?: string | null
 }
 
 const ITEMS_PER_PAGE = 100
@@ -570,6 +574,7 @@ export default function GridView({
   highlightRules = [],
   onModalLayoutSave,
   canEditLayout = false,
+  initialModalEditMode = false,
 }: GridViewProps) {
   const { openRecord } = useRecordPanel()
   const isMobile = useIsMobile()
@@ -597,6 +602,13 @@ export default function GridView({
   const [fieldToDelete, setFieldToDelete] = useState<string | null>(null)
   const [missingRequiredFields, setMissingRequiredFields] = useState<string[]>([])
   const [modalRecordId, setModalRecordId] = useState<string | null>(null)
+
+  // Open record in edit mode when openRecordInEditMode is set
+  useEffect(() => {
+    if (openRecordInEditMode && openRecordInEditMode !== modalRecordId) {
+      setModalRecordId(openRecordInEditMode)
+    }
+  }, [openRecordInEditMode])
 
   // Track previous groupBy to detect changes
   const prevGroupByRef = useRef<string | undefined>(groupBy)
@@ -3862,6 +3874,7 @@ export default function GridView({
           cascadeContext={cascadeContext}
           canEditLayout={canEditLayout}
           onLayoutSave={onModalLayoutSave}
+          initialEditMode={initialModalEditMode || !!openRecordInEditMode}
         />
       )}
     </div>

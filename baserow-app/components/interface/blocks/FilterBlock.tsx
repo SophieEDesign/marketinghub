@@ -159,9 +159,14 @@ export default function FilterBlock({
   // Emit targets as an explicit list so we never "accidentally" affect other tables.
   const effectiveTargetBlocks = useMemo<string[] | 'all'>(() => {
     if (!tableId) return []
+    // If targetBlocks is 'all', preserve 'all' so filter state context can match all compatible blocks
+    // The filter state context will check table compatibility using the tableId we pass
+    if (targetBlocks === 'all') {
+      return 'all'
+    }
     // If user picked explicit blocks, connectedBlocks is already filtered safely.
     return connectedBlocks.map((b) => b.id)
-  }, [connectedBlocks, tableId])
+  }, [connectedBlocks, tableId, targetBlocks])
 
   // Get fields common to all connected blocks
   const availableFields = useMemo(() => {
@@ -251,9 +256,9 @@ export default function FilterBlock({
   useEffect(() => {
     if (block.id) {
       const blockTitle = config?.title || block.id
-      updateFilterBlock(block.id, emittedFilters, effectiveTargetBlocks, blockTitle, filterTree)
+      updateFilterBlock(block.id, emittedFilters, effectiveTargetBlocks, blockTitle, filterTree, tableId)
     }
-  }, [emitSignature, block.id, updateFilterBlock, filterTree])
+  }, [emitSignature, block.id, updateFilterBlock, filterTree, tableId, effectiveTargetBlocks, emittedFilters, config?.title])
 
   // Cleanup only on unmount / blockId change.
   useEffect(() => {

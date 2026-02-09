@@ -35,6 +35,8 @@ interface RecordModalProps {
   canEditLayout?: boolean
   /** Called when user saves layout in edit mode (Done). Pass the new modal_layout; parent persists (e.g. via block config). */
   onLayoutSave?: (modalLayout: BlockConfig['modal_layout']) => void
+  /** When true, modal opens directly in layout edit mode */
+  initialEditMode?: boolean
 }
 
 export default function RecordModal({
@@ -49,6 +51,7 @@ export default function RecordModal({
   cascadeContext,
   canEditLayout = false,
   onLayoutSave,
+  initialEditMode = false,
 }: RecordModalProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isModalEditing, setIsModalEditing] = useState(false)
@@ -65,6 +68,14 @@ export default function RecordModal({
       setDraftBlocks(null)
     }
   }, [isOpen])
+
+  // Auto-enter edit mode when initialEditMode is true and modal opens
+  useEffect(() => {
+    if (isOpen && initialEditMode && hasCustomLayout && !isEditingLayout && modalBlocks.length > 0) {
+      setIsEditingLayout(true)
+      setDraftBlocks([...modalBlocks])
+    }
+  }, [isOpen, initialEditMode, hasCustomLayout, isEditingLayout, modalBlocks])
 
   const core = useRecordEditorCore({
     tableId,

@@ -46,6 +46,8 @@ export type DataSettingsCtx = {
   onEditCanvas?: () => void // For Tabs blocks
   isEditingCanvas?: boolean // For Tabs blocks
   onExitBlockCanvas?: () => void // For Tabs blocks
+  /** Callback to open a record modal in edit mode for layout editing. Returns recordId or null. */
+  onOpenRecordForLayoutEdit?: (tableId: string) => Promise<string | null>
 }
 
 export type AppearanceSettingsCtx = {

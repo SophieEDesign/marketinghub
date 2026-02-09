@@ -35,6 +35,8 @@ interface SettingsPanelProps {
   editingBlockCanvasId?: string | null // ID of block whose canvas is being edited
   onEditBlockCanvas?: (blockId: string) => void // Callback to enter block canvas edit mode
   onExitBlockCanvas?: () => void // Callback to exit block canvas edit mode
+  /** Callback to open a record modal in edit mode for layout editing */
+  onOpenRecordForLayoutEdit?: (tableId: string) => Promise<string | null>
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -55,6 +57,7 @@ export default function SettingsPanel({
   editingBlockCanvasId = null,
   onEditBlockCanvas,
   onExitBlockCanvas,
+  onOpenRecordForLayoutEdit,
 }: SettingsPanelProps) {
   const { toast } = useToast()
   const [tables, setTables] = useState<Table[]>([])
@@ -554,6 +557,7 @@ export default function SettingsPanel({
       onTableChange,
       pageTableId,
       allBlocks,
+      onOpenRecordForLayoutEdit: onOpenRecordForLayoutEdit,
       ...additionalProps,
     } as any)
 

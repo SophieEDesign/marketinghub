@@ -238,6 +238,61 @@ export default function InterfaceBuilder({
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
   const [selectedBlockIds, setSelectedBlockIds] = useState<Set<string>>(new Set())
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false)
+  // Track which block should open a record in edit mode: { blockId, recordId, tableId }
+  const [openRecordInEditModeForBlock, setOpenRecordInEditModeForBlock] = useState<{
+    blockId: string
+    recordId: string
+    tableId: string
+  } | null>(null)
+
+  // Callback to open a record in edit mode for layout editing
+  const handleOpenRecordForLayoutEdit = useCallback(async (tableId: string): Promise<string | null> => {
+    if (!selectedBlockId) return null
+    try {
+      const supabase = createClient()
+      // Get table name
+      const { data: table } = await supabase
+        .from("tables")
+        .select("supabase_table")
+        .eq("id", tableId)
+        .single()
+
+      if (!table?.supabase_table) {
+        return null
+      }
+
+      // Get first record (or create one if none exist)
+      const { data: records } = await supabase
+        .from(table.supabase_table)
+        .select("id")
+        .limit(1)
+        .order("created_at", { ascending: false })
+
+      let recordId: string | null = null
+      if (records && records.length > 0) {
+        recordId = records[0].id
+      } else {
+        // Create a temporary record
+        const { data: newRecord } = await supabase
+          .from(table.supabase_table)
+          .insert([{}])
+          .select("id")
+          .single()
+        if (newRecord) {
+          recordId = newRecord.id
+        }
+      }
+
+      if (recordId) {
+        setOpenRecordInEditModeForBlock({ blockId: selectedBlockId, recordId, tableId })
+        return recordId
+      }
+      return null
+    } catch (error) {
+      console.error("Error opening record for layout edit:", error)
+      return null
+    }
+  }, [selectedBlockId])
   const [isSaving, setIsSaving] = useState(false)
   const [pageSettingsOpen, setPageSettingsOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState<Page>(page)
@@ -1558,6 +1613,7 @@ export default function InterfaceBuilder({
           allBlocks={blocks}
           onLock={handleLockBlock}
           editingBlockCanvasId={editingBlockCanvasId}
+          openRecordInEditModeForBlock={openRecordInEditModeForBlock}
           onEditBlockCanvas={async (blockId) => {
             // For Tabs blocks, open modal instead of inline editing
             const block = blocks.find(b => b.id === blockId)

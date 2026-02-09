@@ -102,6 +102,10 @@ interface GridViewWrapperProps {
   onModalLayoutSave?: (modalLayout: import("@/lib/interface/types").BlockConfig["modal_layout"]) => void
   /** When true, show "Edit layout" in record modal. */
   canEditLayout?: boolean
+  /** When true, modal opens directly in layout edit mode */
+  initialModalEditMode?: boolean
+  /** Record ID to open in edit mode. When set, opens that record with initialModalEditMode=true */
+  openRecordInEditMode?: string | null
 }
 
 export default function GridViewWrapper({
@@ -132,6 +136,8 @@ export default function GridViewWrapper({
   highlightRules = [],
   onModalLayoutSave,
   canEditLayout = false,
+  initialModalEditMode = false,
+  openRecordInEditMode = null,
 }: GridViewWrapperProps) {
   // CRITICAL: Normalize all inputs at wrapper entry point
   const safeInitialFilters = asArray<Filter>(initialFilters)
@@ -894,6 +900,8 @@ export default function GridViewWrapper({
           highlightRules={highlightRules}
           onModalLayoutSave={onModalLayoutSave}
           canEditLayout={canEditLayout}
+          initialModalEditMode={initialModalEditMode || !!openRecordInEditMode}
+          openRecordInEditMode={openRecordInEditMode}
         />
       </div>
       <FieldBuilderDrawer

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo, useRef, useCallback } from "react"
+import React, { useEffect, useState, useMemo, useRef, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { PageBlock, ViewType } from "@/lib/interface/types"
 import GridViewWrapper from "@/components/grid/GridViewWrapper"
@@ -51,6 +51,8 @@ interface GridBlockProps {
   canEditLayout?: boolean
   /** When true (full-page calendar), use compact Airtable-style top bar and date range from block settings. */
   isFullPage?: boolean
+  /** When set and matches this block, opens the record in edit mode */
+  openRecordInEditModeForBlock?: { blockId: string; recordId: string; tableId: string } | null
 }
 
 export default function GridBlock({
@@ -68,9 +70,23 @@ export default function GridBlock({
   onModalLayoutSave,
   canEditLayout = false,
   isFullPage = false,
+  openRecordInEditModeForBlock,
 }: GridBlockProps) {
   const { config } = block
   const { openRecord: openRecordPanel } = useRecordPanel()
+  const [openRecordInEditMode, setOpenRecordInEditMode] = useState<string | null>(null)
+
+  // Open record in edit mode when openRecordInEditModeForBlock matches this block
+  useEffect(() => {
+    if (openRecordInEditModeForBlock && openRecordInEditModeForBlock.blockId === block.id) {
+      setOpenRecordInEditMode(openRecordInEditModeForBlock.recordId)
+      // Clear after a short delay to allow GridView to process it
+      const timer = setTimeout(() => {
+        setOpenRecordInEditMode(null)
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [openRecordInEditModeForBlock, block.id])
 
   // Track base height (collapsed state) to calculate deltas
   const baseHeightRef = useRef<number | null>(null)
@@ -1051,6 +1067,14 @@ export default function GridBlock({
             rowHeightPixels={rowHeight}
             onModalLayoutSave={onModalLayoutSave}
             canEditLayout={canEditLayout}
+            openRecordInEditMode={
+              openRecordInEditModeForBlock &&
+              openRecordInEditModeForBlock.blockId === block.id &&
+              openRecordInEditModeForBlock.tableId === tableId &&
+              openRecordInEditMode
+                ? openRecordInEditMode
+                : null
+            }
           />
         )
     }

@@ -38,6 +38,8 @@ export interface RecordModalProps {
   canEditLayout?: boolean
   /** Called when user saves layout in edit mode (Done). */
   onLayoutSave?: (modalLayout: BlockConfig['modal_layout']) => void
+  /** When true, modal opens directly in layout edit mode */
+  initialEditMode?: boolean
 }
 
 const DEFAULT_SECTION_NAME = "General"
@@ -61,6 +63,7 @@ export default function RecordModal({
   cascadeContext,
   canEditLayout = false,
   onLayoutSave,
+  initialEditMode = false,
 }: RecordModalProps) {
   const { toast } = useToast()
   const [isEditingLayout, setIsEditingLayout] = useState(false)
@@ -219,6 +222,14 @@ export default function RecordModal({
   // Show "Edit layout" when in edit mode with save callback (allow creating layout from scratch, not just editing existing)
   const showEditLayoutButton = canEditLayout && Boolean(onLayoutSave) && Boolean(recordId) && !isEditingLayout
   const blocksForCanvas = isEditingLayout && draftBlocks !== null ? draftBlocks : modalBlocks
+
+  // Auto-enter edit mode when initialEditMode is true and modal opens
+  useEffect(() => {
+    if (open && initialEditMode && hasCustomLayout && !isEditingLayout && modalBlocks.length > 0 && recordId) {
+      setIsEditingLayout(true)
+      setDraftBlocks([...modalBlocks])
+    }
+  }, [open, initialEditMode, hasCustomLayout, isEditingLayout, modalBlocks, recordId])
 
   const handleStartEditLayout = useCallback(() => {
     setIsEditingLayout(true)

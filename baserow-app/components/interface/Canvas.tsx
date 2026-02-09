@@ -84,6 +84,8 @@ interface CanvasProps {
   editingBlockCanvasId?: string | null // ID of block whose canvas is being edited
   /** When set and this is the only block, canvas uses full-page layout (no grid, no drag/resize). Read-only for layout: do not call onLayoutChange. */
   fullPageBlockId?: string | null
+  /** When set, opens the specified record in edit mode for the specified block */
+  openRecordInEditModeForBlock?: { blockId: string; recordId: string; tableId: string } | null
 }
 
 export default function Canvas({
@@ -118,6 +120,7 @@ export default function Canvas({
   pageShowFieldNames = true,
   editingBlockCanvasId = null,
   fullPageBlockId = null,
+  openRecordInEditModeForBlock = null,
 }: CanvasProps) {
   // Get filters from filter blocks for this block
   const { getFiltersForBlock, getFilterTreeForBlock } = useFilterState()
@@ -126,7 +129,11 @@ export default function Canvas({
   // This eliminates duplicate requests - SWR handles deduplication automatically
   // Fetch all aggregates for KPI blocks using per-block page filters.
   // This ensures a Filter block only affects the KPI blocks it targets.
-  const aggregateData = usePageAggregates(blocks, (blockId) => getFiltersForBlock(blockId))
+  const aggregateData = usePageAggregates(blocks, (blockId) => {
+    const block = blocks.find(b => b.id === blockId)
+    const blockTableId = block?.config?.table_id || pageTableId
+    return getFiltersForBlock(blockId, blockTableId)
+  })
   
   // Identify top two field blocks (by y position) for inline editing without Edit button
   // Only consider field blocks in the right column (x >= 4) for record view pages
@@ -1816,8 +1823,8 @@ export default function Canvas({
                             recordId={recordId}
                             recordTableId={recordTableId}
                             mode={mode}
-                            filters={getFiltersForBlock(fullPageBlock.id)}
-                            filterTree={getFilterTreeForBlock(fullPageBlock.id) as FilterTree}
+                            filters={getFiltersForBlock(fullPageBlock.id, fullPageBlock.config?.table_id || pageTableId)}
+                            filterTree={getFilterTreeForBlock(fullPageBlock.id, fullPageBlock.config?.table_id || pageTableId) as FilterTree}
                             onRecordClick={onRecordClick}
                             onRecordContextChange={onRecordContextChange}
                             aggregateData={aggregateData[fullPageBlock.id]}
@@ -1831,6 +1838,7 @@ export default function Canvas({
                             rowHeight={Number(layoutSettings?.rowHeight) || 30}
                             isEditingCanvas={editingBlockCanvasId === fullPageBlock.id}
                             isFullPage
+                            openRecordInEditModeForBlock={openRecordInEditModeForBlock}
                           />
                         </div>
                       </BlockAppearanceWrapper>
@@ -1930,8 +1938,8 @@ export default function Canvas({
                         recordId={recordId}
                         recordTableId={recordTableId}
                         mode={mode}
-                        filters={getFiltersForBlock(fullPageBlock.id)}
-                        filterTree={getFilterTreeForBlock(fullPageBlock.id) as FilterTree}
+                        filters={getFiltersForBlock(fullPageBlock.id, fullPageBlock.config?.table_id || pageTableId)}
+                        filterTree={getFilterTreeForBlock(fullPageBlock.id, fullPageBlock.config?.table_id || pageTableId) as FilterTree}
                         onRecordClick={onRecordClick}
                         onRecordContextChange={onRecordContextChange}
                         aggregateData={aggregateData[fullPageBlock.id]}
@@ -2726,8 +2734,8 @@ export default function Canvas({
                     recordId={recordId}
                     recordTableId={recordTableId}
                     mode={mode}
-                    filters={getFiltersForBlock(block.id)}
-                    filterTree={getFilterTreeForBlock(block.id) as FilterTree}
+                    filters={getFiltersForBlock(block.id, block.config?.table_id || pageTableId)}
+                    filterTree={getFilterTreeForBlock(block.id, block.config?.table_id || pageTableId) as FilterTree}
                     onRecordClick={onRecordClick}
                     onRecordContextChange={onRecordContextChange}
                     aggregateData={aggregateData[block.id]}
@@ -2740,6 +2748,7 @@ export default function Canvas({
                     onEphemeralHeightDelta={(blockId: string, deltaPx: number) => handleEphemeralHeightDelta(blockId, deltaPx)}
                     rowHeight={Number(layoutSettings?.rowHeight) || 30}
                     isEditingCanvas={editingBlockCanvasId === block.id}
+                    openRecordInEditModeForBlock={openRecordInEditModeForBlock}
                   />
                 </div>
               </BlockAppearanceWrapper>
