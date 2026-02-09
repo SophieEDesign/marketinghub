@@ -718,6 +718,7 @@ export default function GridBlock({
             highlightRules={config.highlight_rules}
             onModalLayoutSave={onModalLayoutSave}
             canEditLayout={canEditLayout}
+            interfaceMode={interfaceMode}
           />
         )
       }

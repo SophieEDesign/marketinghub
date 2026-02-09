@@ -51,6 +51,8 @@ export interface RecordModalProps {
   onLayoutSave?: (fieldLayout: FieldLayoutItem[]) => void
   /** When true, modal opens directly in layout edit mode */
   initialEditMode?: boolean
+  /** Interface mode: 'view' | 'edit'. When 'edit', modal opens in layout edit mode (Airtable-style). */
+  interfaceMode?: 'view' | 'edit'
 }
 
 const DEFAULT_SECTION_NAME = "General"
@@ -76,10 +78,28 @@ export default function RecordModal({
   canEditLayout = false,
   onLayoutSave,
   initialEditMode = false,
+  interfaceMode = 'view',
 }: RecordModalProps) {
   const { toast } = useToast()
-  const [isEditingLayout, setIsEditingLayout] = useState(false)
+  
+  // CRITICAL: Initialize layout edit state from interfaceMode (Airtable-style)
+  // When interface is in edit mode, modal MUST open in edit mode immediately
+  const shouldEditLayout = interfaceMode === 'edit' || initialEditMode
+  const [isEditingLayout, setIsEditingLayout] = useState(shouldEditLayout)
   const [draftFieldLayout, setDraftFieldLayout] = useState<FieldLayoutItem[] | null>(null)
+
+  // Log edit mode state on modal open for debugging
+  useEffect(() => {
+    if (open && process.env.NODE_ENV === 'development') {
+      console.log('[RecordModal] Modal opened:', {
+        interfaceMode,
+        initialEditMode,
+        isEditingLayout,
+        shouldEditLayout,
+        recordId,
+      })
+    }
+  }, [open, interfaceMode, initialEditMode, isEditingLayout, shouldEditLayout, recordId])
 
   useEffect(() => {
     if (!open) {
@@ -257,22 +277,30 @@ export default function RecordModal({
     }
   }
 
-  // Show "Edit layout" button for existing records
-  // Allow editing even when there's no existing layout (user can create one)
-  const showEditLayoutButton = canEditLayout && Boolean(onLayoutSave) && Boolean(recordId) && !isEditingLayout
+  // Show "Edit layout" button only when NOT in interface edit mode (Airtable-style)
+  // When interfaceMode === 'edit', modal is already in edit mode, so hide the button
+  const showEditLayoutButton = interfaceMode !== 'edit' && canEditLayout && Boolean(onLayoutSave) && Boolean(recordId) && !isEditingLayout
 
-  // Auto-enter edit mode when initialEditMode is true and modal opens
+  // Auto-enter edit mode when interfaceMode === 'edit' or initialEditMode is true
+  // Initialize draftFieldLayout immediately when modal opens in edit mode
   useEffect(() => {
-    if (open && initialEditMode && !isEditingLayout && recordId) {
+    if (open && shouldEditLayout && resolvedFieldLayout.length > 0 && draftFieldLayout === null) {
       setIsEditingLayout(true)
-      // If there's no existing layout, initialize with all fields visible
-      if (resolvedFieldLayout.length === 0) {
-        setDraftFieldLayout(createInitialFieldLayout(filteredFields, 'modal', effectiveEditable))
-      } else {
-        setDraftFieldLayout([...resolvedFieldLayout])
-      }
+      setDraftFieldLayout([...resolvedFieldLayout])
     }
-  }, [open, initialEditMode, isEditingLayout, resolvedFieldLayout, recordId, filteredFields, effectiveEditable])
+  }, [open, shouldEditLayout, resolvedFieldLayout, draftFieldLayout])
+  
+  // Sync edit state when interfaceMode changes while modal is open
+  useEffect(() => {
+    if (open && interfaceMode === 'edit' && !isEditingLayout && resolvedFieldLayout.length > 0) {
+      setIsEditingLayout(true)
+      setDraftFieldLayout([...resolvedFieldLayout])
+    } else if (open && interfaceMode === 'view' && isEditingLayout && !initialEditMode) {
+      // Exit edit mode when interfaceMode changes to 'view' (unless initialEditMode is set)
+      setIsEditingLayout(false)
+      setDraftFieldLayout(null)
+    }
+  }, [open, interfaceMode, isEditingLayout, resolvedFieldLayout, initialEditMode])
 
   const handleStartEditLayout = useCallback(() => {
     setIsEditingLayout(true)
@@ -306,10 +334,11 @@ export default function RecordModal({
     return sectionAndSortFields(filteredFields)
   }, [filteredFields, showFieldSections])
 
+  // CRITICAL: Unmount on close to prevent stale state (remount safety)
   if (!open) return null
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={onClose} key={`record-modal-${recordId || 'new'}-${interfaceMode}`}>
       <DialogContent className={isEditingLayout ? "max-w-7xl max-h-[90vh] flex flex-col p-0" : "max-w-2xl max-h-[90vh] flex flex-col p-0"}>
         {/* Sticky top bar with save button */}
         <div className="sticky top-0 z-10 bg-white border-b px-6 py-3 flex items-center justify-between gap-2">
@@ -410,7 +439,7 @@ export default function RecordModal({
                     />
                   </div>
                 </>
-              ) : hasCustomLayout && recordId ? (
+              ) : resolvedFieldLayout.length > 0 && recordId ? (
                 // Use RecordFields for existing records with layout
                 <div className="space-y-4 py-4">
                   <RecordFields

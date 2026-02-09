@@ -247,6 +247,19 @@ export default function RecordModal({
   // Allow editing even when there's no existing layout (user can create one)
   const showEditLayoutButton = interfaceMode !== 'edit' && Boolean(onLayoutSave) && !isEditingLayout && canEditLayout
 
+  // Log edit mode state on modal open for debugging
+  useEffect(() => {
+    if (isOpen && process.env.NODE_ENV === 'development') {
+      console.log('[RecordModal] Modal opened:', {
+        interfaceMode,
+        initialEditMode,
+        isEditingLayout,
+        shouldEditLayout,
+        recordId,
+      })
+    }
+  }, [isOpen, interfaceMode, initialEditMode, isEditingLayout, shouldEditLayout, recordId])
+
   // Auto-enter edit mode when interfaceMode === 'edit' or initialEditMode is true
   // Initialize draftFieldLayout immediately when modal opens in edit mode
   useEffect(() => {
@@ -294,10 +307,11 @@ export default function RecordModal({
     setDraftFieldLayout(newLayout)
   }, [])
 
+  // CRITICAL: Unmount on close to prevent stale state (remount safety)
   if (!isOpen) return null
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={onClose} key={`record-modal-${recordId}-${interfaceMode}`}>
       <DialogContent className={isEditingLayout ? "max-w-7xl max-h-[90vh] flex flex-col p-0" : "max-w-4xl max-h-[90vh] overflow-y-auto"}>
         <DialogHeader className={isEditingLayout ? "px-6 pt-6 pb-4 border-b" : ""}>
           <div className="flex items-center justify-between gap-3">

@@ -61,6 +61,8 @@ interface CalendarViewProps {
   onModalLayoutSave?: (fieldLayout: import("@/lib/interface/field-layout-utils").FieldLayoutItem[]) => void
   /** When true, show "Edit layout" in record modal. */
   canEditLayout?: boolean
+  /** Interface mode: 'view' | 'edit'. When 'edit', all record modals open in edit mode (Airtable-style). */
+  interfaceMode?: 'view' | 'edit'
 }
 
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -98,6 +100,7 @@ export default function CalendarView({
   highlightRules = [],
   onModalLayoutSave,
   canEditLayout = false,
+  interfaceMode = 'view',
 }: CalendarViewProps) {
   const viewUuid = useMemo(() => normalizeUuid(viewId), [viewId])
   // Ensure fieldIds is always an array (defensive check for any edge cases)
@@ -2010,6 +2013,7 @@ export default function CalendarView({
       {/* Record Modal for Editing */}
       {selectedRecordId && resolvedTableId && (
         <RecordModal
+          key={`record-modal-${selectedRecordId}-${interfaceMode}`}
           open={selectedRecordId !== null}
           onClose={() => setSelectedRecordId(null)}
           tableId={resolvedTableId}
@@ -2021,6 +2025,7 @@ export default function CalendarView({
           cascadeContext={blockConfig ? { blockConfig } : undefined}
           canEditLayout={canEditLayout}
           onLayoutSave={onModalLayoutSave}
+          interfaceMode={interfaceMode}
           onSave={() => {
             // Reload rows after save
             if (resolvedTableId && supabaseTableName) {
@@ -2039,6 +2044,7 @@ export default function CalendarView({
       {/* Record Modal for Creating New Record */}
       {canCreateRecord && createRecordDate && resolvedTableId && resolvedDateFieldId && (
         <RecordModal
+          key={`record-modal-create-${interfaceMode}`}
           open={createRecordDate !== null}
           onClose={() => setCreateRecordDate(null)}
           tableId={resolvedTableId}
@@ -2050,6 +2056,7 @@ export default function CalendarView({
           cascadeContext={blockConfig ? { blockConfig } : undefined}
           canEditLayout={canEditLayout}
           onLayoutSave={onModalLayoutSave}
+          interfaceMode={interfaceMode}
           initialData={(() => {
             // Pre-fill the date field(s) based on the clicked date
             const initial: Record<string, any> = {}

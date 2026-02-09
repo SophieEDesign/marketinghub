@@ -214,7 +214,7 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     )
     
     return statusField ? [nameField, statusField] : [nameField]
-  }, [fieldLayout, config.left_panel?.title_field, config.left_panel?.field_1, config.left_panel?.field_2, config.title_field, config.preview_fields, columns])
+  }, [config.left_panel?.title_field, config.left_panel?.field_1, config.left_panel?.field_2, config.title_field, config.preview_fields, columns])
   
   // Get group field for grouping - use left_panel.group_by or config.group_by_field
   const groupField = useMemo(() => {
