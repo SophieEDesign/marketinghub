@@ -178,7 +178,7 @@ export default function GridAppearanceSettings({
               <Select
                 value={appearance.gallery_title_field || visibleFieldNames[0] || "__first__"}
                 onValueChange={(v) =>
-                  onUpdate({ gallery_title_field: v === "__first__" ? undefined : v } as any)
+                  onUpdate({ gallery_title_field: v === "__first__" ? undefined : v })
                 }
               >
                 <SelectTrigger>
@@ -196,9 +196,9 @@ export default function GridAppearanceSettings({
           <div className="space-y-2">
             <Label>Rows per page</Label>
             <Select
-              value={String((appearance as any).gallery_rows_per_page || "12")}
-              onValueChange={(v) =>
-                onUpdate({ gallery_rows_per_page: v === "12" ? undefined : parseInt(v, 10) } as any)
+value={String(appearance.gallery_rows_per_page || "12")}
+            onValueChange={(v) =>
+                onUpdate({ gallery_rows_per_page: v === "12" ? undefined : parseInt(v, 10) })
               }
             >
               <SelectTrigger>
