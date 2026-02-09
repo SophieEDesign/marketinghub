@@ -13,6 +13,7 @@ import type { TableField } from "@/types/fields"
 import { useRecordEditorCore } from "@/lib/interface/record-editor-core"
 import { isAbortError } from "@/lib/api/error-handling"
 import { useUserRole } from "@/lib/hooks/useUserRole"
+import { resolveRecordEditMode } from "@/lib/interface/resolve-record-edit-mode"
 
 const MIN_WIDTH = 320
 const MAX_WIDTH = 1200
@@ -28,11 +29,15 @@ export default function RecordPanel() {
   const [fieldsLoaded, setFieldsLoaded] = useState(false)
   const [fieldGroups, setFieldGroups] = useState<Record<string, string[]>>({}) // fieldName -> groupName
   
-  // CRITICAL: Initialize edit state from interfaceMode (Airtable-style)
-  // When interface is in edit mode, RecordPanel MUST open in edit mode immediately
+  // CRITICAL: Use centralized resolver - interfaceMode === 'edit' is ABSOLUTE
+  // When interfaceMode === 'edit', editing is forced (derived value)
+  // When interfaceMode === 'view', allow manual toggle via state
   const interfaceMode = state.interfaceMode ?? 'view'
-  const shouldEdit = interfaceMode === 'edit'
-  const [isPanelEditing, setIsPanelEditing] = useState(shouldEdit)
+  const forcedEditMode = resolveRecordEditMode({ interfaceMode, initialEditMode: false })
+  const [manualEditMode, setManualEditMode] = useState(false)
+  
+  // Combined edit mode: forced OR manual
+  const isPanelEditing = forcedEditMode || manualEditMode
   
   const resizeRef = useRef<HTMLDivElement>(null)
   const isResizingRef = useRef(false)
@@ -61,22 +66,12 @@ export default function RecordPanel() {
   const allowEdit = cascadeContext != null ? canEditRecords : true
   const allowDelete = cascadeContext != null ? canDeleteRecords : true
 
-  // Reset edit state when panel closes
+  // Reset manual edit state when panel closes
   useEffect(() => {
     if (!state.isOpen) {
-      setIsPanelEditing(false)
+      setManualEditMode(false)
     }
   }, [state.isOpen])
-
-  // Sync edit state when interfaceMode changes while panel is open
-  useEffect(() => {
-    if (state.isOpen && interfaceMode === 'edit' && !isPanelEditing) {
-      setIsPanelEditing(true)
-    } else if (state.isOpen && interfaceMode === 'view' && isPanelEditing && !shouldEdit) {
-      // Exit edit mode when interfaceMode changes to 'view' (unless manually toggled)
-      setIsPanelEditing(false)
-    }
-  }, [state.isOpen, interfaceMode, isPanelEditing, shouldEdit])
 
   // Log edit mode state on panel open for debugging
   useEffect(() => {
@@ -84,16 +79,16 @@ export default function RecordPanel() {
       console.log('[RecordPanel] Panel opened:', {
         interfaceMode,
         isPanelEditing,
-        shouldEdit,
+        forcedEditMode,
         recordId: state.recordId,
       })
     }
-  }, [state.isOpen, interfaceMode, isPanelEditing, shouldEdit, state.recordId])
+  }, [state.isOpen, interfaceMode, isPanelEditing, forcedEditMode, state.recordId])
 
   const canShowEditButton = role === "admin" || allowEdit
-  // When interfaceMode === 'edit', panel is already editable, so effectiveAllowEdit = allowEdit
+  // CRITICAL: When interfaceMode === 'edit', ALWAYS allow editing (bypass permission checks)
   // When interfaceMode === 'view', require manual toggle via isPanelEditing
-  const effectiveAllowEdit = canShowEditButton && (interfaceMode === 'edit' ? allowEdit : isPanelEditing)
+  const effectiveAllowEdit = forcedEditMode ? true : (canShowEditButton && isPanelEditing && allowEdit)
 
   // Dev-only guardrail: warn when RecordPanel opens without cascadeContext (surfaces call sites that may want to pass context later)
   const warnedOpenWithoutContextRef = useRef<string | null>(null)
@@ -382,7 +377,9 @@ export default function RecordPanel() {
       )}
 
       {/* Panel */}
+      {/* CRITICAL: Remount key includes interfaceMode to force remount when edit context changes */}
       <div
+        key={`record-panel-${state.recordId}-${interfaceMode}`}
         className={`fixed right-0 top-0 h-full bg-white shadow-xl z-50 flex flex-col transition-all duration-300 ease-out ${
           state.isFullscreen ? "" : ""
         }`}
@@ -464,10 +461,10 @@ export default function RecordPanel() {
           <div className="flex items-center gap-1">
             {/* Show Edit button only when NOT in interface edit mode (Airtable-style) */}
             {/* When interfaceMode === 'edit', panel is already editable, so hide the button */}
-            {canShowEditButton && interfaceMode !== 'edit' && (
+            {canShowEditButton && !forcedEditMode && (
               <button
                 type="button"
-                onClick={() => setIsPanelEditing((v) => !v)}
+                onClick={() => setManualEditMode((v) => !v)}
                 className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-sm font-medium transition-colors ${
                   isPanelEditing
                     ? "bg-primary text-primary-foreground hover:bg-primary/90"

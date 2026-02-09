@@ -58,13 +58,25 @@ export default function RecordDetailPanelInline({
   const [record, setRecord] = useState<Record<string, any> | null>(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [isEditingLayout, setIsEditingLayout] = useState(interfaceMode === "edit")
+  
+  // CRITICAL: Use centralized resolver - interfaceMode === 'edit' is ABSOLUTE
+  // When interfaceMode === 'edit', editing is forced (derived value)
+  // When interfaceMode === 'view', allow manual toggle via state
+  const forcedEditMode = resolveRecordEditMode({ interfaceMode, initialEditMode: false, canEditLayout })
+  const [manualEditMode, setManualEditMode] = useState(false)
+  
+  // Combined edit mode: forced OR manual
+  const isEditingLayout = forcedEditMode || manualEditMode
+  
   const [draftFieldLayout, setDraftFieldLayout] = useState<FieldLayoutItem[] | null>(null)
   const renderCountRef = useRef(0)
   renderCountRef.current += 1
   // #region agent log
-  if (renderCountRef.current <= 10 || renderCountRef.current % 10 === 0) {
-    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordDetailPanelInline.tsx:63',message:'RENDER',data:{renderCount:renderCountRef.current,recordId,interfaceMode,isEditingLayout,draftFieldLayoutLength:draftFieldLayout?.length,fieldLayoutLength:fieldLayout.length},timestamp:Date.now(),hypothesisId:'ALL'})}).catch(()=>{});
+  if (process.env.NODE_ENV === 'development') {
+    console.count('[RecordDetailPanelInline] RENDER')
+    if (renderCountRef.current <= 10 || renderCountRef.current % 10 === 0) {
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordDetailPanelInline.tsx:63',message:'RENDER',data:{renderCount:renderCountRef.current,recordId,interfaceMode,isEditingLayout,draftFieldLayoutLength:draftFieldLayout?.length,fieldLayoutLength:fieldLayout.length},timestamp:Date.now(),hypothesisId:'ALL'})}).catch(()=>{});
+    }
   }
   // #endregion
 
@@ -96,28 +108,23 @@ export default function RecordDetailPanelInline({
     [pageEditable, resolvedFieldLayout]
   )
 
+  // CRITICAL: Initialize draftFieldLayout when entering edit mode
+  // When interfaceMode === 'edit', ALWAYS initialize layout (even if empty)
   useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordDetailPanelInline.tsx:89',message:'interfaceMode effect RUN',data:{interfaceMode,resolvedFieldLayoutLength:resolvedFieldLayout.length,fieldsLength:fields.length,isEditingLayout},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
-    if (interfaceMode === "edit") {
-      setIsEditingLayout(true)
-      if (resolvedFieldLayout.length === 0 && fields.length > 0) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordDetailPanelInline.tsx:93',message:'Creating initial field layout',data:{fieldsLength:fields.length},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
-        // #endregion
-        setDraftFieldLayout(createInitialFieldLayout(fields, "record_review", pageEditable))
-      } else if (resolvedFieldLayout.length > 0) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordDetailPanelInline.tsx:95',message:'Copying resolvedFieldLayout to draft',data:{resolvedFieldLayoutLength:resolvedFieldLayout.length},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
-        // #endregion
+    if (isEditingLayout && draftFieldLayout === null) {
+      // If there's an existing layout, use it; otherwise create initial layout
+      if (resolvedFieldLayout.length > 0) {
         setDraftFieldLayout([...resolvedFieldLayout])
+      } else if (fields.length > 0) {
+        // CRITICAL: When interfaceMode === 'edit', initialize layout even if empty
+        // This allows editing layout from scratch
+        setDraftFieldLayout(createInitialFieldLayout(fields, "record_review", pageEditable))
       }
-    } else {
-      setIsEditingLayout(false)
+    } else if (!isEditingLayout && draftFieldLayout !== null) {
+      // Clear draft when exiting edit mode
       setDraftFieldLayout(null)
     }
-  }, [interfaceMode, resolvedFieldLayout.length, fields.length]) // CRITICAL FIX: Add dependencies to prevent stale closures
+  }, [isEditingLayout, resolvedFieldLayout, draftFieldLayout, fields, pageEditable])
 
   useEffect(() => {
     if (!tableId || !recordId || !tableName) {
@@ -199,7 +206,10 @@ export default function RecordDetailPanelInline({
       // #endregion
       await onLayoutSave(draftFieldLayout)
       setDraftFieldLayout(null)
-      setIsEditingLayout(false)
+      // Only exit edit mode if not forced by interfaceMode
+      if (!forcedEditMode) {
+        setManualEditMode(false)
+      }
       toast({ title: "Layout saved", description: "Detail panel layout has been updated." })
     } catch (err: any) {
       toast({
@@ -210,15 +220,18 @@ export default function RecordDetailPanelInline({
     } finally {
       setSaving(false)
     }
-  }, [onLayoutSave, draftFieldLayout, toast])
+  }, [onLayoutSave, draftFieldLayout, toast, forcedEditMode])
 
   const handleCancelEditLayout = useCallback(() => {
-    setDraftFieldLayout(null)
-    setIsEditingLayout(false)
-  }, [])
+    // Only allow canceling if not forced by interfaceMode
+    if (!forcedEditMode) {
+      setManualEditMode(false)
+      setDraftFieldLayout(null)
+    }
+  }, [forcedEditMode])
 
   const handleStartEditLayout = useCallback(() => {
-    setIsEditingLayout(true)
+    setManualEditMode(true)
     if (resolvedFieldLayout.length === 0 && fields.length > 0) {
       setDraftFieldLayout(createInitialFieldLayout(fields, "record_review", pageEditable))
     } else {
@@ -298,10 +311,10 @@ export default function RecordDetailPanelInline({
                   type="button"
                   onClick={handleStartEditLayout}
                   className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium bg-muted hover:bg-muted/80 text-muted-foreground"
-                  title="Edit detail panel layout"
+                  title="Edit layout"
                 >
                   <LayoutGrid className="h-4 w-4" />
-                  Edit interface
+                  Edit layout
                 </button>
               )
             )}
@@ -356,7 +369,7 @@ export default function RecordDetailPanelInline({
             <p className="text-sm font-medium">No fields in layout</p>
             <p className="text-xs mt-1">
               {canEditLayout
-                ? "Click Edit interface to add and arrange fields in the detail panel."
+                ? "Click Edit layout to add and arrange fields in the detail panel."
                 : "Ask an admin to configure the detail panel layout in Settings."}
             </p>
           </div>

@@ -27,6 +27,7 @@ import {
   convertModalFieldsToFieldLayout,
   createInitialFieldLayout,
 } from '@/lib/interface/field-layout-helpers'
+import { resolveRecordEditMode } from '@/lib/interface/resolve-record-edit-mode'
 
 export interface RecordModalProps {
   open: boolean
@@ -82,28 +83,21 @@ export default function RecordModal({
 }: RecordModalProps) {
   const { toast } = useToast()
   
-  // CRITICAL: Initialize layout edit state from interfaceMode (Airtable-style)
-  // When interface is in edit mode, modal MUST open in edit mode immediately
-  const shouldEditLayout = interfaceMode === 'edit' || initialEditMode
-  const [isEditingLayout, setIsEditingLayout] = useState(shouldEditLayout)
+  // CRITICAL: Use centralized resolver - interfaceMode === 'edit' is ABSOLUTE
+  // When interfaceMode === 'edit', editing is forced (derived value)
+  // When interfaceMode === 'view', allow manual toggle via state
+  const forcedEditMode = resolveRecordEditMode({ interfaceMode, initialEditMode, canEditLayout })
+  const [manualEditMode, setManualEditMode] = useState(false)
+  
+  // Combined edit mode: forced OR manual
+  const isEditingLayout = forcedEditMode || manualEditMode
+  
+  // Track draft layout for editing
   const [draftFieldLayout, setDraftFieldLayout] = useState<FieldLayoutItem[] | null>(null)
-
-  // Log edit mode state on modal open for debugging
-  useEffect(() => {
-    if (open && process.env.NODE_ENV === 'development') {
-      console.log('[RecordModal] Modal opened:', {
-        interfaceMode,
-        initialEditMode,
-        isEditingLayout,
-        shouldEditLayout,
-        recordId,
-      })
-    }
-  }, [open, interfaceMode, initialEditMode, isEditingLayout, shouldEditLayout, recordId])
 
   useEffect(() => {
     if (!open) {
-      setIsEditingLayout(false)
+      setManualEditMode(false)
       setDraftFieldLayout(null)
     }
   }, [open])
@@ -281,29 +275,40 @@ export default function RecordModal({
   // When interfaceMode === 'edit', modal is already in edit mode, so hide the button
   const showEditLayoutButton = interfaceMode !== 'edit' && canEditLayout && Boolean(onLayoutSave) && Boolean(recordId) && !isEditingLayout
 
-  // Auto-enter edit mode when interfaceMode === 'edit' or initialEditMode is true
-  // Initialize draftFieldLayout immediately when modal opens in edit mode
+  // CRITICAL: Initialize draftFieldLayout when entering edit mode
+  // When interfaceMode === 'edit', ALWAYS initialize layout (even if empty)
   useEffect(() => {
-    if (open && shouldEditLayout && resolvedFieldLayout.length > 0 && draftFieldLayout === null) {
-      setIsEditingLayout(true)
-      setDraftFieldLayout([...resolvedFieldLayout])
-    }
-  }, [open, shouldEditLayout, resolvedFieldLayout, draftFieldLayout])
-  
-  // Sync edit state when interfaceMode changes while modal is open
-  useEffect(() => {
-    if (open && interfaceMode === 'edit' && !isEditingLayout && resolvedFieldLayout.length > 0) {
-      setIsEditingLayout(true)
-      setDraftFieldLayout([...resolvedFieldLayout])
-    } else if (open && interfaceMode === 'view' && isEditingLayout && !initialEditMode) {
-      // Exit edit mode when interfaceMode changes to 'view' (unless initialEditMode is set)
-      setIsEditingLayout(false)
+    if (!open) return
+    
+    if (isEditingLayout && draftFieldLayout === null) {
+      // If there's an existing layout, use it; otherwise create initial layout
+      if (resolvedFieldLayout.length > 0) {
+        setDraftFieldLayout([...resolvedFieldLayout])
+      } else if (filteredFields.length > 0) {
+        // CRITICAL: When interfaceMode === 'edit', initialize layout even if empty
+        // This allows editing layout from scratch
+        setDraftFieldLayout(createInitialFieldLayout(filteredFields, 'modal', true))
+      }
+    } else if (!isEditingLayout && draftFieldLayout !== null) {
+      // Clear draft when exiting edit mode
       setDraftFieldLayout(null)
     }
-  }, [open, interfaceMode, isEditingLayout, resolvedFieldLayout, initialEditMode])
+  }, [open, isEditingLayout, resolvedFieldLayout, draftFieldLayout, filteredFields])
+
+  // Log edit mode state on modal open for debugging
+  useEffect(() => {
+    if (open && process.env.NODE_ENV === 'development') {
+      console.log('[RecordModal] Modal opened:', {
+        interfaceMode,
+        initialEditMode,
+        isEditingLayout,
+        recordId,
+      })
+    }
+  }, [open, interfaceMode, initialEditMode, isEditingLayout, recordId])
 
   const handleStartEditLayout = useCallback(() => {
-    setIsEditingLayout(true)
+    setManualEditMode(true)
     // If there's no existing layout, initialize with all fields visible
     if (resolvedFieldLayout.length === 0) {
       setDraftFieldLayout(createInitialFieldLayout(filteredFields, 'modal', effectiveEditable))
@@ -315,14 +320,20 @@ export default function RecordModal({
   const handleDoneEditLayout = useCallback(() => {
     if (!onLayoutSave || draftFieldLayout === null || !canEditLayout) return
     onLayoutSave(draftFieldLayout)
-    setIsEditingLayout(false)
+    // Only exit edit mode if not forced by interfaceMode
+    if (!forcedEditMode) {
+      setManualEditMode(false)
+    }
     setDraftFieldLayout(null)
-  }, [onLayoutSave, canEditLayout, draftFieldLayout])
+  }, [onLayoutSave, canEditLayout, draftFieldLayout, forcedEditMode])
 
   const handleCancelEditLayout = useCallback(() => {
-    setIsEditingLayout(false)
-    setDraftFieldLayout(null)
-  }, [])
+    // Only allow canceling if not forced by interfaceMode
+    if (!forcedEditMode) {
+      setManualEditMode(false)
+      setDraftFieldLayout(null)
+    }
+  }, [forcedEditMode])
 
   const handleFieldLayoutChange = useCallback((newLayout: FieldLayoutItem[]) => {
     setDraftFieldLayout(newLayout)

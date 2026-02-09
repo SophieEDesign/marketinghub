@@ -89,8 +89,11 @@ export default function RecordFieldEditorPanel({
   const renderCountRef = useRef(0)
   renderCountRef.current += 1
   // #region agent log
-  if (renderCountRef.current <= 10 || renderCountRef.current % 10 === 0) {
-    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordFieldEditorPanel.tsx:88',message:'RENDER',data:{renderCount:renderCountRef.current,recordId,fieldLayoutLength:fieldLayout.length,localFieldLayoutLength:localFieldLayout.length},timestamp:Date.now(),hypothesisId:'ALL'})}).catch(()=>{});
+  if (process.env.NODE_ENV === 'development') {
+    console.count('[RecordFieldEditorPanel] RENDER')
+    if (renderCountRef.current <= 10 || renderCountRef.current % 10 === 0) {
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordFieldEditorPanel.tsx:88',message:'RENDER',data:{renderCount:renderCountRef.current,recordId,fieldLayoutLength:fieldLayout.length,localFieldLayoutLength:localFieldLayout.length},timestamp:Date.now(),hypothesisId:'ALL'})}).catch(()=>{});
+    }
   }
   // #endregion
 
@@ -120,17 +123,31 @@ export default function RecordFieldEditorPanel({
     }
   }
 
-  // Sync local layout with prop changes
-  // #region agent log
+  // CRITICAL FIX: Sync local layout with prop changes, but prevent loops
+  // Use ref to track if update came from internal change (onFieldLayoutChange)
+  const isInternalUpdateRef = useRef(false)
+  const prevFieldLayoutRef = useRef<FieldLayoutItem[]>(fieldLayout)
+  
   useEffect(() => {
-    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordFieldEditorPanel.tsx:117',message:'Sync effect RUN',data:{fieldLayoutLength:fieldLayout.length,localFieldLayoutLength:localFieldLayout.length,areEqual:JSON.stringify(fieldLayout)===JSON.stringify(localFieldLayout)},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordFieldEditorPanel.tsx:123',message:'Sync effect RUN',data:{fieldLayoutLength:fieldLayout.length,localFieldLayoutLength:localFieldLayout.length,isInternalUpdate:isInternalUpdateRef.current,areEqual:JSON.stringify(fieldLayout)===JSON.stringify(localFieldLayout)},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
     // #endregion
-    // CRITICAL FIX: Only update if actually different to prevent render loops
-    if (JSON.stringify(fieldLayout) !== JSON.stringify(localFieldLayout)) {
+    
+    // CRITICAL: Skip sync if the update came from our own onFieldLayoutChange
+    // This prevents: onFieldLayoutChange → parent updates fieldLayout prop → sync effect → loop
+    if (isInternalUpdateRef.current) {
+      isInternalUpdateRef.current = false
+      prevFieldLayoutRef.current = fieldLayout
+      return
+    }
+    
+    // Only update if prop actually changed (not just reference)
+    if (JSON.stringify(fieldLayout) !== JSON.stringify(prevFieldLayoutRef.current)) {
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordFieldEditorPanel.tsx:121',message:'Sync effect UPDATING localFieldLayout',data:{fieldLayoutLength:fieldLayout.length},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordFieldEditorPanel.tsx:135',message:'Sync effect UPDATING localFieldLayout from prop',data:{fieldLayoutLength:fieldLayout.length},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
       // #endregion
       setLocalFieldLayout(fieldLayout)
+      prevFieldLayoutRef.current = fieldLayout
     }
   }, [fieldLayout])
 
@@ -397,9 +414,12 @@ export default function RecordFieldEditorPanel({
         const allUpdated = [...updatedLayout, ...hiddenFields]
 
         // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordFieldEditorPanel.tsx:383',message:'handleDragEnd calling onFieldLayoutChange',data:{allUpdatedLength:allUpdated.length},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordFieldEditorPanel.tsx:390',message:'handleDragEnd calling onFieldLayoutChange',data:{allUpdatedLength:allUpdated.length},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
         // #endregion
+        // CRITICAL: Mark as internal update to prevent sync effect from overwriting
+        isInternalUpdateRef.current = true
         setLocalFieldLayout(allUpdated)
+        prevFieldLayoutRef.current = allUpdated
         onFieldLayoutChange?.(allUpdated)
       }
     }
@@ -427,7 +447,10 @@ export default function RecordFieldEditorPanel({
       }
     }
 
+    // CRITICAL: Mark as internal update to prevent sync effect from overwriting
+    isInternalUpdateRef.current = true
     setLocalFieldLayout(updated)
+    prevFieldLayoutRef.current = updated
     onFieldLayoutChange?.(updated)
   }
 
@@ -453,7 +476,10 @@ export default function RecordFieldEditorPanel({
       }
     }
 
+    // CRITICAL: Mark as internal update to prevent sync effect from overwriting
+    isInternalUpdateRef.current = true
     setLocalFieldLayout(updated)
+    prevFieldLayoutRef.current = updated
     onFieldLayoutChange?.(updated)
   }
 

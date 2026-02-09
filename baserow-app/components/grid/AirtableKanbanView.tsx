@@ -193,13 +193,21 @@ export default function AirtableKanbanView({
       } else {
         let rowsData = data || []
         
-        // Apply client-side sorting if needed
+        // Apply client-side sorting if needed (for linked/lookup fields, selects, etc.)
         if (needsClientSideSort && viewSorts.length > 0) {
-          rowsData = await sortRowsByFieldType(
-            rowsData,
-            viewSorts.map(s => ({ field_name: s.field_name, direction: s.direction as 'asc' | 'desc' })),
-            tableFields
-          )
+          try {
+            const sortConfig = viewSorts.map(s => ({ 
+              field_name: s.field_name, 
+              direction: s.direction as 'asc' | 'desc' 
+            }))
+            rowsData = await sortRowsByFieldType(rowsData, sortConfig, tableFields)
+          } catch (sortError) {
+            console.error('[AirtableKanbanView] Error applying client-side sort:', sortError)
+            // Continue with unsorted data rather than failing completely
+          }
+        } else if (viewSorts.length > 0 && !needsClientSideSort) {
+          // Database sorting was already applied in the query above
+          // No additional action needed
         }
         
         setRows(rowsData)
@@ -211,7 +219,7 @@ export default function AirtableKanbanView({
     } finally {
       setLoading(false)
     }
-  }, [supabaseTableName, groupField, viewFilters, viewSorts])
+  }, [supabaseTableName, groupField, viewFilters, viewSorts, tableFields])
 
   // Load rows
   useEffect(() => {
@@ -232,6 +240,7 @@ export default function AirtableKanbanView({
   }, [rows, tableFields, searchQuery, visibleFieldNames])
 
   // Group rows by column (keyed by raw value: option id or label as stored in DB)
+  // Note: Rows are already sorted before grouping, so order should be preserved within each group
   const groupedRows = useMemo(() => {
     if (!groupField) return {}
     const groups: Record<string, typeof filteredRows> = {}
@@ -248,6 +257,7 @@ export default function AirtableKanbanView({
       }
       groups[key].push(row)
     })
+    // Rows are already sorted globally, so order is preserved within each group
     return groups
   }, [filteredRows, groupField])
 

@@ -343,7 +343,26 @@ export default function HorizontalGroupedView({
     )
 
     // If we have a stored layout: keep only blocks whose field is in record_fields, then add blocks for record_fields not in layout
+    // If recordFields is empty but we have a template, use the template as-is (backward compatibility)
     if (template && template.length > 0) {
+      // If recordFields is empty, use template blocks as-is (don't filter)
+      if (recordFields.length === 0) {
+        return template.map((block) => {
+          const fieldName = block.config?.field_name || ''
+          return {
+            ...block,
+            id: `field-${recordId}-${fieldName}`,
+            page_id: `${viewId || `view-${tableId}`}-${recordId}`,
+            config: {
+              ...block.config,
+              table_id: tableId,
+              field_name: fieldName,
+            },
+          }
+        })
+      }
+
+      // Otherwise, filter template blocks by recordFields
       const existingByField = new Map<string, PageBlock>()
       for (const block of template) {
         const fieldName = block.config?.field_name || ''

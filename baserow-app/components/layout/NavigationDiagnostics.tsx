@@ -116,50 +116,58 @@ export default function NavigationDiagnostics() {
 
     // Run diagnostics on pathname change
     // Sidebar lives in WorkspaceShell (page-level), so it may mount after root layout — allow time for it.
+    // CRITICAL: Defer heavy DOM operations to avoid blocking UI thread during navigation
     const runDiagnostics = (checkKind: 'immediate' | 'short' | 'final') => {
-      const sidebarCheck = document.querySelector('[data-sidebar]')
-      if (!sidebarCheck) {
-        // Skip immediate check; sidebar often isn't in DOM yet (page-level layout).
-        if (checkKind === 'immediate') return
-        if (checkKind === 'short') {
-          // After 1s: might still be loading — don't treat as critical yet
-          console.log("🔍 Navigation Diagnostics: Sidebar not yet found (may still be loading)")
-          return
-        }
-        // checkKind === 'final': after 2.5s, treat as missing
-        console.group("🔍 Navigation Diagnostics - ISSUES DETECTED")
-        console.warn("⚠️ Sidebar not found after load. Looking for [data-sidebar] attribute")
-        // Try to find sidebar by other means
-        const possibleSidebars = document.querySelectorAll('[class*="sidebar"], [class*="Sidebar"], aside')
-        console.log("🔍 Possible sidebar elements found:", Array.from(possibleSidebars).map(el => ({
-          tag: el.tagName,
-          classes: el.className,
-          id: el.id,
-          hasDataSidebar: el.hasAttribute('data-sidebar'),
-        })))
-      } else {
-        // Only show full diagnostics if there are actual issues
-        const hasIssues = checkForIssues()
-        if (hasIssues) {
+      // CRITICAL: Wrap heavy operations in requestIdleCallback or setTimeout to avoid blocking
+      const runHeavyDiagnostics = () => {
+        const sidebarCheck = document.querySelector('[data-sidebar]')
+        if (!sidebarCheck) {
+          // Skip immediate check; sidebar often isn't in DOM yet (page-level layout).
+          if (checkKind === 'immediate') return
+          if (checkKind === 'short') {
+            // After 1s: might still be loading — don't treat as critical yet
+            console.log("🔍 Navigation Diagnostics: Sidebar not yet found (may still be loading)")
+            return
+          }
+          // checkKind === 'final': after 2.5s, treat as missing
           console.group("🔍 Navigation Diagnostics - ISSUES DETECTED")
+          console.warn("⚠️ Sidebar not found after load. Looking for [data-sidebar] attribute")
+          // Try to find sidebar by other means
+          const possibleSidebars = document.querySelectorAll('[class*="sidebar"], [class*="Sidebar"], aside')
+          console.log("🔍 Possible sidebar elements found:", Array.from(possibleSidebars).map(el => ({
+            tag: el.tagName,
+            classes: el.className,
+            id: el.id,
+            hasDataSidebar: el.hasAttribute('data-sidebar'),
+          })))
         } else {
-          // Just log a simple summary when everything is OK
-          console.log("✅ Navigation Diagnostics: All checks passed")
-          return // Exit early if no issues
+          // Only show full diagnostics if there are actual issues
+          const hasIssues = checkForIssues()
+          if (hasIssues) {
+            console.group("🔍 Navigation Diagnostics - ISSUES DETECTED")
+          } else {
+            // Just log a simple summary when everything is OK
+            console.log("✅ Navigation Diagnostics: All checks passed")
+            return // Exit early if no issues
+          }
         }
-      }
       
       // 1. Check for blocking overlays
+      // CRITICAL: Batch getComputedStyle calls to reduce layout thrashing
       const overlays = document.querySelectorAll('[class*="fixed"][class*="inset"]')
-      console.log("📋 Overlays:", {
-        count: overlays.length,
-        items: Array.from(overlays).map(el => ({
+      const overlayData = Array.from(overlays).map(el => {
+        const style = window.getComputedStyle(el) // Single getComputedStyle call per element
+        return {
           element: el,
           classes: el.className,
-          zIndex: window.getComputedStyle(el).zIndex,
-          pointerEvents: window.getComputedStyle(el).pointerEvents,
-          display: window.getComputedStyle(el).display,
-        }))
+          zIndex: style.zIndex,
+          pointerEvents: style.pointerEvents,
+          display: style.display,
+        }
+      })
+      console.log("📋 Overlays:", {
+        count: overlays.length,
+        items: overlayData
       })
 
       // 2. Check body/html styles
@@ -181,67 +189,111 @@ export default function NavigationDiagnostics() {
       })
 
       // 3. Check for open modals/dialogs
+      // CRITICAL: Batch getComputedStyle calls to reduce layout thrashing
       const dialogs = document.querySelectorAll('[role="dialog"]')
-      console.log("🚪 Dialogs:", {
-        count: dialogs.length,
-        items: Array.from(dialogs).map(el => ({
+      const dialogData = Array.from(dialogs).map(el => {
+        const style = window.getComputedStyle(el) // Single getComputedStyle call per element
+        return {
           element: el,
           dataState: el.getAttribute("data-state"),
           ariaModal: el.getAttribute("aria-modal"),
-          display: window.getComputedStyle(el).display,
-        }))
+          display: style.display,
+        }
+      })
+      console.log("🚪 Dialogs:", {
+        count: dialogs.length,
+        items: dialogData
       })
 
       // 4. Check sidebar links (Next.js Link components render as <a> tags)
+      // CRITICAL: Batch getComputedStyle calls to reduce layout thrashing
       const sidebarContainer = document.querySelector('[data-sidebar]')
       const sidebarLinks = sidebarContainer 
         ? Array.from(sidebarContainer.querySelectorAll('a[href]'))
         : []
+      const linkData = sidebarLinks.map(el => {
+        const style = window.getComputedStyle(el) // Single getComputedStyle call per element
+        return {
+          element: el,
+          href: el.getAttribute("href"),
+          pointerEvents: style.pointerEvents,
+          zIndex: style.zIndex,
+          display: style.display,
+          tagName: el.tagName,
+        }
+      })
       console.log("🔗 Sidebar Links:", {
         count: sidebarLinks.length,
         containerFound: !!sidebarContainer,
-        items: sidebarLinks.map(el => ({
-          element: el,
-          href: el.getAttribute("href"),
-          pointerEvents: window.getComputedStyle(el).pointerEvents,
-          zIndex: window.getComputedStyle(el).zIndex,
-          display: window.getComputedStyle(el).display,
-          tagName: el.tagName,
-        }))
+        items: linkData
       })
 
       // 5. Check for elements with pointer-events: none
-      const noPointerEvents = Array.from(document.querySelectorAll("*")).filter(el => {
-        const style = window.getComputedStyle(el)
-        return style.pointerEvents === "none"
-      })
-      console.log("🚫 Elements with pointer-events: none:", {
-        count: noPointerEvents.length,
-        top10: noPointerEvents.slice(0, 10).map(el => ({
-          tag: el.tagName,
-          classes: el.className,
-          id: el.id,
-        }))
-      })
-
+      // CRITICAL: Defer expensive querySelectorAll("*") to avoid blocking UI thread
+      // Use requestIdleCallback to run when browser is idle, or setTimeout as fallback
+      const checkPointerEvents = () => {
+        // Only check common container elements instead of ALL elements
+        const containers = document.querySelectorAll('[class*="fixed"], [class*="absolute"], [class*="sticky"], [role="dialog"], [data-sidebar]')
+        const noPointerEvents = Array.from(containers).filter(el => {
+          const style = window.getComputedStyle(el)
+          return style.pointerEvents === "none"
+        })
+        console.log("🚫 Elements with pointer-events: none:", {
+          count: noPointerEvents.length,
+          top10: noPointerEvents.slice(0, 10).map(el => ({
+            tag: el.tagName,
+            classes: el.className,
+            id: el.id,
+          }))
+        })
+      }
+      
       // 6. Check z-index stacking
-      const highZIndex = Array.from(document.querySelectorAll("*")).filter(el => {
-        const zIndex = parseInt(window.getComputedStyle(el).zIndex)
-        return !isNaN(zIndex) && zIndex >= 40
-      }).sort((a, b) => {
-        const za = parseInt(window.getComputedStyle(a).zIndex)
-        const zb = parseInt(window.getComputedStyle(b).zIndex)
-        return zb - za
-      })
-      console.log("📚 High Z-Index Elements (≥40):", {
-        count: highZIndex.length,
-        top10: highZIndex.slice(0, 10).map(el => ({
-          tag: el.tagName,
-          classes: el.className,
-          zIndex: window.getComputedStyle(el).zIndex,
-          pointerEvents: window.getComputedStyle(el).pointerEvents,
-        }))
-      })
+      // CRITICAL: Defer expensive querySelectorAll("*") to avoid blocking UI thread
+      const checkZIndex = () => {
+        // Only check elements that commonly have z-index (overlays, modals, fixed elements)
+        const candidates = document.querySelectorAll('[class*="fixed"], [class*="absolute"], [class*="sticky"], [role="dialog"], [data-sidebar], [style*="z-index"]')
+        const highZIndex = Array.from(candidates).filter(el => {
+          const zIndex = parseInt(window.getComputedStyle(el).zIndex)
+          return !isNaN(zIndex) && zIndex >= 40
+        }).sort((a, b) => {
+          const za = parseInt(window.getComputedStyle(a).zIndex)
+          const zb = parseInt(window.getComputedStyle(b).zIndex)
+          return zb - za
+        })
+        console.log("📚 High Z-Index Elements (≥40):", {
+          count: highZIndex.length,
+          top10: highZIndex.slice(0, 10).map(el => ({
+            tag: el.tagName,
+            classes: el.className,
+            zIndex: window.getComputedStyle(el).zIndex,
+            pointerEvents: window.getComputedStyle(el).pointerEvents,
+          }))
+        })
+      }
+      
+      // Defer heavy operations to avoid blocking UI thread
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'NavigationDiagnostics.tsx:225',message:'Deferring heavy DOM queries',data:{hasIdleCallback:typeof requestIdleCallback !== 'undefined'},timestamp:Date.now(),runId:'pre-fix',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion agent log
+      if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(() => {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'NavigationDiagnostics.tsx:229',message:'Executing deferred DOM queries',data:{timestamp:Date.now()},timestamp:Date.now(),runId:'pre-fix',hypothesisId:'A'})}).catch(()=>{});
+          // #endregion agent log
+          checkPointerEvents()
+          checkZIndex()
+        }, { timeout: 2000 })
+      } else {
+        // Fallback for browsers without requestIdleCallback
+        setTimeout(() => {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'NavigationDiagnostics.tsx:237',message:'Executing deferred DOM queries (setTimeout fallback)',data:{timestamp:Date.now()},timestamp:Date.now(),runId:'pre-fix',hypothesisId:'A'})}).catch(()=>{});
+          // #endregion agent log
+          checkPointerEvents()
+          checkZIndex()
+        }, 0)
+      }
 
       // 7. Check for drag state
       const dragElements = document.querySelectorAll('[class*="dragging"], [class*="drag"]')
@@ -313,18 +365,50 @@ export default function NavigationDiagnostics() {
         // Long task API not supported - silently skip
       }
 
-      console.groupEnd()
+        console.groupEnd()
+      }
+      
+      // Defer heavy diagnostics to avoid blocking UI thread
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'NavigationDiagnostics.tsx:355',message:'Deferring runDiagnostics heavy operations',data:{checkKind,hasIdleCallback:typeof requestIdleCallback !== 'undefined'},timestamp:Date.now(),runId:'pre-fix',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion agent log
+      if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(runHeavyDiagnostics, { timeout: 1000 })
+      } else {
+        // Fallback: use setTimeout with small delay
+        setTimeout(runHeavyDiagnostics, 0)
+      }
     }
 
     // Run after delays so page-level sidebar (WorkspaceShell) has time to mount
-    const t1 = setTimeout(() => runDiagnostics('immediate'), 100)
-    const t2 = setTimeout(() => runDiagnostics('short'), 1000)
-    const t3 = setTimeout(() => runDiagnostics('final'), 2500)
+    // CRITICAL: Use requestIdleCallback for non-critical diagnostics to avoid blocking navigation
+    const timeouts: number[] = []
+    const idleCallbacks: number[] = []
+    
+    const scheduleDiagnostics = (checkKind: 'immediate' | 'short' | 'final', delay: number) => {
+      if (typeof requestIdleCallback !== 'undefined') {
+        const timeoutId = setTimeout(() => {
+          const idleId = requestIdleCallback(() => runDiagnostics(checkKind), { timeout: delay + 500 })
+          idleCallbacks.push(idleId)
+        }, delay)
+        timeouts.push(timeoutId)
+      } else {
+        const timeoutId = setTimeout(() => runDiagnostics(checkKind), delay)
+        timeouts.push(timeoutId)
+      }
+    }
+    
+    scheduleDiagnostics('immediate', 100)
+    scheduleDiagnostics('short', 1000)
+    scheduleDiagnostics('final', 2500)
 
     return () => {
-      clearTimeout(t1)
-      clearTimeout(t2)
-      clearTimeout(t3)
+      timeouts.forEach(id => clearTimeout(id))
+      idleCallbacks.forEach(id => {
+        if (typeof cancelIdleCallback !== 'undefined') {
+          cancelIdleCallback(id)
+        }
+      })
     }
   }, [pathname, enabled])
 
@@ -346,7 +430,8 @@ export default function NavigationDiagnostics() {
       const sidebarContainerForClick = target.closest('[data-sidebar]')
       
       if (sidebarContainerForClick) {
-        console.log("🖱️ CLICK DETECTED in sidebar area:", {
+        // CRITICAL: Log basic info immediately (non-blocking)
+        const basicInfo = {
           target: target,
           targetTag: target.tagName,
           targetClasses: target.className,
@@ -357,7 +442,8 @@ export default function NavigationDiagnostics() {
           defaultPrevented: e.defaultPrevented,
           stopPropagation: e.cancelBubble,
           timestamp: performance.now(),
-        })
+        }
+        console.log("🖱️ CLICK DETECTED in sidebar area:", basicInfo)
 
         // Find link if clicked element is inside one
         const sidebarLink = sidebarContainerForClick 
@@ -365,41 +451,96 @@ export default function NavigationDiagnostics() {
           : null
       
         if (sidebarLink) {
-          console.log("🔗 Click is on a link:", {
-            href: sidebarLink.getAttribute("href"),
-            element: sidebarLink,
-            pointerEvents: window.getComputedStyle(sidebarLink).pointerEvents,
-            zIndex: window.getComputedStyle(sidebarLink).zIndex,
-            display: window.getComputedStyle(sidebarLink).display,
-            visibility: window.getComputedStyle(sidebarLink).visibility,
-            opacity: window.getComputedStyle(sidebarLink).opacity,
-            pathname: pathname,
-          })
+          // CRITICAL: Defer heavy getComputedStyle calls to avoid blocking UI thread
+          // These operations force layout recalculation and can block navigation
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'NavigationDiagnostics.tsx:375',message:'Deferring click handler heavy operations',data:{hasIdleCallback:typeof requestIdleCallback !== 'undefined'},timestamp:Date.now(),runId:'pre-fix',hypothesisId:'B'})}).catch(()=>{});
+          // #endregion agent log
+          if (typeof requestIdleCallback !== 'undefined') {
+            requestIdleCallback(() => {
+              // #region agent log
+              fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'NavigationDiagnostics.tsx:378',message:'Executing deferred click handler operations',data:{timestamp:Date.now()},timestamp:Date.now(),runId:'pre-fix',hypothesisId:'B'})}).catch(()=>{});
+              // #endregion agent log
+              const linkStyle = window.getComputedStyle(sidebarLink)
+              console.log("🔗 Click is on a link:", {
+                href: sidebarLink.getAttribute("href"),
+                element: sidebarLink,
+                pointerEvents: linkStyle.pointerEvents,
+                zIndex: linkStyle.zIndex,
+                display: linkStyle.display,
+                visibility: linkStyle.visibility,
+                opacity: linkStyle.opacity,
+                pathname: pathname,
+              })
 
-          // Check if something is blocking
-          const rect = sidebarLink.getBoundingClientRect()
-          const elementAtPoint = document.elementFromPoint(e.clientX, e.clientY)
-          
-          console.log("📍 Element at click point:", {
-            element: elementAtPoint,
-            elementTag: elementAtPoint?.tagName,
-            elementClasses: elementAtPoint?.className,
-            isLink: elementAtPoint === sidebarLink,
-            isLinkChild: sidebarLink.contains(elementAtPoint),
-            blockingZIndex: elementAtPoint ? window.getComputedStyle(elementAtPoint).zIndex : null,
-            linkZIndex: window.getComputedStyle(sidebarLink).zIndex,
-          })
-          
-          if (elementAtPoint !== sidebarLink && !sidebarLink.contains(elementAtPoint)) {
-            console.warn("⚠️ CLICK BLOCKED! Something is on top of the link:", {
-              blockingElement: elementAtPoint,
-              blockingTag: elementAtPoint?.tagName,
-              blockingClasses: elementAtPoint?.className,
-              blockingZIndex: elementAtPoint ? window.getComputedStyle(elementAtPoint).zIndex : null,
-              blockingPointerEvents: elementAtPoint ? window.getComputedStyle(elementAtPoint).pointerEvents : null,
-              expectedElement: sidebarLink,
-              linkRect: rect,
-            })
+              // Check if something is blocking (deferred)
+              const rect = sidebarLink.getBoundingClientRect()
+              const elementAtPoint = document.elementFromPoint(e.clientX, e.clientY)
+              
+              const blockingStyle = elementAtPoint ? window.getComputedStyle(elementAtPoint) : null
+              console.log("📍 Element at click point:", {
+                element: elementAtPoint,
+                elementTag: elementAtPoint?.tagName,
+                elementClasses: elementAtPoint?.className,
+                isLink: elementAtPoint === sidebarLink,
+                isLinkChild: sidebarLink.contains(elementAtPoint),
+                blockingZIndex: blockingStyle?.zIndex || null,
+                linkZIndex: linkStyle.zIndex,
+              })
+              
+              if (elementAtPoint !== sidebarLink && !sidebarLink.contains(elementAtPoint)) {
+                console.warn("⚠️ CLICK BLOCKED! Something is on top of the link:", {
+                  blockingElement: elementAtPoint,
+                  blockingTag: elementAtPoint?.tagName,
+                  blockingClasses: elementAtPoint?.className,
+                  blockingZIndex: blockingStyle?.zIndex || null,
+                  blockingPointerEvents: blockingStyle?.pointerEvents || null,
+                  expectedElement: sidebarLink,
+                  linkRect: rect,
+                })
+              }
+            }, { timeout: 500 })
+          } else {
+            // Fallback: defer with setTimeout
+            setTimeout(() => {
+              const linkStyle = window.getComputedStyle(sidebarLink)
+              console.log("🔗 Click is on a link:", {
+                href: sidebarLink.getAttribute("href"),
+                element: sidebarLink,
+                pointerEvents: linkStyle.pointerEvents,
+                zIndex: linkStyle.zIndex,
+                display: linkStyle.display,
+                visibility: linkStyle.visibility,
+                opacity: linkStyle.opacity,
+                pathname: pathname,
+              })
+
+              const rect = sidebarLink.getBoundingClientRect()
+              const elementAtPoint = document.elementFromPoint(e.clientX, e.clientY)
+              const blockingStyle = elementAtPoint ? window.getComputedStyle(elementAtPoint) : null
+              
+              console.log("📍 Element at click point:", {
+                element: elementAtPoint,
+                elementTag: elementAtPoint?.tagName,
+                elementClasses: elementAtPoint?.className,
+                isLink: elementAtPoint === sidebarLink,
+                isLinkChild: sidebarLink.contains(elementAtPoint),
+                blockingZIndex: blockingStyle?.zIndex || null,
+                linkZIndex: linkStyle.zIndex,
+              })
+              
+              if (elementAtPoint !== sidebarLink && !sidebarLink.contains(elementAtPoint)) {
+                console.warn("⚠️ CLICK BLOCKED! Something is on top of the link:", {
+                  blockingElement: elementAtPoint,
+                  blockingTag: elementAtPoint?.tagName,
+                  blockingClasses: elementAtPoint?.className,
+                  blockingZIndex: blockingStyle?.zIndex || null,
+                  blockingPointerEvents: blockingStyle?.pointerEvents || null,
+                  expectedElement: sidebarLink,
+                  linkRect: rect,
+                })
+              }
+            }, 0)
           }
         } else {
           console.warn("⚠️ Click in sidebar but NOT on a link:", {

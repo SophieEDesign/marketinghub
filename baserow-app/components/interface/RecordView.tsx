@@ -3,7 +3,10 @@
 /**
  * Record View Component
  * 
- * Combines:
+ * DEPRECATED: This component is no longer used. Record View pages now use
+ * RecordReviewPage with RecordDetailPanelInline for the right panel.
+ * 
+ * Legacy implementation that combined:
  * 1. Record Field Panel (structured table of selected fields)
  * 2. Block Canvas (flexible layout blocks)
  * 
