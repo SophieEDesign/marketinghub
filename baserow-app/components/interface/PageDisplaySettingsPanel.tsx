@@ -619,7 +619,7 @@ export default function PageDisplaySettingsPanel({
           <div className="mt-6">
             <RecordViewPageSettings
               pageId={currentPage.id}
-              pageType={(currentPage.page_type || currentPage.type || 'record_review') as 'record_view' | 'record_review'}
+              pageType={(currentPage.page_type || 'record_review') as 'record_view' | 'record_review'}
               config={{
                 ...(currentPage.config || {}),
                 // Ensure table_id/base_table is available from page if not in config
