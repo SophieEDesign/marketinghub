@@ -1613,7 +1613,7 @@ export default function InterfaceBuilder({
           allBlocks={blocks}
           onLock={handleLockBlock}
           editingBlockCanvasId={editingBlockCanvasId}
-          openRecordInEditModeForBlock={openRecordInEditModeForBlock}
+          onOpenRecordForLayoutEdit={handleOpenRecordForLayoutEdit}
           onEditBlockCanvas={async (blockId) => {
             // For Tabs blocks, open modal instead of inline editing
             const block = blocks.find(b => b.id === blockId)

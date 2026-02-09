@@ -575,6 +575,7 @@ export default function GridView({
   onModalLayoutSave,
   canEditLayout = false,
   initialModalEditMode = false,
+  openRecordInEditMode = null,
 }: GridViewProps) {
   const { openRecord } = useRecordPanel()
   const isMobile = useIsMobile()
@@ -608,7 +609,7 @@ export default function GridView({
     if (openRecordInEditMode && openRecordInEditMode !== modalRecordId) {
       setModalRecordId(openRecordInEditMode)
     }
-  }, [openRecordInEditMode])
+  }, [openRecordInEditMode, modalRecordId])
 
   // Track previous groupBy to detect changes
   const prevGroupByRef = useRef<string | undefined>(groupBy)

@@ -69,14 +69,6 @@ export default function RecordModal({
     }
   }, [isOpen])
 
-  // Auto-enter edit mode when initialEditMode is true and modal opens
-  useEffect(() => {
-    if (isOpen && initialEditMode && hasCustomLayout && !isEditingLayout && modalBlocks.length > 0) {
-      setIsEditingLayout(true)
-      setDraftBlocks([...modalBlocks])
-    }
-  }, [isOpen, initialEditMode, hasCustomLayout, isEditingLayout, modalBlocks])
-
   const core = useRecordEditorCore({
     tableId,
     recordId,
@@ -215,6 +207,14 @@ export default function RecordModal({
   // Show "Edit layout" when we have a custom layout and a save callback; canEditLayout gates actual persistence on Done
   const showEditLayoutButton = hasCustomLayout && Boolean(onLayoutSave) && !isEditingLayout
   const blocksForCanvas = isEditingLayout && draftBlocks !== null ? draftBlocks : modalBlocks
+
+  // Auto-enter edit mode when initialEditMode is true and modal opens
+  useEffect(() => {
+    if (isOpen && initialEditMode && hasCustomLayout && !isEditingLayout && modalBlocks.length > 0) {
+      setIsEditingLayout(true)
+      setDraftBlocks([...modalBlocks])
+    }
+  }, [isOpen, initialEditMode, hasCustomLayout, isEditingLayout, modalBlocks])
 
   const handleStartEditLayout = useCallback(() => {
     setIsEditingLayout(true)
