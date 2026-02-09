@@ -33,6 +33,8 @@ import { isAbortError } from "@/lib/api/error-handling"
 import type { GroupRule } from "@/lib/grouping/types"
 import { buildGroupTree, flattenGroupTree } from "@/lib/grouping/groupTree"
 import { getFieldDisplayName } from "@/lib/fields/display"
+import type { FieldLayoutItem } from "@/lib/interface/field-layout-utils"
+import { getVisibleFieldsForCard } from "@/lib/interface/field-layout-helpers"
 
 interface RecordReviewLeftColumnProps {
   pageId?: string
@@ -65,7 +67,9 @@ interface RecordReviewLeftColumnProps {
     color_field?: string
     image_field?: string
   }
-  pageType?: 'record_view' | 'record_review' // To determine which settings format to use
+    pageType?: 'record_view' | 'record_review' // To determine which settings format to use
+    /** Unified field_layout - when present, card fields use visible_in_card */
+    fieldLayout?: FieldLayoutItem[]
 }
 
 export default function RecordReviewLeftColumn({
@@ -78,6 +82,7 @@ export default function RecordReviewLeftColumn({
   pageConfig,
   leftPanelSettings,
   pageType = 'record_review', // Default to record_review for backward compatibility
+  fieldLayout = [],
 }: RecordReviewLeftColumnProps) {
   const { toast } = useToast()
   const { role: userRole } = useUserRole()
@@ -618,10 +623,18 @@ export default function RecordReviewLeftColumn({
     )
   }, [collapsedGroups, fields, toggleGroupCollapsed])
 
-  // Get ordered fields based on page settings
+  // Get ordered fields for card display
+  // Priority: field_layout.visible_in_card > legacy title_field/field_1/field_2
   const orderedFields = useMemo(() => {
     if (isRecordView) {
-      // For record_view: return fields in order: title, subtitle, additional
+      // If field_layout exists and has visible_in_card, use it as single source of truth
+      if (fieldLayout && fieldLayout.length > 0) {
+        const cardFields = getVisibleFieldsForCard(fieldLayout, fields)
+        if (cardFields.length > 0) {
+          return cardFields
+        }
+      }
+      // Fallback: legacy title_field, field_1, field_2
       const titleField = titleFieldId ? fields.find(f => f.id === titleFieldId) : null
       const subtitleField = subtitleFieldId ? fields.find(f => f.id === subtitleFieldId) : null
       const additionalField = additionalFieldId ? fields.find(f => f.id === additionalFieldId) : null
@@ -637,7 +650,7 @@ export default function RecordReviewLeftColumn({
       }
       return fields
     }
-  }, [fields, fieldOrder, isRecordView, titleFieldId, subtitleFieldId, additionalFieldId])
+  }, [fields, fieldOrder, isRecordView, titleFieldId, subtitleFieldId, additionalFieldId, fieldLayout])
 
   const renderValue = useCallback((field: TableField | null | undefined, value: any) => {
     if (!field) return <span className="text-gray-400">—</span>
@@ -711,13 +724,11 @@ export default function RecordReviewLeftColumn({
     }
 
     if (isRecordView) {
-      const titleField = titleFieldId ? (fields.find((f) => f.id === titleFieldId) ?? null) : null
-      const subtitleField = subtitleFieldId ? (fields.find((f) => f.id === subtitleFieldId) ?? null) : null
-      const additionalField = additionalFieldId ? (fields.find((f) => f.id === additionalFieldId) ?? null) : null
-
+      // Use orderedFields (from field_layout.visible_in_card or legacy title/subtitle/additional)
+      const cardFields = orderedFields
+      const titleField = cardFields[0] ?? null
+      const secondaryFields = cardFields.slice(1)
       const titleValue = titleField ? (record[titleField.name] || "Untitled") : "Untitled"
-      const subtitleValue = subtitleField ? record[subtitleField.name] : null
-      const additionalValue = additionalField ? record[additionalField.name] : null
 
       return (
         <button
@@ -749,24 +760,21 @@ export default function RecordReviewLeftColumn({
           )}
 
           <div className="min-w-0 flex-1">
-            {/* Title */}
+            {/* Title (first field) */}
             <div className="text-sm font-medium text-gray-900 truncate">
               {String(titleValue || "Untitled")}
             </div>
 
-            {/* Subtitle */}
-            {subtitleValue && (
-              <div className="mt-1.5 text-xs text-gray-600 truncate">
-                {renderValue(subtitleField, subtitleValue)}
-              </div>
-            )}
-
-            {/* Additional Field */}
-            {additionalValue && (
-              <div className="mt-1.5 text-xs text-gray-500 truncate">
-                {renderValue(additionalField, additionalValue)}
-              </div>
-            )}
+            {/* Secondary fields (from field_layout or legacy field_1, field_2) */}
+            {secondaryFields.map((field) => {
+              const value = record[field.name]
+              if (value === null || value === undefined || value === "") return null
+              return (
+                <div key={field.id} className="mt-1.5 text-xs text-gray-600 truncate">
+                  {renderValue(field, value)}
+                </div>
+              )
+            })}
           </div>
         </button>
       )
@@ -799,7 +807,6 @@ export default function RecordReviewLeftColumn({
       </button>
     )
   }, [
-    additionalFieldId,
     compact,
     fields,
     isRecordView,
@@ -810,8 +817,6 @@ export default function RecordReviewLeftColumn({
     renderValue,
     selectedRecordId,
     showLabels,
-    subtitleFieldId,
-    titleFieldId,
     visibleFieldIds,
   ])
 

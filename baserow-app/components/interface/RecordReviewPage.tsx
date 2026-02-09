@@ -2,35 +2,40 @@
 
 /**
  * Record Review Page Component
- * 
+ *
  * Layout Structure:
  * ┌──────────────────────────┬──────────────────────────────────────┐
- * │ FIXED LEFT COLUMN         │ RIGHT CANVAS                          │
- * │ (RecordReviewLeftColumn)  │ (InterfaceBuilder with blocks)        │
- * │                           │                                      │
- * │ - Record list             │ - Free canvas                         │
- * │ - Search/filter           │ - Blocks render here                  │
- * │ - Field visibility        │ - Receives recordId context          │
+ * │ FIXED LEFT COLUMN         │ RIGHT PANEL                           │
+ * │ (RecordReviewLeftColumn)  │ - record_view: RecordDetailPanelInline│
+ * │                           │   (canvas layout editor, field_layout)│
+ * │ - Record list (cards)     │ - record_review: InterfaceBuilder     │
+ * │ - Search/filter           │   (blocks canvas)                     │
+ * │ - Card fields from        │                                      │
+ * │   field_layout.visible_   │                                      │
+ * │   in_card                 │                                      │
  * └──────────────────────────┴──────────────────────────────────────┘
- * 
+ *
  * Key Rules:
  * - Left column is structural (not a block, not draggable)
- * - Right side is normal canvas (blocks only)
- * - Only right side persists layout
+ * - record_view: Right panel uses RecordDetailPanelInline (same layout editor as RecordModal)
+ * - record_review: Right side is normal canvas (blocks only)
  * - recordId is ephemeral UI state (never saved to blocks)
- * - Record selection does NOT trigger block reloads
+ * - field_layout is single source of truth for cards + detail panel
  */
 
-import { useState, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import RecordReviewLeftColumn from "./RecordReviewLeftColumn"
 import InterfaceBuilder from "./InterfaceBuilder"
+import RecordDetailPanelInline from "./RecordDetailPanelInline"
 import type { Page, PageBlock } from "@/lib/interface/types"
 import type { PageConfig } from "@/lib/interface/page-config"
+import type { FieldLayoutItem } from "@/lib/interface/field-layout-utils"
 import { useToast } from "@/components/ui/use-toast"
 import { useUserRole } from "@/lib/hooks/useUserRole"
 import { canDeleteRecord } from "@/lib/interface/record-actions"
 import { Button } from "@/components/ui/button"
 import { Trash2 } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
 
 interface RecordReviewPageProps {
   page: Page
@@ -38,6 +43,7 @@ interface RecordReviewPageProps {
   isViewer?: boolean
   onSave?: () => void
   onEditModeChange?: (isEditing: boolean) => void
+  onLayoutSave?: (fieldLayout: FieldLayoutItem[]) => Promise<void>
   hideHeader?: boolean
 }
 
@@ -47,22 +53,69 @@ export default function RecordReviewPage({
   isViewer = false,
   onSave,
   onEditModeChange,
+  onLayoutSave,
   hideHeader = false,
 }: RecordReviewPageProps) {
   // CRITICAL: recordId is ephemeral UI state - never saved to blocks or page config
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null)
   const [lastDeletedRecordId, setLastDeletedRecordId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [tableFields, setTableFields] = useState<any[]>([])
+  const [tableName, setTableName] = useState<string | null>(null)
   const { toast } = useToast()
   const { role: userRole } = useUserRole()
 
-  // Get tableId and leftPanel settings from page.settings or page.config (single source of truth)
-  // InterfacePage uses config, Page type uses settings - handle both
-  // CRITICAL: RecordViewPageSettings saves to config.left_panel (snake_case), so check both formats
+  const pageType = (page as any).page_type || (page as any).type || "record_review"
+  const isRecordView = pageType === "record_view"
+
+  // Load table fields for record_view right panel
   const pageConfig: PageConfig | any = (page as any).config || page.settings || {}
-  const pageTableId = pageConfig.tableId || pageConfig.primary_table_id || page.settings?.tableId || page.settings?.primary_table_id || null
+  const pageTableId =
+    pageConfig.tableId ||
+    pageConfig.primary_table_id ||
+    page.settings?.tableId ||
+    page.settings?.primary_table_id ||
+    null
+
+  useEffect(() => {
+    if (!pageTableId || !isRecordView) return
+    let cancelled = false
+    const supabase = createClient()
+    supabase
+      .from("tables")
+      .select("supabase_table")
+      .eq("id", pageTableId)
+      .single()
+      .then(({ data: table }) => {
+        if (cancelled || !table) return
+        setTableName((table as any).supabase_table || null)
+      })
+    supabase
+      .from("table_fields")
+      .select("*")
+      .eq("table_id", pageTableId)
+      .order("order_index", { ascending: true })
+      .then(({ data: fields }) => {
+        if (cancelled) return
+        setTableFields((fields || []) as any[])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [pageTableId, isRecordView])
+
   // Check both left_panel (snake_case) and leftPanel (camelCase) for backward compatibility
-  const leftPanelSettings = pageConfig.left_panel || pageConfig.leftPanel || page.settings?.left_panel || page.settings?.leftPanel
+  const leftPanelSettings =
+    pageConfig.left_panel || pageConfig.leftPanel || page.settings?.left_panel || page.settings?.leftPanel
+
+  // Field layout - single source of truth for record_view (cards + detail panel)
+  const fieldLayout = useMemo(() => {
+    const layout = pageConfig.field_layout
+    if (layout && Array.isArray(layout) && layout.length > 0) {
+      return layout as FieldLayoutItem[]
+    }
+    return []
+  }, [pageConfig.field_layout])
 
   // Page-level default for "Add record" (used across the interface; blocks can override)
   const pageShowAddRecord =
@@ -70,9 +123,6 @@ export default function RecordReviewPage({
     pageConfig.showAddRecord === true ||
     (page.settings as any)?.show_add_record === true ||
     (page.settings as any)?.showAddRecord === true
-  
-  // Determine page type from page object (for record_view vs record_review)
-  const pageType = (page as any).page_type || (page as any).type || 'record_review'
 
   // Handle record selection
   // CRITICAL: This does NOT trigger block reloads - blocks just re-render with new context
@@ -131,7 +181,7 @@ export default function RecordReviewPage({
     }
   }, [page.id, pageConfig, selectedRecordId, toast, userRole])
 
-  // Get edit mode from InterfaceBuilder
+  // Edit mode: for record_review from InterfaceBuilder; for record_view from isViewer (parent's block edit mode)
   const [isEditing, setIsEditing] = useState(false)
 
   return (
@@ -145,13 +195,13 @@ export default function RecordReviewPage({
         onRecordSelect={handleRecordSelect}
         deletedRecordId={lastDeletedRecordId}
         leftPanelSettings={leftPanelSettings}
-        pageType={pageType as 'record_view' | 'record_review'}
+        pageType={pageType as "record_view" | "record_review"}
         showAddRecord={pageShowAddRecord}
         pageConfig={pageConfig}
+        fieldLayout={fieldLayout}
       />
 
-      {/* Right Canvas - Blocks Only */}
-      {/* CRITICAL: Container must have min-width: 0 to prevent flex collapse */}
+      {/* Right Panel - record_view: RecordDetailPanelInline | record_review: InterfaceBuilder */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0 w-full">
         {/* Record actions (block-based record pages) */}
         {canDeleteSelectedRecord && (
@@ -169,25 +219,36 @@ export default function RecordReviewPage({
             </Button>
           </div>
         )}
-        {/* CRITICAL: Use stable key based on page.id only - NOT recordId
-            This ensures blocks don't remount when record changes, they just re-render with new context */}
-        {/* CRITICAL: Key is ONLY page.id - never include recordId, mode, or isViewer */}
-        {/* This ensures InterfaceBuilder never remounts when record changes or mode toggles */}
-        <InterfaceBuilder
-          key={page.id} // CRITICAL: ONLY page.id - recordId changes don't cause remounts
-          page={page}
-          initialBlocks={initialBlocks}
-          isViewer={isViewer}
-          onSave={onSave}
-          onEditModeChange={(editing) => {
-            setIsEditing(editing)
-            onEditModeChange?.(editing)
-          }}
-          hideHeader={hideHeader}
-          pageTableId={pageTableId}
-          recordId={selectedRecordId} // Ephemeral - passed as context, never saved to blocks
-          mode={isEditing ? 'edit' : 'view'}
-        />
+        {isRecordView ? (
+          <RecordDetailPanelInline
+            pageId={page.id}
+            tableId={pageTableId}
+            recordId={selectedRecordId}
+            tableName={tableName}
+            fields={tableFields}
+            fieldLayout={fieldLayout}
+            pageEditable={pageEditable}
+            interfaceMode={!isViewer ? "edit" : "view"}
+            onLayoutSave={onLayoutSave}
+            titleField={pageConfig.title_field || pageConfig.left_panel?.title_field}
+          />
+        ) : (
+          <InterfaceBuilder
+            key={page.id}
+            page={page}
+            initialBlocks={initialBlocks}
+            isViewer={isViewer}
+            onSave={onSave}
+            onEditModeChange={(editing) => {
+              setIsEditing(editing)
+              onEditModeChange?.(editing)
+            }}
+            hideHeader={hideHeader}
+            pageTableId={pageTableId}
+            recordId={selectedRecordId}
+            mode={isEditing ? "edit" : "view"}
+          />
+        )}
       </div>
     </div>
   )

@@ -1315,10 +1315,30 @@ function InterfacePageClientInternal({
             useRecordReviewLayout ? (
               <RecordReviewPage
                 key={page.id} // CRITICAL: ONLY page.id - never include mode, isViewer, or recordId
-                page={interfaceBuilderPage as any}
+                page={page as any}
                 initialBlocks={memoizedBlocks}
                 isViewer={isViewer || !isBlockEditing}
                 hideHeader={true}
+                onLayoutSave={
+                  page?.page_type === "record_view"
+                    ? async (fieldLayout) => {
+                        const res = await fetch(`/api/interface-pages/${page.id}`, {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            config: { ...(page.config || {}), field_layout: fieldLayout },
+                          }),
+                        })
+                        if (!res.ok) {
+                          const err = await res.json().catch(() => ({}))
+                          throw new Error(err?.error || "Failed to save layout")
+                        }
+                        const updated = await res.json()
+                        setPage(updated)
+                        await handlePageUpdate()
+                      }
+                    : undefined
+                }
               />
             ) : (
               // UNIFIED: All other pages render InterfaceBuilder (which wraps Canvas)

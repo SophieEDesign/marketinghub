@@ -65,6 +65,8 @@ interface RecordViewPageSettingsProps {
   tables: Table[]
   onUpdate: (updates: Partial<PageConfig>) => Promise<void>
   onTableChange?: (tableId: string) => Promise<void>
+  /** record_view pages use inline detail panel (no blocks); record_review uses canvas blocks */
+  pageType?: 'record_view' | 'record_review'
 }
 
 interface FieldConfig {
@@ -80,6 +82,7 @@ export default function RecordViewPageSettings({
   tables,
   onUpdate,
   onTableChange,
+  pageType = 'record_review',
 }: RecordViewPageSettingsProps) {
   // Initialize from config.table_id, config.base_table, or page.base_table
   // Also sync when config changes (e.g., when page is loaded with base_table)
@@ -590,8 +593,10 @@ export default function RecordViewPageSettings({
       detail_fields: oldConfig.visible_fields, // Keep for backward compatibility
     })
     
-    // Auto-create field blocks for visible fields
-    await createFieldBlocksFromNames(oldConfig.visible_fields)
+    // Only create field blocks for record_review (canvas with blocks). record_view uses inline detail panel.
+    if (pageType === 'record_review') {
+      await createFieldBlocksFromNames(oldConfig.visible_fields)
+    }
   }
 
   const visibleFieldConfigs = fieldConfigList.filter((f) => f.visible)
@@ -694,7 +699,7 @@ export default function RecordViewPageSettings({
                 </SelectContent>
               </Select>
               <p className="text-xs text-gray-500">
-                The field used to display the record title in the structured field list.
+                The field used to display the record title in the detail panel.
               </p>
             </div>
           )}
@@ -748,7 +753,7 @@ export default function RecordViewPageSettings({
                 </button>
               </div>
               <p className="text-xs text-gray-500">
-                Select which fields appear in the structured field list. Drag to reorder, and set
+                Select which fields appear in the detail panel and card preview. Drag to reorder, and set
                 editability per field.
               </p>
 
@@ -847,9 +852,9 @@ export default function RecordViewPageSettings({
               <div className="border-t my-6"></div>
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-900 mb-1">Left Panel Settings</h3>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-1">Card preview (left panel)</h3>
                   <p className="text-xs text-gray-500">
-                    Configure how records appear in the left panel (record list).
+                    When no layout is configured, these fields appear on each card. Otherwise, card fields come from the Visible Fields list above.
                   </p>
                 </div>
 
@@ -1331,10 +1336,9 @@ export default function RecordViewPageSettings({
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <Label>Show Structured Field List</Label>
+                <Label>Show detail panel</Label>
                 <p className="text-xs text-gray-500 mt-1">
-                  Display the fixed field list tied to the Record View page. This cannot be deleted
-                  but can be hidden.
+                  Display the record detail panel when a record is selected.
                 </p>
               </div>
               <Switch
@@ -1345,12 +1349,13 @@ export default function RecordViewPageSettings({
               />
             </div>
 
+            {pageType === 'record_review' && (
             <div className="flex items-center justify-between">
               <div>
-                <Label>Show Blocks Section</Label>
+                <Label>Show blocks section</Label>
                 <p className="text-xs text-gray-500 mt-1">
                   Display the flexible blocks section for context and relationships (notes, related
-                  records, etc.).
+                  records, etc.). Not applicable for Record View pages.
                 </p>
               </div>
               <Switch
@@ -1360,6 +1365,7 @@ export default function RecordViewPageSettings({
                 }
               />
             </div>
+            )}
 
             <div className="flex items-center justify-between">
               <div>

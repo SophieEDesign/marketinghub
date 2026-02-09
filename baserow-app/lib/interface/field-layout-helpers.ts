@@ -9,13 +9,18 @@
 import type { FieldLayoutItem } from './field-layout-utils'
 import type { TableField } from '@/types/fields'
 
+export type FieldLayoutVisibilityContext = 'modal' | 'canvas' | 'card'
+
 /**
- * Get visible fields from field_layout for modal display
- * Filters by visible_in_modal !== false and sorts by order
+ * Get visible fields from field_layout for a given context
+ * - modal: visible_in_modal !== false (RecordModal)
+ * - canvas: visible_in_canvas !== false (right detail panel)
+ * - card: visible_in_card !== false (left card preview)
  */
 export function getVisibleFieldsFromLayout(
   fieldLayout: FieldLayoutItem[],
-  allFields: TableField[]
+  allFields: TableField[],
+  context: FieldLayoutVisibilityContext = 'modal'
 ): TableField[] {
   if (!fieldLayout || fieldLayout.length === 0) {
     // If no field_layout, return all fields (backward compatibility)
@@ -29,9 +34,9 @@ export function getVisibleFieldsFromLayout(
     fieldMap.set(field.id, field)
   })
 
-  // Filter and sort by field_layout
+  const visibilityKey = context === 'modal' ? 'visible_in_modal' : context === 'canvas' ? 'visible_in_canvas' : 'visible_in_card'
   const visibleItems = fieldLayout
-    .filter((item) => item.visible_in_modal !== false)
+    .filter((item) => (item as any)[visibilityKey] !== false)
     .sort((a, b) => a.order - b.order)
 
   // Convert to TableField array
@@ -46,15 +51,38 @@ export function getVisibleFieldsFromLayout(
     }
   })
 
-  // Add any fields that exist in allFields but not in field_layout
+  // For modal/canvas: add any fields that exist in allFields but not in field_layout
   // (for backward compatibility when new fields are added)
-  allFields.forEach((field) => {
-    if (!processedFieldNames.has(field.name)) {
-      visibleFields.push(field)
-    }
-  })
+  // For card: do NOT add - card preview should only show explicitly configured fields
+  if (context !== 'card') {
+    allFields.forEach((field) => {
+      if (!processedFieldNames.has(field.name)) {
+        visibleFields.push(field)
+      }
+    })
+  }
 
   return visibleFields
+}
+
+/**
+ * Get visible fields for card preview (left panel) - convenience wrapper
+ */
+export function getVisibleFieldsForCard(
+  fieldLayout: FieldLayoutItem[],
+  allFields: TableField[]
+): TableField[] {
+  return getVisibleFieldsFromLayout(fieldLayout, allFields, 'card')
+}
+
+/**
+ * Get visible fields for detail panel/canvas (right panel) - convenience wrapper
+ */
+export function getVisibleFieldsForCanvas(
+  fieldLayout: FieldLayoutItem[],
+  allFields: TableField[]
+): TableField[] {
+  return getVisibleFieldsFromLayout(fieldLayout, allFields, 'canvas')
 }
 
 /**
@@ -180,10 +208,12 @@ export function convertModalFieldsToFieldLayout(
 /**
  * Get field groups from field_layout
  * Groups fields by group_name for RecordFields component
+ * @param context - 'modal' | 'canvas' - which visibility flag to use
  */
 export function getFieldGroupsFromLayout(
   fieldLayout: FieldLayoutItem[],
-  allFields: TableField[]
+  allFields: TableField[],
+  context: 'modal' | 'canvas' = 'modal'
 ): Record<string, string[]> {
   const groups: Record<string, string[]> = {}
   const DEFAULT_GROUP = 'General'
@@ -200,6 +230,8 @@ export function getFieldGroupsFromLayout(
     return groups
   }
 
+  const visibilityKey = context === 'modal' ? 'visible_in_modal' : 'visible_in_canvas'
+
   // Create field map
   const fieldMap = new Map<string, TableField>()
   allFields.forEach((field) => {
@@ -209,7 +241,7 @@ export function getFieldGroupsFromLayout(
 
   // Group by group_name from layout
   fieldLayout
-    .filter((item) => item.visible_in_modal !== false)
+    .filter((item) => (item as any)[visibilityKey] !== false)
     .forEach((item) => {
       const field = fieldMap.get(item.field_name) || fieldMap.get(item.field_id)
       if (!field) return

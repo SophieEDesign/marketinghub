@@ -1429,6 +1429,10 @@ export default function CalendarView({
             return luminance > 0.5 ? '#000000' : '#ffffff'
           })() : undefined)
 
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:1432',message:'Event construction',data:{rowId:row.id,hasStart:!!parsedStartDay,hasEnd:!!parsedEndExclusive,isMultiDay:parsedEndExclusive && parsedEndExclusive.getTime() > parsedStartDay.getTime() + 86400000},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
+          // #endregion
+          
           return {
             id: row.id,
             title: title || "Untitled",
@@ -1439,7 +1443,9 @@ export default function CalendarView({
             borderColor: finalBackgroundColor,
             textColor: finalTextColor,
             extendedProps: {
-              rowId: row.id,
+              // CRITICAL: Always set recordId explicitly - calendar events ≠ records
+              recordId: row.id,
+              rowId: row.id, // Keep for backward compatibility
               rowData: row.data,
               image: eventImage,
               fitImageSize,
@@ -1905,9 +1911,36 @@ export default function CalendarView({
 
   const onCalendarEventClick = useCallback(
     (info: EventClickArg) => {
-      // Contract: single click opens the record (if permitted) and selects event.
-      const recordId = info.event.id
-      const recordIdString = recordId ? String(recordId) : ""
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:1906',message:'Event click handler entry',data:{eventId:info.event.id,hasExtendedProps:!!info.event.extendedProps,extendedPropsRecordId:info.event.extendedProps?.recordId,extendedPropsRowId:info.event.extendedProps?.rowId,hasStart:!!info.event.start,hasEnd:!!info.event.end,isMultiDay:info.event.end && info.event.start && new Date(info.event.end).getTime() > new Date(info.event.start).getTime() + 86400000},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      
+      // CRITICAL: Calendar events ≠ records. Always read recordId from extendedProps.
+      // event.id may be modified by FullCalendar for multi-day events or slicing.
+      // Priority: extendedProps.recordId > extendedProps.rowId > event.id (fallback)
+      const recordId = info.event.extendedProps?.recordId || info.event.extendedProps?.rowId || info.event.id
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:1912',message:'RecordId resolved',data:{recordId,source:info.event.extendedProps?.recordId?'extendedProps.recordId':info.event.extendedProps?.rowId?'extendedProps.rowId':'event.id',eventId:info.event.id},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      
+      // CRITICAL: Guard against missing recordId to prevent crashes
+      if (!recordId) {
+        const errorMsg = `[CalendarView] Cannot open record: missing recordId in event`
+        console.error(errorMsg, {
+          eventId: info.event.id,
+          eventTitle: info.event.title,
+          extendedProps: info.event.extendedProps,
+          event: info.event
+        })
+        debugWarn('CALENDAR', "[Calendar] Event clicked but no recordId found", { event: info.event })
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:1920',message:'Missing recordId guard triggered',data:{eventId:info.event.id,eventTitle:info.event.title},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
+        // #endregion
+        return // Do not attempt to open record modal
+      }
+      
+      const recordIdString = String(recordId)
       setSelectedEventId(recordIdString || null)
 
       // DEBUG_CALENDAR: Always log event clicks in development (prove click wiring works)
@@ -1933,11 +1966,6 @@ export default function CalendarView({
         allowOpenRecord,
         willUseModal: allowOpenRecord && !onRecordClick,
       })
-
-      if (!recordId) {
-        debugWarn('CALENDAR', "[Calendar] Event clicked but no recordId found", { event: info.event })
-        return
-      }
 
       if (!allowOpenRecord) return
 
