@@ -60,6 +60,16 @@ interface TextBlockProps {
 export default function TextBlock({ block, isEditing = false, onUpdate }: TextBlockProps) {
   const { config } = block
   
+  // Track render count for debugging React #185
+  const renderCountRef = useRef<number>(0)
+  renderCountRef.current += 1
+  // #region agent log
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[TextBlock] RENDER #${renderCountRef.current}: blockId=${block.id}, isEditing=${isEditing}`)
+  }
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TextBlock.tsx:60',message:'TextBlock render',data:{blockId:block.id,renderCount:renderCountRef.current,isEditing},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+  
   // Prevent toolbar interactions from stealing focus/selection from TipTap.
   // Without this, clicks can clear the selection before commands run, making the toolbar feel "broken".
   const handleToolbarMouseDown = useCallback((e: React.MouseEvent) => {
@@ -303,7 +313,20 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         }, 150)
       },
       onUpdate: ({ editor: ed }: { editor: { getJSON: () => any } }) => {
-        if (!onUpdateRef.current || readOnlyRef.current) return
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TextBlock.tsx:305',message:'onUpdate callback fired',data:{editorInitialized:editorInitializedRef.current,hasOnUpdate:!!onUpdateRef.current,readOnly:readOnlyRef.current,blockId:blockIdRef.current},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+        // CRITICAL: Prevent onUpdate from firing during initialization to avoid React #185 loop
+        // When setContent is called during initialization, TipTap may fire onUpdate even with emitUpdate=false
+        if (!onUpdateRef.current || readOnlyRef.current || !editorInitializedRef.current) {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TextBlock.tsx:310',message:'onUpdate blocked',data:{reason:!onUpdateRef.current?'noOnUpdate':readOnlyRef.current?'readOnly':'notInitialized',editorInitialized:editorInitializedRef.current},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
+          return
+        }
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TextBlock.tsx:315',message:'onUpdate proceeding',data:{blockId:blockIdRef.current},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         setSaveStatus("saving")
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
         saveTimeoutRef.current = setTimeout(() => handleSaveContentRef.current?.(ed.getJSON()), 1000)
@@ -312,7 +335,13 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     []
   )
 
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TextBlock.tsx:318',message:'Calling useEditor',data:{blockId:block.id,renderCount:renderCountRef.current,configRef:editorConfig === editorConfig},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   const editor = useEditor(editorConfig)
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TextBlock.tsx:321',message:'useEditor returned',data:{blockId:block.id,hasEditor:!!editor,editorId:editor?.id},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 
   // Keep editorRef current so editorProps.handleKeyDown (memoized) can access it
   useEffect(() => {
@@ -409,12 +438,18 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       previousBlockIdRef.current = block.id
       hasInitialised.current = false
       editorInitializedRef.current = false
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TextBlock.tsx:421',message:'Block ID changed - resetting initialization',data:{blockId:block.id,previousBlockId:previousBlockIdRef.current},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       
       const newContent = getInitialContent()
       editor.commands.setContent(newContent, false) // false = don't emit update event
       lastSavedContentRef.current = cachedConfigContentStrRef.current || JSON.stringify(newContent)
       hasInitialised.current = true
       editorInitializedRef.current = true
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TextBlock.tsx:430',message:'Block ID changed - initialization complete',data:{blockId:block.id,editorInitialized:editorInitializedRef.current},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       
       if (process.env.NODE_ENV === 'development') {
         console.log(`[TextBlock] Block ID changed - rehydrated: blockId=${block.id}`)
@@ -423,12 +458,25 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     }
     
     // Only initialize content on first mount (when hasInitialised is false)
-    if (!hasInitialised.current && contentJson) {
-      const initialContent = getInitialContent()
-      editor.commands.setContent(initialContent, false) // false = don't emit update event
-      lastSavedContentRef.current = cachedConfigContentStrRef.current || JSON.stringify(initialContent)
+    if (!hasInitialised.current) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TextBlock.tsx:439',message:'First mount initialization starting',data:{blockId:block.id,hasContentJson:!!contentJson},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+      
+      if (contentJson) {
+        const initialContent = getInitialContent()
+        editor.commands.setContent(initialContent, false) // false = don't emit update event
+        lastSavedContentRef.current = cachedConfigContentStrRef.current || JSON.stringify(initialContent)
+      } else {
+        // Empty content - still need to initialize lastSavedContentRef
+        const emptyContent = editor.getJSON()
+        lastSavedContentRef.current = JSON.stringify(emptyContent)
+      }
       hasInitialised.current = true
       editorInitializedRef.current = true
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TextBlock.tsx:451',message:'First mount initialization complete',data:{blockId:block.id,editorInitialized:editorInitializedRef.current,hasContentJson:!!contentJson},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       
       if (process.env.NODE_ENV === 'development') {
         console.log(`[TextBlock] Initialized content on first mount: blockId=${block.id}`)
@@ -442,6 +490,9 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
    */
   useEffect(() => {
     if (editor && !editorInitializedRef.current && !isConfigLoading) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TextBlock.tsx:457',message:'Fallback initialization starting',data:{blockId:block.id,hasCachedContent:!!cachedConfigContentStrRef.current},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       // Use cached config content string if available, otherwise stringify current content
       if (cachedConfigContentStrRef.current) {
         lastSavedContentRef.current = cachedConfigContentStrRef.current
@@ -450,6 +501,9 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         lastSavedContentRef.current = JSON.stringify(initialContent)
       }
       editorInitializedRef.current = true
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TextBlock.tsx:466',message:'Fallback initialization complete',data:{blockId:block.id,editorInitialized:editorInitializedRef.current},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
     }
   }, [editor, isConfigLoading, block.id])
 

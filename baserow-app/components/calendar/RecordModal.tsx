@@ -216,8 +216,8 @@ export default function RecordModal({
   // For new records (no recordId), fall back to the simple field list so users can actually enter values
   // instead of seeing read-only "No record selected" placeholders from Field blocks.
   const hasCustomLayout = Boolean(recordId && modalLayout?.blocks && modalLayout.blocks.length > 0)
-  // Show "Edit layout" when we have a custom layout and a save callback; canEditLayout gates actual persistence on Done
-  const showEditLayoutButton = hasCustomLayout && Boolean(onLayoutSave) && !isEditingLayout
+  // Show "Edit layout" when in edit mode with save callback (allow creating layout from scratch, not just editing existing)
+  const showEditLayoutButton = canEditLayout && Boolean(onLayoutSave) && Boolean(recordId) && !isEditingLayout
   const blocksForCanvas = isEditingLayout && draftBlocks !== null ? draftBlocks : modalBlocks
 
   const handleStartEditLayout = useCallback(() => {
@@ -369,8 +369,8 @@ export default function RecordModal({
             </div>
           ) : (
             <div className="space-y-4 py-4">
-              {/* Use custom layout if available, otherwise fall back to simple field list */}
-              {hasCustomLayout ? (
+              {/* Use custom layout if available, or layout editor when editing layout (including from scratch) */}
+              {(hasCustomLayout || isEditingLayout) ? (
                 <div className="min-h-[400px]">
                   <ModalCanvas
                     mode={isEditingLayout ? 'edit' : 'view'}

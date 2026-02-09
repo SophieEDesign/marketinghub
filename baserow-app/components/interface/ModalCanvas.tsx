@@ -123,15 +123,30 @@ export default function ModalCanvas({
     }
   }, [layoutSettings])
 
+  const isEditMode = mode === "edit"
+
   if (blocks.length === 0) {
+    if (isEditMode && onAddField) {
+      return (
+        <div className="flex flex-col items-center justify-center py-8 text-gray-400 text-sm gap-4">
+          <p>No fields in layout. Add fields to customize the modal.</p>
+          <button
+            type="button"
+            onClick={() => onAddField(null)}
+            className="flex items-center justify-center gap-2 w-full max-w-xs py-2.5 border border-dashed border-gray-300 rounded-md text-gray-500 hover:border-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors text-sm"
+          >
+            <Plus className="h-4 w-4" />
+            Add field
+          </button>
+        </div>
+      )
+    }
     return (
       <div className="flex items-center justify-center py-8 text-gray-400 text-sm">
         <p>No fields configured in modal layout</p>
       </div>
     )
   }
-
-  const isEditMode = mode === "edit"
 
   return (
     <div className="w-full h-full flex flex-col">
