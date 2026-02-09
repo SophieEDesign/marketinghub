@@ -11,7 +11,7 @@
  * - Single source of truth: field_layout
  */
 
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { Pencil, Check, X, LayoutGrid } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import RecordFields from "@/components/records/RecordFields"
@@ -60,6 +60,13 @@ export default function RecordDetailPanelInline({
   const [saving, setSaving] = useState(false)
   const [isEditingLayout, setIsEditingLayout] = useState(interfaceMode === "edit")
   const [draftFieldLayout, setDraftFieldLayout] = useState<FieldLayoutItem[] | null>(null)
+  const renderCountRef = useRef(0)
+  renderCountRef.current += 1
+  // #region agent log
+  if (renderCountRef.current <= 10 || renderCountRef.current % 10 === 0) {
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordDetailPanelInline.tsx:63',message:'RENDER',data:{renderCount:renderCountRef.current,recordId,interfaceMode,isEditingLayout,draftFieldLayoutLength:draftFieldLayout?.length,fieldLayoutLength:fieldLayout.length},timestamp:Date.now(),hypothesisId:'ALL'})}).catch(()=>{});
+  }
+  // #endregion
 
   const canEditLayout = pageEditable && (role === "admin" || role === "member") && Boolean(onLayoutSave)
 
@@ -69,6 +76,9 @@ export default function RecordDetailPanelInline({
   }, [draftFieldLayout, fieldLayout])
 
   const visibleFields = useMemo(() => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordDetailPanelInline.tsx:71',message:'visibleFields useMemo RECALCULATING',data:{resolvedFieldLayoutLength:resolvedFieldLayout.length,fieldsLength:fields.length},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
     return getVisibleFieldsFromLayout(resolvedFieldLayout, fields, "canvas")
   }, [resolvedFieldLayout, fields])
 
@@ -87,18 +97,27 @@ export default function RecordDetailPanelInline({
   )
 
   useEffect(() => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordDetailPanelInline.tsx:89',message:'interfaceMode effect RUN',data:{interfaceMode,resolvedFieldLayoutLength:resolvedFieldLayout.length,fieldsLength:fields.length,isEditingLayout},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
     if (interfaceMode === "edit") {
       setIsEditingLayout(true)
       if (resolvedFieldLayout.length === 0 && fields.length > 0) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordDetailPanelInline.tsx:93',message:'Creating initial field layout',data:{fieldsLength:fields.length},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         setDraftFieldLayout(createInitialFieldLayout(fields, "record_review", pageEditable))
       } else if (resolvedFieldLayout.length > 0) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordDetailPanelInline.tsx:95',message:'Copying resolvedFieldLayout to draft',data:{resolvedFieldLayoutLength:resolvedFieldLayout.length},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         setDraftFieldLayout([...resolvedFieldLayout])
       }
     } else {
       setIsEditingLayout(false)
       setDraftFieldLayout(null)
     }
-  }, [interfaceMode])
+  }, [interfaceMode, resolvedFieldLayout.length, fields.length]) // CRITICAL FIX: Add dependencies to prevent stale closures
 
   useEffect(() => {
     if (!tableId || !recordId || !tableName) {
@@ -168,10 +187,16 @@ export default function RecordDetailPanelInline({
   }, [])
 
   const handleDoneEditLayout = useCallback(async () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordDetailPanelInline.tsx:170',message:'handleDoneEditLayout CALLED',data:{hasOnLayoutSave:!!onLayoutSave,draftFieldLayoutLength:draftFieldLayout?.length},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
     if (!onLayoutSave || draftFieldLayout === null) return
 
     setSaving(true)
     try {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordDetailPanelInline.tsx:175',message:'Calling onLayoutSave',data:{draftFieldLayoutLength:draftFieldLayout.length},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
       await onLayoutSave(draftFieldLayout)
       setDraftFieldLayout(null)
       setIsEditingLayout(false)

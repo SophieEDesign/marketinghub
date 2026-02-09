@@ -13,7 +13,7 @@
  * - Search/filter fields
  */
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { Search, GripVertical, Eye, EyeOff, Edit2, Lock, Settings, Plus } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -86,6 +86,13 @@ export default function RecordFieldEditorPanel({
   const [editingField, setEditingField] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [localFieldLayout, setLocalFieldLayout] = useState<FieldLayoutItem[]>(fieldLayout)
+  const renderCountRef = useRef(0)
+  renderCountRef.current += 1
+  // #region agent log
+  if (renderCountRef.current <= 10 || renderCountRef.current % 10 === 0) {
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordFieldEditorPanel.tsx:88',message:'RENDER',data:{renderCount:renderCountRef.current,recordId,fieldLayoutLength:fieldLayout.length,localFieldLayoutLength:localFieldLayout.length},timestamp:Date.now(),hypothesisId:'ALL'})}).catch(()=>{});
+  }
+  // #endregion
 
   // Helper to get the visibility property value based on mode
   // Returns true if visible, false if hidden, undefined if not set (treat as visible)
@@ -114,8 +121,17 @@ export default function RecordFieldEditorPanel({
   }
 
   // Sync local layout with prop changes
+  // #region agent log
   useEffect(() => {
-    setLocalFieldLayout(fieldLayout)
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordFieldEditorPanel.tsx:117',message:'Sync effect RUN',data:{fieldLayoutLength:fieldLayout.length,localFieldLayoutLength:localFieldLayout.length,areEqual:JSON.stringify(fieldLayout)===JSON.stringify(localFieldLayout)},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    // CRITICAL FIX: Only update if actually different to prevent render loops
+    if (JSON.stringify(fieldLayout) !== JSON.stringify(localFieldLayout)) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordFieldEditorPanel.tsx:121',message:'Sync effect UPDATING localFieldLayout',data:{fieldLayoutLength:fieldLayout.length},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      setLocalFieldLayout(fieldLayout)
+    }
   }, [fieldLayout])
 
   // Load record data
@@ -380,6 +396,9 @@ export default function RecordFieldEditorPanel({
         )
         const allUpdated = [...updatedLayout, ...hiddenFields]
 
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordFieldEditorPanel.tsx:383',message:'handleDragEnd calling onFieldLayoutChange',data:{allUpdatedLength:allUpdated.length},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
         setLocalFieldLayout(allUpdated)
         onFieldLayoutChange?.(allUpdated)
       }
