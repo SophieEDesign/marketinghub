@@ -91,9 +91,24 @@ export default function RecordPanel() {
     }
   }, [state.isOpen, state.tableId, state.recordId, state.modalFields])
 
-  // When core finished loading but formData is empty (e.g. 404), treat as record not found
+  // Track whether we've seen the core attempt a load (loading=true). Only treat as "record not found"
+  // when a load actually completed with empty data — not during initial render when loading starts false.
+  const hasAttemptedLoadRef = useRef(false)
   useEffect(() => {
-    if (active && state.recordId && !recordLoading && Object.keys(formData).length === 0) {
+    if (active && recordLoading) hasAttemptedLoadRef.current = true
+    if (!active) hasAttemptedLoadRef.current = false
+  }, [active, recordLoading])
+
+  // When core finished loading but formData is empty (e.g. 404), treat as record not found.
+  // Must have attempted a load first — avoids false positive on first click (loading starts false).
+  useEffect(() => {
+    if (
+      active &&
+      state.recordId &&
+      hasAttemptedLoadRef.current &&
+      !recordLoading &&
+      Object.keys(formData).length === 0
+    ) {
       toast({
         title: "Record not found",
         description: "This record may have been deleted.",

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { ArrowLeft, Save, Trash2, ChevronDown, ChevronRight, Pencil, Check, LayoutGrid } from 'lucide-react'
+import { ArrowLeft, Save, Trash2, ChevronDown, ChevronRight, Check, LayoutGrid } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -17,7 +17,6 @@ import ModalCanvas from '@/components/interface/ModalCanvas'
 import type { BlockConfig, PageBlock } from '@/lib/interface/types'
 import { sectionAndSortFields } from '@/lib/fields/sectioning'
 import { useRecordEditorCore, type RecordEditorCascadeContext } from '@/lib/interface/record-editor-core'
-import { useUserRole } from '@/lib/hooks/useUserRole'
 
 export interface RecordModalProps {
   open: boolean
@@ -64,14 +63,11 @@ export default function RecordModal({
   onLayoutSave,
 }: RecordModalProps) {
   const { toast } = useToast()
-  const { role } = useUserRole()
-  const [isModalEditing, setIsModalEditing] = useState(false)
   const [isEditingLayout, setIsEditingLayout] = useState(false)
   const [draftBlocks, setDraftBlocks] = useState<PageBlock[] | null>(null)
 
   useEffect(() => {
     if (!open) {
-      setIsModalEditing(false)
       setIsEditingLayout(false)
       setDraftBlocks(null)
     }
@@ -113,13 +109,8 @@ export default function RecordModal({
   } = core
 
   const canSave = recordId ? canEditRecords : canCreateRecords
-
-  // View mode: show Edit button and gate editing on isModalEditing. Create mode: always editable when canCreateRecords.
-  const isViewMode = recordId != null
-  const canShowEditButton = isViewMode && (role === 'admin' || canEditRecords)
-  const effectiveEditable = isViewMode
-    ? canShowEditButton && isModalEditing
-    : canCreateRecords
+  // Inline editing: editable whenever user has permission (no Edit/View toggle)
+  const effectiveEditable = canSave
 
   // Load collapsed sections state from localStorage
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
@@ -329,7 +320,7 @@ export default function RecordModal({
               <>
                 <Button type="button" variant="default" size="sm" onClick={handleDoneEditLayout} className="inline-flex items-center gap-1.5" aria-label="Save layout" title="Save layout">
                   <Check className="h-4 w-4" />
-                  Done
+                  Save layout
                 </Button>
                 <Button type="button" variant="outline" size="sm" onClick={handleCancelEditLayout} aria-label="Cancel layout edit" title="Cancel">
                   Cancel
@@ -341,29 +332,6 @@ export default function RecordModal({
                   <Button type="button" variant="outline" size="sm" onClick={handleStartEditLayout} className="inline-flex items-center gap-1.5" aria-label="Edit layout" title="Edit layout">
                     <LayoutGrid className="h-4 w-4" />
                     Edit layout
-                  </Button>
-                )}
-                {canShowEditButton && (
-                  <Button
-                    type="button"
-                    variant={isModalEditing ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setIsModalEditing((v) => !v)}
-                    className="inline-flex items-center gap-1.5"
-                    aria-label={isModalEditing ? 'Done editing' : 'Edit record'}
-                    title={isModalEditing ? 'Done editing' : 'Edit record'}
-                  >
-                    {isModalEditing ? (
-                      <>
-                        <Check className="h-4 w-4" />
-                        Done
-                      </>
-                    ) : (
-                      <>
-                        <Pencil className="h-4 w-4" />
-                        Edit
-                      </>
-                    )}
                   </Button>
                 )}
               </>
@@ -383,8 +351,8 @@ export default function RecordModal({
             </Button>
             <Button
               onClick={handleSave}
-              disabled={saving || loading || !(recordId ? (canSave && effectiveEditable) : canSave)}
-              title={!canSave ? (recordId ? "You don't have permission to edit this record" : "You don't have permission to create records") : recordId && !effectiveEditable ? "Click Edit to make changes" : undefined}
+              disabled={saving || loading || !canSave}
+              title={!canSave ? (recordId ? "You don't have permission to edit this record" : "You don't have permission to create records") : undefined}
               aria-disabled={saving || loading || !canSave}
             >
               <Save className="mr-2 h-4 w-4" />
