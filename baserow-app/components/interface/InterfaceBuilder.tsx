@@ -204,10 +204,16 @@ export default function InterfaceBuilder({
     // This prevents the "edit vs publish" drift issue
   }, [page.id]) // ONLY pageId - NOT initialBlocks, NOT hash, NOT mode, NOT props
   
-  // Also check when initialBlocks arrives asynchronously
-  // This handles the case where blocks load after mount
-  // Runs on every render to catch async initialBlocks without dependencies
+  // CRITICAL FIX: Stabilize async initialBlocks check - use proper dependencies instead of running on every render
+  // This prevents the effect from running unnecessarily and causing re-renders
+  // Track the last initialBlocks length to detect when it actually changes
+  const prevInitialBlocksLengthForAsyncRef = useRef<number | null>(null)
+  
   useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[InterfaceBuilder] Async initialization effect RUN: pageId=${page.id}, hasInitialized=${hasInitializedRef.current}, initialBlocksLength=${initialBlocks?.length ?? 'undefined'}`)
+    }
+    
     // Skip if already initialized
     if (hasInitializedRef.current) {
       return
@@ -221,6 +227,14 @@ export default function InterfaceBuilder({
     }
     
     const currentLength = initialBlocks.length
+    
+    // CRITICAL: Only initialize if initialBlocks length actually changed
+    // This prevents re-running when initialBlocks reference changes but content is the same
+    if (prevInitialBlocksLengthForAsyncRef.current === currentLength) {
+      return
+    }
+    
+    prevInitialBlocksLengthForAsyncRef.current = currentLength
     
     // Initialize now (even if empty - that's a valid state)
     // This catches both immediate and async arrival, including empty blocks
@@ -244,7 +258,8 @@ export default function InterfaceBuilder({
     // Mark as hydrated when blocks arrive asynchronously (even if empty)
     // This allows users to add blocks to empty pages
     setHasHydrated(true)
-  }) // No dependencies - runs on every render to catch async initialBlocks
+  }, [page.id, initialBlocks?.length]) // CRITICAL FIX: Add dependencies to prevent running on every render
+  // Only run when pageId changes or initialBlocks length changes (not on every render)
 
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
   const [selectedBlockIds, setSelectedBlockIds] = useState<Set<string>>(new Set())

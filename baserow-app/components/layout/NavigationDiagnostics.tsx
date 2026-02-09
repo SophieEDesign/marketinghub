@@ -32,8 +32,14 @@ export default function NavigationDiagnostics() {
     }
   }, [])
 
+  // CRITICAL: Stabilize enabled check - only run interval when mounted, not when enabled changes
+  // This prevents re-creating intervals on every enabled state change
   useEffect(() => {
     if (!mounted) return
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[NavigationDiagnostics] Enabled check effect MOUNTED')
+    }
     
     // Check if diagnostics are enabled
     const checkEnabled = () => {
@@ -44,6 +50,7 @@ export default function NavigationDiagnostics() {
       }
     }
     
+    // Initial check
     const currentEnabled = checkEnabled()
     if (currentEnabled !== enabled) {
       setEnabled(currentEnabled)
@@ -54,18 +61,30 @@ export default function NavigationDiagnostics() {
       }
     }
     
+    // CRITICAL: Use ref to access latest enabled value without causing re-runs
+    // Check localStorage periodically but don't recreate interval when enabled changes
     const interval = setInterval(() => {
       const newEnabled = checkEnabled()
-      if (newEnabled !== enabled) {
-        setEnabled(newEnabled)
-        if (newEnabled) {
-          console.log("🔍 Navigation Diagnostics ENABLED - monitoring navigation clicks")
+      setEnabled(prev => {
+        if (prev !== newEnabled) {
+          if (newEnabled) {
+            console.log("🔍 Navigation Diagnostics ENABLED - monitoring navigation clicks")
+          } else {
+            console.log("🔍 Navigation Diagnostics DISABLED")
+          }
+          return newEnabled
         }
-      }
-    }, 500) // Check more frequently
+        return prev
+      })
+    }, 1000) // Reduced frequency: check every 1s instead of 500ms
 
-    return () => clearInterval(interval)
-  }, [mounted, enabled])
+    return () => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[NavigationDiagnostics] Enabled check effect CLEANUP - clearing interval')
+      }
+      clearInterval(interval)
+    }
+  }, [mounted]) // CRITICAL: Only depend on mounted, not enabled - prevents interval recreation
 
   useEffect(() => {
     if (!enabled) return
@@ -313,6 +332,10 @@ export default function NavigationDiagnostics() {
   useEffect(() => {
     if (!enabled) return
 
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[NavigationDiagnostics] Click listeners effect MOUNTED')
+    }
+
     // Sidebar is in page-level layout (WorkspaceShell) — it may not exist at effect run time.
     // Click detection still works once the sidebar is in the DOM; no error needed here.
 
@@ -420,14 +443,17 @@ export default function NavigationDiagnostics() {
     document.addEventListener("mousedown", handleMouseDown, true)
     
     return () => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[NavigationDiagnostics] Click listeners effect CLEANUP - removing listeners')
+      }
       document.removeEventListener("click", handleClick, true)
       document.removeEventListener("click", handleBubble, false)
       document.removeEventListener("mousedown", handleMouseDown, true)
     }
-  }, [enabled, pathname])
+  }, [enabled]) // CRITICAL: Remove pathname dependency - listeners don't need to re-attach on navigation
 
   // Performance monitoring - detect if UI is frozen/blocked
-  // Only log when issues are detected, not continuously
+  // CRITICAL: Use throttled monitoring to reduce overhead - check every 10 frames instead of every frame
   useEffect(() => {
     if (!enabled || !mounted) return
 
@@ -436,6 +462,7 @@ export default function NavigationDiagnostics() {
     let blockedFrames = 0
     let lastWarningTime = 0
     const WARNING_COOLDOWN = 5000 // Only warn once every 5 seconds
+    const CHECK_INTERVAL = 10 // Check every 10 frames instead of every frame
 
     const checkPerformance = () => {
       const now = performance.now()
@@ -459,14 +486,17 @@ export default function NavigationDiagnostics() {
       
       frameCount++
       lastCheck = now
-      
-      // Only log performance status when there's an issue, not every second
-      // This reduces console noise significantly
     }
 
     let rafId: number
+    let checkCounter = 0
     const monitor = () => {
-      checkPerformance()
+      checkCounter++
+      // Only check performance every N frames to reduce overhead
+      if (checkCounter >= CHECK_INTERVAL) {
+        checkPerformance()
+        checkCounter = 0
+      }
       rafId = requestAnimationFrame(monitor)
     }
     rafId = requestAnimationFrame(monitor)
