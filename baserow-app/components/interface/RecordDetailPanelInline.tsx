@@ -27,6 +27,7 @@ import {
   createInitialFieldLayout,
 } from "@/lib/interface/field-layout-helpers"
 import { isAbortError } from "@/lib/api/error-handling"
+import { resolveRecordEditMode } from "@/lib/interface/resolve-record-edit-mode"
 
 interface RecordDetailPanelInlineProps {
   pageId: string
@@ -59,6 +60,9 @@ export default function RecordDetailPanelInline({
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   
+  // Calculate canEditLayout before using it
+  const canEditLayout = pageEditable && (role === "admin" || role === "member") && Boolean(onLayoutSave)
+  
   // CRITICAL: Use centralized resolver - interfaceMode === 'edit' is ABSOLUTE
   // When interfaceMode === 'edit', editing is forced (derived value)
   // When interfaceMode === 'view', allow manual toggle via state
@@ -79,8 +83,6 @@ export default function RecordDetailPanelInline({
     }
   }
   // #endregion
-
-  const canEditLayout = pageEditable && (role === "admin" || role === "member") && Boolean(onLayoutSave)
 
   const resolvedFieldLayout = useMemo(() => {
     if (draftFieldLayout !== null) return draftFieldLayout

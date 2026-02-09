@@ -391,10 +391,10 @@ export default function NavigationDiagnostics() {
           const idleId = requestIdleCallback(() => runDiagnostics(checkKind), { timeout: delay + 500 })
           idleCallbacks.push(idleId)
         }, delay)
-        timeouts.push(timeoutId)
+        timeouts.push(timeoutId as unknown as number)
       } else {
         const timeoutId = setTimeout(() => runDiagnostics(checkKind), delay)
-        timeouts.push(timeoutId)
+        timeouts.push(timeoutId as unknown as number)
       }
     }
     
