@@ -508,7 +508,7 @@ export async function resolvePastedLinkedValue(
     if (isUuid(term)) {
       // Verify the ID exists in target table
       const { data: record } = await supabase
-        .from(targetTable.supabase_table)
+        .from(tableRow.supabase_table)
         .select('id')
         .eq('id', term)
         .single()
@@ -525,10 +525,10 @@ export async function resolvePastedLinkedValue(
     // Search by display name across search fields
     let found = false
 
-    for (const searchField of searchFields) {
+      for (const searchField of searchFields) {
       // Try exact match first
       const { data: exactMatch } = await supabase
-        .from(targetTable.supabase_table)
+        .from(tableRow.supabase_table)
         .select('id')
         .eq(searchField, term)
         .limit(1)
@@ -542,7 +542,7 @@ export async function resolvePastedLinkedValue(
 
       // Try case-insensitive match
       const { data: caseInsensitiveMatch } = await supabase
-        .from(targetTable.supabase_table)
+        .from(tableRow.supabase_table)
         .select('id')
         .ilike(searchField, term)
         .limit(2) // Check for ambiguity
