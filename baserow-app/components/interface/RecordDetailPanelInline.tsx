@@ -4,18 +4,19 @@
  * Record Detail Panel Inline (Right Panel)
  *
  * Airtable-style inline record detail panel for Record View pages.
- * Uses the SAME layout editor as RecordModal (RecordFields + RecordFieldEditorPanel).
+ * Single source of truth: field_layout drives everything.
  *
- * - Left: Record fields (visible_in_canvas from field_layout)
- * - Right (when editing layout): RecordFieldEditorPanel for drag/drop, groups, text blocks
- * - Single source of truth: field_layout
+ * Modes:
+ * - VIEW MODE: Fields are editable (if permissions allow), no drag handles
+ * - LAYOUT MODE: Fields gain drag handles, can be reordered/hidden, record values visible but locked
+ *
+ * No split editor model - the record itself becomes the canvas.
  */
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
-import { Pencil, Check, X, LayoutGrid } from "lucide-react"
+import { Check, X, LayoutGrid } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import RecordFields from "@/components/records/RecordFields"
-import RecordFieldEditorPanel from "./RecordFieldEditorPanel"
 import { useToast } from "@/components/ui/use-toast"
 import { useUserRole } from "@/lib/hooks/useUserRole"
 import type { TableField } from "@/types/fields"
@@ -91,9 +92,6 @@ export default function RecordDetailPanelInline({
   }, [draftFieldLayout, fieldLayout])
 
   const visibleFields = useMemo(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordDetailPanelInline.tsx:71',message:'visibleFields useMemo RECALCULATING',data:{resolvedFieldLayoutLength:resolvedFieldLayout.length,fieldsLength:fields.length},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
     return getVisibleFieldsFromLayout(resolvedFieldLayout, fields, "canvas")
   }, [resolvedFieldLayout, fields])
 
@@ -105,13 +103,15 @@ export default function RecordDetailPanelInline({
 
   const isFieldEditable = useCallback(
     (fieldName: string) => {
+      // In layout mode, fields are locked (not editable)
+      if (isEditingLayout) return false
       // P1 FIX: When interfaceMode === 'edit', ALWAYS allow editing (absolute authority)
       // When interfaceMode === 'view', require pageEditable AND layout permissions
       if (forcedEditMode) return true
       if (!pageEditable) return false
       return isFieldEditableFromLayout(fieldName, resolvedFieldLayout, pageEditable)
     },
-    [forcedEditMode, pageEditable, resolvedFieldLayout]
+    [isEditingLayout, forcedEditMode, pageEditable, resolvedFieldLayout]
   )
 
   // P1 FIX: Reset manual edit mode when forcedEditMode becomes true
@@ -204,8 +204,56 @@ export default function RecordDetailPanelInline({
   )
 
   const handleFieldLayoutChange = useCallback((newLayout: FieldLayoutItem[]) => {
-    setDraftFieldLayout(newLayout)
-  }, [])
+    if (isEditingLayout) {
+      setDraftFieldLayout(newLayout)
+    }
+  }, [isEditingLayout])
+
+  const handleFieldReorder = useCallback((fieldName: string, newIndex: number) => {
+    if (draftFieldLayout === null) return
+    
+    const currentIndex = draftFieldLayout.findIndex(item => item.field_name === fieldName)
+    if (currentIndex === -1) return
+
+    const newLayout = [...draftFieldLayout]
+    const [moved] = newLayout.splice(currentIndex, 1)
+    newLayout.splice(newIndex, 0, moved)
+    
+    // Update order values
+    const updatedLayout = newLayout.map((item, index) => ({
+      ...item,
+      order: index,
+    }))
+    
+    setDraftFieldLayout(updatedLayout)
+  }, [draftFieldLayout])
+
+  const handleFieldVisibilityToggle = useCallback((fieldName: string, visible: boolean) => {
+    if (draftFieldLayout === null) return
+    
+    const updated = draftFieldLayout.map((item) =>
+      item.field_name === fieldName
+        ? { ...item, visible_in_canvas: visible }
+        : item
+    )
+
+    // If field not in layout, add it
+    if (!updated.some((item) => item.field_name === fieldName)) {
+      const field = fields.find((f) => f.name === fieldName)
+      if (field) {
+        const newItem: FieldLayoutItem = {
+          field_id: field.id,
+          field_name: field.name,
+          order: Math.max(...updated.map((i) => i.order), -1) + 1,
+          editable: pageEditable,
+          visible_in_canvas: visible,
+        }
+        updated.push(newItem)
+      }
+    }
+
+    setDraftFieldLayout(updated)
+  }, [draftFieldLayout, fields, pageEditable])
 
   const handleDoneEditLayout = useCallback(async () => {
     // #region agent log
@@ -292,35 +340,37 @@ export default function RecordDetailPanelInline({
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header with Edit Layout controls */}
-      {canEditLayout && (
-        <div className="flex-shrink-0 flex items-center justify-between gap-2 px-4 py-2 border-b border-gray-200 bg-white">
-          <h3 className="text-sm font-medium text-gray-900 truncate">
-            {titleField && record[titleField] ? String(record[titleField]) : "Record details"}
-          </h3>
-          <div className="flex items-center gap-2">
-            {isEditingLayout ? (
-              <>
-                <button
-                  type="button"
-                  onClick={handleDoneEditLayout}
-                  disabled={saving}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                >
-                  <Check className="h-4 w-4" />
-                  Done
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCancelEditLayout}
-                  disabled={saving}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium border border-gray-300 bg-white hover:bg-gray-50"
-                >
-                  <X className="h-4 w-4" />
-                  Cancel
-                </button>
-              </>
-            ) : (
-              showEditLayoutButton && (
+      <div className="flex-shrink-0 flex items-center justify-between gap-2 px-4 py-2 border-b border-gray-200 bg-white">
+        <h3 className="text-sm font-medium text-gray-900 truncate">
+          {titleField && record[titleField] ? String(record[titleField]) : "Record details"}
+        </h3>
+        <div className="flex items-center gap-2">
+          {isEditingLayout ? (
+            <>
+              {/* Layout mode: Show Done/Cancel only */}
+              <button
+                type="button"
+                onClick={handleDoneEditLayout}
+                disabled={saving}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                <Check className="h-4 w-4" />
+                Done
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelEditLayout}
+                disabled={saving}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium border border-gray-300 bg-white hover:bg-gray-50"
+              >
+                <X className="h-4 w-4" />
+                Cancel
+              </button>
+            </>
+          ) : (
+            <>
+              {/* View mode: Show Edit layout button if allowed */}
+              {showEditLayoutButton && (
                 <button
                   type="button"
                   onClick={handleStartEditLayout}
@@ -330,56 +380,35 @@ export default function RecordDetailPanelInline({
                   <LayoutGrid className="h-4 w-4" />
                   Edit layout
                 </button>
-              )
-            )}
-          </div>
+              )}
+            </>
+          )}
         </div>
-      )}
+      </div>
 
-      {/* Content */}
-      <div className="flex-1 flex overflow-hidden min-h-0">
-        {isEditingLayout ? (
-          <>
-            <div className="flex-1 overflow-y-auto px-6 py-4">
-              <RecordFields
-                fields={visibleFields}
-                formData={record}
-                onFieldChange={handleFieldChange}
-                fieldGroups={fieldGroups}
-                tableId={tableId}
-                recordId={recordId}
-                tableName={tableName || ""}
-                isFieldEditable={isFieldEditable}
-              />
-            </div>
-            <div className="w-80 flex-shrink-0 border-l overflow-y-auto bg-gray-50">
-              <RecordFieldEditorPanel
-                tableId={tableId}
-                recordId={recordId}
-                allFields={fields}
-                fieldLayout={draftFieldLayout ?? resolvedFieldLayout}
-                onFieldLayoutChange={handleFieldLayoutChange}
-                onFieldChange={handleFieldChange}
-                pageEditable={pageEditable}
-                mode="record_review"
-              />
-            </div>
-          </>
-        ) : hasVisibleFields ? (
-          <div className="flex-1 overflow-y-auto px-6 py-4">
-            <RecordFields
-              fields={visibleFields}
-              formData={record}
-              onFieldChange={handleFieldChange}
-              fieldGroups={fieldGroups}
-              tableId={tableId}
-              recordId={recordId}
-              tableName={tableName || ""}
-              isFieldEditable={isFieldEditable}
-            />
-          </div>
+      {/* Content - Single canvas, no split */}
+      <div className="flex-1 overflow-y-auto px-6 py-4">
+        {hasVisibleFields ? (
+          <RecordFields
+            fields={visibleFields}
+            formData={record}
+            onFieldChange={handleFieldChange}
+            fieldGroups={fieldGroups}
+            tableId={tableId}
+            recordId={recordId}
+            tableName={tableName || ""}
+            isFieldEditable={isFieldEditable}
+            // Layout mode props
+            layoutMode={isEditingLayout}
+            fieldLayout={draftFieldLayout ?? resolvedFieldLayout}
+            allFields={fields}
+            onFieldReorder={handleFieldReorder}
+            onFieldVisibilityToggle={handleFieldVisibilityToggle}
+            onFieldLayoutChange={handleFieldLayoutChange}
+            pageEditable={pageEditable}
+          />
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 text-center text-gray-500">
+          <div className="flex flex-col items-center justify-center py-12 text-center text-gray-500">
             <p className="text-sm font-medium">No fields in layout</p>
             <p className="text-xs mt-1">
               {canEditLayout
