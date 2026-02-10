@@ -572,7 +572,7 @@ export default function CSVImportModal({
         }
         
         // If column has a new field type specified, add it to create list
-        if (newFieldTypes[col.name]) {
+          if (newFieldTypes[col.name]) {
           // Validate that the field type can be created from CSV import
           if (newFieldTypes[col.name] === 'link_to_table') {
             if (!linkTableOptions[col.name]) {
@@ -633,20 +633,22 @@ export default function CSVImportModal({
             // Convert to sorted array and limit to reasonable number
             const choices = Array.from(uniqueChoices).sort().slice(0, 100)
             
-            // Single_select and multi_select require at least one choice
+            // If the column is completely blank, treat it as an empty/unused column instead of failing the import.
+            // This lets users keep the "New field: single_select" mapping without being blocked when all values are blank.
             if (choices.length === 0) {
-              const availableColumns = parsedData.rows.length > 0 ? Object.keys(parsedData.rows[0]).join(', ') : 'none'
-              throw new Error(
-                `Field "${col.name}" is set as ${newFieldTypes[col.name]}, but no valid choices were found in the CSV data. ` +
-                `Found ${parsedData.rows.length} rows, ${valuesFound} non-empty values. ` +
-                `Available columns: ${availableColumns}. ` +
-                `Please either change the field type or ensure the column contains selectable values.`
+              console.warn(
+                `CSV import: column "${col.name}" was mapped as ${newFieldTypes[col.name]} but contains no non-empty values. ` +
+                `The column will be skipped for this import.`
               )
+              return
             }
-            
-            // Always set options for select fields
+
+            // Always set options for select fields when we have at least one choice
             fieldData.options = { choices }
-            console.log(`Extracted ${choices.length} choices for "${col.name}" from ${valuesFound} values:`, choices.slice(0, 10))
+            console.log(
+              `Extracted ${choices.length} choices for "${col.name}" from ${valuesFound} values:`,
+              choices.slice(0, 10)
+            )
           }
 
           // Set linked_table_id for link_to_table fields
