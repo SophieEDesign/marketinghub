@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react"
-import { ChevronDown, ChevronRight, GripVertical, Eye, EyeOff, Plus } from "lucide-react"
+import { ChevronDown, ChevronRight, Plus } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { useToast } from "@/components/ui/use-toast"
@@ -23,10 +23,9 @@ import {
 import {
   SortableContext,
   sortableKeyboardCoordinates,
-  useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
-import { CSS } from "@dnd-kit/utilities"
+import SortableFieldItem from "./SortableFieldItem"
 
 interface RecordFieldsProps {
   fields: TableField[]
@@ -381,71 +380,8 @@ export default function RecordFields({
     [layoutMode, fieldLayout]
   )
 
-  // Sortable field item component for layout mode
-  function SortableFieldItem({
-    field,
-    children,
-    isVisible,
-  }: {
-    field: TableField
-    children: React.ReactNode
-    isVisible: boolean
-  }) {
-    const {
-      attributes,
-      listeners,
-      setNodeRef,
-      transform,
-      transition,
-      isDragging,
-    } = useSortable({ id: field.id })
-
-    const style = {
-      transform: CSS.Transform.toString(transform),
-      transition,
-      opacity: isDragging ? 0.5 : 1,
-    }
-
-    return (
-      <div
-        ref={setNodeRef}
-        style={style}
-        className={cn(
-          "relative group",
-          !isVisible && "opacity-50"
-        )}
-      >
-        {layoutMode && (
-          <div className="absolute left-0 top-0 bottom-0 flex items-center z-10">
-            <div
-              {...attributes}
-              {...listeners}
-              className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 p-1"
-            >
-              <GripVertical className="h-4 w-4" />
-            </div>
-            {onFieldVisibilityToggle && (
-              <button
-                type="button"
-                onClick={() => onFieldVisibilityToggle(field.name, !isVisible)}
-                className="p-1 text-gray-400 hover:text-gray-600"
-                title={isVisible ? "Hide field" : "Show field"}
-              >
-                {isVisible ? (
-                  <Eye className="h-4 w-4" />
-                ) : (
-                  <EyeOff className="h-4 w-4" />
-                )}
-              </button>
-            )}
-          </div>
-        )}
-        <div className={cn(layoutMode && "ml-10")}>
-          {children}
-        </div>
-      </div>
-    )
-  }
+  // SortableFieldItem is now extracted to a separate component file
+  // to ensure stable hook order (always calls useSortable, disabled when layoutMode is false)
 
   // Handle drag end in layout mode (multi-column, modal-style)
   const handleDragEnd = useCallback(
@@ -664,19 +600,20 @@ export default function RecordFields({
         </div>
       )
 
-      if (layoutMode) {
-        const isVisible = isFieldVisibleInLayout(field.name)
-        return (
-          <SortableFieldItem key={field.id} field={field} isVisible={isVisible}>
-            {fieldContent}
-          </SortableFieldItem>
-        )
-      }
-
+      // CRITICAL FIX: Always render SortableFieldItem to maintain stable hook order
+      // The component internally disables sortable behavior when layoutMode is false
+      // This prevents React #185 (hook order violation) when layoutMode changes
+      const isVisible = layoutMode ? isFieldVisibleInLayout(field.name) : true
       return (
-        <div key={field.id}>
+        <SortableFieldItem 
+          key={field.id} 
+          field={field} 
+          isVisible={isVisible}
+          layoutMode={layoutMode}
+          onFieldVisibilityToggle={onFieldVisibilityToggle}
+        >
           {fieldContent}
-        </div>
+        </SortableFieldItem>
       )
     },
     [

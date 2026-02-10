@@ -81,12 +81,7 @@ export default function RecordModal({
   interfaceMode = 'view',
 }: RecordModalProps) {
   const { toast } = useToast()
-  // TEMP DIAGNOSTIC: Force layoutMode OFF for Calendar record modal to validate
-  // whether React hook order errors (#185) are coming from layout-mode logic.
-  // When this flag is true, Calendar modals render using the non-layout path
-  // even if interfaceMode/initialEditMode would normally enable layout editing.
-  const forceLayoutModeOff = true
-
+  
   // P1 FIX: interfaceMode === 'edit' is ABSOLUTE - no manual overrides allowed
   // When interfaceMode === 'edit', editing is forced (derived value, cannot be disabled)
   // When interfaceMode === 'view', allow manual toggle via state
@@ -516,7 +511,7 @@ export default function RecordModal({
                     recordId={recordId}
                     tableName={effectiveTableName || ''}
                     isFieldEditable={isFieldEditable}
-                    layoutMode={forceLayoutModeOff ? false : true}
+                    layoutMode={true}
                     fieldLayout={draftFieldLayout ?? resolvedFieldLayout}
                     allFields={filteredFields}
                     onFieldVisibilityToggle={handleFieldVisibilityToggle}
