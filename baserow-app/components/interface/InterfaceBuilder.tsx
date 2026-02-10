@@ -78,6 +78,14 @@ export default function InterfaceBuilder({
   pageEditable,
   editableFieldNames = [],
 }: InterfaceBuilderProps) {
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[InterfaceBuilder] render START', {
+      pageId: page.id,
+      initialBlocksCount: initialBlocks?.length ?? 'undefined',
+      isViewer,
+      mode,
+    })
+  }
   const { primaryColor } = useBranding()
   const { toast } = useToast()
   const [blocks, setBlocks] = useState<PageBlock[]>(initialBlocks)

@@ -125,6 +125,16 @@ export default function Canvas({
   fullPageBlockId = null,
   openRecordInEditModeForBlock = null,
 }: CanvasProps) {
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[Canvas] render START', {
+      pageId,
+      blocksCount: blocks?.length ?? 0,
+      isEditing,
+      mode,
+      interfaceMode,
+      fullPageBlockId,
+    })
+  }
   // Get filters from filter blocks for this block
   const { getFiltersForBlock, getFilterTreeForBlock } = useFilterState()
   
