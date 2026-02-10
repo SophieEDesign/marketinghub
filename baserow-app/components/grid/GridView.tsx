@@ -3040,14 +3040,15 @@ export default function GridView({
       {/* Records are added via bottom-of-table button or inline creation */}
       {isEditing && onAddField && (
         <div className="flex-shrink-0 mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <span className="uppercase tracking-wide">Columns</span>
             {onAddField && (
               <button
                 onClick={onAddField}
-                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-md transition-colors flex items-center gap-2"
+                className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-md transition-colors flex items-center gap-1.5"
               >
-                <Plus className="h-4 w-4" />
-                Add Field
+                <Plus className="h-3 w-3" />
+                Add column
               </button>
             )}
           </div>

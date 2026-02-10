@@ -422,48 +422,72 @@ export default function RecordModal({
           <div className="flex items-center gap-2">
             {isEditingLayout ? (
               <>
-                <Button type="button" variant="default" size="sm" onClick={handleDoneEditLayout} className="inline-flex items-center gap-1.5" aria-label="Save layout" title="Save layout">
+                {/* Layout mode: show Done/Cancel for layout only; hide record actions */}
+                <Button
+                  type="button"
+                  variant="default"
+                  size="sm"
+                  onClick={handleDoneEditLayout}
+                  className="inline-flex items-center gap-1.5"
+                  aria-label="Save layout"
+                  title="Save layout"
+                >
                   <Check className="h-4 w-4" />
-                  Save layout
+                  Done
                 </Button>
-                <Button type="button" variant="outline" size="sm" onClick={handleCancelEditLayout} aria-label="Cancel layout edit" title="Cancel">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCancelEditLayout}
+                  aria-label="Cancel layout edit"
+                  title="Cancel"
+                >
                   Cancel
                 </Button>
               </>
             ) : (
               <>
                 {showEditLayoutButton && (
-                  <Button type="button" variant="outline" size="sm" onClick={handleStartEditLayout} className="inline-flex items-center gap-1.5" aria-label="Edit layout" title="Edit layout">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleStartEditLayout}
+                    className="inline-flex items-center gap-1.5"
+                    aria-label="Edit layout"
+                    title="Edit layout"
+                  >
                     <LayoutGrid className="h-4 w-4" />
                     Edit layout
                   </Button>
                 )}
+                {recordId && (
+                  <Button
+                    variant="destructive"
+                    onClick={handleDelete}
+                    disabled={deleting || saving || loading || !canDeleteRecords}
+                    title={!canDeleteRecords ? "You don't have permission to delete this record" : "Delete this record"}
+                    aria-disabled={!canDeleteRecords || deleting || saving || loading}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    {deleting ? 'Deleting…' : 'Delete'}
+                  </Button>
+                )}
+                <Button variant="outline" onClick={onClose} disabled={deleting || saving}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSave}
+                  disabled={saving || loading || !canSave}
+                  title={!canSave ? (recordId ? "You don't have permission to edit this record" : "You don't have permission to create records") : undefined}
+                  aria-disabled={saving || loading || !canSave}
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  {saving ? 'Saving...' : 'Save'}
+                </Button>
               </>
             )}
-            {recordId && !isEditingLayout && (
-              <Button
-                variant="destructive"
-                onClick={handleDelete}
-                disabled={deleting || saving || loading || !canDeleteRecords}
-                title={!canDeleteRecords ? "You don't have permission to delete this record" : "Delete this record"}
-                aria-disabled={!canDeleteRecords || deleting || saving || loading}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                {deleting ? 'Deleting…' : 'Delete'}
-              </Button>
-            )}
-            <Button variant="outline" onClick={onClose} disabled={deleting || saving}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={saving || loading || !canSave}
-              title={!canSave ? (recordId ? "You don't have permission to edit this record" : "You don't have permission to create records") : undefined}
-              aria-disabled={saving || loading || !canSave}
-            >
-              <Save className="mr-2 h-4 w-4" />
-              {saving ? 'Saving...' : 'Save'}
-            </Button>
           </div>
         </div>
 
@@ -490,14 +514,13 @@ export default function RecordModal({
                     layoutMode={true}
                     fieldLayout={draftFieldLayout ?? resolvedFieldLayout}
                     allFields={filteredFields}
-                    onFieldReorder={handleFieldReorder}
                     onFieldVisibilityToggle={handleFieldVisibilityToggle}
                     onFieldLayoutChange={handleFieldLayoutChange}
                     pageEditable={effectiveEditable}
                   />
                 </div>
               ) : resolvedFieldLayout.length > 0 && recordId ? (
-                // Use RecordFields for existing records with layout
+                // Use RecordFields for existing records with layout (multi-column, no drag handles)
                 <div className="space-y-4 py-4">
                   <RecordFields
                     fields={visibleFields}
@@ -508,6 +531,9 @@ export default function RecordModal({
                     recordId={recordId}
                     tableName={effectiveTableName || ''}
                     isFieldEditable={isFieldEditable}
+                    fieldLayout={resolvedFieldLayout}
+                    allFields={filteredFields}
+                    pageEditable={effectiveEditable}
                   />
                 </div>
               ) : showFieldSections && sectionedFields ? (

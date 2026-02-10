@@ -1382,7 +1382,8 @@ export default function CSVImportPanel({
               <Select
                 value={Object.keys(defaultValuesForAll)[0] ?? ""}
                 onValueChange={(fieldName) => {
-                  if (!fieldName) {
+                  // Treat the special "__none__" value as "no field selected"
+                  if (!fieldName || fieldName === "__none__") {
                     setDefaultValuesForAll({})
                     return
                   }
@@ -1395,7 +1396,7 @@ export default function CSVImportPanel({
                   <SelectValue placeholder="Select field" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="__none__">None</SelectItem>
                   {tableFields.map((f) => (
                     <SelectItem key={f.id} value={f.name}>
                       {getFieldDisplayName(f)}

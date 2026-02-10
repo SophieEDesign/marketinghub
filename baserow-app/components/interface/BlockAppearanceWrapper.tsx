@@ -1,9 +1,10 @@
-"use client"
-
-import type { PageBlock } from "@/lib/interface/types"
-import { getAppearanceClasses, getAccentColor, getTitleSizeClass, getTitleAlignClass, getHeaderBarClasses } from "@/lib/interface/appearance-utils"
+ "use client"
+ 
+ import type { PageBlock } from "@/lib/interface/types"
+ import { getAppearanceClasses, getAccentColor, getTitleSizeClass, getTitleAlignClass, getHeaderBarClasses } from "@/lib/interface/appearance-utils"
 import { BLOCK_CONTENT_PADDING, BLOCK_HEADER_PADDING } from "@/lib/interface/spacing-tokens"
 import { cn } from "@/lib/utils"
+ import { getEffectiveBlockSizing } from "@/lib/interface/block-sizing"
 
 interface BlockAppearanceWrapperProps {
   block: PageBlock
@@ -22,6 +23,8 @@ export default function BlockAppearanceWrapper({
   isFullPage = false,
   isRail = false,
 }: BlockAppearanceWrapperProps) {
+  const sizing = getEffectiveBlockSizing(block)
+
   // Full-page: transparent dimensionless wrapper; no block chrome. Single scroll context = block internal content.
   if (isFullPage) {
     return <div className={cn("h-full w-full min-h-0 flex flex-col", className)}>{children}</div>
@@ -93,8 +96,18 @@ export default function BlockAppearanceWrapper({
         </>
       )}
 
-      {/* Block content with fixed padding. Field blocks: no flex-1 min-h-0 so block grows with content; no internal scroll. */}
-      <div className={cn(block.type === 'field' ? 'overflow-visible' : 'flex-1 min-h-0', BLOCK_CONTENT_PADDING)}>
+      {/* Block content with fixed padding. Field blocks: no internal flex sizing so block grows with content; no internal scroll. */}
+      <div
+        className={cn(
+          block.type === 'field'
+            ? 'overflow-visible'
+            : // For content-sized blocks, avoid internal flex grow; let content drive height.
+              sizing === 'content'
+              ? 'overflow-hidden'
+              : 'flex-1 min-h-0',
+          BLOCK_CONTENT_PADDING
+        )}
+      >
         {children}
       </div>
     </div>

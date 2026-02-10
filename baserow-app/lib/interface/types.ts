@@ -27,6 +27,8 @@ export type BlockType =
   | 'horizontal_grouped'
   | 'record_context'
 
+export type BlockSizing = 'content' | 'fill'
+
 export type ChartType = 'bar' | 'line' | 'pie' | 'area' | 'stacked_bar'
 export type AggregateType = 'count' | 'sum' | 'avg' | 'min' | 'max'
 
@@ -35,6 +37,17 @@ export interface PageBlock {
   id: string
   page_id: string
   type: BlockType
+  /**
+   * Sizing model for block content within its layout cell.
+   * - 'content' (default): block height is driven by its content; no flex grow.
+   * - 'fill': block may consume all available height within its layout container.
+   *
+   * IMPORTANT:
+   * - All blocks default to 'content'.
+   * - Only layout containers (e.g. canvases, section/column containers) may opt into 'fill'.
+   * - Rich text / editor-style blocks (e.g. TextBlock) MUST always behave as 'content'.
+   */
+  sizing?: BlockSizing
   x: number
   y: number
   w: number

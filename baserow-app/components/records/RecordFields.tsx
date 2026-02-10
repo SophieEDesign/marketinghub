@@ -1,6 +1,6 @@
-"use client"
+\"use client\"
 
-import { useState, useCallback, useEffect, useMemo } from "react"
+import { useState, useCallback, useEffect, useMemo, useRef } from "react"
 import { ChevronDown, ChevronRight, GripVertical, Eye, EyeOff, Plus } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
@@ -21,7 +21,6 @@ import {
   DragEndEvent,
 } from "@dnd-kit/core"
 import {
-  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
@@ -43,7 +42,6 @@ interface RecordFieldsProps {
   layoutMode?: boolean // Whether we're in layout editing mode
   fieldLayout?: FieldLayoutItem[] // Current field layout
   allFields?: TableField[] // All available fields (for adding new ones)
-  onFieldReorder?: (fieldName: string, newIndex: number) => void
   onFieldVisibilityToggle?: (fieldName: string, visible: boolean) => void
   onFieldLayoutChange?: (layout: FieldLayoutItem[]) => void
   pageEditable?: boolean // For creating new layout items
@@ -71,7 +69,6 @@ export default function RecordFields({
   layoutMode = false,
   fieldLayout = [],
   allFields = [],
-  onFieldReorder,
   onFieldVisibilityToggle,
   onFieldLayoutChange,
   pageEditable = true,
@@ -81,6 +78,7 @@ export default function RecordFields({
   const [editingField, setEditingField] = useState<string | null>(null)
   const [tableName, setTableName] = useState<string | undefined>(propTableName)
   const supabase = createClient()
+  const columnsContainerRef = useRef<HTMLDivElement | null>(null)
 
   // Load collapsed groups state from localStorage
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
@@ -125,7 +123,7 @@ export default function RecordFields({
     }
   }, [tableId, tableName, supabase])
 
-  // Group and sort fields based on metadata
+  // Group and sort fields based on metadata (fallback mode – used when no modal columns are defined)
   const groupedFields = useMemo(() => {
     // Build field-to-group mapping from fieldGroups prop (legacy support)
     const fieldToGroupMap: Record<string, string> = {}
@@ -201,6 +199,109 @@ export default function RecordFields({
     return Object.fromEntries(sortedGroupEntries)
   }, [fields, fieldGroups, layoutMode, fieldLayout])
 
+  // Modal column-aware layout metadata (used by record modal / side panel only).
+  // We keep this entirely derived from fieldLayout so that field_layout remains
+  // the single source of truth. Page canvas / block layout never read these
+  // modal-specific properties.
+  const hasModalColumns = useMemo(
+    () => fieldLayout.some((item) => item.modal_column_id),
+    [fieldLayout]
+  )
+
+  type ModalColumn = {
+    id: string
+    order: number
+    width: number
+    fields: TableField[]
+  }
+
+  const modalColumns: ModalColumn[] = useMemo(() => {
+    // If there is no layout at all, fall back to a single implicit column based on fields order.
+    if (!fieldLayout.length) {
+      const ordered = [...fields].filter(
+        (field) => !isSystemFieldName(field.name) && !field.options?.system
+      )
+      return ordered.length
+        ? [
+            {
+              id: "col-1",
+              order: 0,
+              width: 1,
+              fields: ordered,
+            },
+          ]
+        : []
+    }
+
+    // Build field lookup for safety
+    const fieldMap = new Map<string, TableField>()
+    fields.forEach((field) => {
+      fieldMap.set(field.name, field)
+      fieldMap.set(field.id, field)
+    })
+
+    // Build column buckets from layout metadata, defaulting missing columns to col-1.
+    const byColumn = new Map<
+      string,
+      { id: string; order: number; width: number; fieldOrder: Array<{ order: number; field: TableField }> }
+    >()
+    const seenFieldNames = new Set<string>()
+
+    fieldLayout.forEach((item) => {
+      // Only respect modal visibility in modal canvas
+      if (item.visible_in_modal === false) return
+
+      const colId = item.modal_column_id || "col-1"
+      const colOrder = item.modal_column_order ?? 0
+      const colWidth = item.modal_column_width ?? 1
+      const field = fieldMap.get(item.field_name) || fieldMap.get(item.field_id)
+      if (!field || isSystemFieldName(field.name) || field.options?.system) {
+        return
+      }
+      // Ensure each logical field participates in the modal canvas at most once,
+      // even if field_layout contains duplicate items.
+      if (seenFieldNames.has(field.name)) {
+        return
+      }
+      seenFieldNames.add(field.name)
+
+      if (!byColumn.has(colId)) {
+        byColumn.set(colId, { id: colId, order: colOrder, width: colWidth, fieldOrder: [] })
+      }
+      byColumn.get(colId)!.fieldOrder.push({ order: item.order, field })
+    })
+
+    const columns = Array.from(byColumn.values())
+      .map((col) => ({
+        id: col.id,
+        order: col.order,
+        width: col.width || 1,
+        fields: col.fieldOrder
+          .sort((a, b) => a.order - b.order)
+          .map((f) => f.field),
+      }))
+      .sort((a, b) => a.order - b.order)
+
+    // If we somehow didn't get any columns from layout, fall back to single column.
+    if (!columns.length) {
+      const ordered = [...fields].filter(
+        (field) => !isSystemFieldName(field.name) && !field.options?.system
+      )
+      return ordered.length
+        ? [
+            {
+              id: "col-1",
+              order: 0,
+              width: 1,
+              fields: ordered,
+            },
+          ]
+        : []
+    }
+
+    return columns
+  }, [fieldLayout, fields])
+
   const toggleGroup = (groupName: string) => {
     setCollapsedGroups((prev) => {
       const next = new Set(prev)
@@ -274,7 +375,8 @@ export default function RecordFields({
     (fieldName: string): boolean => {
       if (!layoutMode || fieldLayout.length === 0) return true
       const layoutItem = fieldLayout.find((item) => item.field_name === fieldName)
-      return layoutItem ? layoutItem.visible_in_canvas !== false : true
+      // Modal canvas uses visible_in_modal as the source of truth
+      return layoutItem ? layoutItem.visible_in_modal !== false : true
     },
     [layoutMode, fieldLayout]
   )
@@ -345,49 +447,92 @@ export default function RecordFields({
     )
   }
 
-  // Flatten fields for drag and drop (layout mode only) - respect layout order
-  const flatFieldsForDrag = useMemo(() => {
-    if (!layoutMode) return []
-    
-    // Create order map from fieldLayout
-    const orderMap = new Map<string, number>()
-    fieldLayout.forEach((item) => {
-      orderMap.set(item.field_name, item.order)
-    })
-    
-    // Flatten and sort by layout order
-    const flat = Object.values(groupedFields).flat()
-    return flat.sort((a, b) => {
-      const orderA = orderMap.get(a.name) ?? 9999
-      const orderB = orderMap.get(b.name) ?? 9999
-      return orderA - orderB
-    })
-  }, [layoutMode, groupedFields, fieldLayout])
-
-  // Handle drag end in layout mode
+  // Handle drag end in layout mode (multi-column, modal-style)
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
-      if (!layoutMode || !onFieldReorder) return
+      if (!layoutMode || !onFieldLayoutChange || !fieldLayout.length) return
 
       const { active, over } = event
       if (!over || active.id === over.id) return
 
-      const activeField = flatFieldsForDrag.find((f) => f.id === active.id)
+      const activeId = String(active.id)
+      const overId = String(over.id)
+
+      // Find source/target columns based on field ids
+      let sourceColumnId: string | null = null
+      let targetColumnId: string | null = null
+
+      modalColumns.forEach((col) => {
+        const hasActive = col.fields.some((f) => f.id === activeId)
+        const hasOver = col.fields.some((f) => f.id === overId)
+        if (hasActive) sourceColumnId = col.id
+        if (hasOver) targetColumnId = col.id
+      })
+
+      if (!sourceColumnId || !targetColumnId) return
+
+      const sourceCol = modalColumns.find((c) => c.id === sourceColumnId)
+      const targetCol = modalColumns.find((c) => c.id === targetColumnId)
+      if (!sourceCol || !targetCol) return
+
+      const activeField = sourceCol.fields.find((f) => f.id === activeId)
       if (!activeField) return
 
-      const oldIndex = flatFieldsForDrag.findIndex((f) => f.id === active.id)
-      const newIndex = flatFieldsForDrag.findIndex((f) => f.id === over.id)
-
-      if (oldIndex !== -1 && newIndex !== -1) {
-        onFieldReorder(activeField.name, newIndex)
+      const newTargetFields = [...targetCol.fields]
+      const existingIndex = newTargetFields.findIndex((f) => f.id === activeId)
+      if (existingIndex !== -1) {
+        newTargetFields.splice(existingIndex, 1)
       }
+
+      const overIndex = newTargetFields.findIndex((f) => f.id === overId)
+      const insertIndex = overIndex === -1 ? newTargetFields.length : overIndex
+      newTargetFields.splice(insertIndex, 0, activeField)
+
+      const updatedLayout: FieldLayoutItem[] = fieldLayout.map((item) => {
+        if (item.field_name === activeField.name || item.field_id === activeField.id) {
+          return {
+            ...item,
+            modal_column_id: targetCol.id,
+          }
+        }
+        return item
+      })
+
+      // Recompute order for all items, respecting column order and within-column order
+      let globalOrder = 0
+      const columnOrderMap = new Map<string, TableField[]>()
+      modalColumns.forEach((col) => {
+        if (col.id === targetCol.id) {
+          columnOrderMap.set(col.id, newTargetFields)
+        } else {
+          columnOrderMap.set(col.id, col.fields)
+        }
+      })
+
+      const orderedColumns = [...modalColumns].sort((a, b) => a.order - b.order)
+
+      const finalLayout = updatedLayout.map((item) => {
+        const colId = item.modal_column_id || "col-1"
+        const col = orderedColumns.find((c) => c.id === colId)
+        const colFields = columnOrderMap.get(colId) || col?.fields || []
+        const idx = colFields.findIndex(
+          (f) => f.name === item.field_name || f.id === item.field_id
+        )
+        const nextOrder = idx === -1 ? globalOrder : globalOrder + idx
+        return {
+          ...item,
+          order: nextOrder,
+        }
+      })
+
+      onFieldLayoutChange(finalLayout)
     },
-    [layoutMode, onFieldReorder, flatFieldsForDrag]
+    [layoutMode, onFieldLayoutChange, fieldLayout, modalColumns]
   )
 
   // Handle adding a field in layout mode
   const handleAddField = useCallback(
-    (field: TableField) => {
+    (field: TableField, targetColumnId?: string) => {
       if (!layoutMode || !onFieldLayoutChange || !fieldLayout) return
 
       // Check if field already exists in layout
@@ -398,15 +543,17 @@ export default function RecordFields({
         return
       }
 
-      // Add field to layout
+      // Add field to layout in the target column (default first column)
       const maxOrder = Math.max(...fieldLayout.map((item) => item.order), -1)
+      const columnId = targetColumnId || (modalColumns[0]?.id ?? "col-1")
       const newItem: FieldLayoutItem = {
         field_id: field.id,
         field_name: field.name,
         order: maxOrder + 1,
-        visible_in_canvas: true,
+        visible_in_modal: true,
         editable: pageEditable ?? true,
         group_name: field.group_name ?? undefined,
+        modal_column_id: columnId,
       }
 
       const updatedLayout = [...fieldLayout, newItem]
@@ -426,6 +573,20 @@ export default function RecordFields({
         !layoutFieldNames.has(field.name)
     )
   }, [layoutMode, allFields, fieldLayout])
+
+  // Detect invalid layout items (fields that no longer exist) once and render
+  // a single inline error card instead of crashing the modal.
+  const hasInvalidLayoutItems = useMemo(() => {
+    if (!fieldLayout.length || !allFields.length) return false
+    const fieldKeys = new Set<string>()
+    allFields.forEach((f) => {
+      fieldKeys.add(f.id)
+      fieldKeys.add(f.name)
+    })
+    return fieldLayout.some(
+      (item) => !fieldKeys.has(item.field_id) && !fieldKeys.has(item.field_name)
+    )
+  }, [fieldLayout, allFields])
 
   // Validate field before rendering - prevent #ERROR! states
   const validateField = useCallback((field: TableField): boolean => {
@@ -535,28 +696,151 @@ export default function RecordFields({
     ]
   )
 
+  const showModalColumns = modalColumns.length > 0
+
+  // Compute CSS grid template for modal columns based on relative widths.
+  const gridTemplateColumns = useMemo(() => {
+    if (!showModalColumns) return undefined
+    const total = modalColumns.reduce((sum, col) => sum + (col.width || 1), 0)
+    if (!total) return undefined
+    return modalColumns
+      .map((col) => `${(col.width || 1) / total}fr`)
+      .join(" ")
+  }, [showModalColumns, modalColumns])
+
+  // Column resize handler (layout mode only)
+  const startResize = (leftColIndex: number) => {
+    if (!layoutMode || !onFieldLayoutChange) return
+    const container = columnsContainerRef.current
+    if (!container) return
+
+    const rect = container.getBoundingClientRect()
+    const startWidths = modalColumns.map((c) => c.width || 1)
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaPx = e.clientX - rect.left
+      const fraction = deltaPx / rect.width
+      if (!Number.isFinite(fraction)) return
+
+      const left = modalColumns[leftColIndex]
+      const right = modalColumns[leftColIndex + 1]
+      if (!left || !right) return
+
+      const totalPair = startWidths[leftColIndex] + startWidths[leftColIndex + 1]
+      let newLeftWidth = Math.max(0.1, Math.min(totalPair - 0.1, fraction * totalPair))
+      let newRightWidth = totalPair - newLeftWidth
+
+      const nextWidths = [...startWidths]
+      nextWidths[leftColIndex] = newLeftWidth
+      nextWidths[leftColIndex + 1] = newRightWidth
+
+      const layoutByColumn: Record<string, number> = {}
+      modalColumns.forEach((col, idx) => {
+        layoutByColumn[col.id] = nextWidths[idx] || 1
+      })
+
+      const updated = fieldLayout.map((item) => {
+        const colId = item.modal_column_id || "col-1"
+        return {
+          ...item,
+          modal_column_id: colId,
+          modal_column_width: layoutByColumn[colId] ?? item.modal_column_width ?? 1,
+        }
+      })
+      onFieldLayoutChange(updated)
+    }
+
+    const handleMouseUp = () => {
+      window.removeEventListener("mousemove", handleMouseMove)
+      window.removeEventListener("mouseup", handleMouseUp)
+    }
+
+    window.addEventListener("mousemove", handleMouseMove)
+    window.addEventListener("mouseup", handleMouseUp)
+  }
+
   return (
     <div className="space-y-8">
-      {layoutMode && flatFieldsForDrag.length > 0 ? (
-        // Layout mode: Single sortable list
+      {hasInvalidLayoutItems && (
+        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <div className="font-medium">Some fields in this layout no longer exist.</div>
+          <div className="text-xs text-red-600 mt-1">
+            The layout still loaded safely. You can remove or replace missing fields in layout
+            edit mode.
+          </div>
+        </div>
+      )}
+
+      {showModalColumns ? (
+        // Modal canvas: multi-column record layout
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragEnd={handleDragEnd}
         >
-          <SortableContext
-            items={flatFieldsForDrag.map((f) => f.id)}
-            strategy={verticalListSortingStrategy}
+          <div
+            ref={columnsContainerRef}
+            className="grid gap-6"
+            style={gridTemplateColumns ? { gridTemplateColumns } : undefined}
           >
-            <div className="space-y-3">
-              {flatFieldsForDrag.map((field) => renderField(field))}
-            </div>
-          </SortableContext>
+            {modalColumns.map((column, index) => (
+              <div
+                key={column.id}
+                className="relative group flex flex-col gap-3 min-w-0 border-l border-gray-200 first:border-l-0 pl-4"
+              >
+                <SortableContext
+                  items={column.fields.map((f) => f.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-3">
+                    {column.fields.map((field) => renderField(field))}
+                  </div>
+                </SortableContext>
+
+                {layoutMode && availableFields.length > 0 && (
+                  <div className="pt-2 border-t border-dashed border-gray-200 mt-1">
+                    <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                      Add field to column
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {availableFields.slice(0, 6).map((field) => (
+                        <button
+                          key={field.id}
+                          type="button"
+                          onClick={() => handleAddField(field, column.id)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-gray-300 rounded-md bg-white hover:bg-gray-50 text-gray-700"
+                        >
+                          <Plus className="h-3 w-3" />
+                          {getFieldDisplayName(field)}
+                        </button>
+                      ))}
+                      {availableFields.length > 6 && (
+                        <span className="text-xs text-gray-500 self-center">
+                          +{availableFields.length - 6} more
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Column resize handle between columns (layout mode only, hover affordance) */}
+                {layoutMode && index < modalColumns.length - 1 && (
+                  <div
+                    className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-transparent group-hover:bg-blue-200/60 group-hover:opacity-100 opacity-0 transition-colors"
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      startResize(index)
+                    }}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
         </DndContext>
       ) : (
-        // View mode: Grouped fields
+        // Fallback: grouped single-column layout (used by non-modal contexts)
         Object.entries(groupedFields)
-          .filter(([_, groupFields]) => groupFields.length > 0) // Hide empty groups
+          .filter(([_, groupFields]) => groupFields.length > 0)
           .map(([groupName, groupFields]) => {
             const isCollapsed = collapsedGroups.has(groupName)
             return (
@@ -567,7 +851,9 @@ export default function RecordFields({
                   aria-expanded={!isCollapsed}
                   aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${groupName} group`}
                 >
-                  <span className="text-sm font-semibold text-gray-900 uppercase tracking-wide">{groupName}</span>
+                  <span className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+                    {groupName}
+                  </span>
                   <span className="text-gray-500">
                     {isCollapsed ? (
                       <ChevronRight className="h-4 w-4" />
@@ -584,33 +870,6 @@ export default function RecordFields({
               </section>
             )
           })
-      )}
-
-      {/* Add Field Button (Layout Mode) */}
-      {layoutMode && availableFields.length > 0 && (
-        <div className="pt-4 border-t border-gray-200">
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            Add Field
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {availableFields.slice(0, 10).map((field) => (
-              <button
-                key={field.id}
-                type="button"
-                onClick={() => handleAddField(field)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50 text-gray-700"
-              >
-                <Plus className="h-3 w-3" />
-                {getFieldDisplayName(field)}
-              </button>
-            ))}
-            {availableFields.length > 10 && (
-              <span className="text-xs text-gray-500 self-center">
-                +{availableFields.length - 10} more
-              </span>
-            )}
-          </div>
-        </div>
       )}
 
       {/* Empty State */}

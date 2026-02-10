@@ -495,14 +495,13 @@ export default function RecordModal({
                     layoutMode={true}
                     fieldLayout={draftFieldLayout ?? resolvedFieldLayout}
                     allFields={fields}
-                    onFieldReorder={handleFieldReorder}
                     onFieldVisibilityToggle={handleFieldVisibilityToggle}
                     onFieldLayoutChange={handleFieldLayoutChange}
                     pageEditable={effectiveEditable}
                   />
                 </div>
               ) : (
-                // Normal view
+                // Normal view (multi-column modal canvas, no drag handles)
                 <>
                   <RecordFields
                     fields={visibleFields}
@@ -513,6 +512,9 @@ export default function RecordModal({
                     recordId={recordId}
                     tableName={tableNameFromCore || tableName}
                     isFieldEditable={isFieldEditable}
+                    fieldLayout={resolvedFieldLayout}
+                    allFields={fields}
+                    pageEditable={effectiveEditable}
                   />
 
                   {/* Footer actions */}

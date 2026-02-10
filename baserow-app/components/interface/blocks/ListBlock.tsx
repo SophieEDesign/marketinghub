@@ -22,6 +22,8 @@ import RecordModal from "@/components/calendar/RecordModal"
 import { useToast } from "@/components/ui/use-toast"
 import { VIEWS_ENABLED } from "@/lib/featureFlags"
 import type { GroupRule } from "@/lib/grouping/types"
+import type { FieldLayoutItem } from "@/lib/interface/field-layout-utils"
+import { getVisibleFieldsForCard } from "@/lib/interface/field-layout-helpers"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 function isUuidLike(value: string | null | undefined): value is string {
@@ -247,34 +249,104 @@ export default function ListBlock({
 
   const isLoading = loading || metaLoading
 
-  // Single source of truth: visible_fields. Derive list row from it (Airtable parity).
+  /**
+   * Airtable-style card layout:
+   * - Primary source: field_layout items where visible_in_card !== false
+   * - Fallback: visible_fields / legacy list_* config
+   *
+   * Mental model:
+   * Tables show fields, cards show layouts. Interface List = vertical cards.
+   */
+  const fieldLayout = (config as any)?.field_layout as FieldLayoutItem[] | undefined
+
+  const layoutCardFields: TableField[] = useMemo(() => {
+    if (!Array.isArray(fieldLayout) || fieldLayout.length === 0) {
+      return []
+    }
+    try {
+      return getVisibleFieldsForCard(fieldLayout, safeTableFields)
+    } catch {
+      // Defensive: if layout is malformed, fall back to legacy behaviour.
+      return []
+    }
+  }, [fieldLayout, safeTableFields])
+
+  // Legacy visible_fields are still used as a fallback when no card layout exists.
   const visibleFields = Array.isArray(config.visible_fields) ? config.visible_fields : []
-  const titleField =
-    config.list_title_field ||
-    config.title_field ||
+
+  const layoutFieldNames = layoutCardFields.map((f) => f.name)
+
+  // Title: prefer explicit override that also lives in the card layout, then layout order, then legacy fallbacks.
+  const layoutTitleFieldName =
+    (config.list_title_field && layoutFieldNames.includes(config.list_title_field)
+      ? config.list_title_field
+      : null) ||
+    (config.title_field && layoutFieldNames.includes(config.title_field)
+      ? config.title_field
+      : null) ||
+    layoutCardFields[0]?.name
+
+  const legacyTitleFallback =
     visibleFields[0] ||
     safeTableFields.find((f) => f.name !== "id" && (f.type === "text" || f.type === "long_text"))?.name ||
     safeTableFields.find((f) => f.name !== "id")?.name ||
     ""
-  const restVisible = visibleFields.filter((f) => f !== titleField)
+
+  const titleField = layoutCardFields.length > 0 ? layoutTitleFieldName || legacyTitleFallback : (
+    config.list_title_field ||
+    config.title_field ||
+    legacyTitleFallback
+  )
+
+  // Subtitle fields: remaining card layout fields after the title (max 3), or legacy subtitle config.
   const subtitleFields =
-    restVisible.length > 0 ? restVisible.slice(0, 3) : (config.list_subtitle_fields || [])
-  const imageField =
+    layoutCardFields.length > 0
+      ? layoutCardFields
+          .map((f) => f.name)
+          .filter((name) => name && name !== titleField)
+          .slice(0, 3)
+      : (() => {
+          const restVisible = visibleFields.filter((f) => f !== titleField)
+          return restVisible.length > 0 ? restVisible.slice(0, 3) : (config.list_subtitle_fields || [])
+        })()
+
+  // Image: explicit per-block overrides win; otherwise fall back to first attachment/URL field in the card layout.
+  let imageField: string =
     config.list_image_field || (config.appearance as any)?.image_field || config.image_field || ""
+  if (!imageField && layoutCardFields.length > 0) {
+    const attachmentOrUrl = layoutCardFields.find(
+      (f) => f.type === "attachment" || f.type === "url"
+    )
+    if (attachmentOrUrl) {
+      imageField = attachmentOrUrl.name
+    }
+  }
+
+  // Pills: any single_select / multi_select fields in the card layout; fallback to legacy list_pill_fields.
   const pillFields =
-    visibleFields.length > 0
-      ? visibleFields.filter((fn) => {
-          const f = safeTableFields.find((x) => x.name === fn || x.id === fn)
-          return f && (f.type === "single_select" || f.type === "multi_select")
-        })
-      : (config.list_pill_fields || [])
+    layoutCardFields.length > 0
+      ? layoutCardFields
+          .filter((f) => f.type === "single_select" || f.type === "multi_select")
+          .map((f) => f.name)
+      : visibleFields.length > 0
+        ? visibleFields.filter((fn) => {
+            const f = safeTableFields.find((x) => x.name === fn || x.id === fn)
+            return f && (f.type === "single_select" || f.type === "multi_select")
+          })
+        : (config.list_pill_fields || [])
+
+  // Meta fields: date/number-style fields in the card layout; fallback to legacy list_meta_fields.
   const metaFields =
-    visibleFields.length > 0
-      ? visibleFields.filter((fn) => {
-          const f = safeTableFields.find((x) => x.name === fn || x.id === fn)
-          return f && ["date", "number", "percent", "currency"].includes(f.type as string)
-        })
-      : (config.list_meta_fields || [])
+    layoutCardFields.length > 0
+      ? layoutCardFields
+          .filter((f) => ["date", "number", "percent", "currency"].includes(f.type as string))
+          .map((f) => f.name)
+      : visibleFields.length > 0
+        ? visibleFields.filter((fn) => {
+            const f = safeTableFields.find((x) => x.name === fn || x.id === fn)
+            return f && ["date", "number", "percent", "currency"].includes(f.type as string)
+          })
+        : (config.list_meta_fields || [])
 
   // Apply appearance settings (must be declared before any early return)
   const appearance = config.appearance || {}

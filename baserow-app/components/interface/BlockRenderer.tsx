@@ -49,6 +49,7 @@ import type { FilterTree } from "@/lib/filters/canonical-model"
 import LazyBlockWrapper from "./LazyBlockWrapper"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 import { runBlockDriftChecks } from "@/lib/interface/block-drift"
+import { assertBlockSizingInvariant } from "@/lib/interface/block-sizing"
 
 // Module-level Set to track warned blocks across all component instances
 const warnedBlocks = new Set<string>()
@@ -169,6 +170,17 @@ export default function BlockRenderer({
 
   const renderBlock = () => {
     const canEdit = isEditing && !isLocked
+
+    // Hard sizing invariants: catch illegal 'fill' usage early in development.
+    if (process.env.NODE_ENV === 'development') {
+      try {
+        assertBlockSizingInvariant(block)
+      } catch (error) {
+        // Surface invariant violations loudly in dev without crashing the entire canvas.
+        // eslint-disable-next-line no-console
+        console.error(error)
+      }
+    }
     
     // Backward compatibility: normalize 'table' type to 'grid' (not in BlockType union but may exist in legacy data)
     const normalizedBlockType = ((block.type as string) === 'table' ? 'grid' : block.type) as BlockType

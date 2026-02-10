@@ -20,6 +20,21 @@ export interface FieldLayoutItem {
   visible_in_canvas?: boolean
   editable: boolean
   group_name?: string
+  /**
+   * Modal-only column layout metadata.
+   *
+   * These properties are used exclusively by the record modal / side panel
+   * to render a multi-column Airtable-style canvas. They are intentionally
+   * ignored by page canvas / block layout logic so that page blocks remain
+   * unaffected.
+   *
+   * - modal_column_id: stable logical column identifier
+   * - modal_column_order: ordering of columns inside the modal
+   * - modal_column_width: relative width (0–1) of the column inside the modal
+   */
+  modal_column_id?: string
+  modal_column_order?: number
+  modal_column_width?: number
 }
 
 /**

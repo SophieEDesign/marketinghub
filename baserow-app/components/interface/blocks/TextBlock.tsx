@@ -7,7 +7,7 @@ import Link from "@tiptap/extension-link"
 import TextStyle from "@tiptap/extension-text-style"
 import Color from "@tiptap/extension-color"
 import type { PageBlock } from "@/lib/interface/types"
-import { debugLog, debugWarn } from "@/lib/interface/debug-flags"
+import { debugLog } from "@/lib/interface/debug-flags"
 import { 
   Bold, 
   Italic, 
@@ -59,7 +59,6 @@ interface TextBlockProps {
  */
 export default function TextBlock({ block, isEditing = false, onUpdate }: TextBlockProps) {
   const { config } = block
-  
   // Track render count for debugging React #185
   const renderCountRef = useRef<number>(0)
   renderCountRef.current += 1
@@ -656,8 +655,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         ref={toolbarRef}
         data-toolbar="true"
         className={cn(
-          "flex flex-wrap items-center gap-1 bg-white/95 backdrop-blur border border-gray-200 rounded-lg shadow-sm p-1",
-          "flex-shrink-0"
+          "absolute top-2 left-2 z-20 flex flex-wrap items-center gap-1 bg-white/95 backdrop-blur border border-gray-200 rounded-lg shadow-sm p-1"
         )}
         onMouseDown={(e) => {
           // Don't let the click bubble to the canvas (would select/drag the block),
@@ -928,7 +926,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       ref={containerRef}
       data-block-editing={isBlockEditing ? "true" : "false"}
       className={cn(
-        "h-full w-full flex flex-col relative overflow-hidden",
+        "w-full flex flex-col relative overflow-hidden",
         // Visual editing state: blue ring when actively editing
         isBlockEditing && "ring-2 ring-blue-500 ring-offset-2 rounded-lg",
         // Subtle hover state when not editing
@@ -938,6 +936,10 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       )}
       style={{
         ...blockStyle,
+        // Content-sized blocks: height should be driven by content, not flex or 100% sizing.
+        height: 'auto',
+        alignSelf: 'flex-start',
+        flexGrow: 0,
         // CRITICAL: Do NOT set minHeight - height must be DERIVED from content
         // minHeight causes gaps when blocks collapse - it persists after collapse
         // Height must come from content and current expansion state only
@@ -994,7 +996,8 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       {/* Editor Content - Same source for both edit and view mode */}
       <div 
         className={cn(
-          "flex-1 w-full min-h-0 h-full overflow-hidden",
+          // Editor wrapper: owns internal scroll when content exceeds block height.
+          "flex-1 w-full min-h-0 h-full overflow-auto",
           !hasContent && isEditing && "flex items-center justify-center min-h-[100px]",
           // Cursor cues: text cursor when editable, pointer when clickable, default when not
           isBlockEditing && "cursor-text",
