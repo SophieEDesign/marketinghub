@@ -209,25 +209,6 @@ export default function RecordDetailPanelInline({
     }
   }, [isEditingLayout])
 
-  const handleFieldReorder = useCallback((fieldName: string, newIndex: number) => {
-    if (draftFieldLayout === null) return
-    
-    const currentIndex = draftFieldLayout.findIndex(item => item.field_name === fieldName)
-    if (currentIndex === -1) return
-
-    const newLayout = [...draftFieldLayout]
-    const [moved] = newLayout.splice(currentIndex, 1)
-    newLayout.splice(newIndex, 0, moved)
-    
-    // Update order values
-    const updatedLayout = newLayout.map((item, index) => ({
-      ...item,
-      order: index,
-    }))
-    
-    setDraftFieldLayout(updatedLayout)
-  }, [draftFieldLayout])
-
   const handleFieldVisibilityToggle = useCallback((fieldName: string, visible: boolean) => {
     if (draftFieldLayout === null) return
     
@@ -402,7 +383,6 @@ export default function RecordDetailPanelInline({
             layoutMode={isEditingLayout}
             fieldLayout={draftFieldLayout ?? resolvedFieldLayout}
             allFields={fields}
-            onFieldReorder={handleFieldReorder}
             onFieldVisibilityToggle={handleFieldVisibilityToggle}
             onFieldLayoutChange={handleFieldLayoutChange}
             pageEditable={pageEditable}

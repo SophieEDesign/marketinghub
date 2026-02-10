@@ -316,7 +316,7 @@ export async function resolveLinkedFieldDisplay(
   const supabase = createClient()
 
   const { data: records, error: recordsError } = await supabase
-    .from(targetTable.supabase_table)
+    .from(tableRow.supabase_table)
     .select(`id, ${displayFieldName}`)
     .in('id', uuidIds)
 
@@ -397,7 +397,7 @@ export async function resolveLinkedFieldDisplayMap(
   for (let i = 0; i < uuidIds.length; i += chunkSize) {
     const chunk = uuidIds.slice(i, i + chunkSize)
     const { data: records, error: recordsError } = await supabase
-      .from(targetTable.supabase_table)
+      .from(tableRow.supabase_table)
       .select(`id, ${displayFieldName}`)
       .in('id', chunk)
 

@@ -262,7 +262,7 @@ async function resolveLinkedFieldFilterValue(
   // Search for record with matching label
   const supabase = createClient()
   const { data: records, error: recordsError } = await supabase
-    .from(targetTable.supabase_table)
+    .from(tableRow.supabase_table)
     .select(`id, ${displayFieldName}`)
     .ilike(displayFieldName, value)
     .limit(1)
