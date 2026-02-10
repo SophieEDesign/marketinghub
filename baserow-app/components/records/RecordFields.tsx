@@ -707,13 +707,15 @@ export default function RecordFields({
         </div>
       )}
 
-      {showModalColumns ? (
-        // Modal canvas: multi-column record layout
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
+      {/* CRITICAL FIX: Always wrap in DndContext to provide context for useSortable hooks
+          This ensures SortableFieldItem can always call useSortable, preventing React #185 */}
+      <DndContext
+        sensors={showModalColumns && layoutMode ? sensors : undefined}
+        collisionDetection={closestCenter}
+        onDragEnd={showModalColumns && layoutMode ? handleDragEnd : undefined}
+      >
+        {showModalColumns ? (
+          // Modal canvas: multi-column record layout
           <div
             ref={columnsContainerRef}
             className="grid gap-6"
@@ -772,41 +774,47 @@ export default function RecordFields({
               </div>
             ))}
           </div>
-        </DndContext>
-      ) : (
-        // Fallback: grouped single-column layout (used by non-modal contexts)
-        Object.entries(groupedFields)
-          .filter(([_, groupFields]) => groupFields.length > 0)
-          .map(([groupName, groupFields]) => {
-            const isCollapsed = collapsedGroups.has(groupName)
-            return (
-              <section key={groupName} className="space-y-3">
-                <button
-                  onClick={() => toggleGroup(groupName)}
-                  className="w-full flex items-center justify-between text-left py-2.5 px-3 -mx-3 rounded-md bg-gray-100 border border-gray-200 hover:bg-gray-200 hover:border-gray-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
-                  aria-expanded={!isCollapsed}
-                  aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${groupName} group`}
-                >
-                  <span className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                    {groupName}
-                  </span>
-                  <span className="text-gray-500">
-                    {isCollapsed ? (
-                      <ChevronRight className="h-4 w-4" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4" />
+        ) : (
+          // Fallback: grouped single-column layout (used by non-modal contexts)
+          // CRITICAL: Still wrapped in DndContext so useSortable hooks have context
+          <SortableContext
+            items={fields.map((f) => f.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            {Object.entries(groupedFields)
+              .filter(([_, groupFields]) => groupFields.length > 0)
+              .map(([groupName, groupFields]) => {
+                const isCollapsed = collapsedGroups.has(groupName)
+                return (
+                  <section key={groupName} className="space-y-3">
+                    <button
+                      onClick={() => toggleGroup(groupName)}
+                      className="w-full flex items-center justify-between text-left py-2.5 px-3 -mx-3 rounded-md bg-gray-100 border border-gray-200 hover:bg-gray-200 hover:border-gray-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
+                      aria-expanded={!isCollapsed}
+                      aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${groupName} group`}
+                    >
+                      <span className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+                        {groupName}
+                      </span>
+                      <span className="text-gray-500">
+                        {isCollapsed ? (
+                          <ChevronRight className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
+                      </span>
+                    </button>
+                    {!isCollapsed && (
+                      <div className="space-y-3">
+                        {groupFields.map((field) => renderField(field))}
+                      </div>
                     )}
-                  </span>
-                </button>
-                {!isCollapsed && (
-                  <div className="space-y-3">
-                    {groupFields.map((field) => renderField(field))}
-                  </div>
-                )}
-              </section>
-            )
-          })
-      )}
+                  </section>
+                )
+              })}
+          </SortableContext>
+        )}
+      </DndContext>
 
       {/* Empty State */}
       {fields.length === 0 && (
