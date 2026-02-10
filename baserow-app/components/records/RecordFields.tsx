@@ -804,11 +804,12 @@ export default function RecordFields({
                         )}
                       </span>
                     </button>
-                    {!isCollapsed && (
-                      <div className="space-y-3">
-                        {groupFields.map((field) => renderField(field))}
-                      </div>
-                    )}
+                    {/* CRITICAL FIX: Always render fields to maintain stable hook order
+                        Hide via CSS (hidden class) instead of conditional rendering
+                        This prevents React #185 when groups collapse/expand */}
+                    <div className={isCollapsed ? "hidden" : "space-y-3"}>
+                      {groupFields.map((field) => renderField(field))}
+                    </div>
                   </section>
                 )
               })}
