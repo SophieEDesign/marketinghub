@@ -4,6 +4,12 @@ const nextConfig = {
   images: {
     domains: [],
   },
+  // We already run ESLint in scripts/predeploy-check.ts and allow warnings there.
+  // Disable Next.js' built-in ESLint during production builds so warnings
+  // don't cause Vercel builds to fail.
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   transpilePackages: ['@supabase/supabase-js', '@supabase/ssr'],
   webpack: (config, { isServer }) => {
     // Fix for Supabase ESM module resolution
