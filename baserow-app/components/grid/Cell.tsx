@@ -354,11 +354,6 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
     }
   }
 
-  // Apply text wrapping for text-based fields
-  const textWrapClass = wrapText && (fieldType === 'text' || fieldType === 'long_text' || !fieldType)
-    ? 'line-clamp-2' 
-    : 'truncate'
-
   return (
     <div
       onClick={isVirtual || !editable ? undefined : handleStartEdit}
@@ -371,7 +366,22 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
       title={isVirtual ? "Virtual field (read-only)" : editable ? "Click to edit" : "Read-only"}
     >
       {displayValue ? (
-        <span className={`text-sm ${textWrapClass} w-full`}>{displayValue}</span>
+        <span
+          className={`
+            text-sm w-full
+            ${
+              fieldType === 'long_text'
+                ? // Preserve line breaks for long text fields
+                  'whitespace-pre-wrap'
+                : // Other text-like fields keep existing wrapping behaviour
+                wrapText && (fieldType === 'text' || !fieldType)
+                ? 'line-clamp-2'
+                : 'truncate'
+            }
+          `}
+        >
+          {displayValue}
+        </span>
       ) : (
         <span className="text-gray-400 italic text-sm">—</span>
       )}

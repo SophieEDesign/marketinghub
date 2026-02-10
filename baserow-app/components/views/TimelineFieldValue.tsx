@@ -165,8 +165,17 @@ export default function TimelineFieldValue({
 
   // Text, long_text, and other types - render as plain text
   const textValue = String(value)
+  const isLongText = field.type === "long_text"
+
   return (
-    <span className={`text-xs text-gray-700 ${compact ? "truncate" : ""}`} title={textValue}>
+    <span
+      className={`
+        text-xs text-gray-700
+        ${isLongText ? "whitespace-pre-wrap" : ""}
+        ${!isLongText && compact ? "truncate" : ""}
+      `}
+      title={textValue}
+    >
       {textValue}
     </span>
   )

@@ -12,7 +12,6 @@ import { Button } from '@/components/ui/button'
 import type { TableField } from '@/types/fields'
 import FieldEditor from '@/components/fields/FieldEditor'
 import RecordFields from '@/components/records/RecordFields'
-import RecordFieldEditorPanel from '@/components/interface/RecordFieldEditorPanel'
 import { useToast } from '@/components/ui/use-toast'
 import { isAbortError } from '@/lib/api/error-handling'
 import type { BlockConfig } from '@/lib/interface/types'
@@ -193,6 +192,8 @@ export default function RecordModal({
 
   // Determine if field is editable
   const isFieldEditable = useCallback((fieldName: string) => {
+    // In layout mode, fields are locked (not editable)
+    if (isEditingLayout) return false
     if (!effectiveEditable) return false
     if (!recordId || resolvedFieldLayout.length === 0) {
       return effectiveEditable // For new records or no layout, all fields editable
@@ -202,7 +203,7 @@ export default function RecordModal({
       draftFieldLayout ?? resolvedFieldLayout,
       effectiveEditable
     )
-  }, [effectiveEditable, recordId, draftFieldLayout, resolvedFieldLayout])
+  }, [isEditingLayout, effectiveEditable, recordId, draftFieldLayout, resolvedFieldLayout])
 
   // Load collapsed sections state from localStorage
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
@@ -342,8 +343,54 @@ export default function RecordModal({
   }, [forcedEditMode])
 
   const handleFieldLayoutChange = useCallback((newLayout: FieldLayoutItem[]) => {
-    setDraftFieldLayout(newLayout)
-  }, [])
+    if (isEditingLayout) {
+      setDraftFieldLayout(newLayout)
+    }
+  }, [isEditingLayout])
+
+  const handleFieldReorder = useCallback((fieldName: string, newIndex: number) => {
+    if (draftFieldLayout === null) return
+
+    const currentIndex = draftFieldLayout.findIndex((item) => item.field_name === fieldName)
+    if (currentIndex === -1) return
+
+    const newLayout = [...draftFieldLayout]
+    const [moved] = newLayout.splice(currentIndex, 1)
+    newLayout.splice(newIndex, 0, moved)
+
+    const updatedLayout = newLayout.map((item, index) => ({
+      ...item,
+      order: index,
+    }))
+
+    setDraftFieldLayout(updatedLayout)
+  }, [draftFieldLayout])
+
+  const handleFieldVisibilityToggle = useCallback((fieldName: string, visible: boolean) => {
+    if (draftFieldLayout === null) return
+
+    const updated = draftFieldLayout.map((item) =>
+      item.field_name === fieldName
+        ? { ...item, visible_in_modal: visible }
+        : item
+    )
+
+    if (!updated.some((item) => item.field_name === fieldName)) {
+      const field = filteredFields.find((f) => f.name === fieldName)
+      if (field) {
+        const newItem: FieldLayoutItem = {
+          field_id: field.id,
+          field_name: field.name,
+          order: Math.max(...updated.map((i) => i.order), -1) + 1,
+          editable: effectiveEditable,
+          visible_in_modal: visible,
+        }
+        updated.push(newItem)
+      }
+    }
+
+    setDraftFieldLayout(updated)
+  }, [draftFieldLayout, filteredFields, effectiveEditable])
 
   // Section fields if showFieldSections is enabled (filteredFields from core)
   const sectionedFields = useMemo(() => {
@@ -393,7 +440,7 @@ export default function RecordModal({
                 )}
               </>
             )}
-            {recordId && (
+            {recordId && !isEditingLayout && (
               <Button
                 variant="destructive"
                 onClick={handleDelete}
@@ -429,34 +476,26 @@ export default function RecordModal({
           ) : (
             <>
               {isEditingLayout && recordId ? (
-                // Split view for layout editing (only for existing records)
-                <>
-                  <div className="flex-1 overflow-y-auto px-6 py-4">
-                    <RecordFields
-                      fields={visibleFields}
-                      formData={formData}
-                      onFieldChange={handleFieldChange}
-                      fieldGroups={fieldGroups}
-                      tableId={tableId}
-                      recordId={recordId}
-                      tableName={effectiveTableName || ''}
-                      isFieldEditable={isFieldEditable}
-                    />
-                  </div>
-                  <div className="w-80 border-l overflow-y-auto bg-gray-50">
-                    <RecordFieldEditorPanel
-                      tableId={tableId}
-                      recordId={recordId}
-                      allFields={filteredFields}
-                      fieldLayout={draftFieldLayout ?? resolvedFieldLayout}
-                      onFieldLayoutChange={handleFieldLayoutChange}
-                      onFieldChange={handleFieldChange}
-                      pageEditable={effectiveEditable}
-                      mode="modal"
-                      interfaceMode={interfaceMode}
-                    />
-                  </div>
-                </>
+                // Layout mode: record itself is the canvas with drag handles (existing records only)
+                <div className="flex-1 overflow-y-auto px-6 py-4">
+                  <RecordFields
+                    fields={visibleFields}
+                    formData={formData}
+                    onFieldChange={handleFieldChange}
+                    fieldGroups={fieldGroups}
+                    tableId={tableId}
+                    recordId={recordId}
+                    tableName={effectiveTableName || ''}
+                    isFieldEditable={isFieldEditable}
+                    layoutMode={true}
+                    fieldLayout={draftFieldLayout ?? resolvedFieldLayout}
+                    allFields={filteredFields}
+                    onFieldReorder={handleFieldReorder}
+                    onFieldVisibilityToggle={handleFieldVisibilityToggle}
+                    onFieldLayoutChange={handleFieldLayoutChange}
+                    pageEditable={effectiveEditable}
+                  />
+                </div>
               ) : resolvedFieldLayout.length > 0 && recordId ? (
                 // Use RecordFields for existing records with layout
                 <div className="space-y-4 py-4">

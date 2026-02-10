@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/dialog"
 import { createClient } from "@/lib/supabase/client"
 import RecordFields from "@/components/records/RecordFields"
-import RecordFieldEditorPanel from "@/components/interface/RecordFieldEditorPanel"
 import { useToast } from "@/components/ui/use-toast"
 import { Trash2 } from "lucide-react"
 import { isAbortError } from "@/lib/api/error-handling"
@@ -171,13 +170,15 @@ export default function RecordModal({
 
   // Determine if field is editable
   const isFieldEditable = useCallback((fieldName: string) => {
+    // In layout mode, fields are locked (not editable)
+    if (isEditingLayout) return false
     if (!effectiveEditable) return false
     return isFieldEditableFromLayout(
       fieldName,
       draftFieldLayout ?? resolvedFieldLayout,
       effectiveEditable
     )
-  }, [effectiveEditable, draftFieldLayout, resolvedFieldLayout])
+  }, [isEditingLayout, effectiveEditable, draftFieldLayout, resolvedFieldLayout])
 
   async function handleFieldChange(fieldName: string, value: any) {
     if (!record || !tableNameFromCore || !effectiveEditable) return
@@ -321,8 +322,54 @@ export default function RecordModal({
   }, [forcedEditMode])
 
   const handleFieldLayoutChange = useCallback((newLayout: FieldLayoutItem[]) => {
-    setDraftFieldLayout(newLayout)
-  }, [])
+    if (isEditingLayout) {
+      setDraftFieldLayout(newLayout)
+    }
+  }, [isEditingLayout])
+
+  const handleFieldReorder = useCallback((fieldName: string, newIndex: number) => {
+    if (draftFieldLayout === null) return
+
+    const currentIndex = draftFieldLayout.findIndex((item) => item.field_name === fieldName)
+    if (currentIndex === -1) return
+
+    const newLayout = [...draftFieldLayout]
+    const [moved] = newLayout.splice(currentIndex, 1)
+    newLayout.splice(newIndex, 0, moved)
+
+    const updatedLayout = newLayout.map((item, index) => ({
+      ...item,
+      order: index,
+    }))
+
+    setDraftFieldLayout(updatedLayout)
+  }, [draftFieldLayout])
+
+  const handleFieldVisibilityToggle = useCallback((fieldName: string, visible: boolean) => {
+    if (draftFieldLayout === null) return
+
+    const updated = draftFieldLayout.map((item) =>
+      item.field_name === fieldName
+        ? { ...item, visible_in_modal: visible }
+        : item
+    )
+
+    if (!updated.some((item) => item.field_name === fieldName)) {
+      const field = fields.find((f) => f.name === fieldName)
+      if (field) {
+        const newItem: FieldLayoutItem = {
+          field_id: field.id,
+          field_name: field.name,
+          order: Math.max(...updated.map((i) => i.order), -1) + 1,
+          editable: effectiveEditable,
+          visible_in_modal: visible,
+        }
+        updated.push(newItem)
+      }
+    }
+
+    setDraftFieldLayout(updated)
+  }, [draftFieldLayout, fields, effectiveEditable])
 
   // CRITICAL: Unmount on close to prevent stale state (remount safety)
   if (!isOpen) return null
@@ -405,16 +452,18 @@ export default function RecordModal({
                   )}
                 </>
               )}
-              <button
-                onClick={handleDeleteRecord}
-                disabled={deleting || loading || !canDeleteRecords}
-                className="p-2 rounded-md hover:bg-red-50 transition-colors disabled:opacity-50"
-                aria-label="Delete record"
-                aria-disabled={!canDeleteRecords || deleting || loading}
-                title={!canDeleteRecords ? "You don't have permission to delete this record" : "Delete"}
-              >
-                <Trash2 className="h-4 w-4 text-red-600" />
-              </button>
+              {!isEditingLayout && (
+                <button
+                  onClick={handleDeleteRecord}
+                  disabled={deleting || loading || !canDeleteRecords}
+                  className="p-2 rounded-md hover:bg-red-50 transition-colors disabled:opacity-50"
+                  aria-label="Delete record"
+                  aria-disabled={!canDeleteRecords || deleting || loading}
+                  title={!canDeleteRecords ? "You don't have permission to delete this record" : "Delete"}
+                >
+                  <Trash2 className="h-4 w-4 text-red-600" />
+                </button>
+              )}
               <button
                 onClick={onClose}
                 className="p-2 rounded-md hover:bg-gray-100 transition-colors"
@@ -432,34 +481,26 @@ export default function RecordModal({
           ) : record && Object.keys(record).length > 0 ? (
             <>
               {isEditingLayout ? (
-                // Split view for layout editing
-                <>
-                  <div className="flex-1 overflow-y-auto px-6 py-4">
-                    <RecordFields
-                      fields={visibleFields}
-                      formData={record || {}}
-                      onFieldChange={handleFieldChange}
-                      fieldGroups={fieldGroups}
-                      tableId={tableId}
-                      recordId={recordId}
-                      tableName={tableNameFromCore || tableName}
-                      isFieldEditable={isFieldEditable}
-                    />
-                  </div>
-                  <div className="w-80 border-l overflow-y-auto bg-gray-50">
-                    <RecordFieldEditorPanel
-                      tableId={tableId}
-                      recordId={recordId}
-                      allFields={fields}
-                      fieldLayout={draftFieldLayout ?? resolvedFieldLayout}
-                      onFieldLayoutChange={handleFieldLayoutChange}
-                      onFieldChange={handleFieldChange}
-                      pageEditable={effectiveEditable}
-                      mode="modal"
-                      interfaceMode={interfaceMode}
-                    />
-                  </div>
-                </>
+                // Layout mode: record itself is the canvas with drag handles
+                <div className="flex-1 overflow-y-auto px-6 py-4">
+                  <RecordFields
+                    fields={visibleFields}
+                    formData={record || {}}
+                    onFieldChange={handleFieldChange}
+                    fieldGroups={fieldGroups}
+                    tableId={tableId}
+                    recordId={recordId}
+                    tableName={tableNameFromCore || tableName}
+                    isFieldEditable={isFieldEditable}
+                    layoutMode={true}
+                    fieldLayout={draftFieldLayout ?? resolvedFieldLayout}
+                    allFields={fields}
+                    onFieldReorder={handleFieldReorder}
+                    onFieldVisibilityToggle={handleFieldVisibilityToggle}
+                    onFieldLayoutChange={handleFieldLayoutChange}
+                    pageEditable={effectiveEditable}
+                  />
+                </div>
               ) : (
                 // Normal view
                 <>
@@ -475,19 +516,21 @@ export default function RecordModal({
                   />
 
                   {/* Footer actions */}
-                  <div className="mt-6 flex items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={handleDeleteRecord}
-                      disabled={deleting || loading || !canDeleteRecords}
-                      className="inline-flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                      title={!canDeleteRecords ? "You don't have permission to delete this record" : "Delete this record"}
-                      aria-disabled={!canDeleteRecords || deleting || loading}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Delete record
-                    </button>
-                  </div>
+                  {!isEditingLayout && (
+                    <div className="mt-6 flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={handleDeleteRecord}
+                        disabled={deleting || loading || !canDeleteRecords}
+                        className="inline-flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={!canDeleteRecords ? "You don't have permission to delete this record" : "Delete this record"}
+                        aria-disabled={!canDeleteRecords || deleting || loading}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete record
+                      </button>
+                    </div>
+                  )}
                 </>
               )}
             </>
