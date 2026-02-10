@@ -665,6 +665,8 @@ export default function InterfaceBuilder({
     }),
   }).catch(() => {})
   // #endregion
+  // CRITICAL: Include blocks in dependencies to prevent stale data
+  // This useMemo is used by useUndoRedo, so it must update when blocks change
   const initialLayoutState = useMemo(() => {
     return blocks.map((block) => ({
       i: block.id,
@@ -673,7 +675,7 @@ export default function InterfaceBuilder({
       w: block.w || 4,
       h: block.h || 4,
     }))
-  }, [])
+  }, [blocks])
   
   // #region agent log
   fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {

@@ -2588,6 +2588,19 @@ export default function Canvas({
           {blocks.map((block) => {
             // #region agent log
             blocksMapIterationRef.current += 1
+            fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id: `log_${Date.now()}_canvas_map_start`,
+                timestamp: Date.now(),
+                runId: 'post-fix',
+                hypothesisId: 'H4',
+                location: 'Canvas.tsx:blocks.map START',
+                message: 'Canvas blocks.map iteration START',
+                data: { pageId, blockId: block.id, blockType: block.type, iteration: blocksMapIterationRef.current, blocksLength: blocks.length },
+              }),
+            }).catch(() => {})
             if (process.env.NODE_ENV === 'development') {
               console.log('[Canvas] blocks.map iteration', { pageId, blockId: block.id, blockType: block.type, iteration: blocksMapIterationRef.current })
             }
@@ -2597,6 +2610,21 @@ export default function Canvas({
               block,
               layoutItem: layout.find(l => l.i === block.id),
             })
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id: `log_${Date.now()}_canvas_map_before_render`,
+                timestamp: Date.now(),
+                runId: 'post-fix',
+                hypothesisId: 'H4',
+                location: 'Canvas.tsx:blocks.map before return',
+                message: 'Canvas blocks.map before return JSX',
+                data: { pageId, blockId: block.id, blockType: block.type },
+              }),
+            }).catch(() => {})
+            // #endregion
             return (
               <div
                 key={block.id}

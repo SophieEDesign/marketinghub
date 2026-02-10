@@ -291,6 +291,8 @@ function DraggableColumnHeader({
   onSelect?: (fieldName: string) => void
   isSelected?: boolean
 }) {
+  // CRITICAL: Always call useSortable unconditionally to maintain stable hook order
+  // Disable drag behavior via the `disabled` prop, not by conditionally calling the hook
   const {
     attributes,
     listeners,
@@ -298,7 +300,10 @@ function DraggableColumnHeader({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: fieldName })
+  } = useSortable({ 
+    id: fieldName,
+    disabled: false, // Always enabled - drag behavior controlled by DndContext/SortableContext
+  })
 
   const resizeRef = useRef<HTMLDivElement>(null)
   const resizeStartXRef = useRef(0)
@@ -3139,29 +3144,32 @@ export default function GridView({
                 {imageField && (
                   <th className="px-2 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-12 sticky top-0 bg-gray-50 z-10"></th>
                 )}
+                {/* CRITICAL FIX: Always render DndContext and SortableContext to provide stable context
+                    This ensures DraggableColumnHeader can always call useSortable, preventing React #185
+                    Always render the same component tree structure - disable via props, not presence */}
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                   <SortableContext 
                     items={
-                      safeVisibleFields.length > 0
-                        ? safeVisibleFields
-                            .filter((f): f is NonNullable<typeof f> => f !== null && f !== undefined && !!f.field_name)
-                            .map(f => f.field_name)
-                            .filter((name): name is string => typeof name === 'string' && name.length > 0)
-                        : []
+                      safeVisibleFields
+                        .filter((f): f is NonNullable<typeof f> => f !== null && f !== undefined && !!f.field_name)
+                        .map(f => f.field_name)
+                        .filter((name): name is string => typeof name === 'string' && name.length > 0)
                     } 
                     strategy={horizontalListSortingStrategy}
                   >
-                    {safeVisibleFields.length > 0
-                      ? safeVisibleFields
-                          .filter((field): field is NonNullable<typeof field> => {
-                            // CRITICAL: Filter out null/undefined and ensure field_name exists
-                            return field !== null && 
-                                   field !== undefined && 
-                                   typeof field === 'object' &&
-                                   !!field.field_name && 
-                                   typeof field.field_name === 'string'
-                          })
-                          .map((field, fieldIndex) => {
+                    {/* CRITICAL: Always render the same component tree structure
+                        Filter fields but always render SortableContext children (even if empty array)
+                        This maintains stable hook order across renders */}
+                    {safeVisibleFields
+                      .filter((field): field is NonNullable<typeof field> => {
+                        // CRITICAL: Filter out null/undefined and ensure field_name exists
+                        return field !== null && 
+                               field !== undefined && 
+                               typeof field === 'object' &&
+                               !!field.field_name && 
+                               typeof field.field_name === 'string'
+                      })
+                      .map((field, fieldIndex) => {
                             // CRITICAL: Defensive access to tableField and columnWidth
                             const tableField = Array.isArray(safeTableFields) 
                               ? safeTableFields.find(f => 
@@ -3238,8 +3246,7 @@ export default function GridView({
                                 isSelected={selectedColumnName === field.field_name}
                               />
                             )
-                          })
-                      : null}
+                          })}
                   </SortableContext>
                 </DndContext>
               </tr>
