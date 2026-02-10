@@ -78,6 +78,22 @@ export default function InterfaceBuilder({
   pageEditable,
   editableFieldNames = [],
 }: InterfaceBuilderProps) {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: `log_${Date.now()}_ib_render_start`,
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'H3',
+      location: 'InterfaceBuilder.tsx:render START',
+      message: 'InterfaceBuilder render START',
+      data: { pageId: page.id, initialBlocksCount: initialBlocks?.length ?? 'undefined', isViewer, mode },
+    }),
+  }).catch(() => {})
+  // #endregion
+
   if (process.env.NODE_ENV === 'development') {
     console.log('[InterfaceBuilder] render START', {
       pageId: page.id,
@@ -86,19 +102,209 @@ export default function InterfaceBuilder({
       mode,
     })
   }
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: `log_${Date.now()}_ib_before_useBranding`,
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'H3',
+      location: 'InterfaceBuilder.tsx:before useBranding',
+      message: 'Before useBranding hook',
+      data: {},
+    }),
+  }).catch(() => {})
+  // #endregion
   const { primaryColor } = useBranding()
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: `log_${Date.now()}_ib_after_useBranding`,
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'H3',
+      location: 'InterfaceBuilder.tsx:after useBranding',
+      message: 'After useBranding hook',
+      data: {},
+    }),
+  }).catch(() => {})
+  // #endregion
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: `log_${Date.now()}_ib_before_useToast`,
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'H3',
+      location: 'InterfaceBuilder.tsx:before useToast',
+      message: 'Before useToast hook',
+      data: {},
+    }),
+  }).catch(() => {})
+  // #endregion
   const { toast } = useToast()
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: `log_${Date.now()}_ib_after_useToast`,
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'H3',
+      location: 'InterfaceBuilder.tsx:after useToast',
+      message: 'After useToast hook',
+      data: {},
+    }),
+  }).catch(() => {})
+  // #endregion
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: `log_${Date.now()}_ib_before_useState_blocks`,
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'H3',
+      location: 'InterfaceBuilder.tsx:before useState blocks',
+      message: 'Before useState blocks',
+      data: {},
+    }),
+  }).catch(() => {})
+  // #endregion
   const [blocks, setBlocks] = useState<PageBlock[]>(initialBlocks)
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: `log_${Date.now()}_ib_after_useState_blocks`,
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'H3',
+      location: 'InterfaceBuilder.tsx:after useState blocks',
+      message: 'After useState blocks',
+      data: {},
+    }),
+  }).catch(() => {})
+  // #endregion
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: `log_${Date.now()}_ib_before_useState_saveStatus`,
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'H3',
+      location: 'InterfaceBuilder.tsx:before useState saveStatus',
+      message: 'Before useState saveStatus',
+      data: {},
+    }),
+  }).catch(() => {})
+  // #endregion
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle")
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: `log_${Date.now()}_ib_after_useState_saveStatus`,
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'H3',
+      location: 'InterfaceBuilder.tsx:after useState saveStatus',
+      message: 'After useState saveStatus',
+      data: {},
+    }),
+  }).catch(() => {})
+  // #endregion
   
   // CRITICAL: Hydration lock - prevent Canvas from rendering until blocks are loaded
   // This prevents Canvas from committing empty layout state before blocks arrive
   // There are three states: Loading (undefined), Hydrated (≥0 blocks), Editing (≥0 blocks)
   // Canvas must NOT run until hydration is complete
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: `log_${Date.now()}_ib_before_useState_hasHydrated`,
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'H3',
+      location: 'InterfaceBuilder.tsx:before useState hasHydrated',
+      message: 'Before useState hasHydrated',
+      data: {},
+    }),
+  }).catch(() => {})
+  // #endregion
   const [hasHydrated, setHasHydrated] = useState<boolean>(false)
   
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: `log_${Date.now()}_ib_after_useState_hasHydrated`,
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'H3',
+      location: 'InterfaceBuilder.tsx:after useState hasHydrated',
+      message: 'After useState hasHydrated',
+      data: {},
+    }),
+  }).catch(() => {})
+  // #endregion
+  
   // Use unified editing context for block editing
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: `log_${Date.now()}_ib_before_useBlockEditMode`,
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'H3',
+      location: 'InterfaceBuilder.tsx:before useBlockEditMode',
+      message: 'Before useBlockEditMode hook',
+      data: {},
+    }),
+  }).catch(() => {})
+  // #endregion
   const { isEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(page.id)
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: `log_${Date.now()}_ib_after_useBlockEditMode`,
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'H3',
+      location: 'InterfaceBuilder.tsx:after useBlockEditMode',
+      message: 'After useBlockEditMode hook',
+      data: {},
+    }),
+  }).catch(() => {})
+  // #endregion
   
   // Override edit mode if viewer mode is forced
   const effectiveIsEditing = isViewer ? false : isEditing
@@ -108,18 +314,112 @@ export default function InterfaceBuilder({
   const interfaceMode: 'view' | 'edit' = effectiveIsEditing ? 'edit' : 'view'
   
   // CRITICAL: Sync interfaceMode with RecordPanelContext so RecordPanel inherits edit mode
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: `log_${Date.now()}_ib_before_useRecordPanel`,
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'H3',
+      location: 'InterfaceBuilder.tsx:before useRecordPanel',
+      message: 'Before useRecordPanel hook',
+      data: {},
+    }),
+  }).catch(() => {})
+  // #endregion
   const { setInterfaceMode } = useRecordPanel()
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: `log_${Date.now()}_ib_after_useRecordPanel`,
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'H3',
+      location: 'InterfaceBuilder.tsx:after useRecordPanel',
+      message: 'After useRecordPanel hook',
+      data: {},
+    }),
+  }).catch(() => {})
+  // #endregion
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: `log_${Date.now()}_ib_before_useEffect_setInterfaceMode`,
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'H3',
+      location: 'InterfaceBuilder.tsx:before useEffect setInterfaceMode',
+      message: 'Before useEffect setInterfaceMode',
+      data: {},
+    }),
+  }).catch(() => {})
+  // #endregion
   useEffect(() => {
     setInterfaceMode(interfaceMode)
   }, [interfaceMode, setInterfaceMode])
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: `log_${Date.now()}_ib_after_useEffect_setInterfaceMode`,
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'H3',
+      location: 'InterfaceBuilder.tsx:after useEffect setInterfaceMode',
+      message: 'After useEffect setInterfaceMode',
+      data: {},
+    }),
+  }).catch(() => {})
+  // #endregion
   
   // Aggregate data fetching moved to Canvas (inside FilterStateProvider)
   // This allows access to dynamic filter block filters
   
   // Notify parent of edit mode changes
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: `log_${Date.now()}_ib_before_useEffect_onEditModeChange`,
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'H3',
+      location: 'InterfaceBuilder.tsx:before useEffect onEditModeChange',
+      message: 'Before useEffect onEditModeChange',
+      data: {},
+    }),
+  }).catch(() => {})
+  // #endregion
   useEffect(() => {
     onEditModeChange?.(effectiveIsEditing)
   }, [effectiveIsEditing, onEditModeChange])
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: `log_${Date.now()}_ib_after_useEffect_onEditModeChange`,
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'H3',
+      location: 'InterfaceBuilder.tsx:after useEffect onEditModeChange',
+      message: 'After useEffect onEditModeChange',
+      data: {},
+    }),
+  }).catch(() => {})
+  // #endregion
 
   // CRITICAL: One-way gate - blocks are set from initialBlocks ONCE per pageId, then never replaced
   // After first load, initialBlocks must NEVER overwrite live state
@@ -350,6 +650,21 @@ export default function InterfaceBuilder({
   const canvasScrollContainerRef = useRef<HTMLDivElement | null>(null)
   
   // Undo/Redo for layout changes
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: `log_${Date.now()}_ib_before_useMemo_initialLayoutState`,
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'H3',
+      location: 'InterfaceBuilder.tsx:before useMemo initialLayoutState',
+      message: 'Before useMemo initialLayoutState',
+      data: { blocksLength: blocks.length },
+    }),
+  }).catch(() => {})
+  // #endregion
   const initialLayoutState = useMemo(() => {
     return blocks.map((block) => ({
       i: block.id,
@@ -360,6 +675,37 @@ export default function InterfaceBuilder({
     }))
   }, [])
   
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: `log_${Date.now()}_ib_after_useMemo_initialLayoutState`,
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'H3',
+      location: 'InterfaceBuilder.tsx:after useMemo initialLayoutState',
+      message: 'After useMemo initialLayoutState',
+      data: {},
+    }),
+  }).catch(() => {})
+  // #endregion
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: `log_${Date.now()}_ib_before_useUndoRedo`,
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'H3',
+      location: 'InterfaceBuilder.tsx:before useUndoRedo',
+      message: 'Before useUndoRedo hook',
+      data: {},
+    }),
+  }).catch(() => {})
+  // #endregion
   const {
     state: undoRedoLayoutState,
     setState: setUndoRedoLayoutState,
@@ -371,6 +717,22 @@ export default function InterfaceBuilder({
     maxHistory: 50,
     debounceMs: 300,
   })
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: `log_${Date.now()}_ib_after_useUndoRedo`,
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'H3',
+      location: 'InterfaceBuilder.tsx:after useUndoRedo',
+      message: 'After useUndoRedo hook',
+      data: {},
+    }),
+  }).catch(() => {})
+  // #endregion
 
   // Register mount time for editor safety guards
   useEffect(() => {

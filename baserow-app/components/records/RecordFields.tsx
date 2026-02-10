@@ -710,7 +710,7 @@ export default function RecordFields({
       {/* CRITICAL FIX: Always wrap in DndContext to provide context for useSortable hooks
           This ensures SortableFieldItem can always call useSortable, preventing React #185 */}
       <DndContext
-        sensors={showModalColumns && layoutMode ? sensors : undefined}
+        sensors={sensors}
         collisionDetection={closestCenter}
         onDragEnd={showModalColumns && layoutMode ? handleDragEnd : undefined}
       >

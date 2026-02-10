@@ -27,6 +27,22 @@ export default function SortableFieldItem({
   layoutMode,
   onFieldVisibilityToggle,
 }: SortableFieldItemProps) {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: `log_${Date.now()}_sortable_field_item`,
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'H2',
+      location: 'SortableFieldItem.tsx:render',
+      message: 'SortableFieldItem rendering',
+      data: { fieldId: field.id, fieldName: field.name, layoutMode, isVisible },
+    }),
+  }).catch(() => {})
+  // #endregion
+
   // CRITICAL: Always call useSortable, even when layoutMode is false
   // This ensures stable hook order across renders
   const {
