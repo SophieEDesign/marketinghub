@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Plus, Table2, Trash2, Edit2, Check, X, Upload } from 'lucide-react'
+import { Plus, Table2, Trash2, Edit2, Check, X, Upload, Download } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import Link from 'next/link'
 import CSVImportModal from '@/components/layout/CSVImportModal'
@@ -38,6 +38,7 @@ export default function SettingsDataTab() {
   const [importModalOpen, setImportModalOpen] = useState(false)
   const [tableToImport, setTableToImport] = useState<Table | null>(null)
   const [selectTableDialogOpen, setSelectTableDialogOpen] = useState(false)
+  const [exportingTableId, setExportingTableId] = useState<string | null>(null)
 
   useEffect(() => {
     loadTables()
@@ -213,6 +214,33 @@ export default function SettingsDataTab() {
     setImportModalOpen(true)
   }
 
+  async function handleExportClick(table: Table, e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    try {
+      setExportingTableId(table.id)
+      const res = await fetch(`/api/tables/${table.id}/export-csv`)
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to export CSV')
+      }
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${table.name || 'table'}.csv`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (error: any) {
+      console.error('Error exporting CSV:', error)
+      alert(error.message || 'Failed to export CSV')
+    } finally {
+      setExportingTableId(null)
+    }
+  }
+
   function handleImportComplete() {
     setImportModalOpen(false)
     setTableToImport(null)
@@ -322,6 +350,14 @@ export default function SettingsDataTab() {
                       >
                         {table.name}
                       </Link>
+                      <button
+                        onClick={(e) => handleExportClick(table, e)}
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-emerald-100 rounded transition-all text-emerald-600 hover:text-emerald-700"
+                        title={exportingTableId === table.id ? 'Exporting...' : 'Export CSV'}
+                        disabled={exportingTableId === table.id}
+                      >
+                        <Download className="h-4 w-4" />
+                      </button>
                       <button
                         onClick={(e) => handleImportClick(table, e)}
                         className="opacity-0 group-hover:opacity-100 p-1 hover:bg-blue-100 rounded transition-all text-blue-600 hover:text-blue-700"
