@@ -269,69 +269,6 @@ export default function RecordFields({
     })
   )
 
-  // Handle drag end in layout mode
-  const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      if (!layoutMode || !onFieldReorder) return
-
-      const { active, over } = event
-      if (!over || active.id === over.id) return
-
-      const activeField = flatFieldsForDrag.find((f) => f.id === active.id)
-      if (!activeField) return
-
-      const oldIndex = flatFieldsForDrag.findIndex((f) => f.id === active.id)
-      const newIndex = flatFieldsForDrag.findIndex((f) => f.id === over.id)
-
-      if (oldIndex !== -1 && newIndex !== -1) {
-        onFieldReorder(activeField.name, newIndex)
-      }
-    },
-    [layoutMode, onFieldReorder, flatFieldsForDrag]
-  )
-
-  // Handle adding a field in layout mode
-  const handleAddField = useCallback(
-    (field: TableField) => {
-      if (!layoutMode || !onFieldLayoutChange || !fieldLayout) return
-
-      // Check if field already exists in layout
-      const exists = fieldLayout.some((item) => item.field_name === field.name)
-      if (exists) {
-        // Just make it visible
-        handleFieldVisibilityToggle?.(field.name, true)
-        return
-      }
-
-      // Add field to layout
-      const maxOrder = Math.max(...fieldLayout.map((item) => item.order), -1)
-      const newItem: FieldLayoutItem = {
-        field_id: field.id,
-        field_name: field.name,
-        order: maxOrder + 1,
-        visible_in_canvas: true,
-        editable: pageEditable ?? true,
-        group_name: field.group_name ?? undefined,
-      }
-
-      const updatedLayout = [...fieldLayout, newItem]
-      onFieldLayoutChange?.(updatedLayout)
-    },
-    [layoutMode, onFieldLayoutChange, fieldLayout, handleFieldVisibilityToggle, pageEditable]
-  )
-
-  // Get available fields that aren't in the layout
-  const availableFields = useMemo(() => {
-    if (!layoutMode || !allFields.length) return []
-    const layoutFieldNames = new Set(fieldLayout.map((item) => item.field_name))
-    return allFields.filter(
-      (field) =>
-        !isSystemFieldName(field.name) &&
-        !field.options?.system &&
-        !layoutFieldNames.has(field.name)
-    )
-  }, [layoutMode, allFields, fieldLayout])
-
   // Get visibility for a field in layout mode
   const isFieldVisibleInLayout = useCallback(
     (fieldName: string): boolean => {
@@ -426,6 +363,69 @@ export default function RecordFields({
       return orderA - orderB
     })
   }, [layoutMode, groupedFields, fieldLayout])
+
+  // Handle drag end in layout mode
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      if (!layoutMode || !onFieldReorder) return
+
+      const { active, over } = event
+      if (!over || active.id === over.id) return
+
+      const activeField = flatFieldsForDrag.find((f) => f.id === active.id)
+      if (!activeField) return
+
+      const oldIndex = flatFieldsForDrag.findIndex((f) => f.id === active.id)
+      const newIndex = flatFieldsForDrag.findIndex((f) => f.id === over.id)
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        onFieldReorder(activeField.name, newIndex)
+      }
+    },
+    [layoutMode, onFieldReorder, flatFieldsForDrag]
+  )
+
+  // Handle adding a field in layout mode
+  const handleAddField = useCallback(
+    (field: TableField) => {
+      if (!layoutMode || !onFieldLayoutChange || !fieldLayout) return
+
+      // Check if field already exists in layout
+      const exists = fieldLayout.some((item) => item.field_name === field.name)
+      if (exists) {
+        // Just make it visible
+        onFieldVisibilityToggle?.(field.name, true)
+        return
+      }
+
+      // Add field to layout
+      const maxOrder = Math.max(...fieldLayout.map((item) => item.order), -1)
+      const newItem: FieldLayoutItem = {
+        field_id: field.id,
+        field_name: field.name,
+        order: maxOrder + 1,
+        visible_in_canvas: true,
+        editable: pageEditable ?? true,
+        group_name: field.group_name ?? undefined,
+      }
+
+      const updatedLayout = [...fieldLayout, newItem]
+      onFieldLayoutChange?.(updatedLayout)
+    },
+    [layoutMode, onFieldLayoutChange, fieldLayout, onFieldVisibilityToggle, pageEditable]
+  )
+
+  // Get available fields that aren't in the layout
+  const availableFields = useMemo(() => {
+    if (!layoutMode || !allFields.length) return []
+    const layoutFieldNames = new Set(fieldLayout.map((item) => item.field_name))
+    return allFields.filter(
+      (field) =>
+        !isSystemFieldName(field.name) &&
+        !field.options?.system &&
+        !layoutFieldNames.has(field.name)
+    )
+  }, [layoutMode, allFields, fieldLayout])
 
   // Validate field before rendering - prevent #ERROR! states
   const validateField = useCallback((field: TableField): boolean => {
