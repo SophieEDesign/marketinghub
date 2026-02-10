@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getTable } from '@/lib/crud/tables'
+import { getTableFields } from '@/lib/fields/schema'
+import { getOptionValueToLabelMap, isSelectField } from '@/lib/fields/select-options'
+import type { TableField } from '@/types/fields'
 
 export async function GET(
   request: NextRequest,
@@ -27,10 +30,47 @@ export async function GET(
       )
     }
 
-    const rows = data || []
+    const rows = (data || []) as Record<string, unknown>[]
+
+    // Load field metadata so we can export human-readable labels for select fields.
+    let fields: TableField[] = []
+    try {
+      fields = await getTableFields(table.id)
+    } catch (e) {
+      console.warn('Failed to load table fields for CSV export, falling back to raw values:', e)
+    }
+
+    const selectFieldMaps = new Map<string, Map<string, string>>()
+    for (const f of fields) {
+      if (isSelectField(f)) {
+        const map = getOptionValueToLabelMap(f.type, f.options || null)
+        selectFieldMaps.set(f.name, map)
+      }
+    }
+
+    const transformValueForExport = (columnName: string, value: unknown): unknown => {
+      const map = selectFieldMaps.get(columnName)
+      if (!map) return value
+
+      if (value === null || value === undefined) return ''
+
+      // Single-select: stored as a single string (option id or label)
+      if (!Array.isArray(value)) {
+        const key = String(value)
+        return map.get(key) ?? key
+      }
+
+      // Multi-select: stored as string[]
+      const transformed = value.map((v) => {
+        const key = String(v)
+        return map.get(key) ?? key
+      })
+      return transformed
+    }
 
     // If no rows, still return a CSV with just headers (from keys of an empty object)
-    const headers = rows.length > 0 ? Object.keys(rows[0] as Record<string, unknown>) : []
+    const headers =
+      rows.length > 0 ? Object.keys(rows[0] as Record<string, unknown>) : []
 
     const escapeCsvValue = (value: unknown): string => {
       if (value === null || value === undefined) return ''
@@ -50,7 +90,7 @@ export async function GET(
       lines.push(headers.join(','))
       for (const row of rows as Record<string, unknown>[]) {
         const line = headers
-          .map((key) => escapeCsvValue(row[key]))
+          .map((key) => escapeCsvValue(transformValueForExport(key, row[key])))
           .join(',')
         lines.push(line)
       }
