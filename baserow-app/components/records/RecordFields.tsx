@@ -603,7 +603,6 @@ export default function RecordFields({
       // CRITICAL FIX: Always render SortableFieldItem to maintain stable hook order
       // The component internally disables sortable behavior when layoutMode is false
       // This prevents React #185 (hook order violation) when layoutMode changes
-      const isVisible = layoutMode ? isFieldVisibleInLayout(field.name) : true
       return (
         <SortableFieldItem 
           key={field.id} 
