@@ -2,7 +2,19 @@
 import type { ParsedColumn } from './csvParser'
 
 /**
- * Create all metadata records for imported table
+ * Create all metadata records for imported table.
+ *
+ * Behavior:
+ * - Always creates a first field called "Title" which is treated as the
+ *   default label/ID-style field for the table.
+ * - The Title field:
+ *   - Uses internal name "title"
+ *   - Has label "Title" by default
+ *   - Is type "text" by default
+ *   - Is stored at position/order_index 0 and is intended to stay at order 1.
+ * - The table's primary_field_name is set to this internal name so other
+ *   parts of the app (duplicate detection, record display, etc.) use it as
+ *   the default primary field unless explicitly changed later.
  */
 export async function createImportMetadata(
   tableName: string,

@@ -62,7 +62,19 @@ function extractChoicesForColumn(
 }
 
 /**
- * Create all metadata records for imported table
+ * Create all metadata records for imported table.
+ *
+ * Behavior:
+ * - Always creates a first field called "Title" which is treated as the
+ *   default label/ID-style field for the table.
+ * - The Title field:
+ *   - Uses internal name "title"
+ *   - Has label "Title" by default
+ *   - Is type "text" by default
+ *   - Is stored at position/order_index 0 and is intended to stay at order 1.
+ * - The table's primary_field_name is set to this internal name so other
+ *   parts of the app (duplicate detection, record display, etc.) use it as
+ *   the default primary field unless explicitly changed later.
  */
 export async function createImportMetadata(
   tableName: string,
@@ -79,7 +91,9 @@ export async function createImportMetadata(
   const { supabase } = await import('@/lib/supabase/client')
 
   try {
-    // 1. Create table record
+    // 1. Create table record with a default primary field name of "title".
+    // This can be changed later in Settings, but ensures every table always
+    // starts with a clear human-friendly primary field.
     const { data: tableData, error: tableError } = await supabase
       .from('tables')
       .insert([
@@ -87,6 +101,7 @@ export async function createImportMetadata(
           name: displayName,
           supabase_table: tableName,
           description: `Imported from CSV on ${new Date().toISOString()}`,
+          primary_field_name: 'title',
         },
       ])
       .select()
@@ -100,6 +115,34 @@ export async function createImportMetadata(
     }
 
     const tableId = tableData.id
+
+    // 1.5 Create the default Title field as the first field.
+    // We reserve position/order_index 0 for this field so it always appears
+    // as the first column unless the user explicitly reorders fields later.
+    const titleFieldName = 'title'
+    const titleFieldPayload = {
+      table_id: tableId,
+      name: titleFieldName,
+      label: 'Title',
+      type: 'text' as TableFieldType,
+      position: 0,
+      order_index: 0,
+      required: false,
+      options: {},
+    }
+
+    const { error: titleFieldError } = await supabase
+      .from('table_fields')
+      .upsert([titleFieldPayload] as any, { onConflict: 'table_id,name' })
+
+    if (titleFieldError) {
+      const msg = titleFieldError.message || 'Unknown error'
+      return {
+        success: false,
+        tableId,
+        error: `Failed to create default Title field: ${msg}`,
+      }
+    }
 
     // 2. Create default grid view
     const { data: viewData, error: viewError } = await supabase
@@ -125,6 +168,7 @@ export async function createImportMetadata(
     const viewId = viewData.id
 
     // 2.5 Create table_fields (field metadata, including select choices)
+    // Start imported fields after the Title field, so Title keeps position 0.
     const tableFieldsPayload = columns.map((col, index) => {
       const fieldType = mapParsedColumnToTableFieldType(col.type)
       const options: Record<string, any> = {}
@@ -141,8 +185,8 @@ export async function createImportMetadata(
         name: col.sanitizedName,
         label: col.name, // preserve original header as user-facing label
         type: fieldType,
-        position: index,
-        order_index: index,
+        position: index + 1,
+        order_index: index + 1,
         required: false,
         options,
       }
@@ -182,13 +226,23 @@ export async function createImportMetadata(
       }
     }
 
-    // 3. Create view_fields for each column
-    const viewFields = columns.map((col, index) => ({
-      view_id: viewId,
-      field_name: col.sanitizedName,
-      visible: true,
-      position: index,
-    }))
+    // 3. Create view_fields:
+    // - Include Title as the first visible column
+    // - Then include each imported column in order.
+    const viewFields = [
+      {
+        view_id: viewId,
+        field_name: titleFieldName,
+        visible: true,
+        position: 0,
+      },
+      ...columns.map((col, index) => ({
+        view_id: viewId,
+        field_name: col.sanitizedName,
+        visible: true,
+        position: index + 1,
+      })),
+    ]
 
     const { error: fieldsError } = await supabase
       .from('view_fields')

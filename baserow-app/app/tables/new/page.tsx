@@ -40,6 +40,8 @@ export default function NewTablePage() {
             name,
             supabase_table: supabaseTableName,
             description: description || null,
+            // Default primary field for all new tables is a Title field.
+            primary_field_name: "title",
           },
         ])
         .select()
