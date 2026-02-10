@@ -12,8 +12,7 @@ import type { FilterTree, FilterGroup, FilterCondition } from './canonical-model
 import { normalizeFilterTree } from './canonical-model'
 import type { TableField, LinkedField } from '@/types/fields'
 import { createClient } from '@/lib/supabase/client'
-import { getDisplayFieldNameForLinkedTable } from '@/lib/dataView/linkedFields'
-import type { TargetTableRow, TargetFieldRow } from '@/lib/dataView/linkedFields'
+import { getDisplayFieldNameForLinkedTable, getLinkedTableMetadataCached } from '@/lib/dataView/linkedFields'
 
 type RelativeDateValue = {
   type: 'relative_date'
@@ -243,29 +242,12 @@ async function resolveLinkedFieldFilterValue(
   }
   
   // Value is a label, need to resolve to ID
-  const supabase = createClient()
-  
-  const { data: targetTable, error: tableError } = await supabase
-    .from('tables')
-    .select('supabase_table, primary_field_name')
-    .eq('id', linkedTableId)
-    .single()
-  
-  if (tableError || !targetTable) {
-    return value // Fallback to original value
+  const meta = await getLinkedTableMetadataCached(linkedTableId)
+  if (!meta) {
+    return value // Fallback to original value when we can't resolve metadata
   }
-  
-  const { data: targetFields } = await supabase
-    .from('table_fields')
-    .select('id, name, type')
-    .eq('table_id', linkedTableId)
-    .order('position', { ascending: true })
-  
-  const fieldRows: TargetFieldRow[] = Array.isArray(targetFields) ? targetFields : []
-  const tableRow: TargetTableRow = {
-    supabase_table: targetTable.supabase_table,
-    primary_field_name: targetTable.primary_field_name ?? null,
-  }
+
+  const { table: tableRow, fields: fieldRows } = meta
   
   const displayFieldName = getDisplayFieldNameForLinkedTable({
     targetTable: tableRow,
@@ -278,6 +260,7 @@ async function resolveLinkedFieldFilterValue(
   }
   
   // Search for record with matching label
+  const supabase = createClient()
   const { data: records, error: recordsError } = await supabase
     .from(targetTable.supabase_table)
     .select(`id, ${displayFieldName}`)

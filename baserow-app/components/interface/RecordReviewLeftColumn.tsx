@@ -325,23 +325,6 @@ export default function RecordReviewLeftColumn({
     }
   }, [tableId, loadRecords])
 
-  useEffect(() => {
-    if (tableId) {
-      const supabase = createClient()
-      supabase
-        .from("tables")
-        .select("supabase_table")
-        .eq("id", tableId)
-        .single()
-        .then(({ data: table }) => {
-          if (table?.supabase_table) {
-            setSupabaseTableName(table.supabase_table)
-            loadRecords(table.supabase_table)
-          }
-        })
-    }
-  }, [tableId, loadRecords])
-
   const handleOpenCreateModal = useCallback(() => {
     // Only enable this UX for record_view pages (requested)
     if (!isRecordView) return

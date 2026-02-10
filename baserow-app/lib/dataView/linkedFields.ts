@@ -28,6 +28,86 @@ function isUuid(v: unknown): v is string {
   return typeof v === 'string' && UUID_RE.test(v)
 }
 
+interface LinkedTableMetadata {
+  table: TargetTableRow
+  fields: TargetFieldRow[]
+}
+
+const linkedTableMetaCache = new Map<
+  string,
+  { data: LinkedTableMetadata | null; promise: Promise<LinkedTableMetadata | null> | null }
+>()
+
+/**
+ * Load and cache basic metadata for a linked table (Supabase physical table name + fields).
+ *
+ * This function is intentionally shared across all linked-field helpers to avoid
+ * issuing repeated `/tables?select=supabase_table,primary_field_name` and
+ * `/table_fields` requests for the same linked_table_id.
+ */
+export async function getLinkedTableMetadataCached(
+  linkedTableId: string
+): Promise<LinkedTableMetadata | null> {
+  const existing = linkedTableMetaCache.get(linkedTableId)
+  if (existing?.data) {
+    return existing.data
+  }
+  if (existing?.promise) {
+    return existing.promise
+  }
+
+  const supabase = createClient()
+
+  const promise: Promise<LinkedTableMetadata | null> = (async () => {
+    const { data: targetTable, error: tableError } = await supabase
+      .from('tables')
+      .select('supabase_table, primary_field_name')
+      .eq('id', linkedTableId)
+      .single()
+
+    if (tableError || !targetTable?.supabase_table) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[linkedFields] Target table not found for linked field', {
+          linkedTableId,
+          error: tableError,
+        })
+      }
+      linkedTableMetaCache.set(linkedTableId, { data: null, promise: null })
+      return null
+    }
+
+    const tableRow: TargetTableRow = {
+      supabase_table: targetTable.supabase_table,
+      primary_field_name: targetTable.primary_field_name ?? null,
+    }
+
+    const { data: targetFields } = await supabase
+      .from('table_fields')
+      .select('id, name, type')
+      .eq('table_id', linkedTableId)
+      .order('position', { ascending: true })
+
+    const fieldRows: TargetFieldRow[] = Array.isArray(targetFields) ? targetFields : []
+
+    const meta: LinkedTableMetadata = { table: tableRow, fields: fieldRows }
+    linkedTableMetaCache.set(linkedTableId, { data: meta, promise: null })
+    return meta
+  })().catch((err) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[linkedFields] Failed to load linked table metadata', {
+        linkedTableId,
+        error: err,
+      })
+    }
+    // On failure, clear the promise entry so a future attempt can retry.
+    linkedTableMetaCache.delete(linkedTableId)
+    return null
+  })
+
+  linkedTableMetaCache.set(linkedTableId, { data: null, promise })
+  return promise
+}
+
 /**
  * Determine which field name to use for display labels for a linked table.
  * Fallback order: 1) table primary field, 2) linked_field_id, 3) first text-like field, 4) null (use IDs).
@@ -198,31 +278,12 @@ export async function resolveLinkedFieldDisplay(
     return String(value)
   }
 
-  const supabase = createClient()
-
-  const { data: targetTable, error: tableError } = await supabase
-    .from('tables')
-    .select('supabase_table, primary_field_name')
-    .eq('id', linkedTableId)
-    .single()
-
-  if (tableError || !targetTable) {
-    console.warn(`[resolveLinkedFieldDisplay] Target table not found: ${linkedTableId}`)
+  const meta = await getLinkedTableMetadataCached(linkedTableId)
+  if (!meta) {
     return String(value)
   }
 
-  const tableRow: TargetTableRow = {
-    supabase_table: targetTable.supabase_table,
-    primary_field_name: targetTable.primary_field_name ?? null,
-  }
-
-  const { data: targetFields } = await supabase
-    .from('table_fields')
-    .select('id, name, type')
-    .eq('table_id', linkedTableId)
-    .order('position', { ascending: true })
-
-  const fieldRows: TargetFieldRow[] = Array.isArray(targetFields) ? targetFields : []
+  const { table: tableRow, fields: fieldRows } = meta
 
   const displayFieldName = getDisplayFieldNameForLinkedTable({
     targetTable: tableRow,
@@ -251,6 +312,8 @@ export async function resolveLinkedFieldDisplay(
     // Nothing we can safely resolve; fall back to joining original values.
     return legacyValues.join(', ')
   }
+
+  const supabase = createClient()
 
   const { data: records, error: recordsError } = await supabase
     .from(targetTable.supabase_table)
@@ -300,31 +363,13 @@ export async function resolveLinkedFieldDisplayMap(
     return out
   }
 
-  const supabase = createClient()
-
-  const { data: targetTable, error: tableError } = await supabase
-    .from('tables')
-    .select('supabase_table, primary_field_name')
-    .eq('id', linkedTableId)
-    .single()
-
-  if (tableError || !targetTable?.supabase_table) {
+  const meta = await getLinkedTableMetadataCached(linkedTableId)
+  if (!meta || !meta.table.supabase_table) {
     for (const id of unique) out.set(id, id)
     return out
   }
 
-  const tableRow: TargetTableRow = {
-    supabase_table: targetTable.supabase_table,
-    primary_field_name: targetTable.primary_field_name ?? null,
-  }
-
-  const { data: targetFields } = await supabase
-    .from('table_fields')
-    .select('id, name, type')
-    .eq('table_id', linkedTableId)
-    .order('position', { ascending: true })
-
-  const fieldRows: TargetFieldRow[] = Array.isArray(targetFields) ? targetFields : []
+  const { table: tableRow, fields: fieldRows } = meta
 
   const displayFieldName = getDisplayFieldNameForLinkedTable({
     targetTable: tableRow,
@@ -342,6 +387,8 @@ export async function resolveLinkedFieldDisplayMap(
 
   // Always include legacy values as-is.
   for (const v of legacyValues) out.set(v, v)
+
+  const supabase = createClient()
 
   if (uuidIds.length === 0) return out
 
@@ -400,33 +447,16 @@ export async function resolvePastedLinkedValue(
     }
   }
 
-  const supabase = createClient()
+  const meta = await getLinkedTableMetadataCached(linkedTableId)
 
-  const { data: targetTable, error: tableError } = await supabase
-    .from('tables')
-    .select('supabase_table, primary_field_name')
-    .eq('id', linkedTableId)
-    .single()
-
-  if (tableError || !targetTable) {
+  if (!meta) {
     return {
       ids: null,
       errors: [`Target table not found: ${linkedTableId}`],
     }
   }
 
-  const tableRow: TargetTableRow = {
-    supabase_table: targetTable.supabase_table,
-    primary_field_name: targetTable.primary_field_name ?? null,
-  }
-
-  const { data: targetFields } = await supabase
-    .from('table_fields')
-    .select('id, name, type')
-    .eq('table_id', linkedTableId)
-    .order('position', { ascending: true })
-
-  const fieldRows: TargetFieldRow[] = Array.isArray(targetFields) ? targetFields : []
+  const { table: tableRow, fields: fieldRows } = meta
 
   if (fieldRows.length === 0) {
     return {
@@ -471,6 +501,8 @@ export async function resolvePastedLinkedValue(
 
   // Resolve each search term
   const resolvedIds: string[] = []
+
+  const supabase = createClient()
 
   for (const term of searchTerms) {
     if (isUuid(term)) {
