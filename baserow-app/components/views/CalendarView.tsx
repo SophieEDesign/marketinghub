@@ -1148,10 +1148,11 @@ export default function CalendarView({
         ) ?? null
       }
       
-      // TEMP DIAGNOSTIC: disable range end field entirely to confirm
-      // whether multi-day event mapping is the source of React #185.
-      // We still resolve it above for logging, but do not use it for events.
-      const actualToFieldName = null
+      const actualToFieldName =
+        resolvedToField?.name ||
+        endField?.name ||
+        autoDetectedToField?.name ||
+        null
       
       // #region agent log
       if (process.env.NODE_ENV === 'development') {
