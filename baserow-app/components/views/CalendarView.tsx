@@ -1032,7 +1032,7 @@ export default function CalendarView({
       return null
     }
 
-    const events: EventInput[] = filteredRows
+    const mappedEvents = filteredRows
         .filter((row: TableRow) => {
           if (!row?.data) return false
           const fromVal = getRowDateValue(row, actualFromFieldName || null)
@@ -1044,7 +1044,7 @@ export default function CalendarView({
         })
         // Ensure we have an array before mapping
         .filter((row: TableRow): row is TableRow => row != null)
-        .map((row: TableRow) => {
+        .map((row: TableRow): EventInput | null => {
           const fromVal = getRowDateValue(row, actualFromFieldName || null)
           const toVal = getRowDateValue(row, actualToFieldName || null)
           const startVal = fromVal ?? toVal
@@ -1255,7 +1255,8 @@ export default function CalendarView({
             },
           }
         })
-        .filter((e: EventInput | null): e is EventInput => e != null) as EventInput[]
+    
+    const events: EventInput[] = mappedEvents.filter((e: EventInput | null): e is EventInput => e != null)
 
       if (events.length === 0 && filteredRows.length > 0) {
         debugWarn('CALENDAR', `No events generated from ${filteredRows.length} rows`, {
