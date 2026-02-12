@@ -657,6 +657,28 @@ export default function RecordFields({
 
   const showModalColumns = modalColumns.length > 0
 
+  // Stable canonical field list: same set/order every time so SortableFieldItem count never changes.
+  // Prevents React #185 when layout loads and modalColumns switches from empty to populated.
+  const canonicalFieldList = useMemo(
+    () => Object.values(groupedFields).flat(),
+    [groupedFields]
+  )
+  const canonicalFieldIds = useMemo(
+    () => canonicalFieldList.map((f) => f.id),
+    [canonicalFieldList]
+  )
+
+  // For modal column layout: which grid column (1-based) each field belongs to.
+  const fieldToColumnIndex = useMemo(() => {
+    const map: Record<string, number> = {}
+    modalColumns.forEach((col, i) =>
+      col.fields.forEach((f) => {
+        map[f.id] = i + 1
+      })
+    )
+    return map
+  }, [modalColumns])
+
   // Compute CSS grid template for modal columns based on relative widths.
   const gridTemplateColumns = useMemo(() => {
     if (!showModalColumns) return undefined
@@ -730,123 +752,111 @@ export default function RecordFields({
         </div>
       )}
 
-      {/* CRITICAL FIX: Always wrap in DndContext to provide context for useSortable hooks
-          This ensures SortableFieldItem can always call useSortable, preventing React #185 */}
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={showModalColumns && layoutMode ? handleDragEnd : undefined}
-      >
-        {/* Modal canvas: multi-column record layout (always mounted, toggled via CSS) */}
-        <div className={showModalColumns ? "" : "hidden"}>
-          <div
-            ref={columnsContainerRef}
-            className="grid gap-6"
-            style={gridTemplateColumns ? { gridTemplateColumns } : undefined}
-          >
-            {modalColumns.map((column, index) => (
-              <div
-                key={column.id}
-                className="relative group flex flex-col gap-3 min-w-0 border-l border-gray-200 first:border-l-0 pl-4"
-              >
-                <SortableContext
-                  items={column.fields.map((f) => f.id)}
-                  strategy={verticalListSortingStrategy}
-                >
-                  <div className="space-y-3">
-                    {column.fields.map((field) => renderField(field))}
-                  </div>
-                </SortableContext>
-
-                {layoutMode && availableFields.length > 0 && (
-                  <div className="pt-2 border-t border-dashed border-gray-200 mt-1">
-                    <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                      Add field to column
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {availableFields.slice(0, 6).map((field) => (
-                        <button
-                          key={field.id}
-                          type="button"
-                          onClick={() => handleAddField(field, column.id)}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-gray-300 rounded-md bg-white hover:bg-gray-50 text-gray-700"
-                        >
-                          <Plus className="h-3 w-3" />
-                          {getFieldDisplayName(field)}
-                        </button>
-                      ))}
-                      {availableFields.length > 6 && (
-                        <span className="text-xs text-gray-500 self-center">
-                          +{availableFields.length - 6} more
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Column resize handle between columns (layout mode only, hover affordance) */}
-                {layoutMode && index < modalColumns.length - 1 && (
-                  <div
-                    className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-transparent group-hover:bg-blue-200/60 group-hover:opacity-100 opacity-0 transition-colors"
-                    onMouseDown={(e) => {
-                      e.preventDefault()
-                      startResize(index)
-                    }}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Fallback: grouped single-column layout (always mounted, toggled via CSS)
-            Still wrapped in DndContext so useSortable hooks have context.
-            Items list must match the rendered fields across all groups. */}
-        <div className={showModalColumns ? "hidden" : ""}>
+      {/* CRITICAL: Single stable tree to prevent React #185. Do not mount DndContext with 0
+          fields so hook count never changes from 0 to N. */}
+      {canonicalFieldList.length === 0 ? (
+        <div className="space-y-3" />
+      ) : (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={showModalColumns && layoutMode ? handleDragEnd : undefined}
+        >
+          {/* Single SortableContext + exactly N SortableFieldItems. Same N in both branches. */}
           <SortableContext
-            items={Object.values(groupedFields)
-              .flat()
-              .map((f) => f.id)}
+            items={canonicalFieldIds}
             strategy={verticalListSortingStrategy}
           >
-            {Object.entries(groupedFields).map(([groupName, groupFields]) => {
-              const isCollapsed = collapsedGroups.has(groupName)
-              return (
-                <section key={groupName} className="space-y-3">
-                  <button
-                    onClick={() => toggleGroup(groupName)}
-                    className="w-full flex items-center justify-between text-left py-2.5 px-3 -mx-3 rounded-md bg-gray-100 border border-gray-200 hover:bg-gray-200 hover:border-gray-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
-                    aria-expanded={!isCollapsed}
-                    aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${groupName} group`}
-                  >
-                    <span className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                      {groupName}
-                    </span>
-                    <span className="text-gray-500">
-                      {isCollapsed ? (
-                        <ChevronRight className="h-4 w-4" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4" />
-                      )}
-                    </span>
-                  </button>
-                  {/* Keep groups mounted but hide empty/collapsed ones via CSS to
-                      preserve a stable hook tree in children. */}
+            {showModalColumns ? (
+              <div
+                ref={columnsContainerRef}
+                className="grid gap-6"
+                style={
+                  gridTemplateColumns
+                    ? { gridTemplateColumns }
+                    : undefined
+                }
+              >
+                {canonicalFieldList.map((field) => (
                   <div
-                    className={
-                      isCollapsed || groupFields.length === 0
-                        ? "hidden"
-                        : "space-y-3"
+                    key={field.id}
+                    className="min-w-0 border-l border-gray-200 first:border-l-0 pl-4"
+                    style={
+                      fieldToColumnIndex[field.id]
+                        ? { gridColumn: fieldToColumnIndex[field.id] }
+                        : undefined
                     }
                   >
-                    {groupFields.map((field) => renderField(field))}
+                    {renderField(field)}
                   </div>
-                </section>
-              )
-            })}
+                ))}
+              </div>
+            ) : (
+              /* Grouped fallback: same N fields, grouped into sections (no extra hooks). */
+              <>
+                {Object.entries(groupedFields).map(([groupName, groupFields]) => {
+                  const isCollapsed = collapsedGroups.has(groupName)
+                  return (
+                    <section key={groupName} className="space-y-3">
+                      <button
+                        onClick={() => toggleGroup(groupName)}
+                        className="w-full flex items-center justify-between text-left py-2.5 px-3 -mx-3 rounded-md bg-gray-100 border border-gray-200 hover:bg-gray-200 hover:border-gray-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
+                        aria-expanded={!isCollapsed}
+                        aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${groupName} group`}
+                      >
+                        <span className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+                          {groupName}
+                        </span>
+                        <span className="text-gray-500">
+                          {isCollapsed ? (
+                            <ChevronRight className="h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4" />
+                          )}
+                        </span>
+                      </button>
+                      <div
+                        className={
+                          isCollapsed || groupFields.length === 0
+                            ? "hidden"
+                            : "space-y-3"
+                        }
+                      >
+                        {groupFields.map((field) => renderField(field))}
+                      </div>
+                    </section>
+                  )
+                })}
+              </>
+            )}
+
+            {/* Layout-mode-only UI: Add field + column resize (no hooks, safe to vary). */}
+            {layoutMode && showModalColumns && availableFields.length > 0 && (
+              <div className="pt-2 mt-2 border-t border-dashed border-gray-200 flex flex-wrap gap-2">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide w-full">
+                  Add field
+                </span>
+                {availableFields.slice(0, 6).map((field) => (
+                  <button
+                    key={field.id}
+                    type="button"
+                    onClick={() => handleAddField(field, modalColumns[0]?.id)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-gray-300 rounded-md bg-white hover:bg-gray-50 text-gray-700"
+                  >
+                    <Plus className="h-3 w-3" />
+                    {getFieldDisplayName(field)}
+                  </button>
+                ))}
+                {availableFields.length > 6 && (
+                  <span className="text-xs text-gray-500 self-center">
+                    +{availableFields.length - 6} more
+                  </span>
+                )}
+              </div>
+            )}
           </SortableContext>
-        </div>
-      </DndContext>
+        </DndContext>
+      )}
 
       {/* Empty State */}
       {fields.length === 0 && (
