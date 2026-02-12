@@ -124,12 +124,29 @@ export default function BlockRenderer({
 }: BlockRendererProps & {
   openRecordInEditModeForBlock?: { blockId: string; recordId: string; tableId: string } | null
 }) {
+  // #region HOOK CHECK - BlockRenderer render start
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'BlockRenderer render start', { blockId: block.id, blockType: block.type })
+  }
+  // #endregion
+  
   const diagnosticsEnabled = process.env.NODE_ENV === 'development'
+  
+  // #region HOOK CHECK - Before useEffect blockDriftChecks
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'BlockRenderer before useEffect blockDriftChecks')
+  }
+  // #endregion
   useEffect(() => {
     if (process.env.NODE_ENV !== 'development' || blockDriftChecksRun) return
     blockDriftChecksRun = true
     runBlockDriftChecks()
   }, [])
+  // #region HOOK CHECK - After useEffect blockDriftChecks
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'BlockRenderer after useEffect blockDriftChecks')
+  }
+  // #endregion
 
   // Normalize config to prevent crashes
   const safeConfig = normalizeBlockConfig(block.type, block.config)
@@ -146,6 +163,11 @@ export default function BlockRenderer({
     record_id: safeConfig.record_id || recordId || undefined,
   }
 
+  // #region HOOK CHECK - Before useMemo safeBlock
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'BlockRenderer before useMemo safeBlock')
+  }
+  // #endregion
   // CRITICAL: Memoize safeBlock so block components receive a stable reference.
   // New object every render caused React #185 (maximum update depth) in CalendarBlock/GridBlock.
   const safeBlock = useMemo<PageBlock>(() => ({
@@ -161,6 +183,11 @@ export default function BlockRenderer({
     recordId ?? '',
     JSON.stringify(block.config),
   ])
+  // #region HOOK CHECK - After useMemo safeBlock
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'BlockRenderer after useMemo safeBlock')
+  }
+  // #endregion
 
   const handleUpdate = (updates: Partial<PageBlock["config"]>) => {
     if (onUpdate) {

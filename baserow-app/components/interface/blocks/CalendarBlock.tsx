@@ -46,6 +46,17 @@ function CalendarBlock({
   canEditLayout = false,
   isFullPage = false,
 }: CalendarBlockProps) {
+  // #region HOOK CHECK - CalendarBlock render start
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'CalendarBlock render start', { blockId: block.id })
+  }
+  // #endregion
+  
+  // #region HOOK CHECK - Before useMemo configSignature
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'CalendarBlock before useMemo configSignature')
+  }
+  // #endregion
   // Memoize so GridBlock (and CalendarView/RecordModal) don't get new props every render.
   // CRITICAL: Extract config values to prevent JSON.stringify from causing re-renders
   // JSON.stringify creates a new string every render even if config hasn't changed
@@ -53,7 +64,17 @@ function CalendarBlock({
     const cfg = block.config || {}
     return `${block.id}-${cfg.view_type || ''}-${cfg.table_id || ''}-${cfg.start_date_field || ''}-${cfg.end_date_field || ''}`
   }, [block.id, block.config?.view_type, block.config?.table_id, block.config?.start_date_field, block.config?.end_date_field])
+  // #region HOOK CHECK - After useMemo configSignature
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'CalendarBlock after useMemo configSignature')
+  }
+  // #endregion
   
+  // #region HOOK CHECK - Before useMemo calendarBlock
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'CalendarBlock before useMemo calendarBlock')
+  }
+  // #endregion
   const calendarBlock = useMemo<PageBlock>(() => ({
     ...block,
     config: {
@@ -69,13 +90,33 @@ function CalendarBlock({
     block.h,
     configSignature, // Use stable signature instead of JSON.stringify
   ])
+  // #region HOOK CHECK - After useMemo calendarBlock
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'CalendarBlock after useMemo calendarBlock')
+  }
+  // #endregion
 
+  // #region HOOK CHECK - Before useMemo gridBlockKey
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'CalendarBlock before useMemo gridBlockKey')
+  }
+  // #endregion
   // Stable key so GridBlock/CalendarView don't re-mount or re-run effects when only callback/filterTree identity changes
   const gridBlockKey = useMemo(
     () => `calendar-${block.id}-${interfaceMode}-${pageId ?? ''}-${(filters?.length ?? 0)}`,
     [block.id, interfaceMode, pageId, filters?.length]
   )
+  // #region HOOK CHECK - After useMemo gridBlockKey
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'CalendarBlock after useMemo gridBlockKey')
+  }
+  // #endregion
 
+  // #region HOOK CHECK - Before useMemo gridBlockProps
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'CalendarBlock before useMemo gridBlockProps')
+  }
+  // #endregion
   // Memoize props object to prevent React #185: avoid passing new object reference every render
   const gridBlockProps = useMemo(
     () => ({
@@ -107,6 +148,11 @@ function CalendarBlock({
       isFullPage,
     ]
   )
+  // #region HOOK CHECK - After useMemo gridBlockProps
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'CalendarBlock after useMemo gridBlockProps')
+  }
+  // #endregion
 
   return <GridBlock key={gridBlockKey} {...gridBlockProps} />
 }

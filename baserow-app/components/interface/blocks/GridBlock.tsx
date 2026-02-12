@@ -75,10 +75,43 @@ export default function GridBlock({
   isFullPage = false,
   openRecordInEditModeForBlock,
 }: GridBlockProps) {
+  // #region HOOK CHECK - GridBlock render start
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'GridBlock render start', { blockId: block.id, viewType: block.config?.view_type })
+  }
+  // #endregion
+  
   const { config } = block
+  
+  // #region HOOK CHECK - Before useRecordPanel
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'GridBlock before useRecordPanel')
+  }
+  // #endregion
   const { openRecord: openRecordPanel } = useRecordPanel()
+  // #region HOOK CHECK - After useRecordPanel
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'GridBlock after useRecordPanel')
+  }
+  // #endregion
+  
+  // #region HOOK CHECK - Before useState openRecordInEditMode
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'GridBlock before useState openRecordInEditMode')
+  }
+  // #endregion
   const [openRecordInEditMode, setOpenRecordInEditMode] = useState<string | null>(null)
+  // #region HOOK CHECK - After useState openRecordInEditMode
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'GridBlock after useState openRecordInEditMode')
+  }
+  // #endregion
 
+  // #region HOOK CHECK - Before useEffect openRecordInEditMode
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'GridBlock before useEffect openRecordInEditMode')
+  }
+  // #endregion
   // Open record in edit mode when openRecordInEditModeForBlock matches this block
   useEffect(() => {
     if (openRecordInEditModeForBlock && openRecordInEditModeForBlock.blockId === block.id) {
@@ -90,11 +123,42 @@ export default function GridBlock({
       return () => clearTimeout(timer)
     }
   }, [openRecordInEditModeForBlock, block.id])
+  // #region HOOK CHECK - After useEffect openRecordInEditMode
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'GridBlock after useEffect openRecordInEditMode')
+  }
+  // #endregion
 
+  // #region HOOK CHECK - Before useRef baseHeightRef
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'GridBlock before useRef baseHeightRef')
+  }
+  // #endregion
   // Track base height (collapsed state) to calculate deltas
   const baseHeightRef = useRef<number | null>(null)
-  const previousHeightRef = useRef<number | null>(null)
+  // #region HOOK CHECK - After useRef baseHeightRef
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'GridBlock after useRef baseHeightRef')
+  }
+  // #endregion
   
+  // #region HOOK CHECK - Before useRef previousHeightRef
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'GridBlock before useRef previousHeightRef')
+  }
+  // #endregion
+  const previousHeightRef = useRef<number | null>(null)
+  // #region HOOK CHECK - After useRef previousHeightRef
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'GridBlock after useRef previousHeightRef')
+  }
+  // #endregion
+  
+  // #region HOOK CHECK - Before useCallback handleHeightChange
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'GridBlock before useCallback handleHeightChange')
+  }
+  // #endregion
   // Convert total height from GridView to ephemeral delta
   const handleHeightChange = useCallback((totalHeightGridUnits: number) => {
     if (!onEphemeralHeightDelta) return
@@ -129,6 +193,12 @@ export default function GridBlock({
     
     previousHeightRef.current = totalHeightPx
   }, [onEphemeralHeightDelta, block.id, rowHeight])
+  // #region HOOK CHECK - After useCallback handleHeightChange
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'GridBlock after useCallback handleHeightChange')
+  }
+  // #endregion
+  
   // Grid block table_id resolution: use config.table_id first, fallback to pageTableId
   // This ensures calendar/list/kanban pages work even if table_id isn't explicitly set in block config
   // Backward compatibility: some legacy data used camelCase `tableId`
@@ -136,13 +206,41 @@ export default function GridBlock({
   const tableId = config?.table_id || legacyTableId || pageTableId || config?.base_table || null
   // RULE: Views are currently not used; ignore view_id unless explicitly enabled.
   const viewId = VIEWS_ENABLED ? config?.view_id : null
+  
+  // #region HOOK CHECK - Before useMemo viewUuid
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'GridBlock before useMemo viewUuid')
+  }
+  // #endregion
   const viewUuid = useMemo(() => normalizeUuid(viewId), [viewId])
+  // #region HOOK CHECK - After useMemo viewUuid
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'GridBlock after useMemo viewUuid')
+  }
+  // #endregion
+  
   const viewType: ViewType = config?.view_type || 'grid'
   
   // DEBUG_LIST: Log tableId resolution
   // CRITICAL: Use useState to prevent hydration mismatch - localStorage access must happen after mount
-  const [listDebugEnabled, setListDebugEnabled] = useState(false)
   
+  // #region HOOK CHECK - Before useState listDebugEnabled
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'GridBlock before useState listDebugEnabled')
+  }
+  // #endregion
+  const [listDebugEnabled, setListDebugEnabled] = useState(false)
+  // #region HOOK CHECK - After useState listDebugEnabled
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'GridBlock after useState listDebugEnabled')
+  }
+  // #endregion
+  
+  // #region HOOK CHECK - Before useEffect listDebugEnabled
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'GridBlock before useEffect listDebugEnabled')
+  }
+  // #endregion
   useEffect(() => {
     setListDebugEnabled(isDebugEnabled('LIST'))
     if (isDebugEnabled('LIST')) {
@@ -157,6 +255,12 @@ export default function GridBlock({
       })
     }
   }, [])
+  // #region HOOK CHECK - After useEffect listDebugEnabled
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[HOOK CHECK]', 'GridBlock after useEffect listDebugEnabled')
+  }
+  // #endregion
+  
   // Visible fields from config (required) - ensure it's always an array
   const visibleFieldsConfig = Array.isArray(config?.visible_fields) 
     ? config.visible_fields 
