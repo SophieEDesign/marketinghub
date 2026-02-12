@@ -79,6 +79,29 @@ export default function RecordFields({
   const supabase = createClient()
   const columnsContainerRef = useRef<HTMLDivElement | null>(null)
 
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: `log_${Date.now()}_recordfields_render_start`,
+      timestamp: Date.now(),
+      runId: 'rf-pre-fix',
+      hypothesisId: 'RF1',
+      location: 'RecordFields.tsx:render START',
+      message: 'RecordFields render START',
+      data: {
+        tableId,
+        recordId,
+        layoutMode,
+        fieldsCount: fields.length,
+        fieldLayoutCount: fieldLayout.length,
+        allFieldsCount: allFields.length,
+      },
+    }),
+  }).catch(() => {})
+  // #endregion
+
   // Load collapsed groups state from localStorage
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set()
@@ -709,6 +732,29 @@ export default function RecordFields({
 
       {/* CRITICAL FIX: Always wrap in DndContext to provide context for useSortable hooks
           This ensures SortableFieldItem can always call useSortable, preventing React #185 */}
+      {/* #region agent log */}
+      {fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: `log_${Date.now()}_recordfields_layout_branch`,
+          timestamp: Date.now(),
+          runId: 'rf-pre-fix',
+          hypothesisId: 'RF2',
+          location: 'RecordFields.tsx:before DndContext',
+          message: 'RecordFields layout branch info',
+          data: {
+            tableId,
+            recordId,
+            layoutMode,
+            showModalColumns,
+            modalColumnsCount: modalColumns.length,
+            modalColumnsFieldCounts: modalColumns.map((c) => c.fields.length),
+            groupedFieldsGroupCount: Object.keys(groupedFields).length,
+          },
+        }),
+      }).catch(() => {})}
+      {/* #endregion */}
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -776,43 +822,49 @@ export default function RecordFields({
           </div>
         ) : (
           // Fallback: grouped single-column layout (used by non-modal contexts)
-          // CRITICAL: Still wrapped in DndContext so useSortable hooks have context
+          // CRITICAL: Still wrapped in DndContext so useSortable hooks have context.
+          // Items list must match the rendered fields across all groups.
           <SortableContext
-            items={fields.map((f) => f.id)}
+            items={Object.values(groupedFields)
+              .flat()
+              .map((f) => f.id)}
             strategy={verticalListSortingStrategy}
           >
-            {Object.entries(groupedFields)
-              .filter(([_, groupFields]) => groupFields.length > 0)
-              .map(([groupName, groupFields]) => {
-                const isCollapsed = collapsedGroups.has(groupName)
-                return (
-                  <section key={groupName} className="space-y-3">
-                    <button
-                      onClick={() => toggleGroup(groupName)}
-                      className="w-full flex items-center justify-between text-left py-2.5 px-3 -mx-3 rounded-md bg-gray-100 border border-gray-200 hover:bg-gray-200 hover:border-gray-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
-                      aria-expanded={!isCollapsed}
-                      aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${groupName} group`}
-                    >
-                      <span className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                        {groupName}
-                      </span>
-                      <span className="text-gray-500">
-                        {isCollapsed ? (
-                          <ChevronRight className="h-4 w-4" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4" />
-                        )}
-                      </span>
-                    </button>
-                    {/* CRITICAL FIX: Always render fields to maintain stable hook order
-                        Hide via CSS (hidden class) instead of conditional rendering
-                        This prevents React #185 when groups collapse/expand */}
-                    <div className={isCollapsed ? "hidden" : "space-y-3"}>
-                      {groupFields.map((field) => renderField(field))}
-                    </div>
-                  </section>
-                )
-              })}
+            {Object.entries(groupedFields).map(([groupName, groupFields]) => {
+              const isCollapsed = collapsedGroups.has(groupName)
+              return (
+                <section key={groupName} className="space-y-3">
+                  <button
+                    onClick={() => toggleGroup(groupName)}
+                    className="w-full flex items-center justify-between text-left py-2.5 px-3 -mx-3 rounded-md bg-gray-100 border border-gray-200 hover:bg-gray-200 hover:border-gray-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
+                    aria-expanded={!isCollapsed}
+                    aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${groupName} group`}
+                  >
+                    <span className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+                      {groupName}
+                    </span>
+                    <span className="text-gray-500">
+                      {isCollapsed ? (
+                        <ChevronRight className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      )}
+                    </span>
+                  </button>
+                  {/* Keep groups mounted but hide empty/collapsed ones via CSS to
+                      preserve a stable hook tree in children. */}
+                  <div
+                    className={
+                      isCollapsed || groupFields.length === 0
+                        ? "hidden"
+                        : "space-y-3"
+                    }
+                  >
+                    {groupFields.map((field) => renderField(field))}
+                  </div>
+                </section>
+              )
+            })}
           </SortableContext>
         )}
       </DndContext>
