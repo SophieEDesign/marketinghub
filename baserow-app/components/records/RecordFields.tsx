@@ -658,14 +658,17 @@ export default function RecordFields({
   const showModalColumns = modalColumns.length > 0
 
   // Stable canonical field list: same set/order every time so SortableFieldItem count never changes.
-  // Prevents React #185 when layout loads and modalColumns switches from empty to populated.
-  const canonicalFieldList = useMemo(
-    () => Object.values(groupedFields).flat(),
+  // We also keep groupName here so group headers are purely cosmetic and do NOT affect hook call order.
+  const canonicalFieldItems = useMemo(
+    () =>
+      Object.entries(groupedFields).flatMap(([groupName, groupFields]) =>
+        groupFields.map((field) => ({ field, groupName }))
+      ),
     [groupedFields]
   )
   const canonicalFieldIds = useMemo(
-    () => canonicalFieldList.map((f) => f.id),
-    [canonicalFieldList]
+    () => canonicalFieldItems.map((item) => item.field.id),
+    [canonicalFieldItems]
   )
 
   // For modal column layout: which grid column (1-based) each field belongs to.
@@ -754,7 +757,7 @@ export default function RecordFields({
 
       {/* CRITICAL: Single stable tree to prevent React #185. Do not mount DndContext with 0
           fields so hook count never changes from 0 to N. */}
-      {canonicalFieldList.length === 0 ? (
+      {canonicalFieldItems.length === 0 ? (
         <div className="space-y-3" />
       ) : (
         <DndContext
@@ -762,50 +765,51 @@ export default function RecordFields({
           collisionDetection={closestCenter}
           onDragEnd={showModalColumns && layoutMode ? handleDragEnd : undefined}
         >
-          {/* Single SortableContext + exactly N SortableFieldItems. Same N in both branches. */}
+          {/* Single SortableContext + exactly N SortableFieldItems. Layout (grid vs grouped) is cosmetic only. */}
           <SortableContext
             items={canonicalFieldIds}
             strategy={verticalListSortingStrategy}
           >
-            {showModalColumns ? (
-              <div
-                ref={columnsContainerRef}
-                className="grid gap-6"
-                style={
-                  gridTemplateColumns
-                    ? { gridTemplateColumns }
-                    : undefined
-                }
-              >
-                {canonicalFieldList.map((field) => (
+            <div
+              ref={columnsContainerRef}
+              className={showModalColumns ? "grid gap-6" : "space-y-3"}
+              style={
+                showModalColumns && gridTemplateColumns
+                  ? { gridTemplateColumns }
+                  : undefined
+              }
+            >
+              {canonicalFieldItems.map((item, index) => {
+                const prevGroupName =
+                  index > 0 ? canonicalFieldItems[index - 1].groupName : null
+                const isFirstInGroup = item.groupName !== prevGroupName
+                const isCollapsed = collapsedGroups.has(item.groupName)
+
+                return (
                   <div
-                    key={field.id}
-                    className="min-w-0 border-l border-gray-200 first:border-l-0 pl-4"
+                    key={item.field.id}
+                    className={cn(
+                      showModalColumns &&
+                        "min-w-0 border-l border-gray-200 first:border-l-0 pl-4"
+                    )}
                     style={
-                      fieldToColumnIndex[field.id]
-                        ? { gridColumn: fieldToColumnIndex[field.id] }
+                      showModalColumns && fieldToColumnIndex[item.field.id]
+                        ? { gridColumn: fieldToColumnIndex[item.field.id] }
                         : undefined
                     }
                   >
-                    {renderField(field)}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              /* Grouped fallback: same N fields, grouped into sections (no extra hooks). */
-              <>
-                {Object.entries(groupedFields).map(([groupName, groupFields]) => {
-                  const isCollapsed = collapsedGroups.has(groupName)
-                  return (
-                    <section key={groupName} className="space-y-3">
+                    {/* Group header is cosmetic; no hooks, and only shown in grouped mode. */}
+                    {!showModalColumns && isFirstInGroup && (
                       <button
-                        onClick={() => toggleGroup(groupName)}
-                        className="w-full flex items-center justify-between text-left py-2.5 px-3 -mx-3 rounded-md bg-gray-100 border border-gray-200 hover:bg-gray-200 hover:border-gray-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
+                        onClick={() => toggleGroup(item.groupName)}
+                        className="w-full flex items-center justify-between text-left py-2.5 px-3 -mx-3 mb-2 rounded-md bg-gray-100 border border-gray-200 hover:bg-gray-200 hover:border-gray-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
                         aria-expanded={!isCollapsed}
-                        aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${groupName} group`}
+                        aria-label={`${
+                          isCollapsed ? "Expand" : "Collapse"
+                        } ${item.groupName} group`}
                       >
                         <span className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                          {groupName}
+                          {item.groupName}
                         </span>
                         <span className="text-gray-500">
                           {isCollapsed ? (
@@ -815,20 +819,22 @@ export default function RecordFields({
                           )}
                         </span>
                       </button>
-                      <div
-                        className={
-                          isCollapsed || groupFields.length === 0
-                            ? "hidden"
-                            : "space-y-3"
-                        }
-                      >
-                        {groupFields.map((field) => renderField(field))}
-                      </div>
-                    </section>
-                  )
-                })}
-              </>
-            )}
+                    )}
+
+                    {/* Field content: always rendered; visibility controlled via CSS only. */}
+                    <div
+                      className={
+                        !showModalColumns && isCollapsed
+                          ? "hidden"
+                          : "space-y-3"
+                      }
+                    >
+                      {renderField(item.field)}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
 
             {/* Layout-mode-only UI: Add field + column resize (no hooks, safe to vary). */}
             {layoutMode && showModalColumns && availableFields.length > 0 && (
