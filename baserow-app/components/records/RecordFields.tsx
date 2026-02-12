@@ -79,29 +79,6 @@ export default function RecordFields({
   const supabase = createClient()
   const columnsContainerRef = useRef<HTMLDivElement | null>(null)
 
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      id: `log_${Date.now()}_recordfields_render_start`,
-      timestamp: Date.now(),
-      runId: 'rf-pre-fix',
-      hypothesisId: 'RF1',
-      location: 'RecordFields.tsx:render START',
-      message: 'RecordFields render START',
-      data: {
-        tableId,
-        recordId,
-        layoutMode,
-        fieldsCount: fields.length,
-        fieldLayoutCount: fieldLayout.length,
-        allFieldsCount: allFields.length,
-      },
-    }),
-  }).catch(() => {})
-  // #endregion
-
   // Load collapsed groups state from localStorage
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set()
@@ -757,19 +734,21 @@ export default function RecordFields({
 
       {/* CRITICAL: Single stable tree to prevent React #185. Do not mount DndContext with 0
           fields so hook count never changes from 0 to N. */}
-      {canonicalFieldItems.length === 0 ? (
-        <div className="space-y-3" />
-      ) : (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={showModalColumns && layoutMode ? handleDragEnd : undefined}
+      {/* CRITICAL: Always render DndContext structure to maintain stable hook order.
+          When canonicalFieldItems.length === 0, render empty state inside DndContext. */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={showModalColumns && layoutMode ? handleDragEnd : undefined}
+      >
+        {/* Single SortableContext + exactly N SortableFieldItems. Layout (grid vs grouped) is cosmetic only. */}
+        <SortableContext
+          items={canonicalFieldIds}
+          strategy={verticalListSortingStrategy}
         >
-          {/* Single SortableContext + exactly N SortableFieldItems. Layout (grid vs grouped) is cosmetic only. */}
-          <SortableContext
-            items={canonicalFieldIds}
-            strategy={verticalListSortingStrategy}
-          >
+          {canonicalFieldItems.length === 0 ? (
+            <div className="space-y-3" />
+          ) : (
             <div
               ref={columnsContainerRef}
               className={showModalColumns ? "grid gap-6" : "space-y-3"}
@@ -865,9 +844,10 @@ export default function RecordFields({
                 )}
               </div>
             )}
-          </SortableContext>
-        </DndContext>
-      )}
+            </div>
+          )}
+        </SortableContext>
+      </DndContext>
 
       {/* Empty State */}
       {fields.length === 0 && (

@@ -478,9 +478,11 @@ export default function RecordModal({
         <div className={isEditingLayout ? "flex-1 flex overflow-hidden" : "mt-4"}>
           {loading ? (
             <div className="text-center py-8 text-gray-500">Loading...</div>
-          ) : record && Object.keys(record).length > 0 && visibleFields.length === 0 ? (
+          ) : !record || Object.keys(record).length === 0 ? (
+            <div className="text-center py-8 text-gray-500">Record not found</div>
+          ) : fields.length === 0 || visibleFields.length === 0 ? (
             <div className="text-center py-8 text-gray-500">Preparing fields…</div>
-          ) : record && Object.keys(record).length > 0 ? (
+          ) : (
             <>
               {isEditingLayout ? (
                 // Layout mode: record itself is the canvas with drag handles
@@ -538,8 +540,6 @@ export default function RecordModal({
                 </>
               )}
             </>
-          ) : (
-            <div className="text-center py-8 text-gray-500">Record not found</div>
           )}
         </div>
       </DialogContent>

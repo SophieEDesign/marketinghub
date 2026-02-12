@@ -120,16 +120,16 @@ export default function RecordPanel() {
     )
   }, [active, cascadeContext, state.tableId, state.recordId])
 
+  // CRITICAL: Use stable modalFieldsKey to prevent effect churn.
+  // Do NOT clear fields on close - keeps RecordFields subtree stable between quick opens.
   useEffect(() => {
     if (state.isOpen && state.tableId && state.recordId) {
       setFieldsLoaded(false)
       loadFields()
       loadFieldGroups()
     } else {
-      // IMPORTANT: Do not clear fields here; bouncing fields to []
-      // between opens can change RecordFields' canonical field tree size
-      // mid-lifecycle and contribute to hook-order mismatches.
       setFieldsLoaded(false)
+      // Do NOT clear fields - preserves hook-using subtree stability (React #185)
     }
   }, [state.isOpen, state.tableId, state.recordId, modalFieldsKey])
 
@@ -376,8 +376,13 @@ export default function RecordPanel() {
   const useOverlayLayout = isMobile || state.isFullscreen
 
   const headerLoading = recordLoading || !fieldsLoaded || fieldsLoading
-  // A record is considered present when formData has at least one own key.
-  const hasRecord = !!formData && Object.keys(formData).length > 0
+  // Safe hasRecord: only true when load completed with data. Avoids transient formData emptiness
+  // causing hook-using subtrees (RecordFields) to mount/unmount (React #185).
+  const hasRecord =
+    !recordLoading &&
+    hasAttemptedLoadRef.current &&
+    !!formData &&
+    Object.keys(formData).length > 0
 
   const panelWidth = state.isFullscreen ? "100%" : `${state.width}px`
   // Show back button if in fullscreen (to go to core data) or if there's history

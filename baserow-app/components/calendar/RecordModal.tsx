@@ -497,6 +497,14 @@ export default function RecordModal({
             <div className="flex items-center justify-center py-8">
               <div className="text-gray-500">Loading...</div>
             </div>
+          ) : recordId && (!formData || Object.keys(formData).length === 0) ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-gray-500">Record not found</div>
+            </div>
+          ) : filteredFields.length === 0 ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-gray-500">Preparing fields…</div>
+            </div>
           ) : (
             <>
               {isEditingLayout && recordId ? (

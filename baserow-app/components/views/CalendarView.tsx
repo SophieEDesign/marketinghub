@@ -24,6 +24,7 @@ import type { TableRow } from "@/types/database"
 import type { LinkedField, TableField } from "@/types/fields"
 import RecordModal from "@/components/calendar/RecordModal"
 import { isDebugEnabled, debugLog, debugWarn, debugError } from '@/lib/interface/debug-flags'
+import { resolveCalendarDateFieldNames as resolveDateFields } from '@/lib/interface/calendar-date-fields'
 import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
 import CalendarDateRangeControls from "@/components/views/calendar/CalendarDateRangeControls"
 import TimelineFieldValue, { type FieldValue } from "@/components/views/TimelineFieldValue"
@@ -105,22 +106,6 @@ export default function CalendarView({
   interfaceMode = 'view',
   blockId = null,
 }: CalendarViewProps) {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      id: `log_${Date.now()}_baserow_calendar_render_start`,
-      timestamp: Date.now(),
-      runId: 'post-fix',
-      hypothesisId: 'CAL1',
-      location: 'baserow CalendarView.tsx:render START',
-      message: 'Bas erow CalendarView render START',
-      data: { tableId, viewId },
-    }),
-  }).catch(() => {})
-  // #endregion
-
   const viewUuid = useMemo(() => normalizeUuid(viewId), [viewId])
   // Ensure fieldIds is always an array (defensive check for any edge cases)
   const fieldIds = useMemo(() => {
@@ -879,64 +864,19 @@ export default function CalendarView({
     )
   }, [viewConfig, loadedTableFields])
 
-  function resolveCalendarDateFieldNames(): { fromFieldName: string; toFieldName: string | null } {
-    // Primary ("from") field resolution: block config > view config (start) > resolvedDateFieldId
-    const blockFromField =
-      blockConfig?.date_from ||
-      blockConfig?.from_date_field ||
-      blockConfig?.start_date_field ||
-      blockConfig?.calendar_start_field
-
-    const resolvedFromField = blockFromField
-      ? loadedTableFields.find(
-          (f: TableField) => (f.name === blockFromField || f.id === blockFromField) && f.type === "date"
-        )
-      : null
-
-    const viewStartField = viewConfig?.calendar_start_field
-    const resolvedViewStartField = viewStartField
-      ? loadedTableFields.find(
-          (f: TableField) => (f.name === viewStartField || f.id === viewStartField) && f.type === "date"
-        )
-      : null
-
-    const fromFieldName =
-      resolvedFromField?.name ||
-      startField?.name ||
-      resolvedViewStartField?.name ||
-      (typeof viewStartField === "string" ? viewStartField : "") ||
-      resolvedDateFieldId ||
-      ""
-
-    // Secondary ("to") field resolution: block config > view config (end) > null
-    const blockToField =
-      blockConfig?.date_to ||
-      blockConfig?.to_date_field ||
-      blockConfig?.end_date_field ||
-      blockConfig?.calendar_end_field
-
-    const resolvedToField = blockToField
-      ? loadedTableFields.find(
-          (f: TableField) => (f.name === blockToField || f.id === blockToField) && f.type === "date"
-        )
-      : null
-
-    const viewEndField = viewConfig?.calendar_end_field
-    const resolvedViewEndField = viewEndField
-      ? loadedTableFields.find(
-          (f: TableField) => (f.name === viewEndField || f.id === viewEndField) && f.type === "date"
-        )
-      : null
-
-    const toFieldName =
-      resolvedToField?.name ||
-      endField?.name ||
-      resolvedViewEndField?.name ||
-      (typeof viewEndField === "string" ? viewEndField : "") ||
-      null
-
-    return { fromFieldName, toFieldName }
-  }
+  // Memoize resolved date field names for event computation and event drop
+  const resolvedDateFieldNames = useMemo(
+    () =>
+      resolveDateFields({
+        blockConfig,
+        viewConfig,
+        loadedTableFields,
+        resolvedDateFieldId,
+        fallbackFromField: startField?.name ?? null,
+        fallbackToField: endField?.name ?? null,
+      }),
+    [blockConfig, viewConfig, loadedTableFields, resolvedDateFieldId, startField?.name, endField?.name]
+  )
 
   // CRITICAL: Memoize handleEventDrop to prevent FullCalendar infinite update loops
   // This callback must be stable across renders to prevent React error #185
@@ -958,7 +898,7 @@ export default function CalendarView({
       return
     }
 
-    const { fromFieldName, toFieldName } = resolveCalendarDateFieldNames()
+    const { fromFieldName, toFieldName } = resolvedDateFieldNames
     if (!fromFieldName) {
       debugWarn('CALENDAR', "Calendar: Cannot persist drop - missing fromFieldName", {
         rowId,
@@ -1035,305 +975,68 @@ export default function CalendarView({
         await loadRowsRef.current()
       }
     }
-  }, [supabaseTableName, resolvedDateFieldId, blockConfig, viewConfig, loadedTableFields, startField, endField])
+  }, [supabaseTableName, resolvedDateFieldNames])
 
   function getEvents(): EventInput[] {
-    // Use resolved date field from config or fallback
-    const effectiveDateField = dateField
-    const effectiveDateFieldId = resolvedDateFieldId
-    
-    // Defensive check: ensure we have a valid date field
-    if (!effectiveDateFieldId || !isValidDateField) {
+    try {
+    if (!resolvedDateFieldId || !isValidDateField) {
       debugWarn('CALENDAR', 'Calendar: Cannot generate events - missing or invalid date field', {
         resolvedDateFieldId,
         isValidDateField,
-        dateField,
-        blockConfig,
-        viewConfig
       })
       return []
     }
-    
-    // Defensive check: ensure we have rows
-    if (!filteredRows || filteredRows.length === 0) {
-      debugLog('CALENDAR', 'Calendar: No rows to generate events from', {
-        totalRows: rows.length,
-        filteredRows: filteredRows?.length || 0,
-        searchQuery,
-        filtersCount: filters.length
-      })
+    if (!filteredRows?.length) return []
+
+    const { fromFieldName: actualFromFieldName, toFieldName: actualToFieldName } = resolvedDateFieldNames
+    const actualFieldName = dateField?.name || resolvedDateFieldId
+
+    // Both configured but invalid - return empty to prevent loop
+    const blockFrom = blockConfig?.date_from || blockConfig?.from_date_field || blockConfig?.start_date_field || blockConfig?.calendar_start_field
+    const blockTo = blockConfig?.date_to || blockConfig?.to_date_field || blockConfig?.end_date_field || blockConfig?.calendar_end_field
+    if (blockFrom && !actualFromFieldName && blockTo && !actualToFieldName) {
       return []
     }
-    
-    // Defensive check: log if rows exist but events will be empty
-    debugLog('CALENDAR', 'Calendar: Processing events', {
-      enabled: filteredRows.length > 0,
-      rowCount: filteredRows.length,
-      dateField: effectiveDateFieldId,
-      sampleRowKeys: filteredRows[0]?.data ? Object.keys(filteredRows[0].data).slice(0, 10) : []
-    })
-    
-    try {
-      // CRITICAL: Use field NAME (not ID) when reading row data
-      // Supabase row keys are field names, not IDs
-      // Priority: block config > view config > resolved field
-      const actualFieldName = effectiveDateField?.name || effectiveDateFieldId
-      
-      // DEBUG_CALENDAR: Log date field resolution
-      debugLog('CALENDAR', 'Date field resolution for events', {
-        effectiveDateFieldId,
-        effectiveDateFieldName: effectiveDateField?.name,
-        actualFieldName,
-        sampleRowKeys: filteredRows[0]?.data ? Object.keys(filteredRows[0].data).slice(0, 10) : []
-      })
-      
-      // Resolve date_from field (default/primary): block config > view config > auto-detect > null
-      // Check for date_from, from_date_field, start_date_field, calendar_start_field
-      const blockFromField = blockConfig?.date_from || blockConfig?.from_date_field || blockConfig?.start_date_field || blockConfig?.calendar_start_field
-      const resolvedFromField = blockFromField 
-        ? loadedTableFields.find((f: TableField) => (f.name === blockFromField || f.id === blockFromField) && f.type === 'date')
-        : null
-      
-      // #region agent log
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[CalendarView] Date field resolution - FROM: blockFromField=${blockFromField}, resolvedFromField=${resolvedFromField?.name || 'null'}, startField=${startField?.name || 'null'}`)
+
+    const getRowDateValue = (row: TableRow, fieldName: string | null): unknown => {
+      if (!fieldName || !row?.data) return null
+      let v = row.data[fieldName]
+      if (v != null) return v
+      const lower = fieldName.toLowerCase()
+      for (const key of Object.keys(row.data)) {
+        if (key.toLowerCase() === lower) return row.data[key]
       }
-      // #endregion
-      
-      // Auto-detect date_from field if not configured (look for fields named "date_from", "from_date", "start_date", etc.)
-      let autoDetectedFromField: TableField | null = null
-      if (!resolvedFromField && !startField && !viewConfig?.calendar_start_field) {
-        autoDetectedFromField = loadedTableFields.find((f: TableField) => 
-          f.type === 'date' && (
-            f.name.toLowerCase() === 'date_from' || 
-            f.name.toLowerCase() === 'from_date' ||
-            f.name.toLowerCase() === 'start_date' ||
-            f.name.toLowerCase().includes('date_from') ||
-            f.name.toLowerCase().includes('from_date')
-          )
-        ) ?? null
-      }
-      
-      const actualFromFieldName =
-        resolvedFromField?.name ||
-        startField?.name ||
-        autoDetectedFromField?.name ||
-        actualFieldName ||
-        null
-      
-      // Resolve date_to field (secondary/range): block config > view config > auto-detect > null
-      // Check for date_to, to_date_field, end_date_field, calendar_end_field
-      const blockToField = blockConfig?.date_to || blockConfig?.to_date_field || blockConfig?.end_date_field || blockConfig?.calendar_end_field
-      const resolvedToField = blockToField
-        ? loadedTableFields.find((f: TableField) => (f.name === blockToField || f.id === blockToField) && f.type === 'date')
-        : null
-      
-      // #region agent log
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[CalendarView] Date field resolution - TO: blockToField=${blockToField}, resolvedToField=${resolvedToField?.name || 'null'}, endField=${endField?.name || 'null'}`)
-      }
-      // #endregion
-      
-      // Auto-detect date_to field if not configured (look for fields named "date_to", "to_date", "end_date", etc.)
-      let autoDetectedToField: TableField | null = null
-      if (!resolvedToField && !endField && !viewConfig?.calendar_end_field) {
-        autoDetectedToField = loadedTableFields.find((f: TableField) => 
-          f.type === 'date' && (
-            f.name.toLowerCase() === 'date_to' || 
-            f.name.toLowerCase() === 'to_date' ||
-            f.name.toLowerCase() === 'end_date' ||
-            f.name.toLowerCase().includes('date_to') ||
-            f.name.toLowerCase().includes('to_date')
-          )
-        ) ?? null
-      }
-      
-      const actualToFieldName =
-        resolvedToField?.name ||
-        endField?.name ||
-        autoDetectedToField?.name ||
-        null
-      
-      // #region agent log
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[CalendarView] Final date field names: actualFromFieldName=${actualFromFieldName}, actualToFieldName=${actualToFieldName}`)
-        // Warn if date fields are configured but invalid
-        if (blockFromField && !resolvedFromField && !startField && !viewConfig?.calendar_start_field && !autoDetectedFromField) {
-          console.warn(`[CalendarView] Configured FROM date field "${blockFromField}" not found in table fields`)
-        }
-        if (blockToField && !resolvedToField && !endField && !viewConfig?.calendar_end_field && !autoDetectedToField) {
-          console.warn(`[CalendarView] Configured TO date field "${blockToField}" not found in table fields`)
-        }
-      }
-      // #endregion
-      
-      // CRITICAL: If both date fields are configured but invalid, return empty events to prevent infinite loop
-      // This prevents React #185 when calendar tries to resolve invalid date fields repeatedly
-      if (blockFromField && !actualFromFieldName && blockToField && !actualToFieldName) {
-        if (process.env.NODE_ENV === 'development') {
-          console.warn(`[CalendarView] Both date fields are invalid - returning empty events to prevent loop`, {
-            blockFromField,
-            blockToField,
-            loadedTableFieldsCount: loadedTableFields.length
-          })
-        }
-        return []
-      }
-      
-      if (typeof process !== 'undefined' && process.env.NODE_ENV === 'development' && filteredRows.length > 0) {
-        debugLog('CALENDAR', 'Calendar: Date field resolution', {
-          actualFieldName,
-          actualFromFieldName,
-          actualToFieldName,
-          blockConfig: { date_from: blockConfig?.date_from, date_to: blockConfig?.date_to, start_date_field: blockConfig?.start_date_field, end_date_field: blockConfig?.end_date_field },
-          viewConfig: { calendar_start_field: viewConfig?.calendar_start_field, calendar_end_field: viewConfig?.calendar_end_field }
-        })
-      }
-      
-      // CRITICAL: Log sample row data to debug date field extraction
-      if (typeof process !== 'undefined' && process.env.NODE_ENV === 'development' && filteredRows.length > 0) {
-        const sampleRow = filteredRows[0]
-        debugLog('CALENDAR', 'Calendar: Sample row data for event mapping', {
-          rowId: sampleRow.id,
-          dateFromFieldName: actualFromFieldName,
-          dateToFieldName: actualToFieldName,
-          dateFromValue: sampleRow.data ? sampleRow.data[actualFromFieldName || ''] : 'no data',
-          dateToValue: sampleRow.data ? sampleRow.data[actualToFieldName || ''] : 'no data',
-          allDataKeys: sampleRow.data ? Object.keys(sampleRow.data) : [],
-          rowDataSample: sampleRow.data ? Object.fromEntries(
-            Object.entries(sampleRow.data).slice(0, 5)
-          ) : null
-        })
-      }
-      
-      const events = filteredRows
+      return null
+    }
+
+    const events = filteredRows
         .filter((row: TableRow) => {
-          if (!row || !row.data) {
-            debugWarn('CALENDAR', 'Calendar: Row missing or has no data', { rowId: row?.id })
-            return false
-          }
-          
-          // Check for date values - prefer date_from (default), fallback to date_to if only that exists
-          let fromDateValue: unknown = null
-          let toDateValue: unknown = null
-          
-          // Try to get date_from value
-          if (actualFromFieldName) {
-            fromDateValue = row.data[actualFromFieldName]
-            // Also try common variations (case-insensitive, with/without underscores)
-            if (!fromDateValue) {
-              const lowerFieldName = actualFromFieldName.toLowerCase()
-              for (const key of Object.keys(row.data)) {
-                if (key.toLowerCase() === lowerFieldName) {
-                  fromDateValue = row.data[key]
-                  break
-                }
-              }
-            }
-          }
-          
-          // Try to get date_to value
-          if (actualToFieldName) {
-            toDateValue = row.data[actualToFieldName]
-            // Also try common variations (case-insensitive, with/without underscores)
-            if (!toDateValue) {
-              const lowerFieldName = actualToFieldName.toLowerCase()
-              for (const key of Object.keys(row.data)) {
-                if (key.toLowerCase() === lowerFieldName) {
-                  toDateValue = row.data[key]
-                  break
-                }
-              }
-            }
-          }
-          
-          // Use date_from as default, fallback to date_to if date_from is not available
-          const dateValue = fromDateValue || toDateValue
-          
-          // Skip if no date value at all
-          if (!dateValue || dateValue === null || dateValue === undefined || dateValue === '') {
-            debugLog('CALENDAR', 'Calendar: Row filtered out - no date value', {
-              enabled: filteredRows.length <= 5,
-              rowId: row.id,
-              dateFromField: actualFromFieldName,
-              dateToField: actualToFieldName,
-              availableKeys: Object.keys(row.data)
-            })
-            return false
-          }
-          
-          // Try to parse the date value
-          try {
-            const parsedDate = dateValue instanceof Date ? dateValue : new Date(String(dateValue))
-            // Check if date is valid
-            const isValid = !isNaN(parsedDate.getTime())
-            if (!isValid) {
-              debugWarn('CALENDAR', 'Calendar: Row filtered out - invalid date', {
-                rowId: row.id,
-                dateValue,
-                parsedDate
-              })
-            }
-            return isValid
-          } catch (error) {
-            debugWarn('CALENDAR', 'Calendar: Row filtered out - date parse error', {
-              rowId: row.id,
-              dateValue,
-              error
-            })
-            return false
-          }
+          if (!row?.data) return false
+          const fromVal = getRowDateValue(row, actualFromFieldName || null)
+          const toVal = getRowDateValue(row, actualToFieldName || null)
+          const dateValue = fromVal ?? toVal ?? null
+          if (dateValue == null || dateValue === '') return false
+          const parsed = parseDateValueToLocalDate(dateValue)
+          return parsed != null && !isNaN(parsed.getTime())
         })
         // Ensure we have an array before mapping
-        .filter((row: TableRow): row is TableRow => row !== null && row !== undefined)
+        .filter((row: TableRow): row is TableRow => row != null)
         .map((row: TableRow) => {
-          // Get date values - use date_from (default) and date_to (if available for range)
-          let fromDateValue: unknown = null
-          let toDateValue: unknown = null
-          
-          // Try to get date_from value
-          if (actualFromFieldName) {
-            fromDateValue = row.data[actualFromFieldName]
-            // Also try common variations (case-insensitive, with/without underscores)
-            if (!fromDateValue) {
-              const lowerFieldName = actualFromFieldName.toLowerCase()
-              for (const key of Object.keys(row.data)) {
-                if (key.toLowerCase() === lowerFieldName) {
-                  fromDateValue = row.data[key]
-                  break
-                }
-              }
-            }
-          }
-          
-          // Try to get date_to value
-          if (actualToFieldName) {
-            toDateValue = row.data[actualToFieldName]
-            // Also try common variations (case-insensitive, with/without underscores)
-            if (!toDateValue) {
-              const lowerFieldName = actualToFieldName.toLowerCase()
-              for (const key of Object.keys(row.data)) {
-                if (key.toLowerCase() === lowerFieldName) {
-                  toDateValue = row.data[key]
-                  break
-                }
-              }
-            }
-          }
-          
-          // Parse date values
-          // Use date_from as default start date, fallback to date_to if date_from is not available.
-          // IMPORTANT: FullCalendar treats `end` as EXCLUSIVE for all-day events.
-          // Our `date_to` is stored as an inclusive end date, so we must add +1 day.
-          const parsedStart = parseDateValueToLocalDate(fromDateValue || toDateValue) || new Date()
+          const fromVal = getRowDateValue(row, actualFromFieldName || null)
+          const toVal = getRowDateValue(row, actualToFieldName || null)
+          const startVal = fromVal ?? toVal
+          const parsedStart = parseDateValueToLocalDate(startVal)
+          if (!parsedStart || isNaN(parsedStart.getTime())) return null
           const parsedStartDay = startOfDay(parsedStart)
 
           let parsedEndExclusive: Date | undefined = undefined
-          if (toDateValue) {
-            const parsedEnd = parseDateValueToLocalDate(toDateValue) || parsedStartDay
-            const parsedEndDay = startOfDay(parsedEnd)
-            const inclusiveEndDay = parsedEndDay < parsedStartDay ? parsedStartDay : parsedEndDay
-            parsedEndExclusive = addDays(inclusiveEndDay, 1)
+          if (toVal != null && toVal !== '') {
+            const parsedEnd = parseDateValueToLocalDate(toVal)
+            if (parsedEnd && !isNaN(parsedEnd.getTime())) {
+              const parsedEndDay = startOfDay(parsedEnd)
+              const inclusiveEnd = parsedEndDay < parsedStartDay ? parsedStartDay : parsedEndDay
+              parsedEndExclusive = addDays(inclusiveEnd, 1)
+            }
           }
           
           // Use visible fields (fieldIds) to determine title - prefer first text field
@@ -1347,7 +1050,7 @@ export default function CalendarView({
                 field.name !== actualFieldName && 
                 field.name !== actualFromFieldName &&
                 field.name !== actualToFieldName &&
-                field.id !== effectiveDateFieldId
+                field.id !== resolvedDateFieldId
             })
           
           // Find primary field (name field) or first text field for title
@@ -1457,12 +1160,6 @@ export default function CalendarView({
             return luminance > 0.5 ? '#000000' : '#ffffff'
           })() : undefined)
 
-          // #region agent log
-          if (process.env.NODE_ENV === 'development') {
-            console.log('[CalendarView] Event construction', { rowId: row.id, hasStart: !!parsedStartDay, hasEnd: !!parsedEndExclusive, isMultiDay: parsedEndExclusive && parsedEndExclusive.getTime() > parsedStartDay.getTime() + 86400000 })
-          }
-          // #endregion
-          
           return {
             id: row.id,
             title: title || "Untitled",
@@ -1535,33 +1232,16 @@ export default function CalendarView({
             },
           }
         })
-      
-      // DEBUG_CALENDAR: Log event generation
+        .filter((e): e is EventInput => e != null)
+
       if (events.length === 0 && filteredRows.length > 0) {
         debugWarn('CALENDAR', `No events generated from ${filteredRows.length} rows`, {
-          dateField: effectiveDateFieldId,
-          resolvedDateFieldId,
-          sampleRowData: filteredRows[0]?.data ? {
-            id: filteredRows[0].id,
-            dateFieldValue: filteredRows[0].data[effectiveDateFieldId],
-            allKeys: Object.keys(filteredRows[0].data)
-          } : null,
+          dateField: resolvedDateFieldId,
           check: 'Ensure date field is correctly configured and rows have valid date values'
-        })
-      } else if (events.length > 0) {
-        debugLog('CALENDAR', `Generated ${events.length} events successfully`, {
-          eventCount: events.length,
-          rowCount: filteredRows.length,
-          dateField: effectiveDateFieldId,
-          sampleEvent: events[0] ? {
-            id: events[0].id,
-            title: events[0].title,
-            start: events[0].start
-          } : null
         })
       }
       return events
-    } catch (error) {
+    } catch (error: unknown) {
       debugError('CALENDAR', 'Calendar: Error generating events:', error)
       return []
     }
@@ -1934,22 +1614,10 @@ export default function CalendarView({
 
   const onCalendarEventClick = useCallback(
     (info: EventClickArg) => {
-      // #region agent log
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[CalendarView] Event click handler entry', { eventId: info.event.id, hasExtendedProps: !!info.event.extendedProps, extendedPropsRecordId: info.event.extendedProps?.recordId, extendedPropsRowId: info.event.extendedProps?.rowId, hasStart: !!info.event.start, hasEnd: !!info.event.end, isMultiDay: info.event.end && info.event.start && new Date(info.event.end).getTime() > new Date(info.event.start).getTime() + 86400000 })
-      }
-      // #endregion
-      
       // CRITICAL: Calendar events ≠ records. Always read recordId from extendedProps.
       // event.id may be modified by FullCalendar for multi-day events or slicing.
       // Priority: extendedProps.recordId > extendedProps.rowId > event.id (fallback)
       const recordId = info.event.extendedProps?.recordId || info.event.extendedProps?.rowId || info.event.id
-      
-      // #region agent log
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[CalendarView] RecordId resolved', { recordId, source: info.event.extendedProps?.recordId ? 'extendedProps.recordId' : info.event.extendedProps?.rowId ? 'extendedProps.rowId' : 'event.id', eventId: info.event.id })
-      }
-      // #endregion
       
       // CRITICAL: Guard against missing recordId to prevent crashes
       if (!recordId) {
@@ -1961,11 +1629,6 @@ export default function CalendarView({
           event: info.event
         })
         debugWarn('CALENDAR', "[Calendar] Event clicked but no recordId found", { event: info.event })
-        // #region agent log
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[CalendarView] Missing recordId guard triggered', { eventId: info.event.id, eventTitle: info.event.title })
-        }
-        // #endregion
         return // Do not attempt to open record modal
       }
       
