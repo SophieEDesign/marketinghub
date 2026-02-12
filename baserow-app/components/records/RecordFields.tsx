@@ -732,29 +732,6 @@ export default function RecordFields({
 
       {/* CRITICAL FIX: Always wrap in DndContext to provide context for useSortable hooks
           This ensures SortableFieldItem can always call useSortable, preventing React #185 */}
-      {/* #region agent log */}
-      {fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: `log_${Date.now()}_recordfields_layout_branch`,
-          timestamp: Date.now(),
-          runId: 'rf-pre-fix',
-          hypothesisId: 'RF2',
-          location: 'RecordFields.tsx:before DndContext',
-          message: 'RecordFields layout branch info',
-          data: {
-            tableId,
-            recordId,
-            layoutMode,
-            showModalColumns,
-            modalColumnsCount: modalColumns.length,
-            modalColumnsFieldCounts: modalColumns.map((c) => c.fields.length),
-            groupedFieldsGroupCount: Object.keys(groupedFields).length,
-          },
-        }),
-      }).catch(() => {})}
-      {/* #endregion */}
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
