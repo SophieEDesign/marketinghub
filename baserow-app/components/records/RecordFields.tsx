@@ -737,8 +737,8 @@ export default function RecordFields({
         collisionDetection={closestCenter}
         onDragEnd={showModalColumns && layoutMode ? handleDragEnd : undefined}
       >
-        {showModalColumns ? (
-          // Modal canvas: multi-column record layout
+        {/* Modal canvas: multi-column record layout (always mounted, toggled via CSS) */}
+        <div className={showModalColumns ? "" : "hidden"}>
           <div
             ref={columnsContainerRef}
             className="grid gap-6"
@@ -797,10 +797,12 @@ export default function RecordFields({
               </div>
             ))}
           </div>
-        ) : (
-          // Fallback: grouped single-column layout (used by non-modal contexts)
-          // CRITICAL: Still wrapped in DndContext so useSortable hooks have context.
-          // Items list must match the rendered fields across all groups.
+        </div>
+
+        {/* Fallback: grouped single-column layout (always mounted, toggled via CSS)
+            Still wrapped in DndContext so useSortable hooks have context.
+            Items list must match the rendered fields across all groups. */}
+        <div className={showModalColumns ? "hidden" : ""}>
           <SortableContext
             items={Object.values(groupedFields)
               .flat()
@@ -843,7 +845,7 @@ export default function RecordFields({
               )
             })}
           </SortableContext>
-        )}
+        </div>
       </DndContext>
 
       {/* Empty State */}
