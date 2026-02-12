@@ -1254,6 +1254,7 @@ export default function CalendarView({
               })(),
             },
           }
+          return event
         })
     
     const events: EventInput[] = mappedEvents.filter((e: EventInput | null): e is EventInput => e != null)
