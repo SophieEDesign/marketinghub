@@ -1009,7 +1009,7 @@ export default function CalendarView({
       return null
     }
 
-    const events = filteredRows
+    const events: EventInput[] = filteredRows
         .filter((row: TableRow) => {
           if (!row?.data) return false
           const fromVal = getRowDateValue(row, actualFromFieldName || null)
