@@ -126,7 +126,9 @@ export default function RecordPanel() {
       loadFields()
       loadFieldGroups()
     } else {
-      setFields([])
+      // IMPORTANT: Do not clear fields here; bouncing fields to []
+      // between opens can change RecordFields' canonical field tree size
+      // mid-lifecycle and contribute to hook-order mismatches.
       setFieldsLoaded(false)
     }
   }, [state.isOpen, state.tableId, state.recordId, modalFieldsKey])
