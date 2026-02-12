@@ -30,6 +30,10 @@ export default function RecordPanel() {
   const [fieldsLoading, setFieldsLoading] = useState(false)
   const [fieldsLoaded, setFieldsLoaded] = useState(false)
   const [fieldGroups, setFieldGroups] = useState<Record<string, string[]>>({}) // fieldName -> groupName
+  const modalFieldsKey = useMemo(
+    () => (state.modalFields ?? []).join("|"),
+    [state.modalFields]
+  )
   
   // P1 FIX: interfaceMode === 'edit' is ABSOLUTE - no manual overrides allowed
   // When interfaceMode === 'edit', editing is forced (derived value, cannot be disabled)
@@ -125,7 +129,7 @@ export default function RecordPanel() {
       setFields([])
       setFieldsLoaded(false)
     }
-  }, [state.isOpen, state.tableId, state.recordId, state.modalFields])
+  }, [state.isOpen, state.tableId, state.recordId, modalFieldsKey])
 
   // Track whether we've seen the core attempt a load (loading=true). Only treat as "record not found"
   // when a load actually completed with empty data — not during initial render when loading starts false.
