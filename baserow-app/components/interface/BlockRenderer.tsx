@@ -134,26 +134,6 @@ export default function BlockRenderer({
 }: BlockRendererProps & {
   openRecordInEditModeForBlock?: { blockId: string; recordId: string; tableId: string } | null
 }) {
-  // #region agent log - BlockRenderer render start
-  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      id: `log_${Date.now()}_blockrenderer_start`,
-      timestamp: Date.now(),
-      runId: 'post-fix',
-      hypothesisId: 'H_block_list',
-      location: 'BlockRenderer.tsx:render START',
-      message: 'BlockRenderer render START',
-      data: {
-        blockId: block.id,
-        blockType: block.type,
-        isEditing,
-      },
-    }),
-  }).catch(() => {})
-  // #endregion
-  
   const diagnosticsEnabled = process.env.NODE_ENV === 'development'
   
   // #region HOOK CHECK - Before useEffect blockDriftChecks
@@ -277,26 +257,6 @@ export default function BlockRenderer({
       warnedBlocks.add(block.id)
     }
     
-    // #region agent log - BlockRenderer before switch
-    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: `log_${Date.now()}_blockrenderer_before_switch`,
-        timestamp: Date.now(),
-        runId: 'post-fix',
-        hypothesisId: 'H_block_list',
-        location: 'BlockRenderer.tsx:before switch(normalizedBlockType)',
-        message: 'BlockRenderer before switch on block type',
-        data: {
-          blockId: block.id,
-          blockType: block.type,
-          normalizedBlockType,
-        },
-      }),
-    }).catch(() => {})
-    // #endregion
-
     switch (normalizedBlockType) {
       case "grid":
         // CRITICAL: Pass pageTableId to GridBlock for table resolution fallback

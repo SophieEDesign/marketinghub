@@ -2586,50 +2586,11 @@ export default function Canvas({
           resizeHandles={['se', 'sw', 'ne', 'nw', 'e', 'w', 's', 'n']}
         >
           {blocks.map((block) => {
-            // #region agent log
-            blocksMapIterationRef.current += 1
-            fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                id: `log_${Date.now()}_canvas_blocks_map`,
-                timestamp: Date.now(),
-                runId: 'post-fix',
-                hypothesisId: 'H_block_list',
-                location: 'Canvas.tsx:blocks.map',
-                message: 'Canvas blocks.map iteration',
-                data: {
-                  pageId,
-                  blockId: block.id,
-                  blockType: block.type,
-                  iteration: blocksMapIterationRef.current,
-                  blocksLength: blocks.length,
-                },
-              }),
-            }).catch(() => {})
-            // #endregion
-
             // Log each block being rendered via BlockRenderer
             debugLog('LAYOUT', `[Canvas] Rendering block via BlockRenderer: pageId=${pageId}, blockId=${block.id}, type=${block.type}`, {
               block,
               layoutItem: layout.find(l => l.i === block.id),
             })
-
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                id: `log_${Date.now()}_canvas_before_blockrenderer`,
-                timestamp: Date.now(),
-                runId: 'post-fix',
-                hypothesisId: 'H_block_list',
-                location: 'Canvas.tsx:before BlockRenderer JSX',
-                message: 'Canvas about to render BlockRenderer for block',
-                data: { pageId, blockId: block.id, blockType: block.type },
-              }),
-            }).catch(() => {})
-            // #endregion
 
             return (
               <div
