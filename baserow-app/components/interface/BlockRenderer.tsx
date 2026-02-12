@@ -448,14 +448,24 @@ export default function BlockRenderer({
         return <ButtonBlock block={safeBlock} isEditing={canEdit} />
 
       case "calendar":
-        // TEMP: Debug guard to isolate React #185 source.
-        // Instead of rendering the real CalendarBlock, render a simple placeholder.
-        // If React #185 disappears with this in place, the root cause is inside CalendarBlock
-        // or its descendants (including the record modal / RecordFields path).
+        // Calendar block - wrapper around GridBlock with view_type='calendar'
         return (
-          <div className="flex h-full items-center justify-center rounded-md border border-dashed border-blue-300 bg-blue-50 text-xs text-blue-700">
-            Calendar block temporarily disabled for debugging
-          </div>
+          <LazyBlockWrapper enabled={!isEditing}>
+            <CalendarBlock
+              block={safeBlock}
+              isEditing={canEdit}
+              interfaceMode={interfaceMode}
+              pageTableId={pageTableId}
+              pageId={pageId}
+              filters={filters}
+              filterTree={filterTree}
+              onRecordClick={onRecordClick}
+              pageShowAddRecord={pageShowAddRecord}
+              onModalLayoutSave={onUpdate ? (fieldLayout) => onUpdate(block.id, { field_layout: fieldLayout }) : undefined}
+              canEditLayout={canEdit}
+              isFullPage={isFullPage}
+            />
+          </LazyBlockWrapper>
         )
       
       case "multi_calendar":
