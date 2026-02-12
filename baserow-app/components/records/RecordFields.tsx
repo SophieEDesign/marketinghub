@@ -798,9 +798,14 @@ export default function RecordFields({
                         : undefined
                     }
                   >
-                    {/* Group header is cosmetic; no hooks, and only shown in grouped mode. */}
-                    {!showModalColumns && isFirstInGroup && (
+                    {/* Group header slot: always present so hook tree is stable; visibility via CSS only. */}
+                    <div
+                      className={cn(
+                        showModalColumns || !isFirstInGroup ? "hidden" : ""
+                      )}
+                    >
                       <button
+                        type="button"
                         onClick={() => toggleGroup(item.groupName)}
                         className="w-full flex items-center justify-between text-left py-2.5 px-3 -mx-3 mb-2 rounded-md bg-gray-100 border border-gray-200 hover:bg-gray-200 hover:border-gray-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
                         aria-expanded={!isCollapsed}
@@ -819,7 +824,7 @@ export default function RecordFields({
                           )}
                         </span>
                       </button>
-                    )}
+                    </div>
 
                     {/* Field content: always rendered; visibility controlled via CSS only. */}
                     <div
