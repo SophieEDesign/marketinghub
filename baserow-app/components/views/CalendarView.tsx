@@ -1232,7 +1232,7 @@ export default function CalendarView({
             },
           }
         })
-        .filter((e): e is EventInput => e != null)
+        .filter((e: EventInput | null): e is EventInput => e != null)
 
       if (events.length === 0 && filteredRows.length > 0) {
         debugWarn('CALENDAR', `No events generated from ${filteredRows.length} rows`, {
