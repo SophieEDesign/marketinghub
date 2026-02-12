@@ -61,6 +61,22 @@ const DEFAULT_COLORS = [
 ]
 
 export default function CalendarView({ tableId, viewId, rows, visibleFields }: CalendarViewProps) {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: `log_${Date.now()}_marketing_calendar_render_start`,
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'MCAL1',
+      location: 'components/calendar/CalendarView.tsx:render START',
+      message: 'Marketing CalendarView render START',
+      data: { tableId, viewId, rowsCount: Array.isArray(rows) ? rows.length : 'unknown' },
+    }),
+  }).catch(() => {})
+  // #endregion
+
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [events, setEvents] = useState<CalendarEvent[]>([])

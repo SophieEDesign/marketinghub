@@ -66,6 +66,22 @@ export default function MonthGrid({
   tableFields,
   onCreateEvent,
 }: MonthGridProps) {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: `log_${Date.now()}_marketing_monthgrid_render_start`,
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'MCAL2',
+      location: 'components/calendar/MonthGrid.tsx:render START',
+      message: 'Marketing MonthGrid render START',
+      data: { daysCount: Array.isArray(days) ? days.length : 'unknown', eventsCount: Array.isArray(events) ? events.length : 'unknown' },
+    }),
+  }).catch(() => {})
+  // #endregion
+
   const [draggingEvent, setDraggingEvent] = useState<string | null>(null)
   const [resizingEvent, setResizingEvent] = useState<{ id: string; edge: 'start' | 'end' } | null>(null)
   const [dragStartPos, setDragStartPos] = useState<{ x: number; y: number } | null>(null)

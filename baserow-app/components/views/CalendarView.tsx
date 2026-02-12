@@ -105,6 +105,22 @@ export default function CalendarView({
   interfaceMode = 'view',
   blockId = null,
 }: CalendarViewProps) {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: `log_${Date.now()}_baserow_calendar_render_start`,
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'CAL1',
+      location: 'baserow CalendarView.tsx:render START',
+      message: 'Bas erow CalendarView render START',
+      data: { tableId, viewId },
+    }),
+  }).catch(() => {})
+  // #endregion
+
   const viewUuid = useMemo(() => normalizeUuid(viewId), [viewId])
   // Ensure fieldIds is always an array (defensive check for any edge cases)
   const fieldIds = useMemo(() => {
