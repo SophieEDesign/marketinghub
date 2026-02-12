@@ -376,9 +376,8 @@ export default function RecordPanel() {
   const useOverlayLayout = isMobile || state.isFullscreen
 
   const headerLoading = recordLoading || !fieldsLoaded || fieldsLoading
-  // TEMP DIAGNOSTIC: force hasRecord=true to keep content subtree shape stable across renders.
-  // This helps confirm whether branching on formData emptiness is contributing to React #185.
-  const hasRecord = true
+  // A record is considered present when formData has at least one own key.
+  const hasRecord = !!formData && Object.keys(formData).length > 0
 
   const panelWidth = state.isFullscreen ? "100%" : `${state.width}px`
   // Show back button if in fullscreen (to go to core data) or if there's history
