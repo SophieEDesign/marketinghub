@@ -23,11 +23,21 @@ import LinkPreviewBlock from "./blocks/LinkPreviewBlock"
 import FilterBlock from "./blocks/FilterBlock"
 import FieldBlock from "./blocks/FieldBlock"
 import FieldSectionBlock from "./blocks/FieldSectionBlock"
-import CalendarBlock from "./blocks/CalendarBlock"
 import KanbanBlock from "./blocks/KanbanBlock"
 
-// CRITICAL: MultiCalendarBlock uses FullCalendar which causes hydration mismatches
+// CRITICAL: Calendar-related blocks use FullCalendar which causes hydration mismatches
 // Disable SSR to prevent React error #185
+const CalendarBlock = dynamic(() => import("./blocks/CalendarBlock"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-full flex items-center justify-center">
+      <LoadingSpinner size="lg" text="Loading calendar..." />
+    </div>
+  ),
+})
+
+// Multi-calendar view (multiple sources)
+// Also uses FullCalendar; keep SSR disabled for the same reason as CalendarBlock.
 const MultiCalendarBlock = dynamic(() => import("./blocks/MultiCalendarBlock"), { 
   ssr: false,
   loading: () => (
