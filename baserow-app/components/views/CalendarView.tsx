@@ -1655,66 +1655,11 @@ export default function CalendarView({
     
     isCalculatingEventsRef.current = true
     try {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: `log_${Date.now()}_calendar_events_before_getEvents`,
-          timestamp: Date.now(),
-          runId: 'post-fix',
-          hypothesisId: 'CAL_EVENTS',
-          location: 'CalendarView.tsx:computedCalendarEvents:before_getEvents',
-          message: 'computedCalendarEvents about to call getEvents',
-          data: {
-            filteredRowsCount: filteredRows?.length || 0,
-            resolvedDateFieldId,
-          },
-        }),
-      }).catch(() => {})
-      // #endregion
-
-      let events = getEvents()
-
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: `log_${Date.now()}_calendar_events_after_getEvents`,
-          timestamp: Date.now(),
-          runId: 'post-fix',
-          hypothesisId: 'CAL_EVENTS',
-          location: 'CalendarView.tsx:computedCalendarEvents:after_getEvents',
-          message: 'computedCalendarEvents getEvents completed',
-          data: {
-            eventsCount: Array.isArray(events) ? events.length : -1,
-            isArray: Array.isArray(events),
-          },
-        }),
-      }).catch(() => {})
-      // #endregion
-
+      const events = getEvents()
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[CalendarView] computedCalendarEvents useMemo completed`, { eventsCount: events?.length || 0 })
+      }
       return events
-    } catch (error) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: `log_${Date.now()}_calendar_events_getEvents_error`,
-          timestamp: Date.now(),
-          runId: 'post-fix',
-          hypothesisId: 'CAL_EVENTS',
-          location: 'CalendarView.tsx:computedCalendarEvents:getEvents_error',
-          message: 'computedCalendarEvents getEvents threw error',
-          data: {
-            errorMessage: error instanceof Error ? error.message : String(error),
-          },
-        }),
-      }).catch(() => {})
-      // #endregion
-      throw error
     } finally {
       isCalculatingEventsRef.current = false
     }
