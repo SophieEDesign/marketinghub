@@ -134,10 +134,24 @@ export default function BlockRenderer({
 }: BlockRendererProps & {
   openRecordInEditModeForBlock?: { blockId: string; recordId: string; tableId: string } | null
 }) {
-  // #region HOOK CHECK - BlockRenderer render start
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[HOOK CHECK]', 'BlockRenderer render start', { blockId: block.id, blockType: block.type })
-  }
+  // #region agent log - BlockRenderer render start
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: `log_${Date.now()}_blockrenderer_start`,
+      timestamp: Date.now(),
+      runId: 'post-fix',
+      hypothesisId: 'H_block_list',
+      location: 'BlockRenderer.tsx:render START',
+      message: 'BlockRenderer render START',
+      data: {
+        blockId: block.id,
+        blockType: block.type,
+        isEditing,
+      },
+    }),
+  }).catch(() => {})
   // #endregion
   
   const diagnosticsEnabled = process.env.NODE_ENV === 'development'
@@ -263,6 +277,26 @@ export default function BlockRenderer({
       warnedBlocks.add(block.id)
     }
     
+    // #region agent log - BlockRenderer before switch
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: `log_${Date.now()}_blockrenderer_before_switch`,
+        timestamp: Date.now(),
+        runId: 'post-fix',
+        hypothesisId: 'H_block_list',
+        location: 'BlockRenderer.tsx:before switch(normalizedBlockType)',
+        message: 'BlockRenderer before switch on block type',
+        data: {
+          blockId: block.id,
+          blockType: block.type,
+          normalizedBlockType,
+        },
+      }),
+    }).catch(() => {})
+    // #endregion
+
     switch (normalizedBlockType) {
       case "grid":
         // CRITICAL: Pass pageTableId to GridBlock for table resolution fallback
@@ -414,24 +448,14 @@ export default function BlockRenderer({
         return <ButtonBlock block={safeBlock} isEditing={canEdit} />
 
       case "calendar":
-        // Calendar block - wrapper around GridBlock with view_type='calendar'
+        // TEMP: Debug guard to isolate React #185 source.
+        // Instead of rendering the real CalendarBlock, render a simple placeholder.
+        // If React #185 disappears with this in place, the root cause is inside CalendarBlock
+        // or its descendants (including the record modal / RecordFields path).
         return (
-          <LazyBlockWrapper enabled={!isEditing}>
-            <CalendarBlock
-              block={safeBlock}
-              isEditing={canEdit}
-              interfaceMode={interfaceMode}
-              pageTableId={pageTableId}
-              pageId={pageId}
-              filters={filters}
-              filterTree={filterTree}
-              onRecordClick={onRecordClick}
-              pageShowAddRecord={pageShowAddRecord}
-              onModalLayoutSave={onUpdate ? (fieldLayout) => onUpdate(block.id, { field_layout: fieldLayout }) : undefined}
-              canEditLayout={canEdit}
-              isFullPage={isFullPage}
-            />
-          </LazyBlockWrapper>
+          <div className="flex h-full items-center justify-center rounded-md border border-dashed border-blue-300 bg-blue-50 text-xs text-blue-700">
+            Calendar block temporarily disabled for debugging
+          </div>
         )
       
       case "multi_calendar":

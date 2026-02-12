@@ -2592,39 +2592,45 @@ export default function Canvas({
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                id: `log_${Date.now()}_canvas_map_start`,
+                id: `log_${Date.now()}_canvas_blocks_map`,
                 timestamp: Date.now(),
                 runId: 'post-fix',
-                hypothesisId: 'H4',
-                location: 'Canvas.tsx:blocks.map START',
-                message: 'Canvas blocks.map iteration START',
-                data: { pageId, blockId: block.id, blockType: block.type, iteration: blocksMapIterationRef.current, blocksLength: blocks.length },
+                hypothesisId: 'H_block_list',
+                location: 'Canvas.tsx:blocks.map',
+                message: 'Canvas blocks.map iteration',
+                data: {
+                  pageId,
+                  blockId: block.id,
+                  blockType: block.type,
+                  iteration: blocksMapIterationRef.current,
+                  blocksLength: blocks.length,
+                },
               }),
             }).catch(() => {})
-            if (process.env.NODE_ENV === 'development') {
-              console.log('[Canvas] blocks.map iteration', { pageId, blockId: block.id, blockType: block.type, iteration: blocksMapIterationRef.current })
-            }
             // #endregion
-            // Log each block being rendered
-            debugLog('LAYOUT', `[Canvas] Rendering block: pageId=${pageId}, blockId=${block.id}, type=${block.type}`, {
+
+            // Log each block being rendered via BlockRenderer
+            debugLog('LAYOUT', `[Canvas] Rendering block via BlockRenderer: pageId=${pageId}, blockId=${block.id}, type=${block.type}`, {
               block,
               layoutItem: layout.find(l => l.i === block.id),
             })
+
             // #region agent log
             fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                id: `log_${Date.now()}_canvas_map_before_render`,
+                id: `log_${Date.now()}_canvas_before_blockrenderer`,
                 timestamp: Date.now(),
                 runId: 'post-fix',
-                hypothesisId: 'H4',
-                location: 'Canvas.tsx:blocks.map before return',
-                message: 'Canvas blocks.map before return JSX',
+                hypothesisId: 'H_block_list',
+                location: 'Canvas.tsx:before BlockRenderer JSX',
+                message: 'Canvas about to render BlockRenderer for block',
                 data: { pageId, blockId: block.id, blockType: block.type },
               }),
             }).catch(() => {})
             // #endregion
+
             return (
               <div
                 key={block.id}
