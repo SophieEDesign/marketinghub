@@ -1114,7 +1114,12 @@ export default function CalendarView({
         ) ?? null
       }
       
-      const actualFromFieldName = resolvedFromField?.name || startField?.name || viewConfig?.calendar_start_field || autoDetectedFromField?.name || actualFieldName || null
+      const actualFromFieldName =
+        resolvedFromField?.name ||
+        startField?.name ||
+        autoDetectedFromField?.name ||
+        actualFieldName ||
+        null
       
       // Resolve date_to field (secondary/range): block config > view config > auto-detect > null
       // Check for date_to, to_date_field, end_date_field, calendar_end_field
@@ -1143,7 +1148,11 @@ export default function CalendarView({
         ) ?? null
       }
       
-      const actualToFieldName = resolvedToField?.name || endField?.name || viewConfig?.calendar_end_field || autoDetectedToField?.name || null
+      const actualToFieldName =
+        resolvedToField?.name ||
+        endField?.name ||
+        autoDetectedToField?.name ||
+        null
       
       // #region agent log
       if (process.env.NODE_ENV === 'development') {
