@@ -648,6 +648,33 @@ export default function RecordFields({
     [canonicalFieldItems]
   )
 
+  // #region agent log
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: `log_${Date.now()}_recordfields_canonical`,
+          runId: 'pre-fix-2',
+          hypothesisId: 'H3',
+          location: 'RecordFields.tsx:canonicalFieldItems',
+          message: 'RecordFields canonicalFieldItems computed',
+          data: {
+            tableId,
+            recordId,
+            canonicalFieldItemsLength: canonicalFieldItems.length,
+            canonicalFieldIdsLength: canonicalFieldIds.length,
+            fieldsLength: fields.length,
+            layoutMode
+          },
+          timestamp: Date.now()
+        })
+      }).catch(() => {})
+    }
+  }, [canonicalFieldItems.length, canonicalFieldIds.length, tableId, recordId, fields.length, layoutMode])
+  // #endregion
+
   // For modal column layout: which grid column (1-based) each field belongs to.
   const fieldToColumnIndex = useMemo(() => {
     const map: Record<string, number> = {}
@@ -732,8 +759,6 @@ export default function RecordFields({
         </div>
       )}
 
-      {/* CRITICAL: Single stable tree to prevent React #185. Do not mount DndContext with 0
-          fields so hook count never changes from 0 to N. */}
       {/* CRITICAL: Always render DndContext structure to maintain stable hook order.
           When canonicalFieldItems.length === 0, render empty state inside DndContext. */}
       <DndContext
@@ -743,7 +768,7 @@ export default function RecordFields({
       >
         {/* Single SortableContext + exactly N SortableFieldItems. Layout (grid vs grouped) is cosmetic only. */}
         <SortableContext
-          items={canonicalFieldIds}
+          items={canonicalFieldIds.length > 0 ? canonicalFieldIds : []}
           strategy={verticalListSortingStrategy}
         >
           {canonicalFieldItems.length === 0 ? (

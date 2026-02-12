@@ -34,6 +34,50 @@ export default function RecordModal({
   onSave,
   initialData,
 }: RecordModalProps) {
+  // #region agent log
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const linkToTableFields = tableFields.filter(f => f.type === 'link_to_table' || f.type === 'lookup')
+      const visibleFields = tableFields.filter((field) => {
+        if (field.name === 'id' || field.name === 'created_at' || field.name === 'updated_at') {
+          return false
+        }
+        if (modalFields === undefined) {
+          return true
+        }
+        if (Array.isArray(modalFields)) {
+          return modalFields.includes(field.name)
+        }
+        return true
+      })
+      const visibleLinkToTableFields = visibleFields.filter(f => f.type === 'link_to_table' || f.type === 'lookup')
+      
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: `log_${Date.now()}_calendar_recordmodal_render`,
+          runId: 'pre-fix-3',
+          hypothesisId: 'H1',
+          location: 'RecordModal.tsx:render',
+          message: 'Calendar RecordModal render',
+          data: {
+            open,
+            tableId,
+            recordId,
+            tableFieldsLength: tableFields.length,
+            modalFieldsLength: modalFields?.length ?? null,
+            linkToTableFieldsCount: linkToTableFields.length,
+            visibleFieldsCount: visibleFields.length,
+            visibleLinkToTableFieldsCount: visibleLinkToTableFields.length,
+          },
+          timestamp: Date.now()
+        })
+      }).catch(() => {})
+    }
+  }, [open, tableId, recordId, tableFields.length, modalFields?.length])
+  // #endregion
+
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState<Record<string, any>>({})
@@ -203,6 +247,31 @@ export default function RecordModal({
               })
               .map((field) => {
                 const value = formData[field.name]
+
+                // #region agent log - FieldEditor rendered
+                if (typeof window !== 'undefined' && (field.type === 'link_to_table' || field.type === 'lookup')) {
+                  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      id: `log_${Date.now()}_recordmodal_fieldeditor_${field.id}`,
+                      runId: 'pre-fix-3',
+                      hypothesisId: 'H1',
+                      location: 'RecordModal.tsx:FieldEditor.map',
+                      message: 'FieldEditor rendered for link_to_table/lookup field',
+                      data: {
+                        fieldId: field.id,
+                        fieldName: field.name,
+                        fieldType: field.type,
+                        hasValue: value !== null && value !== undefined,
+                        valueIsArray: Array.isArray(value),
+                        valueLength: Array.isArray(value) ? value.length : (value ? 1 : 0),
+                      },
+                      timestamp: Date.now()
+                    })
+                  }).catch(() => {});
+                }
+                // #endregion
 
                 return (
                   <FieldEditor

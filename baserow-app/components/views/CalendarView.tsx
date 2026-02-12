@@ -991,6 +991,29 @@ export default function CalendarView({
     const { fromFieldName: actualFromFieldName, toFieldName: actualToFieldName } = resolvedDateFieldNames
     const actualFieldName = dateField?.name || resolvedDateFieldId
 
+    // #region agent log - range mode detection
+    if (typeof window !== 'undefined') {
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: `log_${Date.now()}_calendar_range_mode`,
+          runId: 'pre-fix-2',
+          hypothesisId: 'H5',
+          location: 'CalendarView.tsx:getEvents',
+          message: 'Range mode detection in getEvents',
+          data: {
+            actualFromFieldName,
+            actualToFieldName,
+            hasRangeMode: !!actualToFieldName,
+            rowsLength: rows.length
+          },
+          timestamp: Date.now()
+        })
+      }).catch(() => {})
+    }
+    // #endregion
+
     // Both configured but invalid - return empty to prevent loop
     const blockFrom = blockConfig?.date_from || blockConfig?.from_date_field || blockConfig?.start_date_field || blockConfig?.calendar_start_field
     const blockTo = blockConfig?.date_to || blockConfig?.to_date_field || blockConfig?.end_date_field || blockConfig?.calendar_end_field
@@ -1160,7 +1183,7 @@ export default function CalendarView({
             return luminance > 0.5 ? '#000000' : '#ffffff'
           })() : undefined)
 
-          return {
+          const event = {
             id: row.id,
             title: title || "Untitled",
             allDay: true,
@@ -1240,6 +1263,33 @@ export default function CalendarView({
           check: 'Ensure date field is correctly configured and rows have valid date values'
         })
       }
+
+      // #region agent log - event computation summary
+      if (typeof window !== 'undefined') {
+        const eventsWithRange = events.filter(e => e.end).length
+        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: `log_${Date.now()}_calendar_events_computed`,
+            runId: 'pre-fix-2',
+            hypothesisId: 'H5',
+            location: 'CalendarView.tsx:getEvents',
+            message: 'Calendar events array computed',
+            data: {
+              totalEvents: events.length,
+              eventsWithRange,
+              eventsWithoutRange: events.length - eventsWithRange,
+              actualFromFieldName,
+              actualToFieldName,
+              hasRangeMode: !!actualToFieldName
+            },
+            timestamp: Date.now()
+          })
+        }).catch(() => {})
+      }
+      // #endregion
+
       return events
     } catch (error: unknown) {
       debugError('CALENDAR', 'Calendar: Error generating events:', error)
@@ -1618,6 +1668,33 @@ export default function CalendarView({
       // event.id may be modified by FullCalendar for multi-day events or slicing.
       // Priority: extendedProps.recordId > extendedProps.rowId > event.id (fallback)
       const recordId = info.event.extendedProps?.recordId || info.event.extendedProps?.rowId || info.event.id
+
+      // #region agent log - event click
+      if (typeof window !== 'undefined') {
+        const { toFieldName: currentToFieldName } = resolvedDateFieldNames
+        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: `log_${Date.now()}_calendar_event_click`,
+            runId: 'pre-fix-2',
+            hypothesisId: 'H5',
+            location: 'CalendarView.tsx:onCalendarEventClick',
+            message: 'Calendar event clicked',
+            data: {
+              recordId,
+              eventId: info.event.id,
+              hasEnd: !!info.event.end,
+              start: info.event.start?.toISOString(),
+              end: info.event.end?.toISOString(),
+              actualToFieldName: currentToFieldName,
+              hasRangeMode: !!currentToFieldName
+            },
+            timestamp: Date.now()
+          })
+        }).catch(() => {})
+      }
+      // #endregion
       
       // CRITICAL: Guard against missing recordId to prevent crashes
       if (!recordId) {
@@ -1667,7 +1744,7 @@ export default function CalendarView({
       }
       setSelectedRecordId(recordIdString)
     },
-    [allowOpenRecord, onRecordClick]
+    [allowOpenRecord, onRecordClick, resolvedDateFieldNames]
   )
 
   const onCalendarDateClick = useCallback(

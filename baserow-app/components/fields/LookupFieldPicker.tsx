@@ -387,6 +387,31 @@ export default function LookupFieldPicker({
   const loadSelectedRecords = useCallback(async () => {
     if (!lookupTableId || selectedIds.length === 0) return
 
+    // #region agent log - loadSelectedRecords called
+    if (typeof window !== 'undefined') {
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: `log_${Date.now()}_lookuppicker_loadselected_called`,
+          runId: 'pre-fix-3',
+          hypothesisId: 'H1',
+          location: 'LookupFieldPicker.tsx:loadSelectedRecords',
+          message: 'loadSelectedRecords called',
+          data: {
+            fieldId: field.id,
+            fieldName: field.name,
+            fieldType: field.type,
+            lookupTableId,
+            selectedIdsCount: selectedIds.length,
+            selectedIdsSample: selectedIds.slice(0, 5),
+          },
+          timestamp: Date.now()
+        })
+      }).catch(() => {});
+    }
+    // #endregion
+
     const seq = ++loadSelectedSeqRef.current
     setLoading(true)
     try {
@@ -447,6 +472,32 @@ export default function LookupFieldPicker({
         })
         return
       }
+
+      // #region agent log - Supabase query about to be made
+      if (typeof window !== 'undefined') {
+        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: `log_${Date.now()}_lookuppicker_supabase_query`,
+            runId: 'pre-fix-3',
+            hypothesisId: 'H1',
+            location: 'LookupFieldPicker.tsx:loadSelectedRecords',
+            message: 'Supabase query for selected records',
+            data: {
+              fieldId: field.id,
+              fieldName: field.name,
+              lookupTableId,
+              supabaseTableName: table.supabase_table,
+              missingIdsCount: missingIds.length,
+              missingIdsSample: missingIds.slice(0, 10),
+              query: `${table.supabase_table}?select=${fieldsToSelect.join(',')}&id=in.(${missingIds.slice(0, 5).join(',')}...)`,
+            },
+            timestamp: Date.now()
+          })
+        }).catch(() => {});
+      }
+      // #endregion
 
       const supabase = createClient()
       const { data: records, error } = await supabase
@@ -515,6 +566,33 @@ export default function LookupFieldPicker({
   }, [options, selectedIds])
 
   useEffect(() => {
+    // #region agent log - useEffect for loadSelectedRecords
+    if (typeof window !== 'undefined') {
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: `log_${Date.now()}_lookuppicker_useeffect_loadselected`,
+          runId: 'pre-fix-3',
+          hypothesisId: 'H3',
+          location: 'LookupFieldPicker.tsx:useEffect:loadSelectedRecords',
+          message: 'useEffect for loadSelectedRecords triggered',
+          data: {
+            fieldId: field.id,
+            fieldName: field.name,
+            lookupTableId,
+            selectedIdsLength: selectedIds.length,
+            hasMissingSelected,
+            loadedSelectedIdsRef: loadedSelectedIdsRef.current,
+            selectedIdsKey,
+            willCallLoadSelected: !!(lookupTableId && selectedIds.length > 0 && hasMissingSelected && loadedSelectedIdsRef.current !== selectedIdsKey),
+          },
+          timestamp: Date.now()
+        })
+      }).catch(() => {});
+    }
+    // #endregion
+    
     if (!lookupTableId || selectedIds.length === 0) return
     if (!hasMissingSelected) return
     if (loadedSelectedIdsRef.current === selectedIdsKey) return
