@@ -87,6 +87,15 @@ export async function POST(request: NextRequest) {
       }
     )
 
+    // Log invitation attempt for debugging
+    console.log('Invitation attempt:', {
+      email: email.trim(),
+      baseUrl,
+      hasInviteData: !!inviteData,
+      hasError: !!inviteError,
+      userId: inviteData?.user?.id,
+    })
+
     if (inviteError) {
       console.error('Supabase invite error:', inviteError)
       
@@ -161,11 +170,21 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Note: If email is not received, check:
+    // 1. Supabase Dashboard → Authentication → Settings → Email Auth is enabled
+    // 2. SMTP is configured (or using Supabase default email service)
+    // 3. Check spam/junk folder
+    // 4. Verify email address is correct
+    // 5. Check Supabase email sending limits/quota
+    
     return NextResponse.json({ 
       message: 'User invitation sent successfully',
       email: email.trim(),
       role,
       user: inviteData?.user,
+      note: inviteData?.user?.id ? 
+        'If email is not received, check: Supabase email settings, spam folder, and email service configuration.' : 
+        'Invitation may not have been sent. Check server logs for errors.',
     })
   } catch (error: any) {
     console.error('Error inviting user:', error)
