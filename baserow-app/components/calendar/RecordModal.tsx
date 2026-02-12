@@ -493,6 +493,48 @@ export default function RecordModal({
 
         {/* Scrollable content area */}
         <div className={isEditingLayout ? "flex-1 flex overflow-hidden" : "flex-1 overflow-y-auto px-6"}>
+          {(() => {
+            // #region agent log - which branch (create vs view) to test React #185
+            const branch = loading
+              ? 'loading'
+              : recordId && (!formData || Object.keys(formData).length === 0)
+                ? 'record_not_found'
+                : filteredFields.length === 0
+                  ? 'no_fields'
+                  : isEditingLayout && recordId
+                    ? 'layout_edit'
+                    : resolvedFieldLayout.length > 0 && recordId
+                      ? 'record_with_layout'
+                      : showFieldSections && sectionedFields
+                        ? 'sections'
+                        : 'flat_create_or_view'
+            if (typeof window !== 'undefined' && open) {
+              fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  id: `log_${Date.now()}_recordmodal_branch`,
+                  runId: 'pre-fix-3',
+                  hypothesisId: 'H1',
+                  location: 'RecordModal.tsx:content-branch',
+                  message: 'RecordModal render branch (create vs view)',
+                  data: {
+                    branch,
+                    recordId: recordId ?? null,
+                    loading,
+                    filteredFieldsLength: filteredFields.length,
+                    visibleFieldsLength: visibleFields.length,
+                    resolvedFieldLayoutLength: resolvedFieldLayout.length,
+                    isEditingLayout,
+                    showFieldSections: !!showFieldSections,
+                    hasSectionedFields: !!sectionedFields,
+                  },
+                  timestamp: Date.now()
+                })
+              }).catch(() => {})
+            }
+            return null
+          })()}
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <div className="text-gray-500">Loading...</div>

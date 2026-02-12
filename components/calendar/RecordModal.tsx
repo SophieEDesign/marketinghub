@@ -36,7 +36,7 @@ export default function RecordModal({
 }: RecordModalProps) {
   // #region agent log
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && open) {
       const linkToTableFields = tableFields.filter(f => f.type === 'link_to_table' || f.type === 'lookup')
       const visibleFields = tableFields.filter((field) => {
         if (field.name === 'id' || field.name === 'created_at' || field.name === 'updated_at') {
@@ -51,6 +51,8 @@ export default function RecordModal({
         return true
       })
       const visibleLinkToTableFields = visibleFields.filter(f => f.type === 'link_to_table' || f.type === 'lookup')
+      const tableFieldsIds = tableFields.map(f => f.id).join(',')
+      const visibleFieldsIds = visibleFields.map(f => f.id).join(',')
       
       fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
         method: 'POST',
@@ -66,16 +68,18 @@ export default function RecordModal({
             tableId,
             recordId,
             tableFieldsLength: tableFields.length,
+            tableFieldsIdsHash: tableFieldsIds.substring(0, 50), // First 50 chars as hash
             modalFieldsLength: modalFields?.length ?? null,
             linkToTableFieldsCount: linkToTableFields.length,
             visibleFieldsCount: visibleFields.length,
+            visibleFieldsIdsHash: visibleFieldsIds.substring(0, 50),
             visibleLinkToTableFieldsCount: visibleLinkToTableFields.length,
           },
           timestamp: Date.now()
         })
       }).catch(() => {})
     }
-  }, [open, tableId, recordId, tableFields.length, modalFields?.length])
+  }, [open, tableId, recordId, tableFields, modalFields])
   // #endregion
 
   const [loading, setLoading] = useState(false)
@@ -245,24 +249,26 @@ export default function RecordModal({
                 // Fallback: show all if modalFields is not an array
                 return true
               })
-              .map((field) => {
+              .map((field, index) => {
                 const value = formData[field.name]
 
                 // #region agent log - FieldEditor rendered
-                if (typeof window !== 'undefined' && (field.type === 'link_to_table' || field.type === 'lookup')) {
+                if (typeof window !== 'undefined') {
                   fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                      id: `log_${Date.now()}_recordmodal_fieldeditor_${field.id}`,
+                      id: `log_${Date.now()}_recordmodal_fieldeditor_${field.id}_${index}`,
                       runId: 'pre-fix-3',
                       hypothesisId: 'H1',
                       location: 'RecordModal.tsx:FieldEditor.map',
-                      message: 'FieldEditor rendered for link_to_table/lookup field',
+                      message: 'FieldEditor rendered in map',
                       data: {
+                        index,
                         fieldId: field.id,
                         fieldName: field.name,
                         fieldType: field.type,
+                        isLinkToTable: field.type === 'link_to_table' || field.type === 'lookup',
                         hasValue: value !== null && value !== undefined,
                         valueIsArray: Array.isArray(value),
                         valueLength: Array.isArray(value) ? value.length : (value ? 1 : 0),
