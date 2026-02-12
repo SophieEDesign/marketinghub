@@ -749,102 +749,103 @@ export default function RecordFields({
           {canonicalFieldItems.length === 0 ? (
             <div className="space-y-3" />
           ) : (
-            <div
-              ref={columnsContainerRef}
-              className={showModalColumns ? "grid gap-6" : "space-y-3"}
-              style={
-                showModalColumns && gridTemplateColumns
-                  ? { gridTemplateColumns }
-                  : undefined
-              }
-            >
-              {canonicalFieldItems.map((item, index) => {
-                const prevGroupName =
-                  index > 0 ? canonicalFieldItems[index - 1].groupName : null
-                const isFirstInGroup = item.groupName !== prevGroupName
-                const isCollapsed = collapsedGroups.has(item.groupName)
+            <>
+              <div
+                ref={columnsContainerRef}
+                className={showModalColumns ? "grid gap-6" : "space-y-3"}
+                style={
+                  showModalColumns && gridTemplateColumns
+                    ? { gridTemplateColumns }
+                    : undefined
+                }
+              >
+                {canonicalFieldItems.map((item, index) => {
+                  const prevGroupName =
+                    index > 0 ? canonicalFieldItems[index - 1].groupName : null
+                  const isFirstInGroup = item.groupName !== prevGroupName
+                  const isCollapsed = collapsedGroups.has(item.groupName)
 
-                return (
-                  <div
-                    key={item.field.id}
-                    className={cn(
-                      showModalColumns &&
-                        "min-w-0 border-l border-gray-200 first:border-l-0 pl-4"
-                    )}
-                    style={
-                      showModalColumns && fieldToColumnIndex[item.field.id]
-                        ? { gridColumn: fieldToColumnIndex[item.field.id] }
-                        : undefined
-                    }
-                  >
-                    {/* Group header slot: always present so hook tree is stable; visibility via CSS only. */}
+                  return (
                     <div
+                      key={item.field.id}
                       className={cn(
-                        showModalColumns || !isFirstInGroup ? "hidden" : ""
+                        showModalColumns &&
+                          "min-w-0 border-l border-gray-200 first:border-l-0 pl-4"
                       )}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => toggleGroup(item.groupName)}
-                        className="w-full flex items-center justify-between text-left py-2.5 px-3 -mx-3 mb-2 rounded-md bg-gray-100 border border-gray-200 hover:bg-gray-200 hover:border-gray-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
-                        aria-expanded={!isCollapsed}
-                        aria-label={`${
-                          isCollapsed ? "Expand" : "Collapse"
-                        } ${item.groupName} group`}
-                      >
-                        <span className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                          {item.groupName}
-                        </span>
-                        <span className="text-gray-500">
-                          {isCollapsed ? (
-                            <ChevronRight className="h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4" />
-                          )}
-                        </span>
-                      </button>
-                    </div>
-
-                    {/* Field content: always rendered; visibility controlled via CSS only. */}
-                    <div
-                      className={
-                        !showModalColumns && isCollapsed
-                          ? "hidden"
-                          : "space-y-3"
+                      style={
+                        showModalColumns && fieldToColumnIndex[item.field.id]
+                          ? { gridColumn: fieldToColumnIndex[item.field.id] }
+                          : undefined
                       }
                     >
-                      {renderField(item.field)}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+                      {/* Group header slot: always present so hook tree is stable; visibility via CSS only. */}
+                      <div
+                        className={cn(
+                          showModalColumns || !isFirstInGroup ? "hidden" : ""
+                        )}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => toggleGroup(item.groupName)}
+                          className="w-full flex items-center justify-between text-left py-2.5 px-3 -mx-3 mb-2 rounded-md bg-gray-100 border border-gray-200 hover:bg-gray-200 hover:border-gray-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
+                          aria-expanded={!isCollapsed}
+                          aria-label={`${
+                            isCollapsed ? "Expand" : "Collapse"
+                          } ${item.groupName} group`}
+                        >
+                          <span className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+                            {item.groupName}
+                          </span>
+                          <span className="text-gray-500">
+                            {isCollapsed ? (
+                              <ChevronRight className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                          </span>
+                        </button>
+                      </div>
 
-            {/* Layout-mode-only UI: Add field + column resize (no hooks, safe to vary). */}
-            {layoutMode && showModalColumns && availableFields.length > 0 && (
-              <div className="pt-2 mt-2 border-t border-dashed border-gray-200 flex flex-wrap gap-2">
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide w-full">
-                  Add field
-                </span>
-                {availableFields.slice(0, 6).map((field) => (
-                  <button
-                    key={field.id}
-                    type="button"
-                    onClick={() => handleAddField(field, modalColumns[0]?.id)}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-gray-300 rounded-md bg-white hover:bg-gray-50 text-gray-700"
-                  >
-                    <Plus className="h-3 w-3" />
-                    {getFieldDisplayName(field)}
-                  </button>
-                ))}
-                {availableFields.length > 6 && (
-                  <span className="text-xs text-gray-500 self-center">
-                    +{availableFields.length - 6} more
-                  </span>
-                )}
+                      {/* Field content: always rendered; visibility controlled via CSS only. */}
+                      <div
+                        className={
+                          !showModalColumns && isCollapsed
+                            ? "hidden"
+                            : "space-y-3"
+                        }
+                      >
+                        {renderField(item.field)}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-            )}
-            </div>
+
+              {/* Layout-mode-only UI: Add field + column resize (no hooks, safe to vary). */}
+              {layoutMode && showModalColumns && availableFields.length > 0 && (
+                <div className="pt-2 mt-2 border-t border-dashed border-gray-200 flex flex-wrap gap-2">
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide w-full">
+                    Add field
+                  </span>
+                  {availableFields.slice(0, 6).map((field) => (
+                    <button
+                      key={field.id}
+                      type="button"
+                      onClick={() => handleAddField(field, modalColumns[0]?.id)}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-gray-300 rounded-md bg-white hover:bg-gray-50 text-gray-700"
+                    >
+                      <Plus className="h-3 w-3" />
+                      {getFieldDisplayName(field)}
+                    </button>
+                  ))}
+                  {availableFields.length > 6 && (
+                    <span className="text-xs text-gray-500 self-center">
+                      +{availableFields.length - 6} more
+                    </span>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </SortableContext>
       </DndContext>
