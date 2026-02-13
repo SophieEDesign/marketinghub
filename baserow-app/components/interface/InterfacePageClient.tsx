@@ -28,6 +28,7 @@ import { VIEWS_ENABLED } from "@/lib/featureFlags"
 import { toPostgrestColumn } from "@/lib/supabase/postgrest"
 import { normalizeUuid } from "@/lib/utils/ids"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
+import { isAbortError } from "@/lib/api/error-handling"
 
 // Lazy load InterfaceBuilder for dashboard/overview pages
 const InterfaceBuilder = dynamic(() => import("./InterfaceBuilder"), { ssr: false })
@@ -371,13 +372,16 @@ function InterfacePageClientInternal({
   // Blocks must load in BOTH edit and view mode so they render correctly
   useEffect(() => {
     if (!page) return
-    
+
+    const abortController = new AbortController()
+    const signal = abortController.signal
+
     // Reset loaded state when pageId changes
     if (blocksLoadedRef.current.pageId !== page.id) {
       blocksLoadedRef.current = { pageId: page.id, loaded: false }
       blocksLoadingRef.current = false // Reset loading flag on page change
     }
-    
+
     // CRITICAL: Prevent concurrent calls - check both state and ref
     // The ref prevents race conditions where useEffect runs multiple times before state updates
     if (blocksLoadingRef.current || blocksLoading) {
@@ -386,11 +390,16 @@ function InterfacePageClientInternal({
       }
       return
     }
-    
+
     // Only load if blocks haven't been loaded yet for this page
     // loadBlocks() manages the blocksLoadingRef flag internally
     if (!blocksLoadedRef.current.loaded || blocks.length === 0) {
-      loadBlocks()
+      loadBlocks(false, signal)
+    }
+
+    // Abort in-flight request when navigating away or unmounting - prevents "Uncaught (in promise)"
+    return () => {
+      abortController.abort()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page?.id])
@@ -716,13 +725,13 @@ function InterfacePageClientInternal({
     }
   }
 
-  async function loadBlocks(forceReload = false) {
+  async function loadBlocks(forceReload = false, signal?: AbortSignal) {
     console.log('🔥 loadBlocks CALLED', { pageId: page?.id || 'NO_PAGE', forceReload, previousPageId: previousPageIdRef.current, alreadyLoading: blocksLoadingRef.current })
     if (!page) {
       blocksLoadingRef.current = false
       return
     }
-    
+
     // CRITICAL: Prevent concurrent calls - check ref at function entry
     if (!forceReload && blocksLoadingRef.current) {
       if (process.env.NODE_ENV === 'development') {
@@ -730,7 +739,7 @@ function InterfacePageClientInternal({
       }
       return
     }
-    
+
     // CRITICAL: Only reset loaded state if pageId actually changed (not just on every call)
     // DO NOT clear blocks here - that's handled by the page change effect above
     if (blocksLoadedRef.current.pageId !== page.id) {
@@ -741,20 +750,22 @@ function InterfacePageClientInternal({
         console.log(`[loadBlocks] Same pageId — preserving blocks: pageId=${page.id}, forceReload=${forceReload}`)
       }
     }
-    
+
     // CRITICAL: Only load blocks once per page visit (prevent remounts)
     // Unless forceReload is true (e.g., when exiting edit mode to refresh saved content)
     if (!forceReload && blocksLoadedRef.current.loaded && blocks.length > 0) {
       blocksLoadingRef.current = false
       return
     }
-    
+
     // Set loading flag
     blocksLoadingRef.current = true
 
     setBlocksLoading(true)
     try {
-      const res = await fetch(`/api/pages/${page.id}/blocks`)
+      const res = await fetch(`/api/pages/${page.id}/blocks`, { signal })
+      if (signal?.aborted) return
+
       if (!res.ok) {
         const errorText = await res.text()
         console.error(`[loadBlocks] API ERROR: pageId=${page.id}, page_type=${page.page_type}`, {
@@ -766,7 +777,8 @@ function InterfacePageClientInternal({
       }
       
       const data = await res.json()
-      
+      if (signal?.aborted) return
+
       // CRITICAL: Log API response for debugging - show full response structure
       console.log(`[loadBlocks] API returned: pageId=${page.id}, page_type=${page.page_type}`, {
         responseStatus: res.status,
@@ -830,14 +842,16 @@ function InterfacePageClientInternal({
       // Exception: If reload returns empty blocks and we have existing blocks, preserve them
       // (prevents clearing blocks due to race conditions or temporary API issues)
       if (pageBlocks.length === 0 && blocks.length > 0 && !forceReload) {
-        if (process.env.NODE_ENV === 'development') {
-          console.warn('[Blocks] Reload returned empty blocks, preserving existing blocks', {
-            prevBlocksCount: blocks.length,
-            forceReload,
-            pageId: page.id
-          })
+        if (!signal?.aborted) {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('[Blocks] Reload returned empty blocks, preserving existing blocks', {
+              prevBlocksCount: blocks.length,
+              forceReload,
+              pageId: page.id
+            })
+          }
+          blocksLoadedRef.current = { pageId: page.id, loaded: true }
         }
-        blocksLoadedRef.current = { pageId: page.id, loaded: true }
         return
       }
       
@@ -886,24 +900,28 @@ function InterfacePageClientInternal({
         willUpdate: blocksChanged || forceReload,
       })
       
-      // Only update if blocks actually changed or forceReload is true
-      if (blocksChanged || forceReload) {
-        setBlocks(pageBlocks)
-      } else {
-        if (process.env.NODE_ENV === 'development') {
+      // Only update if blocks actually changed or forceReload is true (and not aborted)
+      if (!signal?.aborted) {
+        if (blocksChanged || forceReload) {
+          setBlocks(pageBlocks)
+        } else if (process.env.NODE_ENV === 'development') {
           console.log(`[loadBlocks] Blocks unchanged - skipping setBlocks to prevent re-render`)
         }
+        blocksLoadedRef.current = { pageId: page.id, loaded: true }
       }
-      blocksLoadedRef.current = { pageId: page.id, loaded: true }
     } catch (error) {
-      console.error("Error loading blocks:", error)
+      // Ignore abort errors (expected during navigation/unmount) - prevents "Uncaught (in promise)"
+      if (!isAbortError(error)) {
+        console.error("Error loading blocks:", error)
+      }
       // CRITICAL: Never clear blocks on error - preserve existing blocks
-      // This prevents remount storms when errors occur during reload
-      // Set loaded to true even on error so we don't get stuck in loading state
-      // This allows the UI to render and show error state or allow adding blocks
-      blocksLoadedRef.current = { pageId: page.id, loaded: true }
+      if (!signal?.aborted) {
+        blocksLoadedRef.current = { pageId: page.id, loaded: true }
+      }
     } finally {
-      setBlocksLoading(false)
+      if (!signal?.aborted) {
+        setBlocksLoading(false)
+      }
       blocksLoadingRef.current = false // CRITICAL: Always clear loading flag
     }
   }

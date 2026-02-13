@@ -608,23 +608,25 @@ export default function NavigationDiagnostics() {
     const checkPerformance = () => {
       const now = performance.now()
       const elapsed = now - lastCheck
-      
-      // If frame took > 100ms, UI is likely blocked
-      if (elapsed > 100) {
+      // We check every CHECK_INTERVAL frames, so average frame time = elapsed / CHECK_INTERVAL
+      const avgFrameTime = elapsed / CHECK_INTERVAL
+
+      // UI is blocked if average frame time > 100ms (vs ~16ms for 60fps)
+      if (avgFrameTime > 100) {
         blockedFrames++
         // Only warn if we've accumulated enough blocked frames AND enough time has passed since last warning
         if (blockedFrames > 3 && (now - lastWarningTime) > WARNING_COOLDOWN) {
           lastWarningTime = now
           console.warn("⚠️ UI BLOCKED - Performance issue detected!", {
             blockedFrames,
-            averageFrameTime: elapsed,
+            averageFrameTime: avgFrameTime,
             message: "UI thread is blocked, clicks may not register",
           })
         }
       } else {
         blockedFrames = 0
       }
-      
+
       frameCount++
       lastCheck = now
     }

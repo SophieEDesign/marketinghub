@@ -180,27 +180,21 @@ export default function TimelineView({
   const loadSeqRef = useRef(0)
 
   useEffect(() => {
+    let cancelled = false
+    async function loadTableInfo() {
+      const { data } = await supabase
+        .from("tables")
+        .select("supabase_table")
+        .eq("id", tableId)
+        .single()
+      if (!cancelled && data) {
+        setSupabaseTableName(data.supabase_table)
+      }
+    }
     loadTableInfo()
+    return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableId])
-
-  useEffect(() => {
-    if (supabaseTableName) {
-      loadRows()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabaseTableName, tableId, filtersKey, tableFieldsKey, reloadKey])
-
-  async function loadTableInfo() {
-    const { data } = await supabase
-      .from("tables")
-      .select("supabase_table")
-      .eq("id", tableId)
-      .single()
-    if (data) {
-      setSupabaseTableName(data.supabase_table)
-    }
-  }
 
   async function ensurePhysicalColumns(force = false): Promise<Set<string> | null> {
     if (!supabaseTableName) return null
@@ -371,29 +365,32 @@ export default function TimelineView({
   } | null>(null)
 
   useEffect(() => {
-    if (viewUuid) {
-      loadViewConfig()
+    if (!viewUuid) return
+    let cancelled = false
+
+    async function loadViewConfig() {
+      try {
+        const { data: view } = await supabase
+          .from('views')
+          .select('config')
+          .eq('id', viewUuid)
+          .single()
+
+        if (!cancelled && view?.config) {
+          setViewConfig(view.config as any)
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Timeline: Error loading view config:', error)
+        }
+      }
+    }
+    loadViewConfig()
+    return () => {
+      cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewUuid])
-
-  async function loadViewConfig() {
-    if (!viewUuid) return
-    
-    try {
-      const { data: view } = await supabase
-        .from('views')
-        .select('config')
-        .eq('id', viewUuid)
-        .single()
-
-      if (view?.config) {
-        setViewConfig(view.config as any)
-      }
-    } catch (error) {
-      console.error('Timeline: Error loading view config:', error)
-    }
-  }
 
   // Resolve color field from props (highest priority), block config, view config, or auto-detect
   const resolvedColorField = useMemo(() => {
