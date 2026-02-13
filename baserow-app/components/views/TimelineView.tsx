@@ -58,6 +58,8 @@ interface TimelineViewProps {
   highlightRules?: HighlightRule[]
   /** Interface mode: 'view' | 'edit'. When 'edit', record panel opens editable (Airtable-style). */
   interfaceMode?: 'view' | 'edit'
+  /** Called when a record is deleted from RecordPanel; use to refresh core data. */
+  onRecordDeleted?: () => void
 }
 
 type ZoomLevel = "day" | "week" | "month" | "quarter" | "year"
@@ -99,6 +101,7 @@ export default function TimelineView({
   reloadKey,
   highlightRules = [],
   interfaceMode = 'view',
+  onRecordDeleted,
 }: TimelineViewProps) {
   const supabase = useMemo(() => createClient(), [])
   const viewUuid = useMemo(() => normalizeUuid(viewId), [viewId])
@@ -1143,8 +1146,8 @@ export default function TimelineView({
       onRecordClick(rowId)
       return
     }
-    openRecord(tableId, rowId, supabaseTableName, (blockConfig as any)?.modal_fields, (blockConfig as any)?.modal_layout, blockConfig ? { blockConfig } : undefined, interfaceMode)
-  }, [blockConfig, onRecordClick, openRecord, supabaseTableName, tableId, interfaceMode])
+    openRecord(tableId, rowId, supabaseTableName, (blockConfig as any)?.modal_fields, (blockConfig as any)?.modal_layout, blockConfig ? { blockConfig } : undefined, interfaceMode, onRecordDeleted)
+  }, [blockConfig, onRecordClick, openRecord, supabaseTableName, tableId, interfaceMode, onRecordDeleted])
 
   const handleEventSelect = useCallback((event: TimelineEvent, e: React.MouseEvent) => {
     // Don't open/select if we're resizing/dragging.

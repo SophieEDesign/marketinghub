@@ -22,6 +22,7 @@ const DEFAULT_WIDTH = 480
 
 export default function RecordPanel() {
   const { state, closeRecord, setWidth, togglePin, toggleFullscreen, goBack, navigateToLinkedRecord } = useRecordPanel()
+  const onRecordDeleted = state.onRecordDeleted
   const { toast } = useToast()
   const router = useRouter()
   const { role } = useUserRole()
@@ -64,6 +65,7 @@ export default function RecordPanel() {
         title: "Record deleted",
         description: "The record has been removed.",
       })
+      onRecordDeleted?.()
       closeRecord()
     },
   })

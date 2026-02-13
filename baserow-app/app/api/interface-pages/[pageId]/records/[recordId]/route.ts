@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getInterfacePage } from '@/lib/interface/pages'
 import { getUserRole } from '@/lib/roles'
-import type { PageConfig } from '@/lib/interface/page-config'
+import { runRecordAutomations } from '@/lib/automations/record-trigger'
 
 function canDelete(role: 'admin' | 'member' | null, pageConfig: PageConfig): boolean {
   if (!role) return false
@@ -60,9 +60,23 @@ export async function DELETE(
       return NextResponse.json({ error: 'Table not found or not configured' }, { status: 400 })
     }
 
+    // Fetch record before delete so automations have the data
+    const { data: recordData } = await supabase
+      .from(table.supabase_table)
+      .select('*')
+      .eq('id', recordId)
+      .single()
+
     const { error } = await supabase.from(table.supabase_table).delete().eq('id', recordId)
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // Trigger row_deleted automations (fire-and-forget)
+    if (recordData) {
+      runRecordAutomations(tableId, 'row_deleted', recordData).catch((err) =>
+        console.error('Automation trigger error:', err)
+      )
     }
 
     return NextResponse.json({ success: true }, { status: 200 })

@@ -20,11 +20,13 @@ interface RecordPanelState {
   cascadeContext?: RecordEditorCascadeContext | null
   /** Interface mode: 'view' | 'edit'. When 'edit', RecordPanel opens in edit mode (Airtable-style). */
   interfaceMode?: 'view' | 'edit'
+  /** Called when the record is deleted; blocks use this to refresh core data (grid/calendar). */
+  onRecordDeleted?: () => void
 }
 
 interface RecordPanelContextType {
   state: RecordPanelState
-  openRecord: (tableId: string, recordId: string, tableName: string, modalFields?: string[], modalLayout?: BlockConfig['modal_layout'], cascadeContext?: RecordEditorCascadeContext | null, interfaceMode?: 'view' | 'edit') => void
+  openRecord: (tableId: string, recordId: string, tableName: string, modalFields?: string[], modalLayout?: BlockConfig['modal_layout'], cascadeContext?: RecordEditorCascadeContext | null, interfaceMode?: 'view' | 'edit', onRecordDeleted?: () => void) => void
   /** Fetches table supabase_table by id and opens the record in the panel. Use when only tableId + recordId are available (e.g. linked record click). */
   openRecordByTableId: (tableId: string, recordId: string, interfaceMode?: 'view' | 'edit') => Promise<void>
   closeRecord: () => void
@@ -56,7 +58,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
     interfaceMode: 'view', // Default to view mode
   })
 
-  const openRecord = useCallback((tableId: string, recordId: string, tableName: string, modalFields?: string[], modalLayout?: BlockConfig['modal_layout'], cascadeContext?: RecordEditorCascadeContext | null, interfaceMode?: 'view' | 'edit') => {
+  const openRecord = useCallback((tableId: string, recordId: string, tableName: string, modalFields?: string[], modalLayout?: BlockConfig['modal_layout'], cascadeContext?: RecordEditorCascadeContext | null, interfaceMode?: 'view' | 'edit', onRecordDeleted?: () => void) => {
     if (process.env.NODE_ENV === 'development' && cascadeContext === undefined) {
       console.warn('[RecordPanel] Opened without cascadeContext; block-level permissions will not be enforced.')
     }
@@ -70,6 +72,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
       modalLayout,
       cascadeContext,
       interfaceMode: interfaceMode ?? prev.interfaceMode ?? 'view', // Preserve existing interfaceMode if not provided
+      onRecordDeleted,
       history: prev.isOpen && prev.tableId === tableId && prev.recordId === recordId
         ? prev.history // Don't add to history if same record
         : [...prev.history, { tableId, recordId, tableName }],

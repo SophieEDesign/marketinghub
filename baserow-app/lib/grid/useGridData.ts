@@ -298,20 +298,18 @@ export function useGridData({
   const prevSortsStringRef = useRef<string>(sortsString)
   const prevFieldsStringRef = useRef<string>(fieldsString)
   
-  // Update refs when content changes (but not on every render)
+  // Update refs when content changes. Do NOT update prev*Refs here - the load effect
+  // needs them for change detection and will update them after comparing.
   useEffect(() => {
     filtersRef.current = filters
-    prevFiltersStringRef.current = filtersString
   }, [filtersString, filters])
   
   useEffect(() => {
     sortsRef.current = sorts
-    prevSortsStringRef.current = sortsString
   }, [sortsString, sorts])
   
   useEffect(() => {
     fieldsRef.current = fields
-    prevFieldsStringRef.current = fieldsString
   }, [fieldsString, fields])
   
   // Cap limit to prevent memory exhaustion

@@ -72,6 +72,8 @@ interface ListViewProps {
   cascadeContext?: { pageConfig?: any; blockConfig?: any } | null
   /** Interface mode: 'view' | 'edit'. When 'edit', record panel opens editable (Airtable-style). */
   interfaceMode?: 'view' | 'edit'
+  /** Called when a record is deleted from RecordPanel; use to refresh core data. */
+  onRecordDeleted?: () => void
 }
 
 export default function ListView({
@@ -102,6 +104,7 @@ export default function ListView({
   highlightRules = [],
   cascadeContext,
   interfaceMode = 'view',
+  onRecordDeleted,
 }: ListViewProps) {
   const { openRecord } = useRecordPanel()
   const isMobile = useIsMobile()
@@ -160,9 +163,9 @@ export default function ListView({
     }
     const effectiveTableName = tableName || supabaseTableName
     if (tableId && effectiveTableName) {
-      openRecord(tableId, recordId, effectiveTableName, undefined, undefined, cascadeContext ?? undefined, interfaceMode)
+      openRecord(tableId, recordId, effectiveTableName, undefined, undefined, cascadeContext ?? undefined, interfaceMode, onRecordDeleted)
     }
-  }, [onRecordClick, openRecord, supabaseTableName, tableId, tableName, cascadeContext, interfaceMode])
+  }, [onRecordClick, openRecord, supabaseTableName, tableId, tableName, cascadeContext, interfaceMode, onRecordDeleted])
 
   // Update currentGroupBy when groupBy prop changes
   useEffect(() => {
@@ -277,19 +280,14 @@ export default function ListView({
 
       // Apply sorting
       if (sorts.length > 0 && !needsClientSideSort) {
-        // Use database sorting for fields that don't require client-side sorting
-        sorts.forEach((sort, index) => {
-          if (index === 0) {
-            const col = toPostgrestColumn(sort.field_name)
-            if (!col) {
-              console.warn('[ListView] Skipping sort on invalid column:', sort.field_name)
-              return
-            }
-            query = query.order(col, { ascending: sort.direction === 'asc' })
-          } else {
-            // Supabase only supports one order() call, so we'd need to sort in memory for multiple sorts
-            // For now, just use the first sort
+        // Chain multiple .order() calls for multi-column sort (Supabase/PostgREST supports this)
+        sorts.forEach((sort) => {
+          const col = toPostgrestColumn(sort.field_name)
+          if (!col) {
+            console.warn('[ListView] Skipping sort on invalid column:', sort.field_name)
+            return
           }
+          query = query.order(col, { ascending: sort.direction === 'asc' })
         })
       } else if (sorts.length === 0) {
         query = query.order('created_at', { ascending: false })

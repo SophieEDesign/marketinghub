@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { isAdmin } from '@/lib/roles'
+import { runRecordAutomations } from '@/lib/automations/record-trigger'
 
 export async function POST(request: NextRequest) {
   try {
@@ -199,6 +200,11 @@ export async function POST(request: NextRequest) {
 
     await Promise.all(updatePromises)
 
+    // Build old→new map for automation triggers
+    const oldById = new Map(
+      (currentRows || []).map((r: any) => [r.id, { ...r }])
+    )
+
     // Fetch updated records
     const { data: updatedRecords, error: fetchError } = await supabase
       .from(table)
@@ -207,6 +213,19 @@ export async function POST(request: NextRequest) {
 
     if (fetchError) {
       console.error('Error fetching updated records:', fetchError)
+    }
+
+    // Trigger row_updated automations for each record (fire-and-forget)
+    if (updatedRecords && tableInfo?.id) {
+      for (const row of updatedRecords) {
+        const oldRecord = oldById.get(row.id)
+        runRecordAutomations(
+          tableInfo.id,
+          'row_updated',
+          row,
+          oldRecord
+        ).catch((err) => console.error('Automation trigger error:', err))
+      }
     }
 
     return NextResponse.json({

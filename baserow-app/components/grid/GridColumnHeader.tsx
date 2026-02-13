@@ -43,6 +43,9 @@ interface GridColumnHeaderProps {
   onFilter?: (fieldName: string) => void
   onGroup?: (fieldName: string) => void
   onDuplicate?: (fieldName: string) => void
+  /** When true, column header is sticky (frozen) with given left offset in px */
+  isFrozen?: boolean
+  frozenLeft?: number
 }
 
 export default function GridColumnHeader({
@@ -68,6 +71,8 @@ export default function GridColumnHeader({
   onFilter,
   onGroup,
   onDuplicate,
+  isFrozen = false,
+  frozenLeft = 0,
 }: GridColumnHeaderProps) {
   const isMobile = useIsMobile()
 
@@ -123,10 +128,15 @@ export default function GridColumnHeader({
   const resizeStartXRef = useRef(0)
   const resizeStartWidthRef = useRef(0)
 
-  const style = {
+  const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
+  }
+  if (isFrozen && frozenLeft !== undefined) {
+    style.position = 'sticky'
+    style.left = `${frozenLeft}px`
+    style.zIndex = 20
   }
 
   const handleMouseDown = (e: React.MouseEvent) => {

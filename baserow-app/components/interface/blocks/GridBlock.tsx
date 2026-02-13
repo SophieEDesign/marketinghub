@@ -888,6 +888,7 @@ export default function GridBlock({
             cascadeContext={{ blockConfig: config }}
             reloadKey={refreshKey}
             interfaceMode={interfaceMode}
+            onRecordDeleted={() => setRefreshKey((k) => k + 1)}
           />
         )
       }
@@ -934,6 +935,7 @@ export default function GridBlock({
             fitImageSize={appearance.fit_image_size}
             onRecordClick={onRecordClick}
             reloadKey={refreshKey}
+            onRecordDeleted={() => setRefreshKey((k) => k + 1)}
             // Card field configuration
             titleField={config.timeline_title_field || config.card_title_field}
             cardField1={config.timeline_field_1 || config.card_field_1}
@@ -988,6 +990,7 @@ export default function GridBlock({
             reloadKey={refreshKey}
             highlightRules={config.highlight_rules}
             interfaceMode={interfaceMode}
+            onRecordDeleted={() => setRefreshKey((k) => k + 1)}
           />
         )
       }
@@ -1090,6 +1093,7 @@ export default function GridBlock({
             rowHeight={rowHeight}
             cascadeContext={{ blockConfig: config }}
             interfaceMode={interfaceMode}
+            onRecordDeleted={() => setRefreshKey((k) => k + 1)}
           />
         )
       }
@@ -1127,7 +1131,7 @@ export default function GridBlock({
         const handleRecordClick = allowOpenRecord
           ? (onRecordClick || ((clickedRecordId: string) => {
               if (tableId && table?.supabase_table) {
-                openRecordPanel(tableId, clickedRecordId, table.supabase_table, modalFieldsForRecord, (config as any).modal_layout, { blockConfig: config })
+                openRecordPanel(tableId, clickedRecordId, table.supabase_table, modalFieldsForRecord, (config as any).modal_layout, { blockConfig: config }, undefined, () => setRefreshKey((k) => k + 1))
               }
             }))
           : undefined // Disable record clicks if not allowed

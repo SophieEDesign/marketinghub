@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getInterfacePage } from '@/lib/interface/pages'
 import { getUserRole } from '@/lib/roles'
+import { runRecordAutomations } from '@/lib/automations/record-trigger'
 import type { PageConfig } from '@/lib/interface/page-config'
 
 function canCreate(role: 'admin' | 'member' | null, pageConfig: PageConfig): boolean {
@@ -77,7 +78,14 @@ export async function POST(
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    const createdId = (data as { id?: string; record_id?: string })?.id || (data as { id?: string; record_id?: string })?.record_id
+    const recordData = data as Record<string, unknown>
+    const createdId = (recordData?.id as string) || (recordData?.record_id as string)
+
+    // Trigger row_created automations (fire-and-forget; don't block response)
+    runRecordAutomations(tableId, 'row_created', recordData).catch((err) =>
+      console.error('Automation trigger error:', err)
+    )
+
     return NextResponse.json({ record: data, recordId: createdId }, { status: 200 })
   } catch (error: unknown) {
     const errorMessage = (error as { message?: string })?.message || 'Failed to create record'

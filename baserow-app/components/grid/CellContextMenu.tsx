@@ -5,9 +5,10 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@/components/context-menu/ContextMenu'
-import { Copy, ClipboardPaste } from 'lucide-react'
+import { Copy, ClipboardPaste, Trash2 } from 'lucide-react'
 
 interface CellContextMenuProps {
   children: ReactNode
@@ -16,6 +17,8 @@ interface CellContextMenuProps {
   editable?: boolean
   onCopy?: () => void
   onPaste?: () => void
+  onDelete?: () => void
+  canDelete?: boolean
   formatValue?: (value: any) => string
 }
 
@@ -26,6 +29,8 @@ export default function CellContextMenu({
   editable = true,
   onCopy,
   onPaste,
+  onDelete,
+  canDelete = false,
   formatValue,
 }: CellContextMenuProps) {
   const handleCopy = async () => {
@@ -80,6 +85,18 @@ export default function CellContextMenu({
             <ClipboardPaste className="h-4 w-4 mr-2" />
             Paste
           </ContextMenuItem>
+        )}
+        {canDelete && onDelete && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              onClick={onDelete}
+              className="text-red-600 focus:bg-red-50 focus:text-red-700"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete record
+            </ContextMenuItem>
+          </>
         )}
       </ContextMenuContent>
     </ContextMenu>

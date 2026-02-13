@@ -314,50 +314,6 @@ export default function RecordModal({
     }
   }, [open, interfaceMode, initialEditMode, isEditingLayout, recordId])
 
-  // #region agent log - branch once per open/transition (not on every render)
-  const lastLoggedRef = useRef<string>('')
-  const formDataKeysLength = formData ? Object.keys(formData).length : 0
-  useEffect(() => {
-    if (!open || typeof window === 'undefined') return
-    const branch = loading
-      ? 'loading'
-      : recordId && formDataKeysLength === 0
-        ? 'record_not_found'
-        : filteredFields.length === 0
-          ? 'no_fields'
-          : isEditingLayout && recordId
-            ? 'layout_edit'
-            : resolvedFieldLayout.length > 0 && recordId
-              ? 'record_with_layout'
-              : showFieldSections && sectionedFields
-                ? 'sections'
-                : 'flat_create_or_view'
-    const key = `${branch}-${recordId ?? 'new'}-${loading}`
-    if (lastLoggedRef.current === key) return
-    lastLoggedRef.current = key
-    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: `log_${Date.now()}_recordmodal_branch`,
-        runId: 'pre-fix-3',
-        hypothesisId: 'H1',
-        location: 'RecordModal.tsx:content-branch',
-        message: 'RecordModal branch (create vs view)',
-        data: {
-          branch,
-          recordId: recordId ?? null,
-          loading,
-          filteredFieldsLength: filteredFields.length,
-          visibleFieldsLength: visibleFields.length,
-          resolvedFieldLayoutLength: resolvedFieldLayout.length,
-        },
-        timestamp: Date.now()
-      })
-    }).catch(() => {})
-  }, [open, loading, recordId, formDataKeysLength, filteredFields.length, visibleFields.length, resolvedFieldLayout.length, isEditingLayout, showFieldSections, sectionedFields])
-  // #endregion
-
   const handleStartEditLayout = useCallback(() => {
     setManualEditMode(true)
     // If there's no existing layout, initialize with all fields visible
@@ -441,6 +397,50 @@ export default function RecordModal({
     if (!showFieldSections) return null
     return sectionAndSortFields(filteredFields)
   }, [filteredFields, showFieldSections])
+
+  // #region agent log - branch once per open/transition (not on every render)
+  const lastLoggedRef = useRef<string>('')
+  const formDataKeysLength = formData ? Object.keys(formData).length : 0
+  useEffect(() => {
+    if (!open || typeof window === 'undefined') return
+    const branch = loading
+      ? 'loading'
+      : recordId && formDataKeysLength === 0
+        ? 'record_not_found'
+        : filteredFields.length === 0
+          ? 'no_fields'
+          : isEditingLayout && recordId
+            ? 'layout_edit'
+            : resolvedFieldLayout.length > 0 && recordId
+              ? 'record_with_layout'
+              : showFieldSections && sectionedFields
+                ? 'sections'
+                : 'flat_create_or_view'
+    const key = `${branch}-${recordId ?? 'new'}-${loading}`
+    if (lastLoggedRef.current === key) return
+    lastLoggedRef.current = key
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: `log_${Date.now()}_recordmodal_branch`,
+        runId: 'pre-fix-3',
+        hypothesisId: 'H1',
+        location: 'RecordModal.tsx:content-branch',
+        message: 'RecordModal branch (create vs view)',
+        data: {
+          branch,
+          recordId: recordId ?? null,
+          loading,
+          filteredFieldsLength: filteredFields.length,
+          visibleFieldsLength: visibleFields.length,
+          resolvedFieldLayoutLength: resolvedFieldLayout.length,
+        },
+        timestamp: Date.now()
+      })
+    }).catch(() => {})
+  }, [open, loading, recordId, formDataKeysLength, filteredFields.length, visibleFields.length, resolvedFieldLayout.length, isEditingLayout, showFieldSections, sectionedFields])
+  // #endregion
 
   // CRITICAL: Unmount on close to prevent stale state (remount safety)
   if (!open) return null

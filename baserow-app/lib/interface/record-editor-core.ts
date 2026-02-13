@@ -23,6 +23,7 @@ import {
   canCreateRecord as cascadeCanCreateRecord,
   canDeleteRecord as cascadeCanDeleteRecord,
 } from '@/lib/interface/permission-cascade'
+import { triggerRecordAutomations } from '@/lib/automations/trigger-record-client'
 
 /** Optional context for permission cascade (read-only; core does not enforce). */
 export interface RecordEditorCascadeContext {
@@ -298,6 +299,7 @@ export function useRecordEditorCore(
           .update(payload)
           .eq('id', recordId)
         if (error) throw error
+        triggerRecordAutomations(tableId, 'row_updated', { ...payload, id: recordId })
         onSave?.()
       } else {
         const { data, error } = await supabase
@@ -307,6 +309,7 @@ export function useRecordEditorCore(
           .single()
         if (error) throw error
         const createdId = data?.id ?? null
+        triggerRecordAutomations(tableId, 'row_created', data as Record<string, any>)
         onSave?.(createdId)
       }
     } catch (e) {
@@ -320,6 +323,7 @@ export function useRecordEditorCore(
     formData,
     filteredFields,
     normalizeUpdateValue,
+    tableId,
     onSave,
     cascadeContext,
     canEditRecords,
@@ -345,6 +349,7 @@ export function useRecordEditorCore(
         const supabase = createClient()
         const { error } = await supabase.from(effectiveTableName).delete().eq('id', recordId)
         if (error) throw error
+        triggerRecordAutomations(tableId, 'row_deleted', { ...formData, id: recordId })
         await onDeleted?.()
       } catch (e) {
         if (!isAbortError(e)) throw e
@@ -352,7 +357,7 @@ export function useRecordEditorCore(
         setDeleting(false)
       }
     },
-    [recordId, effectiveTableName, onDeleted, cascadeContext, canDeleteRecords]
+    [recordId, effectiveTableName, formData, tableId, onDeleted, cascadeContext, canDeleteRecords]
   )
 
   return {

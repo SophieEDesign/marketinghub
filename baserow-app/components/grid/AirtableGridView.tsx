@@ -95,6 +95,8 @@ const COLUMN_MIN_WIDTH = 100
 const COLUMN_DEFAULT_WIDTH = 200
 const FROZEN_COLUMN_WIDTH = 50
 const OPEN_RECORD_COLUMN_WIDTH = 32
+// Left offset for first data column (chevron + checkbox + row#)
+const FIRST_DATA_COLUMN_LEFT = OPEN_RECORD_COLUMN_WIDTH + FROZEN_COLUMN_WIDTH * 2
 
 // Map row height values: 'compact' -> 'short', 'comfortable' -> 'tall'
 const mapRowHeightToAirtable = (height: string): 'short' | 'medium' | 'tall' => {
@@ -130,6 +132,8 @@ export default function AirtableGridView({
   const [tableIdState, setTableIdState] = useState<string | null>(tableId || null)
   const [showPasteConfirm, setShowPasteConfirm] = useState(false)
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
+  const [showDeleteRowConfirm, setShowDeleteRowConfirm] = useState(false)
+  const [rowToDelete, setRowToDelete] = useState<string | null>(null)
   const [pendingPasteAction, setPendingPasteAction] = useState<(() => void) | null>(null)
   const [selectedCount, setSelectedCount] = useState(0)
   const { handleError } = useOperationFeedback({
@@ -289,7 +293,7 @@ export default function AirtableGridView({
 
   // Use local sorts so column-header sort triggers refetch; menu sort updates viewSorts -> standardizedSorts -> syncs to sorts
   const sortsForData = useMemo(() => sorts.map(s => ({ field: s.field, direction: s.direction })), [sorts])
-  const { rows: allRows, loading, error, updateCell, refresh, retry, insertRow, physicalColumns } = useGridData({
+  const { rows: allRows, loading, error, updateCell, refresh, retry, insertRow, deleteRow, physicalColumns } = useGridData({
     tableName,
     tableId: tableIdState || tableId,
     fields,
@@ -1758,13 +1762,16 @@ export default function AirtableGridView({
           {/* Column headers */}
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={columnOrder} strategy={horizontalListSortingStrategy}>
-              {visibleFields.map((field) => {
+              {visibleFields.map((field, fieldIndex) => {
                 const sortIndex = sorts.findIndex((s) => s.field === field.name)
                 const sort = sortIndex >= 0 ? sorts[sortIndex] : null
+                const isFirstDataColumn = fieldIndex === 0
                 return (
                   <GridColumnHeader
                     key={field.name}
                     field={field}
+                    isFrozen={isFirstDataColumn}
+                    frozenLeft={isFirstDataColumn ? FIRST_DATA_COLUMN_LEFT : undefined}
                     width={columnWidths[field.name] || COLUMN_DEFAULT_WIDTH}
                     isResizing={resizingColumn === field.name}
                     wrapText={columnWrapText[field.name] || false}
@@ -2041,12 +2048,13 @@ export default function AirtableGridView({
                   </div>
 
                   {/* Cells */}
-                  {visibleFields.map((field) => {
+                  {visibleFields.map((field, fieldIndex) => {
                     const width = columnWidths[field.name] || COLUMN_DEFAULT_WIDTH
                     const isCellSelected =
                       selectedCell?.rowId === row.id && selectedCell?.fieldName === field.name
                     const isColumnSelected = selectedColumnId === field.id
                     const wrapText = columnWrapText[field.name] || false
+                    const isFirstDataColumn = fieldIndex === 0
 
                     return (
                       <div
@@ -2055,6 +2063,8 @@ export default function AirtableGridView({
                         data-row-id={row.id}
                         data-field-name={field.name}
                         className={`border-r border-gray-100/50 relative flex items-center overflow-hidden ${
+                          isFirstDataColumn ? 'sticky z-10 bg-inherit' : ''
+                        } ${
                           isColumnSelected 
                             ? 'bg-blue-100/50 ring-1 ring-blue-400/30 ring-inset' 
                             : isCellSelected 
@@ -2063,7 +2073,12 @@ export default function AirtableGridView({
                                 ? 'bg-green-50 ring-1 ring-green-400/30 ring-inset'
                                 : ''
                         }`}
-                        style={{ width, height: effectiveRowHeight, maxHeight: effectiveRowHeight }}
+                        style={{
+                          width,
+                          height: effectiveRowHeight,
+                          maxHeight: effectiveRowHeight,
+                          ...(isFirstDataColumn && { left: FIRST_DATA_COLUMN_LEFT }),
+                        }}
                         onClick={(e) => {
                           // Single click: select cell and copy value
                           setSelectedCell({ rowId: row.id, fieldName: field.name })
@@ -2115,6 +2130,11 @@ export default function AirtableGridView({
                               console.error('Failed to paste:', err)
                             }
                           }}
+                          onDelete={() => {
+                            setRowToDelete(row.id)
+                            setShowDeleteRowConfirm(true)
+                          }}
+                          canDelete={editable && userRole === 'admin'}
                           formatValue={(val) => formatCellValue(val, fields.find(f => f.name === field.name))}
                         >
                           <div className="w-full h-full flex items-center overflow-hidden relative group">
@@ -2245,6 +2265,31 @@ export default function AirtableGridView({
         description="This paste operation will affect approximately 10,000+ cells. This may take a while. Do you want to continue?"
         confirmLabel="Continue"
         cancelLabel="Cancel"
+      />
+
+      {/* Delete Row Confirmation Dialog (from context menu) */}
+      <ConfirmDialog
+        open={showDeleteRowConfirm}
+        onOpenChange={(open) => {
+          setShowDeleteRowConfirm(open)
+          if (!open) setRowToDelete(null)
+        }}
+        onConfirm={async () => {
+          if (rowToDelete) {
+            try {
+              await deleteRow(rowToDelete)
+              setShowDeleteRowConfirm(false)
+              setRowToDelete(null)
+            } catch (err) {
+              // Error handled by useGridData
+            }
+          }
+        }}
+        title="Delete record"
+        description="Are you sure you want to delete this record? This action cannot be undone."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="destructive"
       />
 
       {/* Bulk Delete Confirmation Dialog */}

@@ -43,6 +43,8 @@ interface KanbanViewProps {
   highlightRules?: HighlightRule[]
   /** Interface mode: 'view' | 'edit'. When 'edit', record panel opens editable (Airtable-style). */
   interfaceMode?: 'view' | 'edit'
+  /** Called when a record is deleted from RecordPanel; use to refresh core data. */
+  onRecordDeleted?: () => void
 }
 
 export default function KanbanView({ 
@@ -63,6 +65,7 @@ export default function KanbanView({
   onOpenSettings,
   highlightRules = [],
   interfaceMode = 'view',
+  onRecordDeleted,
 }: KanbanViewProps) {
   // All hooks must be at the top level, before any conditional returns
   const { openRecord } = useRecordPanel()
@@ -304,9 +307,10 @@ export default function KanbanView({
       (blockConfig as any)?.modal_fields,
       (blockConfig as any)?.modal_layout,
       cascadeContext ?? undefined,
-      interfaceMode
+      interfaceMode,
+      onRecordDeleted
     )
-  }, [blockConfig, cascadeContext, onRecordClick, openRecord, supabaseTableName, tableId, interfaceMode])
+  }, [blockConfig, cascadeContext, onRecordClick, openRecord, supabaseTableName, tableId, interfaceMode, onRecordDeleted])
 
   const handleCellSave = useCallback(async (rowId: string, fieldName: string, value: any) => {
     if (!supabaseTableName) return

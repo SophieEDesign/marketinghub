@@ -49,6 +49,8 @@ interface GalleryViewProps {
   highlightRules?: HighlightRule[]
   /** Interface mode: 'view' | 'edit'. When 'edit', record panel opens editable (Airtable-style). */
   interfaceMode?: 'view' | 'edit'
+  /** Called when a record is deleted from RecordPanel; use to refresh core data. */
+  onRecordDeleted?: () => void
 }
 
 export default function GalleryView({
@@ -71,6 +73,7 @@ export default function GalleryView({
   rowHeight = 30,
   highlightRules = [],
   interfaceMode = 'view',
+  onRecordDeleted,
 }: GalleryViewProps) {
   const { openRecord } = useRecordPanel()
   const [rows, setRows] = useState<TableRow[]>([])
@@ -447,8 +450,8 @@ export default function GalleryView({
       return
     }
     if (!supabaseTableName) return
-    openRecord(tableId, recordId, supabaseTableName, undefined, undefined, undefined, interfaceMode)
-  }, [onRecordClick, openRecord, supabaseTableName, tableId, interfaceMode])
+    openRecord(tableId, recordId, supabaseTableName, undefined, undefined, undefined, interfaceMode, onRecordDeleted)
+  }, [onRecordClick, openRecord, supabaseTableName, tableId, interfaceMode, onRecordDeleted])
 
   const handleCellSave = useCallback(async (rowId: string, fieldName: string, value: any) => {
     if (!supabaseTableName) return

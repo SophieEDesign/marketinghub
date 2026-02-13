@@ -7,3 +7,6 @@
  */
 export const VIEWS_ENABLED: boolean = process.env.NEXT_PUBLIC_ENABLE_VIEWS === "true"
 
+/** When true, Airtable-style dev mode UI is available at /dev/airtable */
+export const isAirtableDevMode = true
+
