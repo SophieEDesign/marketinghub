@@ -3,6 +3,7 @@
 import { RecordPanelProvider } from "@/contexts/RecordPanelContext"
 import { EditModeProvider } from "@/contexts/EditModeContext"
 import { SidebarModeProvider } from "@/contexts/SidebarModeContext"
+import { MainScrollProvider } from "@/contexts/MainScrollContext"
 import { UIStateProvider } from "@/contexts/UIStateContext"
 import type { DevModeShellData } from "@/lib/dev-mode-data"
 import AirtableDevLayout from "./AirtableDevLayout"
@@ -16,9 +17,11 @@ export default function AirtableDevModeClient({ shellData }: AirtableDevModeClie
     <UIStateProvider>
       <EditModeProvider>
         <SidebarModeProvider>
-          <RecordPanelProvider>
-            <AirtableDevLayout shellData={shellData} />
-          </RecordPanelProvider>
+          <MainScrollProvider>
+            <RecordPanelProvider>
+              <AirtableDevLayout shellData={shellData} />
+            </RecordPanelProvider>
+          </MainScrollProvider>
         </SidebarModeProvider>
       </EditModeProvider>
     </UIStateProvider>
