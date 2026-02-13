@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog"
 import { createClient } from "@/lib/supabase/client"
 import RecordFields from "@/components/records/RecordFields"
+import RecordComments from "@/components/records/RecordComments"
 import { useToast } from "@/components/ui/use-toast"
 import { Trash2 } from "lucide-react"
 import { isAbortError } from "@/lib/api/error-handling"
@@ -522,6 +523,15 @@ export default function RecordModal({
                     allFields={fields}
                     pageEditable={effectiveEditable}
                   />
+
+                  {/* Comments */}
+                  <div className="mt-6">
+                    <RecordComments
+                      tableId={tableId}
+                      recordId={recordId}
+                      canAddComment={effectiveEditable}
+                    />
+                  </div>
 
                   {/* Footer actions */}
                   {!isEditingLayout && (

@@ -313,6 +313,9 @@ export default function ListBlock({
   // Image: explicit per-block overrides win; otherwise fall back to first attachment/URL field in the card layout.
   let imageField: string =
     config.list_image_field || (config.appearance as any)?.image_field || config.image_field || ""
+
+  // Color field for status-based row coloring (single-select; uses choice colors)
+  const colorField = (config.appearance as any)?.color_field || config.color_field || ""
   if (!imageField && layoutCardFields.length > 0) {
     const attachmentOrUrl = layoutCardFields.find(
       (f) => f.type === "attachment" || f.type === "url"
@@ -527,6 +530,7 @@ export default function ListBlock({
 
       <ListView
         highlightRules={config.highlight_rules}
+        colorField={colorField || undefined}
         tableId={table.id}
         viewId={viewId || undefined}
         supabaseTableName={table.supabase_table}

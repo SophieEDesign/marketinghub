@@ -17,6 +17,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { Check, X, LayoutGrid } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import RecordFields from "@/components/records/RecordFields"
+import RecordComments from "@/components/records/RecordComments"
 import { useToast } from "@/components/ui/use-toast"
 import { useUserRole } from "@/lib/hooks/useUserRole"
 import type { TableField } from "@/types/fields"
@@ -397,6 +398,15 @@ export default function RecordDetailPanelInline({
             </p>
           </div>
         )}
+
+        {/* Comments - show whenever we have a record */}
+        <div className="mt-6">
+          <RecordComments
+            tableId={tableId}
+            recordId={recordId}
+            canAddComment={pageEditable}
+          />
+        </div>
       </div>
     </div>
   )

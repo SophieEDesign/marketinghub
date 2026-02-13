@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/use-toast"
 import RecordHeader from "./RecordHeader"
 import RecordFields from "./RecordFields"
 import RecordActivity from "./RecordActivity"
+import RecordComments from "./RecordComments"
 import type { TableField } from "@/types/fields"
 import { useRecordEditorCore } from "@/lib/interface/record-editor-core"
 import { isAbortError } from "@/lib/api/error-handling"
@@ -608,6 +609,13 @@ export default function RecordPanel() {
               <RecordActivity
                 record={formData}
                 tableId={state.tableId || ""}
+              />
+
+              {/* Comments Section */}
+              <RecordComments
+                tableId={state.tableId || ""}
+                recordId={state.recordId || ""}
+                canAddComment={effectiveAllowEdit}
               />
             </div>
           )}

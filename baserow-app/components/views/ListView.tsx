@@ -68,6 +68,8 @@ interface ListViewProps {
   rowHeight?: number
   /** Conditional formatting rules */
   highlightRules?: HighlightRule[]
+  /** Field name for status-based row coloring (single-select; uses choice colors) */
+  colorField?: string
   /** Optional: when provided, permission flags are applied in RecordModal. */
   cascadeContext?: { pageConfig?: any; blockConfig?: any } | null
   /** Interface mode: 'view' | 'edit'. When 'edit', record panel opens editable (Airtable-style). */
@@ -102,6 +104,7 @@ export default function ListView({
   onHeightChange,
   rowHeight = 30,
   highlightRules = [],
+  colorField,
   cascadeContext,
   interfaceMode = 'view',
   onRecordDeleted,
@@ -690,6 +693,21 @@ export default function ListView({
     return SEMANTIC_COLORS[Math.abs(hash) % SEMANTIC_COLORS.length]
   }, [])
 
+  // Status-based row color from colorField (single-select choice colors)
+  const getRowColor = useCallback((row: Record<string, any>): string | null => {
+    if (!colorField || typeof colorField !== 'string') return null
+    const colorFieldObj = tableFields.find(f => f.name === colorField || f.id === colorField)
+    if (!colorFieldObj || (colorFieldObj.type !== 'single_select' && colorFieldObj.type !== 'multi_select')) {
+      return null
+    }
+    const colorValue = row?.[colorFieldObj.name] ?? row?.[colorField]
+    if (!colorValue) return null
+    const normalizedValue = String(colorValue).trim()
+    return normalizeHexColor(
+      resolveChoiceColor(normalizedValue, colorFieldObj.type, colorFieldObj.options, colorFieldObj.type === 'single_select')
+    )
+  }, [colorField, tableFields])
+
   const handleAddRecordToGroup = useCallback(async (groupKey: string) => {
     if (!showAddRecord || !canCreateRecord) return
     if (!supabaseTableName || !tableId) return
@@ -813,6 +831,10 @@ export default function ListView({
       ? getFormattingStyle(matchingRule)
       : {}
 
+    // Status-based color (left border, matches Grid/Gallery)
+    const rowColor = getRowColor(row)
+    const borderColor = rowColor ? { borderLeftColor: rowColor, borderLeftWidth: '4px' } : {}
+
     return (
       <div
         key={recordId}
@@ -823,7 +845,7 @@ export default function ListView({
             ? "border-blue-200 ring-2 ring-blue-100"
             : "border-gray-200 hover:border-gray-300 hover:shadow-md active:shadow-sm"
         }`}
-        style={rowFormattingStyle}
+        style={{ ...borderColor, ...rowFormattingStyle }}
       >
         <div className={`flex items-start gap-4 ${isMobile ? 'p-3' : 'p-4'}`}>
           {/* Thumbnail (always reserved, matches card style) */}
@@ -977,6 +999,7 @@ export default function ListView({
     selectedRecordId,
     formatFieldValue,
     getPillColor,
+    getRowColor,
     highlightRules,
   ])
 
