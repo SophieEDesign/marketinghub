@@ -77,10 +77,11 @@ export default function RecordComments({
     try {
       const res = await fetch(`/api/tables/${tableId}/records/${recordId}/comments`)
       if (!res.ok) throw new Error("Failed to load comments")
-      const { comments: data } = await res.json()
-      setComments(data ?? [])
+      const body = (await res.json()) as { comments?: RecordComment[] }
+      const data = body.comments ?? []
+      setComments(data)
 
-      const userIds = [...new Set((data ?? []).map((c: RecordComment) => c.user_id))]
+      const userIds: string[] = [...new Set(data.map((c) => c.user_id))]
       if (userIds.length > 0) {
         const names = await getUserDisplayNames(userIds)
         setUserNames(names)
