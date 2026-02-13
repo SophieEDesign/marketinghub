@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { ChevronDown, Table2, Settings, Shield, Copy, Trash2 } from "lucide-react"
+import { ChevronDown, Table2, Settings, Shield, Copy, Trash2, Edit2, Eye, Home } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useBranding } from "@/contexts/BrandingContext"
+import { useUIMode } from "@/contexts/UIModeContext"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,15 +24,30 @@ interface BaseDropdownProps {
   className?: string
   /** Optional: admin flag for Delete Base visibility */
   isAdmin?: boolean
+  /** Optional: when provided, show Edit/View toggle (Airtable-style) at top of dropdown */
+  onEnterEdit?: () => void
+  /** Optional: when provided with onEnterEdit, show View option to exit edit mode */
+  onExitEdit?: () => void
+  /** Optional: true when in edit mode (for highlighting active state) */
+  isEditMode?: boolean
+  /** Optional: when provided, add Page settings to dropdown */
+  onOpenPageSettings?: () => void
 }
 
 export default function BaseDropdown({
   variant = "default",
   className,
   isAdmin = false,
+  onEnterEdit,
+  onExitEdit,
+  isEditMode: isEditModeProp,
+  onOpenPageSettings,
 }: BaseDropdownProps) {
   const { primaryColor } = useBranding()
   const { toast } = useToast()
+  const { uiMode } = useUIMode()
+  const showEditViewToggle = onEnterEdit != null && onExitEdit != null
+  const inAnyEditMode = isEditModeProp ?? uiMode !== "view"
   const [baseName, setBaseName] = useState<string>("Base")
   const [loading, setLoading] = useState(true)
 
@@ -90,6 +106,38 @@ export default function BaseDropdown({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">
+        {/* Airtable-style: Edit or View (no View data) */}
+        {showEditViewToggle && (
+          <>
+            {inAnyEditMode ? (
+              <DropdownMenuItem onClick={onExitEdit} className="flex items-center gap-2">
+                <Eye className="h-4 w-4" />
+                View
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onClick={onEnterEdit} className="flex items-center gap-2">
+                <Edit2 className="h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem asChild>
+              <Link href="/" className="flex items-center gap-2 cursor-pointer">
+                <Home className="h-4 w-4" />
+                Back to home
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
+        {onOpenPageSettings && (
+          <>
+            <DropdownMenuItem onClick={onOpenPageSettings} className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              Page settings
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
         <DropdownMenuItem asChild>
           <Link href="/tables" className="flex items-center gap-2 cursor-pointer">
             <Table2 className="h-4 w-4" />

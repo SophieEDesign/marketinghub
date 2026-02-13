@@ -222,6 +222,7 @@ export default function NonGridViewWrapper({
       <ViewTopBar
         viewName={viewName}
         viewType={viewType}
+        viewId={viewId}
         tableId={tableId}
         views={views}
         tableFields={tableFields}

@@ -3,13 +3,13 @@
 import { useState, useEffect, useCallback } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
+import { cn } from "@/lib/utils"
 import {
   Filter,
   ArrowUpDown,
   Group,
   Eye,
   MoreVertical,
-  ChevronDown,
   Grid3x3,
   Layout,
   Calendar,
@@ -206,32 +206,30 @@ export default function ViewBuilderToolbar({
   return (
     <>
       <div className="h-10 bg-gray-50 border-b border-gray-200 flex items-center justify-between px-4 z-10 relative">
-        {/* Left side - View name dropdown + Search */}
-        <div className="flex items-center gap-2">
+        {/* Left side - View tabs + Search */}
+        <div className="flex items-center gap-2 min-w-0">
           {views.length > 0 ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2.5 text-xs font-medium text-gray-700 hover:bg-gray-100"
-                >
-                  {viewName}
-                  <span className="text-gray-500 font-normal ml-1">({viewType})</span>
-                  <ChevronDown className="h-3.5 w-3.5 ml-1" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="max-h-64 overflow-y-auto">
-                {views.map((v) => (
-                  <DropdownMenuItem key={v.id} asChild>
-                    <Link href={`/tables/${tableId}/views/${v.id}`} className="block">
-                      <span className="font-medium">{v.name}</span>
-                      <span className="text-gray-500 text-xs ml-1">({v.type})</span>
-                    </Link>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center border-b border-gray-200 -mb-[1px] overflow-x-auto shrink-0 min-w-0">
+              {views.map((v) => {
+                const isActive = v.id === viewId
+                return (
+                  <Link
+                    key={v.id}
+                    href={`/tables/${tableId}/views/${v.id}`}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px",
+                      isActive
+                        ? "border-blue-600 text-blue-600 bg-white"
+                        : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                    )}
+                  >
+                    {getViewIcon(v.type as ViewType)}
+                    <span className="truncate max-w-[120px]">{v.name}</span>
+                    <span className="text-gray-400 text-[10px] capitalize shrink-0">({v.type})</span>
+                  </Link>
+                )
+              })}
+            </div>
           ) : (
             <>
               <span className="text-sm font-medium text-gray-700">{viewName}</span>
@@ -422,16 +420,16 @@ export default function ViewBuilderToolbar({
                       <div className="space-y-2">
                         <Label className="text-xs">Secondary field</Label>
                         <Select
-                          value={cardFields[1] || ""}
+                          value={cardFields[1] || "__none__"}
                           onValueChange={(v) =>
-                            onCardLayoutChange(cardFields[0] || "", v)
+                            onCardLayoutChange(cardFields[0] || "", v === "__none__" ? "" : v)
                           }
                         >
                           <SelectTrigger className="h-8">
                             <SelectValue placeholder="Select field" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">None</SelectItem>
+                            <SelectItem value="__none__">None</SelectItem>
                             {tableFields.map((f) => (
                               <SelectItem key={f.name} value={f.name}>
                                 {f.name}

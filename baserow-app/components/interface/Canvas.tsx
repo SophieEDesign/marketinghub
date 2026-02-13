@@ -138,15 +138,22 @@ export default function Canvas({
   // Get filters from filter blocks for this block
   const { getFiltersForBlock, getFilterTreeForBlock } = useFilterState()
   
+  // CRITICAL: Stabilize pageFilters callback to prevent usePageAggregates from recalculating
+  // on every render. A new callback each render caused React error #185 (maximum update depth).
+  const pageFiltersResolver = useCallback(
+    (blockId: string) => {
+      const block = blocks.find(b => b.id === blockId)
+      const blockTableId = block?.config?.table_id || pageTableId
+      return getFiltersForBlock(blockId, blockTableId)
+    },
+    [blocks, pageTableId, getFiltersForBlock]
+  )
+  
   // CRITICAL: Fetch aggregate data at page level (inside FilterStateProvider)
   // This eliminates duplicate requests - SWR handles deduplication automatically
   // Fetch all aggregates for KPI blocks using per-block page filters.
   // This ensures a Filter block only affects the KPI blocks it targets.
-  const aggregateData = usePageAggregates(blocks, (blockId) => {
-    const block = blocks.find(b => b.id === blockId)
-    const blockTableId = block?.config?.table_id || pageTableId
-    return getFiltersForBlock(blockId, blockTableId)
-  })
+  const aggregateData = usePageAggregates(blocks, pageFiltersResolver)
   
   // Identify top two field blocks (by y position) for inline editing without Edit button
   // Only consider field blocks in the right column (x >= 4) for record view pages

@@ -2063,12 +2063,12 @@ export default function AirtableGridView({
                         data-row-id={row.id}
                         data-field-name={field.name}
                         className={`border-r border-gray-100/50 relative flex items-center overflow-hidden ${
-                          isFirstDataColumn ? 'sticky z-10 bg-inherit' : ''
+                          isFirstDataColumn ? `sticky z-10 ${stickyBgClass}` : ''
                         } ${
                           isColumnSelected 
-                            ? 'bg-blue-100/50 ring-1 ring-blue-400/30 ring-inset' 
+                            ? (isFirstDataColumn ? 'bg-blue-100' : 'bg-blue-100/50') + ' ring-1 ring-blue-400/30 ring-inset' 
                             : isCellSelected 
-                              ? 'bg-blue-50/50 ring-1 ring-blue-400/30 ring-inset' 
+                              ? (isFirstDataColumn ? 'bg-blue-50' : 'bg-blue-50/50') + ' ring-1 ring-blue-400/30 ring-inset' 
                               : fillTargetRowIds.has(row.id) && fillSource?.fieldName === field.name
                                 ? 'bg-green-50 ring-1 ring-green-400/30 ring-inset'
                                 : ''
@@ -2149,6 +2149,11 @@ export default function AirtableGridView({
                               onSave={(value) => handleCellSave(row.id, field.name, value)}
                               onFieldOptionsUpdate={onTableFieldsRefresh}
                               isCellSelected={isCellSelected}
+                              onDelete={() => {
+                                setRowToDelete(row.id)
+                                setShowDeleteRowConfirm(true)
+                              }}
+                              canDelete={editable && userRole === 'admin'}
                             />
                             {isCellSelected && editable && !field.options?.read_only && (
                               <FillHandle

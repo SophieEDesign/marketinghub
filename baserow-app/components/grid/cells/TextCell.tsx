@@ -6,9 +6,10 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@/components/context-menu/ContextMenu'
-import { Copy, Edit } from 'lucide-react'
+import { Copy, Edit, Trash2 } from 'lucide-react'
 import { isUserField, getUserDisplayName } from '@/lib/users/userDisplay'
 
 interface TextCellProps {
@@ -21,6 +22,8 @@ interface TextCellProps {
   onSave: (value: string) => Promise<void>
   placeholder?: string
   onCopy?: () => void // Optional callback for copy action
+  onDelete?: () => void
+  canDelete?: boolean
 }
 
 export default function TextCell({
@@ -32,6 +35,8 @@ export default function TextCell({
   onSave,
   placeholder = '—',
   onCopy,
+  onDelete,
+  canDelete = false,
 }: TextCellProps) {
   const [editing, setEditing] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
@@ -243,6 +248,18 @@ export default function TextCell({
               <ContextMenuItem onClick={() => setModalOpen(true)}>
                 <Edit className="h-4 w-4 mr-2" />
                 Edit in modal
+              </ContextMenuItem>
+            </>
+          )}
+          {canDelete && onDelete && (
+            <>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                onClick={onDelete}
+                className="text-red-600 focus:bg-red-50 focus:text-red-700"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete record
               </ContextMenuItem>
             </>
           )}

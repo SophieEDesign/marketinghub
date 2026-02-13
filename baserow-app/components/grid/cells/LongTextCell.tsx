@@ -7,9 +7,10 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@/components/context-menu/ContextMenu'
-import { Copy, Edit } from 'lucide-react'
+import { Copy, Edit, Trash2 } from 'lucide-react'
 
 interface LongTextCellProps {
   value: string | null
@@ -20,6 +21,8 @@ interface LongTextCellProps {
   onSave: (value: string) => Promise<void>
   placeholder?: string
   onCopy?: () => void // Optional callback for copy action
+  onDelete?: () => void
+  canDelete?: boolean
 }
 
 export default function LongTextCell({
@@ -31,6 +34,8 @@ export default function LongTextCell({
   onSave,
   placeholder = '—',
   onCopy,
+  onDelete,
+  canDelete = false,
 }: LongTextCellProps) {
   const [editing, setEditing] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
@@ -203,6 +208,18 @@ export default function LongTextCell({
               <ContextMenuItem onClick={() => setModalOpen(true)}>
                 <Edit className="h-4 w-4 mr-2" />
                 Edit in rich text editor
+              </ContextMenuItem>
+            </>
+          )}
+          {canDelete && onDelete && (
+            <>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                onClick={onDelete}
+                className="text-red-600 focus:bg-red-50 focus:text-red-700"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete record
               </ContextMenuItem>
             </>
           )}

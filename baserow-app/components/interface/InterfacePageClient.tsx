@@ -2,16 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
-import { Edit2, Settings, MoreVertical, Filter, ArrowUpDown, List } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import dynamic from "next/dynamic"
 import { createClient } from "@/lib/supabase/client"
 import { formatDateUK } from "@/lib/utils"
@@ -69,7 +60,7 @@ function InterfacePageClientInternal({
   // Use unified editing context (block scope kept in sync with UIMode editPages)
   const { isEditing: isPageEditing, enter: enterPageEdit, exit: exitPageEdit } = usePageEditMode(pageId)
   const { isEditing: isBlockEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(pageId)
-  const { uiMode, enterEditPages, exitEditPages, exitRecordLayoutEdit } = useUIMode()
+  const { uiMode, enterEditPages, exitEditPages, exitRecordLayoutEdit, exitFieldSchemaEdit } = useUIMode()
   
   const [blocks, setBlocks] = useState<any[]>([])
   const [blocksLoading, setBlocksLoading] = useState(false)
@@ -1221,6 +1212,12 @@ function InterfacePageClientInternal({
     if (page) loadBlocks(true)
   }
 
+  const handleExitToView = () => {
+    if (uiMode === "editPages") handleDoneEditingInterface()
+    else if (uiMode === "recordLayoutEdit") exitRecordLayoutEdit()
+    else if (uiMode === "fieldSchemaEdit") exitFieldSchemaEdit()
+  }
+
   const handleEnterEditPages = () => {
     if (page?.id) {
       enterEditPages(page.id)
@@ -1234,7 +1231,15 @@ function InterfacePageClientInternal({
       {!isViewer && page && isAdmin && (
         <div className="border-b bg-white px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <BaseDropdown variant="compact" isAdmin={true} className="flex-shrink-0" />
+            <BaseDropdown
+              variant="compact"
+              isAdmin={true}
+              className="flex-shrink-0"
+              onEnterEdit={handleEnterEditPages}
+              onExitEdit={handleExitToView}
+              isEditMode={uiMode !== "view"}
+              onOpenPageSettings={handleOpenPageSettings}
+            />
             {isEditingTitle ? (
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <input
@@ -1293,51 +1298,6 @@ function InterfacePageClientInternal({
                 )}
               </>
             )}
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {uiMode === "view" && (
-              <>
-                <Button variant="outline" size="sm" onClick={handleEnterEditPages} className="gap-1.5">
-                  <Edit2 className="h-4 w-4" />
-                  Edit Pages
-                </Button>
-                <Button variant="ghost" size="sm" title="Filter" disabled className="opacity-60">
-                  <Filter className="h-4 w-4" />
-                  <span className="hidden sm:inline">Filter</span>
-                </Button>
-                <Button variant="ghost" size="sm" title="Sort" disabled className="opacity-60">
-                  <ArrowUpDown className="h-4 w-4" />
-                  <span className="hidden sm:inline">Sort</span>
-                </Button>
-                <Button variant="ghost" size="sm" title="Fields" disabled className="opacity-60">
-                  <List className="h-4 w-4" />
-                  <span className="hidden sm:inline">Fields</span>
-                </Button>
-              </>
-            )}
-            {uiMode === "editPages" && (
-              <Button variant="default" size="sm" onClick={handleDoneEditingInterface} className="gap-1.5">
-                Done Editing
-              </Button>
-            )}
-            {uiMode === "recordLayoutEdit" && (
-              <Button variant="default" size="sm" onClick={exitRecordLayoutEdit} className="gap-1.5">
-                Done Customizing Layout
-              </Button>
-            )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" title="More actions">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleOpenPageSettings}>
-                  <Settings className="h-4 w-4 mr-2" />
-                  Page settings
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         </div>
       )}

@@ -15,19 +15,13 @@ import {
   Layout,
   Calendar,
   FileText,
-  ChevronDown,
   Settings,
   X,
   Clock,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { cn } from "@/lib/utils"
 import {
   Popover,
   PopoverContent,
@@ -53,6 +47,7 @@ interface ViewSummary {
 interface ViewTopBarProps {
   viewName: string
   viewType?: "grid" | "kanban" | "calendar" | "form" | "timeline" | "horizontal_grouped" | "gallery"
+  viewId?: string
   tableId?: string
   views?: ViewSummary[]
   tableFields?: TableField[]
@@ -72,6 +67,7 @@ interface ViewTopBarProps {
 export default function ViewTopBar({
   viewName,
   viewType = "grid",
+  viewId,
   tableId,
   views = [],
   tableFields = [],
@@ -151,33 +147,32 @@ export default function ViewTopBar({
 
   return (
     <div className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4 shadow-sm">
-      {/* Left side - View name and controls */}
+      {/* Left side - View tabs and controls */}
       <div className="flex items-center gap-3 flex-1 min-w-0">
         {views.length > 0 && tableId ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 px-2.5 text-base font-semibold"
-                style={{ color: primaryColor }}
-              >
-                {viewName}
-                <span className="text-xs font-normal ml-1 opacity-80">({viewType})</span>
-                <ChevronDown className="h-4 w-4 ml-1" style={{ color: primaryColor }} />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="max-h-64 overflow-y-auto">
-              {views.map((v) => (
-                <DropdownMenuItem key={v.id} asChild>
-                  <Link href={`/tables/${tableId}/views/${v.id}`} className="block">
-                    <span className="font-medium">{v.name}</span>
-                    <span className="text-gray-500 text-xs ml-1">({v.type})</span>
-                  </Link>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center border-b border-gray-200 -mb-[1px] overflow-x-auto shrink-0 min-w-0">
+            {views.map((v) => {
+              const isActive = v.id === viewId
+              return (
+                <Link
+                  key={v.id}
+                  href={`/tables/${tableId}/views/${v.id}`}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px",
+                    isActive
+                      ? "border-blue-600 text-blue-600 bg-white"
+                      : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                  )}
+                >
+                  <span style={isActive ? { color: primaryColor } : undefined} className="shrink-0 [&>svg]:h-4 [&>svg]:w-4">
+                    {getViewIcon(v.type)}
+                  </span>
+                  <span className="truncate max-w-[120px]">{v.name}</span>
+                  <span className="text-gray-400 text-xs capitalize shrink-0">({v.type})</span>
+                </Link>
+              )
+            })}
+          </div>
         ) : (
           <>
             <h1 className="text-base font-semibold truncate" style={{ color: primaryColor }}>
@@ -300,16 +295,16 @@ export default function ViewTopBar({
                     <div className="space-y-2">
                       <Label className="text-xs">Secondary field</Label>
                       <Select
-                        value={cardFields[1] || ""}
+                        value={cardFields[1] || "__none__"}
                         onValueChange={(v) =>
-                          onCardLayoutChange(cardFields[0] || "", v)
+                          onCardLayoutChange(cardFields[0] || "", v === "__none__" ? "" : v)
                         }
                       >
                         <SelectTrigger className="h-8">
                           <SelectValue placeholder="Select field" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">None</SelectItem>
+                          <SelectItem value="__none__">None</SelectItem>
                           {tableFields.map((f) => (
                             <SelectItem key={f.name} value={f.name}>
                               {f.name}

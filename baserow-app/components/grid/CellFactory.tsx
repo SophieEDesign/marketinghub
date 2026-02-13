@@ -27,6 +27,8 @@ interface CellFactoryProps {
   onSave: (value: any) => Promise<void>
   onFieldOptionsUpdate?: () => void // Callback when select options are updated
   isCellSelected?: boolean // Whether the cell is currently selected
+  onDelete?: (rowId: string) => void
+  canDelete?: boolean
 }
 
 export function CellFactory({
@@ -40,6 +42,8 @@ export function CellFactory({
   onSave,
   onFieldOptionsUpdate,
   isCellSelected = false,
+  onDelete,
+  canDelete = false,
 }: CellFactoryProps): ReactNode {
   const commonProps = {
     value,
@@ -50,12 +54,16 @@ export function CellFactory({
     onSave,
   }
 
+  const deleteProps = canDelete && onDelete
+    ? { onDelete: () => onDelete(rowId), canDelete: true }
+    : {}
+
   switch (field.type) {
     case 'text':
-      return <TextCell {...commonProps} />
+      return <TextCell {...commonProps} {...deleteProps} />
 
     case 'long_text':
-      return <LongTextCell {...commonProps} />
+      return <LongTextCell {...commonProps} {...deleteProps} />
 
     case 'number':
     case 'percent':
@@ -134,7 +142,7 @@ export function CellFactory({
 
     case 'formula':
       // These are read-only or need special handling
-      return <TextCell {...commonProps} editable={false} />
+      return <TextCell {...commonProps} {...deleteProps} editable={false} />
 
     case 'lookup':
       return (
@@ -171,7 +179,7 @@ export function CellFactory({
       if (typeof value === 'object' && value !== null) {
         return <JsonCell {...commonProps} editable={false} />
       }
-      return <TextCell {...commonProps} />
+      return <TextCell {...commonProps} {...deleteProps} />
   }
 }
 

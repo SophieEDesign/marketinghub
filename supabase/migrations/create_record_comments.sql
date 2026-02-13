@@ -2,7 +2,10 @@
 -- Enables discussion/commenting on records across all tables.
 -- Links comments to records via table_id (metadata) + record_id (row id in dynamic table).
 
-CREATE TABLE IF NOT EXISTS public.record_comments (
+-- Drop if exists (handles partial/failed runs with wrong schema)
+DROP TABLE IF EXISTS public.record_comments CASCADE;
+
+CREATE TABLE public.record_comments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   table_id UUID NOT NULL REFERENCES public.tables(id) ON DELETE CASCADE,
   record_id UUID NOT NULL,
