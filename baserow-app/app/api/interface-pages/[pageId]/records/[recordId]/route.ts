@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getInterfacePage } from '@/lib/interface/pages'
 import { getUserRole } from '@/lib/roles'
 import { runRecordAutomations } from '@/lib/automations/record-trigger'
+import type { PageConfig } from '@/lib/interface/page-config'
 
 function canDelete(role: 'admin' | 'member' | null, pageConfig: PageConfig): boolean {
   if (!role) return false

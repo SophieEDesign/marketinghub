@@ -430,7 +430,7 @@ export default function DevRecordPanel() {
                 fieldGroups={fieldGroups}
                 tableId={state.tableId || ""}
                 recordId={state.recordId || ""}
-                tableName={state.tableName}
+                tableName={state.tableName ?? undefined}
                 isFieldEditable={() => effectiveAllowEdit}
                 layoutMode={isRecordLayoutEdit}
                 fieldLayout={resolvedFieldLayout}
