@@ -7,7 +7,7 @@ import NonGridViewWrapper from "@/components/grid/NonGridViewWrapper"
 import InterfacePage from "@/components/views/InterfacePage"
 import WorkspaceShellWrapper from "@/components/layout/WorkspaceShellWrapper"
 import { getTable } from "@/lib/crud/tables"
-import { getView } from "@/lib/crud/views"
+import { getView, getViews } from "@/lib/crud/views"
 import { Button } from "@/components/ui/button"
 import { normalizeUuid } from "@/lib/utils/ids"
 
@@ -148,6 +148,11 @@ export default async function ViewPage({
     const horizontalGroupedGroupField = view.type === "horizontal_grouped" ? groupBy : undefined
     const horizontalGroupedGroupRules = view.type === "horizontal_grouped" ? groupByRules : undefined
 
+    // Fetch all views for this table (for view switcher dropdown)
+    const tableViews = await getViews(tableId).catch(() => []).then((v) =>
+      (v || []).filter((x) => x.type !== "interface")
+    )
+
     return (
       <WorkspaceShellWrapper title={view.name}>
         {view.type === "grid" ? (
@@ -157,6 +162,7 @@ export default async function ViewPage({
             table={table}
             isCoreData={Boolean((table as { is_core_data?: boolean })?.is_core_data)}
             view={view}
+            views={tableViews}
             initialViewFields={viewFields}
             initialViewFilters={viewFilters}
             initialViewSorts={viewSorts}
@@ -170,11 +176,13 @@ export default async function ViewPage({
             viewName={view.name}
             tableId={tableId}
             viewId={viewId}
+            views={tableViews}
             fieldIds={Array.isArray(viewFields) ? viewFields.map((f) => f.field_name).filter(Boolean) : []}
             groupingFieldId={horizontalGroupedGroupField}
             groupByRules={horizontalGroupedGroupRules}
             viewFilters={viewFilters}
             viewSorts={viewSorts}
+            viewFields={viewFields}
             tableFields={tableFields}
           />
         ) : (
@@ -183,6 +191,7 @@ export default async function ViewPage({
             viewName={view.name}
             tableId={tableId}
             viewId={viewId}
+            views={tableViews}
             fieldIds={Array.isArray(viewFields) ? viewFields.map((f) => f.field_name).filter(Boolean) : []}
             groupingFieldId={kanbanGroupField}
             dateFieldId={
@@ -190,6 +199,11 @@ export default async function ViewPage({
                 ? (Array.isArray(viewFields) && viewFields[0]?.field_name) || undefined
                 : undefined
             }
+            viewFilters={viewFilters}
+            viewSorts={viewSorts}
+            viewFields={viewFields}
+            tableFields={tableFields}
+            cardFields={(view.config as { card_fields?: string[] })?.card_fields ?? []}
           />
         )}
       </WorkspaceShellWrapper>

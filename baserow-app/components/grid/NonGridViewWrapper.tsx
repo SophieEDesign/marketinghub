@@ -9,24 +9,44 @@ import CalendarView from "@/components/views/CalendarView"
 import TimelineView from "@/components/views/TimelineView"
 import HorizontalGroupedView from "@/components/views/HorizontalGroupedView"
 import DesignSidebar from "@/components/layout/DesignSidebar"
+import UnifiedFilterDialog from "@/components/filters/UnifiedFilterDialog"
+import SortDialog from "@/components/grid/SortDialog"
+import HideFieldsDialog from "@/components/grid/HideFieldsDialog"
 import { supabase } from "@/lib/supabase/client"
 import type { TableField } from "@/types/fields"
 import type { ViewFilter, ViewSort } from "@/types/database"
+import type { FilterType } from "@/types/database"
 import { applyFiltersToQuery, type FilterConfig } from "@/lib/interface/filters"
 import type { GroupRule } from "@/lib/grouping/types"
+import { normalizeUuid } from "@/lib/utils/ids"
+
+interface ViewSummary {
+  id: string
+  name: string
+  type: string
+}
+
+interface ViewFieldRow {
+  field_name: string
+  visible: boolean
+  position: number
+}
 
 interface NonGridViewWrapperProps {
   viewType: "form" | "kanban" | "calendar" | "timeline" | "horizontal_grouped"
   viewName: string
   tableId: string
   viewId: string
+  views?: ViewSummary[]
   fieldIds: string[]
   groupingFieldId?: string
   groupByRules?: GroupRule[]
   dateFieldId?: string
   viewFilters?: ViewFilter[]
   viewSorts?: ViewSort[]
+  viewFields?: ViewFieldRow[]
   tableFields?: TableField[]
+  cardFields?: string[]
 }
 
 export default function NonGridViewWrapper({
@@ -34,22 +54,59 @@ export default function NonGridViewWrapper({
   viewName,
   tableId,
   viewId,
+  views = [],
   fieldIds: fieldIdsProp,
   groupingFieldId,
   groupByRules,
   dateFieldId,
   viewFilters = [],
   viewSorts = [],
+  viewFields: viewFieldsProp = [],
   tableFields: tableFieldsProp = [],
+  cardFields: cardFieldsProp = [],
 }: NonGridViewWrapperProps) {
-  // Ensure fieldIds is always an array
-  const fieldIds = Array.isArray(fieldIdsProp) ? fieldIdsProp : []
+  const viewUuid = normalizeUuid(viewId)
   const router = useRouter()
   const searchParams = useSearchParams()
   const searchQuery = searchParams.get("q") || ""
   const [designSidebarOpen, setDesignSidebarOpen] = useState(false)
+  const [filterDialogOpen, setFilterDialogOpen] = useState(false)
+  const [sortDialogOpen, setSortDialogOpen] = useState(false)
+  const [hideFieldsDialogOpen, setHideFieldsDialogOpen] = useState(false)
   const [tableInfo, setTableInfo] = useState<{ name: string; supabase_table: string } | null>(null)
   const [tableFields, setTableFields] = useState<TableField[]>(tableFieldsProp)
+  const [filters, setFilters] = useState<ViewFilter[]>(viewFilters)
+  const [sorts, setSorts] = useState<ViewSort[]>(viewSorts)
+  const initialViewFields =
+    viewFieldsProp.length > 0 ? viewFieldsProp : fieldIdsProp.map((name, i) => ({ field_name: name, visible: true, position: i }))
+  const [viewFields, setViewFields] = useState<ViewFieldRow[]>(initialViewFields)
+  const [hiddenFields, setHiddenFields] = useState<string[]>(
+    initialViewFields.filter((f) => !f.visible).map((f) => f.field_name)
+  )
+  const [cardFields, setCardFields] = useState<string[]>(cardFieldsProp)
+
+  const fieldIds = useMemo(() => {
+    if (viewFields.length > 0) {
+      const visible = viewFields
+        .sort((a, b) => a.position - b.position)
+        .filter((vf) => !hiddenFields.includes(vf.field_name))
+        .map((vf) => vf.field_name)
+      if (viewType === "kanban" && cardFields.length > 0) {
+        const primary = cardFields[0]
+        const secondary = cardFields[1]
+        const rest = visible.filter((n) => n !== primary && n !== secondary)
+        const ordered: string[] = []
+        if (primary && visible.includes(primary)) ordered.push(primary)
+        if (secondary && visible.includes(secondary)) ordered.push(secondary)
+        rest.forEach((n) => {
+          if (!ordered.includes(n)) ordered.push(n)
+        })
+        return ordered.length > 0 ? ordered : visible
+      }
+      return visible
+    }
+    return Array.isArray(fieldIdsProp) ? fieldIdsProp : []
+  }, [viewFields, hiddenFields, fieldIdsProp, viewType, cardFields])
 
   useEffect(() => {
     async function loadTableInfo() {
@@ -76,7 +133,7 @@ export default function NonGridViewWrapper({
       setTableFields(tableFieldsProp)
       return
     }
-    
+
     async function loadFields() {
       try {
         const response = await fetch(`/api/tables/${tableId}/fields`)
@@ -90,6 +147,46 @@ export default function NonGridViewWrapper({
     }
     loadFields()
   }, [tableId, tableFieldsProp])
+
+  useEffect(() => {
+    setFilters(viewFilters)
+    setSorts(viewSorts)
+  }, [viewFilters, viewSorts])
+
+  useEffect(() => {
+    if (viewFieldsProp.length > 0) {
+      setViewFields(viewFieldsProp)
+      setHiddenFields(viewFieldsProp.filter((f) => !f.visible).map((f) => f.field_name))
+    }
+  }, [viewFieldsProp])
+
+  useEffect(() => {
+    setCardFields(cardFieldsProp)
+  }, [cardFieldsProp])
+
+  const filtersAsConfig: FilterConfig[] = useMemo(
+    () =>
+      filters.map((f) => ({
+        field: f.field_name,
+        operator: f.operator as FilterConfig["operator"],
+        value: f.value,
+      })),
+    [filters]
+  )
+
+  async function loadViewFields() {
+    if (!viewUuid) return
+    try {
+      const { data } = await supabase
+        .from("view_fields")
+        .select("field_name, visible, position")
+        .eq("view_id", viewUuid)
+        .order("position", { ascending: true })
+      if (data) setViewFields(data as ViewFieldRow[])
+    } catch (error) {
+      console.error("Error loading view fields:", error)
+    }
+  }
 
 
   async function handleNewRecord() {
@@ -125,7 +222,30 @@ export default function NonGridViewWrapper({
       <ViewTopBar
         viewName={viewName}
         viewType={viewType}
+        tableId={tableId}
+        views={views}
+        tableFields={tableFields}
+        cardFields={cardFields}
+        onCardLayoutChange={async (primaryField, secondaryField) => {
+          const next = [primaryField, secondaryField].filter(Boolean)
+          setCardFields(next)
+          try {
+            if (!viewUuid) return
+            const { data: viewData } = await supabase.from("views").select("config").eq("id", viewUuid).single()
+            const currentConfig = (viewData?.config as Record<string, unknown>) || {}
+            await supabase
+              .from("views")
+              .update({ config: { ...currentConfig, card_fields: next } })
+              .eq("id", viewUuid)
+          } catch (error) {
+            console.error("Error saving card layout:", error)
+          }
+          router.refresh()
+        }}
         onSearch={() => {}} // Handled via URL params
+        onFilter={() => setFilterDialogOpen(true)}
+        onSort={() => setSortDialogOpen(true)}
+        onHideFields={() => setHideFieldsDialogOpen(true)}
         onDesign={() => setDesignSidebarOpen(true)}
         onAddField={() => setDesignSidebarOpen(true)}
         onNewRecord={handleNewRecord}
@@ -146,6 +266,7 @@ export default function NonGridViewWrapper({
             fieldIds={fieldIds}
             searchQuery={searchQuery}
             tableFields={tableFields}
+            filters={filtersAsConfig}
           />
         )}
         {viewType === "calendar" && (
@@ -156,6 +277,7 @@ export default function NonGridViewWrapper({
             fieldIds={fieldIds}
             searchQuery={searchQuery}
             tableFields={tableFields}
+            filters={filtersAsConfig}
           />
         )}
         {viewType === "timeline" && (
@@ -166,6 +288,7 @@ export default function NonGridViewWrapper({
             fieldIds={fieldIds}
             searchQuery={searchQuery}
             tableFields={tableFields}
+            filters={filtersAsConfig}
           />
         )}
         {viewType === "horizontal_grouped" && tableInfo && (
@@ -174,14 +297,14 @@ export default function NonGridViewWrapper({
             viewId={viewId}
             supabaseTableName={tableInfo.supabase_table}
             tableFields={tableFields}
-            filters={viewFilters.map(f => ({
+            filters={filters.map((f) => ({
               field: f.field_name,
-              operator: f.operator as FilterConfig['operator'],
+              operator: f.operator as FilterConfig["operator"],
               value: f.value,
             }))}
-            sorts={viewSorts.map(s => ({
+            sorts={sorts.map((s) => ({
               field_name: s.field_name,
-              direction: s.direction as 'asc' | 'desc',
+              direction: s.direction as "asc" | "desc",
             }))}
             groupBy={groupingFieldId}
             groupByRules={groupByRules}
@@ -200,6 +323,83 @@ export default function NonGridViewWrapper({
           hideViewsTab={true}
         />
       )}
+
+      <UnifiedFilterDialog
+        isOpen={filterDialogOpen}
+        onClose={() => setFilterDialogOpen(false)}
+        viewId={viewId}
+        tableFields={tableFields}
+        filters={filters.map((f) => ({
+          id: f.id ?? "",
+          field_name: f.field_name,
+          operator: f.operator as FilterType,
+          value: f.value,
+        }))}
+        onFiltersChange={(newFilters) => {
+          setFilters(
+            newFilters.map((f) => ({
+              id: f.id ?? f.field_name,
+              view_id: viewId,
+              field_name: f.field_name,
+              operator: f.operator,
+              value: f.value,
+            })) as ViewFilter[]
+          )
+          router.refresh()
+        }}
+      />
+      <SortDialog
+        isOpen={sortDialogOpen}
+        onClose={() => setSortDialogOpen(false)}
+        viewId={viewId}
+        tableFields={tableFields}
+        sorts={sorts.map((s) => ({
+          id: s.id ?? s.field_name,
+          field_name: s.field_name,
+          direction: s.direction,
+        }))}
+        onSortsChange={(newSorts) => {
+          setSorts(
+            newSorts.map((s) => ({
+              id: s.id ?? s.field_name,
+              view_id: viewId,
+              field_name: s.field_name,
+              direction: s.direction,
+            })) as ViewSort[]
+          )
+          router.refresh()
+        }}
+      />
+      <HideFieldsDialog
+        isOpen={hideFieldsDialogOpen}
+        onClose={() => setHideFieldsDialogOpen(false)}
+        viewId={viewId}
+        tableFields={tableFields}
+        viewFields={viewFields}
+        hiddenFields={hiddenFields}
+        onHiddenFieldsChange={(fields) => {
+          setHiddenFields(fields)
+          router.refresh()
+        }}
+        onReorder={async (fieldNames) => {
+          if (!viewUuid) return
+          try {
+            await Promise.all(
+              fieldNames.map((fieldName, index) =>
+                supabase
+                  .from("view_fields")
+                  .update({ position: index })
+                  .eq("view_id", viewUuid)
+                  .eq("field_name", fieldName)
+              )
+            )
+            await loadViewFields()
+          } catch (error) {
+            console.error("Error reordering fields:", error)
+          }
+          router.refresh()
+        }}
+      />
     </div>
   )
 }

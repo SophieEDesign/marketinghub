@@ -27,6 +27,7 @@ import {
   createInitialFieldLayout,
 } from "@/lib/interface/field-layout-helpers"
 import { resolveRecordEditMode } from "@/lib/interface/resolve-record-edit-mode"
+import { useUIMode } from "@/contexts/UIModeContext"
 
 interface RecordModalProps {
   isOpen: boolean
@@ -84,6 +85,7 @@ export default function RecordModal({
   const supabase = createClient()
   const { toast } = useToast()
   const { role } = useUserRole()
+  const { enterRecordLayoutEdit, exitRecordLayoutEdit } = useUIMode()
 
   // P1 FIX: Reset edit state when modal closes OR when interfaceMode changes to 'edit'
   // When interfaceMode === 'edit', manual edit modes must be disabled (forced edit takes precedence)
@@ -294,32 +296,32 @@ export default function RecordModal({
   }, [isOpen, interfaceMode, initialEditMode, isEditingLayout, recordId])
 
   const handleStartEditLayout = useCallback(() => {
+    enterRecordLayoutEdit()
     setManualEditMode(true)
-    // If there's no existing layout, initialize with all fields visible
     if (resolvedFieldLayout.length === 0) {
       setDraftFieldLayout(createInitialFieldLayout(fields, 'modal', effectiveEditable))
     } else {
       setDraftFieldLayout([...resolvedFieldLayout])
     }
-  }, [resolvedFieldLayout, fields, effectiveEditable])
+  }, [enterRecordLayoutEdit, resolvedFieldLayout, fields, effectiveEditable])
 
   const handleDoneEditLayout = useCallback(() => {
     if (!onLayoutSave || draftFieldLayout === null || !canEditLayout) return
     onLayoutSave(draftFieldLayout)
-    // Only exit edit mode if not forced by interfaceMode
+    exitRecordLayoutEdit()
     if (!forcedEditMode) {
       setManualEditMode(false)
     }
     setDraftFieldLayout(null)
-  }, [onLayoutSave, canEditLayout, draftFieldLayout, forcedEditMode])
+  }, [onLayoutSave, canEditLayout, draftFieldLayout, forcedEditMode, exitRecordLayoutEdit])
 
   const handleCancelEditLayout = useCallback(() => {
-    // Only allow canceling if not forced by interfaceMode
+    exitRecordLayoutEdit()
     if (!forcedEditMode) {
       setManualEditMode(false)
       setDraftFieldLayout(null)
     }
-  }, [forcedEditMode])
+  }, [forcedEditMode, exitRecordLayoutEdit])
 
   const handleFieldLayoutChange = useCallback((newLayout: FieldLayoutItem[]) => {
     if (isEditingLayout) {

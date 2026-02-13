@@ -14,6 +14,12 @@ import { normalizeUuid } from "@/lib/utils/ids"
 import { isAbortError } from "@/lib/api/error-handling"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 
+interface ViewSummary {
+  id: string
+  name: string
+  type: string
+}
+
 interface AirtableViewPageProps {
   tableId: string
   viewId: string
@@ -30,6 +36,8 @@ interface AirtableViewPageProps {
     type: string
     config?: any
   }
+  /** All views for this table (for view switcher dropdown) */
+  views?: ViewSummary[]
   initialViewFields: Array<{
     field_name: string
     visible: boolean
@@ -63,6 +71,7 @@ export default function AirtableViewPage({
   table,
   isCoreData = false,
   view,
+  views = [],
   initialViewFields,
   initialViewFilters,
   initialViewSorts,
@@ -316,6 +325,7 @@ export default function AirtableViewPage({
           viewName={view.name}
           viewType={view.type as ViewType}
           tableId={tableId}
+          views={views}
           tableFields={tableFields}
           viewFields={viewFields}
           filters={filters}
@@ -378,6 +388,23 @@ export default function AirtableViewPage({
             setHiddenFields(fields)
             router.refresh()
           }}
+          onReorderFields={handleReorderFields}
+          onCardLayoutChange={async (primaryField, secondaryField) => {
+            const next = [primaryField, secondaryField].filter(Boolean)
+            setCardFields(next)
+            try {
+              if (!viewUuid) return
+              const currentConfig = (view.config || {}) as Record<string, unknown>
+              await supabase
+                .from("views")
+                .update({ config: { ...currentConfig, card_fields: next } })
+                .eq("id", viewUuid)
+            } catch (error) {
+              console.error("Error saving card layout:", error)
+            }
+            router.refresh()
+          }}
+          cardFields={cardFields}
           onViewAction={(action) => {
             if (action === "delete") {
               // ViewManagementDialog handles the deletion and redirect

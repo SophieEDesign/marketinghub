@@ -7,6 +7,7 @@ import { getWorkspaceSettings } from "@/lib/branding"
 import { BrandingProvider } from "@/contexts/BrandingContext"
 import { SidebarModeProvider } from "@/contexts/SidebarModeContext"
 import { EditModeProvider } from "@/contexts/EditModeContext"
+import { UIModeProvider } from "@/contexts/UIModeContext"
 import { getInterfaces, getInterfaceCategories, type Interface, type InterfaceCategory } from "@/lib/interfaces"
 import WorkspaceShell from "./WorkspaceShell"
 import DynamicFavicon from "./DynamicFavicon"
@@ -297,8 +298,9 @@ export default async function WorkspaceShellWrapper({
     <BrandingProvider settings={brandingSettings}>
       <DynamicFavicon />
       <EditModeProvider>
-        <SidebarModeProvider>
-          <div data-page-title={finalTitle}>
+        <UIModeProvider>
+          <SidebarModeProvider>
+            <div data-page-title={finalTitle}>
             <WorkspaceShell
               title={title}
               tables={tables}
@@ -312,8 +314,9 @@ export default async function WorkspaceShellWrapper({
             >
               {children}
             </WorkspaceShell>
-          </div>
-        </SidebarModeProvider>
+            </div>
+          </SidebarModeProvider>
+        </UIModeProvider>
       </EditModeProvider>
     </BrandingProvider>
   )

@@ -14,17 +14,14 @@ import {
   Settings,
   Home,
   Database,
-  Edit2,
-  Check,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useBranding } from "@/contexts/BrandingContext"
-import { useSidebarMode } from "@/contexts/SidebarModeContext"
+import { useUIMode } from "@/contexts/UIModeContext"
 import RecentsFavoritesSection from "./RecentsFavoritesSection"
 import { cn } from "@/lib/utils"
 import { useIsMobile } from "@/hooks/useResponsive"
 import type { Automation, Table, View } from "@/types/database"
-import { useToast } from "@/components/ui/use-toast"
 
 interface InterfacePage {
   id: string
@@ -64,9 +61,8 @@ export default function AirtableSidebar({
 }: AirtableSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const { toast } = useToast()
   const { brandName, logoUrl, primaryColor, sidebarColor, sidebarTextColor } = useBranding()
-  const { mode, toggleMode } = useSidebarMode()
+  const { uiMode } = useUIMode()
   const isMobile = useIsMobile()
   const previousPathnameRef = useRef<string | null>(null)
   
@@ -98,7 +94,8 @@ export default function AirtableSidebar({
   const isCollapsed = isMobile ? !isOpen : internalCollapsed
   
   const isAdmin = userRole === 'admin'
-  const isEditMode = mode === "edit"
+  // Edit pages is now driven by page toolbar "Edit Pages" button (UIMode), not sidebar
+  const isEditMode = uiMode === "editPages"
 
   const isInterfacePage = pathname.includes("/pages/")
   const isSettings = pathname.includes("/settings")
@@ -224,38 +221,6 @@ export default function AirtableSidebar({
           </span>
         </Link>
         <div className="flex items-center gap-1">
-          <button
-            onClick={() => {
-              const wasEditing = isEditMode
-              toggleMode()
-              if (wasEditing) {
-                toast({
-                  title: "Finished editing",
-                  description: "Your changes have been saved.",
-                })
-                window.dispatchEvent(new CustomEvent("pages-updated"))
-                router.refresh()
-              }
-            }}
-            className={cn(
-              "h-8 px-2 text-xs font-medium rounded transition-colors flex items-center gap-1",
-              isEditMode ? "bg-black/20 hover:bg-black/25" : "hover:bg-black/10"
-            )}
-            style={{ color: sidebarTextColor }}
-            title={isEditMode ? "Done editing" : "Edit sidebar"}
-          >
-            {isEditMode ? (
-              <>
-                <Check className="h-3 w-3" />
-                <span>Done</span>
-              </>
-            ) : (
-              <>
-                <Edit2 className="h-3 w-3" />
-                <span>Edit</span>
-              </>
-            )}
-          </button>
           <button
             onClick={() => {
               if (isMobile && onClose) {

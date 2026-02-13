@@ -1,6 +1,23 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
+import { GripVertical } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -24,6 +41,59 @@ import type { TableField } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
 import { normalizeUuid } from "@/lib/utils/ids"
 
+function SortableFieldRow({
+  vf,
+  tableFields,
+  isHidden,
+  onToggle,
+}: {
+  vf: { field_name: string; visible: boolean; position: number }
+  tableFields: TableField[]
+  isHidden: boolean
+  onToggle: () => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: vf.field_name,
+  })
+  const field = tableFields.find((f) => f.name === vf.field_name)
+  const style = { transform: CSS.Transform.toString(transform), transition }
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-3 p-2 hover:bg-gray-50 rounded ${isDragging ? "opacity-50" : ""}`}
+    >
+      <button
+        type="button"
+        className="cursor-grab touch-none p-0.5 text-gray-400 hover:text-gray-600"
+        {...attributes}
+        {...listeners}
+        aria-label="Drag to reorder"
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+      <input
+        type="checkbox"
+        id={`hide-${vf.field_name}`}
+        checked={isHidden}
+        onChange={onToggle}
+        className="w-4 h-4"
+      />
+      <Label
+        htmlFor={`hide-${vf.field_name}`}
+        className="flex-1 text-sm font-medium text-gray-700 cursor-pointer"
+      >
+        {vf.field_name}
+      </Label>
+      {field && (
+        <span className="text-xs text-gray-500">
+          {FIELD_TYPES.find((t) => t.type === field.type)?.label}
+        </span>
+      )}
+    </div>
+  )
+}
+
 interface HideFieldsDialogProps {
   isOpen: boolean
   onClose: () => void
@@ -36,6 +106,8 @@ interface HideFieldsDialogProps {
   }>
   hiddenFields: string[]
   onHiddenFieldsChange?: (fields: string[]) => void
+  /** When provided, enables drag-to-reorder. Called with new field order on Apply. */
+  onReorder?: (fieldNames: string[]) => void
 }
 
 export default function HideFieldsDialog({
@@ -46,9 +118,11 @@ export default function HideFieldsDialog({
   viewFields,
   hiddenFields,
   onHiddenFieldsChange,
+  onReorder,
 }: HideFieldsDialogProps) {
   const viewUuid = normalizeUuid(viewId)
   const [localHiddenFields, setLocalHiddenFields] = useState<string[]>(hiddenFields)
+  const [orderedFieldNames, setOrderedFieldNames] = useState<string[]>([])
   const [search, setSearch] = useState("")
   const [sort, setSort] = useState<"position" | "name_asc" | "name_desc" | "type_asc">("position")
   const [pasteText, setPasteText] = useState("")
@@ -57,6 +131,32 @@ export default function HideFieldsDialog({
   useEffect(() => {
     setLocalHiddenFields(hiddenFields)
   }, [hiddenFields, isOpen])
+
+  useEffect(() => {
+    if (isOpen && viewFields.length > 0) {
+      const order = [...viewFields].sort((a, b) => a.position - b.position).map((vf) => vf.field_name)
+      setOrderedFieldNames(order)
+    }
+  }, [isOpen, viewFields])
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  )
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    setOrderedFieldNames((prev) => {
+      const oldIndex = prev.indexOf(String(active.id))
+      const newIndex = prev.indexOf(String(over.id))
+      if (oldIndex === -1 || newIndex === -1) return prev
+      const next = [...prev]
+      const [removed] = next.splice(oldIndex, 1)
+      next.splice(newIndex, 0, removed)
+      return next
+    })
+  }
 
   const normalizeToken = (value: string) =>
     (value || "")
@@ -95,10 +195,24 @@ export default function HideFieldsDialog({
     setLocalHiddenFields(viewFields.filter((vf) => !hidden.has(vf.field_name)).map((vf) => vf.field_name))
   }
 
+  const viewFieldsByName = useMemo(() => {
+    const m = new Map<string, (typeof viewFields)[0]>()
+    for (const vf of viewFields) m.set(vf.field_name, vf)
+    return m
+  }, [viewFields])
+
   const displayViewFields = (() => {
     const s = search.trim().toLowerCase()
     const base = s ? viewFields.filter((vf) => vf.field_name.toLowerCase().includes(s)) : viewFields
-    if (sort === "position") return base
+    if (sort === "position") {
+      if (onReorder && orderedFieldNames.length > 0) {
+        return orderedFieldNames
+          .filter((name) => base.some((vf) => vf.field_name === name))
+          .map((name) => viewFieldsByName.get(name))
+          .filter(Boolean) as typeof viewFields
+      }
+      return base
+    }
 
     const sorted = [...base]
     sorted.sort((a, b) => {
@@ -177,6 +291,9 @@ export default function HideFieldsDialog({
       )
 
       onHiddenFieldsChange?.(localHiddenFields)
+      if (onReorder && sort === "position") {
+        onReorder(orderedFieldNames.length > 0 ? orderedFieldNames : viewFields.map((vf) => vf.field_name))
+      }
       onClose()
     } catch (error) {
       console.error("Error saving hidden fields:", error)
@@ -274,33 +391,51 @@ export default function HideFieldsDialog({
           </div>
 
           <div className="space-y-3 max-h-96 overflow-y-auto">
-          {displayViewFields.map((vf) => {
-            const field = tableFields.find((f) => f.name === vf.field_name)
-            const isHidden = localHiddenFields.includes(vf.field_name)
-
-            return (
-              <div key={vf.field_name} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded">
-                <input
-                  type="checkbox"
-                  id={`hide-${vf.field_name}`}
-                  checked={isHidden}
-                  onChange={() => toggleField(vf.field_name)}
-                  className="w-4 h-4"
-                />
-                <Label
-                  htmlFor={`hide-${vf.field_name}`}
-                  className="flex-1 text-sm font-medium text-gray-700 cursor-pointer"
-                >
-                  {vf.field_name}
-                </Label>
-                {field && (
-                  <span className="text-xs text-gray-500">
-                    {FIELD_TYPES.find(t => t.type === field.type)?.label}
-                  </span>
-                )}
-              </div>
-            )
-          })}
+          {onReorder && sort === "position" ? (
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext
+                items={displayViewFields.map((vf) => vf.field_name)}
+                strategy={verticalListSortingStrategy}
+              >
+                {displayViewFields.map((vf) => (
+                  <SortableFieldRow
+                    key={vf.field_name}
+                    vf={vf}
+                    tableFields={tableFields}
+                    isHidden={localHiddenFields.includes(vf.field_name)}
+                    onToggle={() => toggleField(vf.field_name)}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+          ) : (
+            displayViewFields.map((vf) => {
+              const field = tableFields.find((f) => f.name === vf.field_name)
+              const isHidden = localHiddenFields.includes(vf.field_name)
+              return (
+                <div key={vf.field_name} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded">
+                  <input
+                    type="checkbox"
+                    id={`hide-${vf.field_name}`}
+                    checked={isHidden}
+                    onChange={() => toggleField(vf.field_name)}
+                    className="w-4 h-4"
+                  />
+                  <Label
+                    htmlFor={`hide-${vf.field_name}`}
+                    className="flex-1 text-sm font-medium text-gray-700 cursor-pointer"
+                  >
+                    {vf.field_name}
+                  </Label>
+                  {field && (
+                    <span className="text-xs text-gray-500">
+                      {FIELD_TYPES.find((t) => t.type === field.type)?.label}
+                    </span>
+                  )}
+                </div>
+              )
+            })
+          )}
           </div>
         </div>
 

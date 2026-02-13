@@ -174,6 +174,7 @@ function WorkspaceShellContent({
             <Topbar
               title={title}
               onSidebarToggle={isMobile ? () => setSidebarOpen(!sidebarOpen) : undefined}
+              isAdmin={userRole === "admin"}
             />
           )}
           <main

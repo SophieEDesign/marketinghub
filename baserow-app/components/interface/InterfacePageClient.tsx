@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
-import { Edit2, Settings, MoreVertical } from "lucide-react"
+import { Edit2, Settings, MoreVertical, Filter, ArrowUpDown, List } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import {
@@ -23,12 +23,14 @@ import PageSetupState from "./PageSetupState"
 import PageDisplaySettingsPanel from "./PageDisplaySettingsPanel"
 import { getRequiredAnchorType } from "@/lib/interface/page-types"
 import { usePageEditMode, useBlockEditMode } from "@/contexts/EditModeContext"
+import { useUIMode } from "@/contexts/UIModeContext"
 import { useMainScroll } from "@/contexts/MainScrollContext"
 import { VIEWS_ENABLED } from "@/lib/featureFlags"
 import { toPostgrestColumn } from "@/lib/supabase/postgrest"
 import { normalizeUuid } from "@/lib/utils/ids"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 import { isAbortError } from "@/lib/api/error-handling"
+import BaseDropdown from "@/components/layout/BaseDropdown"
 
 // Lazy load InterfaceBuilder for dashboard/overview pages
 const InterfaceBuilder = dynamic(() => import("./InterfaceBuilder"), { ssr: false })
@@ -64,9 +66,10 @@ function InterfacePageClientInternal({
   const initialDataRef = useRef<any[]>(initialData)
   const pageLoadedRef = useRef<boolean>(!!initialPage)
   
-  // Use unified editing context
+  // Use unified editing context (block scope kept in sync with UIMode editPages)
   const { isEditing: isPageEditing, enter: enterPageEdit, exit: exitPageEdit } = usePageEditMode(pageId)
   const { isEditing: isBlockEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(pageId)
+  const { uiMode, enterEditPages, exitEditPages, exitRecordLayoutEdit } = useUIMode()
   
   const [blocks, setBlocks] = useState<any[]>([])
   const [blocksLoading, setBlocksLoading] = useState(false)
@@ -113,10 +116,9 @@ function InterfacePageClientInternal({
         blocksLoadedRef.current = { pageId: currentPageId || '', loaded: false }
         
         // CRITICAL: Exit edit modes when navigating to a different page
-        // The EditModeContext should handle this, but we ensure it here as well
-        // This prevents edit mode from leaking between pages
         exitPageEdit()
         exitBlockEdit()
+        exitEditPages()
       })
     } else if (previousPageIdRef.current === null && currentPageId) {
       // First load - just set the ref, don't clear blocks
@@ -134,7 +136,7 @@ function InterfacePageClientInternal({
     if (currentPageId) {
       previousPageIdRef.current = currentPageId
     }
-  }, [page?.id, exitPageEdit, exitBlockEdit, blocks.length])
+  }, [page?.id, exitPageEdit, exitBlockEdit, exitEditPages, blocks.length])
   
   // Inline title editing state
   const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -1213,10 +1215,17 @@ function InterfacePageClientInternal({
   }
 
   const handleDoneEditingInterface = () => {
+    exitEditPages()
     exitBlockEdit()
-    // Refresh server components + re-fetch blocks to ensure view mode reflects persisted state.
     router.refresh()
     if (page) loadBlocks(true)
+  }
+
+  const handleEnterEditPages = () => {
+    if (page?.id) {
+      enterEditPages(page.id)
+      enterBlockEdit()
+    }
   }
 
   return (
@@ -1225,6 +1234,7 @@ function InterfacePageClientInternal({
       {!isViewer && page && isAdmin && (
         <div className="border-b bg-white px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3 flex-1 min-w-0">
+            <BaseDropdown variant="compact" isAdmin={true} className="flex-shrink-0" />
             {isEditingTitle ? (
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <input
@@ -1252,12 +1262,28 @@ function InterfacePageClientInternal({
                 >
                   {page.name}
                 </h1>
-                {isBlockEditing && (
+                {uiMode === "editPages" && (
                   <span
                     className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 border border-yellow-200 rounded flex-shrink-0"
                     title="You are editing this interface (layout + block settings)"
                   >
                     Editing
+                  </span>
+                )}
+                {uiMode === "recordLayoutEdit" && (
+                  <span
+                    className="text-xs px-2 py-1 bg-blue-100 text-blue-800 border border-blue-200 rounded flex-shrink-0"
+                    title="Customizing record layout"
+                  >
+                    Customizing layout
+                  </span>
+                )}
+                {uiMode === "fieldSchemaEdit" && (
+                  <span
+                    className="text-xs px-2 py-1 bg-gray-100 text-gray-700 border border-gray-200 rounded flex-shrink-0"
+                    title="Editing field settings"
+                  >
+                    Editing fields
                   </span>
                 )}
                 {page.updated_at && (
@@ -1268,29 +1294,44 @@ function InterfacePageClientInternal({
               </>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {uiMode === "view" && (
+              <>
+                <Button variant="outline" size="sm" onClick={handleEnterEditPages} className="gap-1.5">
+                  <Edit2 className="h-4 w-4" />
+                  Edit Pages
+                </Button>
+                <Button variant="ghost" size="sm" title="Filter" disabled className="opacity-60">
+                  <Filter className="h-4 w-4" />
+                  <span className="hidden sm:inline">Filter</span>
+                </Button>
+                <Button variant="ghost" size="sm" title="Sort" disabled className="opacity-60">
+                  <ArrowUpDown className="h-4 w-4" />
+                  <span className="hidden sm:inline">Sort</span>
+                </Button>
+                <Button variant="ghost" size="sm" title="Fields" disabled className="opacity-60">
+                  <List className="h-4 w-4" />
+                  <span className="hidden sm:inline">Fields</span>
+                </Button>
+              </>
+            )}
+            {uiMode === "editPages" && (
+              <Button variant="default" size="sm" onClick={handleDoneEditingInterface} className="gap-1.5">
+                Done Editing
+              </Button>
+            )}
+            {uiMode === "recordLayoutEdit" && (
+              <Button variant="default" size="sm" onClick={exitRecordLayoutEdit} className="gap-1.5">
+                Done Customizing Layout
+              </Button>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" title="Actions">
+                <Button variant="ghost" size="sm" title="More actions">
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {isBlockEditing ? (
-                  <DropdownMenuItem onClick={handleDoneEditingInterface}>
-                    Done editing
-                  </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem
-                    onClick={() => {
-                      enterBlockEdit()
-                    }}
-                  >
-                    <Edit2 className="h-4 w-4 mr-2" />
-                    Edit interface
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleOpenPageSettings}>
                   <Settings className="h-4 w-4 mr-2" />
                   Page settings
@@ -1305,6 +1346,7 @@ function InterfacePageClientInternal({
       {!isViewer && page && !isAdmin && (
         <div className="border-b bg-white px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3 flex-1 min-w-0">
+            <BaseDropdown variant="compact" isAdmin={false} className="flex-shrink-0" />
             <h1 className="text-lg font-semibold flex-1 min-w-0 truncate">{page.name}</h1>
             <span 
               className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded flex-shrink-0"
@@ -1321,9 +1363,13 @@ function InterfacePageClientInternal({
         </div>
       )}
 
-      {/* Content Area */}
+      {/* Content Area - subtle tint when in any edit mode for visual clarity */}
       {/* CRITICAL: min-h-0 allows flex child to shrink so full-page content doesn't force page scroll */}
-      <div className="flex-1 overflow-hidden min-w-0 min-h-0 w-full">
+      <div
+        className={`flex-1 overflow-hidden min-w-0 min-h-0 w-full transition-colors ${
+          uiMode !== "view" ? "bg-gray-100/40" : ""
+        }`}
+      >
         {/* CRITICAL: Always render the same component tree to prevent remount storms */}
         {/* Show loading/error states as overlays, not separate trees */}
         {loading && !page ? (

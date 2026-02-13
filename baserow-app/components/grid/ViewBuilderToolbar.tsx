@@ -2,12 +2,14 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
+import Link from "next/link"
 import {
   Filter,
   ArrowUpDown,
   Group,
   Eye,
   MoreVertical,
+  ChevronDown,
   Grid3x3,
   Layout,
   Calendar,
@@ -33,6 +35,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
 import UnifiedFilterDialog from "@/components/filters/UnifiedFilterDialog"
 import SortDialog from "./SortDialog"
 import GroupDialog from "./GroupDialog"
@@ -41,11 +56,19 @@ import ViewManagementDialog from "./ViewManagementDialog"
 import type { TableField } from "@/types/fields"
 import type { ViewType, FilterType } from "@/types/database"
 
+interface ViewSummary {
+  id: string
+  name: string
+  type: string
+}
+
 interface ViewBuilderToolbarProps {
   viewId: string
   viewName: string
   viewType: ViewType
   tableId: string
+  /** All views for this table (for view switcher dropdown) */
+  views?: ViewSummary[]
   tableFields: TableField[]
   viewFields: Array<{
     field_name: string
@@ -72,10 +95,14 @@ interface ViewBuilderToolbarProps {
   onGroupChange?: (fieldName: string | null) => void
   onRowHeightChange?: (height: "short" | "medium" | "tall") => void
   onHiddenFieldsChange?: (fields: string[]) => void
+  onReorderFields?: (fieldNames: string[]) => void
+  onCardLayoutChange?: (primaryField: string, secondaryField: string) => void
   onViewAction?: (action: "duplicate" | "rename" | "delete" | "setDefault") => void
   onDesign?: () => void
   onAddField?: () => void
   onNewRecord?: () => void
+  /** Card layout: [primary title field, secondary field] - for kanban/gallery */
+  cardFields?: string[]
 }
 
 export default function ViewBuilderToolbar({
@@ -83,6 +110,7 @@ export default function ViewBuilderToolbar({
   viewName,
   viewType,
   tableId,
+  views = [],
   tableFields,
   viewFields,
   filters,
@@ -96,10 +124,13 @@ export default function ViewBuilderToolbar({
   onGroupChange,
   onRowHeightChange,
   onHiddenFieldsChange,
+  onReorderFields,
+  onCardLayoutChange,
   onViewAction,
   onDesign,
   onAddField,
   onNewRecord,
+  cardFields = [],
 }: ViewBuilderToolbarProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -107,6 +138,7 @@ export default function ViewBuilderToolbar({
   const [sortDialogOpen, setSortDialogOpen] = useState(false)
   const [groupDialogOpen, setGroupDialogOpen] = useState(false)
   const [hideFieldsDialogOpen, setHideFieldsDialogOpen] = useState(false)
+  const [cardLayoutOpen, setCardLayoutOpen] = useState(false)
   const [viewManagementDialogOpen, setViewManagementDialogOpen] = useState(false)
   const [viewManagementAction, setViewManagementAction] = useState<"rename" | "duplicate" | "delete" | null>(null)
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "")
@@ -174,10 +206,38 @@ export default function ViewBuilderToolbar({
   return (
     <>
       <div className="h-10 bg-gray-50 border-b border-gray-200 flex items-center justify-between px-4 z-10 relative">
-        {/* Left side - View name (view type is locked, no selector) */}
+        {/* Left side - View name dropdown + Search */}
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-700">{viewName}</span>
-          <span className="text-xs text-gray-500 capitalize">({viewType})</span>
+          {views.length > 0 ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2.5 text-xs font-medium text-gray-700 hover:bg-gray-100"
+                >
+                  {viewName}
+                  <span className="text-gray-500 font-normal ml-1">({viewType})</span>
+                  <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="max-h-64 overflow-y-auto">
+                {views.map((v) => (
+                  <DropdownMenuItem key={v.id} asChild>
+                    <Link href={`/tables/${tableId}/views/${v.id}`} className="block">
+                      <span className="font-medium">{v.name}</span>
+                      <span className="text-gray-500 text-xs ml-1">({v.type})</span>
+                    </Link>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <>
+              <span className="text-sm font-medium text-gray-700">{viewName}</span>
+              <span className="text-xs text-gray-500 capitalize">({viewType})</span>
+            </>
+          )}
           
           {/* Search */}
           <div className="relative w-64 ml-4">
@@ -319,6 +379,71 @@ export default function ViewBuilderToolbar({
                 <Eye className="h-3.5 w-3.5 mr-1.5" />
                 Hide Fields {hiddenFields.length > 0 && `(${hiddenFields.length})`}
               </Button>
+
+              {(viewType === "kanban" || viewType === "gallery") && onCardLayoutChange && (
+                <Popover open={cardLayoutOpen} onOpenChange={setCardLayoutOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={`h-7 px-2.5 text-xs font-normal ${
+                        cardFields.length > 0
+                          ? "bg-blue-50 text-blue-700 hover:bg-blue-100"
+                          : "text-gray-600 hover:bg-gray-100"
+                      }`}
+                    >
+                      <Layout className="h-3.5 w-3.5 mr-1.5" />
+                      Card Layout {cardFields.length > 0 && `(${cardFields.length})`}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-64">
+                    <div className="space-y-3">
+                      <h4 className="font-medium text-sm">Card Layout</h4>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Primary title field</Label>
+                        <Select
+                          value={cardFields[0] || ""}
+                          onValueChange={(v) =>
+                            onCardLayoutChange(v, cardFields[1] || "")
+                          }
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue placeholder="Select field" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {tableFields.map((f) => (
+                              <SelectItem key={f.name} value={f.name}>
+                                {f.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Secondary field</Label>
+                        <Select
+                          value={cardFields[1] || ""}
+                          onValueChange={(v) =>
+                            onCardLayoutChange(cardFields[0] || "", v)
+                          }
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue placeholder="Select field" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">None</SelectItem>
+                            {tableFields.map((f) => (
+                              <SelectItem key={f.name} value={f.name}>
+                                {f.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
             </>
           )}
 
@@ -406,6 +531,7 @@ export default function ViewBuilderToolbar({
             viewFields={viewFields}
             hiddenFields={hiddenFields}
             onHiddenFieldsChange={onHiddenFieldsChange}
+            onReorder={onReorderFields}
           />
         </>
       )}

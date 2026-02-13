@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from 'react'
+import { useUIMode } from '@/contexts/UIModeContext'
 import { format as formatDate } from 'date-fns'
 import {
   Sheet,
@@ -71,6 +72,7 @@ export default function FieldSettingsDrawer({
   sections = [],
   onSave,
 }: FieldSettingsDrawerProps) {
+  const { enterFieldSchemaEdit, exitFieldSchemaEdit } = useUIMode()
   const [name, setName] = useState('')
   const [type, setType] = useState<FieldType>('text')
   const [required, setRequired] = useState(false)
@@ -282,6 +284,18 @@ export default function FieldSettingsDrawer({
       setPendingLookupType(null)
     }
   }, [field, open])
+
+  // Sync UIMode so toolbar knows we're in field schema edit (drawer handles its own save)
+  useEffect(() => {
+    if (open) {
+      enterFieldSchemaEdit()
+    } else {
+      exitFieldSchemaEdit()
+    }
+    return () => {
+      exitFieldSchemaEdit()
+    }
+  }, [open, enterFieldSchemaEdit, exitFieldSchemaEdit])
 
   function safeId(): string {
     // Browser + modern runtimes

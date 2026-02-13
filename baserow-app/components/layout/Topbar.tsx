@@ -1,60 +1,24 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { Search, User, Menu } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useBranding } from "@/contexts/BrandingContext"
-import { createClient } from "@/lib/supabase/client"
+import BaseDropdown from "@/components/layout/BaseDropdown"
 
 interface TopbarProps {
   title?: string
   onSidebarToggle?: () => void
+  /** Pass when known (e.g. from server) so Delete Base can be shown for admins */
+  isAdmin?: boolean
 }
 
-export default function Topbar({ title, onSidebarToggle }: TopbarProps) {
+export default function Topbar({ title, onSidebarToggle, isAdmin }: TopbarProps) {
   const { primaryColor } = useBranding()
-  const [workspaceName, setWorkspaceName] = useState<string>("Marketing Hub")
-  const [workspaceIcon, setWorkspaceIcon] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    async function loadWorkspace() {
-      try {
-        const supabase = createClient()
-        
-        // Fetch workspace name and icon from workspaces table
-        const { data, error } = await supabase
-          .from('workspaces')
-          .select('name, icon')
-          .limit(1)
-          .maybeSingle()
-
-        if (!error && data) {
-          if (data.name) {
-            setWorkspaceName(data.name)
-          }
-          if (data.icon) {
-            setWorkspaceIcon(data.icon)
-          }
-        }
-      } catch (error) {
-        console.warn('Could not load workspace name and icon:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadWorkspace()
-  }, [])
-
-  // Use provided title if available, otherwise use workspace name
-  const displayTitle = title || workspaceName
 
   return (
     <div className="h-14 border-b bg-white flex items-center justify-between px-6">
       <div className="flex items-center gap-4 flex-1">
-        {/* Sidebar toggle button - only visible on mobile/tablet */}
         {onSidebarToggle && (
           <Button
             variant="ghost"
@@ -66,14 +30,12 @@ export default function Topbar({ title, onSidebarToggle }: TopbarProps) {
             <Menu className="h-5 w-5" style={{ color: primaryColor }} />
           </Button>
         )}
-        {workspaceIcon && (
-          <span className="text-xl" role="img" aria-label="Workspace icon">
-            {workspaceIcon}
+        <BaseDropdown variant="default" isAdmin={isAdmin ?? false} />
+        {title && (
+          <span className="text-lg font-semibold text-gray-700 truncate hidden sm:inline">
+            {title}
           </span>
         )}
-        <h1 className="text-lg font-semibold" style={{ color: primaryColor }}>
-          {loading ? "Loading..." : displayTitle}
-        </h1>
       </div>
       
       <div className="flex items-center gap-3">
