@@ -1185,7 +1185,9 @@ export default function CalendarView({
           // CRITICAL: Use ISO strings for start/end - never new Date() to prevent React #185
           const startStr = parsedStartDay ? format(parsedStartDay, "yyyy-MM-dd") : null
           const endStr = parsedEndExclusive ? format(parsedEndExclusive, "yyyy-MM-dd") : null
-          const event = {
+          // EventInput requires start/end to be DateInput | undefined, not null - skip events without valid start
+          if (!startStr) return null
+          const event: EventInput = {
             id: row.id,
             title: title || "Untitled",
             allDay: true,
