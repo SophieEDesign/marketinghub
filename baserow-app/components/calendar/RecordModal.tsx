@@ -116,6 +116,27 @@ export default function RecordModal({
   // Layout editing not supported in calendar RecordModal - always use view layout
   const isEditingLayout = false
 
+  // Defer content mount until data is ready to avoid React #185 (hook order when RecordFields goes from 0→N fields).
+  const [contentReady, setContentReady] = useState(false)
+  const contentReadyRef = useRef(false)
+  useEffect(() => {
+    const ready =
+      !loading &&
+      (filteredFields.length === 0
+        ? false
+        : recordId
+          ? formData != null && Object.keys(formData).length > 0
+          : true)
+    if (ready && !contentReadyRef.current) {
+      contentReadyRef.current = true
+      setContentReady(true)
+    }
+    if (!open || loading) {
+      contentReadyRef.current = false
+      setContentReady(false)
+    }
+  }, [open, loading, recordId, formData, filteredFields.length])
+
   const permissions = (cascadeContext?.blockConfig as any)?.permissions ?? (cascadeContext?.pageConfig as any)?.permissions ?? {}
   const isViewOnly = permissions.mode === 'view'
 
@@ -338,7 +359,7 @@ export default function RecordModal({
             <div className="flex items-center justify-center py-8">
               <div className="text-gray-500">Record not found</div>
             </div>
-          ) : filteredFields.length === 0 ? (
+          ) : filteredFields.length === 0 || !contentReady ? (
             <div className="flex items-center justify-center py-8">
               <div className="text-gray-500">Preparing fields…</div>
             </div>
