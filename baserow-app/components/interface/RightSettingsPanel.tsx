@@ -2,6 +2,8 @@
 
 import { useSelectionContext } from "@/contexts/SelectionContext"
 import { useRightSettingsPanelData } from "@/contexts/RightSettingsPanelDataContext"
+import { useRecordModal } from "@/contexts/RecordModalContext"
+import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { ChevronRight, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import PageDisplaySettingsPanel from "./PageDisplaySettingsPanel"
@@ -50,7 +52,11 @@ function Breadcrumb({ context, onNavigate }: { context: SelectedContext; onNavig
 export default function RightSettingsPanel() {
   const { selectedContext, setSelectedContext } = useSelectionContext()
   const { data } = useRightSettingsPanelData()
+  const { isRecordModalOpen } = useRecordModal()
+  const { state: recordPanelState } = useRecordPanel()
 
+  // Step 4: Do NOT show PageDisplaySettingsPanel (or any page/record settings sidebar) when RecordModal or RecordPanel is open
+  if (isRecordModalOpen || recordPanelState.isOpen) return null
   if (!selectedContext) return null
 
   const handleClose = () => setSelectedContext(null)

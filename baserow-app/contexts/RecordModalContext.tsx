@@ -111,6 +111,9 @@ export function RecordModalProvider({ children }: { children: ReactNode }) {
           cascadeContext={state?.cascadeContext}
           onSave={handleSave}
           onDeleted={handleDeleted}
+          interfaceMode={state?.interfaceMode}
+          canEditLayout={state?.canEditLayout}
+          onLayoutSave={state?.onLayoutSave}
         />
       </ErrorBoundary>
     </RecordModalContext.Provider>

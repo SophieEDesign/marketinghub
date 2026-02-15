@@ -46,6 +46,8 @@ interface RecordFieldsProps {
   pageEditable?: boolean // For creating new layout items
   /** When provided and not in layout mode, field labels are clickable to open field schema drawer */
   onFieldLabelClick?: (fieldId: string) => void
+  /** Visibility context: 'modal' uses visible_in_modal, 'canvas' uses visible_in_canvas (for RecordDetailPanelInline) */
+  visibilityContext?: 'modal' | 'canvas'
 }
 
 const DEFAULT_GROUP_NAME = "General"
@@ -74,6 +76,7 @@ export default function RecordFields({
   onFieldLayoutChange,
   pageEditable = true,
   onFieldLabelClick,
+  visibilityContext = 'modal',
 }: RecordFieldsProps) {
   const { navigateToLinkedRecord, openRecordByTableId, state: recordPanelState } = useRecordPanel()
   const { toast } = useToast()
@@ -249,9 +252,9 @@ export default function RecordFields({
     >()
     const seenFieldNames = new Set<string>()
 
+    const visKey = visibilityContext === 'canvas' ? 'visible_in_canvas' : 'visible_in_modal'
     fieldLayout.forEach((item) => {
-      // Only respect modal visibility in modal canvas
-      if (item.visible_in_modal === false) return
+      if ((item as any)[visKey] === false) return
 
       const colId = item.modal_column_id || "col-1"
       const colOrder = item.modal_column_order ?? 0
@@ -302,7 +305,7 @@ export default function RecordFields({
     }
 
     return columns
-  }, [fieldLayout, fields])
+  }, [fieldLayout, fields, visibilityContext])
 
   const toggleGroup = (groupName: string) => {
     setCollapsedGroups((prev) => {
@@ -373,14 +376,14 @@ export default function RecordFields({
   )
 
   // Get visibility for a field in layout mode
+  const visibilityKey = visibilityContext === 'canvas' ? 'visible_in_canvas' : 'visible_in_modal'
   const isFieldVisibleInLayout = useCallback(
     (fieldName: string): boolean => {
       if (!layoutMode || fieldLayout.length === 0) return true
       const layoutItem = fieldLayout.find((item) => item.field_name === fieldName)
-      // Modal canvas uses visible_in_modal as the source of truth
-      return layoutItem ? layoutItem.visible_in_modal !== false : true
+      return layoutItem ? (layoutItem as any)[visibilityKey] !== false : true
     },
-    [layoutMode, fieldLayout]
+    [layoutMode, fieldLayout, visibilityKey]
   )
 
   // SortableFieldItem is now extracted to a separate component file
@@ -490,6 +493,7 @@ export default function RecordFields({
         field_name: field.name,
         order: maxOrder + 1,
         visible_in_modal: true,
+        visible_in_canvas: true,
         editable: pageEditable ?? true,
         group_name: field.group_name ?? undefined,
         modal_column_id: columnId,

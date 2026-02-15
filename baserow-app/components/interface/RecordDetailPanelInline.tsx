@@ -11,6 +11,8 @@
  */
 
 import { useState, useEffect, useMemo, useCallback } from "react"
+import { LayoutGrid, Check } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import RecordFields from "@/components/records/RecordFields"
 import RecordComments from "@/components/records/RecordComments"
@@ -57,9 +59,15 @@ export default function RecordDetailPanelInline({
   const { setSelectedContext } = useSelectionContext()
   const [record, setRecord] = useState<Record<string, any> | null>(null)
   const [loading, setLoading] = useState(false)
-  
+  const [manualLayoutEditMode, setManualLayoutEditMode] = useState(false)
+  const [localFieldLayout, setLocalFieldLayout] = useState<FieldLayoutItem[]>([])
+
   // P1 FIX: interfaceMode === 'edit' is ABSOLUTE - no manual overrides allowed
   const forcedEditMode = resolveRecordEditMode({ interfaceMode, initialEditMode: false })
+
+  useEffect(() => {
+    setLocalFieldLayout(resolvedFieldLayout)
+  }, [resolvedFieldLayout])
 
   const resolvedFieldLayout = useMemo(() => {
     return fieldLayout && fieldLayout.length > 0 ? fieldLayout : []
@@ -83,6 +91,8 @@ export default function RecordDetailPanelInline({
     },
     [forcedEditMode, pageEditable, resolvedFieldLayout]
   )
+
+  const canEditLayout = pageEditable && (role === "admin" || role === "member") && Boolean(onLayoutSave)
 
   useEffect(() => {
     if (!tableId || !recordId || !tableName) {
@@ -147,13 +157,61 @@ export default function RecordDetailPanelInline({
     [recordId, tableName, toast]
   )
 
+  const isEditingLayout = manualLayoutEditMode && canEditLayout && resolvedFieldLayout.length > 0
   const handleFieldLabelClick = useCallback(
     (fieldId: string) => {
       if (!tableId) return
+      if (isEditingLayout) return // Disable when in layout mode
       setSelectedContext({ type: "field", fieldId, tableId })
     },
-    [tableId, setSelectedContext]
+    [tableId, setSelectedContext, isEditingLayout]
   )
+
+  const handleFieldLayoutChange = useCallback(
+    (newLayout: FieldLayoutItem[]) => {
+      setLocalFieldLayout(newLayout)
+      onLayoutSave?.(newLayout)
+    },
+    [onLayoutSave]
+  )
+
+  const handleFieldVisibilityToggle = useCallback(
+    (fieldName: string, visible: boolean) => {
+      const updated = localFieldLayout.map((item) =>
+        item.field_name === fieldName ? { ...item, visible_in_canvas: visible } : item
+      )
+      setLocalFieldLayout(updated)
+      onLayoutSave?.(updated)
+    },
+    [localFieldLayout, onLayoutSave]
+  )
+
+  const handleDoneEditLayout = useCallback(async () => {
+    await onLayoutSave?.(localFieldLayout)
+    setManualLayoutEditMode(false)
+  }, [onLayoutSave, localFieldLayout])
+
+  // For layout mode: include ALL fields from layout (including hidden)
+  const layoutFieldsSource = localFieldLayout.length > 0 ? localFieldLayout : resolvedFieldLayout
+  const layoutModeFields = useMemo(() => {
+    if (!isEditingLayout || layoutFieldsSource.length === 0) return visibleFields
+    const fieldMap = new Map<string, TableField>()
+    fields.forEach((f) => {
+      fieldMap.set(f.name, f)
+      fieldMap.set(f.id, f)
+    })
+    const ordered = [...layoutFieldsSource].sort((a, b) => a.order - b.order)
+    const result: TableField[] = []
+    const seen = new Set<string>()
+    ordered.forEach((item) => {
+      const field = fieldMap.get(item.field_name) || fieldMap.get(item.field_id)
+      if (field && !seen.has(field.id)) {
+        result.push(field)
+        seen.add(field.id)
+      }
+    })
+    return result.length > 0 ? result : visibleFields
+  }, [isEditingLayout, layoutFieldsSource, fields, visibleFields])
 
   if (!tableId) {
     return (
@@ -188,22 +246,39 @@ export default function RecordDetailPanelInline({
     )
   }
 
-  const canEditLayout = pageEditable && (role === "admin" || role === "member") && Boolean(onLayoutSave)
-
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Header */}
+      {/* Header: Title, Customize layout / Done */}
       <div className="flex-shrink-0 flex items-center justify-between gap-2 px-4 py-2 border-b border-gray-200 bg-white">
-        <h3 className="text-sm font-medium text-gray-900 truncate">
+        <h3 className="text-sm font-medium text-gray-900 truncate min-w-0">
           {titleField && record[titleField] ? String(record[titleField]) : "Record details"}
         </h3>
+        {canEditLayout && interfaceMode === "edit" && (
+          isEditingLayout ? (
+            <Button variant="default" size="sm" onClick={handleDoneEditLayout} className="gap-1.5 flex-shrink-0">
+              <Check className="h-4 w-4" />
+              Done
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setManualLayoutEditMode(true)}
+              className="gap-1.5 flex-shrink-0"
+              title="Customize which fields appear and their order"
+            >
+              <LayoutGrid className="h-4 w-4" />
+              Customize layout
+            </Button>
+          )
+        )}
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-6 py-4">
         {hasVisibleFields ? (
           <RecordFields
-            fields={visibleFields}
+            fields={isEditingLayout ? layoutModeFields : visibleFields}
             formData={record}
             onFieldChange={handleFieldChange}
             fieldGroups={fieldGroups}
@@ -212,6 +287,13 @@ export default function RecordDetailPanelInline({
             tableName={tableName || ""}
             isFieldEditable={isFieldEditable}
             onFieldLabelClick={handleFieldLabelClick}
+            fieldLayout={isEditingLayout ? localFieldLayout : resolvedFieldLayout}
+            allFields={fields}
+            pageEditable={pageEditable}
+            layoutMode={isEditingLayout}
+            onFieldLayoutChange={isEditingLayout ? handleFieldLayoutChange : undefined}
+            onFieldVisibilityToggle={isEditingLayout ? handleFieldVisibilityToggle : undefined}
+            visibilityContext="canvas"
           />
         ) : (
           <div className="flex flex-col items-center justify-center py-12 text-center text-gray-500">

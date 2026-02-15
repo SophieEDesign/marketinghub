@@ -11,6 +11,8 @@ import RecordHeader from "./RecordHeader"
 import RecordFields from "./RecordFields"
 import RecordActivity from "./RecordActivity"
 import RecordComments from "./RecordComments"
+import FieldSettingsDrawer from "@/components/layout/FieldSettingsDrawer"
+import { getTableSections } from "@/lib/core-data/section-settings"
 import type { TableField } from "@/types/fields"
 import { useRecordEditorCore } from "@/lib/interface/record-editor-core"
 import { isAbortError } from "@/lib/api/error-handling"
@@ -24,7 +26,7 @@ const DEFAULT_WIDTH = 480
 
 export default function RecordPanel() {
   const { state, closeRecord, setWidth, togglePin, toggleFullscreen, goBack, navigateToLinkedRecord } = useRecordPanel()
-  const { setSelectedContext } = useSelectionContext()
+  const { selectedContext, setSelectedContext } = useSelectionContext()
   const onRecordDeleted = state.onRecordDeleted
   const { toast } = useToast()
   const router = useRouter()
@@ -275,6 +277,21 @@ export default function RecordPanel() {
     if (!state.tableId) return
     setSelectedContext({ type: "field", fieldId, tableId: state.tableId })
   }, [state.tableId, setSelectedContext])
+
+  // FieldSettingsDrawer overlay: when RightSettingsPanel is hidden (panel open), show overlay on field label click
+  const selectedFieldForDrawer = useMemo(() => {
+    if (selectedContext?.type !== "field" || selectedContext.tableId !== state.tableId) return null
+    return fields.find((f) => f.id === selectedContext.fieldId) ?? null
+  }, [selectedContext, state.tableId, fields])
+
+  const [sections, setSections] = useState<Array<{ name: string; display_name?: string }>>([])
+  useEffect(() => {
+    if (state.isOpen && state.tableId) {
+      getTableSections(state.tableId).then(setSections).catch(() => setSections([]))
+    }
+  }, [state.isOpen, state.tableId])
+
+  const showFieldSettingsDrawer = Boolean(state.isOpen && selectedFieldForDrawer)
 
   const handleFieldChange = useCallback(async (fieldName: string, value: any) => {
     if (!state.recordId || !state.tableName || !effectiveAllowEdit) return
@@ -629,6 +646,30 @@ export default function RecordPanel() {
           )}
         </div>
       </div>
+
+      {/* FieldSettingsDrawer overlay: when field label clicked, RightSettingsPanel is hidden so we render overlay */}
+      {showFieldSettingsDrawer && selectedFieldForDrawer && (
+        <>
+          <div
+            className="fixed inset-0 z-[59] bg-black/20"
+            onClick={() => setSelectedContext(null)}
+            aria-hidden="true"
+          />
+          <div className="fixed right-0 top-0 h-full w-[400px] z-[60] bg-white border-l border-gray-200 shadow-xl overflow-y-auto">
+            <FieldSettingsDrawer
+              field={selectedFieldForDrawer}
+              open={true}
+              onOpenChange={(open) => !open && setSelectedContext(null)}
+              tableId={state.tableId || ""}
+              tableFields={fields}
+              sections={sections}
+              onSave={() => setSelectedContext(null)}
+              embedded
+              permissionsReadOnly={isViewOnly}
+            />
+          </div>
+        </>
+      )}
     </>
   )
 }
