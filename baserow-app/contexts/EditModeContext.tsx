@@ -355,23 +355,29 @@ export function useSidebarEditMode() {
 
 export function usePageEditMode(pageId?: string) {
   const { isEditing, toggleEditMode, enterEditMode, exitEditMode, state } = useEditMode()
-  return {
+  const enter = useCallback(() => enterEditMode("page", pageId ? { pageId } : undefined), [enterEditMode, pageId])
+  const exit = useCallback(() => exitEditMode("page"), [exitEditMode])
+  const toggle = useCallback(() => toggleEditMode("page", pageId ? { pageId } : undefined), [toggleEditMode, pageId])
+  return useMemo(() => ({
     isEditing: isEditing("page") && (!pageId || state.editingPageId === pageId),
-    toggle: () => toggleEditMode("page", pageId ? { pageId } : undefined),
-    enter: () => enterEditMode("page", pageId ? { pageId } : undefined),
-    exit: () => exitEditMode("page"),
+    toggle,
+    enter,
+    exit,
     editingPageId: state.editingPageId,
-  }
+  }), [isEditing("page"), pageId, state.editingPageId, toggle, enter, exit])
 }
 
 export function useBlockEditMode(pageId?: string) {
   const { isEditing, toggleEditMode, enterEditMode, exitEditMode, state } = useEditMode()
-  return {
+  const enter = useCallback(() => enterEditMode("block", pageId ? { pageId } : undefined), [enterEditMode, pageId])
+  const exit = useCallback(() => exitEditMode("block"), [exitEditMode])
+  const toggle = useCallback(() => toggleEditMode("block", pageId ? { pageId } : undefined), [toggleEditMode, pageId])
+  return useMemo(() => ({
     isEditing: isEditing("block") && (!pageId || state.editingPageId === pageId),
-    toggle: () => toggleEditMode("block", pageId ? { pageId } : undefined),
-    enter: () => enterEditMode("block", pageId ? { pageId } : undefined),
-    exit: () => exitEditMode("block"),
-  }
+    toggle,
+    enter,
+    exit,
+  }), [isEditing("block"), pageId, state.editingPageId, toggle, enter, exit])
 }
 
 export function useRecordEditMode(recordId?: string) {

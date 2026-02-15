@@ -152,6 +152,11 @@ export default function CalendarView({
       debugLog('CALENDAR', `CalendarView UNMOUNT: tableId=${tableId}, viewId=${viewId}`)
     }
   }, [])
+
+  // Diagnostic guard (temporary): if this logs repeatedly without interaction, something is still unstable
+  useEffect(() => {
+    console.log("CalendarView render")
+  })
   // CRITICAL: Initialize resolvedTableId from prop immediately (don't wait for useEffect)
   const [resolvedTableId, setResolvedTableId] = useState<string>(tableId || '')
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
@@ -787,9 +792,9 @@ export default function CalendarView({
     return rows.filter((row) => filteredIds.has(row.id))
   }, [rows, loadedTableFields, searchQuery, fieldIds])
 
-  // Stable signature for filteredRows to prevent getEvents() recalculation when content unchanged
+  // CRITICAL: Stable signature for filteredRows - use id+updated_at to detect actual data changes
   const filteredRowsSignature = useMemo(
-    () => `${filteredRows?.length ?? 0}|${(filteredRows ?? []).map((r: TableRow) => r.id).join(',')}`,
+    () => (filteredRows ?? []).map((r: TableRow) => r.id + ":" + (r.updated_at ?? "")).join("|"),
     [filteredRows]
   )
 
@@ -1177,12 +1182,15 @@ export default function CalendarView({
             return luminance > 0.5 ? '#000000' : '#ffffff'
           })() : undefined)
 
+          // CRITICAL: Use ISO strings for start/end - never new Date() to prevent React #185
+          const startStr = parsedStartDay ? format(parsedStartDay, "yyyy-MM-dd") : null
+          const endStr = parsedEndExclusive ? format(parsedEndExclusive, "yyyy-MM-dd") : null
           const event = {
             id: row.id,
             title: title || "Untitled",
             allDay: true,
-            start: parsedStartDay,
-            end: parsedEndExclusive,
+            start: startStr,
+            end: endStr ?? startStr,
             backgroundColor: finalBackgroundColor,
             borderColor: finalBackgroundColor,
             textColor: finalTextColor,
@@ -1470,17 +1478,14 @@ export default function CalendarView({
   )
   const calendarDayHeaderFormat = useMemo(() => ({ weekday: "short" as const }), [])
 
-  // Use dateFromKey/dateToKey for stable deps (Date refs can cause render loops)
-  const calendarValidRange = useMemo(
-    () =>
-      dateFrom || dateTo
-        ? {
-            start: dateFrom ? format(dateFrom, "yyyy-MM-dd") : undefined,
-            end: dateTo ? format(dateTo, "yyyy-MM-dd") : undefined,
-          }
-        : undefined,
-    [dateFromKey, dateToKey]
-  )
+  // CRITICAL: Use string keys only - never raw Date objects in deps or return (prevents React #185)
+  const calendarValidRange = useMemo(() => {
+    if (!dateFromKey && !dateToKey) return undefined
+    return {
+      start: dateFromKey || undefined,
+      end: dateToKey || undefined,
+    }
+  }, [dateFromKey, dateToKey])
 
   const calendarEventClassNames = useCallback(
     (arg: EventContentArg) => [
@@ -1644,7 +1649,7 @@ export default function CalendarView({
     }
   }, [stableLinkedValueLabelMaps])
 
-  const onCalendarEventClick = useCallback(
+  const handleEventClick = useCallback(
     (info: EventClickArg) => {
       // CRITICAL: Calendar events ≠ records. Always read recordId from extendedProps.
       // event.id may be modified by FullCalendar for multi-day events or slicing.
@@ -1738,17 +1743,17 @@ export default function CalendarView({
           canEditLayout,
           onLayoutSave: onModalLayoutSave,
           interfaceMode,
-          onSave: () => { if (resolvedTableId && supabaseTableName) loadRows() },
-          onDeleted: () => { if (resolvedTableId && supabaseTableName) loadRows() },
+          onSave: () => { if (resolvedTableId && supabaseTableName && loadRowsRef.current) loadRowsRef.current() },
+          onDeleted: () => { if (resolvedTableId && supabaseTableName && loadRowsRef.current) loadRowsRef.current() },
           keySuffix: blockId ?? undefined,
           forceFlatLayout: true, // Avoid React #185 (RecordFields/DndContext path)
         })
       })
     },
-    [allowOpenRecord, onRecordClick, resolvedDateFieldNames, openRecordModal, resolvedTableId, loadedTableFields, blockConfig, supabaseTableName, canEditLayout, onModalLayoutSave, interfaceMode, blockId, loadRows]
+    [allowOpenRecord, onRecordClick, resolvedDateFieldNames, openRecordModal, resolvedTableId, loadedTableFields, blockConfig, supabaseTableName, canEditLayout, onModalLayoutSave, interfaceMode, blockId]
   )
 
-  const onCalendarDateClick = useCallback(
+  const handleDateClick = useCallback(
     (info: { dateStr: string }) => {
       if (!canCreateRecord || !resolvedTableId || !resolvedDateFieldId) return
       const clickedDate = new Date(info.dateStr + "T00:00:00")
@@ -1771,13 +1776,13 @@ export default function CalendarView({
         onLayoutSave: onModalLayoutSave,
         interfaceMode,
         initialData: initial,
-        onSave: () => { if (resolvedTableId && supabaseTableName) loadRows() },
-        onDeleted: () => { if (resolvedTableId && supabaseTableName) loadRows() },
+        onSave: () => { if (resolvedTableId && supabaseTableName && loadRowsRef.current) loadRowsRef.current() },
+        onDeleted: () => { if (resolvedTableId && supabaseTableName && loadRowsRef.current) loadRowsRef.current() },
         keySuffix: blockId ?? undefined,
         forceFlatLayout: true, // Avoid React #185 (RecordFields/DndContext path)
       })
     },
-    [canCreateRecord, resolvedTableId, resolvedDateFieldId, openRecordModal, combinedFiltersForDefaults, loadedTableFields, viewConfig, blockConfig, supabaseTableName, canEditLayout, onModalLayoutSave, interfaceMode, blockId, loadRows]
+    [canCreateRecord, resolvedTableId, resolvedDateFieldId, openRecordModal, combinedFiltersForDefaults, loadedTableFields, viewConfig, blockConfig, supabaseTableName, canEditLayout, onModalLayoutSave, interfaceMode, blockId]
   )
 
   if (loading) {
@@ -1939,8 +1944,8 @@ export default function CalendarView({
             dayHeaderFormat={calendarDayHeaderFormat}
             firstDay={1}
             eventContent={calendarEventContent}
-            eventClick={onCalendarEventClick}
-            dateClick={onCalendarDateClick}
+            eventClick={handleEventClick}
+            dateClick={handleDateClick}
             validRange={calendarValidRange}
           />
         ) : (

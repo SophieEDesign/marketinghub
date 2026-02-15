@@ -5,7 +5,7 @@
  * Mounts immediately without Suspense so the Edit option appears as soon as the page loads,
  * before InterfacePageClientInternal (which uses useSearchParams and suspends) mounts.
  */
-import { useEffect } from "react"
+import { useEffect, useCallback } from "react"
 import { usePageActions } from "@/contexts/PageActionsContext"
 import { useEditMode, usePageEditMode, useBlockEditMode } from "@/contexts/EditModeContext"
 import { useUIMode } from "@/contexts/UIModeContext"
@@ -29,10 +29,19 @@ export default function PageActionsRegistrar({
   const { exitEditPages } = useUIMode()
   const { setSelectedContext } = useSelectionContext()
 
-  // DEBUG: Confirm registration runs when pageId changes (remove after confirmation)
-  useEffect(() => {
-    console.log("[PageActionsRegistrar] Registering page actions for:", pageId)
-  }, [pageId])
+  const onOpenPageSettings = useCallback(() => {
+    setSelectedContext({ type: "page" })
+  }, [setSelectedContext])
+
+  const onEnterEdit = useCallback(() => {
+    enterBlockEdit()
+  }, [enterBlockEdit])
+
+  const onExitEdit = useCallback(() => {
+    exitPageEdit()
+    exitBlockEdit()
+    exitEditPages()
+  }, [exitPageEdit, exitBlockEdit, exitEditPages])
 
   useEffect(() => {
     if (!pageId) return
@@ -43,13 +52,9 @@ export default function PageActionsRegistrar({
     }
 
     registerPageActions({
-      onOpenPageSettings: () => setSelectedContext({ type: "page" }),
-      onEnterEdit: () => enterBlockEdit(),
-      onExitEdit: () => {
-        exitPageEdit()
-        exitBlockEdit()
-        exitEditPages()
-      },
+      onOpenPageSettings,
+      onEnterEdit,
+      onExitEdit,
       isEditing: isPageEditing || isBlockEditing,
     })
 
@@ -57,7 +62,7 @@ export default function PageActionsRegistrar({
       unregisterPageActions()
       clearEditingContext("block")
     }
-  }, [pageId, isAdmin, isViewer, isPageEditing, isBlockEditing, enterBlockEdit, exitPageEdit, exitBlockEdit, exitEditPages, setSelectedContext, registerPageActions, unregisterPageActions, clearEditingContext])
+  }, [pageId, isAdmin, isViewer, isPageEditing, isBlockEditing, onOpenPageSettings, onEnterEdit, onExitEdit, registerPageActions, unregisterPageActions, clearEditingContext])
 
   return null
 }

@@ -114,8 +114,10 @@ export default function InterfaceBuilder({
   
   // CRITICAL: Sync interfaceMode with RecordPanelContext so RecordPanel inherits edit mode
   const { setInterfaceMode } = useRecordPanel()
-  
+  const lastInterfaceModeRef = useRef<'view' | 'edit' | null>(null)
   useEffect(() => {
+    if (lastInterfaceModeRef.current === interfaceMode) return
+    lastInterfaceModeRef.current = interfaceMode
     setInterfaceMode(interfaceMode)
   }, [interfaceMode, setInterfaceMode])
   

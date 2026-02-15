@@ -60,14 +60,23 @@ export function RightSettingsPanelDataProvider({ children }: { children: ReactNo
     fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RightSettingsPanelDataContext.tsx:setData',message:'setData_CALLED',data:{hasBlocks:!!updates?.blocks,hasSelectedBlock:!!updates?.selectedBlock},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{})
     // #endregion
     if (updates === null) {
-      setDataState(null)
+      setDataState((prev) => (prev === null ? prev : null))
       return
     }
-    setDataState((prev) => ({
-      ...defaultData,
-      ...prev,
-      ...updates,
-    }))
+    setDataState((prev) => {
+      const next = { ...defaultData, ...prev, ...updates }
+      // CRITICAL: Skip update if key references unchanged - prevents render loop from redundant setData calls
+      if (prev && prev.page === next.page && prev.blocks === next.blocks && prev.selectedBlock === next.selectedBlock &&
+          prev.onPageUpdate === next.onPageUpdate && prev.onBlockSave === next.onBlockSave &&
+          prev.onBlockMoveToTop === next.onBlockMoveToTop && prev.onBlockMoveToBottom === next.onBlockMoveToBottom &&
+          prev.onBlockLock === next.onBlockLock && prev.pageTableId === next.pageTableId &&
+          prev.recordId === next.recordId && prev.recordTableId === next.recordTableId &&
+          prev.fieldLayout === next.fieldLayout && prev.onLayoutSave === next.onLayoutSave &&
+          prev.tableFields === next.tableFields) {
+        return prev
+      }
+      return next
+    })
   }, [])
 
   const contextValue = useMemo(() => ({ data, setData }), [data, setData])
