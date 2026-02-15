@@ -239,17 +239,20 @@ export default function CustomizeCardsDialog({
       cardWrapText: localWrapText,
       groupBy: localGroupBy || undefined,
     }
-    onConfigChange(nextConfig)
 
     try {
-      if (!viewUuid) return
+      if (!viewUuid) {
+        onConfigChange(nextConfig)
+        onClose()
+        return
+      }
       const { data: viewData } = await supabase
         .from("views")
         .select("config")
         .eq("id", viewUuid)
         .single()
       const currentConfig = (viewData?.config as Record<string, unknown>) || {}
-      await supabase
+      const { error: updateError } = await supabase
         .from("views")
         .update({
           config: {
@@ -262,6 +265,8 @@ export default function CustomizeCardsDialog({
           },
         })
         .eq("id", viewUuid)
+
+      if (updateError) throw updateError
 
       if (localGroupBy && localGroupBy !== config.groupBy) {
         const { data: gvs } = await supabase
@@ -281,9 +286,11 @@ export default function CustomizeCardsDialog({
           })
         }
       }
+      onConfigChange(nextConfig)
       router.refresh()
     } catch (error) {
       console.error("Error saving card config:", error)
+      onConfigChange(nextConfig)
     }
     onClose()
   }

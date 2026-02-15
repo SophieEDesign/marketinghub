@@ -391,9 +391,7 @@ export default function NonGridViewWrapper({
             setCardImageField(next.cardImageField || "")
             setCardColorField(next.cardColorField || "")
             setCardWrapText(next.cardWrapText ?? true)
-            if (next.groupBy && next.groupBy !== groupingFieldId) {
-              router.refresh()
-            }
+            router.refresh()
           }}
         />
       )}
