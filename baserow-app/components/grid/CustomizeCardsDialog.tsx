@@ -138,21 +138,25 @@ export default function CustomizeCardsDialog({
   }, [config, isOpen])
 
   useEffect(() => {
-    if (isOpen && viewFields.length > 0) {
-      const order = [...viewFields]
+    if (isOpen) {
+      const visibleOrder = [...viewFields]
         .sort((a, b) => a.position - b.position)
         .filter((vf) => vf.visible)
         .map((vf) => vf.field_name)
-      if (config.cardFields.length > 0) {
-        const cardSet = new Set(config.cardFields)
-        const ordered = config.cardFields.filter((n) => order.includes(n))
-        const rest = order.filter((n) => !cardSet.has(n))
-        setOrderedFieldNames([...ordered, ...rest])
+      if (visibleOrder.length > 0) {
+        if (config.cardFields.length > 0) {
+          const cardSet = new Set(config.cardFields)
+          const ordered = config.cardFields.filter((n) => visibleOrder.includes(n))
+          const rest = visibleOrder.filter((n) => !cardSet.has(n))
+          setOrderedFieldNames([...ordered, ...rest])
+        } else {
+          setOrderedFieldNames(visibleOrder)
+        }
       } else {
-        setOrderedFieldNames(order)
+        setOrderedFieldNames(tableFields.map((f) => f.name))
       }
     }
-  }, [isOpen, viewFields, config.cardFields])
+  }, [isOpen, viewFields, config.cardFields, tableFields])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -183,19 +187,27 @@ export default function CustomizeCardsDialog({
 
   const hideAll = () => setLocalCardFields([])
   const showAll = () => {
-    const visible = viewFields.filter((vf) => vf.visible).map((vf) => vf.field_name)
+    const visible = hasViewFields
+      ? viewFields.filter((vf) => vf.visible).map((vf) => vf.field_name)
+      : tableFields.map((f) => f.name)
     setLocalCardFields(visible)
   }
 
   const visibleViewFieldNames = viewFields.filter((vf) => vf.visible).map((vf) => vf.field_name)
+  const hasViewFields = visibleViewFieldNames.length > 0
   const displayFields = (() => {
     const s = search.trim().toLowerCase()
-    const base = orderedFieldNames.length > 0
-      ? orderedFieldNames
-          .filter((name) => visibleViewFieldNames.includes(name))
-          .map((name) => tableFields.find((f) => f.name === name))
-          .filter(Boolean) as TableField[]
-      : tableFields.filter((f) => visibleViewFieldNames.includes(f.name))
+    let base: TableField[]
+    if (orderedFieldNames.length > 0 && hasViewFields) {
+      base = orderedFieldNames
+        .filter((name) => visibleViewFieldNames.includes(name))
+        .map((name) => tableFields.find((f) => f.name === name))
+        .filter(Boolean) as TableField[]
+    } else if (hasViewFields) {
+      base = tableFields.filter((f) => visibleViewFieldNames.includes(f.name))
+    } else {
+      base = [...tableFields]
+    }
     if (s) {
       return base.filter(
         (f) =>

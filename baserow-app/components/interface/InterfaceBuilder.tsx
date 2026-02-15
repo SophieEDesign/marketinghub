@@ -102,7 +102,7 @@ export default function InterfaceBuilder({
   const { selectedContext, setSelectedContext } = useSelectionContext()
   const { setData: setRightPanelData } = useRightSettingsPanelData()
   
-  // Edit mode: URL viewer param forces view; otherwise use block edit mode from sidebar menu
+  // Edit mode: URL viewer forces view; otherwise use block edit mode from sidebar menu
   const effectiveIsEditing = !isViewer && isBlockEditing
   
   // Interface mode: single source of truth for edit state (Airtable-style)

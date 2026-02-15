@@ -25,8 +25,6 @@ import { toPostgrestColumn } from "@/lib/supabase/postgrest"
 import { normalizeUuid } from "@/lib/utils/ids"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 import { isAbortError } from "@/lib/api/error-handling"
-import { usePageActions } from "@/contexts/PageActionsContext"
-
 // Lazy load InterfaceBuilder for dashboard/overview pages
 const InterfaceBuilder = dynamic(() => import("./InterfaceBuilder"), { ssr: false })
 // Lazy load RecordReviewPage for record_review pages
@@ -1151,31 +1149,8 @@ function InterfacePageClientInternal({
     mainScroll.setSuppressMainScroll(!!isFullPage)
   }, [mainScroll, page?.page_type, blocks])
 
-  // Register page actions for sidebar BaseDropdown (context-driven: page settings, edit/view)
-  const { registerPageActions, unregisterPageActions } = usePageActions()
-  const handleOpenPageSettings = useCallback(() => setSelectedContext({ type: 'page' }), [setSelectedContext])
-  const handleEditClick = useCallback(() => {
-    if (!page) return
-    enterBlockEdit()
-  }, [page, enterBlockEdit])
-  const handleExitToView = useCallback(() => {
-    exitPageEdit()
-    exitBlockEdit()
-    exitEditPages()
-  }, [exitPageEdit, exitBlockEdit, exitEditPages])
-
-  useEffect(() => {
-    const isViewer = searchParams?.get("view") === "true"
-    if (!isViewer && page && isAdmin) {
-      registerPageActions({
-        onOpenPageSettings: handleOpenPageSettings,
-        onEnterEdit: handleEditClick,
-        onExitEdit: handleExitToView,
-        isEditing: isPageEditing || isBlockEditing,
-      })
-    }
-    return () => unregisterPageActions()
-  }, [searchParams, page, isAdmin, handleOpenPageSettings, handleEditClick, handleExitToView, isPageEditing, isBlockEditing, registerPageActions, unregisterPageActions])
+  // Page actions (Edit/View, Page settings) are registered by PageActionsRegistrar
+  // which mounts immediately without Suspense so the sidebar menu shows Edit before content loads
 
   // ALWAYS render UI - never return null or redirect
   if (loading && !page) {

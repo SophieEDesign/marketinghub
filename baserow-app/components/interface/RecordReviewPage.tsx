@@ -24,6 +24,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from "react"
+import { useBlockEditMode } from "@/contexts/EditModeContext"
 import RecordReviewLeftColumn from "./RecordReviewLeftColumn"
 import InterfaceBuilder from "./InterfaceBuilder"
 import RecordDetailPanelInline from "./RecordDetailPanelInline"
@@ -200,8 +201,8 @@ export default function RecordReviewPage({
     }
   }, [page.id, pageConfig, selectedRecordId, toast, userRole])
 
-  // Edit mode: for record_review from InterfaceBuilder; for record_view from isViewer (parent's block edit mode)
-  const [isEditing, setIsEditing] = useState(false)
+  // Edit mode: use EditModeContext so sidebar Edit/View toggle stays in sync
+  const { isEditing: isBlockEditing } = useBlockEditMode(page.id)
 
   return (
     <div className="flex h-full w-full">
@@ -258,14 +259,11 @@ export default function RecordReviewPage({
             initialBlocks={initialBlocks}
             isViewer={isViewer}
             onSave={onSave}
-            onEditModeChange={(editing) => {
-              setIsEditing(editing)
-              onEditModeChange?.(editing)
-            }}
+            onEditModeChange={onEditModeChange}
             hideHeader={hideHeader}
             pageTableId={pageTableId}
             recordId={selectedRecordId}
-            mode={isEditing ? "edit" : "view"}
+            mode={isBlockEditing ? "edit" : "view"}
           />
         )}
       </div>

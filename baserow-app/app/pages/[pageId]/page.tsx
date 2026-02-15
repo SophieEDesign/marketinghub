@@ -4,15 +4,20 @@ import { getInterfacePage, querySqlView } from "@/lib/interface/pages"
 import { isRecordReviewPage } from "@/lib/interface/page-types"
 import WorkspaceShellWrapper from "@/components/layout/WorkspaceShellWrapper"
 import InterfacePageClient from "@/components/interface/InterfacePageClient"
+import PageActionsRegistrar from "@/components/interface/PageActionsRegistrar"
 
 const isDev = process.env.NODE_ENV === 'development'
 
 export default async function PagePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ pageId: string }>
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
   const { pageId } = await params
+  const search = searchParams ? await searchParams : {}
+  const isViewer = search?.view === "true"
   const supabase = await createClient()
   const admin = await isAdmin()
 
@@ -114,6 +119,7 @@ export default async function PagePage({
   
   return (
     <WorkspaceShellWrapper title={pageName} hideTopbar={true} hideRecordPanel={hideRecordPanel}>
+      {page && <PageActionsRegistrar pageId={pageId} isAdmin={admin} isViewer={isViewer} />}
       <InterfacePageClient 
         pageId={pageId} 
         initialPage={page || undefined}

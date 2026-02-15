@@ -144,36 +144,35 @@ export function usePageAggregates(
     }
   )
   
-  // Build aggregate map from batch results
-  const aggregateMap: AggregateDataMap = {}
-  
-  if (batchResults) {
-    requestGroups.forEach(({ blockIds, index }) => {
-      const result = batchResults[index]
-      const resultData = result?.error ? null : result
-      const resultError = result?.error || null
-      
-      // Assign same data to all blocks with this request
-      blockIds.forEach(blockId => {
-        aggregateMap[blockId] = {
-          data: resultData,
-          error: resultError,
-          isLoading: false,
-        }
+  // Build aggregate map from batch results - memoized to prevent React #185 (re-render cascades)
+  const aggregateMap = useMemo(() => {
+    const map: AggregateDataMap = {}
+    if (batchResults) {
+      requestGroups.forEach(({ blockIds, index }) => {
+        const result = batchResults[index]
+        const resultData = result?.error ? null : result
+        const resultError = result?.error || null
+        blockIds.forEach(blockId => {
+          map[blockId] = {
+            data: resultData,
+            error: resultError,
+            isLoading: false,
+          }
+        })
       })
-    })
-  } else {
-    // Initialize all blocks with loading state
-    requestGroups.forEach(({ blockIds }) => {
-      blockIds.forEach(blockId => {
-        aggregateMap[blockId] = {
-          data: null,
-          error: error ? (error as Error).message : null,
-          isLoading,
-        }
+    } else {
+      requestGroups.forEach(({ blockIds }) => {
+        blockIds.forEach(blockId => {
+          map[blockId] = {
+            data: null,
+            error: error ? (error as Error).message : null,
+            isLoading,
+          }
+        })
       })
-    })
-  }
-  
+    }
+    return map
+  }, [batchResults, requestGroups, error, isLoading])
+
   return aggregateMap
 }
