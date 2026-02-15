@@ -35,14 +35,15 @@ export default function FieldSettingsDrawerHost() {
       return
     }
 
+    const tableIdStr: string = tableId
     let cancelled = false
     setLoading(true)
 
     async function load() {
       try {
         const [fieldsRes, sectionsData] = await Promise.all([
-          fetch(`/api/tables/${tableId}/fields`, { cache: "no-store" }),
-          getTableSections(tableId).catch(() => []),
+          fetch(`/api/tables/${tableIdStr}/fields`, { cache: "no-store" }),
+          getTableSections(tableIdStr).catch(() => []),
         ])
 
         if (cancelled) return
