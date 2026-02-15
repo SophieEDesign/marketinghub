@@ -1704,7 +1704,6 @@ export default function FieldSettingsDrawer({
           )}
         </div>
         </div>
-        </div>
       ) : (
       <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className={cn(

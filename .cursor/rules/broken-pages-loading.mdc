@@ -1,0 +1,25 @@
+---
+description: Known broken state - pages not loading, navigation broken, no data
+alwaysApply: true
+---
+
+# Broken State: Pages Not Loading
+
+**Git tag:** `broken-pages-loading`  
+**Commit:** 6b48b9bc01 — "refactor: streamline interface components and settings management"
+
+## Symptoms
+- Pages do not load
+- Cannot click to navigate to another page
+- No data displayed on pages
+
+## Context
+- Console shows `loadBlocks` called, API returns data, `setBlocks CHECK` runs
+- Likely cause: blocks not being set/rendered, or navigation/overlay blocking clicks
+- FieldSettingsDrawerHost refactor was initially suspected but that component is not used in the app
+
+## To Fix
+1. Compare against `git show broken-pages-loading` or `git diff broken-pages-loading`
+2. Check InterfacePageClient loadBlocks/setBlocks flow and `willUpdate` in logs
+3. Check for overlays (RightSettingsPanel, modals) blocking clicks
+4. Verify RightSettingsPanelDataContext and related components
