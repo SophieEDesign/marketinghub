@@ -25,7 +25,7 @@ import Cell from "./Cell"
 import { CellFactory } from "./CellFactory"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { TableField } from "@/types/fields"
-import RecordModal from "@/components/calendar/RecordModal"
+import { useRecordModal } from "@/contexts/RecordModalContext"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 import { SkeletonLoader } from "@/components/ui/SkeletonLoader"
 import EmptyTableState from "@/components/empty-states/EmptyTableState"
@@ -615,14 +615,30 @@ export default function GridView({
   const [pendingAction, setPendingAction] = useState<(() => Promise<void>) | null>(null)
   const [fieldToDelete, setFieldToDelete] = useState<string | null>(null)
   const [missingRequiredFields, setMissingRequiredFields] = useState<string[]>([])
-  const [modalRecordId, setModalRecordId] = useState<string | null>(null)
+  const { openRecordModal } = useRecordModal()
 
-  // Open record in edit mode when openRecordInEditMode is set
+  // Open record in edit mode when openRecordInEditMode is set (e.g. from block settings)
   useEffect(() => {
-    if (openRecordInEditMode && openRecordInEditMode !== modalRecordId) {
-      setModalRecordId(openRecordInEditMode)
+    if (openRecordInEditMode && recordOpenStyle === 'modal') {
+      openRecordModal({
+        tableId,
+        recordId: openRecordInEditMode,
+        tableFields,
+        modalFields,
+        modalLayout,
+        fieldLayout,
+        supabaseTableName,
+        cascadeContext,
+        canEditLayout,
+        onLayoutSave: onModalLayoutSave,
+        initialEditMode: true,
+        interfaceMode,
+        onSave: () => loadRows(),
+        onDeleted: () => loadRows(),
+        keySuffix: blockId ?? undefined,
+      })
     }
-  }, [openRecordInEditMode, modalRecordId])
+  }, [openRecordInEditMode, recordOpenStyle, openRecordModal, tableId, tableFields, modalFields, modalLayout, fieldLayout, supabaseTableName, cascadeContext, canEditLayout, onModalLayoutSave, interfaceMode, blockId, loadRows])
 
   // Track previous groupBy to detect changes
   const prevGroupByRef = useRef<string | undefined>(groupBy)
@@ -2398,9 +2414,25 @@ export default function GridView({
       return
     }
 
-    // If recordOpenStyle is 'modal', open modal directly
+    // If recordOpenStyle is 'modal', open global RecordModal via context
     if (recordOpenStyle === 'modal') {
-      setModalRecordId(rowId)
+      openRecordModal({
+        tableId,
+        recordId: rowId,
+        tableFields,
+        modalFields,
+        modalLayout,
+        fieldLayout,
+        supabaseTableName,
+        cascadeContext,
+        canEditLayout,
+        onLayoutSave: onModalLayoutSave,
+        initialEditMode: initialModalEditMode || !!openRecordInEditMode,
+        interfaceMode,
+        onSave: () => loadRows(),
+        onDeleted: () => loadRows(),
+        keySuffix: blockId ?? undefined,
+      })
       return
     }
 
@@ -3898,28 +3930,6 @@ export default function GridView({
         variant="destructive"
       />
 
-      {/* Record Modal (when recordOpenStyle is 'modal') */}
-      {recordOpenStyle === 'modal' && (
-        <RecordModal
-          key={`record-modal-${blockId ?? tableId}-${modalRecordId}-${interfaceMode}-${Array.isArray(fieldLayout) ? fieldLayout.length : 0}`}
-          open={!!modalRecordId}
-          onClose={() => setModalRecordId(null)}
-          tableId={tableId}
-          recordId={modalRecordId ?? null}
-          tableFields={tableFields}
-          modalFields={modalFields}
-          modalLayout={modalLayout}
-          fieldLayout={fieldLayout}
-          supabaseTableName={supabaseTableName}
-          cascadeContext={cascadeContext}
-          canEditLayout={canEditLayout}
-          onLayoutSave={onModalLayoutSave}
-          initialEditMode={initialModalEditMode || !!openRecordInEditMode}
-          interfaceMode={interfaceMode}
-          onSave={() => loadRows()}
-          onDeleted={() => loadRows()}
-        />
-      )}
     </div>
   )
 }

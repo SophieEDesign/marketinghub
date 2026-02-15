@@ -20,7 +20,7 @@ import { Plus, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import RecordModal from "@/components/calendar/RecordModal"
+import { useRecordModal } from "@/contexts/RecordModalContext"
 import { useToast } from "@/components/ui/use-toast"
 import { formatDateUK } from "@/lib/utils"
 import { resolveChoiceColor, normalizeHexColor, getTextColorForBackground } from "@/lib/field-colors"
@@ -90,7 +90,7 @@ export default function RecordReviewLeftColumn({
   const [fields, setFields] = useState<TableField[]>([])
   const [loading, setLoading] = useState(false)
   const [creating, setCreating] = useState(false)
-  const [createModalOpen, setCreateModalOpen] = useState(false)
+  const { openRecordModal } = useRecordModal()
   const [searchQuery, setSearchQuery] = useState("")
   const [tableName, setTableName] = useState<string | null>(null)
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
@@ -326,9 +326,8 @@ export default function RecordReviewLeftColumn({
   }, [tableId, loadRecords])
 
   const handleOpenCreateModal = useCallback(() => {
-    // Only enable this UX for record_view pages (requested)
     if (!isRecordView) return
-    if (!supabaseTableName || creating) return
+    if (!supabaseTableName || creating || !tableId) return
     if (!canCreateRecord(userRole, pageConfig)) {
       toast({
         variant: "destructive",
@@ -337,8 +336,31 @@ export default function RecordReviewLeftColumn({
       })
       return
     }
-    setCreateModalOpen(true)
-  }, [creating, isRecordView, pageConfig, supabaseTableName, toast, userRole])
+    openRecordModal({
+      tableId,
+      recordId: null,
+      tableFields: fields,
+      supabaseTableName,
+      cascadeContext: pageConfig ? { pageConfig } : undefined,
+      interfaceMode: "view",
+      onSave: async (createdId) => {
+        if (!createdId) return
+        setCreating(true)
+        try {
+          setSearchQuery("")
+          if (supabaseTableName) await loadRecords(supabaseTableName)
+          onRecordSelect(String(createdId))
+          toast({
+            title: "Record created",
+            description: "Your new record has been created.",
+          })
+        } finally {
+          setCreating(false)
+        }
+      },
+      onDeleted: () => loadRecords(supabaseTableName),
+    })
+  }, [creating, isRecordView, pageConfig, supabaseTableName, toast, userRole, tableId, fields, openRecordModal, loadRecords, onRecordSelect])
 
   const handleCreateRecord = useCallback(async (primaryValue: string) => {
     if (!isRecordView) return
@@ -853,33 +875,6 @@ export default function RecordReviewLeftColumn({
           )}
         </div>
       </div>
-
-      {/* Create record: same Record Editor (create mode) as elsewhere */}
-      {isRecordView && tableId && (
-        <RecordModal
-          open={createModalOpen}
-          onClose={() => setCreateModalOpen(false)}
-          tableId={tableId}
-          recordId={null}
-          tableFields={fields}
-          supabaseTableName={supabaseTableName}
-          onSave={async (createdId) => {
-            if (!createdId) return
-            setCreating(true)
-            try {
-              setSearchQuery("")
-              if (supabaseTableName) await loadRecords(supabaseTableName)
-              onRecordSelect(String(createdId))
-              toast({
-                title: "Record created",
-                description: "Your new record has been created.",
-              })
-            } finally {
-              setCreating(false)
-            }
-          }}
-        />
-      )}
 
       {/* Record List */}
       <div className="flex-1 overflow-y-auto">

@@ -22,7 +22,7 @@ import { addDays, differenceInCalendarDays, format, startOfDay } from "date-fns"
 import type { EventDropArg, EventInput, EventClickArg, EventContentArg } from "@fullcalendar/core"
 import type { TableRow } from "@/types/database"
 import type { LinkedField, TableField } from "@/types/fields"
-import RecordModal from "@/components/calendar/RecordModal"
+import { useRecordModal } from "@/contexts/RecordModalContext"
 import { isDebugEnabled, debugLog, debugWarn, debugError } from '@/lib/interface/debug-flags'
 import { resolveCalendarDateFieldNames as resolveDateFields } from '@/lib/interface/calendar-date-fields'
 import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
@@ -147,9 +147,8 @@ export default function CalendarView({
   const [resolvedTableId, setResolvedTableId] = useState<string>(tableId || '')
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
   const [loadedTableFields, setLoadedTableFields] = useState<TableField[]>(tableFields || [])
-  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null)
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
-  const [createRecordDate, setCreateRecordDate] = useState<Date | null>(null) // Date for creating new record
+  const { openRecordModal } = useRecordModal()
   const [linkedValueLabelMaps, setLinkedValueLabelMaps] = useState<Record<string, Record<string, string>>>({})
   const prevCalendarEventsSignatureRef = useRef<string>("")
   const prevCalendarEventsRef = useRef<EventInput[]>([])
@@ -1750,20 +1749,54 @@ export default function CalendarView({
         onRecordClick(recordIdString)
         return
       }
-      setSelectedRecordId(recordIdString)
+      openRecordModal({
+        tableId: resolvedTableId,
+        recordId: recordIdString,
+        tableFields: Array.isArray(loadedTableFields) ? loadedTableFields : [],
+        modalFields: Array.isArray(blockConfig?.modal_fields) ? blockConfig.modal_fields : [],
+        modalLayout: blockConfig?.modal_layout,
+        supabaseTableName,
+        cascadeContext: blockConfig ? { blockConfig } : undefined,
+        canEditLayout,
+        onLayoutSave: onModalLayoutSave,
+        interfaceMode,
+        onSave: () => { if (resolvedTableId && supabaseTableName) loadRows() },
+        onDeleted: () => { if (resolvedTableId && supabaseTableName) loadRows() },
+        keySuffix: blockId ?? undefined,
+      })
     },
-    [allowOpenRecord, onRecordClick, resolvedDateFieldNames]
+    [allowOpenRecord, onRecordClick, resolvedDateFieldNames, openRecordModal, resolvedTableId, loadedTableFields, blockConfig, supabaseTableName, canEditLayout, onModalLayoutSave, interfaceMode, blockId, loadRows]
   )
 
   const onCalendarDateClick = useCallback(
     (info: { dateStr: string }) => {
-      if (!canCreateRecord) return
-      // Date clicked - open modal to create new record with pre-filled date
-      // info.dateStr is already in YYYY-MM-DD format
-      const clickedDate = new Date(info.dateStr + "T00:00:00") // Ensure it's treated as local date
-      setCreateRecordDate(clickedDate)
+      if (!canCreateRecord || !resolvedTableId || !resolvedDateFieldId) return
+      const clickedDate = new Date(info.dateStr + "T00:00:00")
+      const dateValue = format(clickedDate, 'yyyy-MM-dd')
+      const initial: Record<string, any> = {}
+      const defaultsFromFilters = deriveDefaultValuesFromFilters(combinedFiltersForDefaults, loadedTableFields)
+      if (Object.keys(defaultsFromFilters).length > 0) Object.assign(initial, defaultsFromFilters)
+      initial[resolvedDateFieldId] = dateValue
+      if (viewConfig?.calendar_start_field) initial[viewConfig.calendar_start_field] = dateValue
+      if (viewConfig?.calendar_end_field) initial[viewConfig.calendar_end_field] = dateValue
+      openRecordModal({
+        tableId: resolvedTableId,
+        recordId: null,
+        tableFields: Array.isArray(loadedTableFields) ? loadedTableFields : [],
+        modalFields: Array.isArray(blockConfig?.modal_fields) ? blockConfig.modal_fields : [],
+        modalLayout: blockConfig?.modal_layout,
+        supabaseTableName,
+        cascadeContext: blockConfig ? { blockConfig } : undefined,
+        canEditLayout,
+        onLayoutSave: onModalLayoutSave,
+        interfaceMode,
+        initialData: initial,
+        onSave: () => { if (resolvedTableId && supabaseTableName) loadRows() },
+        onDeleted: () => { if (resolvedTableId && supabaseTableName) loadRows() },
+        keySuffix: blockId ?? undefined,
+      })
     },
-    [canCreateRecord]
+    [canCreateRecord, resolvedTableId, resolvedDateFieldId, openRecordModal, combinedFiltersForDefaults, loadedTableFields, viewConfig, blockConfig, supabaseTableName, canEditLayout, onModalLayoutSave, interfaceMode, blockId, loadRows]
   )
 
   if (loading) {
@@ -1942,91 +1975,6 @@ export default function CalendarView({
           </div>
         )}
       </div>
-
-      {/* Record Modal for Editing */}
-      {selectedRecordId && resolvedTableId && (
-        <RecordModal
-          key={`record-modal-${blockId ?? resolvedTableId}-${selectedRecordId}-${interfaceMode}-${Array.isArray(blockConfig?.field_layout) ? blockConfig.field_layout.length : (blockConfig?.modal_layout?.blocks?.length ?? 0)}`}
-          open={selectedRecordId !== null}
-          onClose={() => setSelectedRecordId(null)}
-          tableId={resolvedTableId}
-          modalFields={Array.isArray(blockConfig?.modal_fields) ? blockConfig.modal_fields : []}
-          modalLayout={blockConfig?.modal_layout}
-          recordId={selectedRecordId}
-          tableFields={Array.isArray(loadedTableFields) ? loadedTableFields : []}
-          supabaseTableName={supabaseTableName}
-          cascadeContext={blockConfig ? { blockConfig } : undefined}
-          canEditLayout={canEditLayout}
-          onLayoutSave={onModalLayoutSave}
-          interfaceMode={interfaceMode}
-          onSave={() => {
-            if (resolvedTableId && supabaseTableName) {
-              loadRows()
-            }
-          }}
-          onDeleted={() => {
-            if (resolvedTableId && supabaseTableName) {
-              loadRows()
-            }
-          }}
-        />
-      )}
-
-      {/* Record Modal for Creating New Record */}
-      {canCreateRecord && createRecordDate && resolvedTableId && resolvedDateFieldId && (
-        <RecordModal
-          key={`record-modal-create-${blockId ?? resolvedTableId}-${interfaceMode}-${Array.isArray(blockConfig?.field_layout) ? blockConfig.field_layout.length : (blockConfig?.modal_layout?.blocks?.length ?? 0)}`}
-          open={createRecordDate !== null}
-          onClose={() => setCreateRecordDate(null)}
-          tableId={resolvedTableId}
-          modalFields={Array.isArray(blockConfig?.modal_fields) ? blockConfig.modal_fields : []}
-          modalLayout={blockConfig?.modal_layout}
-          recordId={null}
-          tableFields={Array.isArray(loadedTableFields) ? loadedTableFields : []}
-          supabaseTableName={supabaseTableName}
-          cascadeContext={blockConfig ? { blockConfig } : undefined}
-          canEditLayout={canEditLayout}
-          onLayoutSave={onModalLayoutSave}
-          interfaceMode={interfaceMode}
-          initialData={(() => {
-            // Pre-fill the date field(s) based on the clicked date
-            const initial: Record<string, any> = {}
-            // Also apply Airtable-style defaults from active filters (when they imply a single-value selection).
-            // NOTE: combinedFilters includes date range UI filters, but deriveDefaultValuesFromFilters() intentionally ignores them.
-            const defaultsFromFilters = deriveDefaultValuesFromFilters(combinedFiltersForDefaults, loadedTableFields)
-            if (Object.keys(defaultsFromFilters).length > 0) {
-              Object.assign(initial, defaultsFromFilters)
-            }
-            // IMPORTANT: Use local date formatting (not UTC via toISOString),
-            // otherwise the day can shift for users outside UTC.
-            const dateValue = format(createRecordDate, 'yyyy-MM-dd')
-            
-            // Use resolved date field or view config fields
-            if (resolvedDateFieldId) {
-              initial[resolvedDateFieldId] = dateValue
-            }
-            
-            // Also set start field if configured
-            if (viewConfig?.calendar_start_field) {
-              initial[viewConfig.calendar_start_field] = dateValue
-            }
-            
-            // Also set end field if configured (same as start for single-day events)
-            if (viewConfig?.calendar_end_field) {
-              initial[viewConfig.calendar_end_field] = dateValue
-            }
-            
-            return initial
-          })()}
-          onSave={() => {
-            // Reload rows after save
-            if (resolvedTableId && supabaseTableName) {
-              loadRows()
-            }
-            setCreateRecordDate(null)
-          }}
-        />
-      )}
     </div>
   )
 }

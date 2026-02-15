@@ -16,7 +16,7 @@ import { ChevronDown, ChevronRight, Filter, Group, MapPin, MoreHorizontal, Plus,
 import { useIsMobile } from "@/hooks/useResponsive"
 import { Button } from "@/components/ui/button"
 import EmptyState from "@/components/empty-states/EmptyState"
-import RecordModal from "@/components/calendar/RecordModal"
+import { useRecordModal } from "@/contexts/RecordModalContext"
 import GroupDialog from "@/components/grid/GroupDialog"
 import FilterDialog from "@/components/grid/FilterDialog"
 import { toPostgrestColumn } from "@/lib/supabase/postgrest"
@@ -131,8 +131,7 @@ export default function ListView({
   const [userDisplayNames, setUserDisplayNames] = useState<Map<string, string>>(new Map())
 
   // Create flow: open modal first; only insert on Save inside modal.
-  const [createModalOpen, setCreateModalOpen] = useState(false)
-  const [createInitialData, setCreateInitialData] = useState<Record<string, any> | null>(null)
+  const { openRecordModal } = useRecordModal()
 
   // CRITICAL: Prevent infinite retry loops
   const loadingRowsRef = useRef(false)
@@ -749,44 +748,42 @@ export default function ListView({
           }
         }
       }
-      // Do NOT insert yet — open the modal with pre-filled data.
-      setCreateInitialData(newData)
-      setCreateModalOpen(true)
+      // Open global RecordModal with pre-filled data
+      openRecordModal({
+        tableId,
+        recordId: null,
+        tableFields: Array.isArray(tableFields) ? tableFields : [],
+        modalFields,
+        initialData: newData,
+        supabaseTableName,
+        cascadeContext: cascadeContext ?? undefined,
+        interfaceMode,
+        onSave: async () => { await loadRows() },
+        onDeleted: () => loadRows(),
+      })
     } catch (error) {
       console.error('Failed to create record:', error)
       alert('Failed to create record. Please try again.')
     }
-  }, [showAddRecord, canCreateRecord, supabaseTableName, tableId, effectiveGroupRules.length, groupPathMap, tableFields, filters])
+  }, [showAddRecord, canCreateRecord, supabaseTableName, tableId, effectiveGroupRules.length, groupPathMap, tableFields, filters, openRecordModal, modalFields, cascadeContext, interfaceMode, loadRows])
 
   const handleOpenCreateModal = useCallback(() => {
     if (!showAddRecord || !canCreateRecord || !tableId || !supabaseTableName) return
     const defaultsFromFilters = deriveDefaultValuesFromFilters(filters, tableFields)
     const initial = Object.keys(defaultsFromFilters).length > 0 ? defaultsFromFilters : {}
-    setCreateInitialData(initial)
-    setCreateModalOpen(true)
-  }, [showAddRecord, canCreateRecord, tableId, supabaseTableName, filters, tableFields])
-
-  const createRecordModal = (
-    <RecordModal
-      open={createModalOpen}
-      onClose={() => {
-        setCreateModalOpen(false)
-        setCreateInitialData(null)
-      }}
-      tableId={tableId}
-      recordId={null}
-      tableFields={Array.isArray(tableFields) ? tableFields : []}
-      modalFields={modalFields}
-      initialData={createInitialData || undefined}
-      onSave={async () => {
-        await loadRows()
-        setCreateModalOpen(false)
-        setCreateInitialData(null)
-      }}
-      supabaseTableName={supabaseTableName}
-      cascadeContext={cascadeContext}
-    />
-  )
+    openRecordModal({
+      tableId,
+      recordId: null,
+      tableFields: Array.isArray(tableFields) ? tableFields : [],
+      modalFields,
+      initialData: initial,
+      supabaseTableName,
+      cascadeContext: cascadeContext ?? undefined,
+      interfaceMode,
+      onSave: async () => { await loadRows() },
+      onDeleted: () => loadRows(),
+    })
+  }, [showAddRecord, canCreateRecord, tableId, supabaseTableName, filters, tableFields, openRecordModal, modalFields, cascadeContext, interfaceMode, loadRows])
 
   // Render a list item
   const renderListItem = useCallback((row: Record<string, any>) => {
@@ -1245,8 +1242,6 @@ export default function ListView({
             </div>
           </div>
         )}
-
-        {createRecordModal}
       </div>
     )
   }
@@ -1357,8 +1352,6 @@ export default function ListView({
             </div>
           </div>
         )}
-
-        {createRecordModal}
       </div>
     )
   }
@@ -1450,8 +1443,6 @@ export default function ListView({
           </div>
         </div>
       )}
-
-      {createRecordModal}
     </div>
   )
 }

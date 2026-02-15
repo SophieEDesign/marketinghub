@@ -30,7 +30,7 @@ import CalendarDateRangeControls from "@/components/views/calendar/CalendarDateR
 import QuickFilterBar from "@/components/filters/QuickFilterBar"
 import type { TableRow } from "@/types/database"
 import type { TableField } from "@/types/fields"
-import RecordModal from "@/components/calendar/RecordModal"
+import { useRecordModal } from "@/contexts/RecordModalContext"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import {
@@ -164,6 +164,7 @@ export default function MultiCalendarView({
 }: MultiCalendarViewProps) {
   const supabase = useMemo(() => createClient(), [])
   const { openRecord } = useRecordPanel()
+  const { openRecordModal } = useRecordModal()
   const { handleError } = useOperationFeedback()
 
   // Respect block permissions + per-block add-record toggle (same contract as GridBlock).
@@ -214,11 +215,6 @@ export default function MultiCalendarView({
   const [createSourceId, setCreateSourceId] = useState<string>("")
   // CRITICAL: Use undefined initially to prevent hydration mismatch, then set to Date after mount
   const [createDate, setCreateDate] = useState<Date | undefined>(undefined)
-  const [createDraft, setCreateDraft] = useState<{
-    sourceId: string
-    tableId: string
-    initialData: Record<string, any>
-  } | null>(null)
 
   const loadingRef = useRef(false)
 
@@ -724,12 +720,18 @@ export default function MultiCalendarView({
     if (startFieldName) newData[startFieldName] = safeDateOnly(dateToUse)
     if (endFieldName) newData[endFieldName] = newData[endFieldName] || safeDateOnly(dateToUse)
 
-    // Do NOT insert yet — open the record modal with pre-filled data.
     setCreateOpen(false)
-    setCreateDraft({
-      sourceId: sid,
+    openRecordModal({
       tableId: mapping.table_id,
+      recordId: null,
+      tableFields,
+      modalFields: Array.isArray((blockConfig as any)?.modal_fields) ? (blockConfig as any).modal_fields : undefined,
       initialData: newData,
+      supabaseTableName: table.supabaseTable,
+      cascadeContext: blockConfig ? { blockConfig } : undefined,
+      interfaceMode: interfaceMode ?? "view",
+      onSave: () => loadAll(),
+      onDeleted: () => loadAll(),
     })
   }
 
@@ -986,22 +988,6 @@ export default function MultiCalendarView({
         </DialogContent>
       </Dialog>
 
-      {createDraft && (
-        <RecordModal
-          open={true}
-          onClose={() => setCreateDraft(null)}
-          tableId={createDraft.tableId}
-          recordId={null}
-          tableFields={fieldsBySource[createDraft.sourceId] || []}
-          modalFields={Array.isArray((blockConfig as any)?.modal_fields) ? (blockConfig as any).modal_fields : []}
-          initialData={createDraft.initialData}
-          cascadeContext={blockConfig ? { blockConfig } : undefined}
-          onSave={async () => {
-            setCreateDraft(null)
-            await loadAll()
-          }}
-        />
-      )}
     </div>
   )
 }

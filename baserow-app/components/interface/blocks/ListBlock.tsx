@@ -18,7 +18,7 @@ import type { TableField } from "@/types/fields"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import QuickFilterBar from "@/components/filters/QuickFilterBar"
-import RecordModal from "@/components/calendar/RecordModal"
+import { useRecordModal } from "@/contexts/RecordModalContext"
 import { useToast } from "@/components/ui/use-toast"
 import { VIEWS_ENABLED } from "@/lib/featureFlags"
 import type { GroupRule } from "@/lib/grouping/types"
@@ -110,8 +110,8 @@ export default function ListBlock({
   }, [viewFiltersWithUserOverrides, filters])
 
   const [loading, setLoading] = useState(true)
-  const [createModalOpen, setCreateModalOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  const { openRecordModal } = useRecordModal()
   const [table, setTable] = useState<{ id: string; supabase_table: string; name?: string | null } | null>(null)
   const [tableFields, setTableFields] = useState<TableField[]>([])
   
@@ -382,27 +382,31 @@ export default function ListBlock({
     titleFieldObj?.type === "email" ||
     titleFieldObj?.type === "url"
 
-  const handleOpenCreateModal = () => {
-    if (!showAddRecord || !canCreateRecord || isLoading || !table || !tableId) return
-    setCreateModalOpen(true)
-  }
+  // Modal uses same field set as Data (single source of truth) — must be before handleOpenCreateModal
+  const modalFields = (config.visible_fields?.length ? config.visible_fields : (config as any)?.modal_fields) as
+    | string[]
+    | undefined
 
-  const handleCreateRecordSave = useCallback(async () => {
+  const handleOpenCreateModal = useCallback(() => {
     if (!showAddRecord || !canCreateRecord || isLoading || !table || !tableId) return
-    
-    toast({ title: "Record created" })
-    // Contract: creating a record must NOT auto-open it.
-    // User can open via the dedicated chevron (or optional double-click) in the list.
-    setCreateModalOpen(false)
-    setRefreshKey((k) => k + 1)
-  }, [canCreateRecord, isLoading, showAddRecord, table, tableId, toast])
-
-  // Prepare initial data for new record (prefill from filters)
-  // Must be declared before any early returns to satisfy React Hooks rules
-  const createInitialData = useMemo(() => {
-    const defaultsFromFilters = deriveDefaultValuesFromFilters(allFilters, safeTableFields)
-    return Object.keys(defaultsFromFilters).length > 0 ? defaultsFromFilters : undefined
-  }, [allFilters, safeTableFields])
+    const createInitialData = deriveDefaultValuesFromFilters(allFilters, safeTableFields)
+    const initialData = Object.keys(createInitialData).length > 0 ? createInitialData : undefined
+    openRecordModal({
+      tableId: table.id,
+      recordId: null,
+      tableFields: safeTableFields,
+      modalFields,
+      initialData,
+      supabaseTableName: table.supabase_table,
+      cascadeContext: { blockConfig: config },
+      interfaceMode: "view",
+      onSave: () => {
+        toast({ title: "Record created" })
+        setRefreshKey((k) => k + 1)
+      },
+      onDeleted: () => setRefreshKey((k) => k + 1),
+    })
+  }, [showAddRecord, canCreateRecord, isLoading, table, tableId, allFilters, safeTableFields, modalFields, config, openRecordModal, toast])
 
   if (!tableId) {
     return (
@@ -468,27 +472,8 @@ export default function ListBlock({
     )
   }
 
-  // Modal uses same field set as Data (single source of truth)
-  const modalFields = (config.visible_fields?.length ? config.visible_fields : (config as any)?.modal_fields) as
-    | string[]
-    | undefined
-
   return (
     <div className="h-full w-full overflow-auto" style={blockStyle}>
-      {table && tableId && (
-        <RecordModal
-          open={createModalOpen}
-          onClose={() => setCreateModalOpen(false)}
-          tableId={table.id}
-          recordId={null}
-          tableFields={safeTableFields}
-          modalFields={modalFields}
-          initialData={createInitialData}
-          onSave={handleCreateRecordSave}
-          supabaseTableName={table.supabase_table}
-          cascadeContext={{ blockConfig: config }}
-        />
-      )}
       {(((appearance.showTitle ?? (appearance as any).show_title) !== false && (appearance.title || (isEditing ? config.title : table?.name))) || showAddRecord) && (
         <div
           className="mb-4 pb-2 border-b flex items-center justify-between gap-3"
