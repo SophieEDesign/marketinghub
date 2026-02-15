@@ -78,27 +78,10 @@ export default function InterfaceBuilder({
   pageEditable,
   editableFieldNames = [],
 }: InterfaceBuilderProps) {
-  // #region agent log
-  const renderCountRef = useRef(0)
-  const lastLogTsRef = useRef(0)
-  renderCountRef.current += 1
-  const now = Date.now()
-  if (now - lastLogTsRef.current < 500 && renderCountRef.current > 8) {
-    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:render',message:'RENDER_LOOP_DETECTED',data:{count:renderCountRef.current,pageId:page.id},timestamp:now})}).catch(()=>{})
-    lastLogTsRef.current = now
-    renderCountRef.current = 0
-  } else if (now - lastLogTsRef.current > 1000) { renderCountRef.current = 0; lastLogTsRef.current = now }
-  // #endregion
   const { primaryColor } = useBranding()
   const { toast } = useToast()
   const [blocks, setBlocks] = useState<PageBlock[]>(initialBlocks)
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle")
-  
-  // CRITICAL: Hydration lock - prevent Canvas from rendering until blocks are loaded
-  // This prevents Canvas from committing empty layout state before blocks arrive
-  // There are three states: Loading (undefined), Hydrated (≥0 blocks), Editing (≥0 blocks)
-  // Canvas must NOT run until hydration is complete
-  const [hasHydrated, setHasHydrated] = useState<boolean>(false)
   
   // Context-driven editing: Edit/View toggle from sidebar menu controls block editing
   const { isEditing: isBlockEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(page.id)
@@ -144,27 +127,16 @@ export default function InterfaceBuilder({
   // Ref: have we resolved multiple full-page blocks for this page (invariant: at most one is_full_page)
   const resolvedFullPageRef = useRef<string | null>(null)
 
-  // Reset initialization flag and hydration state ONLY when pageId changes (navigation to different page)
+  // Reset initialization flag ONLY when pageId changes (navigation to different page)
   useEffect(() => {
     if (prevPageIdRef.current !== page.id) {
       prevPageIdRef.current = page.id
       hasInitializedRef.current = false
       latestLayoutRef.current = null // Reset layout ref on page change
       lastSavedLayoutRef.current = null // Reset saved layout hash on page change
-      setHasHydrated(false) // Reset hydration lock on page change
       resolvedFullPageRef.current = null // Allow full-page resolution to run for new page
     }
   }, [page.id])
-  
-  // Also check if initialBlocks was already populated on mount (synchronous load)
-  // This handles the case where blocks are available immediately
-  // CRITICAL: Empty blocks is a valid state - we should hydrate even with 0 blocks
-  // This allows users to add blocks to empty pages
-  useEffect(() => {
-    if (initialBlocks !== undefined && !hasHydrated) {
-      setHasHydrated(true)
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   
   // CRITICAL: One-way gate - initialize blocks ONCE per pageId, never replace after
   // This is the final fix to prevent edit/view drift
@@ -1432,11 +1404,15 @@ export default function InterfaceBuilder({
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [effectiveIsEditing, selectedBlockId, handleDeleteBlock, handleDuplicateBlock, handleExitEditMode, canUndo, canRedo, undoLayout, redoLayout, layoutModifiedByUserRef])
 
+  // STEP 4: Verification log - confirm stable render, blocks present, edit state consistent
+  if (process.env.NODE_ENV === 'development') {
+    console.log("InterfaceBuilder render", { blocks: blocks.length, effectiveIsEditing })
+  }
+
   return (
-    <div className="flex h-full w-full min-h-0 bg-gray-50 min-w-0">
-      {/* Main Canvas - Full width when not editing */}
-      {/* CRITICAL: min-h-0 so full-page content doesn't force scroll */}
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0 min-h-0 w-full">
+    <div className="flex min-h-screen w-full flex-col bg-gray-50 min-w-0">
+      {/* Main Canvas - Full width; min-h-screen ensures blocks have space to render */}
+      <div className="flex-1 flex flex-col min-w-0 w-full min-h-0">
         {/* Toolbar / Interface Header */}
         {!hideHeader && (
         <div className="h-auto min-h-[56px] bg-white border-b border-gray-200 flex flex-col px-4 py-2">
@@ -1577,13 +1553,7 @@ export default function InterfaceBuilder({
           className={`flex-1 min-w-0 w-full min-h-0 ${fullPageBlockId ? "overflow-hidden p-0" : "overflow-auto p-4"}`}
         >
           <FilterStateProvider>
-            {/* CRITICAL: Hydration lock - never render Canvas until blocks are loaded */}
-            {/* This prevents Canvas from committing empty layout state before blocks arrive */}
-            {!hasHydrated ? (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-gray-500">Loading blocks...</div>
-              </div>
-            ) : (
+            {/* Blocks always render - no conditional visibility. Edit mode changes behaviour only. */}
             <Canvas
               blocks={blocks}
               isEditing={effectiveIsEditing}
@@ -1642,7 +1612,6 @@ export default function InterfaceBuilder({
               editingBlockCanvasId={editingBlockCanvasId}
               fullPageBlockId={fullPageBlockId}
             />
-            )}
           </FilterStateProvider>
           {/* Footer spacer to ensure bottom content is visible (accounts for taskbar) */}
           <div className="h-48 w-full" />
