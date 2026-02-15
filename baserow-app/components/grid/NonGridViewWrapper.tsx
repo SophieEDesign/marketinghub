@@ -12,6 +12,7 @@ import DesignSidebar from "@/components/layout/DesignSidebar"
 import UnifiedFilterDialog from "@/components/filters/UnifiedFilterDialog"
 import SortDialog from "@/components/grid/SortDialog"
 import HideFieldsDialog from "@/components/grid/HideFieldsDialog"
+import CustomizeCardsDialog, { type CardConfig } from "@/components/grid/CustomizeCardsDialog"
 import { supabase } from "@/lib/supabase/client"
 import type { TableField } from "@/types/fields"
 import type { ViewFilter, ViewSort } from "@/types/database"
@@ -47,6 +48,9 @@ interface NonGridViewWrapperProps {
   viewFields?: ViewFieldRow[]
   tableFields?: TableField[]
   cardFields?: string[]
+  cardImageField?: string
+  cardColorField?: string
+  cardWrapText?: boolean
 }
 
 export default function NonGridViewWrapper({
@@ -64,6 +68,9 @@ export default function NonGridViewWrapper({
   viewFields: viewFieldsProp = [],
   tableFields: tableFieldsProp = [],
   cardFields: cardFieldsProp = [],
+  cardImageField: cardImageFieldProp,
+  cardColorField: cardColorFieldProp,
+  cardWrapText: cardWrapTextProp = true,
 }: NonGridViewWrapperProps) {
   const viewUuid = normalizeUuid(viewId)
   const router = useRouter()
@@ -84,6 +91,10 @@ export default function NonGridViewWrapper({
     initialViewFields.filter((f) => !f.visible).map((f) => f.field_name)
   )
   const [cardFields, setCardFields] = useState<string[]>(cardFieldsProp)
+  const [cardImageField, setCardImageField] = useState<string>(cardImageFieldProp || "")
+  const [cardColorField, setCardColorField] = useState<string>(cardColorFieldProp || "")
+  const [cardWrapText, setCardWrapText] = useState(cardWrapTextProp ?? true)
+  const [customizeCardsDialogOpen, setCustomizeCardsDialogOpen] = useState(false)
 
   const fieldIds = useMemo(() => {
     if (viewFields.length > 0) {
@@ -92,15 +103,7 @@ export default function NonGridViewWrapper({
         .filter((vf) => !hiddenFields.includes(vf.field_name))
         .map((vf) => vf.field_name)
       if (viewType === "kanban" && cardFields.length > 0) {
-        const primary = cardFields[0]
-        const secondary = cardFields[1]
-        const rest = visible.filter((n) => n !== primary && n !== secondary)
-        const ordered: string[] = []
-        if (primary && visible.includes(primary)) ordered.push(primary)
-        if (secondary && visible.includes(secondary)) ordered.push(secondary)
-        rest.forEach((n) => {
-          if (!ordered.includes(n)) ordered.push(n)
-        })
+        const ordered = cardFields.filter((n) => visible.includes(n))
         return ordered.length > 0 ? ordered : visible
       }
       return visible
@@ -164,6 +167,12 @@ export default function NonGridViewWrapper({
     setCardFields(cardFieldsProp)
   }, [cardFieldsProp])
 
+  useEffect(() => {
+    setCardImageField(cardImageFieldProp || "")
+    setCardColorField(cardColorFieldProp || "")
+    setCardWrapText(cardWrapTextProp ?? true)
+  }, [cardImageFieldProp, cardColorFieldProp, cardWrapTextProp])
+
   const filtersAsConfig: FilterConfig[] = useMemo(
     () =>
       filters.map((f) => ({
@@ -226,23 +235,7 @@ export default function NonGridViewWrapper({
         tableId={tableId}
         views={views}
         tableFields={tableFields}
-        cardFields={cardFields}
-        onCardLayoutChange={async (primaryField, secondaryField) => {
-          const next = [primaryField, secondaryField].filter(Boolean)
-          setCardFields(next)
-          try {
-            if (!viewUuid) return
-            const { data: viewData } = await supabase.from("views").select("config").eq("id", viewUuid).single()
-            const currentConfig = (viewData?.config as Record<string, unknown>) || {}
-            await supabase
-              .from("views")
-              .update({ config: { ...currentConfig, card_fields: next } })
-              .eq("id", viewUuid)
-          } catch (error) {
-            console.error("Error saving card layout:", error)
-          }
-          router.refresh()
-        }}
+        onCustomizeCards={() => setCustomizeCardsDialogOpen(true)}
         onSearch={() => {}} // Handled via URL params
         onFilter={() => setFilterDialogOpen(true)}
         onSort={() => setSortDialogOpen(true)}
@@ -268,6 +261,9 @@ export default function NonGridViewWrapper({
             searchQuery={searchQuery}
             tableFields={tableFields}
             filters={filtersAsConfig}
+            imageField={cardImageField || undefined}
+            colorField={cardColorField || undefined}
+            wrapText={cardWrapText}
           />
         )}
         {viewType === "calendar" && (
@@ -371,6 +367,32 @@ export default function NonGridViewWrapper({
           router.refresh()
         }}
       />
+      {viewType === "kanban" && (
+        <CustomizeCardsDialog
+          isOpen={customizeCardsDialogOpen}
+          onClose={() => setCustomizeCardsDialogOpen(false)}
+          viewId={viewId}
+          tableId={tableId}
+          tableFields={tableFields}
+          viewFields={viewFields}
+          config={{
+            cardFields,
+            cardImageField: cardImageField || undefined,
+            cardColorField: cardColorField || undefined,
+            cardWrapText: cardWrapText,
+            groupBy: groupingFieldId || undefined,
+          }}
+          onConfigChange={(next) => {
+            setCardFields(next.cardFields)
+            setCardImageField(next.cardImageField || "")
+            setCardColorField(next.cardColorField || "")
+            setCardWrapText(next.cardWrapText ?? true)
+            if (next.groupBy && next.groupBy !== groupingFieldId) {
+              router.refresh()
+            }
+          }}
+        />
+      )}
       <HideFieldsDialog
         isOpen={hideFieldsDialogOpen}
         onClose={() => setHideFieldsDialogOpen(false)}

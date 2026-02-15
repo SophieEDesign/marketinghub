@@ -31,6 +31,7 @@ interface KanbanViewProps {
   colorField?: string // Field name to use for card colors (single-select field)
   imageField?: string // Field name to use for card images
   fitImageSize?: boolean // Whether to fit image to container size
+  wrapText?: boolean // Whether to wrap long text in card cells (default true)
   blockConfig?: Record<string, any> // Block config for modal_fields
   onRecordClick?: (recordId: string) => void
   /** Optional: pass to RecordPanel for permission cascade */
@@ -58,6 +59,7 @@ export default function KanbanView({
   colorField,
   imageField,
   fitImageSize = false,
+  wrapText = true,
   blockConfig = {},
   onRecordClick,
   cascadeContext = null,
@@ -515,7 +517,7 @@ export default function KanbanView({
                               rowId={String(row.id)}
                               tableName={supabaseTableName || ""}
                               editable={!titleField.options?.read_only && titleField.type !== "formula" && titleField.type !== "lookup" && !!supabaseTableName}
-                              wrapText={true}
+                              wrapText={wrapText}
                               rowHeight={undefined}
                               onSave={(value) => handleCellSave(String(row.id), titleField.name, value)}
                             />
@@ -562,7 +564,7 @@ export default function KanbanView({
                                   rowId={String(row.id)}
                                   tableName={supabaseTableName || ""}
                                   editable={!fieldObj.options?.read_only && !isVirtual && !!supabaseTableName}
-                                  wrapText={true}
+                                  wrapText={wrapText}
                                   rowHeight={22}
                                   onSave={(value) => handleCellSave(String(row.id), fieldObj.name, value)}
                                 />
@@ -581,7 +583,7 @@ export default function KanbanView({
                             rowId={String(row.id)}
                             tableName={supabaseTableName || ""}
                             editable={!footerField.options?.read_only && footerField.type !== "formula" && footerField.type !== "lookup" && !!supabaseTableName}
-                            wrapText={true}
+                            wrapText={wrapText}
                             rowHeight={20}
                             onSave={(value) => handleCellSave(String(row.id), footerField.name, value)}
                           />

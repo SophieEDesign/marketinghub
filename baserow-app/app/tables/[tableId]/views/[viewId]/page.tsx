@@ -204,6 +204,9 @@ export default async function ViewPage({
             viewFields={viewFields}
             tableFields={tableFields}
             cardFields={(view.config as { card_fields?: string[] })?.card_fields ?? []}
+            cardImageField={(view.config as { card_image_field?: string })?.card_image_field}
+            cardColorField={(view.config as { card_color_field?: string })?.card_color_field}
+            cardWrapText={(view.config as { card_wrap_text?: boolean })?.card_wrap_text}
           />
         )}
       </WorkspaceShellWrapper>
