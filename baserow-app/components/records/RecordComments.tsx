@@ -1,12 +1,18 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { ChevronDown, ChevronRight, MessageSquare, Send, Trash2, Pencil } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { getUserDisplayNames } from "@/lib/users/userDisplay"
 import { useToast } from "@/components/ui/use-toast"
+
+interface SearchUser {
+  user_id: string
+  email: string
+  display_name: string
+}
 
 export interface RecordComment {
   id: string
@@ -63,6 +69,13 @@ export default function RecordComments({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editBody, setEditBody] = useState("")
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null)
+  const [mentionUsers, setMentionUsers] = useState<SearchUser[]>([])
+  const [mentionIndex, setMentionIndex] = useState(0)
+  const [mentionLoading, setMentionLoading] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const mentionQueryRef = useRef<string>("")
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -101,6 +114,90 @@ export default function RecordComments({
   useEffect(() => {
     loadComments()
   }, [loadComments])
+
+  // Extract @mention query from text (text after last @)
+  const extractMentionQuery = useCallback((text: string): { query: string; startIndex: number } | null => {
+    const atIndex = text.lastIndexOf("@")
+    if (atIndex === -1) return null
+    const afterAt = text.slice(atIndex + 1)
+    if (/\s/.test(afterAt) || afterAt.includes("@")) return null
+    return { query: afterAt, startIndex: atIndex }
+  }, [])
+
+  // Fetch users when mention query changes (debounced)
+  useEffect(() => {
+    if (!mentionQuery) {
+      setMentionUsers([])
+      return
+    }
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(async () => {
+      setMentionLoading(true)
+      try {
+        const res = await fetch(`/api/users/search?q=${encodeURIComponent(mentionQuery)}`)
+        const data = (await res.json()) as { users?: SearchUser[] }
+        setMentionUsers(data.users ?? [])
+        setMentionIndex(0)
+      } catch {
+        setMentionUsers([])
+      } finally {
+        setMentionLoading(false)
+      }
+      debounceRef.current = null
+    }, 200)
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [mentionQuery])
+
+  const handleCommentChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const text = e.target.value
+      setNewComment(text)
+      const extracted = extractMentionQuery(text)
+      if (extracted) {
+        setMentionQuery(extracted.query)
+        mentionQueryRef.current = extracted.query
+      } else {
+        setMentionQuery(null)
+      }
+    },
+    [extractMentionQuery]
+  )
+
+  const insertMention = useCallback(
+    (user: SearchUser) => {
+      const extracted = extractMentionQuery(newComment)
+      if (!extracted) return
+      const before = newComment.slice(0, extracted.startIndex)
+      const after = newComment.slice(extracted.startIndex + extracted.query.length + 1)
+      const inserted = `${before}@${user.email} `
+      setNewComment(inserted + after)
+      setMentionQuery(null)
+      setMentionUsers([])
+      textareaRef.current?.focus()
+    },
+    [newComment, extractMentionQuery]
+  )
+
+  const handleCommentKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (!mentionQuery || mentionUsers.length === 0) return
+      if (e.key === "ArrowDown") {
+        e.preventDefault()
+        setMentionIndex((i) => Math.min(i + 1, mentionUsers.length - 1))
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault()
+        setMentionIndex((i) => Math.max(i - 1, 0))
+      } else if (e.key === "Enter" && mentionUsers.length > 0) {
+        e.preventDefault()
+        insertMention(mentionUsers[mentionIndex])
+      } else if (e.key === "Escape") {
+        setMentionQuery(null)
+      }
+    },
+    [mentionQuery, mentionUsers, mentionIndex, insertMention]
+  )
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -289,14 +386,43 @@ export default function RecordComments({
 
           {canAddComment && (
             <form onSubmit={handleSubmit} className="space-y-2">
-              <Textarea
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                placeholder="Add a comment..."
-                rows={2}
-                className="min-h-[60px] resize-none"
-                disabled={submitting}
-              />
+              <div className="relative">
+                <Textarea
+                  ref={textareaRef}
+                  value={newComment}
+                  onChange={handleCommentChange}
+                  onKeyDown={handleCommentKeyDown}
+                  placeholder="Add a comment... (type @ to mention someone)"
+                  rows={2}
+                  className="min-h-[60px] resize-none"
+                  disabled={submitting}
+                />
+                {mentionQuery !== null && (
+                  <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-auto rounded-md border border-gray-200 bg-white py-1 shadow-lg">
+                    {mentionLoading ? (
+                      <div className="px-3 py-2 text-sm text-gray-500">Searching…</div>
+                    ) : mentionUsers.length === 0 ? (
+                      <div className="px-3 py-2 text-sm text-gray-500">
+                        {mentionQuery.length < 2 ? "Type 2+ characters" : "No users found"}
+                      </div>
+                    ) : (
+                      mentionUsers.map((u, i) => (
+                        <button
+                          key={u.user_id}
+                          type="button"
+                          onClick={() => insertMention(u)}
+                          className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 ${
+                            i === mentionIndex ? "bg-gray-100" : ""
+                          }`}
+                        >
+                          <span className="font-medium">{u.display_name}</span>
+                          <span className="ml-2 text-gray-500">{u.email}</span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
               <Button
                 type="submit"
                 size="sm"

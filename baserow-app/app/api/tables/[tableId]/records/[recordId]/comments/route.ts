@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getTable } from "@/lib/crud/tables"
+import { parseMentions } from "@/lib/comments/parse-mentions"
+import { sendMentionNotification } from "@/lib/email/send-mention-notification"
+import { formatUserDisplayName } from "@/lib/users/userDisplay"
 
 /**
  * GET /api/tables/[tableId]/records/[recordId]/comments
@@ -96,6 +99,45 @@ export async function POST(
     if (error) {
       console.error("Error inserting comment:", error)
       return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // Process @mentions: resolve emails to users, insert comment_mentions, send emails
+    const mentionedEmails = parseMentions(text)
+    const commentAuthorName = formatUserDisplayName(user.email ?? null)
+    const tableName = table.name || "Record"
+    let baseUrl = process.env.NEXT_PUBLIC_APP_URL
+    if (!baseUrl) {
+      baseUrl = process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : "http://localhost:3000"
+    }
+    if (!baseUrl.startsWith("http")) baseUrl = `https://${baseUrl}`
+    const recordUrl = `${baseUrl}/tables/${tableId}?openRecord=${recordId}`
+    const commentPreview = text.length > 150 ? `${text.slice(0, 150)}...` : text
+
+    if (mentionedEmails.length > 0 && comment?.id) {
+      for (const email of mentionedEmails) {
+        const { data: profile } = await supabase
+          .from("user_profile_sync_status")
+          .select("user_id")
+          .ilike("email", email)
+          .maybeSingle()
+
+        if (!profile?.user_id || profile.user_id === user.id) continue
+
+        await supabase.from("comment_mentions").insert({
+          comment_id: comment.id,
+          mentioned_user_id: profile.user_id,
+        })
+
+        sendMentionNotification({
+          toEmail: email,
+          commentAuthorName,
+          recordUrl,
+          commentPreview,
+          tableName,
+        }).catch((err) => console.error("[comments] Mention email failed:", err))
+      }
     }
 
     return NextResponse.json({ comment })

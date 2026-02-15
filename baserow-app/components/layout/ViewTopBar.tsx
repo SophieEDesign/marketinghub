@@ -22,19 +22,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { useBranding } from "@/contexts/BrandingContext"
 import type { TableField } from "@/types/fields"
 
@@ -88,7 +75,6 @@ export default function ViewTopBar({
   const searchParams = useSearchParams()
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "")
   const [debouncedQuery, setDebouncedQuery] = useState(searchQuery)
-  const [cardLayoutOpen, setCardLayoutOpen] = useState(false)
 
   // Debounce search query (300ms)
   useEffect(() => {
@@ -146,37 +132,42 @@ export default function ViewTopBar({
   }
 
   return (
-    <div className="h-10 bg-white border-b border-gray-200 flex items-center gap-3 px-4">
-      {views.length > 0 && tableId ? (
-        <div className="flex items-center border-b border-gray-200 -mb-[1px] overflow-x-auto shrink-0 min-w-0">
-          {views.map((v) => {
-            const isActive = v.id === viewId
-            return (
-              <Link
-                key={v.id}
-                href={`/tables/${tableId}/views/${v.id}`}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px shrink-0",
-                  isActive
-                    ? "border-blue-600 text-blue-600 bg-white"
-                    : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                )}
-              >
-                <span style={isActive ? { color: primaryColor } : undefined} className="shrink-0 [&>svg]:h-4 [&>svg]:w-4">
-                  {getViewIcon(v.type)}
-                </span>
-                <span className="truncate max-w-[140px]">{v.name}</span>
-                <span className="text-gray-400 text-xs capitalize shrink-0">({v.type})</span>
-              </Link>
-            )
-          })}
+    <div className="bg-white border-b border-gray-200 flex flex-col">
+      {/* Row 1: View tabs only */}
+      <div className="flex items-center border-b border-gray-200 overflow-x-auto shrink-0 min-w-0">
+        <div className="flex items-center gap-0 flex-nowrap px-4 py-0 min-w-max">
+          {views.length > 0 && tableId ? (
+            views.map((v) => {
+              const isActive = v.id === viewId
+              return (
+                <Link
+                  key={v.id}
+                  href={`/tables/${tableId}/views/${v.id}`}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 transition-colors shrink-0",
+                    isActive
+                      ? "border-blue-600 text-blue-600 bg-white"
+                      : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                  )}
+                >
+                  <span style={isActive ? { color: primaryColor } : undefined} className="shrink-0 [&>svg]:h-4 [&>svg]:w-4">
+                    {getViewIcon(v.type)}
+                  </span>
+                  <span className="truncate max-w-[140px]">{v.name}</span>
+                  <span className="text-gray-400 text-xs capitalize shrink-0">({v.type})</span>
+                </Link>
+              )
+            })
+          ) : (
+            <span className="text-sm font-medium shrink-0 py-2.5" style={{ color: primaryColor }}>
+              {viewName} <span className="text-gray-500 font-normal">({viewType})</span>
+            </span>
+          )}
         </div>
-      ) : (
-        <span className="text-sm font-medium shrink-0" style={{ color: primaryColor }}>
-          {viewName} <span className="text-gray-500 font-normal">({viewType})</span>
-        </span>
-      )}
+      </div>
 
+      {/* Row 2: Toolbar */}
+      <div className="h-10 flex items-center gap-3 px-4 shrink-0">
       {onDesign && (
         <Button
           variant="outline"
@@ -268,66 +259,6 @@ export default function ViewTopBar({
           Hide Fields
         </Button>
       )}
-      {(viewType === "kanban" || viewType === "gallery") &&
-        onCardLayoutChange &&
-        tableFields.length > 0 && (
-          <Popover open={cardLayoutOpen} onOpenChange={setCardLayoutOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2.5 text-xs font-normal text-gray-600 hover:bg-gray-50 shrink-0"
-              >
-                <Layout className="h-3.5 w-3.5 mr-1.5" />
-                Card Layout {cardFields.length > 0 && `(${cardFields.length})`}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="w-64">
-              <div className="space-y-3">
-                <h4 className="font-medium text-sm">Card Layout</h4>
-                <div className="space-y-2">
-                  <Label className="text-xs">Primary title field</Label>
-                  <Select
-                    value={cardFields[0] || ""}
-                    onValueChange={(v) => onCardLayoutChange(v, cardFields[1] || "")}
-                  >
-                    <SelectTrigger className="h-8">
-                      <SelectValue placeholder="Select field" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {tableFields.map((f) => (
-                        <SelectItem key={f.name} value={f.name}>
-                          {f.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs">Secondary field</Label>
-                  <Select
-                    value={cardFields[1] || "__none__"}
-                    onValueChange={(v) =>
-                      onCardLayoutChange(cardFields[0] || "", v === "__none__" ? "" : v)
-                    }
-                  >
-                    <SelectTrigger className="h-8">
-                      <SelectValue placeholder="Select field" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">None</SelectItem>
-                      {tableFields.map((f) => (
-                        <SelectItem key={f.name} value={f.name}>
-                          {f.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
-        )}
       {onShare && (
         <Button
           variant="ghost"
@@ -351,6 +282,7 @@ export default function ViewTopBar({
           New Record
         </Button>
       )}
+      </div>
     </div>
   )
 }

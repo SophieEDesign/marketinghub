@@ -35,19 +35,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Label } from "@/components/ui/label"
 import UnifiedFilterDialog from "@/components/filters/UnifiedFilterDialog"
 import SortDialog from "./SortDialog"
 import GroupDialog from "./GroupDialog"
@@ -138,7 +125,6 @@ export default function ViewBuilderToolbar({
   const [sortDialogOpen, setSortDialogOpen] = useState(false)
   const [groupDialogOpen, setGroupDialogOpen] = useState(false)
   const [hideFieldsDialogOpen, setHideFieldsDialogOpen] = useState(false)
-  const [cardLayoutOpen, setCardLayoutOpen] = useState(false)
   const [viewManagementDialogOpen, setViewManagementDialogOpen] = useState(false)
   const [viewManagementAction, setViewManagementAction] = useState<"rename" | "duplicate" | "delete" | null>(null)
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "")
@@ -205,40 +191,43 @@ export default function ViewBuilderToolbar({
 
   return (
     <>
-      <div className="h-10 bg-white border-b border-gray-200 flex items-center gap-3 px-4 z-10 relative">
-        {/* View tabs */}
-        {views.length > 0 ? (
-          <div className="flex items-center border-b border-gray-200 -mb-[1px] overflow-x-auto shrink-0 min-w-0">
-            {views.map((v) => {
-              const isActive = v.id === viewId
-              return (
-                <Link
-                  key={v.id}
-                  href={`/tables/${tableId}/views/${v.id}`}
-                  className={cn(
-                    "flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px shrink-0",
-                    isActive
-                      ? "border-blue-600 text-blue-600 bg-white"
-                      : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                  )}
-                >
-                  <span className={cn("shrink-0", isActive && "text-blue-600")}>
-                    {getViewIcon(v.type as ViewType)}
-                  </span>
-                  <span className="truncate max-w-[140px]">{v.name}</span>
-                  <span className="text-gray-400 text-xs capitalize shrink-0">({v.type})</span>
-                </Link>
-              )
-            })}
+      <div className="flex flex-col bg-white border-b border-gray-200 z-10 relative">
+        {/* Row 1: View tabs only (horizontal scroll) */}
+        <div className="flex items-center border-b border-gray-200 overflow-x-auto min-w-0 flex-shrink-0">
+          <div className="flex items-center px-4 py-2 min-w-max">
+            {views.length > 0 ? (
+              views.map((v) => {
+                const isActive = v.id === viewId
+                return (
+                  <Link
+                    key={v.id}
+                    href={`/tables/${tableId}/views/${v.id}`}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors -mb-[1px] shrink-0",
+                      isActive
+                        ? "border-blue-600 text-blue-600 bg-white"
+                        : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                    )}
+                  >
+                    <span className={cn("shrink-0", isActive && "text-blue-600")}>
+                      {getViewIcon(v.type as ViewType)}
+                    </span>
+                    <span className="truncate max-w-[140px]">{v.name}</span>
+                    <span className="text-gray-400 text-xs capitalize shrink-0">({v.type})</span>
+                  </Link>
+                )
+              })
+            ) : (
+              <span className="text-sm font-medium text-gray-700 shrink-0">
+                {viewName} <span className="text-gray-500 font-normal">({viewType})</span>
+              </span>
+            )}
           </div>
-        ) : (
-          <span className="text-sm font-medium text-gray-700 shrink-0">
-            {viewName} <span className="text-gray-500 font-normal">({viewType})</span>
-          </span>
-        )}
+        </div>
 
-        {/* Design | Add Field */}
-        {onDesign && (
+        {/* Row 2: Toolbar - Design | Add Field | Search | Filter | Sort | Group | Row Height | Hide Fields | More | New Record */}
+        <div className="h-10 flex items-center gap-3 px-4 flex-shrink-0">
+          {onDesign && (
           <Button
             variant="outline"
             size="sm"
@@ -369,73 +358,6 @@ export default function ViewBuilderToolbar({
               <Eye className="h-3.5 w-3.5 mr-1.5" />
               Hide Fields {hiddenFields.length > 0 && `(${hiddenFields.length})`}
             </Button>
-
-            {(viewType === "kanban" || viewType === "gallery") && onCardLayoutChange && (
-              <Popover open={cardLayoutOpen} onOpenChange={setCardLayoutOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      "h-7 px-2.5 text-xs font-normal shrink-0",
-                      cardFields.length > 0
-                        ? "bg-blue-50 text-blue-700 hover:bg-blue-100"
-                        : "text-gray-600 hover:bg-gray-50"
-                    )}
-                  >
-                      <Layout className="h-3.5 w-3.5 mr-1.5" />
-                      Card Layout {cardFields.length > 0 && `(${cardFields.length})`}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent align="end" className="w-64">
-                    <div className="space-y-3">
-                      <h4 className="font-medium text-sm">Card Layout</h4>
-                      <div className="space-y-2">
-                        <Label className="text-xs">Primary title field</Label>
-                        <Select
-                          value={cardFields[0] || ""}
-                          onValueChange={(v) =>
-                            onCardLayoutChange(v, cardFields[1] || "")
-                          }
-                        >
-                          <SelectTrigger className="h-8">
-                            <SelectValue placeholder="Select field" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {tableFields.map((f) => (
-                              <SelectItem key={f.name} value={f.name}>
-                                {f.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs">Secondary field</Label>
-                        <Select
-                          value={cardFields[1] || "__none__"}
-                          onValueChange={(v) =>
-                            onCardLayoutChange(cardFields[0] || "", v === "__none__" ? "" : v)
-                          }
-                        >
-                          <SelectTrigger className="h-8">
-                            <SelectValue placeholder="Select field" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__none__">None</SelectItem>
-                            {tableFields.map((f) => (
-                              <SelectItem key={f.name} value={f.name}>
-                                {f.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              )}
-
           </>
         )}
 
@@ -443,7 +365,7 @@ export default function ViewBuilderToolbar({
         <div className="flex-1 min-w-0" />
         {canManageViews && (
           <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+            <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -451,8 +373,8 @@ export default function ViewBuilderToolbar({
                   >
                     <MoreVertical className="h-4 w-4" />
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => {
                     setViewManagementAction("duplicate")
                     setViewManagementDialogOpen(true)
@@ -482,8 +404,8 @@ export default function ViewBuilderToolbar({
                     <Trash2 className="h-4 w-4 mr-2" />
                     Delete View
                   </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
         {onNewRecord && (
           <Button
@@ -495,6 +417,7 @@ export default function ViewBuilderToolbar({
             New Record
           </Button>
         )}
+        </div>
       </div>
 
       {/* Dialogs */}

@@ -5,6 +5,7 @@ import AirtableSidebar from "./AirtableSidebar"
 import Topbar from "./Topbar"
 import { RecordPanelProvider } from "@/contexts/RecordPanelContext"
 import { RecordModalProvider } from "@/contexts/RecordModalContext"
+import { PageActionsProvider } from "@/contexts/PageActionsContext"
 import RecordPanel from "@/components/records/RecordPanel"
 import { MainScrollProvider, useMainScroll } from "@/contexts/MainScrollContext"
 import { useIsMobile } from "@/hooks/useResponsive"
@@ -96,6 +97,7 @@ export default function WorkspaceShell({
   return (
     <RecordPanelProvider>
       <RecordModalProvider>
+      <PageActionsProvider>
       <MainScrollProvider>
         <WorkspaceShellContent
           hideTopbar={hideTopbar}
@@ -115,6 +117,7 @@ export default function WorkspaceShell({
           {children}
         </WorkspaceShellContent>
       </MainScrollProvider>
+      </PageActionsProvider>
       </RecordModalProvider>
     </RecordPanelProvider>
   )

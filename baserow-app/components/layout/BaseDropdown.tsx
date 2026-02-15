@@ -18,9 +18,11 @@ import { cn } from "@/lib/utils"
 
 interface BaseDropdownProps {
   /** Optional: compact styling for page header (e.g. no border, smaller text) */
-  variant?: "default" | "compact"
+  variant?: "default" | "compact" | "sidebar"
   /** Optional: show as leftmost in a row with other header content */
   className?: string
+  /** Optional: override trigger button style (e.g. for sidebar text color) */
+  triggerStyle?: React.CSSProperties
   /** Optional: when provided, show Edit/View toggle (Airtable-style) at top of dropdown */
   onEnterEdit?: () => void
   /** Optional: when provided with onEnterEdit, show View option to exit edit mode */
@@ -34,12 +36,13 @@ interface BaseDropdownProps {
 export default function BaseDropdown({
   variant = "default",
   className,
+  triggerStyle,
   onEnterEdit,
   onExitEdit,
   isEditMode: isEditModeProp,
   onOpenPageSettings,
 }: BaseDropdownProps) {
-  const { primaryColor } = useBranding()
+  const { primaryColor, sidebarTextColor } = useBranding()
   const { uiMode } = useUIMode()
   const showEditViewToggle = onEnterEdit != null && onExitEdit != null
   const inAnyEditMode = isEditModeProp ?? uiMode !== "view"
@@ -67,7 +70,9 @@ export default function BaseDropdown({
     load()
   }, [])
 
-  const isCompact = variant === "compact"
+  const isCompact = variant === "compact" || variant === "sidebar"
+  const isSidebar = variant === "sidebar"
+  const triggerColor = triggerStyle?.color ?? (isSidebar ? sidebarTextColor : isCompact ? primaryColor : undefined)
 
   return (
     <DropdownMenu>
@@ -79,7 +84,7 @@ export default function BaseDropdown({
             isCompact ? "h-8 px-2 text-sm" : "h-9 px-3",
             className
           )}
-          style={isCompact ? { color: primaryColor } : undefined}
+          style={{ ...(triggerColor ? { color: triggerColor } : {}), ...triggerStyle }}
         >
           {loading ? "..." : baseName}
           <ChevronDown className="h-4 w-4 opacity-70" />

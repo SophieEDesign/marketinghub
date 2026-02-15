@@ -18,7 +18,9 @@ import {
 import { createClient } from "@/lib/supabase/client"
 import { useBranding } from "@/contexts/BrandingContext"
 import { useUIMode } from "@/contexts/UIModeContext"
+import { usePageActions } from "@/contexts/PageActionsContext"
 import RecentsFavoritesSection from "./RecentsFavoritesSection"
+import BaseDropdown from "./BaseDropdown"
 import { cn } from "@/lib/utils"
 import { useIsMobile } from "@/hooks/useResponsive"
 import type { Automation, Table, View } from "@/types/database"
@@ -63,6 +65,7 @@ export default function AirtableSidebar({
   const router = useRouter()
   const { brandName, logoUrl, primaryColor, sidebarColor, sidebarTextColor } = useBranding()
   const { uiMode } = useUIMode()
+  const { pageActions } = usePageActions()
   const isMobile = useIsMobile()
   const previousPathnameRef = useRef<string | null>(null)
   
@@ -200,27 +203,20 @@ export default function AirtableSidebar({
         )}
         style={{ backgroundColor: sidebarColor }}
       >
-      {/* Header with Branding */}
+      {/* Header with Edit menu (BaseDropdown) - moved from page level per user request */}
       <div className="px-4 py-3 border-b border-black/10 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 min-w-0">
-          {logoUrl ? (
-            <div className="relative h-5 w-5">
-              <Image
-                src={logoUrl}
-                alt={brandName}
-                fill
-                className="object-contain"
-                unoptimized
-              />
-            </div>
-          ) : (
-            <Home className="h-5 w-5" style={{ color: sidebarTextColor }} />
-          )}
-          <span className="text-sm font-semibold truncate" style={{ color: sidebarTextColor }}>
-            {brandName}
-          </span>
-        </Link>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <BaseDropdown
+            variant="sidebar"
+            className="flex items-center gap-2 font-semibold h-auto py-1 px-0 bg-transparent hover:bg-black/10 border-0 shadow-none text-left min-w-0"
+            triggerStyle={{ color: sidebarTextColor }}
+            onEnterEdit={pageActions?.onEnterEdit}
+            onExitEdit={pageActions?.onExitEdit}
+            isEditMode={uiMode !== "view"}
+            onOpenPageSettings={pageActions?.onOpenPageSettings}
+          />
+        </div>
+        <div className="flex items-center gap-1 flex-shrink-0">
           <button
             onClick={() => {
               if (isMobile && onClose) {

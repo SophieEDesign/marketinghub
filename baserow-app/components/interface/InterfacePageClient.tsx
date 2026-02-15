@@ -21,7 +21,7 @@ import { toPostgrestColumn } from "@/lib/supabase/postgrest"
 import { normalizeUuid } from "@/lib/utils/ids"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 import { isAbortError } from "@/lib/api/error-handling"
-import BaseDropdown from "@/components/layout/BaseDropdown"
+import { usePageActions } from "@/contexts/PageActionsContext"
 
 // Lazy load InterfaceBuilder for dashboard/overview pages
 const InterfaceBuilder = dynamic(() => import("./InterfaceBuilder"), { ssr: false })
@@ -1225,20 +1225,27 @@ function InterfacePageClientInternal({
     }
   }
 
+  // Register page actions for sidebar BaseDropdown (admin only, when on interface page)
+  const { registerPageActions, unregisterPageActions } = usePageActions()
+  const handlersRef = useRef({ handleEnterEditPages, handleExitToView, handleOpenPageSettings })
+  handlersRef.current = { handleEnterEditPages, handleExitToView, handleOpenPageSettings }
+  useEffect(() => {
+    if (!isViewer && page && isAdmin) {
+      registerPageActions({
+        onEnterEdit: () => handlersRef.current.handleEnterEditPages(),
+        onExitEdit: () => handlersRef.current.handleExitToView(),
+        onOpenPageSettings: () => handlersRef.current.handleOpenPageSettings(),
+      })
+    }
+    return () => unregisterPageActions()
+  }, [isViewer, page, isAdmin, registerPageActions, unregisterPageActions])
+
   return (
     <div className={`h-screen flex flex-col ${!useRecordReviewLayout ? "overflow-hidden" : ""}`}>
       {/* Header with Edit Button - Admin Only */}
       {!isViewer && page && isAdmin && (
         <div className="border-b bg-white px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <BaseDropdown
-              variant="compact"
-              className="flex-shrink-0"
-              onEnterEdit={handleEnterEditPages}
-              onExitEdit={handleExitToView}
-              isEditMode={uiMode !== "view"}
-              onOpenPageSettings={handleOpenPageSettings}
-            />
             {isEditingTitle ? (
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <input
@@ -1305,7 +1312,6 @@ function InterfacePageClientInternal({
       {!isViewer && page && !isAdmin && (
         <div className="border-b bg-white px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <BaseDropdown variant="compact" className="flex-shrink-0" />
             <h1 className="text-lg font-semibold flex-1 min-w-0 truncate">{page.name}</h1>
             <span 
               className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded flex-shrink-0"
