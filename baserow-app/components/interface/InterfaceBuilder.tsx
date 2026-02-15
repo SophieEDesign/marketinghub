@@ -187,9 +187,6 @@ export default function InterfaceBuilder({
         w: block.w || 4,
         h: block.h || 4,
       }))
-      // Mark as hydrated when blocks are set (even if empty - that's valid saved data)
-      // This allows users to add blocks to empty pages
-      setHasHydrated(true)
     }
     // CRITICAL: Do NOT update blocks if already initialized (except empty->loaded case above)
     // Even if initialBlocks changes (navigation, revalidation, re-render, etc.)
@@ -248,9 +245,6 @@ export default function InterfaceBuilder({
       w: block.w || 4,
       h: block.h || 4,
     }))
-    // Mark as hydrated when blocks arrive asynchronously (even if empty)
-    // This allows users to add blocks to empty pages
-    setHasHydrated(true)
   }, [page.id, initialBlocks?.length]) // CRITICAL FIX: Add dependencies to prevent running on every render
   // Only run when pageId changes or initialBlocks length changes (not on every render)
 
