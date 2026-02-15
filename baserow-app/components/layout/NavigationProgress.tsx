@@ -16,14 +16,14 @@ export default function NavigationProgress() {
   // Detect internal link clicks and show progress
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      // #region agent log
-      console.log("Message/click handler triggered [NavigationProgress]")
-      // #endregion
       const target = e.target as HTMLElement
       const anchor = target.closest('a[href^="/"]')
       if (!anchor || (anchor as HTMLAnchorElement).target === "_blank") return
       const href = (anchor as HTMLAnchorElement).href
       if (href && typeof window !== "undefined" && href.startsWith(window.location.origin)) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'NavigationProgress.tsx:click',message:'NAV_LINK_CLICKED',data:{href:href.replace(window.location.origin,'')},timestamp:Date.now()})}).catch(()=>{})
+        // #endregion
         setIsNavigating(true)
       }
     }
@@ -34,6 +34,9 @@ export default function NavigationProgress() {
   // Hide progress when pathname has changed (new page loaded)
   useEffect(() => {
     if (pathname !== prevPathnameRef.current) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'NavigationProgress.tsx:pathname',message:'PATHNAME_CHANGED',data:{pathname,prev:prevPathnameRef.current},timestamp:Date.now()})}).catch(()=>{})
+      // #endregion
       prevPathnameRef.current = pathname
       setIsNavigating(false)
     }

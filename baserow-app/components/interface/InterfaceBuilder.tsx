@@ -78,6 +78,17 @@ export default function InterfaceBuilder({
   pageEditable,
   editableFieldNames = [],
 }: InterfaceBuilderProps) {
+  // #region agent log
+  const renderCountRef = useRef(0)
+  const lastLogTsRef = useRef(0)
+  renderCountRef.current += 1
+  const now = Date.now()
+  if (now - lastLogTsRef.current < 500 && renderCountRef.current > 8) {
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:render',message:'RENDER_LOOP_DETECTED',data:{count:renderCountRef.current,pageId:page.id},timestamp:now})}).catch(()=>{})
+    lastLogTsRef.current = now
+    renderCountRef.current = 0
+  } else if (now - lastLogTsRef.current > 1000) { renderCountRef.current = 0; lastLogTsRef.current = now }
+  // #endregion
   const { primaryColor } = useBranding()
   const { toast } = useToast()
   const [blocks, setBlocks] = useState<PageBlock[]>(initialBlocks)

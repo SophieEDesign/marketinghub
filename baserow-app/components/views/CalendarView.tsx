@@ -1945,7 +1945,6 @@ export default function CalendarView({
             eventBackgroundColor="#f3f4f6"
             dayHeaderFormat={calendarDayHeaderFormat}
             firstDay={1}
-            {/* Omit custom eventContent to avoid React #185 in FullCalendar when opening record modal */}
             eventContent={undefined}
             eventClick={handleEventClick}
             dateClick={handleDateClick}

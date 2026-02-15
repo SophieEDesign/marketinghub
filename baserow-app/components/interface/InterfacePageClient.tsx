@@ -955,6 +955,9 @@ function InterfacePageClientInternal({
       // Only update if blocks actually changed or forceReload is true (and not aborted)
       if (!signal?.aborted) {
         if (blocksChanged || forceReload) {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfacePageClient.tsx:loadBlocks',message:'SET_BLOCKS_CALLED',data:{pageId:page.id,blocksCount:pageBlocks.length},timestamp:Date.now()})}).catch(()=>{})
+          // #endregion
           setBlocks(pageBlocks)
         } else if (process.env.NODE_ENV === 'development') {
           console.log(`[loadBlocks] Blocks unchanged - skipping setBlocks to prevent re-render`)
