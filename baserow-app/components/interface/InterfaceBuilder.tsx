@@ -170,7 +170,7 @@ export default function InterfaceBuilder({
     }
   }, [page.id])
   
-  // Check on mount and pageId change
+  // Check on mount and when initialBlocks arrives (handles async load from InterfacePageClient)
   useEffect(() => {
     // CRITICAL: Empty blocks is a valid state - a page might have no blocks yet
     // We should still initialize (hydrate) even with empty blocks to allow adding blocks
@@ -180,8 +180,13 @@ export default function InterfaceBuilder({
     }
     
     // One-way gate: only set blocks if we haven't initialized for this pageId
-    // After this, blocks are managed by user actions only, never replaced by initialBlocks
-    if (!hasInitializedRef.current) {
+    // EXCEPTION: If we initialized with empty and blocks have since arrived, accept them
+    // This fixes "page doesn't load blocks" when InterfaceBuilder mounts before loadBlocks completes
+    const shouldInit =
+      !hasInitializedRef.current ||
+      (blocks.length === 0 && initialBlocks.length > 0)
+
+    if (shouldInit) {
       console.log(`[InterfaceBuilder] First-time initialization (one-way gate): pageId=${page.id}`, {
         initialBlocksCount: initialBlocks.length,
         initialBlockIds: initialBlocks.map(b => b.id),
@@ -203,11 +208,11 @@ export default function InterfaceBuilder({
       // This allows users to add blocks to empty pages
       setHasHydrated(true)
     }
-    // CRITICAL: Do NOT update blocks if already initialized
+    // CRITICAL: Do NOT update blocks if already initialized (except empty->loaded case above)
     // Even if initialBlocks changes (navigation, revalidation, re-render, etc.)
     // Live state takes precedence after first load
     // This prevents the "edit vs publish" drift issue
-  }, [page.id]) // ONLY pageId - NOT initialBlocks, NOT hash, NOT mode, NOT props
+  }, [page.id, initialBlocks, blocks.length])
   
   // CRITICAL FIX: Stabilize async initialBlocks check - use proper dependencies instead of running on every render
   // This prevents the effect from running unnecessarily and causing re-renders
@@ -1569,7 +1574,7 @@ export default function InterfaceBuilder({
               </div>
             ) : (
             <Canvas
-              key={`${page.id}-${interfaceMode}`}
+              key={page.id}
               blocks={blocks}
               isEditing={effectiveIsEditing}
               interfaceMode={interfaceMode}
