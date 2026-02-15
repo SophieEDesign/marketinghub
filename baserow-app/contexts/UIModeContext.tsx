@@ -3,16 +3,18 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from "react"
 
 /**
- * Two modes only (Airtable-style):
+ * UI modes (Airtable-style):
  * - view: Browse content. Read-only unless opening a record/modal.
- * - edit: Edit page layout (drag-and-drop blocks), edit record modals (layout),
- *   settings on right panel, grid editor. One "Edit" in toolbar to enter, "Done" to exit.
+ * - edit: Generic edit (legacy alias for editPages).
+ * - editPages: Edit page layout (drag-and-drop blocks).
+ * - recordLayoutEdit: Edit record modal/drawer layout.
+ * - fieldSchemaEdit: Edit field settings in drawer.
  */
-export type UIMode = "view" | "edit"
+export type UIMode = "view" | "edit" | "editPages" | "recordLayoutEdit" | "fieldSchemaEdit"
 
 export interface UIModeState {
   uiMode: UIMode
-  /** When in edit, which page is being edited (if any). */
+  /** When in editPages, which page is being edited (if any). */
   editingPageId: string | null
 }
 
@@ -24,8 +26,20 @@ interface UIModeContextType {
   enterEdit: (pageId?: string) => void
   /** Exit edit mode. */
   exitEdit: () => void
-  /** True when uiMode === 'edit' and (optional) editingPageId matches. */
+  /** True when in any edit mode and (optional) editingPageId matches. */
   isEdit: (pageId?: string) => boolean
+  /** Legacy: Enter page layout edit. */
+  enterEditPages: (pageId?: string) => void
+  /** Legacy: Exit page layout edit. */
+  exitEditPages: () => void
+  /** Legacy: Enter record layout edit. */
+  enterRecordLayoutEdit: () => void
+  /** Legacy: Exit record layout edit. */
+  exitRecordLayoutEdit: () => void
+  /** Legacy: Enter field schema edit. */
+  enterFieldSchemaEdit: () => void
+  /** Legacy: Exit field schema edit. */
+  exitFieldSchemaEdit: () => void
 }
 
 const UIModeContext = createContext<UIModeContextType | undefined>(undefined)
@@ -40,33 +54,56 @@ export function UIModeProvider({ children }: UIModeProviderProps) {
     editingPageId: null,
   })
 
+  const isEditing = (mode: UIMode) =>
+    mode === "edit" || mode === "editPages" || mode === "recordLayoutEdit" || mode === "fieldSchemaEdit"
+
   const setUIMode = useCallback((mode: UIMode) => {
     setState((prev) => ({
       uiMode: mode,
-      editingPageId: mode === "edit" ? prev.editingPageId : null,
+      editingPageId: mode === "editPages" || mode === "edit" ? prev.editingPageId : null,
     }))
   }, [])
 
   const enterEdit = useCallback((pageId?: string) => {
     setState((prev) => ({
-      uiMode: "edit",
+      uiMode: "editPages",
       editingPageId: pageId ?? prev.editingPageId ?? null,
     }))
   }, [])
 
   const exitEdit = useCallback(() => {
-    setState((prev) => ({
-      ...prev,
+    setState(() => ({
       uiMode: "view",
       editingPageId: null,
     }))
   }, [])
 
+  const enterEditPages = useCallback((pageId?: string) => {
+    setState((prev) => ({
+      uiMode: "editPages",
+      editingPageId: pageId ?? prev.editingPageId ?? null,
+    }))
+  }, [])
+
+  const exitEditPages = exitEdit
+
+  const enterRecordLayoutEdit = useCallback(() => {
+    setState(() => ({ uiMode: "recordLayoutEdit", editingPageId: null }))
+  }, [])
+
+  const exitRecordLayoutEdit = exitEdit
+
+  const enterFieldSchemaEdit = useCallback(() => {
+    setState(() => ({ uiMode: "fieldSchemaEdit", editingPageId: null }))
+  }, [])
+
+  const exitFieldSchemaEdit = exitEdit
+
   const isEdit = useCallback(
     (pageId?: string) => {
-      if (state.uiMode !== "edit") return false
+      if (!isEditing(state.uiMode)) return false
       if (pageId == null) return true
-      return state.editingPageId === pageId
+      return state.uiMode === "editPages" && state.editingPageId === pageId
     },
     [state.uiMode, state.editingPageId]
   )
@@ -80,6 +117,12 @@ export function UIModeProvider({ children }: UIModeProviderProps) {
         enterEdit,
         exitEdit,
         isEdit,
+        enterEditPages,
+        exitEditPages,
+        enterRecordLayoutEdit,
+        exitRecordLayoutEdit,
+        enterFieldSchemaEdit,
+        exitFieldSchemaEdit,
       }}
     >
       {children}
