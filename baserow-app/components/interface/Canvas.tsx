@@ -1933,11 +1933,11 @@ export default function Canvas({
       {/* This ensures the grid gets the full available width, not constrained by parent flex containers */}
       {/* CRITICAL: Parent stack uses normal document flow - reflows immediately when child heights change */}
       {/* No cached heights, no min-height persistence, no delayed updates */}
-      {/* Full-page: overflow-hidden (fixed viewport). Normal: allow overflow so canvas scroll container can scroll. */}
+      {/* flex-1 min-h-0: fill parent flex; min-h-0 allows shrink. Full-page: overflow-hidden. Normal: no overflow on root. */}
       <div
         ref={containerRef}
-        className={`w-full h-full min-w-0 relative ${isFullPageMode ? "overflow-hidden" : ""}`}
-        style={isFullPageMode ? undefined : { paddingBottom: isEditing ? "80px" : "80px" }}
+        className={`flex-1 w-full min-h-0 min-w-0 relative ${isFullPageMode ? "overflow-hidden" : ""}`}
+        style={isFullPageMode ? undefined : { paddingBottom: isEditing ? "80px" : "80px", background: "rgba(255,0,0,0.1)" }}
         onClick={(e) => {
           // Context-driven: clicking empty canvas selects page (opens page settings)
           // Blocks use stopPropagation, so only empty-area clicks reach here

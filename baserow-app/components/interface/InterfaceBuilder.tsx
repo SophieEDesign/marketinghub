@@ -1404,8 +1404,8 @@ export default function InterfaceBuilder({
   }
 
   return (
-    <div className="flex min-h-screen w-full flex-col bg-gray-50 min-w-0">
-      {/* Main Canvas - Full width; min-h-screen ensures blocks have space to render */}
+    <div className="flex flex-col min-h-screen w-full bg-gray-50 min-w-0">
+      {/* Main Canvas - flex-1 fills available space; no h-full/overflow-hidden on root */}
       <div className="flex-1 flex flex-col min-w-0 w-full min-h-0">
         {/* Toolbar / Interface Header */}
         {!hideHeader && (
@@ -1539,12 +1539,11 @@ export default function InterfaceBuilder({
         </div>
         )}
 
-        {/* Canvas */}
-        {/* CRITICAL: Canvas container must have min-width: 0 to prevent flex collapse */}
-        {/* Full-page: no scroll, no padding (single scroll context inside block). Normal: overflow-auto p-4. */}
+        {/* Canvas - flex flex-col so Canvas (flex-1) fills space */}
+        {/* Full-page: no scroll, no padding. Normal: overflow-auto p-4. */}
         <div
           ref={canvasScrollContainerRef}
-          className={`flex-1 min-w-0 w-full min-h-0 ${fullPageBlockId ? "overflow-hidden p-0" : "overflow-auto p-4"}`}
+          className={`flex-1 flex flex-col min-w-0 w-full min-h-0 ${fullPageBlockId ? "overflow-hidden p-0" : "overflow-auto p-4"}`}
         >
           <FilterStateProvider>
             {/* Blocks always render - no conditional visibility. Edit mode changes behaviour only. */}

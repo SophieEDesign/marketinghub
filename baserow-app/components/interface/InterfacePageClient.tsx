@@ -1172,7 +1172,7 @@ function InterfacePageClientInternal({
   }
 
   return (
-    <div className={`h-screen flex flex-col ${!useRecordReviewLayout ? "overflow-hidden" : ""}`}>
+    <div className={`h-screen flex flex-col ${!useRecordReviewLayout ? "overflow-x-hidden" : ""}`}>
       {/* PageActionsRegistrar: tied to page existence, inside InterfacePageClient per unified architecture */}
       {page && isAdmin && (
         <PageActionsRegistrar pageId={pageId} isAdmin={isAdmin} isViewer={isViewer} />
@@ -1239,26 +1239,25 @@ function InterfacePageClientInternal({
         </div>
       )}
 
-      {/* Content Area */}
-      {/* CRITICAL: min-h-0 allows flex child to shrink so full-page content doesn't force page scroll */}
-      <div className="flex-1 overflow-hidden min-w-0 min-h-0 w-full">
+      {/* Content Area - overflow-x-hidden only; overflow-hidden collapses children */}
+      <div className="flex-1 overflow-x-hidden min-w-0 min-h-0 w-full">
         {/* CRITICAL: Always render the same component tree to prevent remount storms */}
         {/* Show loading/error states as overlays, not separate trees */}
         {loading && !page ? (
-          <div className="h-full flex items-center justify-center">
+          <div className="flex-1 min-h-[200px] flex items-center justify-center">
             <LoadingSpinner size="lg" text="Loading page..." />
           </div>
         ) : !page ? (
-          <div className="h-full flex items-center justify-center">
+          <div className="flex-1 min-h-[200px] flex items-center justify-center">
             <div className="text-center">
               <h2 className="text-lg font-semibold text-gray-900 mb-2">Page not found</h2>
               <p className="text-sm text-gray-500">The page you&apos;re looking for doesn&apos;t exist.</p>
             </div>
           </div>
         ) : page ? (
-          <div className="h-full w-full min-w-0 min-h-0 flex flex-col overflow-hidden">
+          <div className="flex-1 w-full min-w-0 min-h-0 flex flex-col overflow-x-hidden">
           {blocksLoading ? (
-            <div className="h-full flex items-center justify-center">
+            <div className="flex-1 min-h-[200px] flex items-center justify-center">
               <LoadingSpinner size="lg" text="Loading blocks..." />
             </div>
           ) : (
