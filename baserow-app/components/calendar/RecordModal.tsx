@@ -113,6 +113,9 @@ export default function RecordModal({
   const canSave = recordId ? canEditRecords : canCreateRecords
   const effectiveEditable = canSave
 
+  // Layout editing not supported in calendar RecordModal - always use view layout
+  const isEditingLayout = false
+
   const permissions = (cascadeContext?.blockConfig as any)?.permissions ?? (cascadeContext?.pageConfig as any)?.permissions ?? {}
   const isViewOnly = permissions.mode === 'view'
 
