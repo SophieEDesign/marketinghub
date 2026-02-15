@@ -97,7 +97,7 @@ export default function Sidebar({
 
     if (href) {
       return (
-        <Link href={href} className="block">
+        <Link href={href} prefetch={false} className="block">
           {content}
         </Link>
       )

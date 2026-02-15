@@ -140,6 +140,9 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
   }, [openRecord])
 
   const setInterfaceMode = useCallback((interfaceMode: 'view' | 'edit') => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordPanelContext.tsx:setInterfaceMode',message:'setInterfaceMode_INVOKED',data:{interfaceMode},timestamp:Date.now(),hypothesisId:'H6'})}).catch(()=>{})
+    // #endregion
     setState((prev) => {
       if (prev.interfaceMode === interfaceMode) return prev
       return { ...prev, interfaceMode }

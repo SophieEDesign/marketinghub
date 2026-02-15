@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getInterfacePage } from "@/lib/interface/pages"
+import { isAdmin } from "@/lib/roles"
 import WorkspaceShellWrapper from "@/components/layout/WorkspaceShellWrapper"
 import InterfacePageClient from "@/components/interface/InterfacePageClient"
 
@@ -11,11 +12,12 @@ export default async function InterfacePage({
 }) {
   const { pageId } = await params
   const supabase = await createClient()
+  const admin = await isAdmin()
 
   // First check if it's a new system page (interface_pages table)
   const newPage = await getInterfacePage(pageId)
   if (newPage) {
-    // Redirect to new route
+    // Redirect to canonical route
     redirect(`/pages/${pageId}`)
   }
 
@@ -28,13 +30,38 @@ export default async function InterfacePage({
     .maybeSingle()
 
   if (!view) {
-    // Page not found in either system, redirect to home
     redirect('/')
   }
 
+  // Convert view to InterfacePage shape for InterfacePageClient
+  const page = {
+    id: view.id,
+    name: view.name || "Interface Page",
+    page_type: "content" as const,
+    base_table: null,
+    config: {},
+    group_id: null,
+    order_index: 0,
+    created_at: "",
+    updated_at: "",
+    created_by: null,
+    is_admin_only: view.is_admin_only ?? false,
+    saved_view_id: null,
+    dashboard_layout_id: null,
+    form_config_id: null,
+    record_config_id: null,
+    source_view: null,
+  }
+
   return (
-    <WorkspaceShellWrapper title={view.name || "Interface Page"}>
-      <InterfacePageClient pageId={pageId} />
+    <WorkspaceShellWrapper title={page.name} hideTopbar={true}>
+      <InterfacePageClient
+        key={pageId}
+        pageId={pageId}
+        initialPage={page as any}
+        initialData={[]}
+        isAdmin={admin}
+      />
     </WorkspaceShellWrapper>
   )
 }

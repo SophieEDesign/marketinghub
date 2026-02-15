@@ -25,6 +25,7 @@ import { toPostgrestColumn } from "@/lib/supabase/postgrest"
 import { normalizeUuid } from "@/lib/utils/ids"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 import { isAbortError } from "@/lib/api/error-handling"
+import PageActionsRegistrar from "./PageActionsRegistrar"
 // Lazy load InterfaceBuilder for dashboard/overview pages
 const InterfaceBuilder = dynamic(() => import("./InterfaceBuilder"), { ssr: false })
 // Lazy load RecordReviewPage for record_review pages
@@ -1237,6 +1238,10 @@ function InterfacePageClientInternal({
 
   return (
     <div className={`h-screen flex flex-col ${!useRecordReviewLayout ? "overflow-hidden" : ""}`}>
+      {/* PageActionsRegistrar: tied to page existence, inside InterfacePageClient per unified architecture */}
+      {page && isAdmin && (
+        <PageActionsRegistrar pageId={pageId} isAdmin={isAdmin} isViewer={isViewer} />
+      )}
       {/* Header with Edit Button - Admin Only */}
       {!isViewer && page && isAdmin && (
         <div className="border-b bg-white px-4 py-3 flex items-center justify-between">
@@ -1316,8 +1321,7 @@ function InterfacePageClientInternal({
             </div>
           </div>
         ) : page ? (
-          // CRITICAL: Remount key = pageId so navigation resets all content state (no stale blocks/edit mode)
-          <div key={pageId} className="h-full w-full min-w-0 min-h-0 flex flex-col overflow-hidden">
+          <div className="h-full w-full min-w-0 min-h-0 flex flex-col overflow-hidden">
           {blocksLoading ? (
             <div className="h-full flex items-center justify-center">
               <LoadingSpinner size="lg" text="Loading blocks..." />
@@ -1327,7 +1331,6 @@ function InterfacePageClientInternal({
             // Content pages use InterfaceBuilder directly with full-width wrapper
             useRecordReviewLayout ? (
               <RecordReviewPage
-                key={page.id}
                 page={page as any}
                 initialBlocks={memoizedBlocks}
                 isViewer={isViewer}
@@ -1342,7 +1345,6 @@ function InterfacePageClientInternal({
               interfaceBuilderPage ? (
                 <div className="h-full w-full min-w-0 min-h-0 flex flex-col overflow-hidden">
                   <InterfaceBuilder
-                    key={page.id} // CRITICAL: ONLY page.id - never include mode, isViewer, or recordId
                     page={interfaceBuilderPage}
                     initialBlocks={memoizedBlocks}
                     // CRITICAL: Respect both URL-based viewer mode and edit mode state

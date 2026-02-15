@@ -56,6 +56,9 @@ export function RightSettingsPanelDataProvider({ children }: { children: ReactNo
   const [data, setDataState] = useState<RightSettingsPanelData | null>(null)
 
   const setData = useCallback((updates: Partial<RightSettingsPanelData> | null) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RightSettingsPanelDataContext.tsx:setData',message:'setData_CALLED',data:{hasBlocks:!!updates?.blocks,hasSelectedBlock:!!updates?.selectedBlock},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{})
+    // #endregion
     if (updates === null) {
       setDataState(null)
       return

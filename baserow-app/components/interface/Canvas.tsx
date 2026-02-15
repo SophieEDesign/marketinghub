@@ -752,6 +752,9 @@ export default function Canvas({
       })
       
       // CRITICAL: Use requestAnimationFrame to defer setLayout and prevent synchronous setState loops
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:layoutSync',message:'layoutSync_setLayout',data:{blocksLen:blocks.length,pageId},timestamp:Date.now(),hypothesisId:'H5'})}).catch(()=>{})
+      // #endregion
       requestAnimationFrame(() => {
         setLayout(newLayout)
         previousBlockIdsRef.current = currentBlockIds

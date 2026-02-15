@@ -873,6 +873,7 @@ export default function GroupedInterfaces({
     return (
       <Link
         href={targetPath}
+        prefetch={false}
         className={cn(
           "flex items-center rounded-md px-3 py-1.5 text-sm transition-colors",
           level > 0 && "pl-10",
@@ -1006,6 +1007,7 @@ export default function GroupedInterfaces({
           ) : (
             <Link
               href={`/pages/${page.id}`}
+              prefetch={false}
               className="flex-1 flex items-center gap-2 px-2 py-1.5 rounded transition-colors hover:bg-black/10"
               style={isActive ? { 
                 backgroundColor: primaryColor + '15', 
