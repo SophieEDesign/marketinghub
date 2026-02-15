@@ -18,13 +18,13 @@ function Breadcrumb({ context, onNavigate }: { context: SelectedContext; onNavig
 
   if (context.type === "block" || context.type === "recordList" || context.type === "record" || context.type === "field") {
     if (context.type === "block") {
-      items.push({ label: "Block", ctx })
+      items.push({ label: "Block", ctx: context })
     } else if (context.type === "recordList") {
-      items.push({ label: "Record list", ctx })
+      items.push({ label: "Record list", ctx: context })
     } else if (context.type === "record" || context.type === "field") {
       items.push({ label: "Record", ctx: { type: "record", recordId: context.type === "record" ? context.recordId : "", tableId: context.tableId } })
       if (context.type === "field") {
-        items.push({ label: "Field", ctx })
+        items.push({ label: "Field", ctx: context })
       }
     }
   }

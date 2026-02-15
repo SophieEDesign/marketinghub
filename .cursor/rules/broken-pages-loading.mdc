@@ -5,8 +5,10 @@ alwaysApply: true
 
 # Broken State: Pages Not Loading
 
-**Git tag:** `broken-pages-loading`  
-**Commit:** 6b48b9bc01 — "refactor: streamline interface components and settings management"
+**Last working:** `868b674` (tag: `last-working-868b674`) — "refactor: replace RecordModal with useRecordModal context across components"  
+**First broken:** `6294cdd` — "refactor: replace RecordModal instances with global context usage"
+
+All commits after 868b674 show Error or broken pages on Vercel.
 
 ## Symptoms
 - Pages do not load
@@ -19,7 +21,8 @@ alwaysApply: true
 - FieldSettingsDrawerHost refactor was initially suspected but that component is not used in the app
 
 ## To Fix
-1. Compare against `git show broken-pages-loading` or `git diff broken-pages-loading`
-2. Check InterfacePageClient loadBlocks/setBlocks flow and `willUpdate` in logs
-3. Check for overlays (RightSettingsPanel, modals) blocking clicks
-4. Verify RightSettingsPanelDataContext and related components
+1. **Baseline:** `868b674` is the last known working state — use `git diff 868b674` to compare
+2. Break introduced in `6294cdd` (RecordModal global context) — compare that commit's changes
+3. Check InterfacePageClient loadBlocks/setBlocks flow and `willUpdate` in logs
+4. Check for overlays (RightSettingsPanel, modals) blocking clicks
+5. Verify RightSettingsPanelDataContext and related components

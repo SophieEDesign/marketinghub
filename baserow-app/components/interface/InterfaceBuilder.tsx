@@ -124,21 +124,6 @@ export default function InterfaceBuilder({
     onEditModeChange?.(effectiveIsEditing)
   }, [effectiveIsEditing, onEditModeChange])
 
-  // Sync block data to RightSettingsPanel when block is selected
-  useEffect(() => {
-    if (effectiveIsEditing && selectedContext?.type === 'block' && selectedBlock) {
-      setRightPanelData({
-        blocks,
-        selectedBlock,
-        onBlockSave: handleSaveSettings,
-        onBlockMoveToTop: handleMoveBlockToTop,
-        onBlockMoveToBottom: handleMoveBlockToBottom,
-        onBlockLock: handleLockBlock,
-        pageTableId,
-      })
-    }
-  }, [effectiveIsEditing, selectedContext?.type, selectedBlock, blocks, pageTableId, setRightPanelData])
-
   // CRITICAL: One-way gate - blocks are set from initialBlocks ONCE per pageId, then never replaced
   // After first load, initialBlocks must NEVER overwrite live state
   // This prevents edit/view drift, layout resets, and state loss
@@ -1279,6 +1264,21 @@ export default function InterfaceBuilder({
   }, [page.id])
 
   const selectedBlock = blocks.find((b) => b.id === selectedBlockId) || null
+
+  // Sync block data to RightSettingsPanel when block is selected (must be after selectedBlock and handlers)
+  useEffect(() => {
+    if (effectiveIsEditing && selectedContext?.type === 'block' && selectedBlock) {
+      setRightPanelData({
+        blocks,
+        selectedBlock,
+        onBlockSave: handleSaveSettings,
+        onBlockMoveToTop: handleMoveBlockToTop,
+        onBlockMoveToBottom: handleMoveBlockToBottom,
+        onBlockLock: handleLockBlock,
+        pageTableId,
+      })
+    }
+  }, [effectiveIsEditing, selectedContext?.type, selectedBlock, blocks, pageTableId, setRightPanelData, handleSaveSettings, handleMoveBlockToTop, handleMoveBlockToBottom, handleLockBlock])
 
   // Apply undo/redo layout changes
   useEffect(() => {

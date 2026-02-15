@@ -214,6 +214,10 @@ function InterfacePageClientInternal({
   }, [setSelectedContext])
 
   // Sync page data to RightSettingsPanel when page is available
+  const selectedBlockIdForPanel =
+    selectedContext?.type === "block" || selectedContext?.type === "recordList"
+      ? selectedContext.blockId
+      : undefined
   useEffect(() => {
     if (!page) {
       setRightPanelData(null)
@@ -224,12 +228,13 @@ function InterfacePageClientInternal({
       onPageUpdate: handlePageUpdate,
       pageTableId,
       blocks,
-      selectedBlock: selectedContext?.type === 'block' && selectedContext?.blockId
-        ? blocks.find((b) => b.id === selectedContext!.blockId) ?? null
-        : null,
+      selectedBlock:
+        selectedBlockIdForPanel != null
+          ? blocks.find((b) => b.id === selectedBlockIdForPanel) ?? null
+          : null,
     })
     return () => setRightPanelData(null)
-  }, [page?.id, page, pageTableId, blocks, selectedContext?.type, selectedContext?.blockId, setRightPanelData])
+  }, [page?.id, page, pageTableId, blocks, selectedContext?.type, selectedBlockIdForPanel, setRightPanelData, handlePageUpdate])
 
   // Initialize title value when page loads
   useEffect(() => {
