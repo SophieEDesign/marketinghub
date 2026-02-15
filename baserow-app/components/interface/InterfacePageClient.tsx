@@ -237,22 +237,30 @@ function InterfacePageClientInternal({
       loadSqlViewData()
     }
   }, [page?.id, page?.source_view])
+  // CRITICAL: Skip redundant setRightPanelData to prevent render loop
+  // Effect → setRightPanelData → context update → re-render → effect runs again (same deps) → setRightPanelData again → loop
+  const lastRightPanelSyncRef = useRef<{ pageRef: InterfacePage | null; blocksRef: any[]; selectedBlockId: string | undefined } | null>(null)
   useEffect(() => {
     if (!page) {
+      lastRightPanelSyncRef.current = null
       setRightPanelData(null)
       return
     }
+    const selectedBlock = selectedBlockIdForPanel != null ? blocks.find((b) => b.id === selectedBlockIdForPanel) ?? null : null
+    const prev = lastRightPanelSyncRef.current
+    if (prev?.pageRef === page && prev?.blocksRef === blocks && prev?.selectedBlockId === selectedBlockIdForPanel) return
+    lastRightPanelSyncRef.current = { pageRef: page, blocksRef: blocks, selectedBlockId: selectedBlockIdForPanel }
     setRightPanelData({
       page,
       onPageUpdate: handlePageUpdate,
       pageTableId,
       blocks,
-      selectedBlock:
-        selectedBlockIdForPanel != null
-          ? blocks.find((b) => b.id === selectedBlockIdForPanel) ?? null
-          : null,
+      selectedBlock,
     })
-    return () => setRightPanelData(null)
+    return () => {
+      lastRightPanelSyncRef.current = null
+      setRightPanelData(null)
+    }
   }, [page?.id, page, pageTableId, blocks, selectedContext?.type, selectedBlockIdForPanel, setRightPanelData, handlePageUpdate])
 
   // Initialize title value when page loads
