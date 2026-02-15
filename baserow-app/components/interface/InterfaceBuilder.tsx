@@ -78,17 +78,6 @@ export default function InterfaceBuilder({
   pageEditable,
   editableFieldNames = [],
 }: InterfaceBuilderProps) {
-  // #region agent log
-  const renderCountRef = useRef(0)
-  const lastLogTsRef = useRef(0)
-  renderCountRef.current += 1
-  const now = Date.now()
-  if (now - lastLogTsRef.current < 500 && renderCountRef.current > 8) {
-    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:render',message:'RENDER_LOOP_DETECTED',data:{count:renderCountRef.current,pageId:page.id},timestamp:now,hypothesisId:'H1'})}).catch(()=>{})
-    lastLogTsRef.current = now
-    renderCountRef.current = 0
-  } else if (now - lastLogTsRef.current > 1000) { renderCountRef.current = 0; lastLogTsRef.current = now }
-  // #endregion
   const { primaryColor } = useBranding()
   const { toast } = useToast()
   const [blocks, setBlocks] = useState<PageBlock[]>(initialBlocks)
@@ -553,9 +542,6 @@ export default function InterfaceBuilder({
    */
   const handleLayoutChange = useCallback(
     (layout: LayoutItem[]) => {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:handleLayoutChange',message:'handleLayoutChange_CALLED',data:{layoutLen:layout?.length},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{})
-      // #endregion
       // Only save in edit mode - view mode never mutates layout
       if (!effectiveIsEditing) return
       
@@ -1276,9 +1262,6 @@ export default function InterfaceBuilder({
       const prev = lastRightPanelSyncRef.current
       if (prev?.blockId === selectedBlock.id && prev?.blocksRef === blocks) return
       lastRightPanelSyncRef.current = { blockId: selectedBlock.id, blocksRef: blocks }
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:setRightPanelData',message:'setRightPanelData_INVOKED',data:{blockId:selectedBlock.id},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{})
-      // #endregion
       setRightPanelData({
         blocks,
         selectedBlock,
