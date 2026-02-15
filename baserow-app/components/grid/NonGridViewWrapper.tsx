@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import ViewTopBar from "@/components/layout/ViewTopBar"
 import FormView from "@/components/views/FormView"
 import KanbanView from "@/components/views/KanbanView"
+import GalleryView from "@/components/views/GalleryView"
 import CalendarView from "@/components/views/CalendarView"
 import TimelineView from "@/components/views/TimelineView"
 import HorizontalGroupedView from "@/components/views/HorizontalGroupedView"
@@ -34,7 +35,7 @@ interface ViewFieldRow {
 }
 
 interface NonGridViewWrapperProps {
-  viewType: "form" | "kanban" | "calendar" | "timeline" | "horizontal_grouped"
+  viewType: "form" | "kanban" | "gallery" | "calendar" | "timeline" | "horizontal_grouped"
   viewName: string
   tableId: string
   viewId: string
@@ -103,13 +104,13 @@ export default function NonGridViewWrapper({
         .sort((a, b) => a.position - b.position)
         .filter((vf) => !hiddenFields.includes(vf.field_name))
         .map((vf) => vf.field_name)
-      if (viewType === "kanban" && cardFields.length > 0) {
+      if ((viewType === "kanban" || viewType === "gallery") && cardFields.length > 0) {
         const ordered = cardFields.filter((n) => visible.includes(n) && tableFieldNames.has(n))
         return ordered.length > 0 ? ordered : visible
       }
       return visible
     }
-    if (viewType === "kanban" && cardFields.length > 0) {
+    if ((viewType === "kanban" || viewType === "gallery") && cardFields.length > 0) {
       return cardFields.filter((n) => tableFieldNames.has(n))
     }
     return Array.isArray(fieldIdsProp) ? fieldIdsProp : []
@@ -270,6 +271,23 @@ export default function NonGridViewWrapper({
             wrapText={cardWrapText}
           />
         )}
+        {viewType === "gallery" && (
+          <GalleryView
+            tableId={tableId}
+            viewId={viewId}
+            fieldIds={fieldIds}
+            searchQuery={searchQuery}
+            tableFields={tableFields}
+            filters={filtersAsConfig}
+            imageField={cardImageField || undefined}
+            colorField={cardColorField || undefined}
+            defaultGroupsCollapsed={false}
+            blockConfig={{
+              gallery_group_by: groupingFieldId || undefined,
+              group_by_rules: groupByRules || undefined,
+            }}
+          />
+        )}
         {viewType === "calendar" && (
           <CalendarView
             tableId={tableId}
@@ -371,7 +389,7 @@ export default function NonGridViewWrapper({
           router.refresh()
         }}
       />
-      {viewType === "kanban" && (
+      {(viewType === "kanban" || viewType === "gallery") && (
         <CustomizeCardsDialog
           isOpen={customizeCardsDialogOpen}
           onClose={() => setCustomizeCardsDialogOpen(false)}

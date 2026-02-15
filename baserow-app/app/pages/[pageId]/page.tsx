@@ -121,6 +121,7 @@ export default async function PagePage({
     <WorkspaceShellWrapper title={pageName} hideTopbar={true} hideRecordPanel={hideRecordPanel}>
       {page && <PageActionsRegistrar pageId={pageId} isAdmin={admin} isViewer={isViewer} />}
       <InterfacePageClient 
+        key={pageId}
         pageId={pageId} 
         initialPage={page || undefined}
         initialData={initialData}

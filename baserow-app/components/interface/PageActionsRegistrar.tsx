@@ -29,6 +29,11 @@ export default function PageActionsRegistrar({
   const { exitEditPages } = useUIMode()
   const { setSelectedContext } = useSelectionContext()
 
+  // DEBUG: Confirm registration runs when pageId changes (remove after confirmation)
+  useEffect(() => {
+    console.log("[PageActionsRegistrar] Registering page actions for:", pageId)
+  }, [pageId])
+
   useEffect(() => {
     if (!pageId) return
 

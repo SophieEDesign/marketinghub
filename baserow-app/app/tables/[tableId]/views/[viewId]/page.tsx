@@ -139,9 +139,9 @@ export default async function ViewPage({
     const groupBy = gridSettings?.group_by_field || (view.config as { groupBy?: string })?.groupBy
     const groupByRules = gridSettings?.group_by_rules || null
     
-    // For Kanban views, get group field from settings or config
-    const kanbanGroupField = view.type === "kanban" 
-      ? (groupBy || (view.config as { kanbanGroupField?: string })?.kanbanGroupField)
+    // For Kanban/Gallery views, get group field from settings or config
+    const kanbanOrGalleryGroupField = (view.type === "kanban" || view.type === "gallery")
+      ? (groupBy || (view.config as { kanbanGroupField?: string })?.kanbanGroupField || (view.config as { gallery_group_by?: string })?.gallery_group_by)
       : undefined
 
     // For horizontal_grouped views, get group field and rules from settings
@@ -187,13 +187,13 @@ export default async function ViewPage({
           />
         ) : (
           <NonGridViewWrapper
-            viewType={view.type as "form" | "kanban" | "calendar" | "timeline"}
+            viewType={view.type as "form" | "kanban" | "gallery" | "calendar" | "timeline"}
             viewName={view.name}
             tableId={tableId}
             viewId={viewId}
             views={tableViews}
             fieldIds={Array.isArray(viewFields) ? viewFields.map((f) => f.field_name).filter(Boolean) : []}
-            groupingFieldId={kanbanGroupField}
+            groupingFieldId={kanbanOrGalleryGroupField}
             dateFieldId={
               view.type === "calendar" || view.type === "timeline"
                 ? (Array.isArray(viewFields) && viewFields[0]?.field_name) || undefined

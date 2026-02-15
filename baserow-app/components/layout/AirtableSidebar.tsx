@@ -14,6 +14,12 @@ import {
   Settings,
   Home,
   Database,
+  Grid3x3,
+  FileText,
+  Columns,
+  Calendar,
+  Clock,
+  LayoutGrid,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useBranding } from "@/contexts/BrandingContext"
@@ -70,6 +76,7 @@ export default function AirtableSidebar({
   // Load initial state - use default on server, sync from localStorage on client after mount
   // This prevents hydration mismatches
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["interfaces"]))
+  const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set())
   const [isMounted, setIsMounted] = useState(false)
   
   // Sync from localStorage after mount to prevent hydration issues
@@ -84,6 +91,15 @@ export default function AirtableSidebar({
       }
     }
   }, [])
+
+  // Auto-expand table when viewing a view from that table
+  useEffect(() => {
+    const match = pathname.match(/\/tables\/([^/]+)(?:\/views\/([^/]+))?/)
+    if (match) {
+      const tableId = match[1]
+      setExpandedTables((prev) => new Set(prev).add(tableId))
+    }
+  }, [pathname])
   
   // For mobile/tablet: use controlled state from parent, default to closed
   // For desktop: use internal collapsed state
@@ -294,98 +310,100 @@ export default function AirtableSidebar({
                 {tables.map((table) => {
                   const isTableActive = pathname.includes(`/tables/${table.id}`)
                   const targetPath = `/tables/${table.id}`
-                  
+                  const tableViews = (views[table.id] || []).filter((v) => v.type !== "interface")
+                  const isTableExpanded = expandedTables.has(table.id)
+
+                  const toggleTableExpanded = (e: React.MouseEvent) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setExpandedTables((prev) => {
+                      const next = new Set(prev)
+                      if (next.has(table.id)) next.delete(table.id)
+                      else next.add(table.id)
+                      return next
+                    })
+                  }
+
                   return (
-                    <Link
-                      key={table.id}
-                      href={targetPath}
-                      className={cn(
-                        "flex items-center gap-2 px-2 py-1.5 rounded transition-colors hover:bg-black/10",
-                        isTableActive && "bg-black/20 font-medium"
-                      )}
-                      style={{ color: sidebarTextColor }}
-                      onClick={(e) => {
-                        const debugEnabled = typeof window !== "undefined" && localStorage.getItem("DEBUG_NAVIGATION") === "1"
-                        const isCurrentlyActive = pathname === targetPath
-                        
-                        if (debugEnabled) {
-                          console.log("[Table Link] Click detected:", {
-                            href: targetPath,
-                            currentPath: pathname,
-                            isActive: isCurrentlyActive,
-                            defaultPrevented: e.defaultPrevented,
-                            target: e.target,
-                            targetTag: (e.target as HTMLElement)?.tagName,
-                            targetClasses: (e.target as HTMLElement)?.className,
-                            currentElement: e.currentTarget,
-                            currentElementTag: (e.currentTarget as HTMLElement)?.tagName,
-                            timestamp: performance.now(),
-                          })
-                        }
-                        
-                        // If clicking the same page, force a refresh
-                        if (isCurrentlyActive) {
-                          if (debugEnabled) {
-                            console.log("[Table Link] Already on this page - forcing refresh")
-                          }
-                          e.preventDefault()
-                          e.stopPropagation()
-                          router.refresh()
-                          return
-                        }
-                        
-                        // For navigation to different pages, let Next.js Link handle it
-                        // Don't call preventDefault or stopPropagation - let the Link work normally
-                        if (debugEnabled) {
-                          console.log("[Table Link] Navigation allowed - letting Next.js Link handle it", {
-                            willNavigate: !e.defaultPrevented,
-                            eventPhase: e.eventPhase,
-                            bubbles: e.bubbles,
-                            cancelable: e.cancelable,
-                          })
-                          
-                          // Track if navigation actually happens
-                          const startTime = performance.now()
-                          const initialPathname = pathname
-                          
-                          // Check multiple times to catch navigation at different stages
-                          const checkNavigation = (attempt: number) => {
-                            setTimeout(() => {
-                              const newPathname = window.location.pathname
-                              const elapsed = performance.now() - startTime
-                              
-                              if (newPathname === targetPath) {
-                                console.log("[Table Link] ✅ Navigation completed successfully", {
-                                  elapsed: `${elapsed.toFixed(2)}ms`,
-                                  attempt,
-                                  from: initialPathname,
-                                  to: newPathname,
-                                })
-                              } else if (attempt < 3) {
-                                // Check again (navigation might be in progress)
-                                checkNavigation(attempt + 1)
-                              } else {
-                                // After 3 attempts (~300ms), navigation likely didn't happen
-                                console.warn("[Table Link] ⚠️ Navigation did not occur after multiple checks", {
-                                  elapsed: `${elapsed.toFixed(2)}ms`,
-                                  expected: targetPath,
-                                  actual: newPathname,
-                                  stillOn: initialPathname,
-                                })
-                                // Fallback: use window.location for more reliable navigation
-                                // This works even if the component is unmounting
-                                console.log("[Table Link] Attempting manual navigation fallback...")
-                                window.location.href = targetPath
+                    <div key={table.id} className="space-y-0.5">
+                      <div className="flex items-center gap-0.5 min-w-0">
+                        <button
+                          type="button"
+                          onClick={toggleTableExpanded}
+                          className="p-0.5 rounded hover:bg-black/10 shrink-0"
+                          style={{ color: sidebarTextColor }}
+                          aria-label={isTableExpanded ? "Collapse views" : "Expand views"}
+                        >
+                          {tableViews.length > 0 ? (
+                            isTableExpanded ? (
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            ) : (
+                              <ChevronRight className="h-3.5 w-3.5" />
+                            )
+                          ) : (
+                            <span className="w-3.5 h-3.5 inline-block" />
+                          )}
+                        </button>
+                        <Link
+                          href={targetPath}
+                          className={cn(
+                            "flex items-center gap-2 px-1.5 py-1.5 rounded transition-colors hover:bg-black/10 flex-1 min-w-0",
+                            isTableActive && "bg-black/20 font-medium"
+                          )}
+                          style={{ color: sidebarTextColor }}
+                          onClick={(e) => {
+                            const debugEnabled = typeof window !== "undefined" && localStorage.getItem("DEBUG_NAVIGATION") === "1"
+                            const isCurrentlyActive = pathname === targetPath
+                            if (isCurrentlyActive) {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              router.refresh()
+                              return
+                            }
+                            if (debugEnabled) {
+                              const startTime = performance.now()
+                              const initialPathname = pathname
+                              const checkNavigation = (attempt: number) => {
+                                setTimeout(() => {
+                                  const newPathname = window.location.pathname
+                                  if (newPathname === targetPath) {
+                                    console.log("[Table Link] Navigation completed", { elapsed: `${(performance.now() - startTime).toFixed(0)}ms` })
+                                  } else if (attempt < 3) checkNavigation(attempt + 1)
+                                  else if (pathname === initialPathname) window.location.href = targetPath
+                                }, 100)
                               }
-                            }, 100)
-                          }
-                          checkNavigation(1)
-                        }
-                      }}
-                    >
-                      <Database className="h-4 w-4 flex-shrink-0" style={{ color: sidebarTextColor }} />
-                      <span className="text-sm truncate">{table.name}</span>
-                    </Link>
+                              checkNavigation(1)
+                            }
+                          }}
+                        >
+                          <Database className="h-4 w-4 flex-shrink-0" style={{ color: sidebarTextColor }} />
+                          <span className="text-sm truncate">{table.name}</span>
+                        </Link>
+                      </div>
+                      {isTableExpanded && tableViews.length > 0 && (
+                        <div className="pl-5 space-y-0.5">
+                          {tableViews.map((view) => {
+                            const viewPath = `/tables/${table.id}/views/${view.id}`
+                            const isViewActive = pathname === viewPath
+                            const ViewIcon = view.type === "grid" ? Grid3x3 : view.type === "form" ? FileText : view.type === "kanban" || view.type === "gallery" ? Columns : view.type === "calendar" ? Calendar : view.type === "timeline" ? Clock : view.type === "horizontal_grouped" ? LayoutGrid : Grid3x3
+                            return (
+                              <Link
+                                key={view.id}
+                                href={viewPath}
+                                className={cn(
+                                  "flex items-center gap-2 px-2 py-1 rounded transition-colors hover:bg-black/10 text-sm",
+                                  isViewActive && "bg-black/20 font-medium"
+                                )}
+                                style={{ color: sidebarTextColor }}
+                              >
+                                <ViewIcon className="h-3.5 w-3.5 flex-shrink-0 opacity-80" />
+                                <span className="truncate">{view.name}</span>
+                              </Link>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
                   )
                 })}
               </div>

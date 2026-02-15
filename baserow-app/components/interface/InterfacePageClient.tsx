@@ -49,6 +49,12 @@ function InterfacePageClientInternal({
   const searchParams = useSearchParams()
   const router = useRouter()
   const { toast } = useToast()
+
+  // DEBUG: Confirm pageId changes on internal navigation (remove after confirmation)
+  useEffect(() => {
+    console.log("[InterfacePageClient] Loaded pageId:", pageId)
+  }, [pageId])
+
   const [page, setPage] = useState<InterfacePage | null>(initialPage || null)
   const [data, setData] = useState<any[]>(initialData)
   const [loading, setLoading] = useState(!initialPage)

@@ -262,10 +262,9 @@ export default function BlockRenderer({
         // CRITICAL: Pass pageTableId to GridBlock for table resolution fallback
         // Table resolution order: block.config.table_id → page.base_table (pageTableId) → block.config.base_table → null
         // pageTableId must flow to blocks for base_table fallback
-        // Lazy-load GridBlock to improve initial page load performance
-        // Disable lazy loading in edit mode so users can see all blocks immediately
+        // Lazy-load GridBlock - CRITICAL: enabled=false for mount stability (edit mode must not change mount structure)
         return (
-          <LazyBlockWrapper enabled={!isEditing}>
+          <LazyBlockWrapper enabled={false}>
             <GridBlock
               block={safeBlock}
               isEditing={canEdit}
@@ -318,10 +317,9 @@ export default function BlockRenderer({
         // CRITICAL: Pass pageTableId to RecordBlock for table resolution fallback
         // record_id can come from config OR from page context (for record review pages)
         // pageTableId must flow to blocks for base_table fallback
-        // Lazy-load RecordBlock to improve initial page load performance
-        // Disable lazy loading in edit mode so users can see all blocks immediately
+        // Lazy-load RecordBlock - CRITICAL: enabled=false for mount stability
         return (
-          <LazyBlockWrapper enabled={!isEditing}>
+          <LazyBlockWrapper enabled={false}>
             <RecordBlock block={safeBlock} isEditing={canEdit} pageTableId={recordContextTableId} pageId={pageId} recordId={recordId} />
           </LazyBlockWrapper>
         )
@@ -377,11 +375,10 @@ export default function BlockRenderer({
         return <FieldSectionBlock block={safeBlock} isEditing={canEdit} pageTableId={recordContextTableId} recordId={recordId} pageShowFieldNames={pageShowFieldNames} hideEditButton={hideEditButton} />
 
       case "text":
-        // Lazy-load TextBlock to improve initial page load performance
-        // Disable lazy loading in edit mode so users can see all blocks immediately
+        // Lazy-load TextBlock - CRITICAL: enabled=false for mount stability
         // CRITICAL: key={block.id} ONLY - no index, no compound keys, no pageId
         return (
-          <LazyBlockWrapper enabled={!isEditing}>
+          <LazyBlockWrapper enabled={false}>
             <TextBlock key={block.id} block={safeBlock} isEditing={canEdit} onUpdate={onUpdate} />
           </LazyBlockWrapper>
         )
@@ -410,7 +407,7 @@ export default function BlockRenderer({
       case "calendar":
         // Calendar block - wrapper around GridBlock with view_type='calendar'
         return (
-          <LazyBlockWrapper enabled={!isEditing}>
+          <LazyBlockWrapper enabled={false}>
             <CalendarBlock
               block={safeBlock}
               isEditing={canEdit}
@@ -430,7 +427,7 @@ export default function BlockRenderer({
       
       case "multi_calendar":
         return (
-          <LazyBlockWrapper enabled={!isEditing}>
+          <LazyBlockWrapper enabled={false}>
             <MultiCalendarBlock
               block={safeBlock}
               isEditing={canEdit}
@@ -447,7 +444,7 @@ export default function BlockRenderer({
       case "kanban":
         // Kanban block - wrapper around GridBlock with view_type='kanban'
         return (
-          <LazyBlockWrapper enabled={!isEditing}>
+          <LazyBlockWrapper enabled={false}>
             <KanbanBlock
               block={safeBlock}
               isEditing={canEdit}
@@ -464,7 +461,7 @@ export default function BlockRenderer({
       case "timeline":
         // Timeline block - wrapper around GridBlock with view_type='timeline'
         return (
-          <LazyBlockWrapper enabled={!isEditing}>
+          <LazyBlockWrapper enabled={false}>
             <TimelineBlock
               block={safeBlock}
               isEditing={canEdit}
@@ -480,7 +477,7 @@ export default function BlockRenderer({
       
       case "multi_timeline":
         return (
-          <LazyBlockWrapper enabled={!isEditing}>
+          <LazyBlockWrapper enabled={false}>
             <MultiTimelineBlock
               block={safeBlock}
               isEditing={canEdit}
@@ -497,7 +494,7 @@ export default function BlockRenderer({
       case "gallery":
         // Gallery block - wrapper around GridBlock with view_type='gallery'
         return (
-          <LazyBlockWrapper enabled={!isEditing}>
+          <LazyBlockWrapper enabled={false}>
             <GalleryBlock
               block={safeBlock}
               isEditing={canEdit}
@@ -523,7 +520,7 @@ export default function BlockRenderer({
           },
         }
         return (
-          <LazyBlockWrapper enabled={!isEditing}>
+          <LazyBlockWrapper enabled={false}>
             <GridBlock
               key={block.id}
               block={listBlockAsGrid}
@@ -547,7 +544,7 @@ export default function BlockRenderer({
       case "horizontal_grouped":
         // Tabs block - displays records grouped by field in tabs
         return (
-          <LazyBlockWrapper enabled={!isEditing}>
+          <LazyBlockWrapper enabled={false}>
             <HorizontalGroupedBlock
               block={safeBlock}
               isEditing={canEdit}
@@ -591,9 +588,12 @@ export default function BlockRenderer({
   return (
     <ErrorBoundary>
       <div className="relative h-full w-full">
-        {/* Filter indicator - subtle badge showing filter control source */}
-        {filterBlockSources.length > 0 && !isEditing && (
-          <div className="absolute top-2 right-2 z-10">
+        {/* Filter indicator - always mount, visibility toggled by isEditing for mount stability */}
+        {filterBlockSources.length > 0 && (
+          <div
+            className={`absolute top-2 right-2 z-10 ${isEditing ? "invisible" : ""}`}
+            aria-hidden={isEditing}
+          >
             <div 
               className="px-2 py-1 bg-blue-100 border border-blue-300 rounded text-xs text-blue-700 flex items-center gap-1"
               title={`Filtered by: ${filterBlockSources.join(', ')}`}

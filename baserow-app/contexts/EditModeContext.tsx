@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react"
+import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from "react"
 import { usePathname } from "next/navigation"
 
 /**
@@ -176,6 +176,21 @@ export function EditModeProvider({ children, isViewer = false }: EditModeProvide
       })
     }
   }, [pathname, isViewer])
+
+  // Clear block scope when navigating to a different page (prevents edit state leakage)
+  const prevPageIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    const pageMatch = pathname.match(/\/pages\/([^\/]+)/)
+    const pageId = pageMatch ? pageMatch[1] : null
+    if (prevPageIdRef.current !== null && prevPageIdRef.current !== pageId) {
+      setState(prev => {
+        const newScopes = new Set(prev.activeScopes)
+        newScopes.delete("block")
+        return { ...prev, activeScopes: newScopes }
+      })
+    }
+    prevPageIdRef.current = pageId
+  }, [pathname])
 
   // Save page edit mode to localStorage when it changes
   useEffect(() => {

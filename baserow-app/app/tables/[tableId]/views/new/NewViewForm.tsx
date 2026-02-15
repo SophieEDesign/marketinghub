@@ -17,7 +17,7 @@ interface NewViewFormProps {
 export default function NewViewForm({ tableId }: NewViewFormProps) {
   const router = useRouter()
   const [name, setName] = useState("")
-  const [type, setType] = useState<"grid" | "form" | "kanban" | "calendar" | "gallery" | "page">("grid")
+  const [type, setType] = useState<"grid" | "form" | "kanban" | "calendar" | "gallery" | "page" | "timeline" | "horizontal_grouped">("grid")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -45,7 +45,16 @@ export default function NewViewForm({ tableId }: NewViewFormProps) {
         setLoading(false)
       } else if (data && data.id) {
         console.log("View created successfully:", data.id, data)
-        // Redirect to the new view page
+        // Initialize view_fields so the view has field config from the start
+        try {
+          const initRes = await fetch(`/api/views/${data.id}/initialize-fields`, { method: "POST" })
+          if (!initRes.ok) {
+            const body = await initRes.json().catch(() => ({}))
+            console.warn("initialize-fields failed (non-blocking):", body?.error ?? initRes.statusText)
+          }
+        } catch (initErr) {
+          console.warn("initialize-fields failed (non-blocking):", initErr)
+        }
         router.push(`/tables/${tableId}/views/${data.id}`)
         router.refresh()
       } else {
@@ -107,6 +116,8 @@ export default function NewViewForm({ tableId }: NewViewFormProps) {
                 <option value="kanban">Kanban</option>
                 <option value="calendar">Calendar</option>
                 <option value="gallery">Gallery</option>
+                <option value="timeline">Timeline</option>
+                <option value="horizontal_grouped">Horizontal Grouped</option>
                 <option value="page">Interface Page</option>
               </select>
             </div>
