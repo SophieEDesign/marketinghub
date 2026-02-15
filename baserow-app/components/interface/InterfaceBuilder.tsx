@@ -97,13 +97,13 @@ export default function InterfaceBuilder({
   // Canvas must NOT run until hydration is complete
   const [hasHydrated, setHasHydrated] = useState<boolean>(false)
   
-  // Context-driven editing: block selection always available when not in viewer mode
-  const { enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(page.id)
+  // Context-driven editing: Edit/View toggle from sidebar menu controls block editing
+  const { isEditing: isBlockEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(page.id)
   const { selectedContext, setSelectedContext } = useSelectionContext()
   const { setData: setRightPanelData } = useRightSettingsPanelData()
   
-  // Allow block selection and editing when not in viewer mode (no global edit toggle)
-  const effectiveIsEditing = !isViewer
+  // Edit mode: URL viewer param forces view; otherwise use block edit mode from sidebar menu
+  const effectiveIsEditing = !isViewer && isBlockEditing
   
   // Interface mode: single source of truth for edit state (Airtable-style)
   // When interface is in edit mode, all record modals must open in edit mode

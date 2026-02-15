@@ -155,13 +155,23 @@ export default function AirtableSidebar({
     return null
   }
 
-  // On tablet/desktop: show collapsed state
+  // On tablet/desktop: show collapsed state with BaseDropdown for Edit/View access
   if (!isMobile && isCollapsed) {
     return (
       <div 
-        className="w-12 border-r border-black/10 flex flex-col items-center py-2"
+        className="w-12 border-r border-black/10 flex flex-col items-center py-2 gap-2"
         style={{ backgroundColor: sidebarColor }}
       >
+        <BaseDropdown
+          variant="sidebar"
+          collapsed
+          className="flex items-center justify-center p-2 min-w-0 w-full bg-transparent hover:bg-black/10 border-0 shadow-none"
+          triggerStyle={{ color: sidebarTextColor }}
+          onOpenPageSettings={pageActions?.onOpenPageSettings}
+          onEnterEdit={pageActions?.onEnterEdit}
+          onExitEdit={pageActions?.onExitEdit}
+          isEditing={pageActions?.isEditing}
+        />
         <button
           onClick={() => setInternalCollapsed(false)}
           className="p-2 hover:bg-black/10 rounded transition-colors"

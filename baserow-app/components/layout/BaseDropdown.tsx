@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { ChevronDown, Table2, Settings, Shield, Home, Edit2, Eye } from "lucide-react"
+import { ChevronDown, Table2, Settings, Shield, Home, Edit2, Eye, Menu } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useBranding } from "@/contexts/BrandingContext"
 import {
@@ -30,6 +30,8 @@ interface BaseDropdownProps {
   onExitEdit?: () => void
   /** Optional: whether currently editing. When true, show View; when false, show Edit. */
   isEditing?: boolean
+  /** Optional: when true, show icon-only trigger (for collapsed sidebar) */
+  collapsed?: boolean
 }
 
 export default function BaseDropdown({
@@ -40,6 +42,7 @@ export default function BaseDropdown({
   onEnterEdit,
   onExitEdit,
   isEditing = false,
+  collapsed = false,
 }: BaseDropdownProps) {
   const { primaryColor, sidebarTextColor } = useBranding()
   const [baseName, setBaseName] = useState<string>("Base")
@@ -79,13 +82,20 @@ export default function BaseDropdown({
           aria-haspopup="menu"
           className={cn(
             "flex items-center gap-1.5 font-semibold",
-            isCompact ? "h-8 px-2 text-sm" : "h-9 px-3",
+            collapsed && "h-9 w-9 p-0 justify-center",
+            isCompact && !collapsed ? "h-8 px-2 text-sm" : !collapsed && "h-9 px-3",
             className
           )}
           style={{ ...(triggerColor ? { color: triggerColor } : {}), ...triggerStyle }}
         >
-          {loading ? "..." : baseName}
-          <ChevronDown className="h-4 w-4 opacity-70" />
+          {collapsed ? (
+            <Menu className="h-5 w-5" />
+          ) : (
+            <>
+              {loading ? "..." : baseName}
+              <ChevronDown className="h-4 w-4 opacity-70" />
+            </>
+          )}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">

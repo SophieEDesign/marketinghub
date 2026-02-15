@@ -212,112 +212,116 @@ export default function ViewTopBar({
         </div>
       </div>
 
-      {/* Row 2: Toolbar */}
-      <div className="h-10 flex items-center gap-3 px-4 shrink-0">
-      {onDesign && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onDesign}
-          className="h-7 px-2.5 text-xs font-normal border-gray-200 bg-white hover:bg-gray-50 shrink-0"
-          style={{ color: primaryColor }}
-        >
-          <Settings className="h-3.5 w-3.5 mr-1.5" />
-          Design
-        </Button>
-      )}
-      {onAddField && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onAddField}
-          className="h-7 px-2.5 text-xs font-normal border-gray-200 bg-white hover:bg-gray-50 shrink-0"
-          style={{ color: primaryColor }}
-        >
-          <Plus className="h-3.5 w-3.5 mr-1.5" />
-          Add Field
-        </Button>
-      )}
-
-      {onSearch && (
-        <div className="relative w-48 shrink-0">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
-          <Input
-            type="text"
-            placeholder="Search this view…"
-            value={searchQuery}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            className="pl-8 pr-7 h-7 text-xs bg-gray-50 border-gray-200 rounded focus:bg-white focus:ring-1"
-          />
-          {searchQuery && (
-            <button
-              onClick={handleClearSearch}
-              className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 hover:text-gray-600"
-              aria-label="Clear search"
+      {/* Row 2: Toolbar - left side scrolls if needed, More & New Record stay visible on right */}
+      <div className="h-10 flex items-center gap-3 px-4 shrink-0 min-w-0">
+        {/* Left: Design, Add Field, Search, Filter, Sort, Group, Hide Fields, Share - can scroll */}
+        <div className="flex items-center gap-3 overflow-x-auto min-w-0 flex-1">
+          {onDesign && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onDesign}
+              className="h-7 px-2.5 text-xs font-normal border-gray-200 bg-white hover:bg-gray-50 shrink-0"
+              style={{ color: primaryColor }}
             >
-              <X className="h-3.5 w-3.5" />
-            </button>
+              <Settings className="h-3.5 w-3.5 mr-1.5" />
+              Design
+            </Button>
+          )}
+          {onAddField && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onAddField}
+              className="h-7 px-2.5 text-xs font-normal border-gray-200 bg-white hover:bg-gray-50 shrink-0"
+              style={{ color: primaryColor }}
+            >
+              <Plus className="h-3.5 w-3.5 mr-1.5" />
+              Add Field
+            </Button>
+          )}
+
+          {onSearch && (
+            <div className="relative w-48 shrink-0">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+              <Input
+                type="text"
+                placeholder="Search this view…"
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="pl-8 pr-7 h-7 text-xs bg-gray-50 border-gray-200 rounded focus:bg-white focus:ring-1"
+              />
+              {searchQuery && (
+                <button
+                  onClick={handleClearSearch}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 hover:text-gray-600"
+                  aria-label="Clear search"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {onFilter && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onFilter}
+              className="h-7 px-2.5 text-xs font-normal text-gray-600 hover:bg-gray-50 shrink-0"
+            >
+              <Filter className="h-3.5 w-3.5 mr-1.5" />
+              Filter
+            </Button>
+          )}
+          {onSort && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onSort}
+              className="h-7 px-2.5 text-xs font-normal text-gray-600 hover:bg-gray-50 shrink-0"
+            >
+              <ArrowUpDown className="h-3.5 w-3.5 mr-1.5" />
+              Sort
+            </Button>
+          )}
+          {onGroup && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onGroup}
+              className="h-7 px-2.5 text-xs font-normal text-gray-600 hover:bg-gray-50 shrink-0"
+            >
+              <Group className="h-3.5 w-3.5 mr-1.5" />
+              Group
+            </Button>
+          )}
+          {onHideFields && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onHideFields}
+              className="h-7 px-2.5 text-xs font-normal text-gray-600 hover:bg-gray-50 shrink-0"
+            >
+              <Eye className="h-3.5 w-3.5 mr-1.5" />
+              Hide Fields
+            </Button>
+          )}
+          {onShare && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onShare}
+              className="h-7 px-2.5 text-xs font-normal text-gray-600 hover:bg-gray-50 shrink-0"
+            >
+              <Share2 className="h-3.5 w-3.5 mr-1.5" />
+              Share
+            </Button>
           )}
         </div>
-      )}
 
-      {onFilter && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onFilter}
-          className="h-7 px-2.5 text-xs font-normal text-gray-600 hover:bg-gray-50 shrink-0"
-        >
-          <Filter className="h-3.5 w-3.5 mr-1.5" />
-          Filter
-        </Button>
-      )}
-      {onSort && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onSort}
-          className="h-7 px-2.5 text-xs font-normal text-gray-600 hover:bg-gray-50 shrink-0"
-        >
-          <ArrowUpDown className="h-3.5 w-3.5 mr-1.5" />
-          Sort
-        </Button>
-      )}
-      {onGroup && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onGroup}
-          className="h-7 px-2.5 text-xs font-normal text-gray-600 hover:bg-gray-50 shrink-0"
-        >
-          <Group className="h-3.5 w-3.5 mr-1.5" />
-          Group
-        </Button>
-      )}
-      {onHideFields && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onHideFields}
-          className="h-7 px-2.5 text-xs font-normal text-gray-600 hover:bg-gray-50 shrink-0"
-        >
-          <Eye className="h-3.5 w-3.5 mr-1.5" />
-          Hide Fields
-        </Button>
-      )}
-      {onShare && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onShare}
-          className="h-7 px-2.5 text-xs font-normal text-gray-600 hover:bg-gray-50 shrink-0"
-        >
-          <Share2 className="h-3.5 w-3.5 mr-1.5" />
-          Share
-        </Button>
-      )}
-
-      <div className="flex-1 min-w-0" />
+        {/* Right: More & New Record - always visible */}
+        <div className="flex items-center gap-2 shrink-0 pl-2">
       {canManageViews && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -383,6 +387,7 @@ export default function ViewTopBar({
           New Record
         </Button>
       )}
+        </div>
       </div>
 
       {/* Dialogs */}

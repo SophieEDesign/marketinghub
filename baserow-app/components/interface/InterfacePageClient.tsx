@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client"
 import { formatDateUK } from "@/lib/utils"
 import type { InterfacePage } from "@/lib/interface/page-types-only"
 import type { RecordContext } from "@/lib/interface/types"
+import type { FieldLayoutItem } from "@/lib/interface/field-layout-utils"
 import { hasPageAnchor, getPageAnchor } from "@/lib/interface/page-utils"
 import PageRenderer from "./PageRenderer"
 import PageSetupState from "./PageSetupState"
@@ -1198,6 +1199,28 @@ function InterfacePageClientInternal({
   const pageAnchor = page ? getPageAnchor(page) : null
   const requiredAnchor = page ? getRequiredAnchorType(page.page_type) : null
 
+  // CRITICAL: Stable callback for record_view layout save - inline function caused infinite loop
+  // (RecordReviewPage effect depends on onLayoutSave; new ref every render → setRightPanelData → re-render → loop)
+  const handleRecordViewLayoutSave = useCallback(
+    async (fieldLayout: FieldLayoutItem[]) => {
+      if (!page?.id) return
+      const res = await fetch(`/api/interface-pages/${page.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          config: { ...(page.config || {}), field_layout: fieldLayout },
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err?.error || "Failed to save layout")
+      }
+      const updated = await res.json()
+      setPage(updated)
+    },
+    [page?.id, page?.config]
+  )
+
   const handleTitleChange = (value: string) => {
     setTitleValue(value)
     // Debounced save
@@ -1339,27 +1362,7 @@ function InterfacePageClientInternal({
                 initialBlocks={memoizedBlocks}
                 isViewer={isViewer}
                 hideHeader={true}
-                onLayoutSave={
-                  page?.page_type === "record_view"
-                    ? async (fieldLayout) => {
-                        const res = await fetch(`/api/interface-pages/${page.id}`, {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            config: { ...(page.config || {}), field_layout: fieldLayout },
-                          }),
-                        })
-                        if (!res.ok) {
-                          const err = await res.json().catch(() => ({}))
-                          throw new Error(err?.error || "Failed to save layout")
-                        }
-                        const updated = await res.json()
-                        setPage(updated)
-                        // Don't call handlePageUpdate - setPage(updated) triggers re-render with new field_layout
-                        // immediately; no extra refetch needed. Cards and right panel will update via props.
-                      }
-                    : undefined
-                }
+                onLayoutSave={page?.page_type === "record_view" ? handleRecordViewLayoutSave : undefined}
               />
             ) : (
               // UNIFIED: All other pages render InterfaceBuilder (which wraps Canvas)
