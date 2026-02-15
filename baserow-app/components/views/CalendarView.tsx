@@ -13,9 +13,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CalendarIcon, X } from "lucide-react"
 import FullCalendar from "@fullcalendar/react"
 import dayGridPlugin from "@fullcalendar/daygrid"
+import interactionPlugin from "@fullcalendar/interaction"
 // Memoize to avoid re-rendering when only modal context changes (prevents React #185 in FullCalendar internals)
 const MemoizedFullCalendar = memo(FullCalendar)
-import interactionPlugin from "@fullcalendar/interaction"
+// Stable plugins array - must not be recreated each render (prevents React #185)
+const CALENDAR_PLUGINS = [dayGridPlugin, interactionPlugin]
 import { filterRowsBySearch } from "@/lib/search/filterRows"
 import { applyFiltersToQuery, deriveDefaultValuesFromFilters, stripFilterBlockFilters, type FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
@@ -71,6 +73,11 @@ interface CalendarViewProps {
 }
 
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/
+
+/** Stable handler for image load errors - avoids inline arrow in eventContent (prevents React #185) */
+function hideImageOnError(e: React.SyntheticEvent<HTMLImageElement, Event>) {
+  ;(e.target as HTMLImageElement).style.display = "none"
+}
 
 function parseDateValueToLocalDate(value: unknown): Date | null {
   if (value === null || value === undefined) return null
@@ -1001,29 +1008,6 @@ export default function CalendarView({
     const { fromFieldName: actualFromFieldName, toFieldName: actualToFieldName } = resolvedDateFieldNames
     const actualFieldName = dateField?.name || resolvedDateFieldId
 
-    // #region agent log - range mode detection
-    if (typeof window !== 'undefined') {
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: `log_${Date.now()}_calendar_range_mode`,
-          runId: 'pre-fix-2',
-          hypothesisId: 'H5',
-          location: 'CalendarView.tsx:getEvents',
-          message: 'Range mode detection in getEvents',
-          data: {
-            actualFromFieldName,
-            actualToFieldName,
-            hasRangeMode: !!actualToFieldName,
-            rowsLength: rows.length
-          },
-          timestamp: Date.now()
-        })
-      }).catch(() => {})
-    }
-    // #endregion
-
     // Both configured but invalid - return empty to prevent loop
     const blockFrom = blockConfig?.date_from || blockConfig?.from_date_field || blockConfig?.start_date_field || blockConfig?.calendar_start_field
     const blockTo = blockConfig?.date_to || blockConfig?.to_date_field || blockConfig?.end_date_field || blockConfig?.calendar_end_field
@@ -1276,32 +1260,6 @@ export default function CalendarView({
         })
       }
 
-      // #region agent log - event computation summary
-      if (typeof window !== 'undefined') {
-        const eventsWithRange = events.filter(e => e.end).length
-        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id: `log_${Date.now()}_calendar_events_computed`,
-            runId: 'pre-fix-2',
-            hypothesisId: 'H5',
-            location: 'CalendarView.tsx:getEvents',
-            message: 'Calendar events array computed',
-            data: {
-              totalEvents: events.length,
-              eventsWithRange,
-              eventsWithoutRange: events.length - eventsWithRange,
-              actualFromFieldName,
-              actualToFieldName,
-              hasRangeMode: !!actualToFieldName
-            },
-            timestamp: Date.now()
-          })
-        }).catch(() => {})
-      }
-      // #endregion
-
       // #region agent log
       const duration = performance.now() - start
       if (duration > 10) console.log("CalendarView getEvents duration:", duration.toFixed(1), "ms", { eventsCount: events.length })
@@ -1501,9 +1459,7 @@ export default function CalendarView({
     }
   }, [computedCalendarEvents])
 
-  // FullCalendar: keep option prop references stable to avoid internal update loops.
-  // IMPORTANT: Hooks must be declared before any early returns.
-  const calendarPlugins = useMemo(() => [dayGridPlugin, interactionPlugin], [])
+  // FullCalendar: use stable plugins array (defined at module level to prevent React #185)
   const calendarHeaderToolbar = useMemo(
     () => ({
       left: "prev,next today",
@@ -1513,6 +1469,18 @@ export default function CalendarView({
     []
   )
   const calendarDayHeaderFormat = useMemo(() => ({ weekday: "short" as const }), [])
+
+  // Use dateFromKey/dateToKey for stable deps (Date refs can cause render loops)
+  const calendarValidRange = useMemo(
+    () =>
+      dateFrom || dateTo
+        ? {
+            start: dateFrom ? format(dateFrom, "yyyy-MM-dd") : undefined,
+            end: dateTo ? format(dateTo, "yyyy-MM-dd") : undefined,
+          }
+        : undefined,
+    [dateFromKey, dateToKey]
+  )
 
   const calendarEventClassNames = useCallback(
     (arg: EventContentArg) => [
@@ -1606,9 +1574,7 @@ export default function CalendarView({
               src={image}
               alt=""
               className={`w-full h-full ${fitImageSize ? "object-contain" : "object-cover"}`}
-              onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                ;(e.target as HTMLImageElement).style.display = "none"
-              }}
+              onError={hideImageOnError}
             />
           </div>
         )}
@@ -1758,21 +1724,25 @@ export default function CalendarView({
         onRecordClick(recordIdString)
         return
       }
-      openRecordModal({
-        tableId: resolvedTableId,
-        recordId: recordIdString,
-        tableFields: Array.isArray(loadedTableFields) ? loadedTableFields : [],
-        modalFields: Array.isArray(blockConfig?.modal_fields) ? blockConfig.modal_fields : [],
-        modalLayout: blockConfig?.modal_layout,
-        supabaseTableName,
-        cascadeContext: blockConfig ? { blockConfig } : undefined,
-        canEditLayout,
-        onLayoutSave: onModalLayoutSave,
-        interfaceMode,
-        onSave: () => { if (resolvedTableId && supabaseTableName) loadRows() },
-        onDeleted: () => { if (resolvedTableId && supabaseTableName) loadRows() },
-        keySuffix: blockId ?? undefined,
-        forceFlatLayout: true, // Avoid React #185 (RecordFields/DndContext path)
+      // Defer opening modal to next tick so FullCalendar's internal state updates commit first,
+      // avoiding React #185 (fewer hooks) when calendar and modal update in the same cycle.
+      queueMicrotask(() => {
+        openRecordModal({
+          tableId: resolvedTableId,
+          recordId: recordIdString,
+          tableFields: Array.isArray(loadedTableFields) ? loadedTableFields : [],
+          modalFields: Array.isArray(blockConfig?.modal_fields) ? blockConfig.modal_fields : [],
+          modalLayout: blockConfig?.modal_layout,
+          supabaseTableName,
+          cascadeContext: blockConfig ? { blockConfig } : undefined,
+          canEditLayout,
+          onLayoutSave: onModalLayoutSave,
+          interfaceMode,
+          onSave: () => { if (resolvedTableId && supabaseTableName) loadRows() },
+          onDeleted: () => { if (resolvedTableId && supabaseTableName) loadRows() },
+          keySuffix: blockId ?? undefined,
+          forceFlatLayout: true, // Avoid React #185 (RecordFields/DndContext path)
+        })
       })
     },
     [allowOpenRecord, onRecordClick, resolvedDateFieldNames, openRecordModal, resolvedTableId, loadedTableFields, blockConfig, supabaseTableName, canEditLayout, onModalLayoutSave, interfaceMode, blockId, loadRows]
@@ -1948,7 +1918,7 @@ export default function CalendarView({
         {/* FullCalendar generates dynamic DOM IDs that differ between server and client */}
         {mounted ? (
           <MemoizedFullCalendar
-            plugins={calendarPlugins}
+            plugins={CALENDAR_PLUGINS}
             events={calendarEvents}
             editable={!isViewOnly}
             eventDrop={handleEventDrop}
@@ -1971,14 +1941,7 @@ export default function CalendarView({
             eventContent={calendarEventContent}
             eventClick={onCalendarEventClick}
             dateClick={onCalendarDateClick}
-            validRange={
-              dateFrom || dateTo
-                ? {
-                    start: dateFrom ? format(dateFrom, 'yyyy-MM-dd') : undefined,
-                    end: dateTo ? format(dateTo, 'yyyy-MM-dd') : undefined,
-                  }
-                : undefined
-            }
+            validRange={calendarValidRange}
           />
         ) : (
           <div className="flex items-center justify-center h-64 text-gray-500">
