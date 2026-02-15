@@ -1233,7 +1233,6 @@ function InterfacePageClientInternal({
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <BaseDropdown
               variant="compact"
-              isAdmin={true}
               className="flex-shrink-0"
               onEnterEdit={handleEnterEditPages}
               onExitEdit={handleExitToView}
@@ -1306,7 +1305,7 @@ function InterfacePageClientInternal({
       {!isViewer && page && !isAdmin && (
         <div className="border-b bg-white px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <BaseDropdown variant="compact" isAdmin={false} className="flex-shrink-0" />
+            <BaseDropdown variant="compact" className="flex-shrink-0" />
             <h1 className="text-lg font-semibold flex-1 min-w-0 truncate">{page.name}</h1>
             <span 
               className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded flex-shrink-0"

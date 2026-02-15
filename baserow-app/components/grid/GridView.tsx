@@ -25,7 +25,7 @@ import Cell from "./Cell"
 import { CellFactory } from "./CellFactory"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { TableField } from "@/types/fields"
-import RecordModal from "./RecordModal"
+import RecordModal from "@/components/calendar/RecordModal"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 import { SkeletonLoader } from "@/components/ui/SkeletonLoader"
 import EmptyTableState from "@/components/empty-states/EmptyTableState"
@@ -3902,19 +3902,22 @@ export default function GridView({
       {recordOpenStyle === 'modal' && (
         <RecordModal
           key={`record-modal-${blockId ?? tableId}-${modalRecordId}-${interfaceMode}-${Array.isArray(fieldLayout) ? fieldLayout.length : 0}`}
-          isOpen={!!modalRecordId}
+          open={!!modalRecordId}
           onClose={() => setModalRecordId(null)}
           tableId={tableId}
-          recordId={modalRecordId || ''}
-          tableName={supabaseTableName}
+          recordId={modalRecordId ?? null}
+          tableFields={tableFields}
           modalFields={modalFields}
           modalLayout={modalLayout}
           fieldLayout={fieldLayout}
+          supabaseTableName={supabaseTableName}
           cascadeContext={cascadeContext}
           canEditLayout={canEditLayout}
           onLayoutSave={onModalLayoutSave}
           initialEditMode={initialModalEditMode || !!openRecordInEditMode}
           interfaceMode={interfaceMode}
+          onSave={() => loadRows()}
+          onDeleted={() => loadRows()}
         />
       )}
     </div>

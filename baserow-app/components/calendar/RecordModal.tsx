@@ -281,8 +281,8 @@ export default function RecordModal({
   }
 
   // Show "Edit layout" button only when NOT in interface edit mode (Airtable-style)
-  // When interfaceMode === 'edit', modal is already in edit mode, so hide the button
-  const showEditLayoutButton = interfaceMode !== 'edit' && canEditLayout && Boolean(onLayoutSave) && Boolean(recordId) && !isEditingLayout
+  // Edit layout button only visible when interfaceMode === 'edit' (plan: no layout editor in view mode)
+  const showEditLayoutButton = interfaceMode === 'edit' && canEditLayout && Boolean(onLayoutSave) && Boolean(recordId) && !isEditingLayout
 
   // CRITICAL: Initialize draftFieldLayout when entering edit mode.
   // Only initialise after table fields are available (never with empty field list due to loading).

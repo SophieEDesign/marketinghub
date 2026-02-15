@@ -5,13 +5,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import { Save } from 'lucide-react'
+import { Save, Copy, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { IconPicker } from '@/components/ui/icon-picker'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatDateTimeUK } from '@/lib/utils'
+import { useToast } from '@/components/ui/use-toast'
 
 export default function SettingsWorkspaceTab() {
+  const { toast } = useToast()
   const [workspaceName, setWorkspaceName] = useState('Marketing Hub')
   const [workspaceIcon, setWorkspaceIcon] = useState('📊')
   const [workspaceSlug, setWorkspaceSlug] = useState('marketing-hub')
@@ -596,6 +598,44 @@ export default function SettingsWorkspaceTab() {
             </Button>
           </div>
         )}
+
+        <div className="pt-6 mt-6 border-t border-red-200">
+          <h3 className="text-sm font-medium text-red-700 mb-3">Advanced base actions</h3>
+          <p className="text-xs text-muted-foreground mb-4">
+            These actions are available only in the admin settings screen.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                toast({
+                  title: 'Duplicate Base',
+                  description: 'This action is not yet implemented.',
+                })
+              }
+              className="text-gray-700"
+            >
+              <Copy className="mr-2 h-4 w-4" />
+              Duplicate Base
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                toast({
+                  title: 'Delete Base',
+                  description: 'This action is not yet implemented.',
+                  variant: 'destructive',
+                })
+              }
+              className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete Base
+            </Button>
+          </div>
+        </div>
       </CardContent>
     </Card>
   )

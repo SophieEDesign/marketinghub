@@ -779,6 +779,12 @@ export default function CalendarView({
     return rows.filter((row) => filteredIds.has(row.id))
   }, [rows, loadedTableFields, searchQuery, fieldIds])
 
+  // Stable signature for filteredRows to prevent getEvents() recalculation when content unchanged
+  const filteredRowsSignature = useMemo(
+    () => `${filteredRows?.length ?? 0}|${(filteredRows ?? []).map((r: TableRow) => r.id).join(',')}`,
+    [filteredRows]
+  )
+
   // Resolve display labels for any link_to_table fields shown on calendar cards.
   useEffect(() => {
     let cancelled = false
@@ -1396,8 +1402,8 @@ export default function CalendarView({
       isCalculatingEventsRef.current = false
     }
   }, [
-    // Data that affects which rows become events
-    filteredRows,
+    // Data that affects which rows become events (use signature to avoid churn from array identity)
+    filteredRowsSignature,
     searchQuery,
     filtersKey,
     // Field/config that affects mapping
@@ -1938,11 +1944,9 @@ export default function CalendarView({
       </div>
 
       {/* Record Modal for Editing */}
-      {selectedRecordId && resolvedTableId && (() => {
-        const layoutSig = Array.isArray(blockConfig?.field_layout) ? blockConfig.field_layout.length : (blockConfig?.modal_layout?.blocks?.length ?? 0)
-        return (
+      {selectedRecordId && resolvedTableId && (
         <RecordModal
-          key={`record-modal-${blockId ?? resolvedTableId}-${selectedRecordId}-${interfaceMode}-${layoutSig}`}
+          key={`record-modal-${blockId ?? resolvedTableId}-${selectedRecordId}-${interfaceMode}-${Array.isArray(blockConfig?.field_layout) ? blockConfig.field_layout.length : (blockConfig?.modal_layout?.blocks?.length ?? 0)}`}
           open={selectedRecordId !== null}
           onClose={() => setSelectedRecordId(null)}
           tableId={resolvedTableId}
@@ -1956,20 +1960,17 @@ export default function CalendarView({
           onLayoutSave={onModalLayoutSave}
           interfaceMode={interfaceMode}
           onSave={() => {
-            // Reload rows after save
             if (resolvedTableId && supabaseTableName) {
               loadRows()
             }
           }}
           onDeleted={() => {
-            // Reload rows after delete
             if (resolvedTableId && supabaseTableName) {
               loadRows()
             }
           }}
         />
-        )
-      })()}
+      )}
 
       {/* Record Modal for Creating New Record */}
       {canCreateRecord && createRecordDate && resolvedTableId && resolvedDateFieldId && (

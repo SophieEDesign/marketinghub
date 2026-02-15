@@ -30,7 +30,7 @@ export default function Topbar({ title, onSidebarToggle, isAdmin }: TopbarProps)
             <Menu className="h-5 w-5" style={{ color: primaryColor }} />
           </Button>
         )}
-        <BaseDropdown variant="default" isAdmin={isAdmin ?? false} />
+        <BaseDropdown variant="default" />
         {title && (
           <span className="text-lg font-semibold text-gray-700 truncate hidden sm:inline">
             {title}

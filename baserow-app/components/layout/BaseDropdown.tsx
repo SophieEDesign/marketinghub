@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { ChevronDown, Table2, Settings, Shield, Copy, Trash2, Edit2, Eye, Home } from "lucide-react"
+import { ChevronDown, Table2, Settings, Shield, Edit2, Eye, Home } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useBranding } from "@/contexts/BrandingContext"
 import { useUIMode } from "@/contexts/UIModeContext"
@@ -14,7 +14,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
-import { useToast } from "@/components/ui/use-toast"
 import { cn } from "@/lib/utils"
 
 interface BaseDropdownProps {
@@ -22,8 +21,6 @@ interface BaseDropdownProps {
   variant?: "default" | "compact"
   /** Optional: show as leftmost in a row with other header content */
   className?: string
-  /** Optional: admin flag for Delete Base visibility */
-  isAdmin?: boolean
   /** Optional: when provided, show Edit/View toggle (Airtable-style) at top of dropdown */
   onEnterEdit?: () => void
   /** Optional: when provided with onEnterEdit, show View option to exit edit mode */
@@ -37,14 +34,12 @@ interface BaseDropdownProps {
 export default function BaseDropdown({
   variant = "default",
   className,
-  isAdmin = false,
   onEnterEdit,
   onExitEdit,
   isEditMode: isEditModeProp,
   onOpenPageSettings,
 }: BaseDropdownProps) {
   const { primaryColor } = useBranding()
-  const { toast } = useToast()
   const { uiMode } = useUIMode()
   const showEditViewToggle = onEnterEdit != null && onExitEdit != null
   const inAnyEditMode = isEditModeProp ?? uiMode !== "view"
@@ -71,21 +66,6 @@ export default function BaseDropdown({
     }
     load()
   }, [])
-
-  const handleDuplicateBase = () => {
-    toast({
-      title: "Duplicate Base",
-      description: "This action is not yet implemented.",
-    })
-  }
-
-  const handleDeleteBase = () => {
-    toast({
-      title: "Delete Base",
-      description: "This action is not yet implemented.",
-      variant: "destructive",
-    })
-  }
 
   const isCompact = variant === "compact"
 
@@ -146,33 +126,10 @@ export default function BaseDropdown({
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href="/settings" className="flex items-center gap-2 cursor-pointer">
-            <Settings className="h-4 w-4" />
-            Base Settings
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href="/settings" className="flex items-center gap-2 cursor-pointer">
             <Shield className="h-4 w-4" />
             Permissions
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleDuplicateBase} className="flex items-center gap-2">
-          <Copy className="h-4 w-4" />
-          Duplicate Base
-        </DropdownMenuItem>
-        {isAdmin && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={handleDeleteBase}
-              className="flex items-center gap-2 text-destructive focus:text-destructive"
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete Base
-            </DropdownMenuItem>
-          </>
-        )}
       </DropdownMenuContent>
     </DropdownMenu>
   )

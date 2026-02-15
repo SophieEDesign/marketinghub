@@ -47,6 +47,142 @@ import { usePageAggregates } from "@/lib/dashboard/usePageAggregates"
 
 const ResponsiveGridLayout = WidthProvider(Responsive)
 
+function CanvasDragGhostOverlay({
+  dragGhost,
+  layoutSettings,
+  containerWidth,
+}: {
+  dragGhost: { x: number; y: number; w: number; h: number }
+  layoutSettings?: { cols?: number; rowHeight?: number; margin?: [number, number] }
+  containerWidth: number
+}) {
+  const cols = layoutSettings?.cols || 12
+  const rowHeight = layoutSettings?.rowHeight || 30
+  const margin = layoutSettings?.margin || [10, 10]
+  const colWidth = (containerWidth - (margin[0] * (cols + 1))) / cols
+  const xPosition = dragGhost.x * colWidth + dragGhost.x * margin[0] + margin[0]
+  const yPosition = dragGhost.y * rowHeight + dragGhost.y * margin[1] + margin[1]
+  const width = dragGhost.w * colWidth + (dragGhost.w - 1) * margin[0]
+  const height = dragGhost.h * rowHeight + (dragGhost.h - 1) * margin[1]
+  return (
+    <div
+      className="absolute pointer-events-none z-40 border-2 border-blue-400 bg-blue-50/30 rounded-lg transition-all duration-150"
+      style={{
+        left: `${xPosition}px`,
+        top: `${yPosition}px`,
+        width: `${width}px`,
+        height: `${height}px`,
+      }}
+    />
+  )
+}
+
+function CanvasAlignmentOverlay({
+  layout,
+  layoutSettings,
+  draggedBlockId,
+  containerWidth,
+}: {
+  layout: LayoutItem[]
+  layoutSettings?: { cols?: number; rowHeight?: number; margin?: [number, number] }
+  draggedBlockId: string | null
+  containerWidth: number
+}) {
+  if (!draggedBlockId) return null
+  const draggedBlock = layout.find((l) => l.i === draggedBlockId)
+  if (!draggedBlock) return null
+
+  const cols = layoutSettings?.cols || 12
+  const rowHeight = layoutSettings?.rowHeight || 30
+  const margin = layoutSettings?.margin || [10, 10]
+  const colWidth = (containerWidth - (margin[0] * (cols + 1))) / cols
+
+  const alignedBlocks: Array<{ blockId: string; x?: number; y?: number; type: 'vertical' | 'horizontal' }> = []
+  layout.forEach((otherBlock) => {
+    if (otherBlock.i === draggedBlockId) return
+    const draggedX = draggedBlock.x || 0
+    const draggedY = draggedBlock.y || 0
+    const otherX = otherBlock.x || 0
+    const otherY = otherBlock.y || 0
+    if (
+      Math.abs(draggedX - otherX) < 0.5 ||
+      Math.abs((draggedX + (draggedBlock.w || 4)) - (otherX + (otherBlock.w || 4))) < 0.5
+    ) {
+      alignedBlocks.push({ blockId: otherBlock.i, x: otherX, type: 'vertical' })
+    }
+    if (
+      Math.abs(draggedY - otherY) < 0.5 ||
+      Math.abs((draggedY + (draggedBlock.h || 4)) - (otherY + (otherBlock.h || 4))) < 0.5
+    ) {
+      alignedBlocks.push({ blockId: otherBlock.i, y: otherY, type: 'horizontal' })
+    }
+  })
+
+  return (
+    <div className="absolute inset-0 pointer-events-none z-40">
+      {alignedBlocks.map((aligned, idx) => {
+        if (aligned.type === 'vertical' && aligned.x !== undefined) {
+          const xPosition = aligned.x * colWidth + aligned.x * margin[0] + margin[0]
+          return (
+            <div
+              key={`align-v-${aligned.blockId}-${idx}`}
+              className="absolute top-0 bottom-0 w-px bg-green-400 opacity-40"
+              style={{ left: `${xPosition}px` }}
+            />
+          )
+        }
+        if (aligned.type === 'horizontal' && aligned.y !== undefined) {
+          const yPosition = aligned.y * rowHeight + aligned.y * margin[1] + margin[1]
+          return (
+            <div
+              key={`align-h-${aligned.blockId}-${idx}`}
+              className="absolute left-0 right-0 h-px bg-green-400 opacity-40"
+              style={{ top: `${yPosition}px` }}
+            />
+          )
+        }
+        return null
+      })}
+    </div>
+  )
+}
+
+function CanvasSnapGuideOverlay({
+  activeSnapTargets,
+  layoutSettings,
+  containerWidth,
+}: {
+  activeSnapTargets: { vertical?: { x: number }; horizontal?: { y: number } }
+  layoutSettings?: { cols?: number; rowHeight?: number; margin?: [number, number] }
+  containerWidth: number
+}) {
+  const cols = layoutSettings?.cols || 12
+  const rowHeight = layoutSettings?.rowHeight || 30
+  const margin = layoutSettings?.margin || [10, 10]
+  const colWidth = (containerWidth - (margin[0] * (cols + 1))) / cols
+  return (
+    <div className="absolute inset-0 pointer-events-none z-50">
+      {activeSnapTargets.vertical && (
+        <div
+          className="absolute top-0 bottom-0 w-0.5 bg-blue-500 opacity-60 transition-opacity duration-150"
+          style={{
+            left: `${(activeSnapTargets.vertical.x || 0) * colWidth + (activeSnapTargets.vertical.x || 0) * margin[0] + margin[0]}px`,
+            transform: 'translateX(-50%)',
+          }}
+        />
+      )}
+      {activeSnapTargets.horizontal && (
+        <div
+          className="absolute left-0 right-0 h-0.5 bg-blue-500 opacity-60 transition-opacity duration-150"
+          style={{
+            top: `${(activeSnapTargets.horizontal.y || 0) * rowHeight + (activeSnapTargets.horizontal.y || 0) * margin[1] + margin[1]}px`,
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
 interface CanvasProps {
   blocks: PageBlock[]
   isEditing: boolean
@@ -426,17 +562,6 @@ export default function Canvas({
   
   // Track keyboard movement for visual feedback
   const [keyboardMoveHighlight, setKeyboardMoveHighlight] = useState<string | null>(null)
-  
-  // Grid overlay toggle
-  // CRITICAL: Use useState to prevent hydration mismatch - localStorage access must happen after mount
-  const [showGridOverlay, setShowGridOverlay] = useState<boolean>(false)
-  
-  // Initialize grid overlay state from localStorage after mount
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setShowGridOverlay(localStorage.getItem('canvas-grid-overlay') === 'true')
-    }
-  }, [])
   
   // Drag ghost/preview state
   const [dragGhost, setDragGhost] = useState<{
@@ -1514,17 +1639,6 @@ export default function Canvas({
         return
       }
       
-      // Toggle grid overlay: Cmd+G
-      if ((e.metaKey || e.ctrlKey) && e.key === 'g') {
-        e.preventDefault()
-        setShowGridOverlay(prev => {
-          const newValue = !prev
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('canvas-grid-overlay', String(newValue))
-          }
-          return newValue
-        })
-      }
     }
     
     window.addEventListener('keydown', handleKeyDown)
@@ -2028,172 +2142,32 @@ export default function Canvas({
           </div>
         ) : (
         <>
-        {/* Grid overlay */}
-        {isEditing && showGridOverlay && containerRef.current && (() => {
-          const cols = layoutSettings?.cols || 12
-          const rowHeight = layoutSettings?.rowHeight || 30
-          const margin = layoutSettings?.margin || [10, 10]
-          const containerWidth = containerRef.current?.offsetWidth || 0
-          const colWidth = (containerWidth - (margin[0] * (cols + 1))) / cols
-          const maxRows = 50 // Show grid for first 50 rows
-          
-          return (
-            <div className="absolute inset-0 pointer-events-none z-10 opacity-20">
-              {/* Vertical grid lines */}
-              {Array.from({ length: cols + 1 }).map((_, i) => {
-                const xPosition = i * colWidth + i * margin[0] + margin[0]
-                return (
-                  <div
-                    key={`v-${i}`}
-                    className="absolute top-0 bottom-0 w-px bg-gray-400"
-                    style={{ left: `${xPosition}px` }}
-                  />
-                )
-              })}
-              {/* Horizontal grid lines */}
-              {Array.from({ length: maxRows + 1 }).map((_, i) => {
-                const yPosition = i * rowHeight + i * margin[1] + margin[1]
-                return (
-                  <div
-                    key={`h-${i}`}
-                    className="absolute left-0 right-0 h-px bg-gray-400"
-                    style={{ top: `${yPosition}px` }}
-                  />
-                )
-              })}
-            </div>
-          )
-        })()}
-        
         {/* Drag ghost/preview */}
-        {isEditing && dragGhost && containerRef.current && (() => {
-          const cols = layoutSettings?.cols || 12
-          const rowHeight = layoutSettings?.rowHeight || 30
-          const margin = layoutSettings?.margin || [10, 10]
-          const containerWidth = containerRef.current?.offsetWidth || 0
-          const colWidth = (containerWidth - (margin[0] * (cols + 1))) / cols
-          
-          const xPosition = dragGhost.x * colWidth + dragGhost.x * margin[0] + margin[0]
-          const yPosition = dragGhost.y * rowHeight + dragGhost.y * margin[1] + margin[1]
-          const width = dragGhost.w * colWidth + (dragGhost.w - 1) * margin[0]
-          const height = dragGhost.h * rowHeight + (dragGhost.h - 1) * margin[1]
-          
-          return (
-            <div
-              className="absolute pointer-events-none z-40 border-2 border-blue-400 bg-blue-50/30 rounded-lg transition-all duration-150"
-              style={{
-                left: `${xPosition}px`,
-                top: `${yPosition}px`,
-                width: `${width}px`,
-                height: `${height}px`,
-              }}
-            />
-          )
-        })()}
+        {isEditing && dragGhost && containerRef.current && (
+          <CanvasDragGhostOverlay
+            dragGhost={dragGhost}
+            layoutSettings={layoutSettings}
+            containerWidth={containerRef.current.offsetWidth}
+          />
+        )}
         
         {/* Alignment helpers - show alignment guides for all blocks when dragging */}
-        {isEditing && activeSnapTargets && containerRef.current && (() => {
-          const draggedBlockId = currentlyDraggingBlockIdRef.current
-          if (!draggedBlockId) return null
-          
-          const draggedBlock = layout.find(l => l.i === draggedBlockId)
-          if (!draggedBlock) return null
-          
-          const cols = layoutSettings?.cols || 12
-          const rowHeight = layoutSettings?.rowHeight || 30
-          const margin = layoutSettings?.margin || [10, 10]
-          const containerWidth = containerRef.current?.offsetWidth || 0
-          const colWidth = (containerWidth - (margin[0] * (cols + 1))) / cols
-          
-          // Find blocks that align with the dragged block
-          const alignedBlocks: Array<{ blockId: string; x?: number; y?: number; type: 'vertical' | 'horizontal' }> = []
-          
-          layout.forEach(otherBlock => {
-            if (otherBlock.i === draggedBlockId) return
-            
-            const draggedX = draggedBlock.x || 0
-            const draggedY = draggedBlock.y || 0
-            const otherX = otherBlock.x || 0
-            const otherY = otherBlock.y || 0
-            
-            // Check vertical alignment (same X or aligned edges)
-            if (Math.abs(draggedX - otherX) < 0.5 || 
-                Math.abs((draggedX + (draggedBlock.w || 4)) - (otherX + (otherBlock.w || 4))) < 0.5) {
-              alignedBlocks.push({ blockId: otherBlock.i, x: otherX, type: 'vertical' })
-            }
-            
-            // Check horizontal alignment (same Y or aligned edges)
-            if (Math.abs(draggedY - otherY) < 0.5 ||
-                Math.abs((draggedY + (draggedBlock.h || 4)) - (otherY + (otherBlock.h || 4))) < 0.5) {
-              alignedBlocks.push({ blockId: otherBlock.i, y: otherY, type: 'horizontal' })
-            }
-          })
-          
-          return (
-            <div className="absolute inset-0 pointer-events-none z-40">
-              {alignedBlocks.map((aligned, idx) => {
-                if (aligned.type === 'vertical' && aligned.x !== undefined) {
-                  const xPosition = aligned.x * colWidth + aligned.x * margin[0] + margin[0]
-                  return (
-                    <div
-                      key={`align-v-${aligned.blockId}-${idx}`}
-                      className="absolute top-0 bottom-0 w-px bg-green-400 opacity-40"
-                      style={{
-                        left: `${xPosition}px`,
-                      }}
-                    />
-                  )
-                } else if (aligned.type === 'horizontal' && aligned.y !== undefined) {
-                  const yPosition = aligned.y * rowHeight + aligned.y * margin[1] + margin[1]
-                  return (
-                    <div
-                      key={`align-h-${aligned.blockId}-${idx}`}
-                      className="absolute left-0 right-0 h-px bg-green-400 opacity-40"
-                      style={{
-                        top: `${yPosition}px`,
-                      }}
-                    />
-                  )
-                }
-                return null
-              })}
-            </div>
-          )
-        })()}
+        {isEditing && activeSnapTargets && containerRef.current && (
+          <CanvasAlignmentOverlay
+            layout={layout}
+            layoutSettings={layoutSettings}
+            draggedBlockId={currentlyDraggingBlockIdRef.current}
+            containerWidth={containerRef.current.offsetWidth}
+          />
+        )}
         
         {/* Guide lines overlay for snap feedback during drag */}
         {isEditing && activeSnapTargets && containerRef.current && (
-          <div className="absolute inset-0 pointer-events-none z-50">
-            {activeSnapTargets.vertical && (() => {
-              const cols = layoutSettings?.cols || 12
-              const margin = layoutSettings?.margin || [10, 10]
-              const containerWidth = containerRef.current?.offsetWidth || 0
-              const colWidth = (containerWidth - (margin[0] * (cols + 1))) / cols
-              const xPosition = (activeSnapTargets.vertical.x || 0) * colWidth + (activeSnapTargets.vertical.x || 0) * margin[0] + margin[0]
-              return (
-                <div
-                  className="absolute top-0 bottom-0 w-0.5 bg-blue-500 opacity-60 transition-opacity duration-150"
-                  style={{
-                    left: `${xPosition}px`,
-                    transform: 'translateX(-50%)',
-                  }}
-                />
-              )
-            })()}
-            {activeSnapTargets.horizontal && (() => {
-              const rowHeight = layoutSettings?.rowHeight || 30
-              const margin = layoutSettings?.margin || [10, 10]
-              const yPosition = (activeSnapTargets.horizontal.y || 0) * rowHeight + (activeSnapTargets.horizontal.y || 0) * margin[1] + margin[1]
-              return (
-                <div
-                  className="absolute left-0 right-0 h-0.5 bg-blue-500 opacity-60 transition-opacity duration-150"
-                  style={{
-                    top: `${yPosition}px`,
-                  }}
-                />
-              )
-            })()}
-          </div>
+          <CanvasSnapGuideOverlay
+            activeSnapTargets={activeSnapTargets}
+            layoutSettings={layoutSettings}
+            containerWidth={containerRef.current.offsetWidth}
+          />
         )}
         <ResponsiveGridLayout
           className="layout" // CRITICAL: No conditional classes - identical in edit and public
