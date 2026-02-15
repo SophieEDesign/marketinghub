@@ -37,13 +37,8 @@ export default async function SettingsPage() {
   }
 
   return (
-    <WorkspaceShellWrapper title="Settings">
+    <WorkspaceShellWrapper>
       <div className="container mx-auto p-6 max-w-6xl">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold mb-2">Settings</h1>
-          <p className="text-muted-foreground">Configure workspace settings and admin controls</p>
-        </div>
-
         <Tabs defaultValue="workspace" className="space-y-6">
           <div className="overflow-x-auto">
             <TabsList className="inline-flex w-auto min-w-full">

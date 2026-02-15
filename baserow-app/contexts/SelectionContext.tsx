@@ -5,8 +5,9 @@ import { createContext, useContext, useState, useCallback, useEffect, ReactNode 
 export type SelectedContext =
   | { type: "page" }
   | { type: "block"; blockId: string }
+  | { type: "recordList"; blockId: string }
   | { type: "record"; recordId: string; tableId?: string }
-  | { type: "field"; fieldId: string; tableId: string }
+  | { type: "field"; fieldId: string; tableId?: string }
   | null
 
 interface SelectionContextType {

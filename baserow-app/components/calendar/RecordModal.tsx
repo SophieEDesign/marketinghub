@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { ArrowLeft, Save, Trash2, ChevronDown, ChevronRight, Check, LayoutGrid, X } from 'lucide-react'
+import { ArrowLeft, Save, Trash2, ChevronDown, ChevronRight, X } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -25,10 +25,8 @@ import {
   getFieldGroupsFromLayout,
   convertModalLayoutToFieldLayout,
   convertModalFieldsToFieldLayout,
-  createInitialFieldLayout,
 } from '@/lib/interface/field-layout-helpers'
 import { getPrimaryFieldName } from '@/lib/fields/primary'
-import { useFieldSettings } from '@/contexts/FieldSettingsContext'
 import { useSelectionContext } from '@/contexts/SelectionContext'
 
 export interface RecordModalProps {
@@ -48,14 +46,6 @@ export interface RecordModalProps {
   showFieldSections?: boolean // Optional: show fields grouped by sections (default: false)
   /** Optional: when provided, permission flags from cascade are applied (edit/create/delete). */
   cascadeContext?: RecordEditorCascadeContext | null
-  /** When true, show "Edit layout" in header; requires onLayoutSave. */
-  canEditLayout?: boolean
-  /** Called when user saves layout in edit mode (Done). Pass the new field_layout. */
-  onLayoutSave?: (fieldLayout: FieldLayoutItem[]) => void
-  /** When true, modal opens directly in layout edit mode */
-  initialEditMode?: boolean
-  /** Interface mode: 'view' | 'edit'. When 'edit', show "Customize layout" button (Airtable-style). */
-  interfaceMode?: 'view' | 'edit'
   /** When true, show comments area in footer. Default: true for existing records. */
   showComments?: boolean
 }
@@ -80,30 +70,10 @@ export default function RecordModal({
   fieldLayout: propFieldLayout,
   showFieldSections = false,
   cascadeContext,
-  canEditLayout = false,
-  onLayoutSave,
-  initialEditMode = false,
-  interfaceMode = 'view',
   showComments = true,
 }: RecordModalProps) {
   const { toast } = useToast()
-  const { openFieldSettings } = useFieldSettings()
   const { setSelectedContext } = useSelectionContext()
-
-  // Layout edit: user-triggered only via "Customize layout" (no auto-enter from interfaceMode)
-  const [manualEditMode, setManualEditMode] = useState(false)
-  const isEditingLayout = initialEditMode || manualEditMode
-  
-  // Track draft layout for editing
-  const [draftFieldLayout, setDraftFieldLayout] = useState<FieldLayoutItem[] | null>(null)
-
-  // Reset layout edit state when modal closes
-  useEffect(() => {
-    if (!open) {
-      setManualEditMode(false)
-      setDraftFieldLayout(null)
-    }
-  }, [open])
 
   const core = useRecordEditorCore({
     tableId,
@@ -143,10 +113,8 @@ export default function RecordModal({
   const canSave = recordId ? canEditRecords : canCreateRecords
   const effectiveEditable = canSave
 
-  // Permissions: hide "Customize layout" when permissions.mode === 'view'
   const permissions = (cascadeContext?.blockConfig as any)?.permissions ?? (cascadeContext?.pageConfig as any)?.permissions ?? {}
   const isViewOnly = permissions.mode === 'view'
-  const canShowCustomizeLayout = !isViewOnly && interfaceMode === 'edit' && canEditLayout && Boolean(onLayoutSave) && Boolean(recordId) && !isEditingLayout
 
   // Record title for header (primary field value or fallback)
   const recordTitle = useMemo(() => {
@@ -183,37 +151,29 @@ export default function RecordModal({
     if (!recordId || resolvedFieldLayout.length === 0) {
       return filteredFields // For new records or no layout, use all filtered fields
     }
-    return getVisibleFieldsFromLayout(
-      draftFieldLayout ?? resolvedFieldLayout,
-      filteredFields
-    )
-  }, [recordId, draftFieldLayout, resolvedFieldLayout, filteredFields])
+    return getVisibleFieldsFromLayout(resolvedFieldLayout, filteredFields)
+  }, [recordId, resolvedFieldLayout, filteredFields])
 
   // Get field groups from field_layout
   const fieldGroups = useMemo(() => {
     if (!recordId || resolvedFieldLayout.length === 0) {
       return {} // For new records or no layout, no grouping
     }
-    return getFieldGroupsFromLayout(
-      draftFieldLayout ?? resolvedFieldLayout,
-      filteredFields
-    )
-  }, [recordId, draftFieldLayout, resolvedFieldLayout, filteredFields])
+    return getFieldGroupsFromLayout(resolvedFieldLayout, filteredFields)
+  }, [recordId, resolvedFieldLayout, filteredFields])
 
   // Determine if field is editable
   const isFieldEditable = useCallback((fieldName: string) => {
-    // In layout mode, fields are locked (not editable)
-    if (isEditingLayout) return false
     if (!effectiveEditable) return false
     if (!recordId || resolvedFieldLayout.length === 0) {
       return effectiveEditable // For new records or no layout, all fields editable
     }
     return isFieldEditableFromLayout(
       fieldName,
-      draftFieldLayout ?? resolvedFieldLayout,
+      resolvedFieldLayout,
       effectiveEditable
     )
-  }, [isEditingLayout, effectiveEditable, recordId, draftFieldLayout, resolvedFieldLayout])
+  }, [effectiveEditable, recordId, resolvedFieldLayout])
 
   // Load collapsed sections state from localStorage
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
@@ -291,108 +251,9 @@ export default function RecordModal({
   }
 
 
-  // CRITICAL: Initialize draftFieldLayout when entering edit mode.
-  // Only initialise after table fields are available (never with empty field list due to loading).
-  useEffect(() => {
-    if (!open) return
-    
-    if (isEditingLayout && draftFieldLayout === null) {
-      if (resolvedFieldLayout.length > 0) {
-        setDraftFieldLayout([...resolvedFieldLayout])
-      } else if (filteredFields.length > 0) {
-        // Table fields loaded; create initial layout from full field list
-        setDraftFieldLayout(createInitialFieldLayout(filteredFields, 'modal', true))
-      }
-      // When filteredFields.length === 0 (still loading), do not set draft; effect will re-run when fields load
-    } else if (!isEditingLayout && draftFieldLayout !== null) {
-      setDraftFieldLayout(null)
-    }
-  }, [open, isEditingLayout, resolvedFieldLayout, draftFieldLayout, filteredFields])
-
-  // Log edit mode state on modal open for debugging
-  useEffect(() => {
-    if (open && process.env.NODE_ENV === 'development') {
-      console.log('[RecordModal] Modal opened:', {
-        interfaceMode,
-        initialEditMode,
-        isEditingLayout,
-        recordId,
-      })
-    }
-  }, [open, interfaceMode, initialEditMode, isEditingLayout, recordId])
-
-  const handleStartEditLayout = useCallback(() => {
-    setManualEditMode(true)
-    // If there's no existing layout, initialize with all fields visible
-    if (resolvedFieldLayout.length === 0) {
-      setDraftFieldLayout(createInitialFieldLayout(filteredFields, 'modal', effectiveEditable))
-    } else {
-      setDraftFieldLayout([...resolvedFieldLayout])
-    }
-  }, [resolvedFieldLayout, filteredFields, effectiveEditable])
-
-  const handleDoneEditLayout = useCallback(() => {
-    if (!onLayoutSave || draftFieldLayout === null || !canEditLayout) return
-    onLayoutSave(draftFieldLayout)
-    setManualEditMode(false)
-    setDraftFieldLayout(null)
-  }, [onLayoutSave, canEditLayout, draftFieldLayout])
-
-  const handleFieldLayoutChange = useCallback((newLayout: FieldLayoutItem[]) => {
-    if (isEditingLayout) {
-      setDraftFieldLayout(newLayout)
-    }
-  }, [isEditingLayout])
-
-  const handleFieldReorder = useCallback((fieldName: string, newIndex: number) => {
-    if (draftFieldLayout === null) return
-
-    const currentIndex = draftFieldLayout.findIndex((item) => item.field_name === fieldName)
-    if (currentIndex === -1) return
-
-    const newLayout = [...draftFieldLayout]
-    const [moved] = newLayout.splice(currentIndex, 1)
-    newLayout.splice(newIndex, 0, moved)
-
-    const updatedLayout = newLayout.map((item, index) => ({
-      ...item,
-      order: index,
-    }))
-
-    setDraftFieldLayout(updatedLayout)
-  }, [draftFieldLayout])
-
   const handleFieldLabelClick = useCallback((fieldId: string) => {
-    if (isEditingLayout) return // Disable schema editing in layout mode (plan Step 5)
     setSelectedContext({ type: "field", fieldId, tableId })
-    openFieldSettings(fieldId, tableId, isViewOnly)
-  }, [isEditingLayout, openFieldSettings, setSelectedContext, tableId, isViewOnly])
-
-  const handleFieldVisibilityToggle = useCallback((fieldName: string, visible: boolean) => {
-    if (draftFieldLayout === null) return
-
-    const updated = draftFieldLayout.map((item) =>
-      item.field_name === fieldName
-        ? { ...item, visible_in_modal: visible }
-        : item
-    )
-
-    if (!updated.some((item) => item.field_name === fieldName)) {
-      const field = filteredFields.find((f) => f.name === fieldName)
-      if (field) {
-        const newItem: FieldLayoutItem = {
-          field_id: field.id,
-          field_name: field.name,
-          order: Math.max(...updated.map((i) => i.order), -1) + 1,
-          editable: effectiveEditable,
-          visible_in_modal: visible,
-        }
-        updated.push(newItem)
-      }
-    }
-
-    setDraftFieldLayout(updated)
-  }, [draftFieldLayout, filteredFields, effectiveEditable])
+  }, [setSelectedContext, tableId])
 
   // Section fields if showFieldSections is enabled (filteredFields from core)
   const sectionedFields = useMemo(() => {
@@ -400,57 +261,13 @@ export default function RecordModal({
     return sectionAndSortFields(filteredFields)
   }, [filteredFields, showFieldSections])
 
-  // #region agent log - branch once per open/transition (not on every render)
-  const lastLoggedRef = useRef<string>('')
-  const formDataKeysLength = formData ? Object.keys(formData).length : 0
-  useEffect(() => {
-    if (!open || typeof window === 'undefined') return
-    const branch = loading
-      ? 'loading'
-      : recordId && formDataKeysLength === 0
-        ? 'record_not_found'
-        : filteredFields.length === 0
-          ? 'no_fields'
-          : isEditingLayout && recordId
-            ? 'layout_edit'
-            : resolvedFieldLayout.length > 0 && recordId
-              ? 'record_with_layout'
-              : showFieldSections && sectionedFields
-                ? 'sections'
-                : 'flat_create_or_view'
-    const key = `${branch}-${recordId ?? 'new'}-${loading}`
-    if (lastLoggedRef.current === key) return
-    lastLoggedRef.current = key
-    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: `log_${Date.now()}_recordmodal_branch`,
-        runId: 'pre-fix-3',
-        hypothesisId: 'H1',
-        location: 'RecordModal.tsx:content-branch',
-        message: 'RecordModal branch (create vs view)',
-        data: {
-          branch,
-          recordId: recordId ?? null,
-          loading,
-          filteredFieldsLength: filteredFields.length,
-          visibleFieldsLength: visibleFields.length,
-          resolvedFieldLayoutLength: resolvedFieldLayout.length,
-        },
-        timestamp: Date.now()
-      })
-    }).catch(() => {})
-  }, [open, loading, recordId, formDataKeysLength, filteredFields.length, visibleFields.length, resolvedFieldLayout.length, isEditingLayout, showFieldSections, sectionedFields])
-  // #endregion
-
   // CRITICAL: Unmount on close to prevent stale state (remount safety)
   if (!open) return null
 
   return (
-    <Dialog open={open} onOpenChange={onClose} key={`record-modal-${recordId || 'new'}-${interfaceMode}`}>
-      <DialogContent className={isEditingLayout ? "max-w-7xl max-h-[90vh] flex flex-col p-0" : "max-w-2xl max-h-[90vh] flex flex-col p-0"}>
-        {/* Header: Back, Title, Customize layout (when allowed), Close */}
+    <Dialog open={open} onOpenChange={onClose} key={`record-modal-${recordId || 'new'}`}>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0">
+        {/* Header: Back, Title, Close */}
         <div className="sticky top-0 z-10 bg-white border-b px-6 py-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <Button
@@ -465,48 +282,9 @@ export default function RecordModal({
             <DialogTitle className="text-lg font-semibold truncate">
               {recordId ? (recordTitle || 'Record Details') : 'Create New Record'}
             </DialogTitle>
-            {canShowCustomizeLayout && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleStartEditLayout}
-                className="inline-flex items-center gap-1.5 flex-shrink-0"
-                aria-label="Customize layout"
-                title="Customize layout"
-              >
-                <LayoutGrid className="h-4 w-4" />
-                Customize layout
-              </Button>
-            )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            {isEditingLayout ? (
-              <>
-                <Button
-                  type="button"
-                  variant="default"
-                  size="sm"
-                  onClick={handleDoneEditLayout}
-                  className="inline-flex items-center gap-1.5"
-                  aria-label="Done"
-                  title="Done"
-                >
-                  <Check className="h-4 w-4" />
-                  Done
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={onClose}
-                  className="h-8 w-8 p-0"
-                  aria-label="Close"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </>
-            ) : (
-              <>
+            <>
                 {recordId && (
                   <Button
                     variant="destructive"
@@ -540,13 +318,15 @@ export default function RecordModal({
                 >
                   <X className="h-4 w-4" />
                 </Button>
-              </>
-            )}
+            </>
           </div>
         </div>
 
-        {/* Scrollable content area */}
-        <div className={isEditingLayout ? "flex-1 flex overflow-hidden" : "flex-1 overflow-y-auto px-6"}>
+        {/* Scrollable content area. Key forces clean mount when switching loading→content to avoid React #185. */}
+        <div
+          key={`modal-content-${loading ? 'loading' : 'ready'}-${recordId ?? 'new'}`}
+          className="flex-1 overflow-y-auto px-6"
+        >
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <div className="text-gray-500">Loading...</div>
@@ -561,28 +341,7 @@ export default function RecordModal({
             </div>
           ) : (
             <>
-              {isEditingLayout && recordId ? (
-                // Layout mode: record itself is the canvas with drag handles (existing records only)
-                <div className="flex-1 overflow-y-auto px-6 py-4">
-                  <RecordFields
-                    fields={visibleFields}
-                    formData={formData}
-                    onFieldChange={handleFieldChange}
-                    fieldGroups={fieldGroups}
-                    tableId={tableId}
-                    recordId={recordId}
-                    tableName={effectiveTableName || ''}
-                    isFieldEditable={isFieldEditable}
-                    layoutMode={true}
-                    fieldLayout={draftFieldLayout ?? resolvedFieldLayout}
-                    allFields={filteredFields}
-                    onFieldVisibilityToggle={handleFieldVisibilityToggle}
-                    onFieldLayoutChange={handleFieldLayoutChange}
-                    pageEditable={effectiveEditable && !isViewOnly}
-                    onFieldLabelClick={handleFieldLabelClick}
-                  />
-                </div>
-              ) : resolvedFieldLayout.length > 0 && recordId ? (
+              {resolvedFieldLayout.length > 0 && recordId ? (
                 // Use RecordFields for existing records with layout (multi-column, no drag handles)
                 <div className="space-y-4 py-4">
                   <RecordFields

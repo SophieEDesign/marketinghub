@@ -36,6 +36,8 @@ import { canDeleteRecord } from "@/lib/interface/record-actions"
 import { Button } from "@/components/ui/button"
 import { Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { useRightSettingsPanelData } from "@/contexts/RightSettingsPanelDataContext"
+import { useSelectionContext } from "@/contexts/SelectionContext"
 
 interface RecordReviewPageProps {
   page: Page
@@ -64,6 +66,8 @@ export default function RecordReviewPage({
   const [tableName, setTableName] = useState<string | null>(null)
   const { toast } = useToast()
   const { role: userRole } = useUserRole()
+  const { setData: setRightPanelData } = useRightSettingsPanelData()
+  const { setSelectedContext } = useSelectionContext()
 
   const pageType = (page as any).page_type || (page as any).type || "record_review"
   const isRecordView = pageType === "record_view"
@@ -124,12 +128,27 @@ export default function RecordReviewPage({
     (page.settings as any)?.show_add_record === true ||
     (page.settings as any)?.showAddRecord === true
 
+  // Sync selected record to RightSettingsPanel and SelectionContext (for record_view)
+  useEffect(() => {
+    if (!isRecordView) return
+    if (selectedRecordId && pageTableId) {
+      setSelectedContext({ type: "record", recordId: selectedRecordId, tableId: pageTableId })
+      setRightPanelData({
+        recordId: selectedRecordId,
+        recordTableId: pageTableId,
+        fieldLayout,
+        onLayoutSave: onLayoutSave ?? null,
+        tableFields,
+      })
+    } else {
+      setSelectedContext({ type: "page" })
+      setRightPanelData({ recordId: null, recordTableId: null, fieldLayout: [], onLayoutSave: null, tableFields: [] })
+    }
+  }, [isRecordView, selectedRecordId, pageTableId, fieldLayout, onLayoutSave, tableFields, setSelectedContext, setRightPanelData])
+
   // Handle record selection
-  // CRITICAL: This does NOT trigger block reloads - blocks just re-render with new context
   const handleRecordSelect = useCallback((recordId: string) => {
-    console.log(`[RecordReviewPage] Record selected: ${recordId}`)
     setSelectedRecordId(recordId)
-    // NO block reload - blocks will receive new recordId via props and re-render
   }, [])
 
   const pageEditable = pageConfig?.allow_editing !== false

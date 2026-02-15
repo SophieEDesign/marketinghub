@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { X, Pin, PinOff, Maximize2, Minimize2, Copy, Trash2, Copy as CopyIcon, ChevronLeft, Pencil, Check } from "lucide-react"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
-import { useFieldSettings } from "@/contexts/FieldSettingsContext"
+import { useSelectionContext } from "@/contexts/SelectionContext"
 import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/components/ui/use-toast"
 import RecordHeader from "./RecordHeader"
@@ -24,7 +24,7 @@ const DEFAULT_WIDTH = 480
 
 export default function RecordPanel() {
   const { state, closeRecord, setWidth, togglePin, toggleFullscreen, goBack, navigateToLinkedRecord } = useRecordPanel()
-  const { openFieldSettings } = useFieldSettings()
+  const { setSelectedContext } = useSelectionContext()
   const onRecordDeleted = state.onRecordDeleted
   const { toast } = useToast()
   const router = useRouter()
@@ -273,8 +273,8 @@ export default function RecordPanel() {
   const isViewOnly = (cascadeContext?.blockConfig as any)?.permissions?.mode === 'view' || (cascadeContext?.pageConfig as any)?.permissions?.mode === 'view'
   const handleFieldLabelClick = useCallback((fieldId: string) => {
     if (!state.tableId) return
-    openFieldSettings(fieldId, state.tableId, isViewOnly)
-  }, [state.tableId, openFieldSettings, isViewOnly])
+    setSelectedContext({ type: "field", fieldId, tableId: state.tableId })
+  }, [state.tableId, setSelectedContext])
 
   const handleFieldChange = useCallback(async (fieldName: string, value: any) => {
     if (!state.recordId || !state.tableName || !effectiveAllowEdit) return

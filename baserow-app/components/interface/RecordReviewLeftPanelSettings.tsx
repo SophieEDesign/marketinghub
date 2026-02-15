@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { GripVertical, Eye, EyeOff, Settings } from "lucide-react"
-import FieldSettingsDrawer from "@/components/layout/FieldSettingsDrawer"
+import { useSelectionContext } from "@/contexts/SelectionContext"
 import {
   DndContext,
   closestCenter,
@@ -66,8 +66,7 @@ export default function RecordReviewLeftPanelSettings({
   )
   const [showLabels, setShowLabels] = useState(currentSettings?.showLabels ?? true)
   const [compact, setCompact] = useState(currentSettings?.compact ?? false)
-  const [editingField, setEditingField] = useState<TableField | null>(null)
-  const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false)
+  const { setSelectedContext } = useSelectionContext()
 
   // Load fields from table
   useEffect(() => {
@@ -226,10 +225,7 @@ export default function RecordReviewLeftPanelSettings({
                     field={field}
                     isVisible={isVisible}
                     onToggle={() => handleFieldToggle(field.id)}
-                    onConfigure={() => {
-                      setEditingField(field)
-                      setSettingsDrawerOpen(true)
-                    }}
+                    onConfigure={() => tableId && setSelectedContext({ type: "field", fieldId: field.id, tableId })}
                   />
                 )
               })}
@@ -262,33 +258,6 @@ export default function RecordReviewLeftPanelSettings({
         </div>
       </div>
 
-      {tableId && (
-        <FieldSettingsDrawer
-          field={editingField}
-          open={settingsDrawerOpen}
-          onOpenChange={(open) => {
-            setSettingsDrawerOpen(open)
-            if (!open) {
-              setEditingField(null)
-            }
-          }}
-          tableId={tableId}
-          tableFields={fields}
-          onSave={async () => {
-            // Reload fields after saving
-            const supabase = createClient()
-            const { data } = await supabase
-              .from("table_fields")
-              .select("*")
-              .eq("table_id", tableId)
-              .order("order_index", { ascending: true })
-            
-            if (data) {
-              setFields(data as TableField[])
-            }
-          }}
-        />
-      )}
     </div>
   )
 }

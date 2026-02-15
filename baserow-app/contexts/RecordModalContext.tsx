@@ -2,11 +2,13 @@
 
 import React, { createContext, useContext, useState, useCallback, useRef, ReactNode } from "react"
 import { useSelectionContext } from "@/contexts/SelectionContext"
+import { useRightSettingsPanelData } from "@/contexts/RightSettingsPanelDataContext"
 import type { TableField } from "@/types/fields"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { RecordEditorCascadeContext } from "@/lib/interface/record-editor-core"
 import type { FieldLayoutItem } from "@/lib/interface/field-layout-utils"
 import RecordModal from "@/components/calendar/RecordModal"
+import { ErrorBoundary } from "@/components/interface/ErrorBoundary"
 
 /** State for opening the global RecordModal. Mirrors RecordModalProps. */
 export interface RecordModalOpenState {
@@ -45,19 +47,30 @@ export function RecordModalProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<RecordModalOpenState | null>(null)
   const onCloseRef = useRef<(() => void) | null>(null)
   const { setSelectedContext } = useSelectionContext()
+  const { setData: setRightPanelData } = useRightSettingsPanelData()
 
   const openRecordModal = useCallback((openState: RecordModalOpenState) => {
     setState(openState)
     // Sync with SelectionContext for single-active-context rule
     if (openState.recordId) {
       setSelectedContext({ type: "record", recordId: openState.recordId, tableId: openState.tableId })
+      // Sync record layout data to RightSettingsPanel
+      setRightPanelData({
+        recordId: openState.recordId,
+        recordTableId: openState.tableId,
+        fieldLayout: openState.fieldLayout ?? [],
+        onLayoutSave: openState.onLayoutSave ?? null,
+        tableFields: openState.tableFields ?? [],
+      })
     }
-  }, [setSelectedContext])
+  }, [setSelectedContext, setRightPanelData])
 
   const closeRecordModal = useCallback(() => {
     setState(null)
     setSelectedContext(null)
-  }, [setSelectedContext])
+    // Clear record layout data from RightSettingsPanel
+    setRightPanelData({ recordId: null, recordTableId: null, fieldLayout: [], onLayoutSave: null, tableFields: [] })
+  }, [setSelectedContext, setRightPanelData])
 
   const handleClose = useCallback(() => {
     closeRecordModal()
@@ -80,27 +93,26 @@ export function RecordModalProvider({ children }: { children: ReactNode }) {
     <RecordModalContext.Provider value={{ openRecordModal, closeRecordModal, isRecordModalOpen: !!state }}>
       {children}
       {/* CRITICAL: RecordModal mounts once, always in the same position. Control via props. Never conditional. */}
-      <RecordModal
-        key="record-modal-global"
-        open={!!state}
-        onClose={handleClose}
-        tableId={state?.tableId ?? ""}
-        recordId={state?.recordId ?? null}
-        tableFields={state?.tableFields}
-        modalFields={state?.modalFields}
-        initialData={state?.initialData}
-        supabaseTableName={state?.supabaseTableName}
-        modalLayout={state?.modalLayout}
-        fieldLayout={state?.fieldLayout}
-        showFieldSections={state?.showFieldSections}
-        cascadeContext={state?.cascadeContext}
-        canEditLayout={state?.canEditLayout}
-        onLayoutSave={state?.onLayoutSave}
-        initialEditMode={state?.initialEditMode}
-        interfaceMode={state?.interfaceMode ?? "view"}
-        onSave={handleSave}
-        onDeleted={handleDeleted}
-      />
+      {/* ErrorBoundary catches React #185 (hook order) so we get componentStack in logs. */}
+      <ErrorBoundary>
+        <RecordModal
+          key="record-modal-global"
+          open={!!state}
+          onClose={handleClose}
+          tableId={state?.tableId ?? ""}
+          recordId={state?.recordId ?? null}
+          tableFields={state?.tableFields}
+          modalFields={state?.modalFields}
+          initialData={state?.initialData}
+          supabaseTableName={state?.supabaseTableName}
+          modalLayout={state?.modalLayout}
+          fieldLayout={state?.fieldLayout}
+          showFieldSections={state?.showFieldSections}
+          cascadeContext={state?.cascadeContext}
+          onSave={handleSave}
+          onDeleted={handleDeleted}
+        />
+      </ErrorBoundary>
     </RecordModalContext.Provider>
   )
 }

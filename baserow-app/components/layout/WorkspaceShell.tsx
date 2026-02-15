@@ -7,8 +7,8 @@ import { RecordPanelProvider } from "@/contexts/RecordPanelContext"
 import { RecordModalProvider } from "@/contexts/RecordModalContext"
 import { SelectionContextProvider } from "@/contexts/SelectionContext"
 import { PageActionsProvider } from "@/contexts/PageActionsContext"
-import { FieldSettingsProvider } from "@/contexts/FieldSettingsContext"
-import FieldSettingsDrawerHost from "@/components/layout/FieldSettingsDrawerHost"
+import { RightSettingsPanelDataProvider } from "@/contexts/RightSettingsPanelDataContext"
+import RightSettingsPanel from "@/components/interface/RightSettingsPanel"
 import RecordPanel from "@/components/records/RecordPanel"
 import { MainScrollProvider, useMainScroll } from "@/contexts/MainScrollContext"
 import { useIsMobile } from "@/hooks/useResponsive"
@@ -99,10 +99,9 @@ export default function WorkspaceShell({
 
   return (
     <SelectionContextProvider>
+      <RightSettingsPanelDataProvider>
       <RecordPanelProvider>
-      <FieldSettingsProvider>
       <RecordModalProvider>
-      <FieldSettingsDrawerHost />
       <PageActionsProvider>
       <MainScrollProvider>
         <WorkspaceShellContent
@@ -124,9 +123,10 @@ export default function WorkspaceShell({
         </WorkspaceShellContent>
       </MainScrollProvider>
       </PageActionsProvider>
+      <RightSettingsPanel />
       </RecordModalProvider>
-      </FieldSettingsProvider>
       </RecordPanelProvider>
+      </RightSettingsPanelDataProvider>
     </SelectionContextProvider>
   )
 }

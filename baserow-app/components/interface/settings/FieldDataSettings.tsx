@@ -19,7 +19,7 @@ import type { Table, TableField } from "@/types/database"
 import type { FieldType, FieldOptions, ChoiceColorTheme } from "@/types/fields"
 import { createClient } from "@/lib/supabase/client"
 import { CHOICE_COLOR_THEME_LABELS, isChoiceColorTheme, resolveChoiceColor } from "@/lib/field-colors"
-import FieldSettingsDrawer from "@/components/layout/FieldSettingsDrawer"
+import { useSelectionContext } from "@/contexts/SelectionContext"
 import { format as formatDate } from "date-fns"
 
 const DATE_FORMAT_OPTIONS: Array<{ value: string; label: string }> = [
@@ -50,9 +50,9 @@ export default function FieldDataSettings({
 }: FieldDataSettingsProps) {
   const [availableFields, setAvailableFields] = useState<TableField[]>([])
   const [selectedField, setSelectedField] = useState<TableField | null>(null)
-  const [fieldSettingsOpen, setFieldSettingsOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const { toast } = useToast()
+  const { setSelectedContext } = useSelectionContext()
   const tableId = config.table_id || pageTableId
 
   // Load fields when table changes
@@ -190,7 +190,7 @@ export default function FieldDataSettings({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setFieldSettingsOpen(true)}
+              onClick={() => tableId && selectedField && setSelectedContext({ type: "field", fieldId: selectedField.id, tableId })}
               className="text-xs"
             >
               <ExternalLink className="h-3 w-3 mr-1" />
@@ -589,20 +589,6 @@ export default function FieldDataSettings({
         {selectedField && renderFieldSettings()}
       </div>
 
-      {/* Full Field Settings Drawer */}
-      {selectedField && tableId && (
-        <FieldSettingsDrawer
-          field={selectedField}
-          open={fieldSettingsOpen}
-          onOpenChange={setFieldSettingsOpen}
-          tableId={tableId}
-          tableFields={availableFields}
-          onSave={async () => {
-            await loadSelectedField(selectedField.id, tableId)
-            await loadFields(tableId)
-          }}
-        />
-      )}
     </>
   )
 }

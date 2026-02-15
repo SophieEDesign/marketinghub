@@ -11,7 +11,7 @@ import type { RecordContext } from "@/lib/interface/types"
 import { hasPageAnchor, getPageAnchor } from "@/lib/interface/page-utils"
 import PageRenderer from "./PageRenderer"
 import PageSetupState from "./PageSetupState"
-import PageDisplaySettingsPanel from "./PageDisplaySettingsPanel"
+import { useRightSettingsPanelData } from "@/contexts/RightSettingsPanelDataContext"
 import { getRequiredAnchorType } from "@/lib/interface/page-types"
 import { usePageEditMode, useBlockEditMode } from "@/contexts/EditModeContext"
 import { useUIMode } from "@/contexts/UIModeContext"
@@ -65,6 +65,7 @@ function InterfacePageClientInternal({
   const { isEditing: isBlockEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(pageId)
   const { exitEditPages } = useUIMode()
   const { selectedContext, setSelectedContext } = useSelectionContext()
+  const { setData: setRightPanelData } = useRightSettingsPanelData()
   const { isRecordModalOpen } = useRecordModal()
   const { state: recordPanelState } = useRecordPanel()
   const isRecordViewOpen = isRecordModalOpen || recordPanelState.isOpen
@@ -211,6 +212,24 @@ function InterfacePageClientInternal({
       window.removeEventListener('open-page-settings', handleOpenSettings)
     }
   }, [setSelectedContext])
+
+  // Sync page data to RightSettingsPanel when page is available
+  useEffect(() => {
+    if (!page) {
+      setRightPanelData(null)
+      return
+    }
+    setRightPanelData({
+      page,
+      onPageUpdate: handlePageUpdate,
+      pageTableId,
+      blocks,
+      selectedBlock: selectedContext?.type === 'block' && selectedContext?.blockId
+        ? blocks.find((b) => b.id === selectedContext!.blockId) ?? null
+        : null,
+    })
+    return () => setRightPanelData(null)
+  }, [page?.id, page, pageTableId, blocks, selectedContext?.type, selectedContext?.blockId, setRightPanelData])
 
   // Initialize title value when page loads
   useEffect(() => {
@@ -1370,15 +1389,7 @@ function InterfacePageClientInternal({
         ) : null}
       </div>
 
-      {/* Page Display Settings Panel - Context-driven: opens when page is selected */}
-      {page && (
-        <PageDisplaySettingsPanel
-          page={page}
-          isOpen={selectedContext?.type === 'page' && !isRecordViewOpen}
-          onClose={() => setSelectedContext(null)}
-          onUpdate={handlePageUpdate}
-        />
-      )}
+      {/* Page settings now in RightSettingsPanel */}
 
     </div>
   )

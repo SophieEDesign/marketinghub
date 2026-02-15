@@ -10,7 +10,7 @@ import { useSelectionContext } from "@/contexts/SelectionContext"
 import { FilterStateProvider } from "@/lib/interface/filter-state"
 import Canvas from "./Canvas"
 import FloatingBlockPicker from "./FloatingBlockPicker"
-import SettingsPanel from "./SettingsPanel"
+import { useRightSettingsPanelData } from "@/contexts/RightSettingsPanelDataContext"
 import HorizontalGroupedCanvasModal from "./blocks/HorizontalGroupedCanvasModal"
 import type { PageBlock, LayoutItem, Page, RecordContext } from "@/lib/interface/types"
 import { BLOCK_REGISTRY } from "@/lib/interface/registry"
@@ -100,6 +100,7 @@ export default function InterfaceBuilder({
   // Context-driven editing: block selection always available when not in viewer mode
   const { enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(page.id)
   const { selectedContext, setSelectedContext } = useSelectionContext()
+  const { setData: setRightPanelData } = useRightSettingsPanelData()
   
   // Allow block selection and editing when not in viewer mode (no global edit toggle)
   const effectiveIsEditing = !isViewer
@@ -122,6 +123,21 @@ export default function InterfaceBuilder({
   useEffect(() => {
     onEditModeChange?.(effectiveIsEditing)
   }, [effectiveIsEditing, onEditModeChange])
+
+  // Sync block data to RightSettingsPanel when block is selected
+  useEffect(() => {
+    if (effectiveIsEditing && selectedContext?.type === 'block' && selectedBlock) {
+      setRightPanelData({
+        blocks,
+        selectedBlock,
+        onBlockSave: handleSaveSettings,
+        onBlockMoveToTop: handleMoveBlockToTop,
+        onBlockMoveToBottom: handleMoveBlockToBottom,
+        onBlockLock: handleLockBlock,
+        pageTableId,
+      })
+    }
+  }, [effectiveIsEditing, selectedContext?.type, selectedBlock, blocks, pageTableId, setRightPanelData])
 
   // CRITICAL: One-way gate - blocks are set from initialBlocks ONCE per pageId, then never replaced
   // After first load, initialBlocks must NEVER overwrite live state
@@ -1622,87 +1638,6 @@ export default function InterfaceBuilder({
         </div>
       </div>
 
-      {/* Settings Panel - Context-driven: opens when block is selected */}
-      {effectiveIsEditing && (
-        <SettingsPanel
-          block={selectedBlock}
-          isOpen={selectedContext?.type === 'block' && !!selectedBlock}
-          onClose={() => {
-            setSelectedContext(null)
-            // Exit block canvas editing when closing settings
-            if (editingBlockCanvasId) {
-              setEditingBlockCanvasId(null)
-            }
-          }}
-          onSave={handleSaveSettings}
-          onMoveToTop={handleMoveBlockToTop}
-          onMoveToBottom={handleMoveBlockToBottom}
-          pageTableId={pageTableId}
-          allBlocks={blocks}
-          onLock={handleLockBlock}
-          editingBlockCanvasId={editingBlockCanvasId}
-          onOpenRecordForLayoutEdit={handleOpenRecordForLayoutEdit}
-          onEditBlockCanvas={async (blockId) => {
-            // For Tabs blocks, open modal instead of inline editing
-            const block = blocks.find(b => b.id === blockId)
-            if (block?.type === 'horizontal_grouped') {
-              const tableId = block.config?.table_id || pageTableId
-              if (!tableId) {
-                toast({
-                  variant: "destructive",
-                  title: "Table not configured",
-                  description: "Please configure a table in block settings first.",
-                })
-                return
-              }
-              
-              // Load table data for modal
-              try {
-                const supabase = createClient()
-                const { data: tableData } = await supabase
-                  .from("tables")
-                  .select("supabase_table")
-                  .eq("id", tableId)
-                  .single()
-                
-                if (!tableData?.supabase_table) {
-                  toast({
-                    variant: "destructive",
-                    title: "Error",
-                    description: "Could not load table information.",
-                  })
-                  return
-                }
-                
-                // Load fields
-                const response = await fetch(`/api/tables/${tableId}/fields`)
-                const data = await response.json()
-                
-                setCanvasModalData({
-                  tableId,
-                  tableName: tableData.supabase_table,
-                  tableFields: data.fields || [],
-                })
-                setCanvasModalBlock(block)
-                setCanvasModalOpen(true)
-              } catch (error) {
-                console.error("Error loading table data for modal:", error)
-                toast({
-                  variant: "destructive",
-                  title: "Error",
-                  description: "Failed to load table data.",
-                })
-              }
-            } else {
-              // For other block types, use inline editing
-              setEditingBlockCanvasId(blockId)
-            }
-          }}
-          onExitBlockCanvas={() => {
-            setEditingBlockCanvasId(null)
-          }}
-        />
-      )}
 
       {/* Floating Block Picker - Only visible in edit mode */}
       {effectiveIsEditing && (

@@ -43,6 +43,8 @@ interface SettingsPanelProps {
   onOpenRecordForLayoutEdit?: (tableId: string) => Promise<string | null>
   /** When true, render read-only (permissions.mode === 'view') - disables all controls, no save */
   readOnly?: boolean
+  /** When true, render content only (no backdrop) for embedding in RightSettingsPanel */
+  embedded?: boolean
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -65,6 +67,7 @@ export default function SettingsPanel({
   onExitBlockCanvas,
   onOpenRecordForLayoutEdit,
   readOnly: readOnlyProp = false,
+  embedded = false,
 }: SettingsPanelProps) {
   const blockPermissionsReadOnly = block ? getBlockPermissions(block.config).mode === 'view' : false
   const readOnly = readOnlyProp || blockPermissionsReadOnly
@@ -405,15 +408,8 @@ export default function SettingsPanel({
   const blockTypeLabel = block ? BLOCK_REGISTRY[block.type]?.label || block.type : ''
   const isDataViewBlock = block && DATA_VIEW_BLOCK_TYPES.includes(block.type)
 
-  return (
-    <>
-      {/* Backdrop: click outside to close (Step 11) */}
-      <div
-        className="fixed inset-0 bg-black/20 z-40"
-        aria-hidden="true"
-        onClick={onClose}
-      />
-      <div className="fixed inset-y-0 right-0 w-96 bg-white border-l border-gray-200 shadow-xl z-50 flex flex-col">
+  const panelContent = (
+      <div className={embedded ? "w-full flex flex-col" : "fixed inset-y-0 right-0 w-96 bg-white border-l border-gray-200 shadow-xl z-50 flex flex-col"}>
       {/* Header */}
       <div className="border-b border-gray-200 px-4 py-3">
         {blockTypeLabel && (
@@ -565,6 +561,19 @@ export default function SettingsPanel({
         </div>
       </div>
     </div>
+  )
+
+  return embedded ? (
+    <div className="p-4">{panelContent}</div>
+  ) : (
+    <>
+      {/* Backdrop: click outside to close */}
+      <div
+        className="fixed inset-0 bg-black/20 z-40"
+        aria-hidden="true"
+        onClick={onClose}
+      />
+      {panelContent}
     </>
   )
 

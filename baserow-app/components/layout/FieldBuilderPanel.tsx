@@ -35,7 +35,7 @@ import { getFieldDisplayName } from "@/lib/fields/display"
 import type { TableField, FieldType, FieldOptions } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
 import FormulaEditor from "@/components/fields/FormulaEditor"
-import FieldSettingsDrawer from "./FieldSettingsDrawer"
+import { useSelectionContext } from "@/contexts/SelectionContext"
 import { getTableSections, reorderSections, upsertSectionSettings, ensureSectionExists } from "@/lib/core-data/section-settings"
 import type { SectionSettings } from "@/lib/core-data/types"
 import { ChevronUp, ChevronDown } from "lucide-react"
@@ -152,10 +152,9 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
   const [loading, setLoading] = useState(true)
   const [primaryFieldName, setPrimaryFieldName] = useState<string | null>(null)
   const [savingPrimary, setSavingPrimary] = useState(false)
-  const [editingField, setEditingField] = useState<TableField | null>(null)
   const [showNewField, setShowNewField] = useState(false)
-  const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false)
   const [sections, setSections] = useState<SectionSettings[]>([])
+  const { setSelectedContext } = useSelectionContext()
   const [loadingSections, setLoadingSections] = useState(false)
   const [reorderingSections, setReorderingSections] = useState(false)
   const [showAddSection, setShowAddSection] = useState(false)
@@ -541,7 +540,6 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
       await loadFields()
       await loadSections() // Reload sections in case section was changed
       onFieldsUpdated()
-      setEditingField(null)
     } catch (error) {
       console.error("Error updating field:", error)
       alert("Failed to update field")
@@ -816,10 +814,7 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
                       key={field.id}
                       field={field}
                       orderIndex={orderIndex + 1}
-                      onEdit={() => {
-                        setEditingField(field)
-                        setSettingsDrawerOpen(true)
-                      }}
+                      onEdit={() => setSelectedContext({ type: "field", fieldId: field.id, tableId })}
                       onDelete={() => handleDeleteField(field.id, field.name)}
                     />
                   )
@@ -841,10 +836,7 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
                       key={field.id}
                       field={field}
                       orderIndex={orderIndex + 1}
-                      onEdit={() => {
-                        setEditingField(field)
-                        setSettingsDrawerOpen(true)
-                      }}
+                      onEdit={() => setSelectedContext({ type: "field", fieldId: field.id, tableId })}
                       onDelete={() => handleDeleteField(field.id, field.name)}
                     />
                   )
@@ -855,24 +847,6 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
         </SortableContext>
       </DndContext>
 
-      <FieldSettingsDrawer
-        field={editingField}
-        open={settingsDrawerOpen}
-        onOpenChange={(open) => {
-          setSettingsDrawerOpen(open)
-          if (!open) {
-            setEditingField(null)
-          }
-        }}
-        tableId={tableId}
-        tableFields={fields}
-        sections={allSections}
-        onSave={async () => {
-          await loadFields()
-          await loadSections()
-          onFieldsUpdated()
-        }}
-      />
     </div>
   )
 })

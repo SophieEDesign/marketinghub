@@ -222,6 +222,16 @@ export default function ViewBuilderToolbar({
                 {viewName} <span className="text-gray-500 font-normal">({viewType})</span>
               </span>
             )}
+            {canManageViews && (
+              <Link
+                href={`/tables/${tableId}/views/new`}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-50 border-transparent border-b-2 -mb-[1px] shrink-0 rounded-sm"
+                title="Add new view"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Add view</span>
+              </Link>
+            )}
           </div>
         </div>
 

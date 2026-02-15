@@ -32,6 +32,8 @@ interface PageDisplaySettingsPanelProps {
   isOpen: boolean
   onClose: () => void
   onUpdate: () => void
+  /** When true, render content only (no Sheet) for embedding in RightSettingsPanel */
+  embedded?: boolean
 }
 
 interface ViewFilter {
@@ -64,6 +66,7 @@ export default function PageDisplaySettingsPanel({
   isOpen,
   onClose,
   onUpdate,
+  embedded = false,
 }: PageDisplaySettingsPanelProps) {
   const [tables, setTables] = useState<Table[]>([])
   const [tableFields, setTableFields] = useState<TableField[]>([])
@@ -531,15 +534,7 @@ export default function PageDisplaySettingsPanel({
       }
     }
 
-    return (
-      <Sheet open={isOpen} onOpenChange={onClose}>
-        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Page Settings</SheetTitle>
-            <SheetDescription>
-              Configure settings for this content page
-            </SheetDescription>
-          </SheetHeader>
+    const contentPageInner = (
           <div className="mt-6 space-y-6">
             <div className="space-y-2">
               <Label>Page Name</Label>
@@ -592,6 +587,23 @@ export default function PageDisplaySettingsPanel({
               They don&apos;t require data sources.
             </p>
           </div>
+    )
+    return embedded ? (
+      <div className="p-4 overflow-y-auto">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold">Page Settings</h2>
+          <p className="text-sm text-muted-foreground">Configure settings for this content page</p>
+        </div>
+        {contentPageInner}
+      </div>
+    ) : (
+      <Sheet open={isOpen} onOpenChange={onClose}>
+        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Page Settings</SheetTitle>
+            <SheetDescription>Configure settings for this content page</SheetDescription>
+          </SheetHeader>
+          {contentPageInner}
         </SheetContent>
       </Sheet>
     )
@@ -607,15 +619,7 @@ export default function PageDisplaySettingsPanel({
   // See docs/architecture/PAGE_TYPE_CONSOLIDATION.md
   // Record-centric pages use special page-level settings
   if (isRecordReviewPage(currentPage.page_type)) {
-    return (
-      <Sheet open={isOpen} onOpenChange={onClose}>
-        <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Record View Settings</SheetTitle>
-            <SheetDescription>
-              Configure page-level settings for this Record View. Block-specific settings are configured in the block settings panel.
-            </SheetDescription>
-          </SheetHeader>
+    const recordViewInner = (
           <div className="mt-6">
             <RecordViewPageSettings
               pageId={currentPage.id}
@@ -658,6 +662,23 @@ export default function PageDisplaySettingsPanel({
               }}
             />
           </div>
+    )
+    return embedded ? (
+      <div className="p-4 overflow-y-auto">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold">Record View Settings</h2>
+          <p className="text-sm text-muted-foreground">Configure page-level settings for this Record View.</p>
+        </div>
+        {recordViewInner}
+      </div>
+    ) : (
+      <Sheet open={isOpen} onOpenChange={onClose}>
+        <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Record View Settings</SheetTitle>
+            <SheetDescription>Configure page-level settings for this Record View. Block-specific settings are configured in the block settings panel.</SheetDescription>
+          </SheetHeader>
+          {recordViewInner}
         </SheetContent>
       </Sheet>
     )
@@ -667,17 +688,8 @@ export default function PageDisplaySettingsPanel({
   // This panel only handles basic page metadata
   const layoutOptions: Array<{ value: string; label: string }> = []
 
-  return (
-    <>
-    <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Page Display Settings</SheetTitle>
-          <SheetDescription>
-            Configure data source, filters, sorting, and display options for this page
-          </SheetDescription>
-        </SheetHeader>
-
+  const defaultPageInner = (
+        <>
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <div className="text-sm text-gray-500">Loading...</div>
@@ -1286,10 +1298,26 @@ export default function PageDisplaySettingsPanel({
             Save
           </Button>
         </div>
+        </>
+  )
+  return embedded ? (
+    <div className="p-4 overflow-y-auto">
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold">Page Display Settings</h2>
+        <p className="text-sm text-muted-foreground">Configure data source, filters, sorting, and display options for this page</p>
+      </div>
+      {defaultPageInner}
+    </div>
+  ) : (
+    <Sheet open={isOpen} onOpenChange={onClose}>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>Page Display Settings</SheetTitle>
+          <SheetDescription>Configure data source, filters, sorting, and display options for this page</SheetDescription>
+        </SheetHeader>
+        {defaultPageInner}
       </SheetContent>
-      </Sheet>
-
-    </>
+    </Sheet>
   )
 }
 

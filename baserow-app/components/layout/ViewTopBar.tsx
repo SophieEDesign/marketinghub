@@ -18,11 +18,39 @@ import {
   Settings,
   X,
   Clock,
+  MoreVertical,
+  Copy,
+  Edit,
+  Trash2,
+  Star,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { useBranding } from "@/contexts/BrandingContext"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import ViewManagementDialog from "@/components/grid/ViewManagementDialog"
 import type { TableField } from "@/types/fields"
 
 interface ViewSummary {
@@ -39,6 +67,8 @@ interface ViewTopBarProps {
   views?: ViewSummary[]
   tableFields?: TableField[]
   cardFields?: string[]
+  /** When true, show More menu (Duplicate, Rename, Delete, Set Default) and Add new view */
+  canManageViews?: boolean
   onCardLayoutChange?: (primaryField: string, secondaryField: string) => void
   onFilter?: () => void
   onSort?: () => void
@@ -49,6 +79,7 @@ interface ViewTopBarProps {
   onNewRecord?: () => void
   onSearch?: (query: string) => void
   onDesign?: () => void
+  onViewAction?: (action: "duplicate" | "rename" | "delete" | "setDefault") => void
 }
 
 export default function ViewTopBar({
@@ -59,6 +90,7 @@ export default function ViewTopBar({
   views = [],
   tableFields = [],
   cardFields = [],
+  canManageViews = true,
   onCardLayoutChange,
   onFilter,
   onSort,
@@ -69,12 +101,16 @@ export default function ViewTopBar({
   onNewRecord,
   onSearch,
   onDesign,
+  onViewAction,
 }: ViewTopBarProps) {
   const { primaryColor } = useBranding()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "")
   const [debouncedQuery, setDebouncedQuery] = useState(searchQuery)
+  const [viewManagementDialogOpen, setViewManagementDialogOpen] = useState(false)
+  const [viewManagementAction, setViewManagementAction] = useState<"rename" | "duplicate" | "delete" | null>(null)
+  const [cardLayoutDialogOpen, setCardLayoutDialogOpen] = useState(false)
 
   // Debounce search query (300ms)
   useEffect(() => {
@@ -162,6 +198,16 @@ export default function ViewTopBar({
             <span className="text-sm font-medium shrink-0 py-2.5" style={{ color: primaryColor }}>
               {viewName} <span className="text-gray-500 font-normal">({viewType})</span>
             </span>
+          )}
+          {canManageViews && tableId && (
+            <Link
+              href={`/tables/${tableId}/views/new`}
+              className="flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-50 border-transparent border-b-2 -mb-px shrink-0 rounded-sm"
+              title="Add new view"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Add view</span>
+            </Link>
           )}
         </div>
       </div>
@@ -272,6 +318,61 @@ export default function ViewTopBar({
       )}
 
       <div className="flex-1 min-w-0" />
+      {canManageViews && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0 text-gray-600 hover:bg-gray-50 shrink-0"
+            >
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {(viewType === "kanban" || viewType === "gallery") &&
+              onCardLayoutChange &&
+              tableFields.length > 0 && (
+                <>
+                  <DropdownMenuItem onClick={() => setCardLayoutDialogOpen(true)}>
+                    <Layout className="h-4 w-4 mr-2" />
+                    Customize cards
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+            <DropdownMenuItem onClick={() => {
+              setViewManagementAction("duplicate")
+              setViewManagementDialogOpen(true)
+            }}>
+              <Copy className="h-4 w-4 mr-2" />
+              Duplicate View
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => {
+              setViewManagementAction("rename")
+              setViewManagementDialogOpen(true)
+            }}>
+              <Edit className="h-4 w-4 mr-2" />
+              Rename View
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onViewAction?.("setDefault")}>
+              <Star className="h-4 w-4 mr-2" />
+              Set as Default
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => {
+                setViewManagementAction("delete")
+                setViewManagementDialogOpen(true)
+              }}
+              className="text-red-600 focus:text-red-600"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete View
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
       {onNewRecord && (
         <Button
           onClick={onNewRecord}
@@ -283,6 +384,77 @@ export default function ViewTopBar({
         </Button>
       )}
       </div>
+
+      {/* Dialogs */}
+      {viewId && tableId && (
+        <ViewManagementDialog
+          isOpen={viewManagementDialogOpen}
+          onClose={() => {
+            setViewManagementDialogOpen(false)
+            setViewManagementAction(null)
+          }}
+          viewId={viewId}
+          viewName={viewName}
+          tableId={tableId}
+          initialAction={viewManagementAction || undefined}
+          onAction={onViewAction}
+        />
+      )}
+      {(viewType === "kanban" || viewType === "gallery") &&
+        onCardLayoutChange &&
+        tableFields.length > 0 && (
+          <Dialog open={cardLayoutDialogOpen} onOpenChange={setCardLayoutDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Customize cards</DialogTitle>
+                <DialogDescription>
+                  Choose which fields appear as the primary title and secondary text on each card.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label className="text-xs">Primary title field</Label>
+                  <Select
+                    value={cardFields[0] || ""}
+                    onValueChange={(v) => onCardLayoutChange(v, cardFields[1] || "")}
+                  >
+                    <SelectTrigger className="h-8">
+                      <SelectValue placeholder="Select field" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tableFields.map((f) => (
+                        <SelectItem key={f.name} value={f.name}>
+                          {f.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Secondary field</Label>
+                  <Select
+                    value={cardFields[1] || "__none__"}
+                    onValueChange={(v) =>
+                      onCardLayoutChange(cardFields[0] || "", v === "__none__" ? "" : v)
+                    }
+                  >
+                    <SelectTrigger className="h-8">
+                      <SelectValue placeholder="Select field" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">None</SelectItem>
+                      {tableFields.map((f) => (
+                        <SelectItem key={f.name} value={f.name}>
+                          {f.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
     </div>
   )
 }
