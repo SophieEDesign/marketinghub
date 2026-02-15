@@ -26,7 +26,6 @@ import InterfaceBuilder from './InterfaceBuilder'
 import { useBlockEditMode } from '@/contexts/EditModeContext'
 import { applySearchToFilters, type FilterConfig } from '@/lib/interface/filters'
 import RecordDetailsPanel from './RecordDetailsPanel'
-import RecordFieldEditorPanel from './RecordFieldEditorPanel'
 import { useToast } from '@/components/ui/use-toast'
 import { debugLog, debugWarn, debugError, isDebugEnabled } from '@/lib/interface/debug-flags'
 import { evaluateFilterTree } from '@/lib/filters/evaluation'
@@ -34,6 +33,7 @@ import { filterConfigsToFilterTree } from '@/lib/filters/converters'
 import type { FilterTree } from '@/lib/filters/canonical-model'
 import { resolveChoiceColor, normalizeHexColor, getTextColorForBackground } from '@/lib/field-colors'
 import { convertToFieldLayout, convertFromFieldLayout, type FieldLayoutItem } from '@/lib/interface/field-layout-utils'
+import { getVisibleFieldsFromLayout } from '@/lib/interface/field-layout-helpers'
 
 interface RecordReviewViewProps {
   page: InterfacePage
@@ -638,7 +638,27 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   const editableFieldNames = useMemo(() => {
     return config.editable_fields || []
   }, [config.editable_fields])
-  
+
+  // Convert old config format to field_layout (with backward compatibility)
+  const fieldLayout = useMemo(() => {
+    if (config.field_layout && Array.isArray(config.field_layout) && config.field_layout.length > 0) {
+      return config.field_layout as FieldLayoutItem[]
+    }
+    return convertToFieldLayout(config, tableFields)
+  }, [config.field_layout, config, tableFields])
+
+  // Get fields to display in detail panel - prefer field_layout, fallback to config
+  const detailVisibleFields = useMemo(() => {
+    if (fieldLayout.length > 0 && tableFields.length > 0) {
+      return getVisibleFieldsFromLayout(fieldLayout, tableFields)
+    }
+    const visibleFieldNames = config.visible_fields || config.detail_fields || []
+    if (visibleFieldNames.length > 0) {
+      return tableFields.filter(f => visibleFieldNames.includes(f.name))
+    }
+    return tableFields
+  }, [fieldLayout, tableFields, config.visible_fields, config.detail_fields])
+
   // Get fields to display in structured field list (page-level config)
   // Uses config.visible_fields (new) or config.detail_fields (backward compatibility)
   const visibleFields = useMemo(() => {
@@ -676,18 +696,6 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     // Otherwise, check if field is in the editable list
     return editableFieldNames.includes(fieldName)
   }, [pageEditable, editableFieldNames])
-  
-  // Layout toggles (page-level)
-  const showFieldList = config.show_field_list !== false // Default to true
-
-  // Convert old config format to field_layout (with backward compatibility)
-  const fieldLayout = useMemo(() => {
-    if (config.field_layout && Array.isArray(config.field_layout) && config.field_layout.length > 0) {
-      return config.field_layout as FieldLayoutItem[]
-    }
-    // Convert from old format
-    return convertToFieldLayout(config, tableFields)
-  }, [config.field_layout, config, tableFields])
 
   // Handle field layout changes
   const handleFieldLayoutChange = useCallback(async (newLayout: FieldLayoutItem[]) => {
@@ -1133,20 +1141,30 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
         </div>
       </div>
 
-      {/* Right Panel - Full Field Editor (Airtable-style) */}
-      {showFieldList && (
-        <div className="w-96 border-l border-gray-200 bg-white flex flex-col">
-          <RecordFieldEditorPanel
-            tableId={pageTableId || ''}
-            recordId={selectedRecordId}
-            allFields={tableFields}
-            fieldLayout={fieldLayout}
-            onFieldLayoutChange={handleFieldLayoutChange}
-            onFieldChange={handleFieldChange}
-            pageEditable={pageEditable}
-          />
-        </div>
-      )}
+      {/* Center Panel - Record Details (layout editing moved here from removed right panel) */}
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <RecordDetailsPanel
+          record={selectedRecord}
+          tableId={pageTableId || ''}
+          recordId={selectedRecordId}
+          tableName={tableName}
+          fields={tableFields}
+          formData={formData}
+          fieldGroups={fieldGroups}
+          visibleFields={detailVisibleFields}
+          pageEditable={pageEditable}
+          editableFieldNames={editableFieldNames}
+          titleField={config.title_field || config.left_panel?.title_field}
+          onFieldChange={handleFieldChange}
+          onRecordDelete={handleRecordDelete}
+          onRecordDuplicate={handleRecordDuplicate}
+          loading={isLoading}
+          blocks={loadedBlocks}
+          page={{ ...page, config } as any}
+          pageTableId={pageTableId}
+          blocksLoading={blocksLoading}
+        />
+      </div>
     </div>
   )
 }

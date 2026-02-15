@@ -16,6 +16,9 @@ import { getRequiredAnchorType } from "@/lib/interface/page-types"
 import { usePageEditMode, useBlockEditMode } from "@/contexts/EditModeContext"
 import { useUIMode } from "@/contexts/UIModeContext"
 import { useMainScroll } from "@/contexts/MainScrollContext"
+import { useSelectionContext } from "@/contexts/SelectionContext"
+import { useRecordModal } from "@/contexts/RecordModalContext"
+import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { VIEWS_ENABLED } from "@/lib/featureFlags"
 import { toPostgrestColumn } from "@/lib/supabase/postgrest"
 import { normalizeUuid } from "@/lib/utils/ids"
@@ -60,11 +63,14 @@ function InterfacePageClientInternal({
   // Use unified editing context (block scope kept in sync with UIMode editPages)
   const { isEditing: isPageEditing, enter: enterPageEdit, exit: exitPageEdit } = usePageEditMode(pageId)
   const { isEditing: isBlockEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(pageId)
-  const { uiMode, enterEditPages, exitEditPages, exitRecordLayoutEdit, exitFieldSchemaEdit } = useUIMode()
-  
+  const { exitEditPages } = useUIMode()
+  const { selectedContext, setSelectedContext } = useSelectionContext()
+  const { isRecordModalOpen } = useRecordModal()
+  const { state: recordPanelState } = useRecordPanel()
+  const isRecordViewOpen = isRecordModalOpen || recordPanelState.isOpen
+
   const [blocks, setBlocks] = useState<any[]>([])
   const [blocksLoading, setBlocksLoading] = useState(false)
-  const [displaySettingsOpen, setDisplaySettingsOpen] = useState(false)
   const [dataLoading, setDataLoading] = useState(false)
   const [pageTableId, setPageTableId] = useState<string | null>(null)
 
@@ -106,10 +112,11 @@ function InterfacePageClientInternal({
         // DO NOT call setBlocks([]) - this causes flicker
         blocksLoadedRef.current = { pageId: currentPageId || '', loaded: false }
         
-        // CRITICAL: Exit edit modes when navigating to a different page
+        // CRITICAL: Exit edit modes and clear selection when navigating to a different page
         exitPageEdit()
         exitBlockEdit()
         exitEditPages()
+        setSelectedContext(null)
       })
     } else if (previousPageIdRef.current === null && currentPageId) {
       // First load - just set the ref, don't clear blocks
@@ -127,7 +134,7 @@ function InterfacePageClientInternal({
     if (currentPageId) {
       previousPageIdRef.current = currentPageId
     }
-  }, [page?.id, exitPageEdit, exitBlockEdit, exitEditPages, blocks.length])
+  }, [page?.id, exitPageEdit, exitBlockEdit, exitEditPages, setSelectedContext, blocks.length])
   
   // Inline title editing state
   const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -181,9 +188,10 @@ function InterfacePageClientInternal({
       previousPageIdRef.current = null
       exitPageEdit()
       exitBlockEdit()
+      setSelectedContext(null)
     }
     previousRoutePageIdRef.current = pageId
-  }, [pageId, exitPageEdit, exitBlockEdit])
+  }, [pageId, exitPageEdit, exitBlockEdit, setSelectedContext])
 
   useEffect(() => {
     // CRITICAL: Only load if we don't have initial page and haven't loaded yet
@@ -193,16 +201,16 @@ function InterfacePageClientInternal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageId])
 
-  // Listen for custom event to open settings panel
+  // Listen for custom event to open settings panel (context-driven)
   useEffect(() => {
     const handleOpenSettings = () => {
-      setDisplaySettingsOpen(true)
+      setSelectedContext({ type: 'page' })
     }
     window.addEventListener('open-page-settings', handleOpenSettings)
     return () => {
       window.removeEventListener('open-page-settings', handleOpenSettings)
     }
-  }, [])
+  }, [setSelectedContext])
 
   // Initialize title value when page loads
   useEffect(() => {
@@ -1105,6 +1113,20 @@ function InterfacePageClientInternal({
     mainScroll.setSuppressMainScroll(!!isFullPage)
   }, [mainScroll, page?.page_type, blocks])
 
+  // Register page actions for sidebar BaseDropdown (context-driven: page settings on selection)
+  const { registerPageActions, unregisterPageActions } = usePageActions()
+  const handleOpenPageSettings = useCallback(() => setSelectedContext({ type: 'page' }), [setSelectedContext])
+
+  useEffect(() => {
+    const isViewer = searchParams?.get("view") === "true"
+    if (!isViewer && page && isAdmin) {
+      registerPageActions({
+        onOpenPageSettings: handleOpenPageSettings,
+      })
+    }
+    return () => unregisterPageActions()
+  }, [searchParams, page, isAdmin, handleOpenPageSettings, registerPageActions, unregisterPageActions])
+
   // ALWAYS render UI - never return null or redirect
   if (loading && !page) {
     return <div className="h-screen flex items-center justify-center">Loading interface page...</div>
@@ -1130,15 +1152,9 @@ function InterfacePageClientInternal({
   // Edit page behavior - UNIFIED: Always enter block editing mode
   const handleEditClick = () => {
     if (!page) return
-    
+
     // UNIFIED: All pages use block editing mode
     enterBlockEdit()
-  }
-  
-  // Handler to open page settings drawer
-  const handleOpenPageSettings = () => {
-    // Use PageDisplaySettingsPanel for all pages (it handles Record View pages with RecordViewPageSettings)
-    setDisplaySettingsOpen(true)
   }
 
   async function handlePageUpdate() {
@@ -1205,41 +1221,6 @@ function InterfacePageClientInternal({
     setTitleValue(page?.name || "")
   }
 
-  const handleDoneEditingInterface = () => {
-    exitEditPages()
-    exitBlockEdit()
-    router.refresh()
-    if (page) loadBlocks(true)
-  }
-
-  const handleExitToView = () => {
-    if (uiMode === "editPages") handleDoneEditingInterface()
-    else if (uiMode === "recordLayoutEdit") exitRecordLayoutEdit()
-    else if (uiMode === "fieldSchemaEdit") exitFieldSchemaEdit()
-  }
-
-  const handleEnterEditPages = () => {
-    if (page?.id) {
-      enterEditPages(page.id)
-      enterBlockEdit()
-    }
-  }
-
-  // Register page actions for sidebar BaseDropdown (admin only, when on interface page)
-  const { registerPageActions, unregisterPageActions } = usePageActions()
-  const handlersRef = useRef({ handleEnterEditPages, handleExitToView, handleOpenPageSettings })
-  handlersRef.current = { handleEnterEditPages, handleExitToView, handleOpenPageSettings }
-  useEffect(() => {
-    if (!isViewer && page && isAdmin) {
-      registerPageActions({
-        onEnterEdit: () => handlersRef.current.handleEnterEditPages(),
-        onExitEdit: () => handlersRef.current.handleExitToView(),
-        onOpenPageSettings: () => handlersRef.current.handleOpenPageSettings(),
-      })
-    }
-    return () => unregisterPageActions()
-  }, [isViewer, page, isAdmin, registerPageActions, unregisterPageActions])
-
   return (
     <div className={`h-screen flex flex-col ${!useRecordReviewLayout ? "overflow-hidden" : ""}`}>
       {/* Header with Edit Button - Admin Only */}
@@ -1273,30 +1254,6 @@ function InterfacePageClientInternal({
                 >
                   {page.name}
                 </h1>
-                {uiMode === "editPages" && (
-                  <span
-                    className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 border border-yellow-200 rounded flex-shrink-0"
-                    title="You are editing this interface (layout + block settings)"
-                  >
-                    Editing
-                  </span>
-                )}
-                {uiMode === "recordLayoutEdit" && (
-                  <span
-                    className="text-xs px-2 py-1 bg-blue-100 text-blue-800 border border-blue-200 rounded flex-shrink-0"
-                    title="Customizing record layout"
-                  >
-                    Customizing layout
-                  </span>
-                )}
-                {uiMode === "fieldSchemaEdit" && (
-                  <span
-                    className="text-xs px-2 py-1 bg-gray-100 text-gray-700 border border-gray-200 rounded flex-shrink-0"
-                    title="Editing field settings"
-                  >
-                    Editing fields
-                  </span>
-                )}
                 {page.updated_at && (
                   <span className="text-xs text-gray-500 flex-shrink-0" suppressHydrationWarning>
                     Updated {formatDateUK(page.updated_at)}
@@ -1328,13 +1285,9 @@ function InterfacePageClientInternal({
         </div>
       )}
 
-      {/* Content Area - subtle tint when in any edit mode for visual clarity */}
+      {/* Content Area */}
       {/* CRITICAL: min-h-0 allows flex child to shrink so full-page content doesn't force page scroll */}
-      <div
-        className={`flex-1 overflow-hidden min-w-0 min-h-0 w-full transition-colors ${
-          uiMode !== "view" ? "bg-gray-100/40" : ""
-        }`}
-      >
+      <div className="flex-1 overflow-hidden min-w-0 min-h-0 w-full">
         {/* CRITICAL: Always render the same component tree to prevent remount storms */}
         {/* Show loading/error states as overlays, not separate trees */}
         {loading && !page ? (
@@ -1363,7 +1316,7 @@ function InterfacePageClientInternal({
                 key={page.id}
                 page={page as any}
                 initialBlocks={memoizedBlocks}
-                isViewer={isViewer || !isBlockEditing}
+                isViewer={isViewer}
                 hideHeader={true}
                 onLayoutSave={
                   page?.page_type === "record_view"
@@ -1401,7 +1354,7 @@ function InterfacePageClientInternal({
                     // CRITICAL: Respect both URL-based viewer mode and edit mode state
                     // URL-based viewer mode takes precedence (force read-only)
                     // Otherwise, viewer mode = not in block editing mode
-                    isViewer={isViewer || !isBlockEditing}
+                    isViewer={isViewer}
                     hideHeader={true}
                     pageTableId={pageTableId}
                     recordId={recordContext?.recordId ?? null}
@@ -1417,12 +1370,12 @@ function InterfacePageClientInternal({
         ) : null}
       </div>
 
-      {/* Page Display Settings Panel - For all pages (uses RecordViewPageSettings for record_view/record_review) */}
+      {/* Page Display Settings Panel - Context-driven: opens when page is selected */}
       {page && (
         <PageDisplaySettingsPanel
           page={page}
-          isOpen={displaySettingsOpen}
-          onClose={() => setDisplaySettingsOpen(false)}
+          isOpen={selectedContext?.type === 'page' && !isRecordViewOpen}
+          onClose={() => setSelectedContext(null)}
           onUpdate={handlePageUpdate}
         />
       )}

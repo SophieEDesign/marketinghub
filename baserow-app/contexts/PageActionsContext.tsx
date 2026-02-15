@@ -3,8 +3,6 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from "react"
 
 export interface PageActions {
-  onEnterEdit: () => void
-  onExitEdit: () => void
   onOpenPageSettings: () => void
 }
 

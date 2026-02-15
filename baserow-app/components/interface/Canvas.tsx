@@ -191,7 +191,7 @@ interface CanvasProps {
   onLayoutChange?: (layout: LayoutItem[]) => void
   onBlockUpdate?: (blockId: string, config: Partial<PageBlock["config"]>) => void
   onBlockClick?: (blockId: string) => void
-  onBlockSettingsClick?: (blockId: string) => void
+  onCanvasClick?: () => void
   onBlockDelete?: (blockId: string) => void
   onBlockDuplicate?: (blockId: string) => void
   onBlockMoveToTop?: (blockId: string) => void
@@ -233,7 +233,7 @@ export default function Canvas({
   onLayoutChange,
   onBlockUpdate,
   onBlockClick,
-  onBlockSettingsClick,
+  onCanvasClick,
   onBlockDelete,
   onBlockDuplicate,
   onBlockMoveToTop,
@@ -1914,6 +1914,13 @@ export default function Canvas({
         ref={containerRef}
         className={`w-full h-full min-w-0 relative ${isFullPageMode ? "overflow-hidden" : ""}`}
         style={isFullPageMode ? undefined : { paddingBottom: isEditing ? "80px" : "80px" }}
+        onClick={(e) => {
+          // Context-driven: clicking empty canvas selects page (opens page settings)
+          // Blocks use stopPropagation, so only empty-area clicks reach here
+          if (onCanvasClick && isEditing) {
+            onCanvasClick()
+          }
+        }}
       >
         {isFullPageMode && fullPageBlock ? (
           /* Full-page: fixed viewport, no chrome, no scroll on wrapper. Rail = left fixed-width + right (preview or empty); fill = single column. */
@@ -1937,29 +1944,16 @@ export default function Canvas({
                         const isEditorContent = target.closest(".ql-editor") || target.closest("textarea") || target.closest("input") ||
                           target.closest('[contenteditable="true"]') || target.closest("button") || target.closest(".ql-toolbar") ||
                           target.closest('[role="textbox"]') || target.closest(".ql-container") || target.closest(".ql-snow")
-                        if (!isEditorContent && onBlockSelect) onBlockSelect(fullPageBlock.id, false)
-                        else if (!isEditorContent) onBlockClick?.(fullPageBlock.id)
+                        if (!isEditorContent) {
+                          e.stopPropagation() // Prevent canvas click (page settings) from firing
+                          if (onBlockSelect) onBlockSelect(fullPageBlock.id, false)
+                          else onBlockClick?.(fullPageBlock.id)
+                        }
                       }
                     }}
                   >
                     {isEditing && (
                       <div className={`absolute top-2 right-2 z-20 flex items-center gap-1.5 ${selectedBlockId === fullPageBlock.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            onBlockClick?.(fullPageBlock.id)
-                            onBlockSettingsClick?.(fullPageBlock.id)
-                          }}
-                          className="p-1.5 rounded-md shadow-sm bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"
-                          title="Configure block"
-                          aria-label="Configure block"
-                        >
-                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                        </button>
                         {onBlockDuplicate && (
                           <button
                             type="button"
@@ -2060,22 +2054,6 @@ export default function Canvas({
               >
                 {isEditing && (
                   <div className={`absolute top-2 right-2 z-20 flex items-center gap-1.5 ${selectedBlockId === fullPageBlock.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onBlockClick?.(fullPageBlock.id)
-                        onBlockSettingsClick?.(fullPageBlock.id)
-                      }}
-                      className="p-1.5 rounded-md shadow-sm bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"
-                      title="Configure block"
-                      aria-label="Configure block"
-                    >
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                    </button>
                     {onBlockDuplicate && (
                       <button
                         type="button"
@@ -2615,6 +2593,7 @@ export default function Canvas({
                     // Only select block if not clicking editor content
                     // This prevents settings panel from opening when clicking inside text blocks
                     if (!isEditorContent) {
+                      e.stopPropagation() // Prevent canvas click (page settings) from firing
                       // Support multi-select with Cmd/Ctrl or Shift
                       if (onBlockSelect) {
                         const addToSelection = e.metaKey || e.ctrlKey || e.shiftKey
@@ -2668,26 +2647,6 @@ export default function Canvas({
                 <div className={`absolute top-2 right-2 z-20 flex items-center gap-1.5 transition-all duration-200 ${
                   (selectedBlockId === block.id || (selectedBlockIds && selectedBlockIds.has(block.id))) ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                 }`}>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      e.preventDefault()
-                      onBlockClick?.(block.id)
-                      onBlockSettingsClick?.(block.id)
-                    }}
-                    className={`p-1.5 rounded-md shadow-sm transition-all duration-150 ${
-                      (selectedBlockId === block.id || (selectedBlockIds && selectedBlockIds.has(block.id)))
-                        ? "bg-blue-600 text-white hover:bg-blue-700"
-                        : "bg-white text-gray-600 border border-gray-300 hover:bg-gray-50 hover:border-gray-400"
-                    }`}
-                    title="Configure block"
-                    aria-label="Configure block"
-                  >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </button>
                   {onBlockDelete && (
                     <>
                       {onBlockDuplicate && (

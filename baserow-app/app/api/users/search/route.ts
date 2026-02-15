@@ -28,11 +28,11 @@ export async function GET(request: NextRequest) {
       .limit(10)
 
     if (error) {
-      console.warn("User search fallback - profiles:", error)
+      console.warn("User search fallback - user_profile_sync_status:", error)
       return NextResponse.json({ users: [] })
     }
 
-    const users = profiles.map((r: { user_id: string; email: string | null }) => ({
+    const users = (rows ?? []).map((r: { user_id: string; email: string | null }) => ({
       user_id: r.user_id,
       email: r.email ?? "",
       display_name: formatUserDisplayName(r.email ?? null),

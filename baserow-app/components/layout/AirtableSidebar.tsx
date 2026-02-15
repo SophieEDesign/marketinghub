@@ -17,7 +17,6 @@ import {
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useBranding } from "@/contexts/BrandingContext"
-import { useUIMode } from "@/contexts/UIModeContext"
 import { usePageActions } from "@/contexts/PageActionsContext"
 import RecentsFavoritesSection from "./RecentsFavoritesSection"
 import BaseDropdown from "./BaseDropdown"
@@ -64,7 +63,6 @@ export default function AirtableSidebar({
   const pathname = usePathname()
   const router = useRouter()
   const { brandName, logoUrl, primaryColor, sidebarColor, sidebarTextColor } = useBranding()
-  const { uiMode } = useUIMode()
   const { pageActions } = usePageActions()
   const isMobile = useIsMobile()
   const previousPathnameRef = useRef<string | null>(null)
@@ -97,8 +95,8 @@ export default function AirtableSidebar({
   const isCollapsed = isMobile ? !isOpen : internalCollapsed
   
   const isAdmin = userRole === 'admin'
-  // Edit pages is now driven by page toolbar "Edit Pages" button (UIMode), not sidebar
-  const isEditMode = uiMode === "editPages"
+  // Context-driven editing: no global edit mode; sidebar page reorder disabled for now
+  const isEditMode = false
 
   const isInterfacePage = pathname.includes("/pages/")
   const isSettings = pathname.includes("/settings")
@@ -210,9 +208,6 @@ export default function AirtableSidebar({
             variant="sidebar"
             className="flex items-center gap-2 font-semibold h-auto py-1 px-0 bg-transparent hover:bg-black/10 border-0 shadow-none text-left min-w-0"
             triggerStyle={{ color: sidebarTextColor }}
-            onEnterEdit={pageActions?.onEnterEdit}
-            onExitEdit={pageActions?.onExitEdit}
-            isEditMode={uiMode !== "view"}
             onOpenPageSettings={pageActions?.onOpenPageSettings}
           />
         </div>

@@ -30,6 +30,7 @@ import {
 } from "@/lib/interface/field-layout-helpers"
 import { isAbortError } from "@/lib/api/error-handling"
 import { resolveRecordEditMode } from "@/lib/interface/resolve-record-edit-mode"
+import { useFieldSettings } from "@/contexts/FieldSettingsContext"
 
 interface RecordDetailPanelInlineProps {
   pageId: string
@@ -58,6 +59,7 @@ export default function RecordDetailPanelInline({
 }: RecordDetailPanelInlineProps) {
   const { toast } = useToast()
   const { role } = useUserRole()
+  const { openFieldSettings } = useFieldSettings()
   const [record, setRecord] = useState<Record<string, any> | null>(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -274,6 +276,11 @@ export default function RecordDetailPanelInline({
     }
   }, [forcedEditMode])
 
+  const handleFieldLabelClick = useCallback((fieldId: string) => {
+    if (isEditingLayout || !tableId) return
+    openFieldSettings(fieldId, tableId, !pageEditable)
+  }, [isEditingLayout, tableId, pageEditable, openFieldSettings])
+
   const handleStartEditLayout = useCallback(() => {
     setManualEditMode(true)
     if (resolvedFieldLayout.length === 0 && fields.length > 0) {
@@ -329,7 +336,7 @@ export default function RecordDetailPanelInline({
         <div className="flex items-center gap-2">
           {isEditingLayout ? (
             <>
-              {/* Layout mode: Show Done/Cancel only */}
+              {/* Layout mode: Done only (plan Step 9 - layout applies instantly, no Cancel) */}
               <button
                 type="button"
                 onClick={handleDoneEditLayout}
@@ -339,28 +346,19 @@ export default function RecordDetailPanelInline({
                 <Check className="h-4 w-4" />
                 Done
               </button>
-              <button
-                type="button"
-                onClick={handleCancelEditLayout}
-                disabled={saving}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium border border-gray-300 bg-white hover:bg-gray-50"
-              >
-                <X className="h-4 w-4" />
-                Cancel
-              </button>
             </>
           ) : (
             <>
-              {/* View mode: Show Edit layout button if allowed */}
+              {/* View mode: Customize layout button if allowed */}
               {showEditLayoutButton && (
                 <button
                   type="button"
                   onClick={handleStartEditLayout}
                   className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium bg-muted hover:bg-muted/80 text-muted-foreground"
-                  title="Edit layout"
+                  title="Customize layout"
                 >
                   <LayoutGrid className="h-4 w-4" />
-                  Edit layout
+                  Customize layout
                 </button>
               )}
             </>
@@ -387,6 +385,7 @@ export default function RecordDetailPanelInline({
             onFieldVisibilityToggle={handleFieldVisibilityToggle}
             onFieldLayoutChange={handleFieldLayoutChange}
             pageEditable={pageEditable}
+            onFieldLabelClick={handleFieldLabelClick}
           />
         ) : (
           <div className="flex flex-col items-center justify-center py-12 text-center text-gray-500">

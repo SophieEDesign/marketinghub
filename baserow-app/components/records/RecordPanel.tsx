@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { X, Pin, PinOff, Maximize2, Minimize2, Copy, Trash2, Copy as CopyIcon, ChevronLeft, Pencil, Check } from "lucide-react"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
+import { useFieldSettings } from "@/contexts/FieldSettingsContext"
 import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/components/ui/use-toast"
 import RecordHeader from "./RecordHeader"
@@ -23,6 +24,7 @@ const DEFAULT_WIDTH = 480
 
 export default function RecordPanel() {
   const { state, closeRecord, setWidth, togglePin, toggleFullscreen, goBack, navigateToLinkedRecord } = useRecordPanel()
+  const { openFieldSettings } = useFieldSettings()
   const onRecordDeleted = state.onRecordDeleted
   const { toast } = useToast()
   const router = useRouter()
@@ -268,6 +270,12 @@ export default function RecordPanel() {
     // RecordFields component uses field.group_name directly from the fields array
   }
 
+  const isViewOnly = (cascadeContext?.blockConfig as any)?.permissions?.mode === 'view' || (cascadeContext?.pageConfig as any)?.permissions?.mode === 'view'
+  const handleFieldLabelClick = useCallback((fieldId: string) => {
+    if (!state.tableId) return
+    openFieldSettings(fieldId, state.tableId, isViewOnly)
+  }, [state.tableId, openFieldSettings, isViewOnly])
+
   const handleFieldChange = useCallback(async (fieldName: string, value: any) => {
     if (!state.recordId || !state.tableName || !effectiveAllowEdit) return
 
@@ -374,9 +382,8 @@ export default function RecordPanel() {
     }
   }, [state.isFullscreen, router, goBack])
 
-  // P2 FIX: Don't render if not open (but keep in DOM for flex layout participation)
-  // On mobile or fullscreen, use overlay behavior; otherwise use inline flex layout
-  const useOverlayLayout = isMobile || state.isFullscreen
+  // Context-driven: RecordPanel always overlays (never pushes layout)
+  const useOverlayLayout = true
 
   const headerLoading = recordLoading || !fieldsLoaded || fieldsLoading
   // Safe hasRecord: only true when load completed with data. Avoids transient formData emptiness
@@ -603,6 +610,7 @@ export default function RecordPanel() {
                 recordId={state.recordId || ""}
                 tableName={state.tableName || undefined}
                 isFieldEditable={() => effectiveAllowEdit}
+                onFieldLabelClick={handleFieldLabelClick}
               />
 
               {/* Activity Section */}

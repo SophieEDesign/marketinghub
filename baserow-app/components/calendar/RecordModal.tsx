@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { ArrowLeft, Save, Trash2, ChevronDown, ChevronRight, Check, LayoutGrid } from 'lucide-react'
+import { ArrowLeft, Save, Trash2, ChevronDown, ChevronRight, Check, LayoutGrid, X } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import type { TableField } from '@/types/fields'
 import FieldEditor from '@/components/fields/FieldEditor'
 import RecordFields from '@/components/records/RecordFields'
+import RecordComments from '@/components/records/RecordComments'
 import { useToast } from '@/components/ui/use-toast'
 import { isAbortError } from '@/lib/api/error-handling'
 import type { BlockConfig } from '@/lib/interface/types'
@@ -26,7 +27,9 @@ import {
   convertModalFieldsToFieldLayout,
   createInitialFieldLayout,
 } from '@/lib/interface/field-layout-helpers'
-import { resolveRecordEditMode } from '@/lib/interface/resolve-record-edit-mode'
+import { getPrimaryFieldName } from '@/lib/fields/primary'
+import { useFieldSettings } from '@/contexts/FieldSettingsContext'
+import { useSelectionContext } from '@/contexts/SelectionContext'
 
 export interface RecordModalProps {
   open: boolean
@@ -51,8 +54,10 @@ export interface RecordModalProps {
   onLayoutSave?: (fieldLayout: FieldLayoutItem[]) => void
   /** When true, modal opens directly in layout edit mode */
   initialEditMode?: boolean
-  /** Interface mode: 'view' | 'edit'. When 'edit', modal opens in layout edit mode (Airtable-style). */
+  /** Interface mode: 'view' | 'edit'. When 'edit', show "Customize layout" button (Airtable-style). */
   interfaceMode?: 'view' | 'edit'
+  /** When true, show comments area in footer. Default: true for existing records. */
+  showComments?: boolean
 }
 
 const DEFAULT_SECTION_NAME = "General"
@@ -79,33 +84,26 @@ export default function RecordModal({
   onLayoutSave,
   initialEditMode = false,
   interfaceMode = 'view',
+  showComments = true,
 }: RecordModalProps) {
   const { toast } = useToast()
-  
-  // P1 FIX: interfaceMode === 'edit' is ABSOLUTE - no manual overrides allowed
-  // When interfaceMode === 'edit', editing is forced (derived value, cannot be disabled)
-  // When interfaceMode === 'view', allow manual toggle via state
-  const forcedEditMode = resolveRecordEditMode({ interfaceMode, initialEditMode })
+  const { openFieldSettings } = useFieldSettings()
+  const { setSelectedContext } = useSelectionContext()
+
+  // Layout edit: user-triggered only via "Customize layout" (no auto-enter from interfaceMode)
   const [manualEditMode, setManualEditMode] = useState(false)
-  
-  // P1 FIX: When forcedEditMode is true, ignore manualEditMode (no hybrid states)
-  // Combined edit mode: forced OR manual (but forced takes absolute precedence)
-  const isEditingLayout = forcedEditMode || (!forcedEditMode && manualEditMode)
+  const isEditingLayout = initialEditMode || manualEditMode
   
   // Track draft layout for editing
   const [draftFieldLayout, setDraftFieldLayout] = useState<FieldLayoutItem[] | null>(null)
 
-  // P1 FIX: Reset edit state when modal closes OR when interfaceMode changes to 'edit'
-  // When interfaceMode === 'edit', manual edit modes must be disabled (forced edit takes precedence)
+  // Reset layout edit state when modal closes
   useEffect(() => {
     if (!open) {
       setManualEditMode(false)
       setDraftFieldLayout(null)
-    } else if (forcedEditMode) {
-      // When forced edit mode is active, disable manual edit mode (no override allowed)
-      setManualEditMode(false)
     }
-  }, [open, forcedEditMode])
+  }, [open])
 
   const core = useRecordEditorCore({
     tableId,
@@ -143,10 +141,22 @@ export default function RecordModal({
   } = core
 
   const canSave = recordId ? canEditRecords : canCreateRecords
-  // P1 FIX: When interfaceMode === 'edit', ALWAYS allow editing (absolute authority, bypasses all checks)
-  // When interfaceMode === 'view', require permission checks
-  // NO EXCEPTIONS: If forcedEditMode is true, editing is always allowed
-  const effectiveEditable = forcedEditMode ? true : canSave
+  const effectiveEditable = canSave
+
+  // Permissions: hide "Customize layout" when permissions.mode === 'view'
+  const permissions = (cascadeContext?.blockConfig as any)?.permissions ?? (cascadeContext?.pageConfig as any)?.permissions ?? {}
+  const isViewOnly = permissions.mode === 'view'
+  const canShowCustomizeLayout = !isViewOnly && interfaceMode === 'edit' && canEditLayout && Boolean(onLayoutSave) && Boolean(recordId) && !isEditingLayout
+
+  // Record title for header (primary field value or fallback)
+  const recordTitle = useMemo(() => {
+    if (!recordId || !formData) return null
+    const primaryName = getPrimaryFieldName(filteredFields)
+    if (primaryName && formData[primaryName] != null && formData[primaryName] !== '') {
+      return String(formData[primaryName])
+    }
+    return null
+  }, [recordId, formData, filteredFields])
 
   // Convert modalLayout/modalFields to field_layout format (backward compatibility)
   const resolvedFieldLayout = useMemo(() => {
@@ -280,9 +290,6 @@ export default function RecordModal({
     }
   }
 
-  // Show "Edit layout" button only when NOT in interface edit mode (Airtable-style)
-  // Edit layout button only visible when interfaceMode === 'edit' (plan: no layout editor in view mode)
-  const showEditLayoutButton = interfaceMode === 'edit' && canEditLayout && Boolean(onLayoutSave) && Boolean(recordId) && !isEditingLayout
 
   // CRITICAL: Initialize draftFieldLayout when entering edit mode.
   // Only initialise after table fields are available (never with empty field list due to loading).
@@ -327,20 +334,9 @@ export default function RecordModal({
   const handleDoneEditLayout = useCallback(() => {
     if (!onLayoutSave || draftFieldLayout === null || !canEditLayout) return
     onLayoutSave(draftFieldLayout)
-    // Only exit edit mode if not forced by interfaceMode
-    if (!forcedEditMode) {
-      setManualEditMode(false)
-    }
+    setManualEditMode(false)
     setDraftFieldLayout(null)
-  }, [onLayoutSave, canEditLayout, draftFieldLayout, forcedEditMode])
-
-  const handleCancelEditLayout = useCallback(() => {
-    // Only allow canceling if not forced by interfaceMode
-    if (!forcedEditMode) {
-      setManualEditMode(false)
-      setDraftFieldLayout(null)
-    }
-  }, [forcedEditMode])
+  }, [onLayoutSave, canEditLayout, draftFieldLayout])
 
   const handleFieldLayoutChange = useCallback((newLayout: FieldLayoutItem[]) => {
     if (isEditingLayout) {
@@ -365,6 +361,12 @@ export default function RecordModal({
 
     setDraftFieldLayout(updatedLayout)
   }, [draftFieldLayout])
+
+  const handleFieldLabelClick = useCallback((fieldId: string) => {
+    if (isEditingLayout) return // Disable schema editing in layout mode (plan Step 5)
+    setSelectedContext({ type: "field", fieldId, tableId })
+    openFieldSettings(fieldId, tableId, isViewOnly)
+  }, [isEditingLayout, openFieldSettings, setSelectedContext, tableId, isViewOnly])
 
   const handleFieldVisibilityToggle = useCallback((fieldName: string, visible: boolean) => {
     if (draftFieldLayout === null) return
@@ -448,64 +450,63 @@ export default function RecordModal({
   return (
     <Dialog open={open} onOpenChange={onClose} key={`record-modal-${recordId || 'new'}-${interfaceMode}`}>
       <DialogContent className={isEditingLayout ? "max-w-7xl max-h-[90vh] flex flex-col p-0" : "max-w-2xl max-h-[90vh] flex flex-col p-0"}>
-        {/* Sticky top bar with save button */}
+        {/* Header: Back, Title, Customize layout (when allowed), Close */}
         <div className="sticky top-0 z-10 bg-white border-b px-6 py-3 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             <Button
               variant="ghost"
               size="sm"
               onClick={onClose}
-              className="h-8 w-8 p-0"
+              className="h-8 w-8 p-0 flex-shrink-0"
+              aria-label="Back"
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <DialogTitle className="text-lg font-semibold">
-              {recordId ? 'Record Details' : 'Create New Record'}
+            <DialogTitle className="text-lg font-semibold truncate">
+              {recordId ? (recordTitle || 'Record Details') : 'Create New Record'}
             </DialogTitle>
+            {canShowCustomizeLayout && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleStartEditLayout}
+                className="inline-flex items-center gap-1.5 flex-shrink-0"
+                aria-label="Customize layout"
+                title="Customize layout"
+              >
+                <LayoutGrid className="h-4 w-4" />
+                Customize layout
+              </Button>
+            )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             {isEditingLayout ? (
               <>
-                {/* Layout mode: show Done/Cancel for layout only; hide record actions */}
                 <Button
                   type="button"
                   variant="default"
                   size="sm"
                   onClick={handleDoneEditLayout}
                   className="inline-flex items-center gap-1.5"
-                  aria-label="Save layout"
-                  title="Save layout"
+                  aria-label="Done"
+                  title="Done"
                 >
                   <Check className="h-4 w-4" />
                   Done
                 </Button>
                 <Button
-                  type="button"
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  onClick={handleCancelEditLayout}
-                  aria-label="Cancel layout edit"
-                  title="Cancel"
+                  onClick={onClose}
+                  className="h-8 w-8 p-0"
+                  aria-label="Close"
                 >
-                  Cancel
+                  <X className="h-4 w-4" />
                 </Button>
               </>
             ) : (
               <>
-                {showEditLayoutButton && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleStartEditLayout}
-                    className="inline-flex items-center gap-1.5"
-                    aria-label="Edit layout"
-                    title="Edit layout"
-                  >
-                    <LayoutGrid className="h-4 w-4" />
-                    Edit layout
-                  </Button>
-                )}
                 {recordId && (
                   <Button
                     variant="destructive"
@@ -529,6 +530,15 @@ export default function RecordModal({
                 >
                   <Save className="mr-2 h-4 w-4" />
                   {saving ? 'Saving...' : 'Save'}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onClose}
+                  className="h-8 w-8 p-0"
+                  aria-label="Close"
+                >
+                  <X className="h-4 w-4" />
                 </Button>
               </>
             )}
@@ -568,7 +578,8 @@ export default function RecordModal({
                     allFields={filteredFields}
                     onFieldVisibilityToggle={handleFieldVisibilityToggle}
                     onFieldLayoutChange={handleFieldLayoutChange}
-                    pageEditable={effectiveEditable}
+                    pageEditable={effectiveEditable && !isViewOnly}
+                    onFieldLabelClick={handleFieldLabelClick}
                   />
                 </div>
               ) : resolvedFieldLayout.length > 0 && recordId ? (
@@ -586,6 +597,7 @@ export default function RecordModal({
                     fieldLayout={resolvedFieldLayout}
                     allFields={filteredFields}
                     pageEditable={effectiveEditable}
+                    onFieldLabelClick={handleFieldLabelClick}
                   />
                 </div>
               ) : showFieldSections && sectionedFields ? (
@@ -657,6 +669,17 @@ export default function RecordModal({
             </>
           )}
         </div>
+
+        {/* Footer: Comments area (if enabled) */}
+        {showComments && recordId && !loading && formData && Object.keys(formData).length > 0 && (
+          <div className="border-t px-6 py-4 flex-shrink-0">
+            <RecordComments
+              tableId={tableId}
+              recordId={recordId}
+              canAddComment={effectiveEditable}
+            />
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )

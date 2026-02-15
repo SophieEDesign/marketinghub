@@ -17,6 +17,7 @@ import {
   validateShallowMerge,
   markUserInteraction,
 } from "@/lib/interface/editor-safety"
+import { getBlockPermissions } from "@/lib/interface/block-permissions"
 import AdvancedSettings from "./settings/AdvancedSettings"
 import FullPageLayoutSettings from "./settings/FullPageLayoutSettings"
 import { BLOCK_REGISTRY } from "@/lib/interface/registry"
@@ -40,6 +41,8 @@ interface SettingsPanelProps {
   onExitBlockCanvas?: () => void // Callback to exit block canvas edit mode
   /** Callback to open a record modal in edit mode for layout editing */
   onOpenRecordForLayoutEdit?: (tableId: string) => Promise<string | null>
+  /** When true, render read-only (permissions.mode === 'view') - disables all controls, no save */
+  readOnly?: boolean
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -61,7 +64,10 @@ export default function SettingsPanel({
   onEditBlockCanvas,
   onExitBlockCanvas,
   onOpenRecordForLayoutEdit,
+  readOnly: readOnlyProp = false,
 }: SettingsPanelProps) {
+  const blockPermissionsReadOnly = block ? getBlockPermissions(block.config).mode === 'view' : false
+  const readOnly = readOnlyProp || blockPermissionsReadOnly
   const { toast } = useToast()
   const [tables, setTables] = useState<Table[]>([])
   const [views, setViews] = useState<View[]>([])
@@ -249,8 +255,8 @@ export default function SettingsPanel({
   }
 
   const handleSave = useCallback(async (configToSave: BlockConfig) => {
-    if (!block) return
-    
+    if (!block || readOnly) return
+
     // Mark user interaction (save button click is a user action)
     markUserInteraction()
     
@@ -362,7 +368,7 @@ export default function SettingsPanel({
     } finally {
       setSaving(false)
     }
-  }, [block, onSave, toast, pageTableId, normalizeConfigForValidation])
+  }, [block, onSave, toast, pageTableId, normalizeConfigForValidation, readOnly])
 
   // Validate config on change (for UI feedback)
   useEffect(() => {
@@ -384,12 +390,12 @@ export default function SettingsPanel({
   if (!isOpen || !block) return null
 
   const updateConfig = (updates: Partial<BlockConfig>) => {
-    // Functional update prevents stale-closure merges when multiple updates happen quickly.
+    if (readOnly) return
     setConfig((prev) => ({ ...(prev || {}), ...updates }))
   }
 
   const updateAppearance = (updates: Partial<BlockConfig['appearance']>) => {
-    // Functional update prevents stale-closure merges when multiple updates happen quickly.
+    if (readOnly) return
     setConfig((prev) => ({
       ...(prev || {}),
       appearance: { ...((prev || {}).appearance || {}), ...updates },
@@ -400,7 +406,14 @@ export default function SettingsPanel({
   const isDataViewBlock = block && DATA_VIEW_BLOCK_TYPES.includes(block.type)
 
   return (
-    <div className="fixed inset-y-0 right-0 w-96 bg-white border-l border-gray-200 shadow-xl z-50 flex flex-col">
+    <>
+      {/* Backdrop: click outside to close (Step 11) */}
+      <div
+        className="fixed inset-0 bg-black/20 z-40"
+        aria-hidden="true"
+        onClick={onClose}
+      />
+      <div className="fixed inset-y-0 right-0 w-96 bg-white border-l border-gray-200 shadow-xl z-50 flex flex-col">
       {/* Header */}
       <div className="border-b border-gray-200 px-4 py-3">
         {blockTypeLabel && (
@@ -419,29 +432,26 @@ export default function SettingsPanel({
         </div>
       </div>
 
-      {/* Tabs - Data-view blocks (list, grid, gallery, kanban, calendar, timeline) have two tabs only; others have three */}
-      {(() => {
-        const tabCount = isDataViewBlock ? 2 : 3
-        return (
-          <Tabs defaultValue="data" className="flex-1 flex flex-col overflow-hidden">
-            <TabsList className={`grid w-full border-b border-gray-200 rounded-none h-auto ${tabCount === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
-              <TabsTrigger value="data" className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600">
-                Data
-              </TabsTrigger>
-              <TabsTrigger value="appearance" className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600">
-                Appearance
-              </TabsTrigger>
-              {!isDataViewBlock && (
-                <TabsTrigger value="advanced" className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600">
-                  Advanced
-                </TabsTrigger>
-              )}
-            </TabsList>
+      {/* Tabs - Data-view blocks have two tabs; others have three (Step 12: no IIFE) */}
+      <Tabs defaultValue="data" className="flex-1 flex flex-col overflow-hidden">
+        <TabsList className={`grid w-full border-b border-gray-200 rounded-none h-auto ${isDataViewBlock ? 'grid-cols-2' : 'grid-cols-3'}`}>
+          <TabsTrigger value="data" className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600">
+            Data
+          </TabsTrigger>
+          <TabsTrigger value="appearance" className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600">
+            Appearance
+          </TabsTrigger>
+          {!isDataViewBlock && (
+            <TabsTrigger value="advanced" className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600">
+              Advanced
+            </TabsTrigger>
+          )}
+        </TabsList>
 
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-6">
-              {/* Validation Errors */}
-              {validationErrors.length > 0 && (
+        {/* Content - pointer-events-none when readOnly to disable all controls */}
+        <div className={`flex-1 overflow-y-auto p-4 space-y-6 ${readOnly ? 'pointer-events-none' : ''}`}>
+          {/* Validation Errors */}
+          {validationErrors.length > 0 && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
                   <p className="text-sm font-semibold text-red-800 mb-1">Configuration Errors</p>
                   <ul className="text-xs text-red-700 list-disc list-inside space-y-1">
@@ -449,10 +459,10 @@ export default function SettingsPanel({
                       <li key={idx}>{error}</li>
                     ))}
                   </ul>
-                </div>
-              )}
+          </div>
+          )}
 
-              <TabsContent value="data" className="mt-0 space-y-6">
+          <TabsContent value="data" className="mt-0 space-y-6">
                 {renderDataSettings()}
                 {block && BLOCK_REGISTRY[block.type]?.supportsFullPage && (
                   <FullPageLayoutSettings
@@ -497,28 +507,26 @@ export default function SettingsPanel({
                     </div>
                   </div>
                 )}
-              </TabsContent>
+          </TabsContent>
 
-              <TabsContent value="appearance" className="mt-0 space-y-6">
-                {renderAppearanceSettings()}
-              </TabsContent>
+          <TabsContent value="appearance" className="mt-0 space-y-6">
+            {renderAppearanceSettings()}
+          </TabsContent>
 
-              {!isDataViewBlock && (
-                <TabsContent value="advanced" className="mt-0 space-y-6">
-                  <AdvancedSettings
-                    block={block}
-                    config={config}
-                    onUpdate={updateConfig}
-                    onMoveToTop={onMoveToTop}
-                    onMoveToBottom={onMoveToBottom}
-                    onLock={onLock}
-                  />
-                </TabsContent>
-              )}
-            </div>
-          </Tabs>
-        )
-      })()}
+          {!isDataViewBlock && (
+            <TabsContent value="advanced" className="mt-0 space-y-6">
+              <AdvancedSettings
+                block={block}
+                config={config}
+                onUpdate={updateConfig}
+                onMoveToTop={onMoveToTop}
+                onMoveToBottom={onMoveToBottom}
+                onLock={onLock}
+              />
+            </TabsContent>
+          )}
+        </div>
+      </Tabs>
 
       {/* Footer */}
       <div className="h-16 border-t border-gray-200 flex items-center justify-between px-4">
@@ -544,17 +552,20 @@ export default function SettingsPanel({
           >
             Close
           </Button>
-          <Button
-            onClick={() => handleSave(config)}
-            disabled={saving}
-            size="sm"
-          >
-            <Save className="h-4 w-4 mr-2" />
-            {saving ? 'Saving...' : 'Save'}
-          </Button>
+          {!readOnly && (
+            <Button
+              onClick={() => handleSave(config)}
+              disabled={saving}
+              size="sm"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {saving ? 'Saving...' : 'Save'}
+            </Button>
+          )}
         </div>
       </div>
     </div>
+    </>
   )
 
   function renderDataSettings() {

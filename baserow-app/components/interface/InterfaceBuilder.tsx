@@ -6,11 +6,11 @@ import { Save, Eye, Edit2, Plus, Trash2, Settings, MoreVertical, Undo2, Redo2 } 
 import { useBranding } from "@/contexts/BrandingContext"
 import { useBlockEditMode } from "@/contexts/EditModeContext"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
+import { useSelectionContext } from "@/contexts/SelectionContext"
 import { FilterStateProvider } from "@/lib/interface/filter-state"
 import Canvas from "./Canvas"
 import FloatingBlockPicker from "./FloatingBlockPicker"
 import SettingsPanel from "./SettingsPanel"
-import PageSettingsDrawer from "./PageSettingsDrawer"
 import HorizontalGroupedCanvasModal from "./blocks/HorizontalGroupedCanvasModal"
 import type { PageBlock, LayoutItem, Page, RecordContext } from "@/lib/interface/types"
 import { BLOCK_REGISTRY } from "@/lib/interface/registry"
@@ -97,11 +97,12 @@ export default function InterfaceBuilder({
   // Canvas must NOT run until hydration is complete
   const [hasHydrated, setHasHydrated] = useState<boolean>(false)
   
-  // Use unified editing context for block editing
-  const { isEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(page.id)
+  // Context-driven editing: block selection always available when not in viewer mode
+  const { enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(page.id)
+  const { selectedContext, setSelectedContext } = useSelectionContext()
   
-  // Override edit mode if viewer mode is forced
-  const effectiveIsEditing = isViewer ? false : isEditing
+  // Allow block selection and editing when not in viewer mode (no global edit toggle)
+  const effectiveIsEditing = !isViewer
   
   // Interface mode: single source of truth for edit state (Airtable-style)
   // When interface is in edit mode, all record modals must open in edit mode
@@ -272,7 +273,6 @@ export default function InterfaceBuilder({
 
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
   const [selectedBlockIds, setSelectedBlockIds] = useState<Set<string>>(new Set())
-  const [settingsPanelOpen, setSettingsPanelOpen] = useState(false)
   // Track which block should open a record in edit mode: { blockId, recordId, tableId }
   const [openRecordInEditModeForBlock, setOpenRecordInEditModeForBlock] = useState<{
     blockId: string
@@ -329,7 +329,6 @@ export default function InterfaceBuilder({
     }
   }, [selectedBlockId])
   const [isSaving, setIsSaving] = useState(false)
-  const [pageSettingsOpen, setPageSettingsOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState<Page>(page)
   // Track which block's internal canvas is being edited (for Tabs blocks)
   const [editingBlockCanvasId, setEditingBlockCanvasId] = useState<string | null>(null)
@@ -683,9 +682,9 @@ export default function InterfaceBuilder({
     if (exitAfterSave) {
       exitBlockEdit()
       setSelectedBlockId(null)
-      setSettingsPanelOpen(false)
+      setSelectedContext(null)
     }
-  }, [saveLayout, page.id, toast, exitBlockEdit])
+  }, [saveLayout, page.id, toast, exitBlockEdit, setSelectedContext])
 
   // Save layout and exit edit mode
   const handleExitEditMode = useCallback(async () => {
@@ -1029,7 +1028,7 @@ export default function InterfaceBuilder({
         setBlocks((prev) => prev.filter((b) => b.id !== blockId))
         if (selectedBlockId === blockId) {
           setSelectedBlockId(null)
-          setSettingsPanelOpen(false)
+          setSelectedContext(null)
         }
         toast({
           variant: "success",
@@ -1435,15 +1434,6 @@ export default function InterfaceBuilder({
               </div>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              {/* Settings button */}
-              <button
-                onClick={() => setPageSettingsOpen(true)}
-                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2 transition-colors"
-                title="Interface Settings"
-              >
-                <Settings className="h-4 w-4" />
-                <span className="hidden sm:inline">Settings</span>
-              </button>
               {effectiveIsEditing ? (
               <>
                 {selectedBlock && (
@@ -1539,12 +1529,7 @@ export default function InterfaceBuilder({
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => enterBlockEdit()}>
-                    <Edit2 className="h-4 w-4 mr-2" />
-                    Edit interface
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setPageSettingsOpen(true)}>
+                  <DropdownMenuItem onClick={() => setSelectedContext({ type: 'page' })}>
                     <Settings className="h-4 w-4 mr-2" />
                     Page settings
                   </DropdownMenuItem>
@@ -1578,7 +1563,11 @@ export default function InterfaceBuilder({
               interfaceMode={interfaceMode}
               onLayoutChange={handleLayoutChange}
               onBlockUpdate={handleBlockUpdate}
-              onBlockClick={setSelectedBlockId}
+              onBlockClick={(blockId) => {
+                setSelectedBlockId(blockId)
+                setSelectedContext({ type: 'block', blockId })
+              }}
+              onCanvasClick={() => setSelectedContext({ type: 'page' })}
               onBlockSelect={(blockId, addToSelection) => {
                 if (addToSelection) {
                   setSelectedBlockIds(prev => {
@@ -1598,13 +1587,10 @@ export default function InterfaceBuilder({
                 } else {
                   setSelectedBlockIds(new Set([blockId]))
                   setSelectedBlockId(blockId)
+                  setSelectedContext({ type: 'block', blockId })
                 }
               }}
               selectedBlockIds={selectedBlockIds}
-              onBlockSettingsClick={(blockId) => {
-                setSelectedBlockId(blockId)
-                setSettingsPanelOpen(true)
-              }}
               onBlockDelete={handleDeleteBlock}
               onBlockDuplicate={handleDuplicateBlock}
               onAddBlock={handleAddBlock}
@@ -1636,14 +1622,13 @@ export default function InterfaceBuilder({
         </div>
       </div>
 
-      {/* Settings Panel - Only opens when explicitly clicked */}
+      {/* Settings Panel - Context-driven: opens when block is selected */}
       {effectiveIsEditing && (
         <SettingsPanel
           block={selectedBlock}
-          isOpen={settingsPanelOpen && !!selectedBlock}
+          isOpen={selectedContext?.type === 'block' && !!selectedBlock}
           onClose={() => {
-            setSettingsPanelOpen(false)
-            setSelectedBlockId(null)
+            setSelectedContext(null)
             // Exit block canvas editing when closing settings
             if (editingBlockCanvasId) {
               setEditingBlockCanvasId(null)
@@ -1723,14 +1708,6 @@ export default function InterfaceBuilder({
       {effectiveIsEditing && (
         <FloatingBlockPicker onSelectBlock={handleAddBlock} />
       )}
-
-      {/* Page Settings Drawer */}
-      <PageSettingsDrawer
-        page={currentPage}
-        open={pageSettingsOpen}
-        onOpenChange={setPageSettingsOpen}
-        onPageUpdate={handlePageUpdate}
-      />
 
       {/* Tabs block canvas modal */}
       {canvasModalOpen && canvasModalBlock && canvasModalData && (

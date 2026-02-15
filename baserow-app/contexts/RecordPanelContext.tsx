@@ -1,6 +1,7 @@
 "use client"
 
 import React, { createContext, useContext, useState, useCallback, ReactNode } from "react"
+import { useSelectionContext } from "@/contexts/SelectionContext"
 
 import type { BlockConfig } from "@/lib/interface/types"
 import type { RecordEditorCascadeContext } from "@/lib/interface/record-editor-core"
@@ -46,6 +47,7 @@ const MIN_WIDTH = 320
 const MAX_WIDTH = 1200
 
 export function RecordPanelProvider({ children }: { children: ReactNode }) {
+  const { setSelectedContext } = useSelectionContext()
   const [state, setState] = useState<RecordPanelState>({
     isOpen: false,
     tableId: null,
@@ -62,6 +64,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
     if (process.env.NODE_ENV === 'development' && cascadeContext === undefined) {
       console.warn('[RecordPanel] Opened without cascadeContext; block-level permissions will not be enforced.')
     }
+    setSelectedContext({ type: "record", recordId, tableId })
     setState((prev) => ({
       ...prev,
       isOpen: true,
@@ -77,15 +80,16 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
         ? prev.history // Don't add to history if same record
         : [...prev.history, { tableId, recordId, tableName }],
     }))
-  }, [])
+  }, [setSelectedContext])
 
   const closeRecord = useCallback(() => {
+    setSelectedContext(null)
     setState((prev) => ({
       ...prev,
       isOpen: false,
       // Keep history for potential re-opening
     }))
-  }, [])
+  }, [setSelectedContext])
 
   const setWidth = useCallback((width: number) => {
     const clampedWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, width))

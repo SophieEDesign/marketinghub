@@ -44,6 +44,8 @@ interface RecordFieldsProps {
   onFieldVisibilityToggle?: (fieldName: string, visible: boolean) => void
   onFieldLayoutChange?: (layout: FieldLayoutItem[]) => void
   pageEditable?: boolean // For creating new layout items
+  /** When provided and not in layout mode, field labels are clickable to open field schema drawer */
+  onFieldLabelClick?: (fieldId: string) => void
 }
 
 const DEFAULT_GROUP_NAME = "General"
@@ -71,6 +73,7 @@ export default function RecordFields({
   onFieldVisibilityToggle,
   onFieldLayoutChange,
   pageEditable = true,
+  onFieldLabelClick,
 }: RecordFieldsProps) {
   const { navigateToLinkedRecord, openRecordByTableId, state: recordPanelState } = useRecordPanel()
   const { toast } = useToast()
@@ -571,9 +574,19 @@ export default function RecordFields({
           )}
         >
           {showFieldNames && (
-            <label className={cn(FIELD_LABEL_CLASS_NO_MARGIN, "flex-shrink-0")}>
-              {getFieldDisplayName(field)}
-            </label>
+            onFieldLabelClick && !layoutMode ? (
+              <button
+                type="button"
+                onClick={() => onFieldLabelClick(field.id)}
+                className={cn(FIELD_LABEL_CLASS_NO_MARGIN, "flex-shrink-0 text-left hover:text-blue-600 hover:underline cursor-pointer")}
+              >
+                {getFieldDisplayName(field)}
+              </button>
+            ) : (
+              <label className={cn(FIELD_LABEL_CLASS_NO_MARGIN, "flex-shrink-0")}>
+                {getFieldDisplayName(field)}
+              </label>
+            )
           )}
           <div className="min-w-0">
             <InlineFieldEditor
@@ -629,6 +642,7 @@ export default function RecordFields({
       recordId,
       tableName,
       validateField,
+      onFieldLabelClick,
     ]
   )
 

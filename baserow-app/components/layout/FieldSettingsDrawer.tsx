@@ -28,6 +28,7 @@ import { FIELD_TYPES } from '@/types/fields'
 import { CHOICE_COLOR_THEME_LABELS, isChoiceColorTheme, resolveChoiceColor } from '@/lib/field-colors'
 import { canChangeType } from '@/lib/fields/validation'
 import { getFieldDisplayName } from '@/lib/fields/display'
+import { cn } from '@/lib/utils'
 import { getPrimaryFieldName } from '@/lib/fields/primary'
 import FormulaEditor from '@/components/fields/FormulaEditor'
 import type { SelectOption } from '@/types/fields'
@@ -61,6 +62,10 @@ interface FieldSettingsDrawerProps {
   tableFields: TableField[]
   sections?: SectionSettings[]
   onSave: () => void
+  /** Optional: overlay mode - higher z-index to overlay modals (e.g. RecordModal) */
+  overlayMode?: boolean
+  /** When true, render read-only (permissions.mode === 'view') - disables all edits */
+  permissionsReadOnly?: boolean
 }
 
 export default function FieldSettingsDrawer({
@@ -71,6 +76,8 @@ export default function FieldSettingsDrawer({
   tableFields,
   sections = [],
   onSave,
+  overlayMode = false,
+  permissionsReadOnly = false,
 }: FieldSettingsDrawerProps) {
   const { enterFieldSchemaEdit, exitFieldSchemaEdit } = useUIMode()
   const [name, setName] = useState('')
@@ -865,15 +872,20 @@ export default function FieldSettingsDrawer({
       </Dialog>
 
       <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+      <SheetContent className={cn(
+        "w-full sm:max-w-lg overflow-y-auto",
+        overlayMode && "z-[60] w-[400px] sm:max-w-[400px]"
+      )}>
         <SheetHeader>
           <SheetTitle>Field Settings</SheetTitle>
           <SheetDescription>
-            Configure field properties and type-specific options
+            {permissionsReadOnly
+              ? 'View field properties (read-only)'
+              : 'Configure field properties and type-specific options'}
           </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-6 space-y-6">
+        <div className={cn("mt-6 space-y-6", permissionsReadOnly && "pointer-events-none opacity-75")}>
           {/* Field Name */}
           <div className="space-y-2">
             <Label htmlFor="field-name">Field Name</Label>
@@ -1677,12 +1689,20 @@ export default function FieldSettingsDrawer({
         </div>
 
         <div className="flex items-center justify-end gap-2 mt-8 pt-4 border-t">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={saving || !name.trim()}>
-            {saving ? 'Saving...' : 'Save Changes'}
-          </Button>
+          {permissionsReadOnly ? (
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Close
+            </Button>
+          ) : (
+            <>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSave} disabled={saving || !name.trim()}>
+                {saving ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </>
+          )}
         </div>
       </SheetContent>
     </Sheet>

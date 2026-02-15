@@ -1,6 +1,7 @@
 "use client"
 
 import React, { createContext, useContext, useState, useCallback, useRef, ReactNode } from "react"
+import { useSelectionContext } from "@/contexts/SelectionContext"
 import type { TableField } from "@/types/fields"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { RecordEditorCascadeContext } from "@/lib/interface/record-editor-core"
@@ -34,6 +35,8 @@ interface RecordModalContextType {
   openRecordModal: (state: RecordModalOpenState) => void
   /** Close the global RecordModal. */
   closeRecordModal: () => void
+  /** True when RecordModal is open (used to hide PageDisplaySettingsPanel per plan Step 4). */
+  isRecordModalOpen: boolean
 }
 
 const RecordModalContext = createContext<RecordModalContextType | undefined>(undefined)
@@ -41,14 +44,20 @@ const RecordModalContext = createContext<RecordModalContextType | undefined>(und
 export function RecordModalProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<RecordModalOpenState | null>(null)
   const onCloseRef = useRef<(() => void) | null>(null)
+  const { setSelectedContext } = useSelectionContext()
 
   const openRecordModal = useCallback((openState: RecordModalOpenState) => {
     setState(openState)
-  }, [])
+    // Sync with SelectionContext for single-active-context rule
+    if (openState.recordId) {
+      setSelectedContext({ type: "record", recordId: openState.recordId, tableId: openState.tableId })
+    }
+  }, [setSelectedContext])
 
   const closeRecordModal = useCallback(() => {
     setState(null)
-  }, [])
+    setSelectedContext(null)
+  }, [setSelectedContext])
 
   const handleClose = useCallback(() => {
     closeRecordModal()
@@ -68,7 +77,7 @@ export function RecordModalProvider({ children }: { children: ReactNode }) {
   }, [state, closeRecordModal])
 
   return (
-    <RecordModalContext.Provider value={{ openRecordModal, closeRecordModal }}>
+    <RecordModalContext.Provider value={{ openRecordModal, closeRecordModal, isRecordModalOpen: !!state }}>
       {children}
       {/* CRITICAL: RecordModal mounts once, always in the same position. Control via props. Never conditional. */}
       <RecordModal
