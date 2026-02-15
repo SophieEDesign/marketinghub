@@ -218,6 +218,19 @@ function InterfacePageClientInternal({
     selectedContext?.type === "block" || selectedContext?.type === "recordList"
       ? selectedContext.blockId
       : undefined
+  // CRITICAL: handlePageUpdate must be stable (useCallback) to prevent infinite loop:
+  // Effect → setRightPanelData → context update → re-render → new handlePageUpdate ref → effect runs again
+  const handlePageUpdate = useCallback(async () => {
+    pageLoadedRef.current = false
+    if (page?.id) {
+      blocksLoadedRef.current = { pageId: page.id, loaded: false }
+    }
+    // Force reload blocks after settings update so UI reflects changes
+    await Promise.all([loadPage(), loadBlocks(true)])
+    if (page?.source_view) {
+      loadSqlViewData()
+    }
+  }, [page?.id, page?.source_view])
   useEffect(() => {
     if (!page) {
       setRightPanelData(null)
@@ -1137,19 +1150,31 @@ function InterfacePageClientInternal({
     mainScroll.setSuppressMainScroll(!!isFullPage)
   }, [mainScroll, page?.page_type, blocks])
 
-  // Register page actions for sidebar BaseDropdown (context-driven: page settings on selection)
+  // Register page actions for sidebar BaseDropdown (context-driven: page settings, edit/view)
   const { registerPageActions, unregisterPageActions } = usePageActions()
   const handleOpenPageSettings = useCallback(() => setSelectedContext({ type: 'page' }), [setSelectedContext])
+  const handleEditClick = useCallback(() => {
+    if (!page) return
+    enterBlockEdit()
+  }, [page, enterBlockEdit])
+  const handleExitToView = useCallback(() => {
+    exitPageEdit()
+    exitBlockEdit()
+    exitEditPages()
+  }, [exitPageEdit, exitBlockEdit, exitEditPages])
 
   useEffect(() => {
     const isViewer = searchParams?.get("view") === "true"
     if (!isViewer && page && isAdmin) {
       registerPageActions({
         onOpenPageSettings: handleOpenPageSettings,
+        onEnterEdit: handleEditClick,
+        onExitEdit: handleExitToView,
+        isEditing: isPageEditing || isBlockEditing,
       })
     }
     return () => unregisterPageActions()
-  }, [searchParams, page, isAdmin, handleOpenPageSettings, registerPageActions, unregisterPageActions])
+  }, [searchParams, page, isAdmin, handleOpenPageSettings, handleEditClick, handleExitToView, isPageEditing, isBlockEditing, registerPageActions, unregisterPageActions])
 
   // ALWAYS render UI - never return null or redirect
   if (loading && !page) {
@@ -1172,34 +1197,6 @@ function InterfacePageClientInternal({
   const pageHasAnchor = page ? hasPageAnchor(page) : false
   const pageAnchor = page ? getPageAnchor(page) : null
   const requiredAnchor = page ? getRequiredAnchorType(page.page_type) : null
-
-  // Edit page behavior - UNIFIED: Always enter block editing mode
-  const handleEditClick = () => {
-    if (!page) return
-
-    // UNIFIED: All pages use block editing mode
-    enterBlockEdit()
-  }
-
-  async function handlePageUpdate() {
-    // CRITICAL: Reset loaded flags to allow reload after settings update
-    // This is intentional - user explicitly updated settings
-    pageLoadedRef.current = false
-    if (page?.id) {
-      blocksLoadedRef.current = { pageId: page.id, loaded: false }
-    }
-    // Reload page data after settings update
-    // Parallelize independent requests
-    await Promise.all([
-      loadPage(),
-      // UNIFIED: All pages support blocks
-      loadBlocks(),
-    ])
-    // Load data after page is loaded (depends on page.source_view)
-    if (page?.source_view) {
-      await loadSqlViewData()
-    }
-  }
 
   const handleTitleChange = (value: string) => {
     setTitleValue(value)

@@ -19,6 +19,10 @@ Code audits, analysis reports, and quality assessments.
 ### [Guides](./guides/)
 Setup guides, troubleshooting documentation, and how-to guides for developers and users.
 
+- [Troubleshooting](./guides/TROUBLESHOOTING.md) — Common issues and fixes
+- [E2E Testing Setup](./guides/E2E_TESTING_SETUP.md) — Playwright/Cypress setup
+- [Legacy Code Cleanup Plan](./guides/LEGACY_CODE_CLEANUP_PLAN.md) — Root vs baserow-app cleanup
+
 ## Quick Links
 
 ### Getting Started

@@ -4,6 +4,12 @@ import { createContext, useContext, useState, useCallback, ReactNode } from "rea
 
 export interface PageActions {
   onOpenPageSettings: () => void
+  /** Enter edit mode (blocks/pages). Shown when not editing. */
+  onEnterEdit?: () => void
+  /** Exit edit mode. Shown when editing. */
+  onExitEdit?: () => void
+  /** Whether the page is currently in edit mode. */
+  isEditing?: boolean
 }
 
 interface PageActionsContextType {

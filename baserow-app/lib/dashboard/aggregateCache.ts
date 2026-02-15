@@ -11,7 +11,7 @@ interface CacheEntry {
   promise?: Promise<any> // For deduplicating concurrent requests
 }
 
-const CACHE_TTL_MS = 5000 // 5 seconds cache
+const CACHE_TTL_MS = 10000 // 10 seconds cache (reduces aggregate request volume)
 const cache = new Map<string, CacheEntry>()
 
 /**

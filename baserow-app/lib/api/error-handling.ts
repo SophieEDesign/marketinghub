@@ -66,21 +66,36 @@ export function isTableNotFoundError(error: ApiError): boolean {
 }
 
 /**
- * Create a standardized error response
+ * Standard API error response shape (for consistency across routes)
+ */
+export interface ApiErrorResponse {
+  error: string
+  code?: string | number
+  details?: string
+}
+
+/**
+ * Create a standardized error response object
  */
 export function createErrorResponse(
   error: unknown,
   defaultMessage: string,
   statusCode: number = 500
-) {
+): ApiErrorResponse {
   const errorObj = error as { message?: string; error?: string; code?: string | number; details?: string } | null
   const errorMessage = errorObj?.message || errorObj?.error || defaultMessage
-  console.error(defaultMessage, error)
-  
+  if (process.env.NODE_ENV === 'development') {
+    console.error(defaultMessage, error)
+  }
   return {
     error: errorMessage,
     ...(errorObj?.code && { code: errorObj.code }),
     ...(errorObj?.details && { details: errorObj.details }),
   }
 }
+
+/**
+ * Use in API routes with NextResponse:
+ *   return NextResponse.json(createErrorResponse(error, 'Failed to load', 500), { status: 500 })
+ */
 

@@ -1,10 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isAdmin } from '@/lib/roles'
+import { getAuthRateLimiter } from '@/lib/rate-limit'
+
+const MAX_BODY_SIZE = 1024 * 10 // 10KB
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting: 5 invites per 15 min per IP (when Upstash configured)
+    const authLimiter = getAuthRateLimiter()
+    if (authLimiter) {
+      const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+        || request.headers.get('x-real-ip')
+        || 'unknown'
+      const { success } = await authLimiter.limit(`invite:${ip}`)
+      if (!success) {
+        return NextResponse.json(
+          { error: 'Too many requests. Please try again later.' },
+          { status: 429 }
+        )
+      }
+    }
+
+    // Request body size limit
+    const contentLength = parseInt(request.headers.get('content-length') || '0', 10)
+    if (contentLength > MAX_BODY_SIZE) {
+      return NextResponse.json(
+        { error: 'Request body too large' },
+        { status: 413 }
+      )
+    }
+
     // Security: Only admins can invite users
     const admin = await isAdmin()
     if (!admin) {

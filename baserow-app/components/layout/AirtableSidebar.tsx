@@ -167,6 +167,7 @@ export default function AirtableSidebar({
           className="p-2 hover:bg-black/10 rounded transition-colors"
           style={{ color: sidebarTextColor }}
           title="Expand sidebar"
+          aria-label="Expand sidebar"
         >
           <ChevronRight className="h-4 w-4" style={{ color: sidebarTextColor }} />
         </button>
@@ -209,6 +210,9 @@ export default function AirtableSidebar({
             className="flex items-center gap-2 font-semibold h-auto py-1 px-0 bg-transparent hover:bg-black/10 border-0 shadow-none text-left min-w-0"
             triggerStyle={{ color: sidebarTextColor }}
             onOpenPageSettings={pageActions?.onOpenPageSettings}
+            onEnterEdit={pageActions?.onEnterEdit}
+            onExitEdit={pageActions?.onExitEdit}
+            isEditing={pageActions?.isEditing}
           />
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
@@ -223,6 +227,7 @@ export default function AirtableSidebar({
             className="p-1 hover:bg-black/10 rounded transition-colors"
             style={{ color: sidebarTextColor }}
             title={isMobile ? "Close sidebar" : "Collapse sidebar"}
+            aria-label={isMobile ? "Close sidebar" : "Collapse sidebar"}
           >
             <X className="h-4 w-4" style={{ color: sidebarTextColor }} />
           </button>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { ChevronDown, Table2, Settings, Shield, Home } from "lucide-react"
+import { ChevronDown, Table2, Settings, Shield, Home, Edit2, Eye } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useBranding } from "@/contexts/BrandingContext"
 import {
@@ -24,6 +24,12 @@ interface BaseDropdownProps {
   triggerStyle?: React.CSSProperties
   /** Optional: when provided, add Page settings to dropdown */
   onOpenPageSettings?: () => void
+  /** Optional: enter edit mode. When provided with onExitEdit, show Edit/View at top. */
+  onEnterEdit?: () => void
+  /** Optional: exit edit mode. */
+  onExitEdit?: () => void
+  /** Optional: whether currently editing. When true, show View; when false, show Edit. */
+  isEditing?: boolean
 }
 
 export default function BaseDropdown({
@@ -31,6 +37,9 @@ export default function BaseDropdown({
   className,
   triggerStyle,
   onOpenPageSettings,
+  onEnterEdit,
+  onExitEdit,
+  isEditing = false,
 }: BaseDropdownProps) {
   const { primaryColor, sidebarTextColor } = useBranding()
   const [baseName, setBaseName] = useState<string>("Base")
@@ -66,6 +75,8 @@ export default function BaseDropdown({
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
+          aria-label="Open base menu"
+          aria-haspopup="menu"
           className={cn(
             "flex items-center gap-1.5 font-semibold",
             isCompact ? "h-8 px-2 text-sm" : "h-9 px-3",
@@ -78,6 +89,22 @@ export default function BaseDropdown({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">
+        {onEnterEdit && onExitEdit && (
+          <>
+            {isEditing ? (
+              <DropdownMenuItem onClick={onExitEdit} className="flex items-center gap-2">
+                <Eye className="h-4 w-4" />
+                View
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onClick={onEnterEdit} className="flex items-center gap-2">
+                <Edit2 className="h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+          </>
+        )}
         {onOpenPageSettings && (
           <>
             <DropdownMenuItem onClick={onOpenPageSettings} className="flex items-center gap-2">

@@ -4,7 +4,6 @@ import { Search, User, Menu } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useBranding } from "@/contexts/BrandingContext"
-import BaseDropdown from "@/components/layout/BaseDropdown"
 
 interface TopbarProps {
   title?: string
@@ -30,7 +29,6 @@ export default function Topbar({ title, onSidebarToggle, isAdmin }: TopbarProps)
             <Menu className="h-5 w-5" style={{ color: primaryColor }} />
           </Button>
         )}
-        <BaseDropdown variant="default" />
         {title && (
           <span className="text-lg font-semibold text-gray-700 truncate hidden sm:inline">
             {title}

@@ -65,7 +65,7 @@ interface MultiCalendarViewProps {
   sources: MultiSource[]
   filters?: FilterConfig[]
   filterTree?: FilterTree | null
-  blockConfig?: Record<string, any>
+  blockConfig?: Record<string, unknown>
   isEditing?: boolean
   onRecordClick?: (recordId: string, tableId?: string) => void
   pageShowAddRecord?: boolean
