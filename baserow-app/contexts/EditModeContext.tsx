@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from "react"
+import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback, useMemo } from "react"
 import { usePathname } from "next/navigation"
 
 /**
@@ -302,19 +302,28 @@ export function EditModeProvider({ children, isViewer = false }: EditModeProvide
     exitEditMode(scope)
   }, [exitEditMode])
 
+  const contextValue = useMemo(() => ({
+    state,
+    isEditing,
+    isAnyEditing,
+    enterEditMode,
+    exitEditMode,
+    toggleEditMode,
+    exitAllEditModes,
+    clearEditingContext,
+  }), [
+    state,
+    isEditing,
+    isAnyEditing,
+    enterEditMode,
+    exitEditMode,
+    toggleEditMode,
+    exitAllEditModes,
+    clearEditingContext,
+  ])
+
   return (
-    <EditModeContext.Provider
-      value={{
-        state,
-        isEditing,
-        isAnyEditing,
-        enterEditMode,
-        exitEditMode,
-        toggleEditMode,
-        exitAllEditModes,
-        clearEditingContext,
-      }}
-    >
+    <EditModeContext.Provider value={contextValue}>
       {children}
     </EditModeContext.Provider>
   )

@@ -354,12 +354,6 @@ export default function Canvas({
   const blocksMapIterationRef = useRef(0)
   // #endregion
 
-  // #region agent log - render loop detection
-  useEffect(() => {
-    console.log("[Canvas] render")
-  })
-  // #endregion
-
   // Dev assertion: verify edit mode toggle does NOT cause Canvas remount
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { createContext, useContext, useState, useCallback, ReactNode } from "react"
+import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from "react"
 import { useSelectionContext } from "@/contexts/SelectionContext"
 
 import type { BlockConfig } from "@/lib/interface/types"
@@ -140,10 +140,10 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
   }, [openRecord])
 
   const setInterfaceMode = useCallback((interfaceMode: 'view' | 'edit') => {
-    setState((prev) => ({
-      ...prev,
-      interfaceMode,
-    }))
+    setState((prev) => {
+      if (prev.interfaceMode === interfaceMode) return prev
+      return { ...prev, interfaceMode }
+    })
   }, [])
 
   const goBack = useCallback(() => {
@@ -165,21 +165,32 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  const contextValue = useMemo(() => ({
+    state,
+    openRecord,
+    openRecordByTableId,
+    closeRecord,
+    setWidth,
+    togglePin,
+    toggleFullscreen,
+    navigateToLinkedRecord,
+    goBack,
+    setInterfaceMode,
+  }), [
+    state,
+    openRecord,
+    openRecordByTableId,
+    closeRecord,
+    setWidth,
+    togglePin,
+    toggleFullscreen,
+    navigateToLinkedRecord,
+    goBack,
+    setInterfaceMode,
+  ])
+
   return (
-    <RecordPanelContext.Provider
-      value={{
-        state,
-        openRecord,
-        openRecordByTableId,
-        closeRecord,
-        setWidth,
-        togglePin,
-        toggleFullscreen,
-        navigateToLinkedRecord,
-        goBack,
-        setInterfaceMode,
-      }}
-    >
+    <RecordPanelContext.Provider value={contextValue}>
       {children}
     </RecordPanelContext.Provider>
   )

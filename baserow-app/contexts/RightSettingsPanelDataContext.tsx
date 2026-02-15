@@ -5,6 +5,7 @@ import {
   useContext,
   useState,
   useCallback,
+  useMemo,
   ReactNode,
 } from "react"
 import type { InterfacePage } from "@/lib/interface/page-types-only"
@@ -66,8 +67,10 @@ export function RightSettingsPanelDataProvider({ children }: { children: ReactNo
     }))
   }, [])
 
+  const contextValue = useMemo(() => ({ data, setData }), [data, setData])
+
   return (
-    <RightSettingsPanelDataContext.Provider value={{ data, setData }}>
+    <RightSettingsPanelDataContext.Provider value={contextValue}>
       {children}
     </RightSettingsPanelDataContext.Provider>
   )

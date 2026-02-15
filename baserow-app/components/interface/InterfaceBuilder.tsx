@@ -109,12 +109,6 @@ export default function InterfaceBuilder({
   // When interface is in edit mode, all record modals must open in edit mode
   const interfaceMode: 'view' | 'edit' = effectiveIsEditing ? 'edit' : 'view'
   
-  // #region agent log - render loop detection
-  useEffect(() => {
-    console.log("[InterfaceBuilder] render")
-  })
-  // #endregion
-
   // CRITICAL: Sync interfaceMode with RecordPanelContext so RecordPanel inherits edit mode
   const { setInterfaceMode } = useRecordPanel()
   
@@ -1272,8 +1266,13 @@ export default function InterfaceBuilder({
   const selectedBlock = blocks.find((b) => b.id === selectedBlockId) || null
 
   // Sync block data to RightSettingsPanel when block is selected (must be after selectedBlock and handlers)
+  // CRITICAL: Skip redundant updates when block and blocks ref unchanged to prevent render loops
+  const lastRightPanelSyncRef = useRef<{ blockId: string; blocksRef: PageBlock[] } | null>(null)
   useEffect(() => {
     if (effectiveIsEditing && selectedContext?.type === 'block' && selectedBlock) {
+      const prev = lastRightPanelSyncRef.current
+      if (prev?.blockId === selectedBlock.id && prev?.blocksRef === blocks) return
+      lastRightPanelSyncRef.current = { blockId: selectedBlock.id, blocksRef: blocks }
       setRightPanelData({
         blocks,
         selectedBlock,
@@ -1283,6 +1282,8 @@ export default function InterfaceBuilder({
         onBlockLock: handleLockBlock,
         pageTableId,
       })
+    } else {
+      lastRightPanelSyncRef.current = null
     }
   }, [effectiveIsEditing, selectedContext?.type, selectedBlock, blocks, pageTableId, setRightPanelData, handleSaveSettings, handleMoveBlockToTop, handleMoveBlockToBottom, handleLockBlock])
 

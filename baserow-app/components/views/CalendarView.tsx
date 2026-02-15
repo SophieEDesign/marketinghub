@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useRef, useCallback } from "react"
+import { useState, useEffect, useMemo, useRef, useCallback, memo } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent } from "@/components/ui/card"
@@ -13,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CalendarIcon, X } from "lucide-react"
 import FullCalendar from "@fullcalendar/react"
 import dayGridPlugin from "@fullcalendar/daygrid"
+// Memoize to avoid re-rendering when only modal context changes (prevents React #185 in FullCalendar internals)
+const MemoizedFullCalendar = memo(FullCalendar)
 import interactionPlugin from "@fullcalendar/interaction"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
 import { applyFiltersToQuery, deriveDefaultValuesFromFilters, stripFilterBlockFilters, type FilterConfig } from "@/lib/interface/filters"
@@ -1945,7 +1947,7 @@ export default function CalendarView({
         {/* CRITICAL: Only render FullCalendar after mount to prevent hydration mismatch (React error #185) */}
         {/* FullCalendar generates dynamic DOM IDs that differ between server and client */}
         {mounted ? (
-          <FullCalendar
+          <MemoizedFullCalendar
             plugins={calendarPlugins}
             events={calendarEvents}
             editable={!isViewOnly}

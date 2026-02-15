@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useCallback, ReactNode } from "react"
+import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from "react"
 
 export interface PageActions {
   onOpenPageSettings: () => void
@@ -34,10 +34,14 @@ export function PageActionsProvider({ children }: { children: ReactNode }) {
     setPageActions(null)
   }, [])
 
+  const contextValue = useMemo(() => ({
+    pageActions,
+    registerPageActions,
+    unregisterPageActions,
+  }), [pageActions, registerPageActions, unregisterPageActions])
+
   return (
-    <PageActionsContext.Provider
-      value={{ pageActions, registerPageActions, unregisterPageActions }}
-    >
+    <PageActionsContext.Provider value={contextValue}>
       {children}
     </PageActionsContext.Provider>
   )
