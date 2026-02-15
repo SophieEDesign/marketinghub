@@ -33,8 +33,8 @@ function Breadcrumb({ context, onNavigate }: { context: SelectedContext; onNavig
 
   return (
     <div className="flex items-center gap-1 text-sm text-gray-600 flex-wrap">
-      {items.map((item) => (
-        <span key={`${item.ctx.type}-${item.ctx.blockId ?? ''}-${item.ctx.recordId ?? ''}-${item.ctx.fieldId ?? ''}`} className="flex items-center gap-1">
+      {items.map((item, i) => (
+        <span key={`${item.label}-${item.ctx.type}-${i}`} className="flex items-center gap-1">
           {i > 0 && <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />}
           <button
             type="button"

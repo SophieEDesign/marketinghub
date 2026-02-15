@@ -60,6 +60,7 @@ interface WorkspaceShellProps {
   userRole: "admin" | "member" | null
   hideTopbar?: boolean // Option to hide topbar (for interface pages that have their own toolbar)
   hideRecordPanel?: boolean // Option to hide the global RecordPanel (for pages that have their own record detail panel)
+  defaultPageId?: string | null // For "Back to home" link - never link to abstract /
 }
 
 export default function WorkspaceShell({
