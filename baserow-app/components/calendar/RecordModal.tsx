@@ -15,6 +15,7 @@ import RecordFields from '@/components/records/RecordFields'
 import RecordComments from '@/components/records/RecordComments'
 import FieldSettingsDrawer from '@/components/layout/FieldSettingsDrawer'
 import { getTableSections } from '@/lib/core-data/section-settings'
+import type { SectionSettings } from '@/lib/core-data/types'
 import { useToast } from '@/components/ui/use-toast'
 import { isAbortError } from '@/lib/api/error-handling'
 import type { BlockConfig } from '@/lib/interface/types'
@@ -200,6 +201,12 @@ export default function RecordModal({
     return getFieldGroupsFromLayout(resolvedFieldLayout, filteredFields)
   }, [recordId, resolvedFieldLayout, filteredFields])
 
+  // Layout editing state - must be declared before layoutFieldsSource which uses it
+  const [localFieldLayout, setLocalFieldLayout] = useState<FieldLayoutItem[]>([])
+  useEffect(() => {
+    setLocalFieldLayout(resolvedFieldLayout)
+  }, [resolvedFieldLayout])
+
   // Layout editing: only when user clicked "Customize layout" and we have layout + save callback
   const isEditingLayout = manualEditMode && Boolean(onLayoutSave) && resolvedFieldLayout.length > 0
 
@@ -326,11 +333,6 @@ export default function RecordModal({
   }, [open])
 
   // Layout change handlers for RecordFields in layout mode
-  const [localFieldLayout, setLocalFieldLayout] = useState<FieldLayoutItem[]>([])
-  useEffect(() => {
-    setLocalFieldLayout(resolvedFieldLayout)
-  }, [resolvedFieldLayout])
-
   const handleFieldLayoutChange = useCallback((newLayout: FieldLayoutItem[]) => {
     setLocalFieldLayout(newLayout)
     onLayoutSave?.(newLayout)
@@ -355,7 +357,7 @@ export default function RecordModal({
     return filteredFields.find((f) => f.id === selectedContext.fieldId) ?? null
   }, [selectedContext, tableId, filteredFields])
 
-  const [sections, setSections] = useState<Array<{ name: string; display_name?: string }>>([])
+  const [sections, setSections] = useState<SectionSettings[]>([])
   useEffect(() => {
     if (open && tableId) {
       getTableSections(tableId).then(setSections).catch(() => setSections([]))

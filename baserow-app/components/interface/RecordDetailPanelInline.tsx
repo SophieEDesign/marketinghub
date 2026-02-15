@@ -65,13 +65,13 @@ export default function RecordDetailPanelInline({
   // P1 FIX: interfaceMode === 'edit' is ABSOLUTE - no manual overrides allowed
   const forcedEditMode = resolveRecordEditMode({ interfaceMode, initialEditMode: false })
 
-  useEffect(() => {
-    setLocalFieldLayout(resolvedFieldLayout)
-  }, [resolvedFieldLayout])
-
   const resolvedFieldLayout = useMemo(() => {
     return fieldLayout && fieldLayout.length > 0 ? fieldLayout : []
   }, [fieldLayout])
+
+  useEffect(() => {
+    setLocalFieldLayout(resolvedFieldLayout)
+  }, [resolvedFieldLayout])
 
   const visibleFields = useMemo(() => {
     return getVisibleFieldsFromLayout(resolvedFieldLayout, fields, "canvas")

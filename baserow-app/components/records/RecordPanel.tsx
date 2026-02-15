@@ -13,6 +13,7 @@ import RecordActivity from "./RecordActivity"
 import RecordComments from "./RecordComments"
 import FieldSettingsDrawer from "@/components/layout/FieldSettingsDrawer"
 import { getTableSections } from "@/lib/core-data/section-settings"
+import type { SectionSettings } from "@/lib/core-data/types"
 import type { TableField } from "@/types/fields"
 import { useRecordEditorCore } from "@/lib/interface/record-editor-core"
 import { isAbortError } from "@/lib/api/error-handling"
@@ -284,7 +285,7 @@ export default function RecordPanel() {
     return fields.find((f) => f.id === selectedContext.fieldId) ?? null
   }, [selectedContext, state.tableId, fields])
 
-  const [sections, setSections] = useState<Array<{ name: string; display_name?: string }>>([])
+  const [sections, setSections] = useState<SectionSettings[]>([])
   useEffect(() => {
     if (state.isOpen && state.tableId) {
       getTableSections(state.tableId).then(setSections).catch(() => setSections([]))

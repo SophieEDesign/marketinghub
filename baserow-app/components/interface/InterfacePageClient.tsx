@@ -1155,33 +1155,8 @@ function InterfacePageClientInternal({
     mainScroll.setSuppressMainScroll(!!isFullPage)
   }, [mainScroll, page?.page_type, blocks])
 
-  // Page actions (Edit/View, Page settings) are registered by PageActionsRegistrar
-  // which mounts immediately without Suspense so the sidebar menu shows Edit before content loads
-
-  // ALWAYS render UI - never return null or redirect
-  if (loading && !page) {
-    return <div className="h-screen flex items-center justify-center">Loading interface page...</div>
-  }
-
-  if (!page || !pageWithConfig) {
-    return <div className="h-screen flex items-center justify-center">Page not found</div>
-  }
-
-  const isViewer = searchParams?.get("view") === "true"
-  const isRecordView = page?.page_type === 'record_view'
-  const isRecordReview = page?.page_type === 'record_review'
-  // NOTE: record_view and record_review intentionally share the same shell.
-  // They differ only by left-column configuration and settings UX.
-  // See docs/architecture/PAGE_TYPE_CONSOLIDATION.md
-  const useRecordReviewLayout = isRecordReview || isRecordView
-
-  // Check if page has a valid anchor
-  const pageHasAnchor = page ? hasPageAnchor(page) : false
-  const pageAnchor = page ? getPageAnchor(page) : null
-  const requiredAnchor = page ? getRequiredAnchorType(page.page_type) : null
-
-  // CRITICAL: Stable callback for record_view layout save - inline function caused infinite loop
-  // (RecordReviewPage effect depends on onLayoutSave; new ref every render → setRightPanelData → re-render → loop)
+  // CRITICAL: Stable callback for record_view layout save - MUST be before early returns (React Hooks rule).
+  // Inline function caused infinite loop (RecordReviewPage effect depends on onLayoutSave; new ref every render → setRightPanelData → re-render → loop)
   const handleRecordViewLayoutSave = useCallback(
     async (fieldLayout: FieldLayoutItem[]) => {
       if (!page?.id) return
@@ -1201,6 +1176,20 @@ function InterfacePageClientInternal({
     },
     [page?.id, page?.config]
   )
+
+  // ALWAYS render UI - never return null or redirect (early returns AFTER all hooks)
+  if (loading && !page) {
+    return <div className="h-screen flex items-center justify-center">Loading interface page...</div>
+  }
+
+  if (!page || !pageWithConfig) {
+    return <div className="h-screen flex items-center justify-center">Page not found</div>
+  }
+
+  const isViewer = searchParams?.get("view") === "true"
+  const isRecordView = page?.page_type === 'record_view'
+  const isRecordReview = page?.page_type === 'record_review'
+  const useRecordReviewLayout = isRecordReview || isRecordView
 
   const handleTitleChange = (value: string) => {
     setTitleValue(value)
