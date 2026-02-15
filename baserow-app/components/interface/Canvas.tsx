@@ -194,6 +194,7 @@ interface CanvasProps {
   onCanvasClick?: () => void
   onBlockDelete?: (blockId: string) => void
   onBlockDuplicate?: (blockId: string) => void
+  onBlockSettingsClick?: (blockId: string) => void
   onBlockMoveToTop?: (blockId: string) => void
   onBlockMoveToBottom?: (blockId: string) => void
   onAddBlock?: (type: BlockType) => void | Promise<void>
@@ -236,6 +237,7 @@ export default function Canvas({
   onCanvasClick,
   onBlockDelete,
   onBlockDuplicate,
+  onBlockSettingsClick,
   onBlockMoveToTop,
   onBlockMoveToBottom,
   onAddBlock,

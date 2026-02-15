@@ -27,7 +27,8 @@ export default function FieldSettingsDrawerHost() {
   const open = Boolean(effectiveFieldId && effectiveTableId)
 
   useEffect(() => {
-    if (!effectiveFieldId || !effectiveTableId) {
+    const tableId = effectiveTableId
+    if (!effectiveFieldId || !tableId) {
       setField(null)
       setTableFields([])
       setSections([])
@@ -40,8 +41,8 @@ export default function FieldSettingsDrawerHost() {
     async function load() {
       try {
         const [fieldsRes, sectionsData] = await Promise.all([
-          fetch(`/api/tables/${effectiveTableId}/fields`, { cache: "no-store" }),
-          getTableSections(effectiveTableId).catch(() => []),
+          fetch(`/api/tables/${tableId}/fields`, { cache: "no-store" }),
+          getTableSections(tableId).catch(() => []),
         ])
 
         if (cancelled) return
@@ -86,7 +87,7 @@ export default function FieldSettingsDrawerHost() {
     // Schema edits are global; parent components may refetch via their own data flow
   }
 
-  if (!open) return null
+  if (!open || !effectiveTableId) return null
 
   return (
     <FieldSettingsDrawer

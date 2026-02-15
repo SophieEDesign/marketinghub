@@ -1242,11 +1242,11 @@ export default function InterfaceBuilder({
       // CRITICAL: Ensure edit mode stays active after saving
       // User may need to edit other blocks, so explicitly keep edit mode active
       // Only if not in viewer mode
-      if (!isViewer && !isEditing) {
+      if (!isViewer && !effectiveIsEditing) {
         enterBlockEdit()
       }
     },
-    [handleBlockUpdate, isViewer, isEditing, enterBlockEdit]
+    [handleBlockUpdate, isViewer, effectiveIsEditing, enterBlockEdit]
   )
 
   const handlePageUpdate = useCallback(async () => {
