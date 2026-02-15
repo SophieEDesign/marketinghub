@@ -51,10 +51,10 @@ function InterfacePageClientInternal({
   const router = useRouter()
   const { toast } = useToast()
 
-  // DEBUG: Confirm pageId changes on internal navigation (remove after confirmation)
+  // Strict mount log - if this runs more than once without navigation, something above is remounting
   useEffect(() => {
-    console.log("[InterfacePageClient] Loaded pageId:", pageId)
-  }, [pageId])
+    console.log("[InterfacePageClient] MOUNT once:", pageId)
+  }, [])
 
   const [page, setPage] = useState<InterfacePage | null>(initialPage || null)
   const [data, setData] = useState<any[]>(initialData)
@@ -97,51 +97,8 @@ function InterfacePageClientInternal({
   // CRITICAL: Track if loadBlocks is currently executing to prevent concurrent calls
   const blocksLoadingRef = useRef<boolean>(false)
   
-  // CRITICAL: Reset blocks and edit mode state ONLY when pageId actually changes
-  // This ensures previous page's edit mode doesn't leak to the new page
-  // DO NOT clear blocks for: edit mode toggles, viewer mode, saveLayout reloads, block updates, forceReload
-  // Only clear for actual navigation (pageId changes)
-  // CRITICAL: Use requestAnimationFrame to defer state updates and prevent cascading re-renders
-  useEffect(() => {
-    const currentPageId = page?.id || null
-    
-    // Only clear blocks if pageId actually changed (navigation occurred)
-    if (previousPageIdRef.current !== null && previousPageIdRef.current !== currentPageId) {
-      // Page actually changed - mark as not loaded but DO NOT clear blocks
-      // CRITICAL: Keep current blocks until new load completes to prevent flicker
-      // Blocks will be replaced in one setState when new page loads
-      // CRITICAL: Defer state updates to prevent synchronous setState loops
-      requestAnimationFrame(() => {
-        console.log(`[loadBlocks] Page changed — keeping blocks until new load: oldPageId=${previousPageIdRef.current}, newPageId=${currentPageId}`, {
-          previousBlocksCount: blocks.length,
-          previousBlockIds: blocks.map(b => b.id),
-        })
-        // DO NOT call setBlocks([]) - this causes flicker
-        blocksLoadedRef.current = { pageId: currentPageId || '', loaded: false }
-        
-        // CRITICAL: Exit edit modes and clear selection when navigating to a different page
-        exitPageEdit()
-        exitBlockEdit()
-        exitEditPages()
-        setSelectedContext(null)
-      })
-    } else if (previousPageIdRef.current === null && currentPageId) {
-      // First load - just set the ref, don't clear blocks
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[loadBlocks] First page load: pageId=${currentPageId}`)
-      }
-    } else if (previousPageIdRef.current === currentPageId && currentPageId) {
-      // Same page - preserve blocks
-      if (process.env.NODE_ENV === 'development' && blocks.length > 0) {
-        console.log(`[loadBlocks] Same page — preserving blocks: pageId=${currentPageId}, blocksCount=${blocks.length}`)
-      }
-    }
-    
-    // Update ref after checking (only if pageId exists)
-    if (currentPageId) {
-      previousPageIdRef.current = currentPageId
-    }
-  }, [page?.id, exitPageEdit, exitBlockEdit, exitEditPages, setSelectedContext, blocks.length])
+  // CRITICAL: Edit mode reset is handled in the route-change effect below (pageId dependency)
+  // Do NOT add effects that depend on blocks, page, or edit mode - they cause remount loops
   
   // Inline title editing state
   const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -228,15 +185,15 @@ function InterfacePageClientInternal({
   // Effect → setRightPanelData → context update → re-render → new handlePageUpdate ref → effect runs again
   const handlePageUpdate = useCallback(async () => {
     pageLoadedRef.current = false
-    if (page?.id) {
-      blocksLoadedRef.current = { pageId: page.id, loaded: false }
+    if (pageId) {
+      blocksLoadedRef.current = { pageId, loaded: false }
     }
     // Force reload blocks after settings update so UI reflects changes
     await Promise.all([loadPage(), loadBlocks(true)])
     if (page?.source_view) {
       loadSqlViewData()
     }
-  }, [page?.id, page?.source_view])
+  }, [pageId, page?.id, page?.source_view])
   // CRITICAL: Skip redundant setRightPanelData to prevent render loop
   // Effect → setRightPanelData → context update → re-render → effect runs again (same deps) → setRightPanelData again → loop
   const lastRightPanelSyncRef = useRef<{ pageRef: InterfacePage | null; blocksRef: any[]; selectedBlockId: string | undefined } | null>(null)
@@ -376,7 +333,7 @@ function InterfacePageClientInternal({
             // Reload both data and blocks to ensure everything reflects the saved view
             loadListViewData()
             // Force reload blocks to pick up any changes in view configuration
-            if (page && blocksLoadedRef.current.pageId === page.id) {
+            if (blocksLoadedRef.current.pageId === pageId) {
               loadBlocks(true) // forceReload = true
             }
           } else if (!previousUpdatedAt) {
@@ -419,42 +376,21 @@ function InterfacePageClientInternal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page?.saved_view_id])
 
-  // CRITICAL: Load blocks for ALL pages - unified Canvas + Blocks architecture
-  // All pages render Canvas, so all pages need blocks loaded
-  // Blocks must load in BOTH edit and view mode so they render correctly
+  // CRITICAL: loadBlocks runs ONLY when pageId changes - nothing else
+  // Does NOT depend on: blocks, page, edit mode, loading state
   useEffect(() => {
-    if (!page) return
+    if (!pageId) return
 
     const abortController = new AbortController()
     const signal = abortController.signal
 
-    // Reset loaded state when pageId changes
-    if (blocksLoadedRef.current.pageId !== page.id) {
-      blocksLoadedRef.current = { pageId: page.id, loaded: false }
-      blocksLoadingRef.current = false // Reset loading flag on page change
-    }
+    loadBlocks(false, signal)
 
-    // CRITICAL: Prevent concurrent calls - check both state and ref
-    // The ref prevents race conditions where useEffect runs multiple times before state updates
-    if (blocksLoadingRef.current || blocksLoading) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[loadBlocks] Skipping - already loading: pageId=${page.id}`)
-      }
-      return
-    }
-
-    // Only load if blocks haven't been loaded yet for this page
-    // loadBlocks() manages the blocksLoadingRef flag internally
-    if (!blocksLoadedRef.current.loaded || blocks.length === 0) {
-      loadBlocks(false, signal)
-    }
-
-    // Abort in-flight request when navigating away or unmounting - prevents "Uncaught (in promise)"
     return () => {
       abortController.abort()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page?.id])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadBlocks intentionally excluded; only pageId should trigger
+  }, [pageId])
 
   // CRITICAL: Mode changes must NEVER trigger block reloads
   // Edit mode is a capability flag only - it controls drag/resize/settings, not block state
@@ -778,8 +714,8 @@ function InterfacePageClientInternal({
   }
 
   async function loadBlocks(forceReload = false, signal?: AbortSignal) {
-    console.log('🔥 loadBlocks CALLED', { pageId: page?.id || 'NO_PAGE', forceReload, previousPageId: previousPageIdRef.current, alreadyLoading: blocksLoadingRef.current })
-    if (!page) {
+    console.log('🔥 loadBlocks CALLED', { pageId, forceReload, previousPageId: previousPageIdRef.current, alreadyLoading: blocksLoadingRef.current })
+    if (!pageId) {
       blocksLoadingRef.current = false
       return
     }
@@ -787,25 +723,16 @@ function InterfacePageClientInternal({
     // CRITICAL: Prevent concurrent calls - check ref at function entry
     if (!forceReload && blocksLoadingRef.current) {
       if (process.env.NODE_ENV === 'development') {
-        console.log(`[loadBlocks] Already loading - skipping duplicate call: pageId=${page.id}`)
+        console.log(`[loadBlocks] Already loading - skipping duplicate call: pageId=${pageId}`)
       }
       return
     }
 
     // CRITICAL: Only reset loaded state if pageId actually changed (not just on every call)
-    // DO NOT clear blocks here - that's handled by the page change effect above
-    if (blocksLoadedRef.current.pageId !== page.id) {
-      console.log(`[loadBlocks] PageId changed in loadBlocks: old=${blocksLoadedRef.current.pageId}, new=${page.id}`)
-      blocksLoadedRef.current = { pageId: page.id, loaded: false }
-    } else {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[loadBlocks] Same pageId — preserving blocks: pageId=${page.id}, forceReload=${forceReload}`)
-      }
-    }
-
-    // CRITICAL: Only load blocks once per page visit (prevent remounts)
-    // Unless forceReload is true (e.g., when exiting edit mode to refresh saved content)
-    if (!forceReload && blocksLoadedRef.current.loaded && blocks.length > 0) {
+    if (blocksLoadedRef.current.pageId !== pageId) {
+      console.log(`[loadBlocks] PageId changed in loadBlocks: old=${blocksLoadedRef.current.pageId}, new=${pageId}`)
+      blocksLoadedRef.current = { pageId, loaded: false }
+    } else if (!forceReload && blocksLoadedRef.current.loaded && blocks.length > 0) {
       blocksLoadingRef.current = false
       return
     }
@@ -815,12 +742,12 @@ function InterfacePageClientInternal({
 
     setBlocksLoading(true)
     try {
-      const res = await fetch(`/api/pages/${page.id}/blocks`, { signal })
+      const res = await fetch(`/api/pages/${pageId}/blocks`, { signal })
       if (signal?.aborted) return
 
       if (!res.ok) {
         const errorText = await res.text()
-        console.error(`[loadBlocks] API ERROR: pageId=${page.id}, page_type=${page.page_type}`, {
+        console.error(`[loadBlocks] API ERROR: pageId=${pageId}`, {
           status: res.status,
           statusText: res.statusText,
           errorText,
@@ -832,7 +759,7 @@ function InterfacePageClientInternal({
       if (signal?.aborted) return
 
       // CRITICAL: Log API response for debugging - show full response structure
-      console.log(`[loadBlocks] API returned: pageId=${page.id}, page_type=${page.page_type}`, {
+      console.log(`[loadBlocks] API returned: pageId=${pageId}`, {
         responseStatus: res.status,
         responseOk: res.ok,
         apiResponseRaw: data,
@@ -875,7 +802,7 @@ function InterfacePageClientInternal({
         
         return {
           id: block.id,
-          page_id: block.page_id || page.id,
+          page_id: block.page_id || pageId,
           type: block.type,
           // CRITICAL: Use API-mapped values (x/y/w/h) if available, otherwise use DB columns
           // API maps position_x -> x, position_y -> y, width -> w, height -> h
@@ -899,10 +826,10 @@ function InterfacePageClientInternal({
             console.warn('[Blocks] Reload returned empty blocks, preserving existing blocks', {
               prevBlocksCount: blocks.length,
               forceReload,
-              pageId: page.id
+              pageId
             })
           }
-          blocksLoadedRef.current = { pageId: page.id, loaded: true }
+          blocksLoadedRef.current = { pageId, loaded: true }
         }
         return
       }
@@ -940,7 +867,7 @@ function InterfacePageClientInternal({
       
       const blocksChanged = blockIdsChanged || blockContentChanged
       
-      console.log(`[loadBlocks] setBlocks CHECK: pageId=${page.id}, page_type=${page.page_type}`, {
+      console.log(`[loadBlocks] setBlocks CHECK: pageId=${pageId}`, {
         forceReload,
         oldBlocksCount: blocks.length,
         newBlocksCount: pageBlocks.length,
@@ -956,13 +883,13 @@ function InterfacePageClientInternal({
       if (!signal?.aborted) {
         if (blocksChanged || forceReload) {
           // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfacePageClient.tsx:loadBlocks',message:'SET_BLOCKS_CALLED',data:{pageId:page.id,blocksCount:pageBlocks.length},timestamp:Date.now()})}).catch(()=>{})
+          fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfacePageClient.tsx:loadBlocks',message:'SET_BLOCKS_CALLED',data:{pageId,blocksCount:pageBlocks.length},timestamp:Date.now()})}).catch(()=>{})
           // #endregion
           setBlocks(pageBlocks)
         } else if (process.env.NODE_ENV === 'development') {
           console.log(`[loadBlocks] Blocks unchanged - skipping setBlocks to prevent re-render`)
         }
-        blocksLoadedRef.current = { pageId: page.id, loaded: true }
+        blocksLoadedRef.current = { pageId, loaded: true }
       }
     } catch (error) {
       // Ignore abort errors (expected during navigation/unmount) - prevents "Uncaught (in promise)"
@@ -971,7 +898,7 @@ function InterfacePageClientInternal({
       }
       // CRITICAL: Never clear blocks on error - preserve existing blocks
       if (!signal?.aborted) {
-        blocksLoadedRef.current = { pageId: page.id, loaded: true }
+        blocksLoadedRef.current = { pageId, loaded: true }
       }
     } finally {
       if (!signal?.aborted) {

@@ -32,6 +32,8 @@ interface BaseDropdownProps {
   isEditing?: boolean
   /** Optional: when true, show icon-only trigger (for collapsed sidebar) */
   collapsed?: boolean
+  /** Optional: default page ID for "Back to home" - never link to abstract / */
+  defaultPageId?: string | null
 }
 
 export default function BaseDropdown({
@@ -43,6 +45,7 @@ export default function BaseDropdown({
   onExitEdit,
   isEditing = false,
   collapsed = false,
+  defaultPageId = null,
 }: BaseDropdownProps) {
   const { primaryColor, sidebarTextColor } = useBranding()
   const [baseName, setBaseName] = useState<string>("Base")
@@ -125,7 +128,11 @@ export default function BaseDropdown({
           </>
         )}
         <DropdownMenuItem asChild>
-          <Link href="/" className="flex items-center gap-2 cursor-pointer">
+          <Link
+            href={defaultPageId ? `/pages/${defaultPageId}` : "/"}
+            prefetch={false}
+            className="flex items-center gap-2 cursor-pointer"
+          >
             <Home className="h-4 w-4" />
             Back to home
           </Link>

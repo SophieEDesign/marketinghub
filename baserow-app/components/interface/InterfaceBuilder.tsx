@@ -1585,7 +1585,6 @@ export default function InterfaceBuilder({
               </div>
             ) : (
             <Canvas
-              key={page.id}
               blocks={blocks}
               isEditing={effectiveIsEditing}
               interfaceMode={interfaceMode}
@@ -1651,10 +1650,10 @@ export default function InterfaceBuilder({
       </div>
 
 
-      {/* Floating Block Picker - Only visible in edit mode */}
-      {effectiveIsEditing && (
+      {/* Floating Block Picker - Always mount; visibility/pointer-events controlled by edit mode (never conditional render) */}
+      <div className={effectiveIsEditing ? "" : "invisible pointer-events-none"}>
         <FloatingBlockPicker onSelectBlock={handleAddBlock} />
-      )}
+      </div>
 
       {/* Tabs block canvas modal */}
       {canvasModalOpen && canvasModalBlock && canvasModalData && (

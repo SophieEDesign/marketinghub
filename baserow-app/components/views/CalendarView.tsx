@@ -162,7 +162,7 @@ export default function CalendarView({
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
   const [loadedTableFields, setLoadedTableFields] = useState<TableField[]>(tableFields || [])
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
-  const { openRecordModal } = useRecordModal()
+  const { openRecordModal, isRecordModalOpen } = useRecordModal()
   const [linkedValueLabelMaps, setLinkedValueLabelMaps] = useState<Record<string, Record<string, string>>>({})
   const prevCalendarEventsSignatureRef = useRef<string>("")
   const prevCalendarEventsRef = useRef<EventInput[]>([])
@@ -1612,7 +1612,7 @@ export default function CalendarView({
                     }
                     
                     return (
-                      <span key={`${eventInfo.event.id}-cf-${idx}`} className="truncate inline-flex items-center shrink-0 max-w-full">
+                      <span key={`${eventInfo.event.id}-cf-${f?.field?.id ?? f?.field?.name ?? idx}`} className="truncate inline-flex items-center shrink-0 max-w-full">
                         {idx > 0 && <span className="text-gray-500 mr-1">·</span>}
                         {f?.field ? (
                           <TimelineFieldValue
@@ -1922,8 +1922,8 @@ export default function CalendarView({
       
       <div className="p-6 bg-white">
         {/* CRITICAL: Only render FullCalendar after mount to prevent hydration mismatch (React error #185) */}
-        {/* FullCalendar generates dynamic DOM IDs that differ between server and client */}
-        {mounted ? (
+        {/* When record modal is open, unmount FullCalendar so it is not in the tree during modal open (avoids React #185 in FullCalendar internals). */}
+        {mounted && !isRecordModalOpen ? (
           <MemoizedFullCalendar
             plugins={CALENDAR_PLUGINS}
             events={calendarEvents}
@@ -1950,6 +1950,10 @@ export default function CalendarView({
             dateClick={handleDateClick}
             validRange={calendarValidRange}
           />
+        ) : mounted && isRecordModalOpen ? (
+          <div className="flex items-center justify-center h-64 text-gray-400">
+            Record open — close to return to calendar
+          </div>
         ) : (
           <div className="flex items-center justify-center h-64 text-gray-500">
             Loading calendar...

@@ -55,6 +55,7 @@ interface AirtableSidebarProps {
   userRole?: 'admin' | 'member' | null
   isOpen?: boolean
   onClose?: () => void
+  defaultPageId?: string | null // For "Back to home" - never link to abstract /
 }
 
 export default function AirtableSidebar({ 
@@ -64,7 +65,8 @@ export default function AirtableSidebar({
   views = {},
   userRole = null,
   isOpen: isOpenProp,
-  onClose
+  onClose,
+  defaultPageId = null,
 }: AirtableSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
@@ -187,6 +189,7 @@ export default function AirtableSidebar({
           onEnterEdit={pageActions?.onEnterEdit}
           onExitEdit={pageActions?.onExitEdit}
           isEditing={pageActions?.isEditing}
+          defaultPageId={defaultPageId}
         />
         <button
           onClick={() => setInternalCollapsed(false)}
@@ -239,6 +242,7 @@ export default function AirtableSidebar({
             onEnterEdit={pageActions?.onEnterEdit}
             onExitEdit={pageActions?.onExitEdit}
             isEditing={pageActions?.isEditing}
+            defaultPageId={defaultPageId}
           />
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">

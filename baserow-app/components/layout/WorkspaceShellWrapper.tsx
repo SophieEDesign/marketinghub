@@ -8,7 +8,7 @@ import { BrandingProvider } from "@/contexts/BrandingContext"
 import { SidebarModeProvider } from "@/contexts/SidebarModeContext"
 import { EditModeProvider } from "@/contexts/EditModeContext"
 import { UIModeProvider } from "@/contexts/UIModeContext"
-import { getInterfaces, getInterfaceCategories, type Interface, type InterfaceCategory } from "@/lib/interfaces"
+import { getInterfaces, getInterfaceCategories, resolveLandingPage, type Interface, type InterfaceCategory } from "@/lib/interfaces"
 import WorkspaceShell from "./WorkspaceShell"
 import DynamicFavicon from "./DynamicFavicon"
 import type { View } from "@/types/database"
@@ -294,6 +294,18 @@ export default async function WorkspaceShellWrapper({
   // Determine final title: page title > workspace name > default
   const finalTitle = title || workspaceName || "Baserow App"
 
+  // Resolve default page for "Back to home" link - never link to abstract / route
+  let defaultPageId: string | null = null
+  try {
+    const { pageId } = await resolveLandingPage()
+    defaultPageId = pageId
+  } catch {
+    // Fallback: first accessible interface page
+    if (interfacePages.length > 0) {
+      defaultPageId = interfacePages[0].id
+    }
+  }
+
   return (
     <BrandingProvider settings={brandingSettings}>
       <DynamicFavicon />
@@ -311,6 +323,7 @@ export default async function WorkspaceShellWrapper({
               userRole={userRole}
               hideTopbar={hideTopbar}
               hideRecordPanel={hideRecordPanel}
+              defaultPageId={defaultPageId}
             >
               {children}
             </WorkspaceShell>

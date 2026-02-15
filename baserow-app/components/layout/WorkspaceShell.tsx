@@ -73,6 +73,7 @@ export default function WorkspaceShell({
   userRole,
   hideTopbar = false,
   hideRecordPanel = false,
+  defaultPageId = null,
 }: WorkspaceShellProps) {
   const isMobile = useIsMobile()
   const { primaryColor } = useBranding()
@@ -118,6 +119,7 @@ export default function WorkspaceShell({
           dashboards={dashboards}
           userRole={userRole}
           hideRecordPanel={hideRecordPanel}
+          defaultPageId={defaultPageId}
         >
           {children}
         </WorkspaceShellContent>
@@ -141,6 +143,7 @@ function WorkspaceShellContent({
   userRole,
   hideTopbar = false,
   hideRecordPanel = false,
+  defaultPageId = null,
   isMobile,
   sidebarOpen,
   setSidebarOpen,
@@ -179,6 +182,7 @@ function WorkspaceShellContent({
         userRole={userRole}
         isOpen={isMobile ? sidebarOpen : undefined}
         onClose={isMobile ? () => setSidebarOpen(false) : undefined}
+        defaultPageId={defaultPageId}
       />
       {/* Main content area - RecordPanel overlays when open (position: fixed) */}
       <div className="flex-1 flex flex-col overflow-hidden min-h-0 min-w-0">

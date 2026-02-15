@@ -1,7 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback, useMemo } from "react"
-import { usePathname } from "next/navigation"
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from "react"
 
 /**
  * Unified Edit Mode Context
@@ -83,8 +82,6 @@ interface EditModeProviderProps {
 }
 
 export function EditModeProvider({ children, isViewer = false }: EditModeProviderProps) {
-  const pathname = usePathname()
-  
   const [state, setState] = useState<EditModeState>({
     activeScopes: new Set(),
     editingPageId: null,
@@ -114,83 +111,9 @@ export function EditModeProvider({ children, isViewer = false }: EditModeProvide
     localStorage.setItem("sidebar-edit-mode", String(isSidebarEditing))
   }, [state.activeScopes, isViewer])
 
-  // Load page edit mode from localStorage when page changes
-  // CRITICAL: Reset edit mode when navigating to a different page to prevent mode leakage
-  useEffect(() => {
-    if (isViewer) return
-    
-    // Extract page ID from pathname if on a page route
-    const pageMatch = pathname.match(/\/pages\/([^\/]+)/)
-    if (pageMatch) {
-      const pageId = pageMatch[1]
-      
-      setState(prev => {
-        // CRITICAL: If we're navigating to a different page, clear page/block edit modes
-        // This prevents edit mode from leaking between pages
-        const isDifferentPage = prev.editingPageId !== null && prev.editingPageId !== pageId
-        
-        if (isDifferentPage) {
-          // Clear page and block scopes when navigating to a different page
-          const newScopes = new Set<EditScope>(prev.activeScopes)
-          newScopes.delete("page")
-          newScopes.delete("block")
-          
-          return {
-            ...prev,
-            activeScopes: newScopes,
-            editingPageId: null, // Clear until we restore from localStorage
-          }
-        }
-        
-        return prev
-      })
-      
-      // After clearing, restore edit mode from localStorage if saved for this page
-      const saved = localStorage.getItem(`page-edit-mode-${pageId}`)
-      if (saved === "true") {
-        setState(prev => {
-          // Only restore if we're still on the same page (prevent race conditions)
-          const currentPageMatch = pathname.match(/\/pages\/([^\/]+)/)
-          if (currentPageMatch && currentPageMatch[1] === pageId) {
-            return {
-              ...prev,
-              activeScopes: new Set([...prev.activeScopes, "page"]),
-              editingPageId: pageId,
-            }
-          }
-          return prev
-        })
-      }
-    } else {
-      // Not on a page route - clear page/block edit modes
-      setState(prev => {
-        const newScopes = new Set<EditScope>(prev.activeScopes)
-        newScopes.delete("page")
-        newScopes.delete("block")
-        
-        return {
-          ...prev,
-          activeScopes: newScopes,
-          editingPageId: null,
-        }
-      })
-    }
-  }, [pathname, isViewer])
-
-  // Clear block scope when navigating to a different page (prevents edit state leakage)
-  const prevPageIdRef = useRef<string | null>(null)
-  useEffect(() => {
-    const pageMatch = pathname.match(/\/pages\/([^\/]+)/)
-    const pageId = pageMatch ? pageMatch[1] : null
-    if (prevPageIdRef.current !== null && prevPageIdRef.current !== pageId) {
-      setState(prev => {
-        const newScopes = new Set(prev.activeScopes)
-        newScopes.delete("block")
-        return { ...prev, activeScopes: newScopes }
-      })
-    }
-    prevPageIdRef.current = pageId
-  }, [pathname])
+  // CRITICAL: No automatic edit enabling (e.g. if isAdmin enterBlockEdit) - edit mode only changes when user clicks Edit
+  // Block scope reset is handled by InterfacePageClient when pageId changes (calls exitBlockEdit)
+  // Do NOT use pathname, router, or searchParams for reset - only pageId in the page component
 
   // Save page edit mode to localStorage when it changes
   useEffect(() => {

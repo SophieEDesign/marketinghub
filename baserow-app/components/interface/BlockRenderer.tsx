@@ -591,7 +591,7 @@ export default function BlockRenderer({
         {/* Filter indicator - always mount, visibility toggled by isEditing for mount stability */}
         {filterBlockSources.length > 0 && (
           <div
-            className={`absolute top-2 right-2 z-10 ${isEditing ? "invisible" : ""}`}
+            className={`absolute top-2 right-2 z-10 ${isEditing ? "invisible pointer-events-none" : ""}`}
             aria-hidden={isEditing}
           >
             <div 
