@@ -983,6 +983,9 @@ export default function CalendarView({
   }, [supabaseTableName, resolvedDateFieldNames])
 
   function getEvents(): EventInput[] {
+    // #region agent log
+    const start = performance.now()
+    // #endregion
     try {
     if (!resolvedDateFieldId || !isValidDateField) {
       debugWarn('CALENDAR', 'Calendar: Cannot generate events - missing or invalid date field', {
@@ -1297,6 +1300,10 @@ export default function CalendarView({
       }
       // #endregion
 
+      // #region agent log
+      const duration = performance.now() - start
+      if (duration > 10) console.log("CalendarView getEvents duration:", duration.toFixed(1), "ms", { eventsCount: events.length })
+      // #endregion
       return events
     } catch (error: unknown) {
       debugError('CALENDAR', 'Calendar: Error generating events:', error)
@@ -1763,6 +1770,7 @@ export default function CalendarView({
         onSave: () => { if (resolvedTableId && supabaseTableName) loadRows() },
         onDeleted: () => { if (resolvedTableId && supabaseTableName) loadRows() },
         keySuffix: blockId ?? undefined,
+        forceFlatLayout: true, // Avoid React #185 (RecordFields/DndContext path)
       })
     },
     [allowOpenRecord, onRecordClick, resolvedDateFieldNames, openRecordModal, resolvedTableId, loadedTableFields, blockConfig, supabaseTableName, canEditLayout, onModalLayoutSave, interfaceMode, blockId, loadRows]
@@ -1794,6 +1802,7 @@ export default function CalendarView({
         onSave: () => { if (resolvedTableId && supabaseTableName) loadRows() },
         onDeleted: () => { if (resolvedTableId && supabaseTableName) loadRows() },
         keySuffix: blockId ?? undefined,
+        forceFlatLayout: true, // Avoid React #185 (RecordFields/DndContext path)
       })
     },
     [canCreateRecord, resolvedTableId, resolvedDateFieldId, openRecordModal, combinedFiltersForDefaults, loadedTableFields, viewConfig, blockConfig, supabaseTableName, canEditLayout, onModalLayoutSave, interfaceMode, blockId, loadRows]

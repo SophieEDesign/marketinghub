@@ -30,6 +30,8 @@ export interface RecordModalOpenState {
   onDeleted?: () => void | Promise<void>
   /** Optional key suffix for modal remount (e.g. blockId) */
   keySuffix?: string
+  /** When true, skip RecordFields/sectioned and always use flat FieldEditor list (avoids React #185 in calendar). */
+  forceFlatLayout?: boolean
 }
 
 interface RecordModalContextType {
@@ -114,6 +116,7 @@ export function RecordModalProvider({ children }: { children: ReactNode }) {
           interfaceMode={state?.interfaceMode}
           canEditLayout={state?.canEditLayout}
           onLayoutSave={state?.onLayoutSave}
+          forceFlatLayout={state?.forceFlatLayout}
         />
       </ErrorBoundary>
     </RecordModalContext.Provider>

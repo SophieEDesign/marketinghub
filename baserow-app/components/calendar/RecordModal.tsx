@@ -56,6 +56,8 @@ export interface RecordModalProps {
   canEditLayout?: boolean
   /** Callback to save field layout when user finishes layout edit. */
   onLayoutSave?: (fieldLayout: FieldLayoutItem[]) => void | Promise<void>
+  /** When true, skip RecordFields/sectioned and always use flat FieldEditor list (avoids React #185 in calendar). */
+  forceFlatLayout?: boolean
 }
 
 const DEFAULT_SECTION_NAME = "General"
@@ -82,6 +84,7 @@ export default function RecordModal({
   interfaceMode = 'view',
   canEditLayout = false,
   onLayoutSave,
+  forceFlatLayout = false,
 }: RecordModalProps) {
   const { toast } = useToast()
   const { selectedContext, setSelectedContext } = useSelectionContext()
@@ -475,7 +478,7 @@ export default function RecordModal({
             </div>
           ) : (
             <>
-              {resolvedFieldLayout.length > 0 && recordId ? (
+              {!forceFlatLayout && resolvedFieldLayout.length > 0 && recordId ? (
                 // Use RecordFields for existing records with layout (multi-column, drag handles when layout editing)
                 <div className="space-y-4 py-4">
                   <RecordFields
@@ -496,7 +499,7 @@ export default function RecordModal({
                     onFieldVisibilityToggle={isEditingLayout ? handleFieldVisibilityToggle : undefined}
                   />
                 </div>
-              ) : showFieldSections && sectionedFields ? (
+              ) : !forceFlatLayout && showFieldSections && sectionedFields ? (
                 // Render with sections (for new records or when sections enabled)
                 <div className="space-y-4 py-4">
                   {sectionedFields.map(([sectionName, sectionFields]) => {

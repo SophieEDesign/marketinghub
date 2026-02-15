@@ -16,6 +16,9 @@ export default function NavigationProgress() {
   // Detect internal link clicks and show progress
   useEffect(() => {
     function handleClick(e: MouseEvent) {
+      // #region agent log
+      console.log("Message/click handler triggered [NavigationProgress]")
+      // #endregion
       const target = e.target as HTMLElement
       const anchor = target.closest('a[href^="/"]')
       if (!anchor || (anchor as HTMLAnchorElement).target === "_blank") return

@@ -98,10 +98,17 @@ export function usePageAggregates(
   pageFilters: PageFiltersResolver = []
 ): AggregateDataMap {
   // Extract all aggregate requests from KPI blocks
-  const requests = useMemo(
-    () => extractAggregateRequests(blocks, pageFilters),
-    [blocks, pageFilters]
-  )
+  const requests = useMemo(() => {
+    // #region agent log
+    const start = performance.now()
+    // #endregion
+    const result = extractAggregateRequests(blocks, pageFilters)
+    // #region agent log
+    const duration = performance.now() - start
+    if (duration > 5) console.log("usePageAggregates extractRequests duration:", duration.toFixed(1), "ms", { requestCount: result.size })
+    // #endregion
+    return result
+  }, [blocks, pageFilters])
   
   // Group requests by their parameters to deduplicate
   // Multiple blocks with same params will share the same result
@@ -146,6 +153,9 @@ export function usePageAggregates(
   
   // Build aggregate map from batch results - memoized to prevent React #185 (re-render cascades)
   const aggregateMap = useMemo(() => {
+    // #region agent log
+    const start = performance.now()
+    // #endregion
     const map: AggregateDataMap = {}
     if (batchResults) {
       requestGroups.forEach(({ blockIds, index }) => {
@@ -171,6 +181,10 @@ export function usePageAggregates(
         })
       })
     }
+    // #region agent log
+    const duration = performance.now() - start
+    if (duration > 5) console.log("usePageAggregates aggregateMap duration:", duration.toFixed(1), "ms")
+    // #endregion
     return map
   }, [batchResults, requestGroups, error, isLoading])
 

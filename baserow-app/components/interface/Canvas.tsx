@@ -280,9 +280,17 @@ export default function Canvas({
   // on every render. A new callback each render caused React error #185 (maximum update depth).
   const pageFiltersResolver = useCallback(
     (blockId: string) => {
+      // #region agent log
+      const start = performance.now()
+      // #endregion
       const block = blocks.find(b => b.id === blockId)
       const blockTableId = block?.config?.table_id || pageTableId
-      return getFiltersForBlock(blockId, blockTableId)
+      const result = getFiltersForBlock(blockId, blockTableId)
+      // #region agent log
+      const duration = performance.now() - start
+      if (duration > 5) console.log("pageFiltersResolver duration:", duration.toFixed(1), "ms", { blockId })
+      // #endregion
+      return result
     },
     [blocks, pageTableId, getFiltersForBlock]
   )
@@ -344,6 +352,12 @@ export default function Canvas({
   const currentlyResizingBlockIdRef = useRef<string | null>(null)
   // #region agent log
   const blocksMapIterationRef = useRef(0)
+  // #endregion
+
+  // #region agent log - render loop detection
+  useEffect(() => {
+    console.log("[Canvas] render")
+  })
   // #endregion
 
   // Dev assertion: verify edit mode toggle does NOT cause Canvas remount

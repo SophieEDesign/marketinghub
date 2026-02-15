@@ -109,6 +109,12 @@ export default function InterfaceBuilder({
   // When interface is in edit mode, all record modals must open in edit mode
   const interfaceMode: 'view' | 'edit' = effectiveIsEditing ? 'edit' : 'view'
   
+  // #region agent log - render loop detection
+  useEffect(() => {
+    console.log("[InterfaceBuilder] render")
+  })
+  // #endregion
+
   // CRITICAL: Sync interfaceMode with RecordPanelContext so RecordPanel inherits edit mode
   const { setInterfaceMode } = useRecordPanel()
   

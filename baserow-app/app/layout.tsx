@@ -83,7 +83,8 @@ export default function RootLayout({
           <InteractionFailsafe />
           <PerformanceMonitor />
           <NavigationProgress />
-          <NavigationDiagnostics />
+          {/* STEP 1: Temporarily disabled to verify not causing heavy message listeners or loops */}
+          {/* <NavigationDiagnostics /> */}
           <DynamicTitle />
           {children}
           <Toaster />
