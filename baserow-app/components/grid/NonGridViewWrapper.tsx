@@ -97,19 +97,23 @@ export default function NonGridViewWrapper({
   const [customizeCardsDialogOpen, setCustomizeCardsDialogOpen] = useState(false)
 
   const fieldIds = useMemo(() => {
+    const tableFieldNames = new Set(tableFields.map((f) => f.name))
     if (viewFields.length > 0) {
       const visible = viewFields
         .sort((a, b) => a.position - b.position)
         .filter((vf) => !hiddenFields.includes(vf.field_name))
         .map((vf) => vf.field_name)
       if (viewType === "kanban" && cardFields.length > 0) {
-        const ordered = cardFields.filter((n) => visible.includes(n))
+        const ordered = cardFields.filter((n) => visible.includes(n) && tableFieldNames.has(n))
         return ordered.length > 0 ? ordered : visible
       }
       return visible
     }
+    if (viewType === "kanban" && cardFields.length > 0) {
+      return cardFields.filter((n) => tableFieldNames.has(n))
+    }
     return Array.isArray(fieldIdsProp) ? fieldIdsProp : []
-  }, [viewFields, hiddenFields, fieldIdsProp, viewType, cardFields])
+  }, [viewFields, hiddenFields, fieldIdsProp, viewType, cardFields, tableFields])
 
   useEffect(() => {
     async function loadTableInfo() {

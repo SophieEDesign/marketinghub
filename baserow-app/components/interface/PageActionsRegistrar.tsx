@@ -7,7 +7,7 @@
  */
 import { useEffect } from "react"
 import { usePageActions } from "@/contexts/PageActionsContext"
-import { usePageEditMode, useBlockEditMode } from "@/contexts/EditModeContext"
+import { useEditMode, usePageEditMode, useBlockEditMode } from "@/contexts/EditModeContext"
 import { useUIMode } from "@/contexts/UIModeContext"
 import { useSelectionContext } from "@/contexts/SelectionContext"
 
@@ -23,39 +23,36 @@ export default function PageActionsRegistrar({
   isViewer,
 }: PageActionsRegistrarProps) {
   const { registerPageActions, unregisterPageActions } = usePageActions()
+  const { clearEditingContext } = useEditMode()
   const { isEditing: isPageEditing, exit: exitPageEdit } = usePageEditMode(pageId)
   const { isEditing: isBlockEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(pageId)
   const { exitEditPages } = useUIMode()
   const { setSelectedContext } = useSelectionContext()
 
   useEffect(() => {
-    if (!isViewer && pageId && isAdmin) {
-      registerPageActions({
-        onOpenPageSettings: () => setSelectedContext({ type: "page" }),
-        onEnterEdit: () => enterBlockEdit(),
-        onExitEdit: () => {
-          exitPageEdit()
-          exitBlockEdit()
-          exitEditPages()
-        },
-        isEditing: isPageEditing || isBlockEditing,
-      })
+    if (!pageId) return
+
+    if (isViewer || !isAdmin) {
+      unregisterPageActions()
+      return
     }
-    return () => unregisterPageActions()
-  }, [
-    isViewer,
-    pageId,
-    isAdmin,
-    isPageEditing,
-    isBlockEditing,
-    enterBlockEdit,
-    exitPageEdit,
-    exitBlockEdit,
-    exitEditPages,
-    setSelectedContext,
-    registerPageActions,
-    unregisterPageActions,
-  ])
+
+    registerPageActions({
+      onOpenPageSettings: () => setSelectedContext({ type: "page" }),
+      onEnterEdit: () => enterBlockEdit(),
+      onExitEdit: () => {
+        exitPageEdit()
+        exitBlockEdit()
+        exitEditPages()
+      },
+      isEditing: isPageEditing || isBlockEditing,
+    })
+
+    return () => {
+      unregisterPageActions()
+      clearEditingContext("block")
+    }
+  }, [pageId, isAdmin, isViewer, isPageEditing, isBlockEditing, enterBlockEdit, exitPageEdit, exitBlockEdit, exitEditPages, setSelectedContext, registerPageActions, unregisterPageActions, clearEditingContext])
 
   return null
 }
