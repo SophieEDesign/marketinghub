@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from "react"
 import { useSelectionContext } from "@/contexts/SelectionContext"
-import { useRightSettingsPanelData } from "@/contexts/RightSettingsPanelDataContext"
 
 import type { BlockConfig } from "@/lib/interface/types"
 import type { RecordEditorCascadeContext } from "@/lib/interface/record-editor-core"
@@ -20,6 +19,8 @@ interface RecordPanelState {
   modalFields?: string[]
   modalLayout?: BlockConfig["modal_layout"]
   fieldLayout?: FieldLayoutItem[]
+  onLayoutSave?: (layout: FieldLayoutItem[]) => void | Promise<void>
+  tableFields?: TableField[]
   history: Array<{ tableId: string; recordId: string; tableName: string }> // For breadcrumb navigation
   /** When provided, RecordPanel enforces canEditRecords/canDeleteRecords from cascade. */
   cascadeContext?: RecordEditorCascadeContext | null
@@ -52,7 +53,6 @@ const MAX_WIDTH = 1200
 
 export function RecordPanelProvider({ children }: { children: ReactNode }) {
   const { setSelectedContext } = useSelectionContext()
-  const { setData: setRightPanelData } = useRightSettingsPanelData()
   const [state, setState] = useState<RecordPanelState>({
     isOpen: false,
     tableId: null,
@@ -91,6 +91,8 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
       modalFields,
       modalLayout,
       fieldLayout,
+      onLayoutSave,
+      tableFields,
       cascadeContext,
       interfaceMode: interfaceMode ?? prev.interfaceMode ?? "view",
       onRecordDeleted,
@@ -99,16 +101,8 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
           ? prev.history
           : [...prev.history, { tableId, recordId, tableName }],
     }))
-    // Populate RightSettingsPanel so record layout settings show next to the panel (Airtable-style)
-    const layout = fieldLayout ?? []
-    setRightPanelData({
-      recordId,
-      recordTableId: tableId,
-      fieldLayout: layout,
-      onLayoutSave: onLayoutSave ?? null,
-      tableFields: tableFields ?? [],
-    })
-  }, [setSelectedContext, setRightPanelData])
+    // Per architectural contract: do NOT call setRightPanelData. Inspector reads from selection.
+  }, [setSelectedContext])
 
   const closeRecord = useCallback(() => {
     setSelectedContext(null)
@@ -117,8 +111,8 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
       isOpen: false,
       // Keep history for potential re-opening
     }))
-    setRightPanelData({ recordId: null, recordTableId: null, fieldLayout: [], onLayoutSave: null, tableFields: [] })
-  }, [setSelectedContext, setRightPanelData])
+    // Per architectural contract: do NOT call setRightPanelData. Inspector derives from selection.
+  }, [setSelectedContext])
 
   const setWidth = useCallback((width: number) => {
     const clampedWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, width))

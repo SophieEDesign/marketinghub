@@ -2,7 +2,6 @@
 
 import { useSelectionContext } from "@/contexts/SelectionContext"
 import { useRightSettingsPanelData } from "@/contexts/RightSettingsPanelDataContext"
-import { useRecordModal } from "@/contexts/RecordModalContext"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { ChevronRight, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -52,14 +51,11 @@ function Breadcrumb({ context, onNavigate }: { context: SelectedContext; onNavig
 export default function RightSettingsPanel() {
   const { selectedContext, setSelectedContext } = useSelectionContext()
   const { data } = useRightSettingsPanelData()
-  const { isRecordModalOpen } = useRecordModal()
   const { state: recordPanelState } = useRecordPanel()
 
   // Show when: (1) user selected page/block/record, OR (2) RecordPanel is open (Airtable-style: settings next to record)
-  // Hide when RecordModal (center modal) is open - that flow is deprecated in favor of right panel
   const isVisible =
-    (selectedContext || (recordPanelState.isOpen && recordPanelState.recordId)) &&
-    !isRecordModalOpen
+    selectedContext || (recordPanelState.isOpen && recordPanelState.recordId)
 
   // When RecordPanel is open, position settings panel to the left of it (no overlap)
   const panelWidth = 400
@@ -152,13 +148,13 @@ export default function RightSettingsPanel() {
           )
         )}
 
-        {selectedContext?.type === "record" && data?.recordId && data?.recordTableId && (
+        {selectedContext?.type === "record" && recordPanelState.isOpen && recordPanelState.recordId && recordPanelState.tableId && recordPanelState.onLayoutSave && (
           <RecordLayoutSettings
-            tableId={data.recordTableId}
-            recordId={data.recordId}
-            fieldLayout={data.fieldLayout}
-            onLayoutSave={data.onLayoutSave}
-            fields={data.tableFields}
+            tableId={recordPanelState.tableId}
+            recordId={recordPanelState.recordId}
+            fieldLayout={recordPanelState.fieldLayout ?? []}
+            onLayoutSave={recordPanelState.onLayoutSave}
+            fields={recordPanelState.tableFields ?? []}
           />
         )}
 

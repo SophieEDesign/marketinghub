@@ -4,6 +4,12 @@
  * Filter State Context
  * Manages filter block state across a page
  * Allows multiple filter blocks to emit filters that affect target blocks
+ *
+ * PLACEMENT (intentional): FilterStateProvider wraps Canvas only, inside InterfaceBuilder.
+ * It remounts on page navigation. Option B per architecture plan:
+ * - FilterBlocks re-register on mount via updateFilterBlock in useEffect
+ * - No effects depend on previous Map references
+ * - Filter state is page-scoped; fresh Map per page is correct
  */
 
 import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react'

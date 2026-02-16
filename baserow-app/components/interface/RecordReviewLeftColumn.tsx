@@ -91,6 +91,10 @@ export default function RecordReviewLeftColumn({
   const [loading, setLoading] = useState(false)
   const [creating, setCreating] = useState(false)
   const { openRecordModal } = useRecordModal()
+  const cascadeContext = useMemo(
+    () => (pageConfig ? { pageConfig } : undefined),
+    [pageConfig]
+  )
   const [searchQuery, setSearchQuery] = useState("")
   const [tableName, setTableName] = useState<string | null>(null)
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
@@ -341,7 +345,7 @@ export default function RecordReviewLeftColumn({
       recordId: null,
       tableFields: fields,
       supabaseTableName,
-      cascadeContext: pageConfig ? { pageConfig } : undefined,
+      cascadeContext,
       interfaceMode: "view",
       onSave: async (createdId) => {
         if (!createdId) return
@@ -360,7 +364,7 @@ export default function RecordReviewLeftColumn({
       },
       onDeleted: () => loadRecords(supabaseTableName),
     })
-  }, [creating, isRecordView, pageConfig, supabaseTableName, toast, userRole, tableId, fields, openRecordModal, loadRecords, onRecordSelect])
+  }, [creating, isRecordView, pageConfig, cascadeContext, supabaseTableName, toast, userRole, tableId, fields, openRecordModal, loadRecords, onRecordSelect])
 
   const handleCreateRecord = useCallback(async (primaryValue: string) => {
     if (!isRecordView) return

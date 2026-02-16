@@ -57,7 +57,11 @@ export default function ListBlock({
 }: ListBlockProps) {
   const { toast } = useToast()
   const { config } = block
-  
+  const cascadeContext = useMemo(
+    () => (config ? { blockConfig: config } : undefined),
+    [config]
+  )
+
   // Track base height (collapsed state) to calculate deltas
   const baseHeightRef = useRef<number | null>(null)
   const previousHeightRef = useRef<number | null>(null)
@@ -398,7 +402,7 @@ export default function ListBlock({
       modalFields,
       initialData,
       supabaseTableName: table.supabase_table,
-      cascadeContext: { blockConfig: config },
+      cascadeContext,
       interfaceMode: "view",
       onSave: () => {
         toast({ title: "Record created" })
@@ -538,7 +542,7 @@ export default function ListBlock({
         reloadKey={refreshKey}
         onHeightChange={(groupBy || (groupByRulesFromConfig && groupByRulesFromConfig.length > 0)) ? handleHeightChange : undefined}
         rowHeight={rowHeight}
-        cascadeContext={{ blockConfig: config }}
+        cascadeContext={cascadeContext}
       />
     </div>
   )

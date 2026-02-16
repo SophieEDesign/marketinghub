@@ -137,12 +137,6 @@ export default function GroupedInterfaces({
   // State updates are async, but refs are synchronous - prevents stuck navigation
   const isDraggingRef = useRef(false)
   
-  // DEBUG: Set localStorage DEBUG_NAV_FULL_RELOAD=1 to use full page reload (tests if Link is blocked)
-  const [useFullReload, setUseFullReload] = useState(false)
-  useEffect(() => {
-    setUseFullReload(localStorage.getItem("DEBUG_NAV_FULL_RELOAD") === "1")
-  }, [])
-  
   // Store original order for revert on error
   const [originalGroups, setOriginalGroups] = useState<InterfaceGroup[]>([])
   const [originalPages, setOriginalPages] = useState<InterfacePage[]>([])
@@ -886,38 +880,10 @@ export default function GroupedInterfaces({
     )
     const style = { color: sidebarTextColor }
 
-    if (useFullReload) {
-      return (
-        <a
-          href={`/pages/${targetPageId}`}
-          className={className}
-          style={style}
-          onClick={(e) => {
-            e.preventDefault()
-            console.log("[Nav] DEBUG full reload to:", targetPageId)
-            window.location.href = `/pages/${targetPageId}`
-          }}
-        >
-          <span className="truncate flex-1">{page.name}</span>
-        </a>
-      )
-    }
-
     return (
       <Link
         href={`/pages/${targetPageId}`}
         prefetch={false}
-        onClick={() => {
-          if (isActive) return
-          // Fallback: if Next.js Link navigation doesn't complete (known issue), force full reload after 100ms
-          const targetPath = `/pages/${targetPageId}`
-          const startPath = pathname
-          setTimeout(() => {
-            if (window.location.pathname !== targetPath && window.location.pathname === startPath) {
-              window.location.href = targetPath
-            }
-          }, 100)
-        }}
         className={className}
         style={style}
       >
@@ -1021,17 +987,7 @@ export default function GroupedInterfaces({
                 if (editMode && isDraggingRef.current && activeId) {
                   e.preventDefault()
                   e.stopPropagation()
-                  return
                 }
-                if (isActive) return
-                // Fallback: if Next.js Link navigation doesn't complete (known issue), force full reload
-                const targetPath = `/pages/${targetPageId}`
-                const startPath = pathname
-                setTimeout(() => {
-                  if (window.location.pathname !== targetPath && window.location.pathname === startPath) {
-                    window.location.href = targetPath
-                  }
-                }, 100)
               }}
             >
               <Layers className="h-4 w-4 flex-shrink-0" style={{ color: isActive ? primaryColor : sidebarTextColor }} />

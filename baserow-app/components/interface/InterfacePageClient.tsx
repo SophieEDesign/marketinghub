@@ -18,7 +18,6 @@ import { usePageEditMode, useBlockEditMode } from "@/contexts/EditModeContext"
 import { useUIMode } from "@/contexts/UIModeContext"
 import { useMainScroll } from "@/contexts/MainScrollContext"
 import { useSelectionContext } from "@/contexts/SelectionContext"
-import { useRecordModal } from "@/contexts/RecordModalContext"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { VIEWS_ENABLED } from "@/lib/featureFlags"
 import { toPostgrestColumn } from "@/lib/supabase/postgrest"
@@ -68,9 +67,8 @@ function InterfacePageClientInternal({
   const { exitEditPages } = useUIMode()
   const { selectedContext, setSelectedContext } = useSelectionContext()
   const { setData: setRightPanelData } = useRightSettingsPanelData()
-  const { isRecordModalOpen } = useRecordModal()
   const { state: recordPanelState } = useRecordPanel()
-  const isRecordViewOpen = isRecordModalOpen || recordPanelState.isOpen
+  const isRecordViewOpen = recordPanelState.isOpen
 
   const [blocks, setBlocks] = useState<any[]>([])
   const [blocksLoading, setBlocksLoading] = useState(false)
@@ -181,23 +179,29 @@ function InterfacePageClientInternal({
     selectedContext?.type === "block" || selectedContext?.type === "recordList"
       ? selectedContext.blockId
       : undefined
-  // CRITICAL: handlePageUpdate must be stable (useCallback) to prevent infinite loop:
-  // Effect → setRightPanelData → context update → re-render → new handlePageUpdate ref → effect runs again
+  // handlePageUpdate changes when page loads (page?.id, page?.source_view) - must not be in sync effect deps
   const handlePageUpdate = useCallback(async () => {
     pageLoadedRef.current = false
     if (pageId) {
       blocksLoadedRef.current = { pageId, loaded: false }
     }
-    // Force reload blocks after settings update so UI reflects changes
     await Promise.all([loadPage(), loadBlocks(true)])
     if (page?.source_view) {
       loadSqlViewData()
     }
   }, [pageId, page?.id, page?.source_view])
-  // CRITICAL: Skip redundant setRightPanelData to prevent render loop
-  // Effect → setRightPanelData → context update → re-render → effect runs again (same deps) → setRightPanelData again → loop
+
+  const handlePageUpdateRef = useRef(handlePageUpdate)
+  useEffect(() => {
+    handlePageUpdateRef.current = handlePageUpdate
+  }, [handlePageUpdate])
+
+  const stableHandlePageUpdate = useCallback(async () => {
+    await handlePageUpdateRef.current()
+  }, [])
+
+  // CRITICAL: RightPanel sync depends ONLY on page.id, page, blocks, selectedContext - NOT handlePageUpdate
   const lastRightPanelSyncRef = useRef<{ pageRef: InterfacePage | null; blocksRef: any[]; selectedBlockId: string | undefined } | null>(null)
-  // Stabilize blocks reference: same content => same array ref to prevent Canvas/BlockRenderer remounts
   const prevBlocksRef = useRef<{ blocks: any[]; signature: string }>({ blocks: [], signature: "" })
   useEffect(() => {
     if (!page) return
@@ -205,22 +209,19 @@ function InterfacePageClientInternal({
     const prev = lastRightPanelSyncRef.current
     if (prev?.pageRef === page && prev?.blocksRef === blocks && prev?.selectedBlockId === selectedBlockIdForPanel) return
     lastRightPanelSyncRef.current = { pageRef: page, blocksRef: blocks, selectedBlockId: selectedBlockIdForPanel }
-    // When block is selected but not in our blocks (e.g. newly added in InterfaceBuilder), omit selectedBlock
-    // so InterfaceBuilder's sync can provide it - prevents "Loading block settings..." for new blocks
     const updates: Parameters<typeof setRightPanelData>[0] = {
       page,
-      onPageUpdate: handlePageUpdate,
+      onPageUpdate: stableHandlePageUpdate,
       pageTableId,
       blocks,
     }
     if (selectedBlockIdForPanel == null) {
-      updates.selectedBlock = null // Clear when no block selected
+      updates.selectedBlock = null
     } else if (selectedBlock != null) {
-      updates.selectedBlock = selectedBlock // Only set when we have the block
+      updates.selectedBlock = selectedBlock
     }
-    // When selectedBlockIdForPanel is set but block not found: omit selectedBlock (don't overwrite with null)
     setRightPanelData(updates)
-  }, [page?.id, page, pageTableId, blocks, selectedContext?.type, selectedBlockIdForPanel, setRightPanelData, handlePageUpdate])
+  }, [page?.id, page, pageTableId, blocks, selectedContext?.type, selectedBlockIdForPanel, setRightPanelData, stableHandlePageUpdate])
 
   // Initialize title value when page loads
   useEffect(() => {
@@ -1242,57 +1243,53 @@ function InterfacePageClientInternal({
         </div>
       )}
 
-      {/* Content Area - overflow-x-hidden only; overflow-hidden collapses children */}
-      <div className="flex-1 overflow-x-hidden min-w-0 min-h-0 w-full">
-        {/* CRITICAL: Always render the same component tree to prevent remount storms */}
-        {/* Show loading/error states as overlays, not separate trees */}
-        {loading && !page ? (
-          <div className="flex-1 min-h-[200px] flex items-center justify-center">
+      {/* Content Area - single stable tree; loading/error as overlays */}
+      <div className="flex-1 overflow-x-hidden min-w-0 min-h-0 w-full relative">
+        {loading && !page && (
+          <div className="absolute inset-0 flex items-center justify-center z-10">
             <LoadingSpinner size="lg" text="Loading page..." />
           </div>
-        ) : !page ? (
+        )}
+        {!loading && !page && (
           <div className="flex-1 min-h-[200px] flex items-center justify-center">
             <div className="text-center">
               <h2 className="text-lg font-semibold text-gray-900 mb-2">Page not found</h2>
               <p className="text-sm text-gray-500">The page you&apos;re looking for doesn&apos;t exist.</p>
             </div>
           </div>
-        ) : page ? (
+        )}
+        {page && (
           <div className="flex-1 w-full min-w-0 min-h-0 flex flex-col overflow-x-hidden relative">
-          {/* CRITICAL: Canvas is ALWAYS rendered when page exists - never gated by blocksLoading.
-              Blocks may be [] initially; Canvas mounts immediately and populates when blocks load.
-              isDraggable/isResizable inside Canvas depend on isEditing - not component visibility. */}
-          {useRecordReviewLayout ? (
-            <RecordReviewPage
-              page={page as any}
-              initialBlocks={memoizedBlocks}
-              isViewer={isViewer}
-              hideHeader={true}
-              onLayoutSave={page?.page_type === "record_view" ? handleRecordViewLayoutSave : undefined}
-            />
-          ) : interfaceBuilderPage ? (
-            <div className="min-h-screen w-full min-w-0 flex flex-col">
-              <InterfaceBuilder
-                page={interfaceBuilderPage}
+            {useRecordReviewLayout ? (
+              <RecordReviewPage
+                page={page as any}
                 initialBlocks={memoizedBlocks}
                 isViewer={isViewer}
                 hideHeader={true}
-                pageTableId={pageTableId}
-                recordId={recordContext?.recordId ?? null}
-                recordTableId={recordContext?.tableId ?? null}
-                onRecordContextChange={setRecordContext}
-                mode="view"
+                onLayoutSave={page?.page_type === "record_view" ? handleRecordViewLayoutSave : undefined}
               />
-            </div>
-          ) : null}
-          {/* Loading overlay when blocks are loading - does not replace Canvas */}
-          {blocksLoading && (
-            <div className="absolute inset-0 bg-white/60 flex items-center justify-center z-10 pointer-events-none">
-              <LoadingSpinner size="lg" text="Loading blocks..." />
-            </div>
-          )}
+            ) : interfaceBuilderPage ? (
+              <div className="min-h-screen w-full min-w-0 flex flex-col">
+                <InterfaceBuilder
+                  page={interfaceBuilderPage}
+                  initialBlocks={memoizedBlocks}
+                  isViewer={isViewer}
+                  hideHeader={true}
+                  pageTableId={pageTableId}
+                  recordId={recordContext?.recordId ?? null}
+                  recordTableId={recordContext?.tableId ?? null}
+                  onRecordContextChange={setRecordContext}
+                  mode="view"
+                />
+              </div>
+            ) : null}
+            {blocksLoading && (
+              <div className="absolute inset-0 bg-white/60 flex items-center justify-center z-10 pointer-events-none">
+                <LoadingSpinner size="lg" text="Loading blocks..." />
+              </div>
+            )}
           </div>
-        ) : null}
+        )}
       </div>
 
       {/* Page settings now in RightSettingsPanel */}

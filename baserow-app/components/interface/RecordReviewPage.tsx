@@ -37,7 +37,6 @@ import { canDeleteRecord } from "@/lib/interface/record-actions"
 import { Button } from "@/components/ui/button"
 import { Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { useRightSettingsPanelData } from "@/contexts/RightSettingsPanelDataContext"
 import { useSelectionContext } from "@/contexts/SelectionContext"
 
 interface RecordReviewPageProps {
@@ -69,7 +68,6 @@ export default function RecordReviewPage({
   const [tableName, setTableName] = useState<string | null>(null)
   const { toast } = useToast()
   const { role: userRole } = useUserRole()
-  const { setData: setRightPanelData } = useRightSettingsPanelData()
   const { setSelectedContext } = useSelectionContext()
 
   const pageType = (page as any).page_type || (page as any).type || "record_review"
@@ -131,23 +129,14 @@ export default function RecordReviewPage({
     (page.settings as any)?.show_add_record === true ||
     (page.settings as any)?.showAddRecord === true
 
-  // Sync selected record to RightSettingsPanel and SelectionContext (record_view and record_review)
+  // Sync selected record to SelectionContext only (per architectural contract: no setRightPanelData)
   useEffect(() => {
     if (selectedRecordId && pageTableId) {
       setSelectedContext({ type: "record", recordId: selectedRecordId, tableId: pageTableId })
-      setRightPanelData({
-        recordId: selectedRecordId,
-        recordTableId: pageTableId,
-        fieldLayout,
-        onLayoutSave: onLayoutSave ?? null,
-        tableFields,
-      })
     } else {
-      // Don't auto-open RightSettingsPanel on load when no record selected
       setSelectedContext(null)
-      setRightPanelData({ recordId: null, recordTableId: null, fieldLayout: [], onLayoutSave: null, tableFields: [] })
     }
-  }, [selectedRecordId, pageTableId, fieldLayout, onLayoutSave, tableFields, setSelectedContext, setRightPanelData])
+  }, [selectedRecordId, pageTableId, setSelectedContext])
 
   // Handle record selection - reset to view mode when switching records (Airtable-style)
   const handleRecordSelect = useCallback((recordId: string) => {

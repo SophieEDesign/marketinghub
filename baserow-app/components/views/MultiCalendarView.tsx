@@ -166,6 +166,10 @@ export default function MultiCalendarView({
   const { openRecord } = useRecordPanel()
   const { openRecordModal } = useRecordModal()
   const { handleError } = useOperationFeedback()
+  const cascadeContext = useMemo(
+    () => (blockConfig ? { blockConfig } : undefined),
+    [blockConfig]
+  )
 
   // Respect block permissions + per-block add-record toggle (same contract as GridBlock).
   const appearance = (blockConfig as any)?.appearance || {}
@@ -677,9 +681,9 @@ export default function MultiCalendarView({
         onRecordClick(recordId, tableId)
         return
       }
-      openRecord(tableId, recordId, tableName, (blockConfig as any)?.modal_fields, (blockConfig as any)?.modal_layout, blockConfig ? { blockConfig } : undefined, interfaceMode, undefined, (blockConfig as any)?.field_layout)
+      openRecord(tableId, recordId, tableName, (blockConfig as any)?.modal_fields, (blockConfig as any)?.modal_layout, cascadeContext, interfaceMode, undefined, (blockConfig as any)?.field_layout)
     },
-    [blockConfig, onRecordClick, openRecord, interfaceMode]
+    [blockConfig, cascadeContext, onRecordClick, openRecord, interfaceMode]
   )
 
   const onCalendarDateClick = useCallback(
@@ -728,7 +732,7 @@ export default function MultiCalendarView({
       modalFields: Array.isArray((blockConfig as any)?.modal_fields) ? (blockConfig as any).modal_fields : undefined,
       initialData: newData,
       supabaseTableName: table.supabaseTable,
-      cascadeContext: blockConfig ? { blockConfig } : undefined,
+      cascadeContext,
       interfaceMode: interfaceMode ?? "view",
       onSave: () => loadAll(),
       onDeleted: () => loadAll(),

@@ -1,16 +1,21 @@
 "use client"
 
-import React, { createContext, useContext, useState, useCallback, useRef, ReactNode } from "react"
-import { useSelectionContext } from "@/contexts/SelectionContext"
-import { useRightSettingsPanelData } from "@/contexts/RightSettingsPanelDataContext"
+/**
+ * RecordModalContext — DELEGATE TO RecordPanel
+ *
+ * All record editing uses the right-side RecordPanel only.
+ * openRecordModal delegates to RecordPanelContext.openRecord.
+ * No modal component is rendered.
+ */
+
+import React, { createContext, useContext, useCallback, ReactNode } from "react"
+import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { TableField } from "@/types/fields"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { RecordEditorCascadeContext } from "@/lib/interface/record-editor-core"
 import type { FieldLayoutItem } from "@/lib/interface/field-layout-utils"
-import RecordModal from "@/components/calendar/RecordModal"
-import { ErrorBoundary } from "@/components/interface/ErrorBoundary"
 
-/** State for opening the global RecordModal. Mirrors RecordModalProps. */
+/** State for opening record (delegates to RecordPanel). */
 export interface RecordModalOpenState {
   tableId: string
   recordId: string | null
@@ -28,109 +33,58 @@ export interface RecordModalOpenState {
   interfaceMode?: "view" | "edit"
   onSave?: (createdRecordId?: string | null) => void
   onDeleted?: () => void | Promise<void>
-  /** Optional key suffix for modal remount (e.g. blockId) */
   keySuffix?: string
-  /** When true, skip RecordFields/sectioned and always use flat FieldEditor list (avoids React #185 in calendar). */
   forceFlatLayout?: boolean
 }
 
 interface RecordModalContextType {
-  /** Open the global RecordModal with the given state. */
   openRecordModal: (state: RecordModalOpenState) => void
-  /** Close the global RecordModal. */
   closeRecordModal: () => void
-  /** True when RecordModal is open (used to hide PageDisplaySettingsPanel per plan Step 4). */
+  /** Always false — modal removed; all editing in RecordPanel */
   isRecordModalOpen: boolean
 }
 
 const RecordModalContext = createContext<RecordModalContextType | undefined>(undefined)
 
 export function RecordModalProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<RecordModalOpenState | null>(null)
-  const onCloseRef = useRef<(() => void) | null>(null)
-  const lastRecordPanelRef = useRef<{ recordId: string; tableId: string } | null>(null)
-  const { setSelectedContext } = useSelectionContext()
-  const { setData: setRightPanelData } = useRightSettingsPanelData()
+  const { openRecord, closeRecord } = useRecordPanel()
 
-  const openRecordModal = useCallback((openState: RecordModalOpenState) => {
-    setState(openState)
-    // Sync with SelectionContext for single-active-context rule
-    if (openState.recordId) {
-      setSelectedContext({ type: "record", recordId: openState.recordId, tableId: openState.tableId })
-      // CRITICAL: Defer setRightPanelData to next tick to avoid React #185.
-      // Three synchronous state updates in one handler can cause cascading re-renders.
-      // Idempotent: only update if recordId/tableId actually changed (prevents update-depth issues).
-      queueMicrotask(() => {
-        const recordId = openState.recordId
-        const tableId = openState.tableId
-        if (!recordId) return
-        const prev = lastRecordPanelRef.current
-        if (prev?.recordId === recordId && prev?.tableId === tableId) return
-        lastRecordPanelRef.current = { recordId, tableId }
-        setRightPanelData({
-          recordId,
-          recordTableId: tableId,
-          fieldLayout: openState.fieldLayout ?? [],
-          onLayoutSave: openState.onLayoutSave ?? null,
-          tableFields: openState.tableFields ?? [],
-        })
-      })
-    }
-  }, [setSelectedContext, setRightPanelData])
-
-  const closeRecordModal = useCallback(() => {
-    setState(null)
-    // CRITICAL: Do NOT clear selection - selection persists when modal closes (Record Lifecycle Contract)
-    lastRecordPanelRef.current = null
-    // Clear record layout data from RightSettingsPanel
-    setRightPanelData({ recordId: null, recordTableId: null, fieldLayout: [], onLayoutSave: null, tableFields: [] })
-  }, [setRightPanelData])
-
-  const handleClose = useCallback(() => {
-    closeRecordModal()
-  }, [closeRecordModal])
-
-  const handleSave = useCallback(
-    (createdRecordId?: string | null) => {
-      state?.onSave?.(createdRecordId)
-      closeRecordModal()
+  const openRecordModal = useCallback(
+    (openState: RecordModalOpenState) => {
+      const tableName = openState.supabaseTableName ?? openState.tableId
+      if (openState.recordId) {
+        openRecord(
+          openState.tableId,
+          openState.recordId,
+          tableName,
+          openState.modalFields,
+          openState.modalLayout,
+          openState.cascadeContext,
+          openState.interfaceMode,
+          openState.onDeleted,
+          openState.fieldLayout,
+          openState.onLayoutSave ?? undefined,
+          openState.tableFields
+        )
+      }
+      // Create mode (recordId null): RecordPanel does not support yet — skip for now
     },
-    [state, closeRecordModal]
+    [openRecord]
   )
 
-  const handleDeleted = useCallback(async () => {
-    await state?.onDeleted?.()
-    closeRecordModal()
-  }, [state, closeRecordModal])
+  const closeRecordModal = useCallback(() => {
+    closeRecord()
+  }, [closeRecord])
+
+  const value: RecordModalContextType = {
+    openRecordModal,
+    closeRecordModal,
+    isRecordModalOpen: false,
+  }
 
   return (
-    <RecordModalContext.Provider value={{ openRecordModal, closeRecordModal, isRecordModalOpen: !!state }}>
+    <RecordModalContext.Provider value={value}>
       {children}
-      {/* CRITICAL: RecordModal mounts once, always in the same position. Control via props. Never conditional. */}
-      {/* ErrorBoundary catches React #185 (hook order) so we get componentStack in logs. */}
-      <ErrorBoundary>
-        <RecordModal
-          key="record-modal-global"
-          open={!!state}
-          onClose={handleClose}
-          tableId={state?.tableId ?? ""}
-          recordId={state?.recordId ?? null}
-          tableFields={state?.tableFields}
-          modalFields={state?.modalFields}
-          initialData={state?.initialData}
-          supabaseTableName={state?.supabaseTableName}
-          modalLayout={state?.modalLayout}
-          fieldLayout={state?.fieldLayout}
-          showFieldSections={state?.showFieldSections}
-          cascadeContext={state?.cascadeContext}
-          onSave={handleSave}
-          onDeleted={handleDeleted}
-          interfaceMode={state?.interfaceMode}
-          canEditLayout={state?.canEditLayout}
-          onLayoutSave={state?.onLayoutSave}
-          forceFlatLayout={state?.forceFlatLayout}
-        />
-      </ErrorBoundary>
     </RecordModalContext.Provider>
   )
 }

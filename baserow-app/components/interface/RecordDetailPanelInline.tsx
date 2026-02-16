@@ -8,12 +8,11 @@
  * Single source of truth: field_layout drives everything.
  */
 
+import { useMemo } from "react"
 import RecordEditor from "@/components/records/RecordEditor"
 import { useRecordModal } from "@/contexts/RecordModalContext"
 import type { TableField } from "@/types/fields"
 import type { FieldLayoutItem } from "@/lib/interface/field-layout-utils"
-import type { RecordEditorCascadeContext } from "@/lib/interface/record-editor-core"
-
 interface RecordDetailPanelInlineProps {
   pageId: string
   tableId: string | null
@@ -41,6 +40,7 @@ export default function RecordDetailPanelInline({
   onLayoutSave,
 }: RecordDetailPanelInlineProps) {
   const { openRecordModal } = useRecordModal()
+  const cascadeContext = useMemo(() => ({ pageConfig: {} }), [])
 
   if (!tableId) {
     return (
@@ -58,8 +58,6 @@ export default function RecordDetailPanelInline({
       </div>
     )
   }
-
-  const cascadeContext: RecordEditorCascadeContext = { pageConfig: {} }
 
   return (
     <div className="flex flex-col h-full overflow-hidden">

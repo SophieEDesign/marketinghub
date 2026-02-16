@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useEffect, ReactNode } from "react"
+import { createContext, useContext, useEffect, useCallback, useMemo, ReactNode } from "react"
 import { useEditMode } from "./EditModeContext"
 
 /**
@@ -33,21 +33,29 @@ export function SidebarModeProvider({ children }: { children: ReactNode }) {
 
   const isSidebarEditing = isEditing("sidebar")
   const mode: SidebarMode = isSidebarEditing ? "edit" : "view"
-  
-  const setMode = (newMode: SidebarMode) => {
-    if (newMode === "edit") {
-      enterEditMode("sidebar")
-    } else {
-      exitEditMode("sidebar")
-    }
-  }
 
-  const toggleMode = () => {
+  const setMode = useCallback(
+    (newMode: SidebarMode) => {
+      if (newMode === "edit") {
+        enterEditMode("sidebar")
+      } else {
+        exitEditMode("sidebar")
+      }
+    },
+    [enterEditMode, exitEditMode]
+  )
+
+  const toggleMode = useCallback(() => {
     toggleEditMode("sidebar")
-  }
+  }, [toggleEditMode])
+
+  const value = useMemo(
+    () => ({ mode, setMode, toggleMode }),
+    [mode, setMode, toggleMode]
+  )
 
   return (
-    <SidebarModeContext.Provider value={{ mode, setMode, toggleMode }}>
+    <SidebarModeContext.Provider value={value}>
       {children}
     </SidebarModeContext.Provider>
   )

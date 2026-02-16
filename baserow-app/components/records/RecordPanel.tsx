@@ -4,7 +4,6 @@ import { useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { X, Pin, PinOff, Maximize2, Minimize2, Copy as CopyIcon, ChevronLeft } from "lucide-react"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
-import { useRecordModal } from "@/contexts/RecordModalContext"
 import { useToast } from "@/components/ui/use-toast"
 import RecordEditor from "./RecordEditor"
 import { useIsMobile } from "@/hooks/useResponsive"
@@ -21,7 +20,6 @@ export default function RecordPanel() {
     toggleFullscreen,
     goBack,
   } = useRecordPanel()
-  const { openRecordModal } = useRecordModal()
   const { toast } = useToast()
   const router = useRouter()
   const isMobile = useIsMobile()
@@ -29,38 +27,11 @@ export default function RecordPanel() {
   const isResizingRef = useRef(false)
   const resizeCleanupRef = useRef<null | (() => void)>(null)
 
-  const active = Boolean(state.isOpen && state.tableId && state.recordId)
+  const active = Boolean(state.isOpen && state.tableId)
   const interfaceMode = state.interfaceMode ?? "view"
 
-  const handleOpenModal = useCallback(() => {
-    if (!state.tableId || !state.recordId) return
-    closeRecord()
-    openRecordModal({
-      tableId: state.tableId,
-      recordId: state.recordId,
-      supabaseTableName: state.tableName ?? undefined,
-      modalFields: state.modalFields,
-      modalLayout: state.modalLayout,
-      fieldLayout: state.fieldLayout,
-      cascadeContext: state.cascadeContext,
-      interfaceMode,
-      onDeleted: state.onRecordDeleted,
-    })
-  }, [
-    state.tableId,
-    state.recordId,
-    state.tableName,
-    state.modalFields,
-    state.modalLayout,
-    state.fieldLayout,
-    state.cascadeContext,
-    state.onRecordDeleted,
-    interfaceMode,
-    closeRecord,
-    openRecordModal,
-  ])
-
   const handleCopyLink = useCallback(() => {
+    if (!state.recordId) return
     const url = `${window.location.origin}/tables/${state.tableId}/records/${state.recordId}`
     navigator.clipboard.writeText(url)
     toast({
@@ -109,8 +80,9 @@ export default function RecordPanel() {
         />
       )}
 
+      {/* Key: remount on record change only; interfaceMode is a prop, not a key */}
       <div
-        key={`record-panel-${state.recordId}-${interfaceMode}`}
+        key={`record-panel-${state.recordId}`}
         className={`${
           useOverlayLayout
             ? "fixed right-0 top-0 h-full z-50"
@@ -173,13 +145,15 @@ export default function RecordPanel() {
             )}
           </div>
           <div className="flex items-center gap-1">
-            <button
-              onClick={handleCopyLink}
-              className="p-1.5 hover:bg-gray-200 rounded transition-colors"
-              title="Copy link"
-            >
-              <CopyIcon className="h-4 w-4 text-gray-600" />
-            </button>
+            {state.recordId && (
+              <button
+                onClick={handleCopyLink}
+                className="p-1.5 hover:bg-gray-200 rounded transition-colors"
+                title="Copy link"
+              >
+                <CopyIcon className="h-4 w-4 text-gray-600" />
+              </button>
+            )}
             <button
               onClick={togglePin}
               className={`p-1.5 hover:bg-gray-200 rounded transition-colors ${
@@ -222,6 +196,7 @@ export default function RecordPanel() {
             tableId={state.tableId ?? ""}
             mode="review"
             fieldLayoutConfig={state.fieldLayout}
+            tableFields={state.tableFields}
             supabaseTableName={state.tableName}
             cascadeContext={state.cascadeContext}
             active={active}
@@ -230,11 +205,12 @@ export default function RecordPanel() {
               state.onRecordDeleted?.()
               closeRecord()
             }}
-            onOpenModal={handleOpenModal}
             interfaceMode={interfaceMode}
             renderHeaderActions={false}
             modalLayout={state.modalLayout}
             modalFields={state.modalFields}
+            canEditLayout={!!state.onLayoutSave}
+            onLayoutSave={state.onLayoutSave}
           />
         </div>
       </div>

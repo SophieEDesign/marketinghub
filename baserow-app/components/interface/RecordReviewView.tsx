@@ -113,6 +113,10 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   const { openRecordModal } = useRecordModal()
   
   const allowEditing = config.allow_editing || false
+  const cascadeContext = useMemo(
+    () => (config ? { pageConfig: config } : undefined),
+    [config]
+  )
 
   // Get columns from config or data - ensure it's always an array
   const columns = useMemo(() => {
@@ -1060,7 +1064,7 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
             fieldLayoutConfig={fieldLayout}
             tableFields={tableFields}
             supabaseTableName={tableName}
-            cascadeContext={{ pageConfig: config }}
+            cascadeContext={cascadeContext}
             active={true}
             allowEdit={pageEditable}
             onDeleted={() => handleRecordDelete(selectedRecordId)}
@@ -1072,7 +1076,7 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
                 supabaseTableName: tableName ?? undefined,
                 fieldLayout,
                 tableFields,
-                cascadeContext: { pageConfig: config },
+                cascadeContext,
                 interfaceMode: isEditing ? 'edit' : 'view',
               })
             }

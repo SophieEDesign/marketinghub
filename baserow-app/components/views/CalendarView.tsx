@@ -169,6 +169,10 @@ export default function CalendarView({
   // to get new identity → FullCalendar reinit → React #185. Reading from ref stabilizes the handler.
   const blockConfigRef = useRef<typeof blockConfig | null>(null)
   blockConfigRef.current = blockConfig
+  const cascadeContext = useMemo(
+    () => (blockConfig ? { blockConfig } : undefined),
+    [blockConfig]
+  )
   const router = useRouter()
   const [rows, setRows] = useState<TableRow[]>([])
   // CRITICAL: Use ref to access latest rows in callbacks without causing re-renders
@@ -1761,7 +1765,7 @@ export default function CalendarView({
           supabaseTableName ?? "",
           Array.isArray(bc?.modal_fields) ? bc.modal_fields : undefined,
           bc?.modal_layout,
-          bc ? { blockConfig: bc } : undefined,
+          cascadeContext ?? undefined,
           interfaceMode,
           () => { if (resolvedTableId && supabaseTableName && loadRowsRef.current) loadRowsRef.current() },
           (bc as any)?.field_layout,
@@ -1770,7 +1774,7 @@ export default function CalendarView({
         )
       })
     },
-    [allowOpenRecord, onRecordClick, resolvedDateFieldNames, openRecordPanel, resolvedTableId, loadedTableFields, supabaseTableName, interfaceMode, onModalLayoutSave]
+    [allowOpenRecord, onRecordClick, resolvedDateFieldNames, openRecordPanel, resolvedTableId, loadedTableFields, supabaseTableName, interfaceMode, onModalLayoutSave, cascadeContext]
   )
   const handleEventClickRef = useRef(handleEventClickImpl)
   handleEventClickRef.current = handleEventClickImpl
@@ -1799,7 +1803,7 @@ export default function CalendarView({
         modalFields: Array.isArray(bc?.modal_fields) ? bc.modal_fields : [],
         modalLayout: bc?.modal_layout,
         supabaseTableName,
-        cascadeContext: bc ? { blockConfig: bc } : undefined,
+        cascadeContext,
         canEditLayout,
         onLayoutSave: onModalLayoutSave,
         interfaceMode,
@@ -1810,7 +1814,7 @@ export default function CalendarView({
         forceFlatLayout: true,
       })
     },
-    [canCreateRecord, resolvedTableId, resolvedDateFieldId, openRecordModal, combinedFiltersForDefaults, loadedTableFields, viewConfig, supabaseTableName, canEditLayout, onModalLayoutSave, interfaceMode, blockId]
+    [canCreateRecord, resolvedTableId, resolvedDateFieldId, openRecordModal, combinedFiltersForDefaults, loadedTableFields, viewConfig, supabaseTableName, canEditLayout, onModalLayoutSave, interfaceMode, blockId, cascadeContext]
   )
   const handleDateClickRef = useRef(handleDateClickImpl)
   handleDateClickRef.current = handleDateClickImpl
