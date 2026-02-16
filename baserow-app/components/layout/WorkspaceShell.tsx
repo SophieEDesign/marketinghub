@@ -46,10 +46,10 @@ interface InterfaceGroup {
   name: string
   order_index: number
   collapsed: boolean
-  workspace_id?: string | null
+  _id?: string | null
 }
 
-interface WorkspaceShellProps {
+interface ShellProps {
   children: React.ReactNode
   title?: string
   tables: Table[]
@@ -63,7 +63,7 @@ interface WorkspaceShellProps {
   defaultPageId?: string | null // For "Back to home" link - never link to abstract /
 }
 
-export default function WorkspaceShell({
+export default function Shell({
   children,
   title,
   tables,
@@ -75,7 +75,7 @@ export default function WorkspaceShell({
   hideTopbar = false,
   hideRecordPanel = false,
   defaultPageId = null,
-}: WorkspaceShellProps) {
+}: ShellProps) {
   const isMobile = useIsMobile()
   const { primaryColor } = useBranding()
   // On mobile: sidebar closed by default
@@ -106,7 +106,7 @@ export default function WorkspaceShell({
       <RecordModalProvider>
       <PageActionsProvider>
       <MainScrollProvider>
-        <WorkspaceShellContent
+        <ShellContent
           hideTopbar={hideTopbar}
           isMobile={isMobile}
           sidebarOpen={sidebarOpen}
@@ -123,7 +123,7 @@ export default function WorkspaceShell({
           defaultPageId={defaultPageId}
         >
           {children}
-        </WorkspaceShellContent>
+        </ShellContent>
       </MainScrollProvider>
       </PageActionsProvider>
       <RightSettingsPanel />
@@ -134,7 +134,7 @@ export default function WorkspaceShell({
   )
 }
 
-function WorkspaceShellContent({
+function ShellContent({
   children,
   title,
   tables,
@@ -149,7 +149,7 @@ function WorkspaceShellContent({
   sidebarOpen,
   setSidebarOpen,
   primaryColor,
-}: WorkspaceShellProps & {
+}: ShellProps & {
   isMobile: boolean
   sidebarOpen: boolean
   setSidebarOpen: (v: boolean) => void

@@ -2728,16 +2728,6 @@ export default function Canvas({
                 willChange: keyboardMoveHighlight === block.id ? 'transform' : 'auto',
                 transitionProperty: 'transform, opacity',
               }}
-                // CRITICAL: Do NOT set minHeight - height must be DERIVED from content
-                // minHeight causes gaps when blocks collapse - it persists after collapse
-                // Height must come from content and current expansion state only
-                // CRITICAL: No height transitions - they delay reflow on collapse
-                // Airtable prioritises correctness over animation
-                // Only animate non-layout properties (transform, opacity) if needed
-                willChange: keyboardMoveHighlight === block.id ? 'transform' : 'auto',
-                // Removed height from transition - height changes must be immediate
-                transitionProperty: 'transform, opacity',
-              }}
             >
               <BlockAppearanceWrapper 
                 block={block}
