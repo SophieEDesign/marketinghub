@@ -2,6 +2,9 @@
 /**
  * Canonical block renderer (PageBlock). For the parallel ViewBlock path see components/blocks/BlockRenderer.tsx (adapter candidate).
  * See docs/architecture/BLOCK_SYSTEM_CANONICAL.md.
+ *
+ * CRITICAL: BlockRenderer MUST always render block content. Never return null based on isEditing.
+ * isEditing only affects behaviour (editability), not visibility. Block content must be visible in both view and edit mode.
  */
 
 import type { PageBlock, BlockType, ViewType, RecordContext } from "@/lib/interface/types"

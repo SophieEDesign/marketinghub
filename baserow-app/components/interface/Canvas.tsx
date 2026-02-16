@@ -1937,7 +1937,7 @@ export default function Canvas({
       <div
         ref={containerRef}
         className={`flex-1 w-full min-h-0 min-w-0 relative ${isFullPageMode ? "overflow-hidden" : ""}`}
-        style={isFullPageMode ? undefined : { paddingBottom: isEditing ? "80px" : "80px", background: "rgba(255,0,0,0.1)" }}
+        style={isFullPageMode ? undefined : { paddingBottom: isEditing ? "80px" : "80px" }}
         onClick={(e) => {
           // Context-driven: clicking empty canvas selects page (opens page settings)
           // Blocks use stopPropagation, so only empty-area clicks reach here
@@ -2576,7 +2576,7 @@ export default function Canvas({
             return (
               <div
                 key={block.id}
-                className={`relative transition-all duration-200 ${
+                className={`block-container relative transition-all duration-200 ${
                   isEditing
                     ? `group bg-white border-2 border-dashed border-gray-200 hover:border-gray-300 rounded-lg shadow-sm hover:shadow-md ${
                         selectedBlockId === block.id
@@ -2718,15 +2718,16 @@ export default function Canvas({
                 View Only
             </div>
             
-            {/* Block Content */}
-            {/* CRITICAL: No min-height - height must be DERIVED from content */}
-            {/* min-h-0 allows flex children to shrink below content size */}
-            {/* INVARIANT: Field blocks never scroll; only the record container scrolls. */}
-            {/* In view mode use overflow-auto for non-field blocks so saved block sizes are respected; field blocks use overflow-visible. */}
+            {/* Block Content - ALWAYS visible; never conditional on isEditing */}
+            {/* CRITICAL: Block content must render in both view and edit mode. Only edit chrome is conditional. */}
             <div 
-              className={`h-full w-full min-h-0 rounded-lg ${block.config?.locked ? 'pointer-events-none opacity-75' : ''} ${block.type === 'field' ? 'overflow-visible' : isEditing ? 'overflow-hidden' : 'overflow-auto'}`}
+              className={`block-content h-full w-full min-h-0 rounded-lg ${block.config?.locked ? 'pointer-events-none opacity-75' : ''} ${block.type === 'field' ? 'overflow-visible' : isEditing ? 'overflow-hidden' : 'overflow-auto'}`}
               data-block-id={block.id}
               style={{
+                visibility: 'visible',
+                willChange: keyboardMoveHighlight === block.id ? 'transform' : 'auto',
+                transitionProperty: 'transform, opacity',
+              }}
                 // CRITICAL: Do NOT set minHeight - height must be DERIVED from content
                 // minHeight causes gaps when blocks collapse - it persists after collapse
                 // Height must come from content and current expansion state only
