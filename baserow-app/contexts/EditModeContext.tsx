@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from "react"
+import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback, useMemo } from "react"
 
 /**
  * Unified Edit Mode Context
@@ -117,9 +117,24 @@ export function EditModeProvider({ children, isViewer = false }: EditModeProvide
     localStorage.setItem("sidebar-edit-mode", String(isSidebarEditing))
   }, [state.activeScopes, isViewer])
 
-  // CRITICAL: No automatic edit enabling (e.g. if isAdmin enterBlockEdit) - edit mode only changes when user clicks Edit
-  // Block scope reset is handled by InterfacePageClient when pageId changes (calls exitBlockEdit)
-  // Do NOT use pathname, router, or searchParams for reset - only pageId in the page component
+  // CRITICAL: Edit state only changes when enterBlockEdit/exitBlockEdit (or enter/exit for other scopes) is called.
+  // Do NOT clear block scope or editingPageId on navigation - state persists across page changes.
+
+  // Save block edit mode per page to localStorage - only on explicit enter/exit, not on navigation
+  const prevBlockPageIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (isViewer) return
+    const isBlockEditing = state.activeScopes.has("block")
+    const pageId = state.editingPageId
+    if (isBlockEditing && pageId) {
+      localStorage.setItem(`block-edit-mode-${pageId}`, "true")
+      prevBlockPageIdRef.current = pageId
+    } else if (prevBlockPageIdRef.current) {
+      // User explicitly exited block scope - save false for that page only
+      localStorage.setItem(`block-edit-mode-${prevBlockPageIdRef.current}`, "false")
+      prevBlockPageIdRef.current = null
+    }
+  }, [state.activeScopes, state.editingPageId, isViewer])
 
   // Save page edit mode to localStorage when it changes
   useEffect(() => {

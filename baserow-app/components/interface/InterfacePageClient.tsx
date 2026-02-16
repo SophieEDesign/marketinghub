@@ -97,7 +97,16 @@ function InterfacePageClientInternal({
   // CRITICAL: Track if loadBlocks is currently executing to prevent concurrent calls
   const blocksLoadingRef = useRef<boolean>(false)
   
-  // CRITICAL: Edit mode reset is handled in the route-change effect below (pageId dependency)
+  // Restore block edit mode from localStorage when navigating to a page (persists across refresh/navigation)
+  useEffect(() => {
+    if (!pageId || typeof window === "undefined") return
+    const saved = localStorage.getItem(`block-edit-mode-${pageId}`)
+    if (saved === "true") {
+      enterBlockEdit()
+    }
+  }, [pageId, enterBlockEdit])
+
+  // CRITICAL: Edit state is NOT reset on navigation - only when user explicitly exits
   // Do NOT add effects that depend on blocks, page, or edit mode - they cause remount loops
   
   // Inline title editing state
@@ -140,7 +149,9 @@ function InterfacePageClientInternal({
     resolveTableId()
   }, [page?.id, page?.base_table, page?.saved_view_id])
 
-  // CRITICAL: When route pageId changes (navigation), reset page state so we refetch and remount
+  // CRITICAL: When route pageId changes (navigation), reset page state so we refetch and remount.
+  // Do NOT call exitPageEdit/exitBlockEdit - edit state persists across navigation.
+  // Only change edit state when user explicitly calls enter/exit via UI.
   useEffect(() => {
     if (previousRoutePageIdRef.current !== null && previousRoutePageIdRef.current !== pageId) {
       setPage(null)
@@ -150,12 +161,10 @@ function InterfacePageClientInternal({
       initialPageRef.current = null // so loadPage() runs for the new page
       blocksLoadedRef.current = { pageId: null, loaded: false }
       previousPageIdRef.current = null
-      exitPageEdit()
-      exitBlockEdit()
       setSelectedContext(null)
     }
     previousRoutePageIdRef.current = pageId
-  }, [pageId, exitPageEdit, exitBlockEdit, setSelectedContext])
+  }, [pageId, setSelectedContext])
 
   useEffect(() => {
     // CRITICAL: Only load if we don't have initial page and haven't loaded yet
