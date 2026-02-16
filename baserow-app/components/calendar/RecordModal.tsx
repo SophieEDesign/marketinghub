@@ -461,9 +461,9 @@ export default function RecordModal({
           </div>
         </div>
 
-        {/* Scrollable content area. Key forces full remount when leaving loading to avoid React #185 (hook order). */}
+        {/* Scrollable content area. Key by record identity only - do NOT include loading state. */}
         <div
-          key={`modal-body-${recordId ?? 'new'}-${loading ? 'loading' : 'ready'}`}
+          key={`modal-body-${recordId ?? 'new'}`}
           className={isEditingLayout ? "flex-1 flex overflow-hidden" : "flex-1 overflow-y-auto px-6"}
         >
           {loading ? (

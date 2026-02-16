@@ -81,16 +81,10 @@ export default function GroupedInterfaces({
   editMode = false,
   onRefresh,
 }: GroupedInterfacesProps) {
-  const params = useParams()
   const pathname = usePathname()
   const router = useRouter()
-  const currentPageId = params?.pageId as string | undefined
-  console.log("Derived currentPageId:", currentPageId)
-  // #region agent log
-  if (typeof window !== "undefined") {
-    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GroupedInterfaces.tsx',message:'Derived currentPageId',data:{currentPageId},timestamp:Date.now(),hypothesisId:'params-fix'})}).catch(()=>{});
-  }
-  // #endregion
+  // Single source of truth: derive from pathname only (no params/searchParams mix)
+  const currentPageId = pathname?.match(/\/pages\/([^/?]+)/)?.[1] ?? undefined
   const { primaryColor, sidebarTextColor } = useBranding()
   const { toast } = useToast()
   // Filter out any null/undefined groups (safety check)
@@ -889,8 +883,6 @@ export default function GroupedInterfaces({
           isActive && "bg-black/20 font-semibold"
         )}
         onClick={(e) => {
-          console.log("Sidebar click:", targetPageId, "current:", currentPageId)
-          console.log("Calling router.push:", `/pages/${targetPageId}`)
           const debugEnabled = typeof window !== "undefined" && localStorage.getItem("DEBUG_NAVIGATION") === "1"
           const isCurrentlyActive = currentPageId === targetPageId
           
@@ -1026,8 +1018,6 @@ export default function GroupedInterfaces({
                 color: primaryColor 
               } : { color: sidebarTextColor }}
               onClick={(e) => {
-                console.log("Sidebar click:", targetPageId, "current:", currentPageId)
-                console.log("Calling router.push:", `/pages/${targetPageId}`)
                 const debugEnabled = typeof window !== "undefined" && localStorage.getItem("DEBUG_NAVIGATION") === "1"
                 const isCurrentlyActive = currentPageId === targetPageId
                 

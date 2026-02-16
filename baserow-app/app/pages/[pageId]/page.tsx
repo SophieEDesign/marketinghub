@@ -13,9 +13,6 @@ export default async function PagePage({
   params: { pageId: string }
 }) {
   const { pageId } = params
-  // #region agent log
-  console.log('[PagePage] Server render with pageId:', pageId)
-  // #endregion
   const supabase = await createClient()
   const admin = await isAdmin()
 
@@ -121,7 +118,6 @@ export default async function PagePage({
   return (
     <WorkspaceShellWrapper title={pageName} hideTopbar={true} hideRecordPanel={hideRecordPanel}>
       <InterfacePageClient
-        key={pageId}
         pageId={pageId}
         initialPage={page || undefined}
         initialData={initialData}

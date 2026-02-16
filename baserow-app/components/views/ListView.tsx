@@ -1053,7 +1053,7 @@ export default function ListView({
 
         {/* Grouped Content */}
         <div className="flex-1 overflow-y-auto">
-          {flattenedGroups.map((it) => {
+          {flattenedGroups.map((it, idx) => {
             if (it.type === 'group') {
               const node = it.node
               const isCollapsed = collapsedGroups.has(node.pathKey)
@@ -1191,7 +1191,7 @@ export default function ListView({
 
             // Item row (card)
             const row = it.item as any
-            const key = `${String(row?.id ?? Math.random())}::${it.groupPathKey}`
+            const key = `${String(row?.id ?? `idx-${idx}`)}::${it.groupPathKey}`
             return (
               <div key={key} className="px-4 py-3">
                 {renderListItem(row)}

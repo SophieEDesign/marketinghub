@@ -47,6 +47,12 @@ function InterfacePageClientInternal({
   initialData = [],
   isAdmin = false
 }: InterfacePageClientProps) {
+  // #region agent log
+  if (typeof window !== "undefined") {
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfacePageClient.tsx:render',message:'InterfacePageClient pageId',data:{pageId,isUndefined:pageId===undefined},timestamp:Date.now()})}).catch(()=>{});
+  }
+  console.log("[InterfacePageClient] pageId:", pageId)
+  // #endregion
   const searchParams = useSearchParams()
   const router = useRouter()
   const { toast } = useToast()

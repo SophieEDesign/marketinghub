@@ -3461,7 +3461,7 @@ export default function GridView({
 
                   return (
                     <tr
-                      key={thisRowId ? `${thisRowId}::${it.groupPathKey}` : `row-${Math.random()}`}
+                      key={thisRowId ? `${thisRowId}::${it.groupPathKey}` : `group-row-${it.groupPathKey}-${idx}`}
                       className={`border-b border-gray-100 transition-colors ${
                         thisRowId && selectedRowId === thisRowId ? 'bg-blue-50' : 'hover:bg-gray-50/50'
                       } cursor-default`}
@@ -3646,7 +3646,7 @@ export default function GridView({
               ) : (
                 // Render ungrouped rows
                 // CRITICAL: filteredRows is already normalized, but guard for safety
-                filteredRows.map((row) => {
+                filteredRows.map((row, rowIndex) => {
                   const rowColor = getRowColor ? getRowColor(row) : null
                   const rowImage = getRowImage ? getRowImage(row) : null
                   const borderColor = rowColor ? { borderLeftColor: rowColor, borderLeftWidth: '4px' } : {}
@@ -3666,7 +3666,7 @@ export default function GridView({
                   
                   return (
                   <tr
-                    key={row?.id || `row-${Math.random()}`}
+                    key={row?.id || `row-${rowIndex}`}
                     className={`border-b border-gray-100 transition-colors ${
                       thisRowId && selectedRowId === thisRowId ? 'bg-blue-50' : 'hover:bg-gray-50/50'
                     } cursor-default`}

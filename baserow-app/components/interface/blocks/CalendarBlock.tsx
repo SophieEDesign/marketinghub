@@ -96,22 +96,6 @@ function CalendarBlock({
   }
   // #endregion
 
-  // #region HOOK CHECK - Before useMemo gridBlockKey
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[HOOK CHECK]', 'CalendarBlock before useMemo gridBlockKey')
-  }
-  // #endregion
-  // Stable key so GridBlock/CalendarView don't re-mount or re-run effects when only callback/filterTree identity changes
-  const gridBlockKey = useMemo(
-    () => `calendar-${block.id}-${interfaceMode}-${pageId ?? ''}-${(filters?.length ?? 0)}`,
-    [block.id, interfaceMode, pageId, filters?.length]
-  )
-  // #region HOOK CHECK - After useMemo gridBlockKey
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[HOOK CHECK]', 'CalendarBlock after useMemo gridBlockKey')
-  }
-  // #endregion
-
   // #region HOOK CHECK - Before useMemo gridBlockProps
   if (process.env.NODE_ENV === 'development') {
     console.log('[HOOK CHECK]', 'CalendarBlock before useMemo gridBlockProps')
@@ -154,7 +138,7 @@ function CalendarBlock({
   }
   // #endregion
 
-  return <GridBlock key={gridBlockKey} {...gridBlockProps} />
+  return <GridBlock key={block.id} {...gridBlockProps} />
 }
 
 export default React.memo(CalendarBlock)

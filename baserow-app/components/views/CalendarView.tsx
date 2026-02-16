@@ -834,12 +834,6 @@ export default function CalendarView({
     [filteredRows]
   )
 
-  // #region agent log
-  useEffect(() => {
-    console.log("[filteredRowsSignature] changed:", filteredRowsSignature?.slice(0, 80) + (filteredRowsSignature?.length > 80 ? "..." : ""))
-  }, [filteredRowsSignature])
-  // #endregion
-
   // Resolve display labels for any link_to_table fields shown on calendar cards.
   useEffect(() => {
     let cancelled = false
