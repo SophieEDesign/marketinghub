@@ -41,7 +41,7 @@ export default function EditModeGuard() {
 
       const href = link.getAttribute("href")
       if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) return
-      if (link.target === "_blank") return
+      if (link.getAttribute("target") === "_blank") return
 
       try {
         const url = new URL(href, window.location.origin)
