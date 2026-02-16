@@ -3316,7 +3316,7 @@ export default function GridView({
                   </td>
                 </tr>
               ) : flattenedGroups ? (
-                flattenedGroups.map((it) => {
+                flattenedGroups.map((it, idx) => {
                   if (it.type === 'group') {
                     const node = it.node
                     const isCollapsed = collapsedGroups.has(node.pathKey)
