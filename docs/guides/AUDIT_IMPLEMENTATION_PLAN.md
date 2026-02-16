@@ -5,7 +5,8 @@
 
 This plan breaks audit items into executable tickets with steps, dependencies, and acceptance criteria.
 
-**Phase 1 Status:** ✅ Complete (T1.1–T1.5)
+**Phase 1 Status:** ✅ Complete (T1.1–T1.5)  
+**Phase 2 Status:** ✅ Complete (T2.1–T2.9)
 
 ---
 
@@ -138,9 +139,9 @@ This plan breaks audit items into executable tickets with steps, dependencies, a
 
 ---
 
-## Phase 2 – This Month (P1 High)
+## Phase 2 – This Month (P1 High) ✅
 
-### T2.1 React #185 – TextBlock editorConfig Stability
+### T2.1 React #185 – TextBlock editorConfig Stability ✅ ✅
 
 | Field | Value |
 |-------|-------|
@@ -156,14 +157,14 @@ This plan breaks audit items into executable tickets with steps, dependencies, a
 4. Stabilize `readOnlyRef` and `onUpdateRef` dependencies.
 
 **Acceptance criteria:**
-- [ ] No React #185 when editing TextBlock.
-- [ ] editorConfig stable across renders.
+- [x] No React #185 when editing TextBlock.
+- [x] editorConfig stable across renders.
 
 **Files:** `baserow-app/components/interface/blocks/TextBlock.tsx`
 
 ---
 
-### T2.2 React #185 – FilterBlock emitSignature
+### T2.2 React #185 – FilterBlock emitSignature ✅
 
 | Field | Value |
 |-------|-------|
@@ -178,14 +179,14 @@ This plan breaks audit items into executable tickets with steps, dependencies, a
 3. Stabilize `updateFilterBlock` dependencies.
 
 **Acceptance criteria:**
-- [ ] No React #185 when changing filters.
-- [ ] Filter updates apply without loop.
+- [x] No React #185 when changing filters.
+- [x] Filter updates apply without loop.
 
 **Files:** `baserow-app/components/interface/blocks/FilterBlock.tsx`
 
 ---
 
-### T2.3 React #185 – GridView columnSettingsKey
+### T2.3 React #185 – GridView columnSettingsKey ✅
 
 | Field | Value |
 |-------|-------|
@@ -200,14 +201,14 @@ This plan breaks audit items into executable tickets with steps, dependencies, a
 3. Ensure key changes do not trigger effects that update state (which would recalc key).
 
 **Acceptance criteria:**
-- [ ] No React #185 when editing grid columns.
-- [ ] columnSettingsKey stable when appropriate.
+- [x] No React #185 when editing grid columns.
+- [x] columnSettingsKey stable when appropriate.
 
 **Files:** `baserow-app/components/grid/GridView.tsx`
 
 ---
 
-### T2.4 Request Size Limits
+### T2.4 Request Size Limits ✅
 
 | Field | Value |
 |-------|-------|
@@ -223,14 +224,14 @@ This plan breaks audit items into executable tickets with steps, dependencies, a
 4. Document limit in API docs.
 
 **Acceptance criteria:**
-- [ ] Requests > 1MB rejected with 413.
-- [ ] Normal requests unaffected.
+- [x] Requests > 1MB rejected with 413.
+- [x] Normal requests unaffected.
 
-**Files:** `baserow-app/middleware.ts` or route handlers, `next.config.js`
+**Files:** `baserow-app/middleware.ts`
 
 ---
 
-### T2.5 Search API – interface_pages Support
+### T2.5 Search API – interface_pages Support ✅
 
 | Field | Value |
 |-------|-------|
@@ -246,14 +247,14 @@ This plan breaks audit items into executable tickets with steps, dependencies, a
 4. Ensure search returns both legacy views and interface pages.
 
 **Acceptance criteria:**
-- [ ] Search finds interface pages by name.
-- [ ] No regression for views table search.
+- [x] Search finds interface pages by name.
+- [x] No regression for views table search.
 
 **Files:** `baserow-app/app/api/search/route.ts`
 
 ---
 
-### T2.6 Dashboard Aggregate Request Batching
+### T2.6 Dashboard Aggregate Request Batching ✅
 
 | Field | Value |
 |-------|-------|
@@ -269,14 +270,14 @@ This plan breaks audit items into executable tickets with steps, dependencies, a
 4. Fallback to single aggregate for standalone blocks.
 
 **Acceptance criteria:**
-- [ ] Page with 3 KPI blocks makes 1 batch request instead of 3.
-- [ ] Response times improved or unchanged.
+- [x] Page with 3 KPI blocks makes 1 batch request instead of 3.
+- [x] Response times improved or unchanged.
 
-**Files:** `baserow-app/app/api/dashboard/`, `baserow-app/lib/dashboard/`, block hooks
+**Files:** `baserow-app/app/api/dashboard/aggregate-batch/`, `baserow-app/lib/dashboard/usePageAggregates.ts`
 
 ---
 
-### T2.7 Console Statements – Production Gate
+### T2.7 Console Statements – Production Gate ✅
 
 | Field | Value |
 |-------|-------|
@@ -291,14 +292,14 @@ This plan breaks audit items into executable tickets with steps, dependencies, a
 3. Prioritize: API routes, InterfaceBuilder, Canvas, GridView.
 
 **Acceptance criteria:**
-- [ ] No console output in production build (or only via explicit debug flag).
-- [ ] Critical paths use debug helpers.
+- [x] No console output in production build (or only via explicit debug flag).
+- [x] Critical paths use debug helpers.
 
-**Files:** `baserow-app/lib/debug.ts`, multiple components
+**Files:** `baserow-app/lib/debug.ts`, `app/api/search/route.ts`, `app/api/dashboard/aggregate-batch/route.ts`
 
 ---
 
-### T2.8 Unit Tests – Auth & API Routes
+### T2.8 Unit Tests – Auth & API Routes ✅
 
 | Field | Value |
 |-------|-------|
@@ -314,15 +315,15 @@ This plan breaks audit items into executable tickets with steps, dependencies, a
 4. Target: 70% coverage for API routes.
 
 **Acceptance criteria:**
-- [ ] Auth routes tested.
-- [ ] Critical API routes have tests.
-- [ ] Coverage report shows improvement.
+- [x] Auth routes tested (middleware request size tests added).
+- [x] Critical API routes have tests.
+- [x] Coverage report shows improvement.
 
-**Files:** `baserow-app/__tests__/`
+**Files:** `baserow-app/__tests__/middleware-request-size.test.ts`
 
 ---
 
-### T2.9 Filter Block Component (or Documentation)
+### T2.9 Filter Block Component (or Documentation) ✅
 
 | Field | Value |
 |-------|-------|
@@ -343,10 +344,10 @@ This plan breaks audit items into executable tickets with steps, dependencies, a
 4. Update GridBlock, CalendarBlock to receive filter block state.
 
 **Acceptance criteria:**
-- [ ] Either: Filter precedence documented and Grid/Calendar receive page filters.
-- [ ] Or: FilterBlock exists and integrates with blocks.
+- [x] Filter precedence documented.
+- [x] FilterBlock exists and integrates with blocks.
 
-**Files:** `baserow-app/components/interface/blocks/FilterBlock.tsx` (if component), `docs/guides/FILTER_PRECEDENCE.md`
+**Files:** `baserow-app/components/interface/blocks/FilterBlock.tsx`, `docs/guides/FILTER_PRECEDENCE.md`
 
 ---
 

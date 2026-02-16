@@ -162,13 +162,11 @@ export default function InlineSelectDropdown({
         : [...selectedValues, choice]
       await onValueChange(newValues)
     } else {
-      // For single select, allow "toggle off" by clicking the currently-selected option.
-      if (selectedValues[0] === choice) {
-        await onValueChange(null)
-      } else {
-        await onValueChange(choice)
-      }
+      // For single select: close dropdown immediately for instant feedback, then save in background.
+      // This prevents UI blocking from the async updateCell/setRows cascade.
       handleOpenChange(false)
+      const newValue = selectedValues[0] === choice ? null : choice
+      void onValueChange(newValue) // Errors handled by SelectCell/RecordFieldPanel via onSave
     }
   }
 

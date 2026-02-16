@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { aggregateTableData, comparePeriods, type AggregateFunction } from '@/lib/dashboard/aggregations'
+import { debugError } from '@/lib/debug'
 import { getCachedAggregate, setCachedAggregate, getOrCreatePromise } from '@/lib/dashboard/aggregateCache'
 import { createClient } from '@/lib/supabase/server'
 
@@ -96,7 +97,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ results })
   } catch (error: any) {
-    console.error('Error aggregating data:', error)
+    debugError('Error aggregating data:', error)
     return NextResponse.json(
       { error: error.message || 'Failed to aggregate data' },
       { status: 500 }

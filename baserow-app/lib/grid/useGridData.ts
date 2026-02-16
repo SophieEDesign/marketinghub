@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, startTransition } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import type { TableField } from '@/types/fields'
 import { asArray } from '@/lib/utils/asArray'
@@ -679,8 +679,8 @@ export function useGridData({
               
               if (res.ok && syncResult.success) {
                 console.log('[useGridData] Schema sync result:', syncResult)
-                // Wait a moment for PostgREST cache to refresh
-                await new Promise(resolve => setTimeout(resolve, 500))
+                // Brief wait for PostgREST cache to refresh (reduced from 500ms for faster select UX)
+                await new Promise(resolve => setTimeout(resolve, 150))
                 await refreshPhysicalColumns(true)
                 
                 // Check if the column was added or if it's still missing
@@ -789,8 +789,8 @@ export function useGridData({
                 )
               }
 
-              // Wait a moment for PostgREST cache to refresh
-              await new Promise(resolve => setTimeout(resolve, 500))
+              // Brief wait for PostgREST cache to refresh (reduced from 500ms for faster select UX)
+              await new Promise(resolve => setTimeout(resolve, 150))
               
               // Retry the update with the array value
               const retry = await doUpdate(finalSavedValue)
@@ -861,12 +861,14 @@ export function useGridData({
           }
         }
 
-        // Optimistically update local state
-        setRows((prevRows) =>
-          prevRows.map((row) =>
-            row.id === rowId ? { ...row, [fieldName]: finalSavedValue } : row
+        // Optimistically update local state - use startTransition to avoid blocking UI
+        startTransition(() => {
+          setRows((prevRows) =>
+            prevRows.map((row) =>
+              row.id === rowId ? { ...row, [fieldName]: finalSavedValue } : row
+            )
           )
-        )
+        })
       } catch (err: unknown) {
         console.error('Error updating cell:', {
           tableName,

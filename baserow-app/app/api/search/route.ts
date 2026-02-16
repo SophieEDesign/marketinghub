@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { isAdmin } from '@/lib/roles'
+import { debugError } from '@/lib/debug'
 
 /**
  * GET /api/search - Global search across tables, pages, views, interfaces
@@ -121,9 +122,17 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ items: results })
+    // Deduplicate by ID (views and interface_pages can overlap in legacy setups)
+    const seen = new Set<string>()
+    const deduped = results.filter((r) => {
+      if (seen.has(r.id)) return false
+      seen.add(r.id)
+      return true
+    })
+
+    return NextResponse.json({ items: deduped })
   } catch (error: any) {
-    console.error('Error searching:', error)
+    debugError('Error searching:', error)
     return NextResponse.json(
       { error: error.message || 'Failed to search' },
       { status: 500 }

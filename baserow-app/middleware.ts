@@ -103,8 +103,25 @@ function isProtectedApiRoute(pathname: string): boolean {
   return true;
 }
 
+/** Max request body size for API routes (1MB) - returns 413 when exceeded */
+const API_BODY_SIZE_LIMIT_BYTES = 1024 * 1024;
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  // Request size limit for API routes (POST/PUT/PATCH with body)
+  if (pathname.startsWith('/api/') && ['POST', 'PUT', 'PATCH'].includes(req.method)) {
+    const contentLength = req.headers.get('content-length');
+    if (contentLength) {
+      const size = parseInt(contentLength, 10);
+      if (!Number.isNaN(size) && size > API_BODY_SIZE_LIMIT_BYTES) {
+        return new NextResponse(
+          JSON.stringify({ error: 'Payload too large', message: `Request body exceeds ${API_BODY_SIZE_LIMIT_BYTES / 1024 / 1024}MB limit` }),
+          { status: 413, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+  }
 
   // Skip static assets and Next.js internals
   if (
