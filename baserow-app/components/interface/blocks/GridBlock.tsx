@@ -57,7 +57,7 @@ interface GridBlockProps {
   openRecordInEditModeForBlock?: { blockId: string; recordId: string; tableId: string } | null
 }
 
-function GridBlockInner({
+export default function GridBlock({
   block,
   isEditing = false,
   interfaceMode = 'view',
@@ -1333,31 +1333,4 @@ function GridBlockInner({
     </div>
   )
 }
-
-// Memoize to prevent re-render cascade (logs showed 60+ renders in 100ms from context updates)
-function blockPropsEqual(prev: GridBlockProps, next: GridBlockProps): boolean {
-  if (prev.block.id !== next.block.id) return false
-  if (prev.block.type !== next.block.type) return false
-  if (prev.block.x !== next.block.x || prev.block.y !== next.block.y || prev.block.w !== next.block.w || prev.block.h !== next.block.h) return false
-  const prevConfig = prev.block.config || {}
-  const nextConfig = next.block.config || {}
-  if (JSON.stringify(prevConfig) !== JSON.stringify(nextConfig)) return false
-  if (prev.isEditing !== next.isEditing) return false
-  if (prev.interfaceMode !== next.interfaceMode) return false
-  if (prev.pageTableId !== next.pageTableId) return false
-  if (prev.pageId !== next.pageId) return false
-  if (prev.recordId !== next.recordId) return false
-  if (prev.pageShowAddRecord !== next.pageShowAddRecord) return false
-  if (prev.canEditLayout !== next.canEditLayout) return false
-  if (prev.isFullPage !== next.isFullPage) return false
-  // Compare by content - parent often passes filters ?? [] or new filterTree ref with same content
-  if (JSON.stringify(prev.filters ?? []) !== JSON.stringify(next.filters ?? [])) return false
-  if (JSON.stringify(prev.filterTree ?? null) !== JSON.stringify(next.filterTree ?? null)) return false
-  const openPrev = prev.openRecordInEditModeForBlock
-  const openNext = next.openRecordInEditModeForBlock
-  if (openPrev?.blockId !== openNext?.blockId || openPrev?.recordId !== openNext?.recordId || openPrev?.tableId !== openNext?.tableId) return false
-  return true
-}
-
-export default React.memo(GridBlockInner, blockPropsEqual)
 

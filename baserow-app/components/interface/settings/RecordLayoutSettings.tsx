@@ -129,7 +129,11 @@ export default function RecordLayoutSettings({
       if (existing) {
         return prev.map((i) =>
           i.field_name === fieldName || i.field_id === fieldName
-            ? { ...i, visible_in_canvas: visible }
+            ? {
+                ...i,
+                visible_in_canvas: visible,
+                visible_in_modal: visible,
+              }
             : i
         )
       }
@@ -141,6 +145,7 @@ export default function RecordLayoutSettings({
         order: Math.max(...prev.map((i) => i.order), -1) + 1,
         editable: true,
         visible_in_canvas: visible,
+        visible_in_modal: visible,
       }
       return [...prev, newItem]
     })
