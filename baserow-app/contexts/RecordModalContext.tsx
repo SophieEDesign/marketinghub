@@ -48,6 +48,7 @@ const RecordModalContext = createContext<RecordModalContextType | undefined>(und
 export function RecordModalProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<RecordModalOpenState | null>(null)
   const onCloseRef = useRef<(() => void) | null>(null)
+  const lastRecordPanelRef = useRef<{ recordId: string; tableId: string } | null>(null)
   const { setSelectedContext } = useSelectionContext()
   const { setData: setRightPanelData } = useRightSettingsPanelData()
 
@@ -56,13 +57,22 @@ export function RecordModalProvider({ children }: { children: ReactNode }) {
     // Sync with SelectionContext for single-active-context rule
     if (openState.recordId) {
       setSelectedContext({ type: "record", recordId: openState.recordId, tableId: openState.tableId })
-      // Sync record layout data to RightSettingsPanel
-      setRightPanelData({
-        recordId: openState.recordId,
-        recordTableId: openState.tableId,
-        fieldLayout: openState.fieldLayout ?? [],
-        onLayoutSave: openState.onLayoutSave ?? null,
-        tableFields: openState.tableFields ?? [],
+      // CRITICAL: Defer setRightPanelData to next tick to avoid React #185.
+      // Three synchronous state updates in one handler can cause cascading re-renders.
+      // Idempotent: only update if recordId/tableId actually changed (prevents update-depth issues).
+      queueMicrotask(() => {
+        const recordId = openState.recordId
+        const tableId = openState.tableId
+        const prev = lastRecordPanelRef.current
+        if (prev?.recordId === recordId && prev?.tableId === tableId) return
+        lastRecordPanelRef.current = { recordId, tableId }
+        setRightPanelData({
+          recordId,
+          recordTableId: tableId,
+          fieldLayout: openState.fieldLayout ?? [],
+          onLayoutSave: openState.onLayoutSave ?? null,
+          tableFields: openState.tableFields ?? [],
+        })
       })
     }
   }, [setSelectedContext, setRightPanelData])
@@ -70,6 +80,7 @@ export function RecordModalProvider({ children }: { children: ReactNode }) {
   const closeRecordModal = useCallback(() => {
     setState(null)
     setSelectedContext(null)
+    lastRecordPanelRef.current = null
     // Clear record layout data from RightSettingsPanel
     setRightPanelData({ recordId: null, recordTableId: null, fieldLayout: [], onLayoutSave: null, tableFields: [] })
   }, [setSelectedContext, setRightPanelData])
