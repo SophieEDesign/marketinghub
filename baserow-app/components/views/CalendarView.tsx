@@ -163,25 +163,11 @@ export default function CalendarView({
     debugWarn('CALENDAR', 'CalendarView: fieldIdsProp is not an array:', { type: typeof fieldIdsProp, value: fieldIdsProp })
     return []
   }, [fieldIdsProp])
-  // #region agent log – H1: fieldIdsProp stability (new ref each render = loop risk)
-  const fieldIdsPropRef = useRef<typeof fieldIdsProp | null>(null)
-  const fieldIdsPropKey = Array.isArray(fieldIdsProp) ? fieldIdsProp.join('|') : ''
-  if (typeof window !== 'undefined' && fieldIdsPropRef.current !== fieldIdsProp) {
-    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:fieldIdsProp',message:'fieldIdsProp ref changed',data:{prevRef:!!fieldIdsPropRef.current,contentKey:fieldIdsPropKey?.substring(0,50),hypothesisId:'H1'},timestamp:Date.now()})}).catch(()=>{});
-    fieldIdsPropRef.current = fieldIdsProp
-  }
-  // #endregion
   // CRITICAL: Ref for blockConfig so handleEventClick can read latest without depending on it.
   // blockConfig is a new object each render (from CalendarBlock's spread), causing handleEventClick
   // to get new identity → FullCalendar reinit → React #185. Reading from ref stabilizes the handler.
   const blockConfigRef = useRef<typeof blockConfig | null>(null)
-  const prevBlockConfigForLog = blockConfigRef.current
   blockConfigRef.current = blockConfig
-  // #region agent log – blockConfig stability (new ref each render = handleEventClick deps / effect loop)
-  if (typeof window !== 'undefined' && prevBlockConfigForLog !== blockConfig) {
-    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:blockConfig',message:'blockConfig ref changed',data:{hypothesisId:'H-blockConfig'},timestamp:Date.now()})}).catch(()=>{});
-  }
-  // #endregion
   const router = useRouter()
   const [rows, setRows] = useState<TableRow[]>([])
   // CRITICAL: Use ref to access latest rows in callbacks without causing re-renders
@@ -206,11 +192,6 @@ export default function CalendarView({
     // Set debug flag after mount to prevent hydration mismatch
     setCalendarDebugEnabled(isDebugEnabled('CALENDAR'))
     debugLog('CALENDAR', `CalendarView MOUNT: tableId=${tableId}, viewId=${viewId}`)
-    // #region agent log – CalendarView mount (repeated = remount / parent conditional/key change)
-    if (typeof window !== 'undefined') {
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:mount',message:'CalendarView MOUNT',data:{tableId,viewId,mountCount},timestamp:Date.now(),hypothesisId:'H-mount'})}).catch(()=>{});
-    }
-    // #endregion
     // Mark as mounted to prevent hydration mismatch with FullCalendar
     setMounted(true)
     return () => {
@@ -218,10 +199,6 @@ export default function CalendarView({
     }
   }, [])
 
-  // Diagnostic guard (temporary): if this logs repeatedly without interaction, something is still unstable
-  useEffect(() => {
-    console.log("CalendarView render")
-  })
   // CRITICAL: Initialize resolvedTableId from prop immediately (don't wait for useEffect)
   const [resolvedTableId, setResolvedTableId] = useState<string>(tableId || '')
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
@@ -865,11 +842,6 @@ export default function CalendarView({
 
   // Resolve display labels for any link_to_table fields shown on calendar cards.
   useEffect(() => {
-    // #region agent log – H2: linkedValueLabelMaps effect runs (if every render = loop risk)
-    if (typeof window !== 'undefined') {
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:linkedValueMapsEffect',message:'linkedValueLabelMaps useEffect ran',data:{filteredRowsLen:filteredRows?.length,fieldIdsLen:fieldIds?.length,hypothesisId:'H2'},timestamp:Date.now()})}).catch(()=>{});
-    }
-    // #endregion
     let cancelled = false
 
     async function load() {
@@ -890,9 +862,6 @@ export default function CalendarView({
       if (idsToResolve.size === 0) {
         setLinkedValueLabelMaps((prev: Record<string, Record<string, string>>) => {
           const willClear = Object.keys(prev).length > 0
-          if (typeof window !== 'undefined' && willClear) {
-            fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:linkedValueMapsClear',message:'setLinkedValueLabelMaps clear (state update)',data:{hypothesisId:'H2'},timestamp:Date.now()})}).catch(()=>{});
-          }
           return willClear ? {} : prev
         })
         return
@@ -917,11 +886,6 @@ export default function CalendarView({
       if (!cancelled) {
         setLinkedValueLabelMaps((prev: Record<string, Record<string, string>>) => {
           const willUpdate = !areLinkedValueMapsEqual(prev, next)
-          // #region agent log – H2: did we call setState?
-          if (typeof window !== 'undefined' && willUpdate) {
-            fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:linkedValueMapsSet',message:'setLinkedValueLabelMaps called (state update)',data:{hypothesisId:'H2'},timestamp:Date.now()})}).catch(()=>{});
-          }
-          // #endregion
           return willUpdate ? next : prev
         })
       }
@@ -1552,15 +1516,6 @@ export default function CalendarView({
       return prevCalendarEventsRef.current || []
     }
   }, [computedCalendarEvents])
-  // #region agent log – H4: calendarEvents identity changes (FullCalendar reinit risk)
-  const calendarEventsRef = useRef(calendarEvents)
-  useEffect(() => {
-    if (calendarEventsRef.current !== calendarEvents && typeof window !== 'undefined') {
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:calendarEvents',message:'calendarEvents ref changed',data:{len:calendarEvents?.length,hypothesisId:'H4'},timestamp:Date.now()})}).catch(()=>{});
-      calendarEventsRef.current = calendarEvents
-    }
-  }, [calendarEvents])
-  // #endregion
 
   // FullCalendar: use stable plugins array (defined at module level to prevent React #185)
   const calendarHeaderToolbar = useMemo(
@@ -1751,33 +1706,6 @@ export default function CalendarView({
       // CRITICAL: Calendar events ≠ records. Always read recordId from extendedProps.
       const recordId = info.event.extendedProps?.recordId || info.event.extendedProps?.rowId || info.event.id
 
-      // #region agent log - event click
-      if (typeof window !== 'undefined') {
-        const { toFieldName: currentToFieldName } = resolvedDateFieldNames
-        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id: `log_${Date.now()}_calendar_event_click`,
-            runId: 'post-fix',
-            hypothesisId: 'H5',
-            location: 'CalendarView.tsx:onCalendarEventClick',
-            message: 'Calendar event clicked',
-            data: {
-              recordId,
-              eventId: info.event.id,
-              hasEnd: !!info.event.end,
-              start: info.event.start?.toISOString(),
-              end: info.event.end?.toISOString(),
-              actualToFieldName: currentToFieldName,
-              hasRangeMode: !!currentToFieldName
-            },
-            timestamp: Date.now()
-          })
-        }).catch(() => {})
-      }
-      // #endregion
-      
       if (!recordId) {
         const errorMsg = `[CalendarView] Cannot open record: missing recordId in event`
         console.error(errorMsg, {
@@ -1849,13 +1777,6 @@ export default function CalendarView({
   const handleEventClick = useCallback((info: EventClickArg) => {
     handleEventClickRef.current(info)
   }, [])
-  // #region agent log – H3: verify stable handler passed to FullCalendar
-  const handleEventClickStableRef = useRef(handleEventClick)
-  if (handleEventClickStableRef.current !== handleEventClick && typeof window !== 'undefined') {
-    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:handleEventClick',message:'handleEventClick STABLE (identity should not change)',data:{hypothesisId:'H3-stable'},timestamp:Date.now()})}).catch(()=>{});
-    handleEventClickStableRef.current = handleEventClick
-  }
-  // #endregion
 
   // Stable dateClick handler - same pattern as handleEventClick to prevent FullCalendar rx.set → #185
   const handleDateClickImpl = useCallback(

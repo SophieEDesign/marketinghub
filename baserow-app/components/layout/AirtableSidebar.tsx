@@ -357,7 +357,6 @@ export default function AirtableSidebar({
                           )}
                           style={{ color: sidebarTextColor }}
                           onClick={(e) => {
-                            const debugEnabled = typeof window !== "undefined" && localStorage.getItem("DEBUG_NAVIGATION") === "1"
                             const isCurrentlyActive = pathname === targetPath
                             if (isCurrentlyActive) {
                               e.preventDefault()
@@ -365,20 +364,13 @@ export default function AirtableSidebar({
                               router.refresh()
                               return
                             }
-                            if (debugEnabled) {
-                              const startTime = performance.now()
-                              const initialPathname = pathname
-                              const checkNavigation = (attempt: number) => {
-                                setTimeout(() => {
-                                  const newPathname = window.location.pathname
-                                  if (newPathname === targetPath) {
-                                    console.log("[Table Link] Navigation completed", { elapsed: `${(performance.now() - startTime).toFixed(0)}ms` })
-                                  } else if (attempt < 3) checkNavigation(attempt + 1)
-                                  else if (pathname === initialPathname) window.location.href = targetPath
-                                }, 100)
+                            // Fallback: if Next.js Link navigation doesn't complete (known issue), force full reload
+                            const startPath = pathname
+                            setTimeout(() => {
+                              if (window.location.pathname !== targetPath && window.location.pathname === startPath) {
+                                window.location.href = targetPath
                               }
-                              checkNavigation(1)
-                            }
+                            }, 500)
                           }}
                         >
                           <Database className="h-4 w-4 flex-shrink-0" style={{ color: sidebarTextColor }} />
@@ -400,6 +392,15 @@ export default function AirtableSidebar({
                                   isViewActive && "bg-black/20 font-medium"
                                 )}
                                 style={{ color: sidebarTextColor }}
+                                onClick={(e) => {
+                                  if (isViewActive) return
+                                  const startPath = pathname
+                                  setTimeout(() => {
+                                    if (window.location.pathname !== viewPath && window.location.pathname === startPath) {
+                                      window.location.href = viewPath
+                                    }
+                                  }, 500)
+                                }}
                               >
                                 <ViewIcon className="h-3.5 w-3.5 flex-shrink-0 opacity-80" />
                                 <span className="truncate">{view.name}</span>
@@ -426,6 +427,15 @@ export default function AirtableSidebar({
               isSettings && "bg-black/20 font-medium"
             )}
             style={{ color: sidebarTextColor }}
+            onClick={() => {
+              if (isSettings) return
+              const startPath = pathname
+              setTimeout(() => {
+                if (window.location.pathname !== "/settings" && window.location.pathname === startPath) {
+                  window.location.href = "/settings"
+                }
+              }, 500)
+            }}
           >
             <Settings className="h-4 w-4 flex-shrink-0" style={{ color: sidebarTextColor }} />
             <span className="text-sm">Settings</span>

@@ -89,17 +89,6 @@ export default function GridBlock({
   const configContentKey = config ? JSON.stringify(config) : ''
   const stableBlockConfig = useMemo(() => config ?? {}, [configContentKey])
 
-  // #region agent log – block identity (upstream churn = new block each render)
-  const prevBlockRef = useRef<typeof block | null>(null)
-  if (typeof window !== 'undefined') {
-    const identityChanged = prevBlockRef.current !== block
-    if (identityChanged) {
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GridBlock.tsx:blockIdentity',message:'block identity changed',data:{blockId:block.id,hypothesisId:'H-blockIdentity'},timestamp:Date.now()})}).catch(()=>{});
-      prevBlockRef.current = block
-    }
-  }
-  // #endregion
-  
   // #region HOOK CHECK - Before useRecordPanel
   if (process.env.NODE_ENV === 'development') {
     console.log('[HOOK CHECK]', 'GridBlock before useRecordPanel')
@@ -816,11 +805,6 @@ export default function GridBlock({
         }
         
         // CalendarView will load view config and use that; it shows empty state if tableId or date field is missing
-        // #region agent log – calendar branch (viewType/config stability; if viewType flips, CalendarView remounts)
-        if (typeof window !== 'undefined') {
-          fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GridBlock.tsx:calendar-branch',message:'GridBlock rendering calendar branch',data:{blockId:block.id,viewType,configViewType:config?.view_type},timestamp:Date.now(),hypothesisId:'H-viewType'})}).catch(()=>{});
-        }
-        // #endregion
         return (
           <CalendarView
             key={block.id}
@@ -898,9 +882,9 @@ export default function GridBlock({
             colorField={appearance.color_field}
             imageField={appearance.image_field}
             fitImageSize={appearance.fit_image_size}
-            blockConfig={stableBlockConfig}
+            blockConfig={config}
             onRecordClick={onRecordClick}
-            cascadeContext={{ blockConfig: stableBlockConfig }}
+            cascadeContext={{ blockConfig: config }}
             reloadKey={refreshKey}
             interfaceMode={interfaceMode}
             onRecordDeleted={() => setRefreshKey((k) => k + 1)}
@@ -944,7 +928,7 @@ export default function GridBlock({
             searchQuery=""
             tableFields={tableFields}
             filters={allFilters} // Pass merged filters
-            blockConfig={stableBlockConfig} // Pass block config so TimelineView can read date_from/date_to from page settings
+            blockConfig={config} // Pass block config so TimelineView can read date_from/date_to from page settings
             colorField={appearance.color_field}
             imageField={appearance.image_field}
             fitImageSize={appearance.fit_image_size}
@@ -997,7 +981,7 @@ export default function GridBlock({
             filters={allFilters}
             filterTree={filterTree}
             onRecordClick={onRecordClick}
-            blockConfig={stableBlockConfig}
+            blockConfig={config}
             defaultGroupsCollapsed={galleryDefaultGroupsCollapsed}
             colorField={appearance.color_field}
             imageField={appearance.image_field}
@@ -1106,7 +1090,7 @@ export default function GridBlock({
             reloadKey={refreshKey}
             onHeightChange={isGrouped ? handleHeightChange : undefined}
             rowHeight={rowHeight}
-            cascadeContext={{ blockConfig: stableBlockConfig }}
+            cascadeContext={{ blockConfig: config }}
             interfaceMode={interfaceMode}
             onRecordDeleted={() => setRefreshKey((k) => k + 1)}
           />
@@ -1146,7 +1130,7 @@ export default function GridBlock({
         const handleRecordClick = allowOpenRecord
           ? (onRecordClick || ((clickedRecordId: string) => {
               if (tableId && table?.supabase_table) {
-                openRecordPanel(tableId, clickedRecordId, table.supabase_table, modalFieldsForRecord, (config as any).modal_layout, { blockConfig: stableBlockConfig }, undefined, () => setRefreshKey((k) => k + 1))
+                openRecordPanel(tableId, clickedRecordId, table.supabase_table, modalFieldsForRecord, (config as any).modal_layout, { blockConfig: config }, undefined, () => setRefreshKey((k) => k + 1))
               }
             }))
           : undefined // Disable record clicks if not allowed
@@ -1186,7 +1170,7 @@ export default function GridBlock({
             modalFields={modalFieldsForRecord}
             modalLayout={(config as any).modal_layout}
             fieldLayout={(config as any).field_layout}
-            cascadeContext={{ blockConfig: stableBlockConfig }}
+            cascadeContext={{ blockConfig: config }}
             reloadKey={refreshKey}
             defaultGroupsCollapsed={defaultGroupsCollapsed}
             appearance={{

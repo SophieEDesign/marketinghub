@@ -908,9 +908,15 @@ export default function GroupedInterfaces({
         href={`/pages/${targetPageId}`}
         prefetch={false}
         onClick={() => {
-          if (process.env.NODE_ENV === "development") {
-            console.log("[Nav] Sidebar page clicked:", { targetPageId, currentPageId, isActive })
-          }
+          if (isActive) return
+          // Fallback: if Next.js Link navigation doesn't complete (known issue), force full reload after 500ms
+          const targetPath = `/pages/${targetPageId}`
+          const startPath = pathname
+          setTimeout(() => {
+            if (window.location.pathname !== targetPath && window.location.pathname === startPath) {
+              window.location.href = targetPath
+            }
+          }, 500)
         }}
         className={className}
         style={style}
@@ -1015,7 +1021,17 @@ export default function GroupedInterfaces({
                 if (editMode && isDraggingRef.current && activeId) {
                   e.preventDefault()
                   e.stopPropagation()
+                  return
                 }
+                if (isActive) return
+                // Fallback: if Next.js Link navigation doesn't complete (known issue), force full reload
+                const targetPath = `/pages/${targetPageId}`
+                const startPath = pathname
+                setTimeout(() => {
+                  if (window.location.pathname !== targetPath && window.location.pathname === startPath) {
+                    window.location.href = targetPath
+                  }
+                }, 500)
               }}
             >
               <Layers className="h-4 w-4 flex-shrink-0" style={{ color: isActive ? primaryColor : sidebarTextColor }} />
