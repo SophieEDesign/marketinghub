@@ -912,6 +912,7 @@ export default function InterfaceBuilder({
 
         setBlocks((prev) => [...prev, block])
         setSelectedBlockId(block.id)
+        setSelectedContext({ type: "block", blockId: block.id })
 
         // When adding the first block and type supports full-page, prompt to use as full-page view only if block is eligible (e.g. record_context needs table_id)
         if (wasEmpty && def.supportsFullPage && isBlockEligibleForFullPage(block)) {

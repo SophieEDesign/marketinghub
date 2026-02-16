@@ -212,13 +212,21 @@ function InterfacePageClientInternal({
     const prev = lastRightPanelSyncRef.current
     if (prev?.pageRef === page && prev?.blocksRef === blocks && prev?.selectedBlockId === selectedBlockIdForPanel) return
     lastRightPanelSyncRef.current = { pageRef: page, blocksRef: blocks, selectedBlockId: selectedBlockIdForPanel }
-    setRightPanelData({
+    // When block is selected but not in our blocks (e.g. newly added in InterfaceBuilder), omit selectedBlock
+    // so InterfaceBuilder's sync can provide it - prevents "Loading block settings..." for new blocks
+    const updates: Parameters<typeof setRightPanelData>[0] = {
       page,
       onPageUpdate: handlePageUpdate,
       pageTableId,
       blocks,
-      selectedBlock,
-    })
+    }
+    if (selectedBlockIdForPanel == null) {
+      updates.selectedBlock = null // Clear when no block selected
+    } else if (selectedBlock != null) {
+      updates.selectedBlock = selectedBlock // Only set when we have the block
+    }
+    // When selectedBlockIdForPanel is set but block not found: omit selectedBlock (don't overwrite with null)
+    setRightPanelData(updates)
   }, [page?.id, page, pageTableId, blocks, selectedContext?.type, selectedBlockIdForPanel, setRightPanelData, handlePageUpdate])
 
   // Initialize title value when page loads
