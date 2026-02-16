@@ -187,13 +187,6 @@ export default function SettingsPagesTab() {
     }
   }
 
-  // Page creation is now handled by PageCreationWizard component
-  // This function is kept for backward compatibility but should not be used
-  async function handleCreatePage() {
-    // This is deprecated - use PageCreationWizard instead
-    console.warn('handleCreatePage is deprecated - use PageCreationWizard')
-  }
-
   async function handleEdit(page: Page) {
     if (page.type === 'interface') {
       router.push(`/pages/${page.id}`)

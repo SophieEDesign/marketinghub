@@ -33,7 +33,6 @@ import { BarChart3, LineChart as LineChartIcon, PieChart as PieChartIcon } from 
 interface ChartBlockProps {
   block: PageBlock
   isEditing?: boolean
-  pageTableId?: string | null // Table ID from the page
   pageId?: string | null // Page ID
   filters?: FilterConfig[] // Page-level filters
   filterTree?: FilterTree
@@ -56,18 +55,16 @@ interface CategoricalLegendItem {
 export default function ChartBlock({
   block,
   isEditing = false,
-  pageTableId = null,
   pageId = null,
   filters = [],
   filterTree = null,
 }: ChartBlockProps) {
   const router = useRouter()
   const { config } = block
-  // Chart block table_id resolution:
-  // Prefer explicit config.table_id, but fall back to the page's table context for usability/compatibility.
-  // Backward compatibility: some legacy data used camelCase `tableId`.
+  // Chart block table_id resolution: require explicit config.table_id.
+  // Backward compatibility: legacy camelCase `tableId` and `base_table`.
   const legacyTableId = (config as any)?.tableId
-  const tableId = config?.table_id || legacyTableId || pageTableId || config?.base_table || null
+  const tableId = config?.table_id || legacyTableId || config?.base_table || null
   const chartType = config?.chart_type || "bar"
   // Explicitly type metricType so comparisons against "count" are valid in TS.
   const metricType: AggregateType = (config?.chart_aggregate as AggregateType) || "count"

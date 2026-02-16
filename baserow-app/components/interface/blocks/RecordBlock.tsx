@@ -10,14 +10,13 @@ import RecordFieldPanel from "@/components/records/RecordFieldPanel"
 interface RecordBlockProps {
   block: PageBlock
   isEditing?: boolean
-  pageTableId?: string | null // Table ID from the page
   pageId?: string | null // Page ID
   recordId?: string | null // Record ID for record review pages
   /** When false, all fields are read-only (e.g. when page is view-only). Default true. */
   allowRecordEdit?: boolean
 }
 
-export default function RecordBlock({ block, isEditing = false, pageTableId = null, pageId = null, recordId: pageRecordId = null, allowRecordEdit = true }: RecordBlockProps) {
+export default function RecordBlock({ block, isEditing = false, pageId = null, recordId: pageRecordId = null, allowRecordEdit = true }: RecordBlockProps) {
   const { config } = block
   // Record block MUST have table_id configured
   // record_id can come from config OR from page context (for record review pages)

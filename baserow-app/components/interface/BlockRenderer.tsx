@@ -323,13 +323,11 @@ export default function BlockRenderer({
         )
 
       case "record":
-        // CRITICAL: Pass pageTableId to RecordBlock for table resolution fallback
         // record_id can come from config OR from page context (for record review pages)
-        // pageTableId must flow to blocks for base_table fallback
         // Lazy-load RecordBlock - CRITICAL: enabled=false for mount stability
         return (
           <LazyBlockWrapper enabled={false}>
-            <RecordBlock block={safeBlock} isEditing={canEdit} pageTableId={recordContextTableId} pageId={pageId} recordId={recordId} />
+            <RecordBlock block={safeBlock} isEditing={canEdit} pageId={pageId} recordId={recordId} />
           </LazyBlockWrapper>
         )
 
@@ -346,15 +344,11 @@ export default function BlockRenderer({
         )
 
       case "chart":
-        // CRITICAL: Pass pageTableId to ChartBlock for table resolution fallback
-        // pageTableId must flow to blocks for base_table fallback
-        return <ChartBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} filters={filters} filterTree={filterTree} />
+        return <ChartBlock block={safeBlock} isEditing={canEdit} pageId={pageId} filters={filters} filterTree={filterTree} />
 
       case "kpi":
-        // CRITICAL: Pass pageTableId to KPIBlock for table resolution fallback
-        // pageTableId must flow to blocks for base_table fallback
         // CRITICAL: Pass pre-fetched aggregate data to prevent duplicate requests
-        return <KPIBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} filters={filters} filterTree={filterTree} aggregateData={aggregateData} />
+        return <KPIBlock block={safeBlock} isEditing={canEdit} pageId={pageId} filters={filters} filterTree={filterTree} aggregateData={aggregateData} />
 
       case "filter":
         // Filter block emits filter state via context

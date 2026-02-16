@@ -370,7 +370,7 @@ export default function AirtableSidebar({
                               if (window.location.pathname !== targetPath && window.location.pathname === startPath) {
                                 window.location.href = targetPath
                               }
-                            }, 250)
+                            }, 100)
                           }}
                         >
                           <Database className="h-4 w-4 flex-shrink-0" style={{ color: sidebarTextColor }} />
@@ -399,7 +399,7 @@ export default function AirtableSidebar({
                                     if (window.location.pathname !== viewPath && window.location.pathname === startPath) {
                                       window.location.href = viewPath
                                     }
-                                  }, 250)
+                                  }, 100)
                                 }}
                               >
                                 <ViewIcon className="h-3.5 w-3.5 flex-shrink-0 opacity-80" />
@@ -434,7 +434,7 @@ export default function AirtableSidebar({
                 if (window.location.pathname !== "/settings" && window.location.pathname === startPath) {
                   window.location.href = "/settings"
                 }
-              }, 250)
+              }, 100)
             }}
           >
             <Settings className="h-4 w-4 flex-shrink-0" style={{ color: sidebarTextColor }} />

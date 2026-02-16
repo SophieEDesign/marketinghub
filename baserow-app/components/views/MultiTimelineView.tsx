@@ -385,7 +385,13 @@ export default function MultiTimelineView({
   }
 
   useEffect(() => {
-    loadAll()
+    loadAll().catch((err) => {
+      if (!isAbortError(err)) {
+        setLoading(false)
+        loadingRef.current = false
+        setErrorsBySource({ __global__: (err as Error)?.message || "Failed to load timeline" })
+      }
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourcesKey, filtersKey, quickFiltersBySource])
 

@@ -9,7 +9,6 @@ import type { FilterTree } from "@/lib/filters/canonical-model"
 interface KPIBlockProps {
   block: PageBlock
   isEditing?: boolean
-  pageTableId?: string | null // Table ID from the page
   pageId?: string | null // Page ID
   filters?: FilterConfig[] // Page-level filters
   filterTree?: FilterTree
@@ -27,7 +26,6 @@ interface ComparisonData {
 export default function KPIBlock({
   block,
   isEditing = false,
-  pageTableId = null,
   pageId = null,
   filters = [],
   filterTree = null,
