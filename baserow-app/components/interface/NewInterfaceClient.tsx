@@ -26,7 +26,7 @@ export default function NewInterfaceClient() {
       const { page } = await response.json()
 
       if (page) {
-        router.push(`/interface/${page.id}`)
+        router.push(`/pages/${page.id}`)
       }
     } catch (error) {
       console.error("Failed to create page:", error)

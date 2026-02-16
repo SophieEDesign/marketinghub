@@ -549,9 +549,24 @@ export default function RecordModal({
                 </div>
               ) : (
                 // Render flat list (default behavior for new records)
+                // When forceFlatLayout, skip LookupFieldPicker for link/lookup to avoid React #185 in map (chunks 8357/8362).
                 <div className="space-y-4 py-4">
                   {filteredFields.map((field) => {
                     const value = formData[field.name]
+                    if (forceFlatLayout && (field.type === 'link_to_table' || field.type === 'lookup')) {
+                      const display = value == null || value === '' ? '—' : Array.isArray(value) ? value.join(', ') : String(value)
+                      return (
+                        <div key={field.id} className="space-y-1.5">
+                          <label className="text-sm font-medium text-gray-700">
+                            {field.name}
+                            {field.required && <span className="text-red-500 ml-0.5">*</span>}
+                          </label>
+                          <div className="px-3 py-2 rounded-md border border-gray-200 bg-gray-50/50 text-sm text-gray-700">
+                            {display}
+                          </div>
+                        </div>
+                      )
+                    }
                     return (
                       <FieldEditor
                         key={field.id}

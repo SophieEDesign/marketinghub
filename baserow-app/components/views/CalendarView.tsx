@@ -89,10 +89,38 @@ function parseDateValueToLocalDate(value: unknown): Date | null {
   return isNaN(d.getTime()) ? null : d
 }
 
-export default function CalendarView({ 
-  tableId, 
-  viewId, 
-  dateFieldId, 
+/**
+ * Single component for event card field in .map() - ensures same component type every iteration
+ * so hook order is stable (this component has no hooks; conditional logic is render-only).
+ */
+function CalendarEventCardField({
+  field,
+  value,
+  valueLabelMap,
+  compact = true,
+}: {
+  field: TableField | null
+  value: unknown
+  valueLabelMap?: Record<string, string>
+  compact?: boolean
+}) {
+  if (field) {
+    return (
+      <TimelineFieldValue
+        field={field}
+        value={value as FieldValue}
+        valueLabelMap={valueLabelMap}
+        compact={compact}
+      />
+    )
+  }
+  return <span className="truncate">{value != null && value !== "" ? String(value) : "—"}</span>
+}
+
+export default function CalendarView({
+  tableId,
+  viewId,
+  dateFieldId,
   fieldIds: fieldIdsProp,
   searchQuery = "",
   tableFields = [],
@@ -115,6 +143,14 @@ export default function CalendarView({
   interfaceMode = 'view',
   blockId = null,
 }: CalendarViewProps) {
+  console.log("[CalendarView] MOUNT", blockId)
+
+  // -------------------------------------------------------------------------
+  // HOOKS: All useState, useMemo, useEffect, useRef, useCallback (and useRouter)
+  // must be declared here, in the same order every render. No hook inside
+  // conditionals, loops, or after any return. Conditional logic goes inside
+  // the hook body (e.g. useMemo(() => { if (!x) return null; ... }, [x])).
+  // -------------------------------------------------------------------------
   const viewUuid = useMemo(() => normalizeUuid(viewId), [viewId])
   // Ensure fieldIds is always an array (defensive check for any edge cases)
   const fieldIds = useMemo(() => {
@@ -162,7 +198,7 @@ export default function CalendarView({
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
   const [loadedTableFields, setLoadedTableFields] = useState<TableField[]>(tableFields || [])
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
-  const { openRecordModal, isRecordModalOpen } = useRecordModal()
+  const { openRecordModal } = useRecordModal()
   const [linkedValueLabelMaps, setLinkedValueLabelMaps] = useState<Record<string, Record<string, string>>>({})
   const prevCalendarEventsSignatureRef = useRef<string>("")
   const prevCalendarEventsRef = useRef<EventInput[]>([])
@@ -1609,27 +1645,26 @@ export default function CalendarView({
               <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px] opacity-90 min-w-0">
                 {cardFields.slice(0, 2).map((f: { field: TableField; value: unknown }, idx: number) => {
                   try {
-                    // Guard against invalid field data
                     if (!f || typeof f !== 'object') {
                       if (process.env.NODE_ENV === 'development') {
                         console.warn(`[CalendarView] Invalid card field in JSX at index ${idx}:`, f)
                       }
                       return null
                     }
-                    
+                    const field = f?.field ? (f.field as TableField) : null
+                    const value = f?.value
+                    const valueLabelMap = field
+                      ? (stableLinkedValueLabelMaps[field.name] || stableLinkedValueLabelMaps[field.id])
+                      : undefined
                     return (
-                      <span key={`${eventInfo.event.id}-cf-${f?.field?.id ?? f?.field?.name ?? idx}`} className="truncate inline-flex items-center shrink-0 max-w-full">
+                      <span key={`${eventInfo.event.id}-cf-${field?.id ?? field?.name ?? idx}`} className="truncate inline-flex items-center shrink-0 max-w-full">
                         {idx > 0 && <span className="text-gray-500 mr-1">·</span>}
-                        {f?.field ? (
-                          <TimelineFieldValue
-                            field={f.field as TableField}
-                            value={f.value as FieldValue}
-                            valueLabelMap={stableLinkedValueLabelMaps[f.field.name] || stableLinkedValueLabelMaps[f.field.id]}
-                            compact={true}
-                          />
-                        ) : (
-                          String(f?.value || "")
-                        )}
+                        <CalendarEventCardField
+                          field={field}
+                          value={value}
+                          valueLabelMap={valueLabelMap}
+                          compact={true}
+                        />
                       </span>
                     )
                   } catch (err) {
@@ -1794,6 +1829,9 @@ export default function CalendarView({
     [canCreateRecord, resolvedTableId, resolvedDateFieldId, openRecordModal, combinedFiltersForDefaults, loadedTableFields, viewConfig, blockConfig, supabaseTableName, canEditLayout, onModalLayoutSave, interfaceMode, blockId]
   )
 
+  // ---------- END OF HOOKS: No hook may be declared below this line ----------
+  // From here on only conditional returns and the main render.
+
   if (loading) {
     return <div className="p-4">Loading...</div>
   }
@@ -1929,8 +1967,7 @@ export default function CalendarView({
       
       <div className="p-6 bg-white">
         {/* CRITICAL: Only render FullCalendar after mount to prevent hydration mismatch (React error #185) */}
-        {/* When record modal is open, unmount FullCalendar so it is not in the tree during modal open (avoids React #185 in FullCalendar internals). */}
-        {mounted && !isRecordModalOpen ? (
+        {mounted ? (
           <MemoizedFullCalendar
             plugins={CALENDAR_PLUGINS}
             events={calendarEvents}
@@ -1952,15 +1989,11 @@ export default function CalendarView({
             eventBackgroundColor="#f3f4f6"
             dayHeaderFormat={calendarDayHeaderFormat}
             firstDay={1}
-            eventContent={undefined}
+            eventContent={calendarEventContent}
             eventClick={handleEventClick}
             dateClick={handleDateClick}
             validRange={calendarValidRange}
           />
-        ) : mounted && isRecordModalOpen ? (
-          <div className="flex items-center justify-center h-64 text-gray-400">
-            Record open — close to return to calendar
-          </div>
         ) : (
           <div className="flex items-center justify-center h-64 text-gray-500">
             Loading calendar...

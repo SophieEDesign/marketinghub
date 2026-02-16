@@ -408,7 +408,7 @@ export default function BlockRenderer({
         return <ButtonBlock block={safeBlock} isEditing={canEdit} />
 
       case "calendar":
-        // Calendar block - wrapper around GridBlock with view_type='calendar'
+        // CRITICAL: Calendar block must always render (never return null). Validation/empty state is inside CalendarView.
         return (
           <LazyBlockWrapper enabled={false}>
             <CalendarBlock

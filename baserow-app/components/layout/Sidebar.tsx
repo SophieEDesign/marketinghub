@@ -194,9 +194,8 @@ export default function Sidebar({
               </button>
             )}
               {interfacePages.map((page) => {
-                // Use /pages route for new system pages, /interface for old system pages
-                const href = page.is_new_system ? `/pages/${page.id}` : `/interface/${page.id}`
-                const isPageActive = isActive(href) || isActive(`/interface/${page.id}`) || isActive(`/pages/${page.id}`)
+                const href = `/pages/${page.id}`
+                const isPageActive = isActive(href)
                 return (
                   <SidebarItem
                     key={page.id}
@@ -220,11 +219,11 @@ export default function Sidebar({
             )}
             <div className="space-y-0.5">
               {dashboards.map((dashboard) => {
-                const isDashboardActive = isActive(`/dashboard/${dashboard.id}`)
+                const isDashboardActive = isActive(`/pages/${dashboard.id}`)
                 return (
                   <SidebarItem
                     key={dashboard.id}
-                    href={`/dashboard/${dashboard.id}`}
+                    href={`/pages/${dashboard.id}`}
                     icon={LayoutDashboard}
                     label={dashboard.name}
                     active={isDashboardActive}

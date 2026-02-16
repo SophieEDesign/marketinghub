@@ -753,20 +753,7 @@ export default function GridBlock({
     
     switch (viewType) {
       case 'calendar': {
-        // Calendar requires tableId - if missing, show error or let CalendarView handle it
-        if (!tableId) {
-          return (
-            <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
-              <div className="text-center">
-                <p className="mb-2">{isEditing ? "Calendar view requires a table connection." : "No table configured"}</p>
-                {isEditing && (
-                  <p className="text-xs text-gray-400">Configure a table in block settings.</p>
-                )}
-              </div>
-            </div>
-          )
-        }
-        
+        // CRITICAL: Always render CalendarView so the block mounts. Validation and empty states are handled inside CalendarView.
         // Calendar will load its own config from the view, but we can provide a fallback dateFieldId
         // Find ALL date fields in the table (not just visibleFields) to ensure we can find the configured field
         const allDateFieldsInTable = safeTableFields
@@ -803,13 +790,10 @@ export default function GridBlock({
           dateFieldId = defaultDateField.field.name
         }
         
-        // CalendarView will load view config and use that, so we don't need to error here
-        // Just pass the fallback dateFieldId in case view config doesn't have one
-        // Pass tableId as string (not null) since we've validated it above
-        
+        // CalendarView will load view config and use that; it shows empty state if tableId or date field is missing
         return (
           <CalendarView
-            tableId={tableId}
+            tableId={tableId ?? ''}
             viewId={viewUuid || ''}
             dateFieldId={dateFieldId}
             fieldIds={fieldIds}

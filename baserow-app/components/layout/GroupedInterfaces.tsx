@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { useParams, usePathname, useRouter } from "next/navigation"
 import { useBranding } from "@/contexts/BrandingContext"
 import {
   DndContext,
@@ -81,8 +81,11 @@ export default function GroupedInterfaces({
   editMode = false,
   onRefresh,
 }: GroupedInterfacesProps) {
+  const params = useParams()
   const pathname = usePathname()
   const router = useRouter()
+  const currentPageId = params?.pageId as string | undefined
+  console.log("Derived currentPageId:", currentPageId)
   const { primaryColor, sidebarTextColor } = useBranding()
   const { toast } = useToast()
   // Filter out any null/undefined groups (safety check)
@@ -437,7 +440,7 @@ export default function GroupedInterfaces({
       setPages((prev) => prev.filter((p) => p.id !== pageId))
       
       // If we're on the deleted page, redirect to home
-      if (pathname.includes(`/pages/${pageId}`)) {
+      if (currentPageId === pageId) {
         window.location.href = '/'
       } else {
         onRefresh?.()
@@ -867,12 +870,12 @@ export default function GroupedInterfaces({
 
   // Navigation Page Component (view mode)
   function NavigationPage({ page, level = 0 }: { page: InterfacePage; level?: number }) {
-    const isActive = pathname.includes(`/pages/${page.id}`)
-    const targetPath = `/pages/${page.id}`
+    const targetPageId = page.id
+    const isActive = currentPageId === targetPageId
 
     return (
       <Link
-        href={targetPath}
+        href={`/pages/${targetPageId}`}
         prefetch={false}
         className={cn(
           "flex items-center rounded-md px-3 py-1.5 text-sm transition-colors",
@@ -881,17 +884,15 @@ export default function GroupedInterfaces({
           isActive && "bg-black/20 font-semibold"
         )}
         onClick={(e) => {
-          const currentPageId = pathname.match(/\/pages\/([^/]+)/)?.[1] ?? null
-          const targetPageId = page.id
           console.log("Sidebar click:", targetPageId, "current:", currentPageId)
           console.log("Calling router.push:", `/pages/${targetPageId}`)
           const debugEnabled = typeof window !== "undefined" && localStorage.getItem("DEBUG_NAVIGATION") === "1"
-          const isCurrentlyActive = pathname === targetPath
+          const isCurrentlyActive = currentPageId === targetPageId
           
           if (debugEnabled) {
             console.log("[NavigationPage] Click detected:", {
-              href: targetPath,
-              currentPath: pathname,
+              href: `/pages/${targetPageId}`,
+              currentPageId,
               isActive,
               isCurrentlyActive,
               defaultPrevented: e.defaultPrevented,
@@ -919,7 +920,7 @@ export default function GroupedInterfaces({
           router.push(`/pages/${targetPageId}`)
           
           if (debugEnabled) {
-            console.log("[NavigationPage] router.push called for:", targetPath)
+            console.log("[NavigationPage] router.push called for:", `/pages/${targetPageId}`)
           }
         }}
         style={{ color: sidebarTextColor }}
@@ -962,7 +963,8 @@ export default function GroupedInterfaces({
       opacity: isDragging ? 0.3 : 1,
     }
 
-    const isActive = pathname.includes(`/pages/${page.id}`)
+    const targetPageId = page.id
+    const isActive = currentPageId === targetPageId
 
     return (
       <div 
@@ -1011,7 +1013,7 @@ export default function GroupedInterfaces({
             />
           ) : (
             <Link
-              href={`/pages/${page.id}`}
+              href={`/pages/${targetPageId}`}
               prefetch={false}
               className="flex-1 flex items-center gap-2 px-2 py-1.5 rounded transition-colors hover:bg-black/10"
               style={isActive ? { 
@@ -1019,18 +1021,15 @@ export default function GroupedInterfaces({
                 color: primaryColor 
               } : { color: sidebarTextColor }}
               onClick={(e) => {
-                const currentPageId = pathname.match(/\/pages\/([^/]+)/)?.[1] ?? null
-                const targetPageId = page.id
                 console.log("Sidebar click:", targetPageId, "current:", currentPageId)
                 console.log("Calling router.push:", `/pages/${targetPageId}`)
                 const debugEnabled = typeof window !== "undefined" && localStorage.getItem("DEBUG_NAVIGATION") === "1"
-                const targetPath = `/pages/${targetPageId}`
-                const isCurrentlyActive = pathname === targetPath
+                const isCurrentlyActive = currentPageId === targetPageId
                 
                 if (debugEnabled) {
                   console.log("[Sidebar Link] Click detected:", {
-                    href: targetPath,
-                    currentPath: pathname,
+                    href: `/pages/${targetPageId}`,
+                    currentPageId,
                     isActive: isCurrentlyActive,
                     editMode,
                     isDragging: isDraggingRef.current,
@@ -1070,7 +1069,7 @@ export default function GroupedInterfaces({
                 router.push(`/pages/${targetPageId}`)
                 
                 if (debugEnabled) {
-                  console.log("[Sidebar Link] router.push called for:", targetPath)
+                  console.log("[Sidebar Link] router.push called for:", `/pages/${targetPageId}`)
                 }
               }}
             >

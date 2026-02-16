@@ -1,14 +1,13 @@
-import EmptyView from "@/components/layout/EmptyView"
+import { redirect } from "next/navigation"
 import { getInterfacePage } from "@/lib/interface/pages"
-import WorkspaceShellWrapper from "@/components/layout/WorkspaceShellWrapper"
-import InterfacePageClient from "@/components/interface/InterfacePageClient"
 import { isAdmin } from "@/lib/roles"
+import EmptyView from "@/components/layout/EmptyView"
+import WorkspaceShellWrapper from "@/components/layout/WorkspaceShellWrapper"
 import { LayoutDashboard } from "lucide-react"
 
 /**
- * Dashboard route - unified with /pages/[pageId] architecture.
- * If dashboardId exists as an interface page, render through InterfacePageClient.
- * Otherwise show placeholder (dashboards table entries not yet migrated).
+ * Legacy /dashboard/[dashboardId] route - redirect to canonical /pages/[dashboardId] when page exists.
+ * Only /pages/[pageId] renders InterfacePageClient.
  */
 export default async function DashboardPage({
   params,
@@ -20,7 +19,6 @@ export default async function DashboardPage({
   const admin = await isAdmin()
 
   if (page) {
-    // Page exists in interface_pages - use same flow as /pages/[pageId]
     if (page.is_admin_only && !admin) {
       return (
         <WorkspaceShellWrapper title="Access Denied">
@@ -30,17 +28,7 @@ export default async function DashboardPage({
         </WorkspaceShellWrapper>
       )
     }
-    return (
-      <WorkspaceShellWrapper title={page.name} hideTopbar={true}>
-        <InterfacePageClient
-          key={dashboardId}
-          pageId={dashboardId}
-          initialPage={page}
-          initialData={[]}
-          isAdmin={admin}
-        />
-      </WorkspaceShellWrapper>
-    )
+    redirect(`/pages/${dashboardId}`)
   }
 
   // Dashboard not in interface_pages - show placeholder

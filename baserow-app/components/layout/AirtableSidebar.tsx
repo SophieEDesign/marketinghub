@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { usePathname, useRouter } from "next/navigation"
+import { useParams, usePathname, useRouter } from "next/navigation"
 import PageCreationWizard from "@/components/interface/PageCreationWizard"
 import GroupedInterfaces from "./GroupedInterfaces"
 import { 
@@ -116,7 +116,8 @@ export default function AirtableSidebar({
   // Context-driven editing: no global edit mode; sidebar page reorder disabled for now
   const isEditMode = false
 
-  const isInterfacePage = pathname.includes("/pages/")
+  const params = useParams()
+  const isInterfacePage = (params?.pageId as string) != null
   const isSettings = pathname.includes("/settings")
   const isTablePage = pathname.includes("/tables/")
   
