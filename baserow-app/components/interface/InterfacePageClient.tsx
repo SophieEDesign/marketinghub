@@ -160,6 +160,9 @@ function InterfacePageClientInternal({
   // Only change edit state when user explicitly calls enter/exit via UI.
   useEffect(() => {
     if (previousRoutePageIdRef.current !== null && previousRoutePageIdRef.current !== pageId) {
+      if (process.env.NODE_ENV === "development") {
+        console.log("[Nav] Route pageId changed:", { from: previousRoutePageIdRef.current, to: pageId })
+      }
       setPage(null)
       setBlocks([])
       setLoading(false)

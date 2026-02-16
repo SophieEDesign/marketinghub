@@ -137,6 +137,12 @@ export default function GroupedInterfaces({
   // State updates are async, but refs are synchronous - prevents stuck navigation
   const isDraggingRef = useRef(false)
   
+  // DEBUG: Set localStorage DEBUG_NAV_FULL_RELOAD=1 to use full page reload (tests if Link is blocked)
+  const [useFullReload, setUseFullReload] = useState(false)
+  useEffect(() => {
+    setUseFullReload(localStorage.getItem("DEBUG_NAV_FULL_RELOAD") === "1")
+  }, [])
+  
   // Store original order for revert on error
   const [originalGroups, setOriginalGroups] = useState<InterfaceGroup[]>([])
   const [originalPages, setOriginalPages] = useState<InterfacePage[]>([])
@@ -872,17 +878,42 @@ export default function GroupedInterfaces({
     const targetPageId = page.id
     const isActive = currentPageId === targetPageId
 
+    const className = cn(
+      "flex items-center rounded-md px-3 py-1.5 text-sm transition-colors",
+      level > 0 && "pl-10",
+      "hover:bg-black/10",
+      isActive && "bg-black/20 font-semibold"
+    )
+    const style = { color: sidebarTextColor }
+
+    if (useFullReload) {
+      return (
+        <a
+          href={`/pages/${targetPageId}`}
+          className={className}
+          style={style}
+          onClick={(e) => {
+            e.preventDefault()
+            console.log("[Nav] DEBUG full reload to:", targetPageId)
+            window.location.href = `/pages/${targetPageId}`
+          }}
+        >
+          <span className="truncate flex-1">{page.name}</span>
+        </a>
+      )
+    }
+
     return (
       <Link
         href={`/pages/${targetPageId}`}
         prefetch={false}
-        className={cn(
-          "flex items-center rounded-md px-3 py-1.5 text-sm transition-colors",
-          level > 0 && "pl-10",
-          "hover:bg-black/10",
-          isActive && "bg-black/20 font-semibold"
-        )}
-        style={{ color: sidebarTextColor }}
+        onClick={() => {
+          if (process.env.NODE_ENV === "development") {
+            console.log("[Nav] Sidebar page clicked:", { targetPageId, currentPageId, isActive })
+          }
+        }}
+        className={className}
+        style={style}
       >
         <span className="truncate flex-1">{page.name}</span>
       </Link>
