@@ -160,6 +160,14 @@ export default function CalendarView({
     debugWarn('CALENDAR', 'CalendarView: fieldIdsProp is not an array:', { type: typeof fieldIdsProp, value: fieldIdsProp })
     return []
   }, [fieldIdsProp])
+  // #region agent log – H1: fieldIdsProp stability (new ref each render = loop risk)
+  const fieldIdsPropRef = useRef<typeof fieldIdsProp | null>(null)
+  const fieldIdsPropKey = Array.isArray(fieldIdsProp) ? fieldIdsProp.join('|') : ''
+  if (typeof window !== 'undefined' && fieldIdsPropRef.current !== fieldIdsProp) {
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:fieldIdsProp',message:'fieldIdsProp ref changed',data:{prevRef:!!fieldIdsPropRef.current,contentKey:fieldIdsPropKey?.substring(0,50),hypothesisId:'H1'},timestamp:Date.now()})}).catch(()=>{});
+    fieldIdsPropRef.current = fieldIdsProp
+  }
+  // #endregion
   const router = useRouter()
   const [rows, setRows] = useState<TableRow[]>([])
   // CRITICAL: Use ref to access latest rows in callbacks without causing re-renders
@@ -841,6 +849,11 @@ export default function CalendarView({
 
   // Resolve display labels for any link_to_table fields shown on calendar cards.
   useEffect(() => {
+    // #region agent log – H2: linkedValueLabelMaps effect runs (if every render = loop risk)
+    if (typeof window !== 'undefined') {
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:linkedValueMapsEffect',message:'linkedValueLabelMaps useEffect ran',data:{filteredRowsLen:filteredRows?.length,fieldIdsLen:fieldIds?.length,hypothesisId:'H2'},timestamp:Date.now()})}).catch(()=>{});
+    }
+    // #endregion
     let cancelled = false
 
     async function load() {
@@ -859,7 +872,13 @@ export default function CalendarView({
       }
 
       if (idsToResolve.size === 0) {
-        setLinkedValueLabelMaps((prev: Record<string, Record<string, string>>) => (Object.keys(prev).length === 0 ? prev : {}))
+        setLinkedValueLabelMaps((prev: Record<string, Record<string, string>>) => {
+          const willClear = Object.keys(prev).length > 0
+          if (typeof window !== 'undefined' && willClear) {
+            fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:linkedValueMapsClear',message:'setLinkedValueLabelMaps clear (state update)',data:{hypothesisId:'H2'},timestamp:Date.now()})}).catch(()=>{});
+          }
+          return willClear ? {} : prev
+        })
         return
       }
 
@@ -880,7 +899,15 @@ export default function CalendarView({
       }
 
       if (!cancelled) {
-        setLinkedValueLabelMaps((prev: Record<string, Record<string, string>>) => (areLinkedValueMapsEqual(prev, next) ? prev : next))
+        setLinkedValueLabelMaps((prev: Record<string, Record<string, string>>) => {
+          const willUpdate = !areLinkedValueMapsEqual(prev, next)
+          // #region agent log – H2: did we call setState?
+          if (typeof window !== 'undefined' && willUpdate) {
+            fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:linkedValueMapsSet',message:'setLinkedValueLabelMaps called (state update)',data:{hypothesisId:'H2'},timestamp:Date.now()})}).catch(()=>{});
+          }
+          // #endregion
+          return willUpdate ? next : prev
+        })
       }
     }
 
@@ -1509,6 +1536,15 @@ export default function CalendarView({
       return prevCalendarEventsRef.current || []
     }
   }, [computedCalendarEvents])
+  // #region agent log – H4: calendarEvents identity changes (FullCalendar reinit risk)
+  const calendarEventsRef = useRef(calendarEvents)
+  useEffect(() => {
+    if (calendarEventsRef.current !== calendarEvents && typeof window !== 'undefined') {
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:calendarEvents',message:'calendarEvents ref changed',data:{len:calendarEvents?.length,hypothesisId:'H4'},timestamp:Date.now()})}).catch(()=>{});
+      calendarEventsRef.current = calendarEvents
+    }
+  }, [calendarEvents])
+  // #endregion
 
   // FullCalendar: use stable plugins array (defined at module level to prevent React #185)
   const calendarHeaderToolbar = useMemo(
@@ -1795,6 +1831,13 @@ export default function CalendarView({
     },
     [allowOpenRecord, onRecordClick, resolvedDateFieldNames, openRecordModal, resolvedTableId, loadedTableFields, blockConfig, supabaseTableName, canEditLayout, onModalLayoutSave, interfaceMode, blockId]
   )
+  // #region agent log – H3/H4: handleEventClick identity changes (FullCalendar reinit risk)
+  const handleEventClickRef = useRef(handleEventClick)
+  if (handleEventClickRef.current !== handleEventClick && typeof window !== 'undefined') {
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:handleEventClick',message:'handleEventClick identity changed',data:{hypothesisId:'H3'},timestamp:Date.now()})}).catch(()=>{});
+    handleEventClickRef.current = handleEventClick
+  }
+  // #endregion
 
   const handleDateClick = useCallback(
     (info: { dateStr: string }) => {

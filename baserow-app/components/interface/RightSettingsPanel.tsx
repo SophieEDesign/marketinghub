@@ -147,7 +147,7 @@ export default function RightSettingsPanel() {
           )
         )}
 
-        {selectedContext.type === "record" && data?.recordId && data?.recordTableId && (
+        {selectedContext?.type === "record" && data?.recordId && data?.recordTableId && (
           <RecordLayoutSettings
             tableId={data.recordTableId}
             recordId={data.recordId}
@@ -157,7 +157,7 @@ export default function RightSettingsPanel() {
           />
         )}
 
-        {selectedContext.type === "field" && selectedContext.fieldId && (
+        {selectedContext && selectedContext.type === "field" && selectedContext.fieldId && (
           <FieldSchemaSettings
             fieldId={selectedContext.fieldId}
             tableId={selectedContext.tableId ?? data?.recordTableId ?? data?.pageTableId ?? ""}
