@@ -507,37 +507,22 @@ describe('Interface Invariants - Pre-Deploy Safety Checks', () => {
       expect(blockRendererProps.pageTableId).not.toBeNull()
     })
 
-    it('should pass pageTableId to RecordBlock (not null)', () => {
-      const pageTableId = 'table-789'
-      const blockRendererProps = {
-        block: { id: 'block-3', type: 'record' as const, config: {} },
-        pageTableId,
-      }
-      
-      expect(blockRendererProps.pageTableId).toBe('table-789')
-      expect(blockRendererProps.pageTableId).not.toBeNull()
+    it('should require config.table_id for RecordBlock (no pageTableId fallback)', () => {
+      const block = { id: 'block-3', type: 'record' as const, config: { table_id: 'table-789' } }
+      expect(block.config.table_id).toBe('table-789')
+      expect(block.config.table_id).not.toBeNull()
     })
 
-    it('should pass pageTableId to ChartBlock (not null)', () => {
-      const pageTableId = 'table-abc'
-      const blockRendererProps = {
-        block: { id: 'block-4', type: 'chart' as const, config: {} },
-        pageTableId,
-      }
-      
-      expect(blockRendererProps.pageTableId).toBe('table-abc')
-      expect(blockRendererProps.pageTableId).not.toBeNull()
+    it('should require config.table_id for ChartBlock (no pageTableId fallback)', () => {
+      const block = { id: 'block-4', type: 'chart' as const, config: { table_id: 'table-abc' } }
+      expect(block.config.table_id).toBe('table-abc')
+      expect(block.config.table_id).not.toBeNull()
     })
 
-    it('should pass pageTableId to KPIBlock (not null)', () => {
-      const pageTableId = 'table-def'
-      const blockRendererProps = {
-        block: { id: 'block-5', type: 'kpi' as const, config: {} },
-        pageTableId,
-      }
-      
-      expect(blockRendererProps.pageTableId).toBe('table-def')
-      expect(blockRendererProps.pageTableId).not.toBeNull()
+    it('should require config.table_id for KPIBlock (no pageTableId fallback)', () => {
+      const block = { id: 'block-5', type: 'kpi' as const, config: { table_id: 'table-def' } }
+      expect(block.config.table_id).toBe('table-def')
+      expect(block.config.table_id).not.toBeNull()
     })
   })
 

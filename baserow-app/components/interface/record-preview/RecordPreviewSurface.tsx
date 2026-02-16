@@ -50,7 +50,6 @@ export default function RecordPreviewSurface({
       <RecordBlock
         block={syntheticBlock}
         isEditing={isEditing}
-        pageTableId={tableId}
         pageId={pageId}
         recordId={recordId}
         allowRecordEdit={pageEditable !== false}
