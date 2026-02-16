@@ -182,6 +182,11 @@ export default function CalendarView({
     // Set debug flag after mount to prevent hydration mismatch
     setCalendarDebugEnabled(isDebugEnabled('CALENDAR'))
     debugLog('CALENDAR', `CalendarView MOUNT: tableId=${tableId}, viewId=${viewId}`)
+    // #region agent log – CalendarView mount (repeated = identity destruction / key change upstream)
+    if (typeof window !== 'undefined') {
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:mount',message:'CalendarView MOUNT',data:{tableId,viewId},timestamp:Date.now(),hypothesisId:'H-mount'})}).catch(()=>{});
+    }
+    // #endregion
     // Mark as mounted to prevent hydration mismatch with FullCalendar
     setMounted(true)
     return () => {

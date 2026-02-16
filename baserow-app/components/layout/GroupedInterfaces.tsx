@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import Link from "next/link"
-import { useParams, usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { useBranding } from "@/contexts/BrandingContext"
 import {
   DndContext,
@@ -82,7 +82,6 @@ export default function GroupedInterfaces({
   onRefresh,
 }: GroupedInterfacesProps) {
   const pathname = usePathname()
-  const router = useRouter()
   // Single source of truth: derive from pathname only (no params/searchParams mix)
   const currentPageId = pathname?.match(/\/pages\/([^/?]+)/)?.[1] ?? undefined
   const { primaryColor, sidebarTextColor } = useBranding()
@@ -868,6 +867,7 @@ export default function GroupedInterfaces({
   }
 
   // Navigation Page Component (view mode)
+  // Use plain Link - no onClick/router.push. Avoids double-handling that can freeze transitions.
   function NavigationPage({ page, level = 0 }: { page: InterfacePage; level?: number }) {
     const targetPageId = page.id
     const isActive = currentPageId === targetPageId
@@ -882,44 +882,6 @@ export default function GroupedInterfaces({
           "hover:bg-black/10",
           isActive && "bg-black/20 font-semibold"
         )}
-        onClick={(e) => {
-          const debugEnabled = typeof window !== "undefined" && localStorage.getItem("DEBUG_NAVIGATION") === "1"
-          const isCurrentlyActive = currentPageId === targetPageId
-          
-          if (debugEnabled) {
-            console.log("[NavigationPage] Click detected:", {
-              href: `/pages/${targetPageId}`,
-              currentPageId,
-              isActive,
-              isCurrentlyActive,
-              defaultPrevented: e.defaultPrevented,
-              target: e.target,
-            })
-          }
-          
-          // CRITICAL: If clicking the same page, force a refresh/reload
-          // Next.js Link won't navigate if already on the page, but user might want to refresh
-          if (isCurrentlyActive) {
-            if (debugEnabled) {
-              console.log("[NavigationPage] Already on this page - forcing refresh")
-            }
-            // Prevent default Link behavior and manually refresh
-            e.preventDefault()
-            e.stopPropagation()
-            router.refresh()
-            return
-          }
-          
-          // For different pages: use router.push explicitly to ensure navigation completes
-          // (Link default behavior can be blocked by overlays or event propagation)
-          e.preventDefault()
-          e.stopPropagation()
-          router.push(`/pages/${targetPageId}`)
-          
-          if (debugEnabled) {
-            console.log("[NavigationPage] router.push called for:", `/pages/${targetPageId}`)
-          }
-        }}
         style={{ color: sidebarTextColor }}
       >
         <span className="truncate flex-1">{page.name}</span>
@@ -1018,53 +980,10 @@ export default function GroupedInterfaces({
                 color: primaryColor 
               } : { color: sidebarTextColor }}
               onClick={(e) => {
-                const debugEnabled = typeof window !== "undefined" && localStorage.getItem("DEBUG_NAVIGATION") === "1"
-                const isCurrentlyActive = currentPageId === targetPageId
-                
-                if (debugEnabled) {
-                  console.log("[Sidebar Link] Click detected:", {
-                    href: `/pages/${targetPageId}`,
-                    currentPageId,
-                    isActive: isCurrentlyActive,
-                    editMode,
-                    isDragging: isDraggingRef.current,
-                    activeId,
-                    willPrevent: editMode && isDraggingRef.current && activeId,
-                    defaultPrevented: e.defaultPrevented,
-                    timestamp: performance.now(),
-                  })
-                }
-                
-                // CRITICAL: Use ref for synchronous check - state might be stale
-                // Only prevent navigation if we're ACTUALLY dragging (both conditions)
-                // AND we're in edit mode (browse mode should never block navigation)
+                // Only prevent navigation when dragging in edit mode - never block otherwise
                 if (editMode && isDraggingRef.current && activeId) {
-                  if (debugEnabled) {
-                    console.warn("[Sidebar Link] Navigation prevented - dragging in edit mode")
-                  }
                   e.preventDefault()
                   e.stopPropagation()
-                  return
-                }
-                
-                // If clicking the same page, force a refresh
-                if (isCurrentlyActive) {
-                  if (debugEnabled) {
-                    console.log("[Sidebar Link] Already on this page - refreshing data")
-                  }
-                  e.preventDefault()
-                  e.stopPropagation()
-                  router.refresh()
-                  return
-                }
-                
-                // For different pages: use router.push explicitly to ensure navigation completes
-                e.preventDefault()
-                e.stopPropagation()
-                router.push(`/pages/${targetPageId}`)
-                
-                if (debugEnabled) {
-                  console.log("[Sidebar Link] router.push called for:", `/pages/${targetPageId}`)
                 }
               }}
             >

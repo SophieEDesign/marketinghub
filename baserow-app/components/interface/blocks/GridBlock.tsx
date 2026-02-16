@@ -219,7 +219,9 @@ export default function GridBlock({
   }
   // #endregion
   
-  const viewType: ViewType = config?.view_type || 'grid'
+  // CRITICAL: For calendar blocks, always use 'calendar' so sibling structure stays stable and CalendarView does not remount.
+  // If we fall back to 'grid' when config is briefly undefined, React sees a different tree and unmounts CalendarView.
+  const viewType: ViewType = block.type === 'calendar' ? 'calendar' : (config?.view_type || 'grid')
   
   // DEBUG_LIST: Log tableId resolution
   // CRITICAL: Use useState to prevent hydration mismatch - localStorage access must happen after mount
@@ -791,8 +793,14 @@ export default function GridBlock({
         }
         
         // CalendarView will load view config and use that; it shows empty state if tableId or date field is missing
+        // #region agent log – calendar branch (viewType/config stability; if viewType flips, CalendarView remounts)
+        if (typeof window !== 'undefined') {
+          fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GridBlock.tsx:calendar-branch',message:'GridBlock rendering calendar branch',data:{blockId:block.id,viewType,configViewType:config?.view_type},timestamp:Date.now(),hypothesisId:'H-viewType'})}).catch(()=>{});
+        }
+        // #endregion
         return (
           <CalendarView
+            key={block.id}
             tableId={tableId ?? ''}
             viewId={viewUuid || ''}
             dateFieldId={dateFieldId}
