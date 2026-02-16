@@ -2576,7 +2576,7 @@ export default function Canvas({
             return (
               <div
                 key={block.id}
-                className={`block-container relative transition-all duration-200 ${
+                className={`block-container relative transition-[box-shadow,border-color] duration-200 ${
                   isEditing
                     ? `group bg-white border-2 border-dashed border-gray-200 hover:border-gray-300 rounded-lg shadow-sm hover:shadow-md ${
                         selectedBlockId === block.id
@@ -2720,14 +2720,10 @@ export default function Canvas({
             
             {/* Block Content - ALWAYS visible; never conditional on isEditing */}
             {/* CRITICAL: Block content must render in both view and edit mode. Only edit chrome is conditional. */}
+            {/* NO willChange, transitionProperty, or transform here - they can defer initial paint. */}
             <div 
               className={`block-content h-full w-full min-h-0 rounded-lg ${block.config?.locked ? 'pointer-events-none opacity-75' : ''} ${block.type === 'field' ? 'overflow-visible' : isEditing ? 'overflow-hidden' : 'overflow-auto'}`}
               data-block-id={block.id}
-              style={{
-                visibility: 'visible',
-                willChange: keyboardMoveHighlight === block.id ? 'transform' : 'auto',
-                transitionProperty: 'transform, opacity',
-              }}
             >
               <BlockAppearanceWrapper 
                 block={block}
