@@ -2,6 +2,8 @@
 
 A Baserow-style interface built with Next.js 14 and Supabase. This project replicates the Baserow frontend (Grid, Kanban, Calendar, Form, Record View) using Supabase as the backend.
 
+**Note:** `baserow-app/` is the single source of truth. Root-level legacy code (`lib/`, `components/`) has been removed. See [LEGACY_CODE_CLEANUP_PLAN](../docs/guides/LEGACY_CODE_CLEANUP_PLAN.md) for details.
+
 ## Features
 
 - **Multiple View Types**: Grid, Form, Kanban, Calendar, and Interface Page (block builder)

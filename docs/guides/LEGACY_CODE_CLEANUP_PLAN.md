@@ -1,7 +1,21 @@
 # Legacy Code Cleanup Plan
 
 **Date:** February 2026  
+**Executed:** February 16, 2026  
 **Related:** [CODE_AUDIT_REPORT](../audits/CODE_AUDIT_REPORT.md)
+
+---
+
+## Execution Summary (February 16, 2026)
+
+The following root-level directories were removed as orphaned legacy code (not used by baserow-app build):
+
+- **`lib/`** – Entire directory (icons.ts, supabase.ts, views.ts, data.ts, roles.ts, permissions.ts, navigation.ts, import/, grid-view-settings.ts, blocks.ts)
+- **`components/`** – Entire directory (ui/, navigation/, views/, blocks/, workspace/, calendar/, settings/, etc.)
+
+**Verification:** No baserow-app files import from root `lib/` or `components/`. The app runs from `baserow-app/` only; `@/*` maps to `baserow-app/*`.
+
+**Preserved:** `baserow-app/components/blocks/BlockRenderer.tsx` – Kept (used by InterfacePage and block-drift).
 
 ---
 
