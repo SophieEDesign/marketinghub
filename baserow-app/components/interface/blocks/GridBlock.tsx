@@ -88,6 +88,10 @@ export default function GridBlock({
   // → FullCalendar reinit → React #185. Memoize by content so CalendarView receives stable reference.
   const configContentKey = config ? JSON.stringify(config) : ''
   const stableBlockConfig = useMemo(() => config ?? {}, [configContentKey])
+  const cascadeContext = useMemo(
+    () => (stableBlockConfig ? { blockConfig: stableBlockConfig } : undefined),
+    [stableBlockConfig]
+  )
 
   // #region HOOK CHECK - Before useRecordPanel
   if (process.env.NODE_ENV === 'development') {
@@ -499,21 +503,9 @@ export default function GridBlock({
   // Combine loading states
   const isLoading = loading || metaLoading
 
-  if (!tableId) {
-    return (
-      <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
-        <div className="text-center">
-          <p className="mb-2">{isEditing ? "This block requires a table connection." : "No table connection"}</p>
-          {isEditing && (
-            <p className="text-xs text-gray-400">Configure the table in block settings.</p>
-          )}
-        </div>
-      </div>
-    )
-  }
-
   // Determine visible fields: use config.visible_fields if provided, otherwise use view_fields
   // Ensure all values are arrays to prevent runtime errors
+  // CRITICAL: Must run before any early return so useMemo (fieldIds) is always called (Rules of Hooks)
   type ViewFieldType = {
     field_name: string
     visible: boolean
@@ -536,6 +528,19 @@ export default function GridBlock({
     () => visibleFields.map(f => f.field_name),
     [visibleFields.map(f => f.field_name).join(',')]
   )
+
+  if (!tableId) {
+    return (
+      <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
+        <div className="text-center">
+          <p className="mb-2">{isEditing ? "This block requires a table connection." : "No table connection"}</p>
+          {isEditing && (
+            <p className="text-xs text-gray-400">Configure the table in block settings.</p>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   // DEBUG_LIST: Log visible fields resolution
   if (listDebugEnabled) {
@@ -884,7 +889,7 @@ export default function GridBlock({
             fitImageSize={appearance.fit_image_size}
             blockConfig={config}
             onRecordClick={onRecordClick}
-            cascadeContext={{ blockConfig: config }}
+            cascadeContext={cascadeContext}
             reloadKey={refreshKey}
             interfaceMode={interfaceMode}
             onRecordDeleted={() => setRefreshKey((k) => k + 1)}
@@ -1090,7 +1095,7 @@ export default function GridBlock({
             reloadKey={refreshKey}
             onHeightChange={isGrouped ? handleHeightChange : undefined}
             rowHeight={rowHeight}
-            cascadeContext={{ blockConfig: config }}
+            cascadeContext={cascadeContext}
             interfaceMode={interfaceMode}
             onRecordDeleted={() => setRefreshKey((k) => k + 1)}
           />
@@ -1170,7 +1175,7 @@ export default function GridBlock({
             modalFields={modalFieldsForRecord}
             modalLayout={(config as any).modal_layout}
             fieldLayout={(config as any).field_layout}
-            cascadeContext={{ blockConfig: config }}
+            cascadeContext={cascadeContext}
             reloadKey={refreshKey}
             defaultGroupsCollapsed={defaultGroupsCollapsed}
             appearance={{

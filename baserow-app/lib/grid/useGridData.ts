@@ -386,7 +386,7 @@ export function useGridData({
         )
       }
 
-      const runQuery = async (attempt: number): Promise<null> => {
+      const runQuery = async (attempt: number): Promise<GridRow[]> => {
         // Use refs to get current filters/sorts/fields without causing dependency issues
         const currentFilters = filtersRef.current
         const currentSorts = sortsRef.current
@@ -577,8 +577,8 @@ export function useGridData({
       if (typeof window !== 'undefined' && (process.env.NODE_ENV === 'development' || localStorage.getItem('DEBUG_GRID_DATA') === '1')) {
         console.log('[useGridData] Running query...')
       }
-      const resultRows = await runQuery(0)
-      if (resultRows) setRows(resultRows)
+      const resultRows: GridRow[] = await runQuery(0)
+      setRows(resultRows)
       if (typeof window !== 'undefined' && (process.env.NODE_ENV === 'development' || localStorage.getItem('DEBUG_GRID_DATA') === '1')) {
         console.log('[useGridData] Query completed successfully')
       }
