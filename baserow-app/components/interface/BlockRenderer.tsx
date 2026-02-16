@@ -415,9 +415,11 @@ export default function BlockRenderer({
 
       case "calendar":
         // CRITICAL: Calendar block must always render (never return null). Validation/empty state is inside CalendarView.
+        // CRITICAL: key={block.id} ONLY - no compound keys. Unstable keys cause mount loop → React #185.
         return (
           <LazyBlockWrapper enabled={false}>
             <CalendarBlock
+              key={block.id}
               block={safeBlock}
               isEditing={canEdit}
               interfaceMode={interfaceMode}

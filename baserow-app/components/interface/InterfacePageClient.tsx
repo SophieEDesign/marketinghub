@@ -207,11 +207,7 @@ function InterfacePageClientInternal({
   // Stabilize blocks reference: same content => same array ref to prevent Canvas/BlockRenderer remounts
   const prevBlocksRef = useRef<{ blocks: any[]; signature: string }>({ blocks: [], signature: "" })
   useEffect(() => {
-    if (!page) {
-      lastRightPanelSyncRef.current = null
-      setRightPanelData(null)
-      return
-    }
+    if (!page) return
     const selectedBlock = selectedBlockIdForPanel != null ? blocks.find((b) => b.id === selectedBlockIdForPanel) ?? null : null
     const prev = lastRightPanelSyncRef.current
     if (prev?.pageRef === page && prev?.blocksRef === blocks && prev?.selectedBlockId === selectedBlockIdForPanel) return
@@ -223,10 +219,6 @@ function InterfacePageClientInternal({
       blocks,
       selectedBlock,
     })
-    return () => {
-      lastRightPanelSyncRef.current = null
-      setRightPanelData(null)
-    }
   }, [page?.id, page, pageTableId, blocks, selectedContext?.type, selectedBlockIdForPanel, setRightPanelData, handlePageUpdate])
 
   // Initialize title value when page loads

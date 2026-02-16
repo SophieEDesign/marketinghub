@@ -55,16 +55,21 @@ export default function RightSettingsPanel() {
   const { isRecordModalOpen } = useRecordModal()
   const { state: recordPanelState } = useRecordPanel()
 
-  // Step 4: Do NOT show PageDisplaySettingsPanel (or any page/record settings sidebar) when RecordModal or RecordPanel is open
-  if (isRecordModalOpen || recordPanelState.isOpen) return null
-  if (!selectedContext) return null
+  // Always mount; control visibility via CSS to keep React tree stable (no race collapse, stable effects)
+  const isVisible =
+    selectedContext &&
+    !isRecordModalOpen &&
+    !recordPanelState.isOpen
 
   const handleClose = () => setSelectedContext(null)
 
   return (
     <div
-      className="fixed right-0 top-0 h-full w-[400px] bg-white border-l border-gray-200 shadow-xl z-40 flex flex-col"
+      className={`fixed right-0 top-0 h-full w-[400px] bg-white border-l border-gray-200 shadow-xl z-40 flex flex-col transition-transform duration-200 ${
+        isVisible ? "translate-x-0" : "translate-x-full pointer-events-none"
+      }`}
       style={{ height: "100vh" }}
+      aria-hidden={!isVisible}
     >
       {/* Header with breadcrumb and close */}
       <div className="border-b border-gray-200 px-4 py-3 flex-shrink-0">
@@ -86,44 +91,60 @@ export default function RightSettingsPanel() {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto min-h-0">
-        {selectedContext.type === "page" && data?.page && (
-          <PageDisplaySettingsPanel
-            page={data.page}
-            isOpen={true}
-            onClose={handleClose}
-            onUpdate={data.onPageUpdate}
-            embedded
-          />
+        {!selectedContext && (
+          <div className="p-4 text-sm text-muted-foreground">No selection</div>
         )}
 
-        {selectedContext.type === "block" && data?.selectedBlock && (
-          <SettingsPanel
-            block={data.selectedBlock}
-            isOpen={true}
-            onClose={handleClose}
-            onSave={data.onBlockSave}
-            onMoveToTop={data.onBlockMoveToTop}
-            onMoveToBottom={data.onBlockMoveToBottom}
-            onLock={data.onBlockLock}
-            pageTableId={data.pageTableId}
-            allBlocks={data.blocks}
-            embedded
-          />
+        {selectedContext?.type === "page" && (
+          data?.page ? (
+            <PageDisplaySettingsPanel
+              page={data.page}
+              isOpen={true}
+              onClose={handleClose}
+              onUpdate={data.onPageUpdate}
+              embedded
+            />
+          ) : (
+            <div className="p-4 text-sm text-muted-foreground">Loading page settings…</div>
+          )
         )}
 
-        {selectedContext.type === "recordList" && data?.selectedBlock && (
-          <SettingsPanel
-            block={data.selectedBlock}
-            isOpen={true}
-            onClose={handleClose}
-            onSave={data.onBlockSave}
-            onMoveToTop={data.onBlockMoveToTop}
-            onMoveToBottom={data.onBlockMoveToBottom}
-            onLock={data.onBlockLock}
-            pageTableId={data.pageTableId}
-            allBlocks={data.blocks}
-            embedded
-          />
+        {selectedContext?.type === "block" && (
+          data?.selectedBlock ? (
+            <SettingsPanel
+              block={data.selectedBlock}
+              isOpen={true}
+              onClose={handleClose}
+              onSave={data.onBlockSave}
+              onMoveToTop={data.onBlockMoveToTop}
+              onMoveToBottom={data.onBlockMoveToBottom}
+              onLock={data.onBlockLock}
+              pageTableId={data.pageTableId}
+              allBlocks={data.blocks}
+              embedded
+            />
+          ) : (
+            <div className="p-4 text-sm text-muted-foreground">Loading block settings…</div>
+          )
+        )}
+
+        {selectedContext?.type === "recordList" && (
+          data?.selectedBlock ? (
+            <SettingsPanel
+              block={data.selectedBlock}
+              isOpen={true}
+              onClose={handleClose}
+              onSave={data.onBlockSave}
+              onMoveToTop={data.onBlockMoveToTop}
+              onMoveToBottom={data.onBlockMoveToBottom}
+              onLock={data.onBlockLock}
+              pageTableId={data.pageTableId}
+              allBlocks={data.blocks}
+              embedded
+            />
+          ) : (
+            <div className="p-4 text-sm text-muted-foreground">Loading block settings…</div>
+          )
         )}
 
         {selectedContext.type === "record" && data?.recordId && data?.recordTableId && (
