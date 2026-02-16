@@ -74,6 +74,9 @@ interface CalendarViewProps {
 
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/
 
+// Module-level mount counter for remount detection (remount = parent conditional/key change)
+let _calendarViewMountCount = 0
+
 /** Stable handler for image load errors - avoids inline arrow in eventContent (prevents React #185) */
 function hideImageOnError(e: React.SyntheticEvent<HTMLImageElement, Event>) {
   ;(e.target as HTMLImageElement).style.display = "none"
@@ -168,6 +171,13 @@ export default function CalendarView({
     fieldIdsPropRef.current = fieldIdsProp
   }
   // #endregion
+  // #region agent log – blockConfig stability (new ref each render = handleEventClick deps / effect loop)
+  const blockConfigRef = useRef<typeof blockConfig | null>(null)
+  if (typeof window !== 'undefined' && blockConfigRef.current !== blockConfig) {
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:blockConfig',message:'blockConfig ref changed',data:{hypothesisId:'H-blockConfig'},timestamp:Date.now()})}).catch(()=>{});
+    blockConfigRef.current = blockConfig
+  }
+  // #endregion
   const router = useRouter()
   const [rows, setRows] = useState<TableRow[]>([])
   // CRITICAL: Use ref to access latest rows in callbacks without causing re-renders
@@ -187,12 +197,14 @@ export default function CalendarView({
   
   // Lifecycle logging
   useEffect(() => {
+    _calendarViewMountCount += 1
+    const mountCount = _calendarViewMountCount
     // Set debug flag after mount to prevent hydration mismatch
     setCalendarDebugEnabled(isDebugEnabled('CALENDAR'))
     debugLog('CALENDAR', `CalendarView MOUNT: tableId=${tableId}, viewId=${viewId}`)
-    // #region agent log – CalendarView mount (repeated = identity destruction / key change upstream)
+    // #region agent log – CalendarView mount (repeated = remount / parent conditional/key change)
     if (typeof window !== 'undefined') {
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:mount',message:'CalendarView MOUNT',data:{tableId,viewId},timestamp:Date.now(),hypothesisId:'H-mount'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:mount',message:'CalendarView MOUNT',data:{tableId,viewId,mountCount},timestamp:Date.now(),hypothesisId:'H-mount'})}).catch(()=>{});
     }
     // #endregion
     // Mark as mounted to prevent hydration mismatch with FullCalendar

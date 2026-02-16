@@ -523,6 +523,14 @@ export default function GridBlock({
       }).filter(Boolean) as Array<{ field_name: string; visible: boolean; position: number }>
     : safeViewFields.filter(f => f && f.visible)
 
+  // CRITICAL: Memoize fieldIds so CalendarView (and other views) receive a stable array reference.
+  // Without this, visibleFields.map(...) creates a new array every render → CalendarView's
+  // linkedValueLabelMaps effect re-runs → setState → re-render → React #185 loop.
+  const fieldIds = useMemo(
+    () => visibleFields.map(f => f.field_name),
+    [visibleFields.map(f => f.field_name).join(',')]
+  )
+
   // DEBUG_LIST: Log visible fields resolution
   if (listDebugEnabled) {
     debugLog('LIST', 'GridBlock visible fields resolution', {
@@ -751,8 +759,6 @@ export default function GridBlock({
 
   // Render based on view type
   const renderView = () => {
-    const fieldIds = visibleFields.map(f => f.field_name)
-    
     switch (viewType) {
       case 'calendar': {
         // CRITICAL: Always render CalendarView so the block mounts. Validation and empty states are handled inside CalendarView.

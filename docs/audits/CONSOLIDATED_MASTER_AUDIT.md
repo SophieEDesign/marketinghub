@@ -1,399 +1,291 @@
-# Consolidated Master Audit - Marketing Hub
-
-**Date:** February 16, 2026  
-**Scope:** Merged findings from all 38 audit documents in `docs/audits/`  
-**Exclusions:** Broken pages state (6294cdd) - addressed separately
-
----
-
-## Executive Summary
-
-This document consolidates findings from 38 audit reports into a single master audit with unified priorities and actionable next steps. The Marketing Hub is a Baserow-style interface built with Next.js 14, React, and Supabase.
-
-### Overall Health (from COMPREHENSIVE_APP_AUDIT_2026)
-
-| Domain | Score | Status |
-|--------|-------|--------|
-| Security | 70% | Good foundation, gaps remain |
-| Performance | 65% | Caching implemented, optimization needed |
-| Code Quality | 75% | Good structure, duplication issues |
-| Architecture | 80% | Solid separation of concerns |
-| Testing | 40% | Insufficient coverage |
-| Accessibility | 50% | Partial ARIA, keyboard nav incomplete |
-| User Experience | 60% | Functional, missing polish |
-| Documentation | 85% | Comprehensive guides |
-
-### Issue Counts (Deduplicated)
-
-| Severity | Count | Status |
-|----------|-------|--------|
-| **P0 (Critical)** | 12 | 4 fixed, 8 open |
-| **P1 (High)** | 18 | 6 fixed/partial, 12 open |
-| **P2 (Medium)** | 22 | 5 fixed, 17 open |
-| **P3 (Low)** | 15 | Backlog |
-
-### Top 5 Actionable Priorities
-
-1. **Fix CORS configuration** - PostgREST not honoring CORS (production errors)
-2. **Add comprehensive test coverage** - Only 9 test files for entire app
-3. **Address schema critical issues** - 17 critical schema issues (indexes, constraints)
-4. **Remove config loading fallbacks** - Blocks inconsistently use `pageTableId`
-5. **Implement request batching** - Dashboard aggregate requests (420 in sample period)
-
----
-
-## Unified Priority Matrix
-
-### P0 (Critical - Fix Immediately)
-
-| # | Issue | Status | Source |
-|---|-------|--------|--------|
-| 1 | CORS configuration - PostgREST not honoring CORS settings | OPEN | COMPREHENSIVE_APP_AUDIT_2026 |
-| 2 | RLS policies too permissive - Table delete restricted to admin (FIXED); other policies need review | PARTIAL | COMPREHENSIVE_APP_AUDIT_2026, schema_audit |
-| 3 | React #185 (Maximum Update Depth) - TextBlock, FilterBlock, GridView, InterfaceBuilder | OPEN | FULL_APP_AUDIT_AIRTABLE_PARITY |
-| 4 | Schema: Missing indexes on foreign keys (47 critical issues) | PARTIAL | SCHEMA_AUDIT_REPORT |
-| 5 | Schema: Missing ON DELETE CASCADE, missing unique/check constraints | OPEN | SCHEMA_AUDIT_REPORT |
-| 6 | Insufficient test coverage - Only 9 test files | OPEN | COMPREHENSIVE_APP_AUDIT_2026 |
-| 7 | No E2E tests | OPEN | COMPREHENSIVE_APP_AUDIT_2026 |
-| 8 | Config loading consistency - Blocks fall back to `pageTableId` (Chart, KPI, Record) | OPEN | INTERFACE_BUILDER_AUDIT_REPORT |
-| 9 | Save loop prevention - Audit all blocks for save loops | PARTIAL | INTERFACE_BUILDER_AUDIT_REPORT, TEXTBLOCK_AUDIT |
-| 10 | MultiCalendar/MultiTimeline - No error handling, errors silently swallowed | OPEN | MULTI_CALENDAR_TIMELINE_AUDIT_REPORT |
-| 11 | Page creation without required config - Settings → Pages tab allows invalid pages | OPEN | UX_AUDIT_REPORT |
-| 12 | Incomplete keyboard navigation | PARTIAL | COMPREHENSIVE_APP_AUDIT_2026 |
-
-### P1 (High - Fix Soon)
-
-| # | Issue | Status | Source |
-|---|-------|--------|--------|
-| 1 | Rate limiting on API routes | FIXED | COMPREHENSIVE_APP_AUDIT_2026 |
-| 2 | No request size limits on API routes | OPEN | COMPREHENSIVE_APP_AUDIT_2026 |
-| 3 | Missing CSRF protection | OPEN | COMPREHENSIVE_APP_AUDIT_2026 |
-| 4 | Excessive dashboard aggregate requests | MITIGATED | VERCEL_LOGS_ANALYSIS, COMPREHENSIVE_APP_AUDIT_2026 |
-| 5 | Slow page loads (avg 978ms) | OPEN | VERCEL_LOGS_ANALYSIS |
-| 6 | Client-side data loading - Up to 2000 rows, no pagination | OPEN | COMPREHENSIVE_APP_AUDIT_2026 |
-| 7 | Console statements in production | OPEN | COMPREHENSIVE_APP_AUDIT_2026 |
-| 8 | Excessive `any` types | PARTIAL | COMPREHENSIVE_APP_AUDIT_2026 |
-| 9 | Code duplication - ~50+ duplicate files (root vs baserow-app) | PLANNED | CODE_AUDIT_REPORT |
-| 10 | Edit mode authority (`interfaceMode === 'edit'`) | FIXED | P1_EDIT_MODE_AUTHORITY_IMPLEMENTATION |
-| 11 | Right panel inline canvas | FIXED | P2_INLINE_CANVAS_IMPLEMENTATION |
-| 12 | Focus management in modals/dialogs | OPEN | COMPREHENSIVE_APP_AUDIT_2026 |
-| 13 | Missing keyboard shortcuts (undo, duplicate, delete) | OPEN | COMPREHENSIVE_APP_AUDIT_2026 |
-| 14 | No undo/redo | OPEN | COMPREHENSIVE_APP_AUDIT_2026 |
-| 15 | No Filter Block component - Grid/Calendar don't receive page filters | OPEN | FILTER_AUDIT_SUMMARY |
-| 16 | InterfaceBuilder state complexity - 10+ state variables | OPEN | COMPREHENSIVE_APP_AUDIT_2026 |
-| 17 | Search API - Only searches `views` table, not `interface_pages` | OPEN | CROSS_PAGE_ISSUES_ANALYSIS |
-| 18 | Connection exhaustion | FIXED | CONNECTION_EXHAUSTION_FIX_AUDIT |
-
-### P2 (Medium - Fix When Possible)
-
-| # | Issue | Status | Source |
-|---|-------|--------|--------|
-| 1 | Session management - No explicit timeout, no refresh | OPEN | COMPREHENSIVE_APP_AUDIT_2026 |
-| 2 | Audit logging for admin actions | OPEN | COMPREHENSIVE_APP_AUDIT_2026 |
-| 3 | Bundle size analysis | OPEN | COMPREHENSIVE_APP_AUDIT_2026 |
-| 4 | Image optimization - No Next.js Image component | OPEN | COMPREHENSIVE_APP_AUDIT_2026 |
-| 5 | Lazy loading for heavy components | OPEN | COMPREHENSIVE_APP_AUDIT_2026 |
-| 6 | API design standardization | OPEN | COMPREHENSIVE_APP_AUDIT_2026 |
-| 7 | Color contrast - No WCAG audit | OPEN | COMPREHENSIVE_APP_AUDIT_2026 |
-| 8 | Missing onboarding | PLANNED | COMPREHENSIVE_APP_AUDIT_2026 |
-| 9 | Poor empty states | PLANNED | COMPREHENSIVE_APP_AUDIT_2026 |
-| 10 | View type support in Grid Block - Kanban, Timeline, Gallery disabled | OPEN | INTERFACE_BUILDER_AUDIT_REPORT |
-| 11 | Page settings validation - Required fields not enforced | OPEN | INTERFACE_BUILDER_AUDIT_REPORT |
-| 12 | Filter format standardization | OPEN | FILTER_AUDIT_SUMMARY |
-| 13 | Page creation wizard - Settings → Pages tab still uses old flow | OPEN | UX_AUDIT_REPORT |
-| 14 | Modal layout editor - WYSIWYG gap | OPEN | MODAL_LAYOUT_AUDIT |
-| 15 | Tabs block - Registered but no component exists | OPEN | DASHBOARD_BLOCKS_AUDIT |
-| 16 | SQL view auto-generation - Document or implement | OPEN | INTERFACE_BUILDER_AUDIT_REPORT |
-| 17 | Shared query builder utility | OPEN | INTERFACE_BUILDER_AUDIT_REPORT |
-| 18 | Canvas state - Block reload on mode change | FIXED | CANVAS_STATE_AUDIT |
-| 19 | Page block persistence - Asymmetric save/load | OPEN | PAGE_BLOCK_PERSISTENCE_ANALYSIS |
-| 20 | Legacy code cleanup - PageCreationWizard, NewPageModal | OPEN | CLEANUP_SUMMARY |
-| 21 | Test coverage reports | OPEN | COMPREHENSIVE_APP_AUDIT_2026 |
-| 22 | API documentation (OpenAPI/Swagger) | PLANNED | COMPREHENSIVE_APP_AUDIT_2026 |
-
-### P3 (Low / Backlog)
-
-| # | Issue | Source |
-|---|-------|--------|
-| 1 | Full-text search indexes | SCHEMA_AUDIT_REPORT |
-| 2 | Migration guides in migration files | COMPREHENSIVE_APP_AUDIT_2026 |
-| 3 | Component documentation (JSDoc) | COMPREHENSIVE_APP_AUDIT_2026 |
-| 4 | Set default view for tables | PROGRESS_AUDIT |
-| 5 | Search in Form/Kanban/Calendar views | PROGRESS_AUDIT |
-| 6 | Multi-select tag UI enhancement | PROGRESS_AUDIT |
-| 7 | Responsive design improvements | COMPREHENSIVE_APP_AUDIT_2026 |
-| 8 | Skip links for keyboard navigation | COMPREHENSIVE_APP_AUDIT_2026 |
-| 9 | Filter block settings UI | FILTER_AUDIT_SUMMARY |
-| 10 | Filter state context | FILTER_AUDIT_SUMMARY |
-| 11 | Cache invalidation in useViewMeta | CONNECTION_EXHAUSTION_FIX_AUDIT |
-| 12 | Password policy - Require special chars for admin | COMPREHENSIVE_APP_AUDIT_2026 |
-| 13 | Help documentation in-app | COMPREHENSIVE_APP_AUDIT_2026 |
-| 14 | Performance benchmarks | COMPREHENSIVE_APP_AUDIT_2026 |
-| 15 | Pages without group_id - Ungrouped section in Sidebar | CROSS_PAGE_ISSUES_ANALYSIS |
+# CONSOLIDATED MASTER AUDIT
+
+Last Updated: February 16, 2026
+
+--------------------------------------------------
+1. Executive Summary
+--------------------------------------------------
+
+This document is the single source of truth for Marketing Hub app health. It consolidates 38 audit documents in `docs/audits/` plus `docs/guides/LEGACY_CODE_CLEANUP_PLAN.md`. The app is a Baserow-style interface (Next.js 14, React, Supabase).
+
+**Overall health** (from COMPREHENSIVE_APP_AUDIT_2026): Security 70%, Performance 65%, Code Quality 75%, Architecture 80%, Testing 40%, Accessibility 50%, UX 60%, Documentation 85%.
+
+**Total issues by severity (after dedupe):** P0: 12 | P1: 18 | P2: 22 | P3: 15
+
+**Count by status:** FIXED: 8 | PARTIAL: 6 | OPEN: 41 | PLANNED: 6
+
+**Top 5 actionable priorities:**
+1. Fix CORS configuration (PostgREST not honoring CORS in production)
+2. Add comprehensive test coverage (only 9 test files)
+3. Address schema critical issues (missing FK indexes, constraints)
+4. Remove config loading fallbacks (Chart, KPI, Record blocks use `pageTableId`)
+5. Implement request batching for dashboard aggregates (420 requests in sample)
+
+**Note:** Broken pages (6294cdd) excluded from scope.
+
+--------------------------------------------------
+2. Unified Priority Matrix
+--------------------------------------------------
+
+## P0 – Critical
+
+| Issue | Domain | Status | Sources | Notes |
+|-------|--------|--------|---------|-------|
+| CORS configuration – PostgREST not honoring CORS settings | Security | OPEN | COMPREHENSIVE_APP_AUDIT_2026 | Production errors |
+| RLS policies too permissive | Security | PARTIAL | COMPREHENSIVE_APP_AUDIT_2026, SCHEMA_AUDIT_REPORT | Table delete restricted to admin; other policies need review |
+| React #185 (Maximum Update Depth) – TextBlock, FilterBlock, GridView, InterfaceBuilder | Interface | OPEN | FULL_APP_AUDIT_AIRTABLE_PARITY | Infinite loop risk |
+| Missing foreign key indexes (47 critical schema issues) | Schema | PARTIAL | SCHEMA_AUDIT_REPORT | schema_audit_fixes partially addresses |
+| Missing ON DELETE CASCADE, unique/check constraints | Schema | OPEN | SCHEMA_AUDIT_REPORT | Data integrity risk |
+| Insufficient test coverage (9 test files) | Testing | OPEN | COMPREHENSIVE_APP_AUDIT_2026 | Target 70%+ |
+| No E2E tests | Testing | OPEN | COMPREHENSIVE_APP_AUDIT_2026 | Playwright/Cypress |
+| Config loading consistency – blocks fall back to `pageTableId` | Interface | OPEN | INTERFACE_BUILDER_AUDIT_REPORT | Chart, KPI, Record blocks |
+| Save loop prevention – audit all blocks | Interface | PARTIAL | INTERFACE_BUILDER_AUDIT_REPORT, TEXTBLOCK_AUDIT | TextBlock, Settings Panel done |
+| MultiCalendar/MultiTimeline – no error handling, errors swallowed | Interface | OPEN | MULTI_CALENDAR_TIMELINE_AUDIT_REPORT | Add catch blocks, user feedback |
+| Page creation without required config – Settings → Pages tab | UX | OPEN | UX_AUDIT_REPORT | Invalid pages created |
+| Incomplete keyboard navigation | Accessibility | PARTIAL | COMPREHENSIVE_APP_AUDIT_2026 | BaseDropdown, sidebar done |
+
+## P1 – High
+
+| Issue | Domain | Status | Sources | Notes |
+|-------|--------|--------|---------|-------|
+| Rate limiting on API routes | Security | FIXED | COMPREHENSIVE_APP_AUDIT_2026 | Upstash, invite endpoint |
+| No request size limits | Security | OPEN | COMPREHENSIVE_APP_AUDIT_2026 | DoS risk |
+| Missing CSRF protection | Security | OPEN | COMPREHENSIVE_APP_AUDIT_2026 | State-changing ops |
+| Excessive dashboard aggregate requests | Performance | PARTIAL | VERCEL_LOGS_ANALYSIS | 10s cache TTL applied |
+| Slow page loads (avg 978ms) | Performance | OPEN | VERCEL_LOGS_ANALYSIS | Parallelize API calls |
+| Client-side data loading – 2000 rows, no pagination | Performance | OPEN | COMPREHENSIVE_APP_AUDIT_2026 | useGridData |
+| Console statements in production | Code | OPEN | COMPREHENSIVE_APP_AUDIT_2026 | Use debugLog/debugWarn |
+| Excessive `any` types | Code | PARTIAL | COMPREHENSIVE_APP_AUDIT_2026 | MultiCalendarView fixed |
+| Code duplication – ~50+ duplicate files | Code | PLANNED | CODE_AUDIT_REPORT, LEGACY_CODE_CLEANUP_PLAN | Verify before remove |
+| Edit mode authority (`interfaceMode === 'edit'`) | Records | FIXED | P1_EDIT_MODE_AUTHORITY_IMPLEMENTATION | RecordPanel, RecordModal |
+| Right panel inline canvas | UX | FIXED | P2_INLINE_CANVAS_IMPLEMENTATION | Flex layout |
+| Focus management in modals/dialogs | Accessibility | OPEN | COMPREHENSIVE_APP_AUDIT_2026 | Focus trapping |
+| Missing keyboard shortcuts (undo, duplicate, delete) | UX | OPEN | COMPREHENSIVE_APP_AUDIT_2026 | |
+| No undo/redo | UX | OPEN | COMPREHENSIVE_APP_AUDIT_2026 | Interface builder, grid |
+| No Filter Block – Grid/Calendar don't receive page filters | Interface | OPEN | FILTER_AUDIT_SUMMARY | |
+| InterfaceBuilder state complexity (10+ state vars) | Architecture | OPEN | COMPREHENSIVE_APP_AUDIT_2026 | Consider useReducer |
+| Search API – only searches `views`, not `interface_pages` | Architecture | OPEN | CROSS_PAGE_ISSUES_ANALYSIS | |
+| Connection exhaustion | Performance | FIXED | CONNECTION_EXHAUSTION_FIX_AUDIT | useViewMeta cache |
 
----
+## P2 – Medium
 
-## Domain Sections
+| Issue | Domain | Status | Sources | Notes |
+|-------|--------|--------|---------|-------|
+| Session management – no timeout, no refresh | Security | OPEN | COMPREHENSIVE_APP_AUDIT_2026 | |
+| Audit logging for admin actions | Security | OPEN | COMPREHENSIVE_APP_AUDIT_2026 | |
+| Bundle size analysis | Performance | OPEN | COMPREHENSIVE_APP_AUDIT_2026 | |
+| Image optimization – no Next.js Image | Performance | OPEN | COMPREHENSIVE_APP_AUDIT_2026 | |
+| Lazy loading for heavy components | Performance | OPEN | COMPREHENSIVE_APP_AUDIT_2026 | |
+| API design standardization | Architecture | OPEN | COMPREHENSIVE_APP_AUDIT_2026 | |
+| Color contrast – no WCAG audit | Accessibility | OPEN | COMPREHENSIVE_APP_AUDIT_2026 | |
+| Missing onboarding | UX | PLANNED | COMPREHENSIVE_APP_AUDIT_2026 | Welcome, guided tour |
+| Poor empty states | UX | PLANNED | COMPREHENSIVE_APP_AUDIT_2026 | |
+| View type support – Kanban, Timeline, Gallery disabled in Grid Block | Interface | OPEN | INTERFACE_BUILDER_AUDIT_REPORT | |
+| Page settings validation – required fields not enforced | Interface | OPEN | INTERFACE_BUILDER_AUDIT_REPORT | |
+| Filter format standardization | Interface | OPEN | FILTER_AUDIT_SUMMARY | |
+| Page creation wizard – Settings → Pages uses old flow | UX | OPEN | UX_AUDIT_REPORT | |
+| Modal layout editor – WYSIWYG gap | UX | OPEN | MODAL_LAYOUT_AUDIT | |
+| Tabs block – registered but no component | Interface | OPEN | DASHBOARD_BLOCKS_AUDIT | |
+| SQL view auto-generation | Architecture | OPEN | INTERFACE_BUILDER_AUDIT_REPORT | Document or implement |
+| Shared query builder utility | Architecture | OPEN | INTERFACE_BUILDER_AUDIT_REPORT | |
+| Canvas state – block reload on mode change | Architecture | FIXED | CANVAS_STATE_AUDIT | One-way gate |
+| Page block persistence – asymmetric save/load | Architecture | OPEN | PAGE_BLOCK_PERSISTENCE_ANALYSIS | page_id vs view_id |
+| Legacy code cleanup – PageCreationWizard, NewPageModal | Code | OPEN | CLEANUP_SUMMARY | |
+| Test coverage reports | Testing | OPEN | COMPREHENSIVE_APP_AUDIT_2026 | |
+| API documentation (OpenAPI/Swagger) | Code | PLANNED | COMPREHENSIVE_APP_AUDIT_2026 | |
 
-### 1. Security
+## P3 – Low / Backlog
 
-**Summary:** Authentication middleware is enabled (bypass only with `AUTH_BYPASS=true`). Rate limiting added for invite endpoint. RLS policies partially hardened. CORS and CSRF remain gaps.
+| Issue | Domain | Status | Sources | Notes |
+|-------|--------|--------|---------|-------|
+| Full-text search indexes | Schema | OPEN | SCHEMA_AUDIT_REPORT | |
+| Migration guides in migration files | Code | OPEN | COMPREHENSIVE_APP_AUDIT_2026 | |
+| Component documentation (JSDoc) | Code | OPEN | COMPREHENSIVE_APP_AUDIT_2026 | |
+| Set default view for tables | UX | OPEN | PROGRESS_AUDIT | |
+| Search in Form/Kanban/Calendar views | Interface | OPEN | PROGRESS_AUDIT | |
+| Multi-select tag UI enhancement | Interface | OPEN | PROGRESS_AUDIT | |
+| Responsive design improvements | UX | OPEN | COMPREHENSIVE_APP_AUDIT_2026 | |
+| Skip links for keyboard navigation | Accessibility | OPEN | COMPREHENSIVE_APP_AUDIT_2026 | |
+| Filter block settings UI | Interface | OPEN | FILTER_AUDIT_SUMMARY | |
+| Filter state context | Interface | OPEN | FILTER_AUDIT_SUMMARY | |
+| Cache invalidation in useViewMeta | Performance | OPEN | CONNECTION_EXHAUSTION_FIX_AUDIT | Low priority |
+| Password policy – special chars for admin | Security | OPEN | COMPREHENSIVE_APP_AUDIT_2026 | |
+| Help documentation in-app | UX | OPEN | COMPREHENSIVE_APP_AUDIT_2026 | |
+| Performance benchmarks | Testing | OPEN | COMPREHENSIVE_APP_AUDIT_2026 | |
+| Pages without group_id – ungrouped section in Sidebar | Architecture | OPEN | CROSS_PAGE_ISSUES_ANALYSIS | |
 
-**Open:**
-- CORS configuration (PostgREST)
-- Request size limits
-- CSRF protection
-- RLS policy review (beyond table delete)
-- SQL injection protection for dynamic queries
+--------------------------------------------------
+3. Domain Breakdown
+--------------------------------------------------
 
-**Fixed:**
-- Rate limiting (Upstash)
-- Table delete restricted to admin
-- Auth middleware (LOGIN_AUDIT may be outdated)
+### Security
 
-**Source:** [COMPREHENSIVE_APP_AUDIT_2026.md](COMPREHENSIVE_APP_AUDIT_2026.md) §1, [PERMISSION_ENFORCEMENT_FINAL.md](PERMISSION_ENFORCEMENT_FINAL.md)
+Auth middleware enabled (bypass only with AUTH_BYPASS=true). Rate limiting on invite. Table delete restricted to admin. CORS and CSRF gaps remain.
 
----
+**Open:** CORS config, request size limits, CSRF, RLS policy review, SQL injection protection for dynamic queries.
 
-### 2. Performance
+**Fixed:** Rate limiting, table delete to admin, auth middleware.
 
-**Summary:** HTTP caching added for fields, favorites, recents. Connection exhaustion fixed. Dashboard aggregate caching mitigated (10s TTL). Page loads still slow (avg 978ms).
+**Sources:** COMPREHENSIVE_APP_AUDIT_2026 §1, PERMISSION_ENFORCEMENT_FINAL, LOGIN_AUDIT_REPORT
 
-**Open:**
-- Parallelize independent API calls
-- Pagination/virtual scrolling for large grids
-- Request deduplication (SWR/React Query)
-- Chart block server-side aggregation
-- Bundle size analysis
+### Performance
 
-**Fixed:**
-- Connection exhaustion (useViewMeta cache)
-- Dashboard aggregate cache TTL
-- HTTP cache headers
-- Error handling refactoring
+HTTP caching for fields, favorites, recents. Connection exhaustion fixed. Dashboard aggregate cache 10s TTL. Page loads avg 978ms.
 
-**Source:** [COMPREHENSIVE_APP_AUDIT_2026.md](COMPREHENSIVE_APP_AUDIT_2026.md) §2, [VERCEL_LOGS_ANALYSIS.md](VERCEL_LOGS_ANALYSIS.md), [OPTIMIZATION_SUMMARY.md](OPTIMIZATION_SUMMARY.md), [CONNECTION_EXHAUSTION_FIX_AUDIT.md](CONNECTION_EXHAUSTION_FIX_AUDIT.md)
+**Open:** Parallelize API calls, pagination/virtual scroll, SWR/React Query, chart server-side aggregation, bundle analysis.
 
----
+**Fixed:** Connection exhaustion (useViewMeta), dashboard cache TTL, HTTP cache headers, error handling refactor.
 
-### 3. Schema & Database
+**Sources:** COMPREHENSIVE_APP_AUDIT_2026 §2, VERCEL_LOGS_ANALYSIS, OPTIMIZATION_SUMMARY, CONNECTION_EXHAUSTION_FIX_AUDIT
 
-**Summary:** 47 critical issues identified. Missing indexes on FKs, ON DELETE CASCADE, unique constraints, check constraints, NOT NULL. `schema_audit_fixes.sql` partially addresses indexes.
+### Schema & DB
 
-**Critical:**
-- Add indexes on all foreign keys
-- Add ON DELETE CASCADE where appropriate
-- Fix missing foreign key constraints
-- Fix data integrity issues (Section 14)
+47 critical issues. Missing FK indexes, ON DELETE CASCADE, unique/check constraints, NOT NULL. schema_audit_fixes partially addresses indexes.
 
-**High:**
-- Unique constraints, check constraints
-- Performance indexes, composite indexes
+**Open:** All critical schema fixes per SCHEMA_AUDIT_REPORT.
 
-**Source:** [SCHEMA_AUDIT_REPORT.md](SCHEMA_AUDIT_REPORT.md), [CORE_DATA_VIEWS_SCHEMA.md](CORE_DATA_VIEWS_SCHEMA.md)
+**Sources:** SCHEMA_AUDIT_REPORT, CORE_DATA_VIEWS_SCHEMA
 
----
+### Code Quality
 
-### 4. Code Quality
+Main app in baserow-app/. Root app/, components/, lib/ legacy. ~50+ duplicates. LEGACY_CODE_CLEANUP_PLAN exists; verify before removing.
 
-**Summary:** Main app in `baserow-app/`. Root-level `app/`, `components/`, `lib/` are legacy. ~50+ duplicate files. LEGACY_CODE_CLEANUP_PLAN exists; verify before removing.
+**Open:** Remove root duplicates, replace `any`, remove console statements, catalog 525 TODOs, MultiCalendar/MultiTimeline error handling.
 
-**Open:**
-- Remove root duplicates (verify imports first)
-- Replace `any` types
-- Remove console statements
-- Catalog TODO/FIXME (525 matches)
-- Add error handling to MultiCalendar/MultiTimeline
+**Fixed:** MultiCalendarView blockConfig, core architecture unified.
 
-**Fixed:**
-- MultiCalendarView blockConfig: `Record<string, unknown>`
-- Core architecture unified (CLEANUP_SUMMARY)
+**Sources:** COMPREHENSIVE_APP_AUDIT_2026 §3, CODE_AUDIT_REPORT, CLEANUP_SUMMARY, LEGACY_CODE_CLEANUP_PLAN
 
-**Source:** [COMPREHENSIVE_APP_AUDIT_2026.md](COMPREHENSIVE_APP_AUDIT_2026.md) §3, [CODE_AUDIT_REPORT.md](CODE_AUDIT_REPORT.md), [CLEANUP_SUMMARY.md](CLEANUP_SUMMARY.md)
+### Architecture
 
----
+Three-layer (Data → Pages → Blocks). InterfaceBuilder complex state. Asymmetric save/load (page_id vs view_id), preview vs persisted drift.
 
-### 5. Architecture
+**Open:** Simplify InterfaceBuilder (useReducer), fix asymmetric save/load, resolve state drift.
 
-**Summary:** Three-layer (Data → Pages → Blocks). InterfaceBuilder has complex state. PAGE_BLOCK_PERSISTENCE_ANALYSIS identified asymmetric save/load, state merge issues.
+**Fixed:** Canvas state (no block reload on mode change), one-way gate, layout-mapping.ts.
 
-**Open:**
-- Simplify InterfaceBuilder state (consider useReducer)
-- Fix asymmetric save/load (page_id vs view_id)
-- Resolve preview vs persisted state drift
+**Sources:** COMPREHENSIVE_APP_AUDIT_2026 §4, PAGE_BLOCK_PERSISTENCE_ANALYSIS, CANVAS_STATE_AUDIT, INTERFACE_PAGE_RESOLUTION_ANALYSIS, CROSS_PAGE_ISSUES_ANALYSIS
 
-**Fixed:**
-- Canvas state - No block reload on mode change
-- One-way gate for blocks (InterfaceBuilder)
-- Layout mapping unified (layout-mapping.ts)
+### Testing
 
-**Source:** [COMPREHENSIVE_APP_AUDIT_2026.md](COMPREHENSIVE_APP_AUDIT_2026.md) §4, [PAGE_BLOCK_PERSISTENCE_ANALYSIS.md](PAGE_BLOCK_PERSISTENCE_ANALYSIS.md), [CANVAS_STATE_AUDIT.md](CANVAS_STATE_AUDIT.md)
+Vitest configured. 9 test files. No E2E. Auth, user mgmt, data ops not tested.
 
----
+**Open:** Unit tests, integration tests, E2E (Playwright/Cypress), auth flows, coverage reporting.
 
-### 6. Testing
+**Sources:** COMPREHENSIVE_APP_AUDIT_2026 §5
 
-**Summary:** Vitest configured. 9 test files. No E2E tests. Critical paths (auth, user management, data ops) not tested.
+### Accessibility
 
-**Open:**
-- Add unit tests for critical components
-- Integration tests for API routes
-- E2E tests (Playwright/Cypress)
-- Tests for auth flows, user management
-- Performance regression tests
-- Test coverage reporting
+Some ARIA labels. BaseDropdown, sidebar buttons have aria-label. Full keyboard nav incomplete.
 
-**Source:** [COMPREHENSIVE_APP_AUDIT_2026.md](COMPREHENSIVE_APP_AUDIT_2026.md) §5
+**Open:** Full keyboard audit, focus trapping, form labels, WCAG contrast, skip links.
 
----
+**Fixed:** BaseDropdown trigger, sidebar expand/collapse.
 
-### 7. Accessibility
+**Sources:** COMPREHENSIVE_APP_AUDIT_2026 §6, UX_AUDIT_REPORT
 
-**Summary:** Some ARIA labels. BaseDropdown, sidebar buttons have aria-label. Full keyboard nav incomplete. Focus management in modals needs work.
+### UX & Airtable Parity
 
-**Open:**
-- Full keyboard navigation audit
-- Focus trapping in modals
-- Form labels for all inputs
-- Color contrast (WCAG AA)
-- Skip links
+Pages can exist in invalid states. Settings → Pages creates pages without config. Edit mode authority and inline canvas implemented.
 
-**Fixed:**
-- BaseDropdown trigger (aria-label, aria-haspopup)
-- Sidebar expand/collapse buttons
+**Open:** Page creation wizard all flows, empty states, Filter Block, config loading consistency, new record inline edit.
 
-**Source:** [COMPREHENSIVE_APP_AUDIT_2026.md](COMPREHENSIVE_APP_AUDIT_2026.md) §6, [UX_AUDIT_REPORT.md](UX_AUDIT_REPORT.md)
+**Fixed:** Edit mode authority, right panel inline canvas, page anchors, default page redirect, layout save hardening.
 
----
+**Sources:** FULL_APP_AUDIT_AIRTABLE_PARITY, UX_AUDIT_REPORT, MARKETING_HUB_AUDIT_REPORT, P1_EDIT_MODE_AUTHORITY_IMPLEMENTATION, P2_INLINE_CANVAS_IMPLEMENTATION
 
-### 8. UX & Airtable Parity
+### Interface System
 
-**Summary:** Pages can exist in invalid states. Settings → Pages tab creates pages without required config. Edit mode authority and inline canvas implemented. Filter/sort apply UX inconsistent.
+Block-based. Config loading inconsistencies (pageTableId fallbacks). Save loop prevention in TextBlock and Settings Panel. Filter block missing.
 
-**Open:**
-- Page creation wizard for all flows
-- Empty states with actionable guidance
-- Filter block component
-- Grid block config loading consistency
-- New record inline edit mode
+**Open:** Remove pageTableId fallbacks, audit all blocks for save loops, Filter Block, enable view types, page settings validation.
 
-**Fixed:**
-- Edit mode authority (P1)
-- Right panel inline canvas (P2)
-- Page anchors system
-- Default page redirect
-- Layout save hardening
+**Fixed:** TextBlock save loop, Settings panel debouncing, block config from view_blocks.config.
 
-**Source:** [FULL_APP_AUDIT_AIRTABLE_PARITY.md](FULL_APP_AUDIT_AIRTABLE_PARITY.md), [UX_AUDIT_REPORT.md](UX_AUDIT_REPORT.md), [MARKETING_HUB_AUDIT_REPORT.md](MARKETING_HUB_AUDIT_REPORT.md)
+**Sources:** INTERFACE_BUILDER_AUDIT_REPORT, CANVAS_STATE_AUDIT, INVARIANTS_AUDIT_REPORT, FILTER_AUDIT_REPORT, FILTER_AUDIT_SUMMARY, DASHBOARD_BLOCKS_AUDIT, TEXTBLOCK_AUDIT_REPORT
 
----
+### Record Shells & Edit Mode
 
-### 9. Interface System
+Permissions locked. RecordPanel, RecordModal (grid/calendar), RecordDrawer enforce cascadeContext. P1 edit mode authority implemented.
 
-**Summary:** Block-based architecture. Config loading inconsistencies (pageTableId fallbacks). Save loop prevention in TextBlock and Settings Panel. Filter block missing. Grid block view types (Kanban, Timeline, Gallery) disabled.
+**Fixed:** Edit mode authority, RecordPanel, RecordModal, RecordDetailPanelInline, permission enforcement, dev-only guardrails.
 
-**Open:**
-- Remove pageTableId fallbacks (Chart, KPI, Record blocks)
-- Audit all blocks for save loops
-- Create Filter Block
-- Enable view types or document why disabled
-- Page settings validation
+**Sources:** P1_EDIT_MODE_AUTHORITY_IMPLEMENTATION, P2_INLINE_CANVAS_IMPLEMENTATION, RECORD_EDITOR_SHELLS_WIRING_PLAN, PERMISSION_ENFORCEMENT_FINAL, PERMISSION_ENFORCEMENT_VERIFICATION, PERMISSION_ENFORCEMENT_FINAL_HARDENING
 
-**Fixed:**
-- TextBlock save loop prevention
-- Settings panel debouncing
-- Block config from view_blocks.config
+--------------------------------------------------
+4. Actionable Next Steps
+--------------------------------------------------
 
-**Source:** [INTERFACE_BUILDER_AUDIT_REPORT.md](INTERFACE_BUILDER_AUDIT_REPORT.md), [CANVAS_STATE_AUDIT.md](CANVAS_STATE_AUDIT.md), [INVARIANTS_AUDIT_REPORT.md](INVARIANTS_AUDIT_REPORT.md)
+## This Week (P0)
 
----
+1. Add schema migration for FK indexes (per schema_audit_fixes.sql).
+2. Add catch blocks and user feedback to MultiCalendarView and MultiTimelineView loadAll().
+3. Remove pageTableId fallbacks from ChartBlock, KPIBlock, RecordBlock; require table_id in config.
+4. Verify PostgREST CORS config in Supabase dashboard; test production.
+5. Wire PageCreationWizard to Settings → Pages tab to prevent invalid page creation.
 
-### 10. Record Shells & Edit Mode
+## This Month (P1)
 
-**Summary:** Permissions locked. RecordPanel, RecordModal (grid/calendar), RecordDrawer enforce cascadeContext. P1 edit mode authority implemented. Intentionally permissive for core data when cascadeContext absent.
+1. Add unit tests for auth, API routes, critical components (target 70%+).
+2. Gate or remove console statements; use debugLog/debugWarn.
+3. Implement request batching for dashboard aggregates.
+4. Create Filter Block component or document page-level filter usage.
+5. Fix React #185: TextBlock editorConfig, FilterBlock emitSignature, GridView columnSettingsKey.
+6. Add request size limits to API routes.
+7. Add Search API support for interface_pages table.
 
-**Fixed:**
-- Edit mode authority (interfaceMode === 'edit')
-- RecordPanel, RecordModal, RecordDetailPanelInline
-- Permission enforcement (PERMISSION_ENFORCEMENT_FINAL)
-- Dev-only guardrails
+## Next Quarter (P2/P3)
 
-**Source:** [P1_EDIT_MODE_AUTHORITY_IMPLEMENTATION.md](P1_EDIT_MODE_AUTHORITY_IMPLEMENTATION.md), [P2_INLINE_CANVAS_IMPLEMENTATION.md](P2_INLINE_CANVAS_IMPLEMENTATION.md), [RECORD_EDITOR_SHELLS_WIRING_PLAN.md](RECORD_EDITOR_SHELLS_WIRING_PLAN.md), [PERMISSION_ENFORCEMENT_FINAL.md](PERMISSION_ENFORCEMENT_FINAL.md)
+1. Implement E2E tests with Playwright or Cypress.
+2. Execute LEGACY_CODE_CLEANUP_PLAN (verify imports first).
+3. Add OpenAPI/Swagger for API routes.
+4. Add onboarding (welcome screen, guided tour).
+5. Implement undo/redo for interface builder and grid editing.
+6. Add WCAG color contrast audit.
+7. Add test coverage reporting to CI.
 
----
+--------------------------------------------------
+5. Source Audit Index
+--------------------------------------------------
 
-## Actionable Next Steps
-
-### Immediate (This Week)
-
-1. **Fix CORS** - Verify PostgREST CORS config in Supabase dashboard; test production
-2. **Add schema indexes** - Apply migration for FK indexes (schema_audit_fixes.sql)
-3. **Fix MultiCalendar/MultiTimeline error handling** - Add catch blocks, user feedback
-4. **Remove pageTableId fallbacks** - ChartBlock, KPIBlock, RecordBlock require table_id in config
-
-### Short Term (This Month)
-
-1. **Test coverage** - Add tests for auth, API routes, critical components (target 70%+)
-2. **Console statements** - Gate or remove; use debugLog/debugWarn
-3. **Request batching** - Implement for dashboard aggregates
-4. **Filter Block** - Create component or document page-level filter usage
-5. **Page creation** - Wire PageCreationWizard to Settings → Pages tab
-6. **React #185** - Fix TextBlock editorConfig, FilterBlock emitSignature, GridView columnSettingsKey
-
-### Long Term (Next Quarter)
-
-1. **E2E tests** - Playwright or Cypress for critical flows
-2. **Legacy code removal** - Execute LEGACY_CODE_CLEANUP_PLAN (verify first)
-3. **API documentation** - OpenAPI/Swagger
-4. **Onboarding** - Welcome screen, guided tour
-5. **Undo/redo** - Interface builder, grid editing
-
----
-
-## Source Audit Index
-
-| File | Domain(s) | Date | Summary |
-|------|-----------|------|---------|
+| Audit File | Domain(s) | Last Updated | One-line Summary |
+|------------|-----------|--------------|------------------|
 | CORE_DATA_VIEWS_SCHEMA.md | Schema | - | view_fields, view_filters, view_sorts schema |
 | COMPREHENSIVE_APP_AUDIT_2026.md | Full-stack | Feb 2026 | Security, performance, code, architecture, testing, a11y, UX, docs |
 | VERCEL_LOGS_ANALYSIS.md | Performance | Jan 2026 | Dashboard aggregates, slow page loads |
 | TEXTBLOCK_AUDIT_REPORT.md | Interface | - | TextBlock save loop, content persistence |
 | UX_AUDIT_REPORT.md | UX | - | Page creation, invalid states, Airtable parity |
 | SCHEMA_AUDIT_REPORT.md | Schema | - | 47 critical issues, indexes, constraints |
-| RECORD_EDITOR_SHELLS_WIRING_PLAN.md | Record | - | Shell-by-shell logic, useRecordEditorCore |
-| QA_CHECKLIST_AUDIT_RESULTS.md | QA | - | Canonical UI contracts, sanity tests |
+| RECORD_EDITOR_SHELLS_WIRING_PLAN.md | Records | - | Shell-by-shell logic, useRecordEditorCore |
+| QA_CHECKLIST_AUDIT_RESULTS.md | Interface | Jan 2025 | Canonical UI contracts, sanity tests |
 | PROGRESS_AUDIT.md | Progress | Jan 2025 | ~89% complete, feature status |
 | PRODUCT_MODEL_CONSOLIDATION_AUDIT.md | Architecture | - | Page types, record view concept |
-| PERMISSION_ENFORCEMENT_VERIFICATION.md | Security | - | Surfaces vs permission flags |
+| PERMISSION_ENFORCEMENT_VERIFICATION.md | Security | Feb 2025 | Surfaces vs permission flags |
 | PERMISSION_ENFORCEMENT_FINAL_HARDENING.md | Security | Feb 2025 | Cascade context, guardrails |
 | PERMISSION_ENFORCEMENT_FINAL.md | Security | Feb 2025 | Lock confirmed, call-site summary |
 | PAGE_BLOCK_PERSISTENCE_ANALYSIS.md | Architecture | - | Save/load asymmetry, state merge |
-| P2_INLINE_CANVAS_IMPLEMENTATION.md | UX | - | Right panel inline canvas - FIXED |
-| P1_EDIT_MODE_AUTHORITY_IMPLEMENTATION.md | Record | - | interfaceMode authority - FIXED |
-| MULTI_CALENDAR_TIMELINE_AUDIT_REPORT.md | Interface | - | Error handling, field resolution |
+| P2_INLINE_CANVAS_IMPLEMENTATION.md | UX | - | Right panel inline canvas – FIXED |
+| P1_EDIT_MODE_AUTHORITY_IMPLEMENTATION.md | Records | - | interfaceMode authority – FIXED |
+| MULTI_CALENDAR_TIMELINE_AUDIT_REPORT.md | Interface | Jan 2025 | Error handling, field resolution |
 | OPTIMIZATION_SUMMARY.md | Performance | - | HTTP caching, error handling |
 | MODAL_LAYOUT_VERIFICATION.md | UX | - | Modal layout verification |
 | MODAL_LAYOUT_AUDIT.md | UX | - | Modal layout edit vs view divergence |
 | MODAL_EDITOR_UX_REDESIGN_PLAN.md | UX | - | Modal editor redesign plan |
-| MARKETING_HUB_AUDIT_REPORT.md | UX | - | Interface system, core principles |
-| MARKETING_HUB_AUDIT.md | UX | - | Interface audit |
+| MARKETING_HUB_AUDIT_REPORT.md | UX | Jan 2025 | Interface system, core principles |
+| MARKETING_HUB_AUDIT.md | UX | Jan 2025 | Interface audit |
 | LOGIN_AUDIT_REPORT.md | Security | Jan 2025 | Auth, middleware, RLS |
 | LIFECYCLE_AUDIT_REPORT.md | Architecture | - | Mount/unmount, keys, page load |
 | INVARIANTS_AUDIT_REPORT.md | Interface | - | Layout, TextBlock, edit mode invariants |
 | INTERFACE_PAGE_RESOLUTION_ANALYSIS.md | Architecture | - | pageId resolution, navigation |
-| INTERFACE_BUILDER_AUDIT_REPORT.md | Interface | - | Blocks, config, view types |
+| INTERFACE_BUILDER_AUDIT_REPORT.md | Interface | Jan 2025 | Blocks, config, view types |
 | FULL_APP_AUDIT_AIRTABLE_PARITY.md | Full-stack | Feb 2026 | Performance, React #185, edit mode, grid UX |
 | FULL_APP_ARCHITECTURE_UX_AUDIT.md | Architecture | Feb 2025 | Core constraints, principles |
 | FILTER_AUDIT_SUMMARY.md | Interface | - | Filter block, page filters |
-| FILTER_AUDIT_REPORT.md | Interface | - | Block vs page filters, precedence |
-| DASHBOARD_BLOCKS_AUDIT.md | Interface | - | 11 block types, registry |
+| FILTER_AUDIT_REPORT.md | Interface | Jan 2025 | Block vs page filters, precedence |
+| DASHBOARD_BLOCKS_AUDIT.md | Interface | Jan 2025 | 11 block types, registry |
 | CROSS_PAGE_ISSUES_ANALYSIS.md | Architecture | - | group_id, search API, dual table |
-| CONNECTION_EXHAUSTION_FIX_AUDIT.md | Performance | Jan 2025 | useViewMeta cache - FIXED |
+| CONNECTION_EXHAUSTION_FIX_AUDIT.md | Performance | Jan 2025 | useViewMeta cache – FIXED |
 | CLEANUP_SUMMARY.md | Code | - | Unified canvas, remaining refs |
 | CODE_AUDIT_REPORT.md | Code | Jan 2025 | Duplicates, legacy, ~50 files |
-| CANVAS_STATE_AUDIT.md | Architecture | - | Block reload, one-way gate - FIXED |
-
----
-
-**Report Generated:** February 16, 2026  
-**Next Audit Recommended:** May 16, 2026 (3 months)
+| CANVAS_STATE_AUDIT.md | Architecture | - | Block reload, one-way gate – FIXED |
+| LEGACY_CODE_CLEANUP_PLAN.md (docs/guides/) | Code | Feb 2026 | Root vs baserow-app cleanup steps |
