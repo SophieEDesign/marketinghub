@@ -909,14 +909,14 @@ export default function GroupedInterfaces({
         prefetch={false}
         onClick={() => {
           if (isActive) return
-          // Fallback: if Next.js Link navigation doesn't complete (known issue), force full reload after 500ms
+          // Fallback: if Next.js Link navigation doesn't complete (known issue), force full reload after 250ms
           const targetPath = `/pages/${targetPageId}`
           const startPath = pathname
           setTimeout(() => {
             if (window.location.pathname !== targetPath && window.location.pathname === startPath) {
               window.location.href = targetPath
             }
-          }, 500)
+          }, 250)
         }}
         className={className}
         style={style}
@@ -1031,7 +1031,7 @@ export default function GroupedInterfaces({
                   if (window.location.pathname !== targetPath && window.location.pathname === startPath) {
                     window.location.href = targetPath
                   }
-                }, 500)
+                }, 250)
               }}
             >
               <Layers className="h-4 w-4 flex-shrink-0" style={{ color: isActive ? primaryColor : sidebarTextColor }} />

@@ -142,7 +142,8 @@ export default function RecordReviewPage({
         tableFields,
       })
     } else {
-      setSelectedContext({ type: "page" })
+      // Don't auto-open RightSettingsPanel on load when no record selected
+      setSelectedContext(null)
       setRightPanelData({ recordId: null, recordTableId: null, fieldLayout: [], onLayoutSave: null, tableFields: [] })
     }
   }, [isRecordView, selectedRecordId, pageTableId, fieldLayout, onLayoutSave, tableFields, setSelectedContext, setRightPanelData])

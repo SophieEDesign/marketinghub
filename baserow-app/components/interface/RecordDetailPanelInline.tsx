@@ -11,7 +11,7 @@
  */
 
 import { useState, useEffect, useMemo, useCallback } from "react"
-import { LayoutGrid, Check } from "lucide-react"
+import { LayoutGrid, Check, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import RecordFields from "@/components/records/RecordFields"
@@ -191,6 +191,13 @@ export default function RecordDetailPanelInline({
     setManualLayoutEditMode(false)
   }, [onLayoutSave, localFieldLayout])
 
+  // Blur active element to exit field editing (saves on blur)
+  const handleDoneEditing = useCallback(() => {
+    if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur()
+    }
+  }, [])
+
   // For layout mode: include ALL fields from layout (including hidden)
   const layoutFieldsSource = localFieldLayout.length > 0 ? localFieldLayout : resolvedFieldLayout
   const layoutModeFields = useMemo(() => {
@@ -248,30 +255,55 @@ export default function RecordDetailPanelInline({
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Header: Title, Customize layout / Done */}
+      {/* Header: Title, Editing badge, Customize layout / Done */}
       <div className="flex-shrink-0 flex items-center justify-between gap-2 px-4 py-2 border-b border-gray-200 bg-white">
-        <h3 className="text-sm font-medium text-gray-900 truncate min-w-0">
-          {titleField && record[titleField] ? String(record[titleField]) : "Record details"}
-        </h3>
-        {canEditLayout && interfaceMode === "edit" && (
-          isEditingLayout ? (
-            <Button variant="default" size="sm" onClick={handleDoneEditLayout} className="gap-1.5 flex-shrink-0">
-              <Check className="h-4 w-4" />
-              Done
-            </Button>
-          ) : (
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <h3 className="text-sm font-medium text-gray-900 truncate min-w-0">
+            {titleField && record[titleField] ? String(record[titleField]) : "Record details"}
+          </h3>
+          {forcedEditMode && (
+            <span
+              className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200"
+              title="Click Done when finished editing"
+            >
+              <Pencil className="h-3 w-3" />
+              Editing
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {forcedEditMode && !isEditingLayout && (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setManualLayoutEditMode(true)}
-              className="gap-1.5 flex-shrink-0"
-              title="Customize which fields appear and their order"
+              onClick={handleDoneEditing}
+              className="gap-1.5"
+              title="Finish editing (saves any open field)"
             >
-              <LayoutGrid className="h-4 w-4" />
-              Customize layout
+              <Check className="h-4 w-4" />
+              Done
             </Button>
-          )
-        )}
+          )}
+          {canEditLayout && interfaceMode === "edit" && (
+            isEditingLayout ? (
+              <Button variant="default" size="sm" onClick={handleDoneEditLayout} className="gap-1.5">
+                <Check className="h-4 w-4" />
+                Done
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setManualLayoutEditMode(true)}
+                className="gap-1.5"
+                title="Customize which fields appear and their order"
+              >
+                <LayoutGrid className="h-4 w-4" />
+                Customize layout
+              </Button>
+            )
+          )}
+        </div>
       </div>
 
       {/* Content */}

@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import { Link2, Plus, X, Calculator, Link as LinkIcon, Paperclip, ExternalLink, Mail, Pencil } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { formatDateUK, cn } from "@/lib/utils"
+import { formatDateByField, formatNumericValue } from "@/lib/fields/format"
+import { cn } from "@/lib/utils"
 import type { TableField } from "@/types/fields"
 import { useToast } from "@/components/ui/use-toast"
 import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/LookupFieldPicker"
@@ -340,8 +341,8 @@ export default function InlineFieldEditor({
   if (field.type === "date") {
     // For input: use ISO format (YYYY-MM-DD) - HTML5 date input requires this
     const dateValueForInput = value ? new Date(value).toISOString().split("T")[0] : ""
-    // For display: use UK format (DD/MM/YYYY)
-    const dateValueForDisplay = value ? formatDateUK(value, "—") : ""
+    // For display: use field's date_format option or UK format
+    const dateValueForDisplay = formatDateByField(value, field, "—")
 
     if (isEditing && !isReadOnly) {
       return (
@@ -740,9 +741,10 @@ export default function InlineFieldEditor({
     )
   }
 
-  // Default: Text, Number, etc.
+  // Default: Text, Number, Percent, Currency, etc.
   if (isEditing && !isReadOnly) {
-    const inputType = field.type === "number" ? "number" : "text"
+    const inputType =
+      field.type === "number" || field.type === "percent" || field.type === "currency" ? "number" : "text"
 
     return (
       <div className={containerClassName}>
@@ -752,7 +754,9 @@ export default function InlineFieldEditor({
           type={inputType}
           value={localValue ?? ""}
           onChange={(e) =>
-            handleChange(inputType === "number" ? (e.target.value === "" ? null : Number(e.target.value)) : e.target.value)
+            handleChange(
+            inputType === "number" ? (e.target.value === "" ? null : Number(e.target.value)) : e.target.value
+          )
           }
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
@@ -779,6 +783,8 @@ export default function InlineFieldEditor({
         <div className={readOnlyBoxClassName}>
           {isUserFieldType && userDisplayName ? (
             userDisplayName
+          ) : field.type === "number" || field.type === "percent" || field.type === "currency" ? (
+            formatNumericValue(typeof value === "number" ? value : parseFloat(String(value)), field, "—")
           ) : value !== null && value !== undefined ? (
             String(value)
           ) : (
@@ -797,6 +803,8 @@ export default function InlineFieldEditor({
         >
           {isUserFieldType && userDisplayName ? (
             userDisplayName
+          ) : field.type === "number" || field.type === "percent" || field.type === "currency" ? (
+            formatNumericValue(typeof value === "number" ? value : parseFloat(String(value)), field, "—")
           ) : value !== null && value !== undefined ? (
             String(value)
           ) : (

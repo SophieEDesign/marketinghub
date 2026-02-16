@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { Plus, Edit2, Palette, X, Check } from 'lucide-react'
+import { Plus, Edit2, Palette, X, Check, ChevronDown } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   resolveChoiceColor,
@@ -404,22 +404,23 @@ export default function InlineSelectDropdown({
   return (
     <Popover open={isOpen} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
-        {/* Dropdown trigger */}
+        {/* Dropdown trigger - match SelectTrigger styling with chevron affordance */}
         <button
           type="button"
-          className="cell-editor w-full min-h-[32px] px-2.5 py-1.5 flex items-start flex-wrap gap-1.5 text-sm border border-gray-300 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 focus-visible:ring-offset-2"
+          className="cell-editor flex min-h-10 w-full items-center justify-between gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground hover:border-gray-400 hover:bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
           onMouseDown={handleMouseDown}
           onClick={handleTriggerClick}
         >
-          {selectedValues.length > 0 ? (
-            selectedValues.map((val: string) => {
-              return (
+          <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 text-left">
+            {selectedValues.length > 0 ? (
+              selectedValues.map((val: string) => (
                 <ChoicePill key={val} label={val} fieldType={fieldType} fieldOptions={mergedOptions} />
-              )
-            })
-          ) : (
-            <span className="text-gray-400 italic text-sm">{placeholder}</span>
-          )}
+              ))
+            ) : (
+              <span className="text-muted-foreground italic">{placeholder}</span>
+            )}
+          </span>
+          <ChevronDown className="h-4 w-4 shrink-0 opacity-50" aria-hidden />
         </button>
       </PopoverTrigger>
 

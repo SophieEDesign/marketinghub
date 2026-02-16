@@ -3,7 +3,7 @@
 import { useRef, useEffect, useCallback, useMemo, useState } from "react"
 import { Calculator, Link as LinkIcon, Paperclip, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { formatDateUK } from "@/lib/utils"
+import { formatDateByField, formatNumericValue } from "@/lib/fields/format"
 import type { TableField } from "@/types/fields"
 import { getFieldDisplayName } from "@/lib/fields/display"
 import { FIELD_LABEL_CLASS_NO_MARGIN } from "@/lib/fields/field-label"
@@ -702,7 +702,7 @@ export default function FieldEditor({
     const dateValueForInput = value ? new Date(value).toISOString().split("T")[0] : ""
 
     if (isReadOnly) {
-      const dateValueForDisplay = value ? formatDateUK(value, "—") : ""
+      const dateValueForDisplay = formatDateByField(value, field, "—")
       return (
         <div className="space-y-2.5">
           {showLabel && (
@@ -855,7 +855,11 @@ export default function FieldEditor({
           </label>
         )}
         <div className={`px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-600 italic ${inputClassName}`}>
-          {value !== null && value !== undefined ? String(value) : "—"}
+          {(field.type === "number" || field.type === "percent" || field.type === "currency")
+            ? formatNumericValue(typeof value === "number" ? value : parseFloat(String(value)), field, "—")
+            : value !== null && value !== undefined
+              ? String(value)
+              : "—"}
           {field.type === "formula" && field.options?.formula && (
             <div className="text-xs text-gray-500 mt-1 font-mono">
               = {field.options.formula}
