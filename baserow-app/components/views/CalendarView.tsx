@@ -798,6 +798,12 @@ export default function CalendarView({
     [filteredRows]
   )
 
+  // #region agent log
+  useEffect(() => {
+    console.log("[filteredRowsSignature] changed:", filteredRowsSignature?.slice(0, 80) + (filteredRowsSignature?.length > 80 ? "..." : ""))
+  }, [filteredRowsSignature])
+  // #endregion
+
   // Resolve display labels for any link_to_table fields shown on calendar cards.
   useEffect(() => {
     let cancelled = false
@@ -1699,7 +1705,6 @@ export default function CalendarView({
       }
       
       const recordIdString = String(recordId)
-      setSelectedEventId(recordIdString || null)
 
       // DEBUG_CALENDAR: Always log event clicks in development (prove click wiring works)
       // Standardise on localStorage.getItem("DEBUG_CALENDAR") === "1"
@@ -1728,9 +1733,11 @@ export default function CalendarView({
       if (!allowOpenRecord) return
 
       if (onRecordClick) {
+        setSelectedEventId(recordIdString || null)
         onRecordClick(recordIdString)
         return
       }
+      // Do not setSelectedEventId when opening modal — avoids CalendarView re-render and FullCalendar #185.
       // Defer opening modal to next tick so FullCalendar's internal state updates commit first,
       // avoiding React #185 (fewer hooks) when calendar and modal update in the same cycle.
       queueMicrotask(() => {

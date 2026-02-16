@@ -82,6 +82,9 @@ export function FilterStateProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const getFiltersForBlock = useCallback((blockId: string, blockTableId?: string | null): FilterConfigWithSource[] => {
+    // #region agent log
+    console.log("[getFiltersForBlock] blockId:", blockId, "blockTableId:", blockTableId)
+    // #endregion
     const filters: FilterConfigWithSource[] = []
     
     // Collect filters from all filter blocks that target this block

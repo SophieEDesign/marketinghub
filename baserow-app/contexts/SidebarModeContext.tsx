@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, ReactNode } from "react"
+import { createContext, useContext, useEffect, ReactNode } from "react"
 import { useEditMode } from "./EditModeContext"
 
 /**
@@ -23,6 +23,12 @@ interface SidebarModeContextType {
 const SidebarModeContext = createContext<SidebarModeContextType | undefined>(undefined)
 
 export function SidebarModeProvider({ children }: { children: ReactNode }) {
+  // #region agent log
+  useEffect(() => {
+    console.log("[SidebarModeProvider] MOUNT")
+    return () => { console.log("[SidebarModeProvider] UNMOUNT") }
+  }, [])
+  // #endregion
   const { isEditing, toggleEditMode, enterEditMode, exitEditMode } = useEditMode()
 
   const isSidebarEditing = isEditing("sidebar")

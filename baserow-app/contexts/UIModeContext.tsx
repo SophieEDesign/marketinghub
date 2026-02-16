@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useCallback, ReactNode } from "react"
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react"
 
 /**
  * UI modes (Airtable-style):
@@ -49,6 +49,12 @@ interface UIModeProviderProps {
 }
 
 export function UIModeProvider({ children }: UIModeProviderProps) {
+  // #region agent log
+  useEffect(() => {
+    console.log("[UIModeProvider] MOUNT")
+    return () => { console.log("[UIModeProvider] UNMOUNT") }
+  }, [])
+  // #endregion
   const [state, setState] = useState<UIModeState>({
     uiMode: "view",
     editingPageId: null,

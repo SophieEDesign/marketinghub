@@ -82,6 +82,12 @@ interface EditModeProviderProps {
 }
 
 export function EditModeProvider({ children, isViewer = false }: EditModeProviderProps) {
+  // #region agent log
+  useEffect(() => {
+    console.log("[EditModeProvider] MOUNT")
+    return () => { console.log("[EditModeProvider] UNMOUNT") }
+  }, [])
+  // #endregion
   const [state, setState] = useState<EditModeState>({
     activeScopes: new Set(),
     editingPageId: null,
@@ -295,12 +301,16 @@ export function useBlockEditMode(pageId?: string) {
   const enter = useCallback(() => enterEditMode("block", pageId ? { pageId } : undefined), [enterEditMode, pageId])
   const exit = useCallback(() => exitEditMode("block"), [exitEditMode])
   const toggle = useCallback(() => toggleEditMode("block", pageId ? { pageId } : undefined), [toggleEditMode, pageId])
-  return useMemo(() => ({
+  const result = useMemo(() => ({
     isEditing: isEditing("block") && (!pageId || state.editingPageId === pageId),
     toggle,
     enter,
     exit,
   }), [isEditing("block"), pageId, state.editingPageId, toggle, enter, exit])
+  // #region agent log
+  console.log("[useBlockEditMode] pageId:", pageId, "return:", { isEditing: result.isEditing, editingPageId: state.editingPageId })
+  // #endregion
+  return result
 }
 
 export function useRecordEditMode(recordId?: string) {

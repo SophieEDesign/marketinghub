@@ -881,6 +881,8 @@ export default function GroupedInterfaces({
           isActive && "bg-black/20 font-semibold"
         )}
         onClick={(e) => {
+          const currentPageId = pathname.match(/\/pages\/([^/]+)/)?.[1] ?? null
+          console.log("Sidebar click:", page.id, "current:", currentPageId)
           const debugEnabled = typeof window !== "undefined" && localStorage.getItem("DEBUG_NAVIGATION") === "1"
           const isCurrentlyActive = pathname === targetPath
           
@@ -1014,6 +1016,8 @@ export default function GroupedInterfaces({
                 color: primaryColor 
               } : { color: sidebarTextColor }}
               onClick={(e) => {
+                const currentPageId = pathname.match(/\/pages\/([^/]+)/)?.[1] ?? null
+                console.log("Sidebar click:", page.id, "current:", currentPageId)
                 const debugEnabled = typeof window !== "undefined" && localStorage.getItem("DEBUG_NAVIGATION") === "1"
                 const targetPath = `/pages/${page.id}`
                 const isCurrentlyActive = pathname === targetPath
