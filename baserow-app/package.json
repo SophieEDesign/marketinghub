@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "predeploy-check": "tsx scripts/predeploy-check.ts",
     "repair-linked-fields": "tsx scripts/repair-linked-fields.ts",
-    "prebuild": "npm run predeploy-check"
+    "prebuild": "npm run predeploy-check",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "next": "^14.2.5",
@@ -77,6 +78,7 @@
     "postcss": "^8.4.38",
     "autoprefixer": "^10.4.19",
     "tsx": "^4.7.0",
-    "vitest": "^1.0.0"
+    "vitest": "^1.0.0",
+    "@playwright/test": "^1.49.0"
   }
 }

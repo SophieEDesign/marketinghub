@@ -62,6 +62,8 @@ export default function RecordReviewPage({
   // CRITICAL: recordId is ephemeral UI state - never saved to blocks or page config
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null)
   const [lastDeletedRecordId, setLastDeletedRecordId] = useState<string | null>(null)
+  // Airtable-style: default to view mode; user clicks Edit to enter edit mode
+  const [recordInterfaceMode, setRecordInterfaceMode] = useState<"view" | "edit">("view")
   const [deleting, setDeleting] = useState(false)
   const [tableFields, setTableFields] = useState<any[]>([])
   const [tableName, setTableName] = useState<string | null>(null)
@@ -148,9 +150,10 @@ export default function RecordReviewPage({
     }
   }, [isRecordView, selectedRecordId, pageTableId, fieldLayout, onLayoutSave, tableFields, setSelectedContext, setRightPanelData])
 
-  // Handle record selection
+  // Handle record selection - reset to view mode when switching records (Airtable-style)
   const handleRecordSelect = useCallback((recordId: string) => {
     setSelectedRecordId(recordId)
+    setRecordInterfaceMode("view")
   }, [])
 
   const pageEditable = pageConfig?.allow_editing !== false
@@ -249,7 +252,8 @@ export default function RecordReviewPage({
             fields={tableFields}
             fieldLayout={fieldLayout}
             pageEditable={pageEditable}
-            interfaceMode={!isViewer ? "edit" : "view"}
+            interfaceMode={isViewer ? "view" : recordInterfaceMode}
+            onInterfaceModeChange={isViewer ? undefined : setRecordInterfaceMode}
             onLayoutSave={onLayoutSave}
             titleField={pageConfig.title_field || pageConfig.left_panel?.title_field}
           />

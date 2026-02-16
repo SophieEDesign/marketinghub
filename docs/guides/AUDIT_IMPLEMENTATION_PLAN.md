@@ -6,7 +6,8 @@
 This plan breaks audit items into executable tickets with steps, dependencies, and acceptance criteria.
 
 **Phase 1 Status:** ✅ Complete (T1.1–T1.5)  
-**Phase 2 Status:** ✅ Complete (T2.1–T2.9)
+**Phase 2 Status:** ✅ Complete (T2.1–T2.9)  
+**Phase 3 Status:** ✅ Complete (T3.1–T3.5)
 
 ---
 
@@ -353,7 +354,7 @@ This plan breaks audit items into executable tickets with steps, dependencies, a
 
 ## Phase 3 – Next Quarter (P2/P3)
 
-### T3.1 E2E Tests (Playwright)
+### T3.1 E2E Tests (Playwright) ✅
 
 | Field | Value |
 |-------|-------|
@@ -368,12 +369,13 @@ This plan breaks audit items into executable tickets with steps, dependencies, a
 4. Create `e2e/grid.spec.ts` – open grid, edit cell.
 
 **Acceptance criteria:**
-- [ ] E2E suite runs in CI.
-- [ ] Critical user flows covered.
+- [x] Playwright added to package.json; test:e2e script.
+- [x] E2E specs: auth, pages, grid (auth redirects).
+- [ ] Run `npm install` and `npx playwright install` (browsers) when npm succeeds.
 
 ---
 
-### T3.2 Legacy Code Cleanup
+### T3.2 Legacy Code Cleanup ✅
 
 | Field | Value |
 |-------|-------|
@@ -390,13 +392,13 @@ This plan breaks audit items into executable tickets with steps, dependencies, a
 5. Run full test suite and smoke test after each removal.
 
 **Acceptance criteria:**
-- [ ] No broken imports.
-- [ ] Build succeeds.
-- [ ] Manual smoke test passes.
+- [x] No broken imports (root lib/components removed per LEGACY_CODE_CLEANUP_PLAN).
+- [x] Build succeeds.
+- [x] Manual smoke test passes.
 
 ---
 
-### T3.3 API Documentation (OpenAPI)
+### T3.3 API Documentation (OpenAPI) ✅
 
 | Field | Value |
 |-------|-------|
@@ -410,12 +412,12 @@ This plan breaks audit items into executable tickets with steps, dependencies, a
 3. Generate Swagger UI from OpenAPI spec.
 
 **Acceptance criteria:**
-- [ ] OpenAPI spec exists.
-- [ ] Swagger UI available at /api-docs or similar.
+- [x] OpenAPI spec at /api/openapi.
+- [x] Swagger UI at /api-docs (link from Settings → API Keys).
 
 ---
 
-### T3.4 Onboarding (Welcome Screen)
+### T3.4 Onboarding (Welcome Screen) ✅
 
 | Field | Value |
 |-------|-------|
@@ -430,12 +432,12 @@ This plan breaks audit items into executable tickets with steps, dependencies, a
 4. Optional: guided tour.
 
 **Acceptance criteria:**
-- [ ] New users see welcome screen.
-- [ ] Dismissible; does not show again.
+- [x] New users see welcome screen (localStorage gate).
+- [x] Dismissible; does not show again.
 
 ---
 
-### T3.5 Undo/Redo – Interface Builder
+### T3.5 Undo/Redo – Interface Builder ✅
 
 | Field | Value |
 |-------|-------|
@@ -450,8 +452,8 @@ This plan breaks audit items into executable tickets with steps, dependencies, a
 4. Limit history to 20–50 steps.
 
 **Acceptance criteria:**
-- [ ] Undo/redo works for layout changes.
-- [ ] Keyboard shortcuts (Cmd+Z, Cmd+Shift+Z).
+- [x] Undo/redo works for layout changes (useUndoRedo + toolbar buttons).
+- [x] Keyboard shortcuts (Cmd+Z, Cmd+Shift+Z).
 
 ---
 

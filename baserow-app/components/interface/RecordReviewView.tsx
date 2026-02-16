@@ -1162,6 +1162,7 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
           blocks={loadedBlocks}
           page={{ ...page, config } as any}
           pageTableId={pageTableId}
+          isEditing={isEditing}
           blocksLoading={blocksLoading}
         />
       </div>

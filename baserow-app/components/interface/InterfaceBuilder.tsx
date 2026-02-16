@@ -192,61 +192,7 @@ export default function InterfaceBuilder({
     // Even if initialBlocks changes (navigation, revalidation, re-render, etc.)
     // Live state takes precedence after first load
     // This prevents the "edit vs publish" drift issue
-  }, [page.id, initialBlocks, blocks.length])
-  
-  // CRITICAL FIX: Stabilize async initialBlocks check - use proper dependencies instead of running on every render
-  // This prevents the effect from running unnecessarily and causing re-renders
-  // Track the last initialBlocks length to detect when it actually changes
-  const prevInitialBlocksLengthForAsyncRef = useRef<number | null>(null)
-  
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[InterfaceBuilder] Async initialization effect RUN: pageId=${page.id}, hasInitialized=${hasInitializedRef.current}, initialBlocksLength=${initialBlocks?.length ?? 'undefined'}`)
-    }
-    
-    // Skip if already initialized
-    if (hasInitializedRef.current) {
-      return
-    }
-    
-    // CRITICAL: Empty blocks is a valid state - we should hydrate even with 0 blocks
-    // This allows users to add blocks to empty pages
-    // Only skip if initialBlocks is undefined (still loading)
-    if (initialBlocks === undefined) {
-      return
-    }
-    
-    const currentLength = initialBlocks.length
-    
-    // CRITICAL: Only initialize if initialBlocks length actually changed
-    // This prevents re-running when initialBlocks reference changes but content is the same
-    if (prevInitialBlocksLengthForAsyncRef.current === currentLength) {
-      return
-    }
-    
-    prevInitialBlocksLengthForAsyncRef.current = currentLength
-    
-    // Initialize now (even if empty - that's a valid state)
-    // This catches both immediate and async arrival, including empty blocks
-    console.log(`[InterfaceBuilder] Async initialization (one-way gate): pageId=${page.id}`, {
-      initialBlocksCount: currentLength,
-      initialBlockIds: initialBlocks.map(b => b.id),
-      isEmpty: currentLength === 0,
-    })
-    setBlocks(initialBlocks)
-    hasInitializedRef.current = true
-    prevInitialBlocksLengthRef.current = currentLength
-    // Initialize latestLayoutRef from initialBlocks (grid's source of truth)
-    // Empty array is valid - means no blocks yet
-    latestLayoutRef.current = initialBlocks.map((block) => ({
-      i: block.id,
-      x: block.x || 0,
-      y: block.y || 0,
-      w: block.w || 4,
-      h: block.h || 4,
-    }))
-  }, [page.id, initialBlocks?.length]) // CRITICAL FIX: Add dependencies to prevent running on every render
-  // Only run when pageId changes or initialBlocks length changes (not on every render)
+  }, [page.id, initialBlocks?.length, blocks.length])
 
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
   const [selectedBlockIds, setSelectedBlockIds] = useState<Set<string>>(new Set())

@@ -411,7 +411,8 @@ export default function CalendarView({
   // MUST be declared before combinedFilters which uses it
   const resolvedDateFieldId = useMemo(() => {
     // 1. Check block/page config first (from page settings)
-    const pageDateField = blockConfig?.start_date_field || blockConfig?.from_date_field || blockConfig?.date_field || blockConfig?.calendar_date_field
+    // Include calendar_start_field for two-date config (start + end)
+    const pageDateField = blockConfig?.start_date_field || blockConfig?.from_date_field || blockConfig?.date_field || blockConfig?.calendar_date_field || blockConfig?.calendar_start_field
     if (pageDateField) {
       // Validate it exists in table fields and is a date field
       const field = loadedTableFields.find((f: TableField) => 

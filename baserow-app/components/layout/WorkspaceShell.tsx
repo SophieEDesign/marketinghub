@@ -15,6 +15,7 @@ import { useIsMobile } from "@/hooks/useResponsive"
 import { useBranding } from "@/contexts/BrandingContext"
 import { Button } from "@/components/ui/button"
 import { Menu } from "lucide-react"
+import WelcomeScreen from "@/components/onboarding/WelcomeScreen"
 import type { Table, View } from "@/types/database"
 
 interface InterfacePage {
@@ -127,6 +128,7 @@ export default function Shell({
       </MainScrollProvider>
       </PageActionsProvider>
       <RightSettingsPanel />
+      <WelcomeScreen />
       </RecordModalProvider>
       </RecordPanelProvider>
       </RightSettingsPanelDataProvider>

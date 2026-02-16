@@ -38,6 +38,7 @@ interface RecordDetailPanelInlineProps {
   fieldLayout: FieldLayoutItem[]
   pageEditable?: boolean
   interfaceMode?: "view" | "edit"
+  onInterfaceModeChange?: (mode: "view" | "edit") => void
   onLayoutSave?: (fieldLayout: FieldLayoutItem[]) => Promise<void>
   titleField?: string
 }
@@ -51,6 +52,7 @@ export default function RecordDetailPanelInline({
   fieldLayout,
   pageEditable = true,
   interfaceMode = "view",
+  onInterfaceModeChange,
   onLayoutSave,
   titleField,
 }: RecordDetailPanelInlineProps) {
@@ -191,12 +193,13 @@ export default function RecordDetailPanelInline({
     setManualLayoutEditMode(false)
   }, [onLayoutSave, localFieldLayout])
 
-  // Blur active element to exit field editing (saves on blur)
+  // Blur active element to exit field editing (saves on blur); optionally switch back to view mode
   const handleDoneEditing = useCallback(() => {
     if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
       document.activeElement.blur()
     }
-  }, [])
+    onInterfaceModeChange?.("view")
+  }, [onInterfaceModeChange])
 
   // For layout mode: include ALL fields from layout (including hidden)
   const layoutFieldsSource = localFieldLayout.length > 0 ? localFieldLayout : resolvedFieldLayout
@@ -254,34 +257,49 @@ export default function RecordDetailPanelInline({
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Header: Title, Editing badge, Customize layout / Done */}
+    <div
+      className={`flex flex-col h-full overflow-hidden ${forcedEditMode && !isEditingLayout ? "border-l-4 border-blue-500" : ""}`}
+    >
+      {/* Edit mode banner - Airtable-style prominent indicator (record field editing only, not layout mode) */}
+      {forcedEditMode && !isEditingLayout && (
+        <div className="flex-shrink-0 flex items-center justify-between gap-2 px-4 py-2 bg-blue-50 border-b border-blue-200">
+          <div className="flex items-center gap-2">
+            <Pencil className="h-4 w-4 text-blue-600" />
+            <span className="text-sm font-medium text-blue-700">Editing</span>
+          </div>
+          {!isEditingLayout && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDoneEditing}
+              className="gap-1.5 border-blue-200 bg-white hover:bg-blue-50"
+              title="Finish editing (saves any open field)"
+            >
+              <Check className="h-4 w-4" />
+              Done
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Header: Title, Edit / Customize layout / Done */}
       <div className="flex-shrink-0 flex items-center justify-between gap-2 px-4 py-2 border-b border-gray-200 bg-white">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <h3 className="text-sm font-medium text-gray-900 truncate min-w-0">
             {titleField && record[titleField] ? String(record[titleField]) : "Record details"}
           </h3>
-          {forcedEditMode && (
-            <span
-              className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200"
-              title="Click Done when finished editing"
-            >
-              <Pencil className="h-3 w-3" />
-              Editing
-            </span>
-          )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          {forcedEditMode && !isEditingLayout && (
+          {interfaceMode === "view" && pageEditable && onInterfaceModeChange && (
             <Button
               variant="outline"
               size="sm"
-              onClick={handleDoneEditing}
+              onClick={() => onInterfaceModeChange("edit")}
               className="gap-1.5"
-              title="Finish editing (saves any open field)"
+              title="Edit this record"
             >
-              <Check className="h-4 w-4" />
-              Done
+              <Pencil className="h-4 w-4" />
+              Edit
             </Button>
           )}
           {canEditLayout && interfaceMode === "edit" && (
@@ -307,7 +325,9 @@ export default function RecordDetailPanelInline({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto px-6 py-4">
+      <div
+        className={`flex-1 overflow-y-auto px-6 py-4 ${forcedEditMode && !isEditingLayout ? "bg-blue-50/20" : ""}`}
+      >
         {hasVisibleFields ? (
           <RecordFields
             fields={isEditingLayout ? layoutModeFields : visibleFields}

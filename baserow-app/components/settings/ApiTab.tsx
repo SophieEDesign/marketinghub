@@ -1,9 +1,10 @@
 "use client"
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Copy, Check } from 'lucide-react'
+import { Copy, Check, FileText } from 'lucide-react'
 
 export default function SettingsApiTab() {
   const [copiedField, setCopiedField] = useState<string | null>(null)
@@ -97,6 +98,14 @@ export default function SettingsApiTab() {
           <p className="text-xs text-muted-foreground">
             These are read-only values from your environment configuration. To change them, update your environment variables.
           </p>
+          <div className="pt-4 border-t">
+            <Link href="/api-docs">
+              <Button variant="outline" className="gap-2">
+                <FileText className="h-4 w-4" />
+                View API Documentation (OpenAPI / Swagger)
+              </Button>
+            </Link>
+          </div>
         </div>
       </CardContent>
     </Card>

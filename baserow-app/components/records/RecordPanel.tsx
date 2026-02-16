@@ -438,7 +438,7 @@ export default function RecordPanel() {
           useOverlayLayout
             ? "fixed right-0 top-0 h-full z-50"
             : "flex-shrink-0 border-l border-gray-200"
-        } bg-white shadow-xl flex flex-col transition-all duration-300 ease-out`}
+        } ${forcedEditMode ? "border-l-4 border-l-blue-500" : ""} bg-white shadow-xl flex flex-col transition-all duration-300 ease-out`}
         style={{
           width: state.isOpen ? panelWidth : "0px",
           transform: useOverlayLayout && !state.isOpen ? "translateX(100%)" : "none",
@@ -485,6 +485,14 @@ export default function RecordPanel() {
               document.addEventListener("mouseup", handleMouseUp)
             }}
           />
+        )}
+
+        {/* Edit mode banner - Airtable-style prominent indicator when interfaceMode === 'edit' */}
+        {forcedEditMode && (
+          <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-blue-50 border-b border-blue-200">
+            <Pencil className="h-4 w-4 text-blue-600" />
+            <span className="text-sm font-medium text-blue-700">Editing</span>
+          </div>
         )}
 
         {/* Header */}
@@ -597,7 +605,7 @@ export default function RecordPanel() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto">
+        <div className={`flex-1 overflow-y-auto ${forcedEditMode ? "bg-blue-50/20" : ""}`}>
           {headerLoading ? (
             <div className="p-6 space-y-6">
               <div className="space-y-3">

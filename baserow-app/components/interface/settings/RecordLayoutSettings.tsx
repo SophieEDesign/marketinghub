@@ -50,7 +50,8 @@ function SortableFieldRow({
   field: TableField
   onVisibilityToggle: (fieldName: string, visible: boolean) => void
 }) {
-  const visible = (item as any).visible_in_modal !== false
+  // Use visible_in_canvas (record_view inline panel); fallback to visible_in_modal for legacy layouts
+  const visible = ((item as any).visible_in_canvas ?? (item as any).visible_in_modal) !== false
   const {
     attributes,
     listeners,
@@ -111,13 +112,13 @@ export default function RecordLayoutSettings({
   const resolvedLayout =
     fieldLayout.length > 0
       ? fieldLayout
-      : createInitialFieldLayout(fields, "modal", true)
+      : createInitialFieldLayout(fields, "record_review", true)
 
   const [draftLayout, setDraftLayout] = useState<FieldLayoutItem[]>(() => [
     ...resolvedLayout,
   ])
 
-  const visibleFields = getVisibleFieldsFromLayout(draftLayout, fields, "modal")
+  const visibleFields = getVisibleFieldsFromLayout(draftLayout, fields, "canvas")
   const fieldMap = new Map(fields.map((f) => [f.name, f]))
 
   const handleVisibilityToggle = useCallback((fieldName: string, visible: boolean) => {
@@ -128,7 +129,7 @@ export default function RecordLayoutSettings({
       if (existing) {
         return prev.map((i) =>
           i.field_name === fieldName || i.field_id === fieldName
-            ? { ...i, visible_in_modal: visible }
+            ? { ...i, visible_in_canvas: visible }
             : i
         )
       }
@@ -139,7 +140,7 @@ export default function RecordLayoutSettings({
         field_name: field.name,
         order: Math.max(...prev.map((i) => i.order), -1) + 1,
         editable: true,
-        visible_in_modal: visible,
+        visible_in_canvas: visible,
       }
       return [...prev, newItem]
     })

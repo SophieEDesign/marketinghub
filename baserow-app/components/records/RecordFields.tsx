@@ -582,7 +582,8 @@ export default function RecordFields({
               <button
                 type="button"
                 onClick={() => onFieldLabelClick(field.id)}
-                className={cn(FIELD_LABEL_CLASS_NO_MARGIN, "flex-shrink-0 text-left hover:text-blue-600 hover:underline cursor-pointer")}
+                className={cn(FIELD_LABEL_CLASS_NO_MARGIN, "flex-shrink-0 text-left hover:text-blue-600 hover:underline cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 focus:ring-offset-1 rounded")}
+                title="Click to open field settings"
               >
                 {getFieldDisplayName(field)}
               </button>

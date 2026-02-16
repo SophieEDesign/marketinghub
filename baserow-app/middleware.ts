@@ -51,6 +51,7 @@ function isProtectedRoute(pathname: string): boolean {
     '/dashboard',           // Dashboards
     '/interface',           // Interface builder
     '/import',              // Import functionality
+    '/api-docs',            // API documentation (Swagger UI)
   ];
 
   // Check if pathname matches any protected route

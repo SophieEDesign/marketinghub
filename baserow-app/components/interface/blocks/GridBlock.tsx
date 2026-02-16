@@ -764,6 +764,14 @@ export default function GridBlock({
   ))
 
   // Render based on view type
+  // #region agent log – trace CalendarView mount source (viewType flip = CalendarView unmount/remount)
+  const viewTypeRef = useRef<string | null>(null)
+  const prevViewType = viewTypeRef.current
+  if (prevViewType !== viewType) {
+    viewTypeRef.current = viewType
+    console.log('[GridBlock] viewType changed', { blockId: block.id, viewType, prevViewType })
+  }
+  // #endregion
   const renderView = () => {
     switch (viewType) {
       case 'calendar': {
@@ -786,8 +794,8 @@ export default function GridBlock({
         // The CalendarView component will load the view config and use that instead
         let dateFieldId = ''
         
-        // Check block config first
-        const dateFieldFromConfig = config.calendar_date_field || config.start_date_field
+        // Check block config first (include calendar_start_field for two-date config)
+        const dateFieldFromConfig = config.calendar_date_field || config.start_date_field || (config as any).calendar_start_field
         
         if (dateFieldFromConfig) {
           // If config has a field ID/name, find the actual field to validate it exists and is a date field
