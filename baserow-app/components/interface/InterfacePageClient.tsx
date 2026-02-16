@@ -1255,46 +1255,38 @@ function InterfacePageClientInternal({
             </div>
           </div>
         ) : page ? (
-          <div className="flex-1 w-full min-w-0 min-h-0 flex flex-col overflow-x-hidden">
-          {blocksLoading ? (
-            <div className="flex-1 min-h-[200px] flex items-center justify-center">
-              <LoadingSpinner size="lg" text="Loading blocks..." />
-            </div>
-          ) : (
-            // Record Review pages use RecordReviewPage wrapper (fixed left + right canvas)
-            // Content pages use InterfaceBuilder directly with full-width wrapper
-            useRecordReviewLayout ? (
-              <RecordReviewPage
-                page={page as any}
+          <div className="flex-1 w-full min-w-0 min-h-0 flex flex-col overflow-x-hidden relative">
+          {/* CRITICAL: Canvas is ALWAYS rendered when page exists - never gated by blocksLoading.
+              Blocks may be [] initially; Canvas mounts immediately and populates when blocks load.
+              isDraggable/isResizable inside Canvas depend on isEditing - not component visibility. */}
+          {useRecordReviewLayout ? (
+            <RecordReviewPage
+              page={page as any}
+              initialBlocks={memoizedBlocks}
+              isViewer={isViewer}
+              hideHeader={true}
+              onLayoutSave={page?.page_type === "record_view" ? handleRecordViewLayoutSave : undefined}
+            />
+          ) : interfaceBuilderPage ? (
+            <div className="min-h-screen w-full min-w-0 flex flex-col">
+              <InterfaceBuilder
+                page={interfaceBuilderPage}
                 initialBlocks={memoizedBlocks}
                 isViewer={isViewer}
                 hideHeader={true}
-                onLayoutSave={page?.page_type === "record_view" ? handleRecordViewLayoutSave : undefined}
+                pageTableId={pageTableId}
+                recordId={recordContext?.recordId ?? null}
+                recordTableId={recordContext?.tableId ?? null}
+                onRecordContextChange={setRecordContext}
+                mode="view"
               />
-            ) : (
-              // UNIFIED: All other pages render InterfaceBuilder (which wraps Canvas)
-              // Use isViewer prop to control edit/view mode instead of switching components
-              // This prevents remount storms when switching between edit and view modes
-              // CRITICAL: Content pages need full-width container - wrap in div with proper flex constraints
-              interfaceBuilderPage ? (
-                <div className="min-h-screen w-full min-w-0 flex flex-col">
-                  <InterfaceBuilder
-                    page={interfaceBuilderPage}
-                    initialBlocks={memoizedBlocks}
-                    // CRITICAL: Respect both URL-based viewer mode and edit mode state
-                    // URL-based viewer mode takes precedence (force read-only)
-                    // Otherwise, viewer mode = not in block editing mode
-                    isViewer={isViewer}
-                    hideHeader={true}
-                    pageTableId={pageTableId}
-                    recordId={recordContext?.recordId ?? null}
-                    recordTableId={recordContext?.tableId ?? null}
-                    onRecordContextChange={setRecordContext}
-                    mode="view"
-                  />
-                </div>
-              ) : null
-            )
+            </div>
+          ) : null}
+          {/* Loading overlay when blocks are loading - does not replace Canvas */}
+          {blocksLoading && (
+            <div className="absolute inset-0 bg-white/60 flex items-center justify-center z-10 pointer-events-none">
+              <LoadingSpinner size="lg" text="Loading blocks..." />
+            </div>
           )}
           </div>
         ) : null}
