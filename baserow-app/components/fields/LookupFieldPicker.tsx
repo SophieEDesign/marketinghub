@@ -228,12 +228,16 @@ export default function LookupFieldPicker({
     field.options?.linked_table_id
 
   // Requested label fields (may be undefined); effective fields are resolved per-table after loading fields.
+  // CRITICAL: Use stable primitive for deps to avoid effect loops (new array ref every render).
   const requestedPrimaryLabelField = config?.primaryLabelField
-  const requestedSecondaryLabelFields = config?.secondaryLabelFields || []
+  const requestedSecondaryLabelFields = config?.secondaryLabelFields ?? []
+  const requestedSecondaryKey = useMemo(
+    () => (Array.isArray(requestedSecondaryLabelFields) ? requestedSecondaryLabelFields.join("|") : ""),
+    [requestedSecondaryLabelFields]
+  )
   const contextKey = useMemo(
     () => (lookupTableId ? buildContextKey(lookupTableId, requestedPrimaryLabelField, requestedSecondaryLabelFields) : ""),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lookupTableId, requestedPrimaryLabelField, (requestedSecondaryLabelFields || []).join("|")]
+    [lookupTableId, requestedPrimaryLabelField, requestedSecondaryKey]
   )
 
   // Get table name for display
@@ -380,37 +384,11 @@ export default function LookupFieldPicker({
         if (seq === loadOptionsSeqRef.current) setLoading(false)
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lookupTableId, contextKey, requestedPrimaryLabelField, (requestedSecondaryLabelFields || []).join("|")]
+    [lookupTableId, contextKey, requestedPrimaryLabelField, requestedSecondaryKey]
   )
 
   const loadSelectedRecords = useCallback(async () => {
     if (!lookupTableId || selectedIds.length === 0) return
-
-    // #region agent log - loadSelectedRecords called
-    if (typeof window !== 'undefined') {
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: `log_${Date.now()}_lookuppicker_loadselected_called`,
-          runId: 'pre-fix-3',
-          hypothesisId: 'H1',
-          location: 'LookupFieldPicker.tsx:loadSelectedRecords',
-          message: 'loadSelectedRecords called',
-          data: {
-            fieldId: field.id,
-            fieldName: field.name,
-            fieldType: field.type,
-            lookupTableId,
-            selectedIdsCount: selectedIds.length,
-            selectedIdsSample: selectedIds.slice(0, 5),
-          },
-          timestamp: Date.now()
-        })
-      }).catch(() => {});
-    }
-    // #endregion
 
     const seq = ++loadSelectedSeqRef.current
     setLoading(true)
@@ -473,32 +451,6 @@ export default function LookupFieldPicker({
         return
       }
 
-      // #region agent log - Supabase query about to be made
-      if (typeof window !== 'undefined') {
-        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id: `log_${Date.now()}_lookuppicker_supabase_query`,
-            runId: 'pre-fix-3',
-            hypothesisId: 'H1',
-            location: 'LookupFieldPicker.tsx:loadSelectedRecords',
-            message: 'Supabase query for selected records',
-            data: {
-              fieldId: field.id,
-              fieldName: field.name,
-              lookupTableId,
-              supabaseTableName: table.supabase_table,
-              missingIdsCount: missingIds.length,
-              missingIdsSample: missingIds.slice(0, 10),
-              query: `${table.supabase_table}?select=${fieldsToSelect.join(',')}&id=in.(${missingIds.slice(0, 5).join(',')}...)`,
-            },
-            timestamp: Date.now()
-          })
-        }).catch(() => {});
-      }
-      // #endregion
-
       const supabase = createClient()
       const { data: records, error } = await supabase
         .from(table.supabase_table)
@@ -544,8 +496,7 @@ export default function LookupFieldPicker({
     legacySelectedValues.join("|"),
     contextKey,
     requestedPrimaryLabelField,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    (requestedSecondaryLabelFields || []).join("|"),
+    requestedSecondaryKey,
   ])
 
   // Load options when search query changes
@@ -566,33 +517,6 @@ export default function LookupFieldPicker({
   }, [options, selectedIds])
 
   useEffect(() => {
-    // #region agent log - useEffect for loadSelectedRecords
-    if (typeof window !== 'undefined') {
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: `log_${Date.now()}_lookuppicker_useeffect_loadselected`,
-          runId: 'pre-fix-3',
-          hypothesisId: 'H3',
-          location: 'LookupFieldPicker.tsx:useEffect:loadSelectedRecords',
-          message: 'useEffect for loadSelectedRecords triggered',
-          data: {
-            fieldId: field.id,
-            fieldName: field.name,
-            lookupTableId,
-            selectedIdsLength: selectedIds.length,
-            hasMissingSelected,
-            loadedSelectedIdsRef: loadedSelectedIdsRef.current,
-            selectedIdsKey,
-            willCallLoadSelected: !!(lookupTableId && selectedIds.length > 0 && hasMissingSelected && loadedSelectedIdsRef.current !== selectedIdsKey),
-          },
-          timestamp: Date.now()
-        })
-      }).catch(() => {});
-    }
-    // #endregion
-    
     if (!lookupTableId || selectedIds.length === 0) return
     if (!hasMissingSelected) return
     if (loadedSelectedIdsRef.current === selectedIdsKey) return

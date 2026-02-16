@@ -63,6 +63,7 @@ export function RecordModalProvider({ children }: { children: ReactNode }) {
       queueMicrotask(() => {
         const recordId = openState.recordId
         const tableId = openState.tableId
+        if (!recordId) return
         const prev = lastRecordPanelRef.current
         if (prev?.recordId === recordId && prev?.tableId === tableId) return
         lastRecordPanelRef.current = { recordId, tableId }
