@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react"
+import { createContext, useContext, useState, useCallback, useEffect, useMemo, ReactNode } from "react"
 
 /**
  * UI modes (Airtable-style):
@@ -114,23 +114,35 @@ export function UIModeProvider({ children }: UIModeProviderProps) {
     [state.uiMode, state.editingPageId]
   )
 
+  const value = useMemo(
+    () => ({
+      state,
+      uiMode: state.uiMode,
+      setUIMode,
+      enterEdit,
+      exitEdit,
+      isEdit,
+      enterEditPages,
+      exitEditPages,
+      enterRecordLayoutEdit,
+      exitRecordLayoutEdit,
+      enterFieldSchemaEdit,
+      exitFieldSchemaEdit,
+    }),
+    [
+      state,
+      setUIMode,
+      enterEdit,
+      exitEdit,
+      isEdit,
+      enterEditPages,
+      enterRecordLayoutEdit,
+      enterFieldSchemaEdit,
+    ]
+  )
+
   return (
-    <UIModeContext.Provider
-      value={{
-        state,
-        uiMode: state.uiMode,
-        setUIMode,
-        enterEdit,
-        exitEdit,
-        isEdit,
-        enterEditPages,
-        exitEditPages,
-        enterRecordLayoutEdit,
-        exitRecordLayoutEdit,
-        enterFieldSchemaEdit,
-        exitFieldSchemaEdit,
-      }}
-    >
+    <UIModeContext.Provider value={value}>
       {children}
     </UIModeContext.Provider>
   )

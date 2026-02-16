@@ -1516,20 +1516,18 @@ export default function InterfaceBuilder({
               onCanvasClick={() => setSelectedContext({ type: 'page' })}
               onBlockSelect={(blockId, addToSelection) => {
                 if (addToSelection) {
-                  setSelectedBlockIds(prev => {
-                    const next = new Set(prev)
-                    if (next.has(blockId)) {
-                      next.delete(blockId)
-                      // If removing the last selected, clear single selection too
-                      if (next.size === 0) {
-                        setSelectedBlockId(null)
-                      }
-                    } else {
-                      next.add(blockId)
-                      setSelectedBlockId(blockId) // Update primary selection
+                  const next = new Set(selectedBlockIds)
+                  if (next.has(blockId)) {
+                    next.delete(blockId)
+                    // If removing the last selected, clear single selection too
+                    if (next.size === 0) {
+                      setSelectedBlockId(null)
                     }
-                    return next
-                  })
+                  } else {
+                    next.add(blockId)
+                    setSelectedBlockId(blockId) // Update primary selection
+                  }
+                  setSelectedBlockIds(next)
                 } else {
                   setSelectedBlockIds(new Set([blockId]))
                   setSelectedBlockId(blockId)
