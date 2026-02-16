@@ -263,16 +263,6 @@ export default function Canvas({
   fullPageBlockId = null,
   openRecordInEditModeForBlock = null,
 }: CanvasProps) {
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[Canvas] render START', {
-      pageId,
-      blocksCount: blocks?.length ?? 0,
-      isEditing,
-      mode,
-      interfaceMode,
-      fullPageBlockId,
-    })
-  }
   // Get filters from filter blocks for this block
   const { getFiltersForBlock, getFilterTreeForBlock } = useFilterState()
   
@@ -280,17 +270,9 @@ export default function Canvas({
   // on every render. A new callback each render caused React error #185 (maximum update depth).
   const pageFiltersResolver = useCallback(
     (blockId: string) => {
-      // #region agent log
-      const start = performance.now()
-      // #endregion
       const block = blocks.find(b => b.id === blockId)
       const blockTableId = block?.config?.table_id || pageTableId
-      const result = getFiltersForBlock(blockId, blockTableId)
-      // #region agent log
-      const duration = performance.now() - start
-      if (duration > 5) console.log("pageFiltersResolver duration:", duration.toFixed(1), "ms", { blockId })
-      // #endregion
-      return result
+      return getFiltersForBlock(blockId, blockTableId)
     },
     [blocks, pageTableId, getFiltersForBlock]
   )

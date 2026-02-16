@@ -6,7 +6,7 @@
  * Allows multiple filter blocks to emit filters that affect target blocks
  */
 
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react'
 import type { FilterConfig } from './filters'
 import type { FilterTree } from '@/lib/filters/canonical-model'
 import { andFilterTrees } from '@/lib/filters/canonical-model'
@@ -82,9 +82,9 @@ export function FilterStateProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const getFiltersForBlock = useCallback((blockId: string, blockTableId?: string | null): FilterConfigWithSource[] => {
-    // #region agent log
-    console.log("[getFiltersForBlock] blockId:", blockId, "blockTableId:", blockTableId)
-    // #endregion
+    // Blocks with null table should not participate in filter logic (text, divider, etc.)
+    if (!blockTableId) return []
+
     const filters: FilterConfigWithSource[] = []
     
     // Collect filters from all filter blocks that target this block
@@ -127,6 +127,9 @@ export function FilterStateProvider({ children }: { children: ReactNode }) {
   }, [filterBlocks, filterBlockTitles])
 
   const getFilterTreeForBlock = useCallback((blockId: string, blockTableId?: string | null): FilterTree => {
+    // Blocks with null table should not participate in filter logic
+    if (!blockTableId) return andFilterTrees([])
+
     const trees: FilterTree[] = []
 
     for (const [, state] of filterBlocks.entries()) {
@@ -206,17 +209,27 @@ export function FilterStateProvider({ children }: { children: ReactNode }) {
     return Array.from(filterBlocks.values())
   }, [filterBlocks])
 
+  const contextValue = useMemo(
+    () => ({
+      getFiltersForBlock,
+      getFilterTreeForBlock,
+      getFilterBlockInfo,
+      updateFilterBlock,
+      removeFilterBlock,
+      getAllFilterBlocks,
+    }),
+    [
+      getFiltersForBlock,
+      getFilterTreeForBlock,
+      getFilterBlockInfo,
+      updateFilterBlock,
+      removeFilterBlock,
+      getAllFilterBlocks,
+    ]
+  )
+
   return (
-    <FilterStateContext.Provider
-      value={{
-        getFiltersForBlock,
-        getFilterTreeForBlock,
-        getFilterBlockInfo,
-        updateFilterBlock,
-        removeFilterBlock,
-        getAllFilterBlocks,
-      }}
-    >
+    <FilterStateContext.Provider value={contextValue}>
       {children}
     </FilterStateContext.Provider>
   )
