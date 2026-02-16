@@ -178,7 +178,7 @@ export default function AirtableSidebar({
   if (!isMobile && isCollapsed) {
     return (
       <div 
-        className="w-12 border-r border-black/10 flex flex-col items-center py-2 gap-2"
+        className="w-12 border-r border-black/10 flex flex-col items-center py-2 gap-2 flex-shrink-0"
         style={{ backgroundColor: sidebarColor }}
       >
         <BaseDropdown
@@ -224,7 +224,7 @@ export default function AirtableSidebar({
       <div 
         data-sidebar
         className={cn(
-          "flex flex-col h-screen shadow-sm transition-transform duration-300",
+          "flex flex-col h-screen shadow-sm transition-transform duration-300 flex-shrink-0",
           isMobile 
             ? "fixed left-0 top-0 z-50 w-64" 
             : "relative w-64",

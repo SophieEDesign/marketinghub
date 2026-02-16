@@ -23,6 +23,7 @@ interface RecordDetailPanelInlineProps {
   fieldLayout: FieldLayoutItem[]
   pageEditable?: boolean
   interfaceMode?: "view" | "edit"
+  onInterfaceModeChange?: (mode: "view" | "edit") => void
   onLayoutSave?: (fieldLayout: FieldLayoutItem[]) => Promise<void>
   titleField?: string
 }
@@ -36,6 +37,7 @@ export default function RecordDetailPanelInline({
   fieldLayout,
   pageEditable = true,
   interfaceMode = "view",
+  onInterfaceModeChange,
   onLayoutSave,
 }: RecordDetailPanelInlineProps) {
   const { openRecordModal } = useRecordModal()

@@ -140,6 +140,9 @@ export default function RecordEditor({
     canDeleteRecords,
   } = core
 
+  const [manualEditMode, setManualEditMode] = useState(false)
+  const [reviewEditMode, setReviewEditMode] = useState(false)
+
   const canSave = recordId ? canEditRecords : canCreateRecords
   const effectiveEditable =
     !allowEdit
@@ -147,9 +150,6 @@ export default function RecordEditor({
       : mode === "review"
         ? canSave && (interfaceMode === "edit" || reviewEditMode)
         : canSave
-
-  const [manualEditMode, setManualEditMode] = useState(false)
-  const [reviewEditMode, setReviewEditMode] = useState(false)
   const [contentReady, setContentReady] = useState(false)
   const contentReadyRef = useRef(false)
 

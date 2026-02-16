@@ -13,7 +13,7 @@ export default async function TablesPage() {
 
     return (
       <WorkspaceShellWrapper title="Tables">
-        <div>
+        <div className="container mx-auto p-6 max-w-6xl">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-2xl font-bold">Tables</h1>
