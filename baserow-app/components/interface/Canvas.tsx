@@ -331,6 +331,86 @@ export default function Canvas({
   
   // Persistent layout state (saved to DB)
   const [layout, setLayout] = useState<Layout[]>([])
+
+  // Full-page mode: exactly one block with is_full_page (used for gridLayout and block rendering)
+  const isFullPageMode = Boolean(
+    fullPageBlockId && blocks.length === 1 && blocks[0].id === fullPageBlockId
+  )
+  const fullPageBlock = isFullPageMode ? blocks[0] : null
+
+  /**
+   * CRITICAL: Grid layout must never be empty when blocks exist.
+   * - Returns [] when no blocks.
+   * - layout state syncs in useEffect (after first paint) - so first render has layout=[].
+   * - This useMemo derives from blocks when layout is empty, ensuring blocks render on first mount.
+   * - Edit mode does NOT affect layout source - only interactivity (isDraggable/isResizable).
+   * - Full-page mode: single item spanning full width with large h.
+   */
+  const gridLayout = useMemo(() => {
+    if (!blocks || blocks.length === 0) return []
+    const cols = layoutSettings?.cols || 12
+    // Full-page mode: single full-width item (grid always used; full-page content rendered inside)
+    if (isFullPageMode && fullPageBlock) {
+      return [{
+        i: fullPageBlock.id,
+        x: 0,
+        y: 0,
+        w: cols,
+        h: 50,
+        minW: 2,
+        minH: 2,
+        maxW: cols,
+      }]
+    }
+    if (layout.length > 0) {
+      return layout.map((item) => {
+        const deltaH = ephemeralDeltas.get(item.i) || 0
+        const effectiveH = (item.h || 4) + deltaH
+        const itemX = item.x || 0
+        const itemMaxW = cols - itemX
+        return {
+          ...item,
+          h: effectiveH,
+          maxW: Math.max(2, itemMaxW),
+          minW: 2,
+          minH: 2,
+        }
+      })
+    }
+    // First render: layout state not synced yet - derive directly from blocks
+    return blocks.map((block) => {
+      const mapped = dbBlockToPageBlock({
+        id: block.id,
+        position_x: (block as any).position_x ?? block.x ?? null,
+        position_y: (block as any).position_y ?? block.y ?? null,
+        width: (block as any).width ?? block.w ?? null,
+        height: (block as any).height ?? block.h ?? null,
+      })
+      if (!mapped) {
+        return {
+          i: block.id,
+          x: 0,
+          y: 0,
+          w: 4,
+          h: 4,
+          minW: 2,
+          minH: 2,
+          maxW: cols,
+        }
+      }
+      const maxW = cols - (mapped.x || 0)
+      return {
+        i: block.id,
+        x: mapped.x,
+        y: mapped.y,
+        w: mapped.w,
+        h: mapped.h || 4,
+        minW: 2,
+        minH: 2,
+        maxW: Math.max(2, maxW),
+      }
+    })
+  }, [blocks, layout, ephemeralDeltas, layoutSettings?.cols, isFullPageMode, fullPageBlock])
   
   // Ephemeral expansion deltas (runtime only, not saved)
   // Maps blockId -> deltaH (additional height in grid units from collapsible expansion)
@@ -1907,12 +1987,6 @@ export default function Canvas({
     }
   }, [shouldLogLayout, layout, blocks.length, pageId, isEditing])
 
-  // Full-page mode: exactly one block with is_full_page, no grid, no drag/resize.
-  // Read-only guard: we do NOT call onLayoutChange or attach any layout-mutating handlers.
-  const isFullPageMode = Boolean(
-    fullPageBlockId && blocks.length === 1 && blocks[0].id === fullPageBlockId
-  )
-  const fullPageBlock = isFullPageMode ? blocks[0] : null
   const fullPageDef = fullPageBlock ? getBlockDefinition(fullPageBlock.type) : null
   const isRail = fullPageDef?.fullPageLayout === "rail"
   const showPreview =
@@ -1933,10 +2007,10 @@ export default function Canvas({
       {/* This ensures the grid gets the full available width, not constrained by parent flex containers */}
       {/* CRITICAL: Parent stack uses normal document flow - reflows immediately when child heights change */}
       {/* No cached heights, no min-height persistence, no delayed updates */}
-      {/* flex-1 min-h-0: fill parent flex; min-h-0 allows shrink. Full-page: overflow-hidden. Normal: no overflow on root. */}
+      {/* flex-1 flex flex-col min-h-0: fill parent flex; min-h-0 prevents flex collapse; flex flex-col for block list. */}
       <div
         ref={containerRef}
-        className={`flex-1 w-full min-h-0 min-w-0 relative ${isFullPageMode ? "overflow-hidden" : ""}`}
+        className={`flex-1 flex flex-col w-full min-h-0 min-w-0 relative ${isFullPageMode ? "overflow-hidden" : ""}`}
         style={isFullPageMode ? undefined : { paddingBottom: isEditing ? "80px" : "80px" }}
         onClick={(e) => {
           // Context-driven: clicking empty canvas selects page (opens page settings)
@@ -1946,202 +2020,8 @@ export default function Canvas({
           }
         }}
       >
-        {isFullPageMode && fullPageBlock ? (
-          /* Full-page: fixed viewport, no chrome, no scroll on wrapper. Rail = left fixed-width + right (preview or empty); fill = single column. */
-          <div className="absolute inset-0 flex flex-col min-h-0 overflow-hidden">
-            {isRail ? (
-              <div className="flex h-full w-full overflow-hidden">
-                {/* Left rail */}
-                <div
-                  className="h-full overflow-hidden border-r flex flex-col"
-                  style={{ width: fullPageDef?.fullPageMaxWidth ?? 360 }}
-                >
-                  <div
-                    className={`flex-1 min-h-0 flex flex-col relative overflow-hidden ${
-                      isEditing
-                        ? `group ${selectedBlockId === fullPageBlock.id ? "ring-2 ring-blue-500 ring-inset" : ""}`
-                        : ""
-                    }`}
-                    onClick={(e) => {
-                      if (isEditing) {
-                        const target = e.target as HTMLElement
-                        const isEditorContent = target.closest(".ql-editor") || target.closest("textarea") || target.closest("input") ||
-                          target.closest('[contenteditable="true"]') || target.closest("button") || target.closest(".ql-toolbar") ||
-                          target.closest('[role="textbox"]') || target.closest(".ql-container") || target.closest(".ql-snow")
-                        if (!isEditorContent) {
-                          e.stopPropagation() // Prevent canvas click (page settings) from firing
-                          if (onBlockSelect) onBlockSelect(fullPageBlock.id, false)
-                          else onBlockClick?.(fullPageBlock.id)
-                        }
-                      }
-                    }}
-                  >
-                    {/* Full-page duplicate/delete - always mount; visibility toggled by isEditing */}
-                    <div className={`absolute top-2 right-2 z-20 flex items-center gap-1.5 ${selectedBlockId === fullPageBlock.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"} ${isEditing ? "" : "invisible pointer-events-none"}`}>
-                      {onBlockDuplicate && (
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); onBlockDuplicate(fullPageBlock.id) }}
-                          className="p-1.5 rounded-md shadow-sm bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"
-                          title="Duplicate block"
-                          aria-label="Duplicate block"
-                        >
-                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                          </svg>
-                        </button>
-                      )}
-                      {onBlockDelete && (
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); onBlockDelete(fullPageBlock.id) }}
-                          className="p-1.5 rounded-md shadow-sm bg-white text-red-600 border border-red-300 hover:bg-red-50"
-                          title="Delete block"
-                          aria-label="Delete block"
-                        >
-                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-                    <div className="flex-1 min-h-0 w-full h-full overflow-hidden">
-                      <BlockAppearanceWrapper block={fullPageBlock} isFullPage isRail className={isEditing ? "pointer-events-auto" : ""}>
-                        <div className="h-full w-full overflow-hidden">
-                          <BlockRenderer
-                            block={fullPageBlock}
-                            isEditing={isEditing && !fullPageBlock.config?.locked}
-                            interfaceMode={interfaceMode}
-                            onUpdate={onBlockUpdate}
-                            isLocked={fullPageBlock.config?.locked || false}
-                            pageTableId={pageTableId}
-                            pageId={pageId}
-                            recordId={recordId}
-                            recordTableId={recordTableId}
-                            mode={mode}
-                            filters={getFiltersForBlock(fullPageBlock.id, fullPageBlock.config?.table_id || pageTableId)}
-                            filterTree={getFilterTreeForBlock(fullPageBlock.id, fullPageBlock.config?.table_id || pageTableId) as FilterTree}
-                            onRecordClick={onRecordClick}
-                            onRecordContextChange={onRecordContextChange}
-                            aggregateData={aggregateData[fullPageBlock.id]}
-                            pageShowAddRecord={pageShowAddRecord}
-                            pageEditable={pageEditable}
-                            editableFieldNames={editableFieldNames}
-                            pageShowFieldNames={pageShowFieldNames}
-                            hideEditButton={topTwoFieldBlockIds.has(fullPageBlock.id)}
-                            allBlocks={blocks}
-                            onEphemeralHeightDelta={() => {}}
-                            rowHeight={Number(layoutSettings?.rowHeight) || 30}
-                            isEditingCanvas={editingBlockCanvasId === fullPageBlock.id}
-                            isFullPage
-                            openRecordInEditModeForBlock={openRecordInEditModeForBlock}
-                          />
-                        </div>
-                      </BlockAppearanceWrapper>
-                    </div>
-                  </div>
-                </div>
-                {/* Right: preview surface or empty */}
-                <div className="flex-1 min-w-0 h-full overflow-hidden">
-                  {showPreview ? (
-                    <RecordPreviewSurface
-                      tableId={recordTableId!}
-                      recordId={recordId!}
-                      pageId={pageId}
-                      isEditing={isEditing}
-                      pageEditable={pageEditable}
-                      blockConfig={fullPageBlock.config}
-                    />
-                  ) : (
-                    <div className="flex-1 h-full bg-background" />
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div
-                className={`flex-1 min-h-0 flex flex-col relative overflow-hidden ${
-                  isEditing
-                    ? `group ${selectedBlockId === fullPageBlock.id ? "ring-2 ring-blue-500 ring-inset" : ""}`
-                    : ""
-                }`}
-                onClick={(e) => {
-                  if (isEditing) {
-                    const target = e.target as HTMLElement
-                    const isEditorContent = target.closest(".ql-editor") || target.closest("textarea") || target.closest("input") ||
-                      target.closest('[contenteditable="true"]') || target.closest("button") || target.closest(".ql-toolbar") ||
-                      target.closest('[role="textbox"]') || target.closest(".ql-container") || target.closest(".ql-snow")
-                    if (!isEditorContent && onBlockSelect) onBlockSelect(fullPageBlock.id, false)
-                    else if (!isEditorContent) onBlockClick?.(fullPageBlock.id)
-                  }
-                }}
-              >
-                {/* Full-page duplicate/delete - always mount; visibility toggled by isEditing */}
-                <div className={`absolute top-2 right-2 z-20 flex items-center gap-1.5 ${selectedBlockId === fullPageBlock.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"} ${isEditing ? "" : "invisible pointer-events-none"}`}>
-                  {onBlockDuplicate && (
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); onBlockDuplicate(fullPageBlock.id) }}
-                      className="p-1.5 rounded-md shadow-sm bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"
-                      title="Duplicate block"
-                      aria-label="Duplicate block"
-                    >
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
-                    </button>
-                  )}
-                  {onBlockDelete && (
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); onBlockDelete(fullPageBlock.id) }}
-                      className="p-1.5 rounded-md shadow-sm bg-white text-red-600 border border-red-300 hover:bg-red-50"
-                      title="Delete block"
-                      aria-label="Delete block"
-                    >
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-                <div className="flex-1 min-h-0 w-full h-full overflow-hidden">
-                  <BlockAppearanceWrapper block={fullPageBlock} isFullPage className={isEditing ? "pointer-events-auto" : ""}>
-                    <div className="h-full w-full overflow-hidden">
-                      <BlockRenderer
-                        block={fullPageBlock}
-                        isEditing={isEditing && !fullPageBlock.config?.locked}
-                        interfaceMode={interfaceMode}
-                        onUpdate={onBlockUpdate}
-                        isLocked={fullPageBlock.config?.locked || false}
-                        pageTableId={pageTableId}
-                        pageId={pageId}
-                        recordId={recordId}
-                        recordTableId={recordTableId}
-                        mode={mode}
-                        filters={getFiltersForBlock(fullPageBlock.id, fullPageBlock.config?.table_id || pageTableId)}
-                        filterTree={getFilterTreeForBlock(fullPageBlock.id, fullPageBlock.config?.table_id || pageTableId) as FilterTree}
-                        onRecordClick={onRecordClick}
-                        onRecordContextChange={onRecordContextChange}
-                        aggregateData={aggregateData[fullPageBlock.id]}
-                        pageShowAddRecord={pageShowAddRecord}
-                        pageEditable={pageEditable}
-                        editableFieldNames={editableFieldNames}
-                        pageShowFieldNames={pageShowFieldNames}
-                        hideEditButton={topTwoFieldBlockIds.has(fullPageBlock.id)}
-                        allBlocks={blocks}
-                        onEphemeralHeightDelta={() => {}}
-                        rowHeight={Number(layoutSettings?.rowHeight) || 30}
-                        isEditingCanvas={editingBlockCanvasId === fullPageBlock.id}
-                        isFullPage
-                      />
-                    </div>
-                  </BlockAppearanceWrapper>
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-        <>
+        {/* CRITICAL: ResponsiveGridLayout is ALWAYS rendered - no conditional wrapping or early return */}
+        <div className="flex-1 flex flex-col min-h-0 min-w-0">
         {/* Drag ghost/preview */}
         {isEditing && dragGhost && containerRef.current && (
           <CanvasDragGhostOverlay
@@ -2170,23 +2050,8 @@ export default function Canvas({
           />
         )}
         <ResponsiveGridLayout
-          className="layout" // CRITICAL: No conditional classes - identical in edit and public
-          layouts={{ lg: layout.map(item => {
-            // Use effective height (persistent h + ephemeral deltaH) for positioning
-            const deltaH = ephemeralDeltas.get(item.i) || 0
-            const effectiveH = (item.h || 4) + deltaH
-            const cols = layoutSettings?.cols || 12
-            // CRITICAL: Always recalculate maxW based on current position to prevent overflow
-            // This ensures maxW is always correct even if block position changes
-            const itemX = item.x || 0
-            const itemMaxW = cols - itemX
-            const calculatedMaxW = Math.max(2, itemMaxW) // Ensure maxW is at least minW (2)
-            return {
-              ...item,
-              h: effectiveH, // React Grid Layout uses effectiveH for positioning
-              maxW: calculatedMaxW, // Always use calculated maxW to prevent overflow
-            }
-          }) }}
+          className="layout flex-1 min-h-0 min-w-0" // CRITICAL: flex-1 min-h-0 prevents flex collapse; identical in edit and public
+          layouts={{ lg: gridLayout }}
           breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
           // CRITICAL: All layout-affecting props come from GRID_CONFIG constant
           // isEditing MUST NOT appear in any of these props
@@ -2200,9 +2065,10 @@ export default function Canvas({
           containerPadding={GRID_CONFIG.containerPadding}
           useCSSTransforms={GRID_CONFIG.useCSSTransforms}
           // CRITICAL: isEditing ONLY controls interactivity (never layout geometry)
-          isDraggable={isEditing}
-          isResizable={isEditing}
-          onLayoutChange={handleLayoutChange}
+          // Full-page mode: no drag/resize (single full-width block)
+          isDraggable={isEditing && !isFullPageMode}
+          isResizable={isEditing && !isFullPageMode}
+          onLayoutChange={isFullPageMode ? () => {} : handleLayoutChange}
           onResizeStart={(layout, oldItem, newItem, placeholder, e, element) => {
             const blockId = oldItem.i
             currentlyResizingBlockIdRef.current = blockId
@@ -2576,7 +2442,7 @@ export default function Canvas({
             return (
               <div
                 key={block.id}
-                className={`block-container relative transition-[box-shadow,border-color] duration-200 ${
+                className={`block-container relative ${
                   isEditing
                     ? `group bg-white border-2 border-dashed border-gray-200 hover:border-gray-300 rounded-lg shadow-sm hover:shadow-md ${
                         selectedBlockId === block.id
@@ -2588,7 +2454,7 @@ export default function Canvas({
                           : ""
                       } ${
                         keyboardMoveHighlight === block.id
-                          ? "ring-2 ring-green-400 border-green-400 shadow-lg animate-pulse"
+                          ? "ring-2 ring-green-400 border-green-400 shadow-lg"
                           : ""
                       }`
                     : "bg-transparent border-0 shadow-none"
@@ -2629,7 +2495,8 @@ export default function Canvas({
               >
             {/* Edit Mode Controls - Always mount for stability; visibility toggled by isEditing */}
             <div className={isEditing ? "" : "invisible pointer-events-none"}>
-                {/* Drag Handle - Only visible on hover, hidden when block is editing (via CSS) */}
+                {/* Drag Handle - Hidden for full-page (no drag); visible for grid blocks */}
+                {!isFullPageMode && (
                 <div
                   className={`absolute top-2 left-2 z-20 drag-handle transition-all duration-200 ${
                     (selectedBlockId === block.id || (selectedBlockIds && selectedBlockIds.has(block.id))) ? "opacity-100 scale-100" : "opacity-30 group-hover:opacity-100 scale-95 group-hover:scale-100"
@@ -2663,6 +2530,7 @@ export default function Canvas({
                     </svg>
                   </button>
                 </div>
+                )}
 
                 {/* Block Toolbar - Only visible on hover */}
                 <div className={`absolute top-2 right-2 z-20 flex items-center gap-1.5 transition-all duration-200 ${
@@ -2718,13 +2586,98 @@ export default function Canvas({
                 View Only
             </div>
             
-            {/* Block Content - ALWAYS visible; never conditional on isEditing */}
-            {/* CRITICAL: Block content must render in both view and edit mode. Only edit chrome is conditional. */}
-            {/* NO willChange, transitionProperty, or transform here - they can defer initial paint. */}
-            <div 
+            {/* Block Content - ALWAYS visible; never conditional on isEditing. No transition/willChange - immediate paint. */}
+            <div
               className={`block-content h-full w-full min-h-0 rounded-lg ${block.config?.locked ? 'pointer-events-none opacity-75' : ''} ${block.type === 'field' ? 'overflow-visible' : isEditing ? 'overflow-hidden' : 'overflow-auto'}`}
               data-block-id={block.id}
             >
+              {isFullPageMode && fullPageBlock && block.id === fullPageBlock.id ? (
+                /* Full-page: rail layout (left block + right preview) or fill layout */
+                isRail ? (
+                  <div className="flex h-full w-full overflow-hidden">
+                    <div className="h-full overflow-hidden border-r flex flex-col" style={{ width: fullPageDef?.fullPageMaxWidth ?? 360 }}>
+                      <BlockAppearanceWrapper block={fullPageBlock} isFullPage isRail className={isEditing ? "pointer-events-auto" : ""}>
+                        <div className="h-full w-full overflow-hidden">
+                          <BlockRenderer
+                            block={fullPageBlock}
+                            isEditing={isEditing && !fullPageBlock.config?.locked}
+                            interfaceMode={interfaceMode}
+                            onUpdate={onBlockUpdate}
+                            isLocked={fullPageBlock.config?.locked || false}
+                            pageTableId={pageTableId}
+                            pageId={pageId}
+                            recordId={recordId}
+                            recordTableId={recordTableId}
+                            mode={mode}
+                            filters={getFiltersForBlock(fullPageBlock.id, fullPageBlock.config?.table_id || pageTableId)}
+                            filterTree={getFilterTreeForBlock(fullPageBlock.id, fullPageBlock.config?.table_id || pageTableId) as FilterTree}
+                            onRecordClick={onRecordClick}
+                            onRecordContextChange={onRecordContextChange}
+                            aggregateData={aggregateData[fullPageBlock.id]}
+                            pageShowAddRecord={pageShowAddRecord}
+                            pageEditable={pageEditable}
+                            editableFieldNames={editableFieldNames}
+                            pageShowFieldNames={pageShowFieldNames}
+                            hideEditButton={topTwoFieldBlockIds.has(fullPageBlock.id)}
+                            allBlocks={blocks}
+                            onEphemeralHeightDelta={() => {}}
+                            rowHeight={Number(layoutSettings?.rowHeight) || 30}
+                            isEditingCanvas={editingBlockCanvasId === fullPageBlock.id}
+                            isFullPage
+                            openRecordInEditModeForBlock={openRecordInEditModeForBlock}
+                          />
+                        </div>
+                      </BlockAppearanceWrapper>
+                    </div>
+                    <div className="flex-1 min-w-0 h-full overflow-hidden">
+                      {showPreview ? (
+                        <RecordPreviewSurface
+                          tableId={recordTableId!}
+                          recordId={recordId!}
+                          pageId={pageId}
+                          isEditing={isEditing}
+                          pageEditable={pageEditable}
+                          blockConfig={fullPageBlock.config}
+                        />
+                      ) : (
+                        <div className="flex-1 h-full bg-background" />
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <BlockAppearanceWrapper block={fullPageBlock} isFullPage className={isEditing ? "pointer-events-auto" : ""}>
+                    <div className="h-full w-full overflow-hidden">
+                      <BlockRenderer
+                        block={fullPageBlock}
+                        isEditing={isEditing && !fullPageBlock.config?.locked}
+                        interfaceMode={interfaceMode}
+                        onUpdate={onBlockUpdate}
+                        isLocked={fullPageBlock.config?.locked || false}
+                        pageTableId={pageTableId}
+                        pageId={pageId}
+                        recordId={recordId}
+                        recordTableId={recordTableId}
+                        mode={mode}
+                        filters={getFiltersForBlock(fullPageBlock.id, fullPageBlock.config?.table_id || pageTableId)}
+                        filterTree={getFilterTreeForBlock(fullPageBlock.id, fullPageBlock.config?.table_id || pageTableId) as FilterTree}
+                        onRecordClick={onRecordClick}
+                        onRecordContextChange={onRecordContextChange}
+                        aggregateData={aggregateData[fullPageBlock.id]}
+                        pageShowAddRecord={pageShowAddRecord}
+                        pageEditable={pageEditable}
+                        editableFieldNames={editableFieldNames}
+                        pageShowFieldNames={pageShowFieldNames}
+                        hideEditButton={topTwoFieldBlockIds.has(fullPageBlock.id)}
+                        allBlocks={blocks}
+                        onEphemeralHeightDelta={() => {}}
+                        rowHeight={Number(layoutSettings?.rowHeight) || 30}
+                        isEditingCanvas={editingBlockCanvasId === fullPageBlock.id}
+                        isFullPage
+                      />
+                    </div>
+                  </BlockAppearanceWrapper>
+                )
+              ) : (
               <BlockAppearanceWrapper 
                 block={block}
                 className={isEditing ? "pointer-events-auto" : ""}
@@ -2759,13 +2712,13 @@ export default function Canvas({
                   />
                 </div>
               </BlockAppearanceWrapper>
+              )}
             </div>
           </div>
             )
           })}
         </ResponsiveGridLayout>
-        </>
-        )}
+        </div>
       </div>
     </ErrorBoundary>
   )
