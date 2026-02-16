@@ -27,6 +27,7 @@ import type { EventDropArg, EventInput, EventClickArg, EventContentArg } from "@
 import type { TableRow } from "@/types/database"
 import type { LinkedField, TableField } from "@/types/fields"
 import { useRecordModal } from "@/contexts/RecordModalContext"
+import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { isDebugEnabled, debugLog, debugWarn, debugError } from '@/lib/interface/debug-flags'
 import { resolveCalendarDateFieldNames as resolveDateFields } from '@/lib/interface/calendar-date-fields'
 import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
@@ -205,6 +206,7 @@ export default function CalendarView({
   const [loadedTableFields, setLoadedTableFields] = useState<TableField[]>(tableFields || [])
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
   const { openRecordModal } = useRecordModal()
+  const { openRecord: openRecordPanel } = useRecordPanel()
   const [linkedValueLabelMaps, setLinkedValueLabelMaps] = useState<Record<string, Record<string, string>>>({})
   const prevCalendarEventsSignatureRef = useRef<string>("")
   const prevCalendarEventsRef = useRef<EventInput[]>([])
@@ -1750,27 +1752,25 @@ export default function CalendarView({
         onRecordClick(recordIdString)
         return
       }
+      // Use right-side RecordPanel (Airtable-style) instead of center modal
       queueMicrotask(() => {
         const bc = blockConfigRef.current
-        openRecordModal({
-          tableId: resolvedTableId,
-          recordId: recordIdString,
-          tableFields: Array.isArray(loadedTableFields) ? loadedTableFields : [],
-          modalFields: Array.isArray(bc?.modal_fields) ? bc.modal_fields : [],
-          modalLayout: bc?.modal_layout,
-          supabaseTableName,
-          cascadeContext: bc ? { blockConfig: bc } : undefined,
-          canEditLayout,
-          onLayoutSave: onModalLayoutSave,
+        openRecordPanel(
+          resolvedTableId,
+          recordIdString,
+          supabaseTableName ?? "",
+          Array.isArray(bc?.modal_fields) ? bc.modal_fields : undefined,
+          bc?.modal_layout,
+          bc ? { blockConfig: bc } : undefined,
           interfaceMode,
-          onSave: () => { if (resolvedTableId && supabaseTableName && loadRowsRef.current) loadRowsRef.current() },
-          onDeleted: () => { if (resolvedTableId && supabaseTableName && loadRowsRef.current) loadRowsRef.current() },
-          keySuffix: blockId ?? undefined,
-          forceFlatLayout: true,
-        })
+          () => { if (resolvedTableId && supabaseTableName && loadRowsRef.current) loadRowsRef.current() },
+          (bc as any)?.field_layout,
+          onModalLayoutSave ?? undefined,
+          Array.isArray(loadedTableFields) ? loadedTableFields : undefined
+        )
       })
     },
-    [allowOpenRecord, onRecordClick, resolvedDateFieldNames, openRecordModal, resolvedTableId, loadedTableFields, supabaseTableName, canEditLayout, onModalLayoutSave, interfaceMode, blockId]
+    [allowOpenRecord, onRecordClick, resolvedDateFieldNames, openRecordPanel, resolvedTableId, loadedTableFields, supabaseTableName, interfaceMode, onModalLayoutSave]
   )
   const handleEventClickRef = useRef(handleEventClickImpl)
   handleEventClickRef.current = handleEventClickImpl

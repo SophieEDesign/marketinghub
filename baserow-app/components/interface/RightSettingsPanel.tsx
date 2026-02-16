@@ -55,20 +55,25 @@ export default function RightSettingsPanel() {
   const { isRecordModalOpen } = useRecordModal()
   const { state: recordPanelState } = useRecordPanel()
 
-  // Always mount; control visibility via CSS to keep React tree stable (no race collapse, stable effects)
+  // Show when: (1) user selected page/block/record, OR (2) RecordPanel is open (Airtable-style: settings next to record)
+  // Hide when RecordModal (center modal) is open - that flow is deprecated in favor of right panel
   const isVisible =
-    selectedContext &&
-    !isRecordModalOpen &&
-    !recordPanelState.isOpen
+    (selectedContext || (recordPanelState.isOpen && recordPanelState.recordId)) &&
+    !isRecordModalOpen
+
+  // When RecordPanel is open, position settings panel to the left of it (no overlap)
+  const panelWidth = 400
+  const recordPanelWidth = recordPanelState.isOpen ? recordPanelState.width : 0
+  const rightOffset = recordPanelState.isOpen ? recordPanelWidth : 0
 
   const handleClose = () => setSelectedContext(null)
 
   return (
     <div
-      className={`fixed right-0 top-0 h-full w-[400px] bg-white border-l border-gray-200 shadow-xl z-40 flex flex-col transition-transform duration-200 ${
+      className={`fixed top-0 h-full w-[400px] bg-white border-l border-gray-200 shadow-xl z-40 flex flex-col transition-all duration-200 ${
         isVisible ? "translate-x-0" : "translate-x-full pointer-events-none"
       }`}
-      style={{ height: "100vh" }}
+      style={{ height: "100vh", right: rightOffset }}
       aria-hidden={!isVisible}
     >
       {/* Header with breadcrumb and close */}

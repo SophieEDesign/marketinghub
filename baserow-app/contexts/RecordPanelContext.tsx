@@ -2,10 +2,12 @@
 
 import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from "react"
 import { useSelectionContext } from "@/contexts/SelectionContext"
+import { useRightSettingsPanelData } from "@/contexts/RightSettingsPanelDataContext"
 
 import type { BlockConfig } from "@/lib/interface/types"
 import type { RecordEditorCascadeContext } from "@/lib/interface/record-editor-core"
 import type { FieldLayoutItem } from "@/lib/interface/field-layout-utils"
+import type { TableField } from "@/types/fields"
 
 interface RecordPanelState {
   isOpen: boolean
@@ -29,7 +31,7 @@ interface RecordPanelState {
 
 interface RecordPanelContextType {
   state: RecordPanelState
-  openRecord: (tableId: string, recordId: string, tableName: string, modalFields?: string[], modalLayout?: BlockConfig["modal_layout"], cascadeContext?: RecordEditorCascadeContext | null, interfaceMode?: "view" | "edit", onRecordDeleted?: () => void, fieldLayout?: FieldLayoutItem[]) => void
+  openRecord: (tableId: string, recordId: string, tableName: string, modalFields?: string[], modalLayout?: BlockConfig["modal_layout"], cascadeContext?: RecordEditorCascadeContext | null, interfaceMode?: "view" | "edit", onRecordDeleted?: () => void, fieldLayout?: FieldLayoutItem[], onLayoutSave?: (layout: FieldLayoutItem[]) => void | Promise<void>, tableFields?: TableField[]) => void
   /** Fetches table supabase_table by id and opens the record in the panel. Use when only tableId + recordId are available (e.g. linked record click). */
   openRecordByTableId: (tableId: string, recordId: string, interfaceMode?: 'view' | 'edit') => Promise<void>
   closeRecord: () => void
@@ -50,6 +52,7 @@ const MAX_WIDTH = 1200
 
 export function RecordPanelProvider({ children }: { children: ReactNode }) {
   const { setSelectedContext } = useSelectionContext()
+  const { setData: setRightPanelData } = useRightSettingsPanelData()
   const [state, setState] = useState<RecordPanelState>({
     isOpen: false,
     tableId: null,
@@ -71,7 +74,9 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
     cascadeContext?: RecordEditorCascadeContext | null,
     interfaceMode?: "view" | "edit",
     onRecordDeleted?: () => void,
-    fieldLayout?: FieldLayoutItem[]
+    fieldLayout?: FieldLayoutItem[],
+    onLayoutSave?: (layout: FieldLayoutItem[]) => void | Promise<void>,
+    tableFields?: TableField[]
   ) => {
     if (process.env.NODE_ENV === "development" && cascadeContext === undefined) {
       console.warn("[RecordPanel] Opened without cascadeContext; block-level permissions will not be enforced.")
@@ -94,7 +99,16 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
           ? prev.history
           : [...prev.history, { tableId, recordId, tableName }],
     }))
-  }, [setSelectedContext])
+    // Populate RightSettingsPanel so record layout settings show next to the panel (Airtable-style)
+    const layout = fieldLayout ?? []
+    setRightPanelData({
+      recordId,
+      recordTableId: tableId,
+      fieldLayout: layout,
+      onLayoutSave: onLayoutSave ?? null,
+      tableFields: tableFields ?? [],
+    })
+  }, [setSelectedContext, setRightPanelData])
 
   const closeRecord = useCallback(() => {
     setSelectedContext(null)
@@ -103,7 +117,8 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
       isOpen: false,
       // Keep history for potential re-opening
     }))
-  }, [setSelectedContext])
+    setRightPanelData({ recordId: null, recordTableId: null, fieldLayout: [], onLayoutSave: null, tableFields: [] })
+  }, [setSelectedContext, setRightPanelData])
 
   const setWidth = useCallback((width: number) => {
     const clampedWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, width))
