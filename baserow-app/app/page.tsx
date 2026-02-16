@@ -76,7 +76,8 @@ export default async function HomePage({
     // If it returns a pageId, the page exists and user has access
     // We should redirect to it - even if it fails to render, that's a separate issue
     if (pageId) {
-      // Log the redirect decision
+      // Log the redirect decision (server-side - appears in terminal)
+      console.log('[Redirect] app/page.tsx redirecting to /pages/' + pageId, { reason })
       if (isDev) {
         console.log('[Default Page] ✓ Redirecting to resolved page:', { 
           reason, 
@@ -93,6 +94,7 @@ export default async function HomePage({
     // No default page resolved - fallback to first accessible page
     if (accessiblePages.length > 0) {
       const firstPageId = accessiblePages[0].id
+      console.log('[Redirect] app/page.tsx redirecting to first accessible /pages/' + firstPageId)
       if (isDev) {
         console.log('[Default Page] No default set, using first accessible page:', { 
           reason: 'first_accessible_fallback', 

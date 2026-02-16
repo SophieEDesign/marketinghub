@@ -17,7 +17,8 @@ export default async function InterfacePage({
   // First check if it's a new system page (interface_pages table)
   const newPage = await getInterfacePage(pageId)
   if (newPage) {
-    // Redirect to canonical route
+    // Redirect to canonical route (old /interface/xxx -> /pages/xxx)
+    console.log('[Redirect] app/interface/[pageId] redirecting to canonical /pages/' + pageId)
     redirect(`/pages/${pageId}`)
   }
 
@@ -30,6 +31,7 @@ export default async function InterfacePage({
     .maybeSingle()
 
   if (!view) {
+    console.log('[Redirect] app/interface/[pageId] page not found, redirecting to /')
     redirect('/')
   }
 

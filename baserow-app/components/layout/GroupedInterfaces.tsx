@@ -882,7 +882,9 @@ export default function GroupedInterfaces({
         )}
         onClick={(e) => {
           const currentPageId = pathname.match(/\/pages\/([^/]+)/)?.[1] ?? null
-          console.log("Sidebar click:", page.id, "current:", currentPageId)
+          const targetPageId = page.id
+          console.log("Sidebar click:", targetPageId, "current:", currentPageId)
+          console.log("Calling router.push:", `/pages/${targetPageId}`)
           const debugEnabled = typeof window !== "undefined" && localStorage.getItem("DEBUG_NAVIGATION") === "1"
           const isCurrentlyActive = pathname === targetPath
           
@@ -906,17 +908,18 @@ export default function GroupedInterfaces({
             // Prevent default Link behavior and manually refresh
             e.preventDefault()
             e.stopPropagation()
-            // Use router.refresh() to reload server components
             router.refresh()
             return
           }
           
-          // For different pages, let Next.js Link handle navigation normally
-          // Only stop propagation to prevent parent handlers from interfering
+          // For different pages: use router.push explicitly to ensure navigation completes
+          // (Link default behavior can be blocked by overlays or event propagation)
+          e.preventDefault()
           e.stopPropagation()
+          router.push(`/pages/${targetPageId}`)
           
           if (debugEnabled) {
-            console.log("[NavigationPage] Navigation allowed - letting Next.js Link handle it")
+            console.log("[NavigationPage] router.push called for:", targetPath)
           }
         }}
         style={{ color: sidebarTextColor }}
@@ -1017,9 +1020,11 @@ export default function GroupedInterfaces({
               } : { color: sidebarTextColor }}
               onClick={(e) => {
                 const currentPageId = pathname.match(/\/pages\/([^/]+)/)?.[1] ?? null
-                console.log("Sidebar click:", page.id, "current:", currentPageId)
+                const targetPageId = page.id
+                console.log("Sidebar click:", targetPageId, "current:", currentPageId)
+                console.log("Calling router.push:", `/pages/${targetPageId}`)
                 const debugEnabled = typeof window !== "undefined" && localStorage.getItem("DEBUG_NAVIGATION") === "1"
-                const targetPath = `/pages/${page.id}`
+                const targetPath = `/pages/${targetPageId}`
                 const isCurrentlyActive = pathname === targetPath
                 
                 if (debugEnabled) {
@@ -1048,19 +1053,24 @@ export default function GroupedInterfaces({
                   return
                 }
                 
-                // If clicking the same page, force a refresh (but don't block navigation)
+                // If clicking the same page, force a refresh
                 if (isCurrentlyActive) {
                   if (debugEnabled) {
                     console.log("[Sidebar Link] Already on this page - refreshing data")
                   }
-                  // Don't prevent default - let Link handle it, but also refresh
-                  // Next.js Link won't navigate if already on page, so refresh is safe
+                  e.preventDefault()
+                  e.stopPropagation()
                   router.refresh()
-                  // Continue - don't return, let Link handle the click
+                  return
                 }
                 
+                // For different pages: use router.push explicitly to ensure navigation completes
+                e.preventDefault()
+                e.stopPropagation()
+                router.push(`/pages/${targetPageId}`)
+                
                 if (debugEnabled) {
-                  console.log("[Sidebar Link] Navigation allowed - letting Next.js Link handle it")
+                  console.log("[Sidebar Link] router.push called for:", targetPath)
                 }
               }}
             >

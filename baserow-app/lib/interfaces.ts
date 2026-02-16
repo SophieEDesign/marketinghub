@@ -325,6 +325,7 @@ export async function resolveLandingPage(): Promise<{ pageId: string | null; rea
       const validation = await validatePageAccess(userDefaultPageId, userIsAdmin)
       
       if (validation.valid) {
+        console.log('[resolveLandingPage] returning user_default:', userDefaultPageId)
         if (isDev) {
           console.log('[Landing Page] Using user default page:', userDefaultPageId)
         }
@@ -391,6 +392,7 @@ export async function resolveLandingPage(): Promise<{ pageId: string | null; rea
       }
       
       if (validation.valid) {
+        console.log('[resolveLandingPage] returning workspace_default:', workspaceDefaultPageId)
         if (isDev) {
           console.log('[Landing Page] ✓ Using workspace default page:', workspaceDefaultPageId)
         }
@@ -451,6 +453,7 @@ export async function resolveLandingPage(): Promise<{ pageId: string | null; rea
       // Ignore errors checking workspace settings
     }
     
+    console.log('[resolveLandingPage] returning first_accessible:', accessiblePages[0].id)
     if (isDev) {
       console.log('[Landing Page] Using first accessible page:', accessiblePages[0].id, '(fallback)')
     }
@@ -468,6 +471,7 @@ export async function resolveLandingPage(): Promise<{ pageId: string | null; rea
       .limit(1)
     
     if (anyPages && anyPages.length > 0) {
+      console.log('[resolveLandingPage] returning first_page_fallback:', anyPages[0].id)
       if (isDev) {
         console.log('[Landing Page] Using first page (any):', anyPages[0].id, '(final fallback)')
       }

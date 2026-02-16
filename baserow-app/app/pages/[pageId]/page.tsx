@@ -100,8 +100,11 @@ export default async function PagePage({
   }
 
   // ALWAYS render - never redirect away from explicitly requested page
-  // CRITICAL: Only redirect if page doesn't exist or is not accessible
+  // CRITICAL: No redirect when page is null (not found / access denied) - render InterfacePageClient with null
   // DO NOT redirect on render errors (missing blocks, data errors, etc.)
+  if (isDev && !page) {
+    console.log('[Page Render] Rendering with null page (not found or access denied) - NO redirect')
+  }
   // Those should be shown on the page itself
   // NOTE: record_view and record_review intentionally share the same shell.
   // They differ only by left-column configuration and settings UX.
