@@ -37,151 +37,17 @@ import BlockAppearanceWrapper from "./BlockAppearanceWrapper"
 import RecordPreviewSurface from "./record-preview/RecordPreviewSurface"
 import { ErrorBoundary } from "./ErrorBoundary"
 import type { PageBlock, LayoutItem, BlockType, RecordContext } from "@/lib/interface/types"
+import { CanvasDragGhostOverlay, CanvasAlignmentOverlay, CanvasSnapGuideOverlay } from "./CanvasOverlays"
 import { getBlockDefinition } from "@/lib/interface/registry"
 import { useFilterState } from "@/lib/interface/filter-state"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import { dbBlockToPageBlock } from "@/lib/interface/layout-mapping"
 import { CANVAS_LAYOUT_DEFAULTS } from "@/lib/interface/canvas-layout-defaults"
 import { debugLog, debugWarn, isDebugEnabled } from "@/lib/interface/debug-flags"
+import { debugLog as devLog, debugWarn as devWarn, debugError as devError } from "@/lib/debug"
 import { usePageAggregates } from "@/lib/dashboard/usePageAggregates"
 
 const ResponsiveGridLayout = WidthProvider(Responsive)
-
-function CanvasDragGhostOverlay({
-  dragGhost,
-  layoutSettings,
-  containerWidth,
-}: {
-  dragGhost: { x: number; y: number; w: number; h: number }
-  layoutSettings?: { cols?: number; rowHeight?: number; margin?: [number, number] }
-  containerWidth: number
-}) {
-  const cols = layoutSettings?.cols || 12
-  const rowHeight = layoutSettings?.rowHeight || 30
-  const margin = layoutSettings?.margin || [10, 10]
-  const colWidth = (containerWidth - (margin[0] * (cols + 1))) / cols
-  const xPosition = dragGhost.x * colWidth + dragGhost.x * margin[0] + margin[0]
-  const yPosition = dragGhost.y * rowHeight + dragGhost.y * margin[1] + margin[1]
-  const width = dragGhost.w * colWidth + (dragGhost.w - 1) * margin[0]
-  const height = dragGhost.h * rowHeight + (dragGhost.h - 1) * margin[1]
-  return (
-    <div
-      className="absolute pointer-events-none z-40 border-2 border-blue-400 bg-blue-50/30 rounded-lg transition-all duration-150"
-      style={{
-        left: `${xPosition}px`,
-        top: `${yPosition}px`,
-        width: `${width}px`,
-        height: `${height}px`,
-      }}
-    />
-  )
-}
-
-function CanvasAlignmentOverlay({
-  layout,
-  layoutSettings,
-  draggedBlockId,
-  containerWidth,
-}: {
-  layout: LayoutItem[]
-  layoutSettings?: { cols?: number; rowHeight?: number; margin?: [number, number] }
-  draggedBlockId: string | null
-  containerWidth: number
-}) {
-  if (!draggedBlockId) return null
-  const draggedBlock = layout.find((l) => l.i === draggedBlockId)
-  if (!draggedBlock) return null
-
-  const cols = layoutSettings?.cols || 12
-  const rowHeight = layoutSettings?.rowHeight || 30
-  const margin = layoutSettings?.margin || [10, 10]
-  const colWidth = (containerWidth - (margin[0] * (cols + 1))) / cols
-
-  const alignedBlocks: Array<{ blockId: string; x?: number; y?: number; type: 'vertical' | 'horizontal' }> = []
-  layout.forEach((otherBlock) => {
-    if (otherBlock.i === draggedBlockId) return
-    const draggedX = draggedBlock.x || 0
-    const draggedY = draggedBlock.y || 0
-    const otherX = otherBlock.x || 0
-    const otherY = otherBlock.y || 0
-    if (
-      Math.abs(draggedX - otherX) < 0.5 ||
-      Math.abs((draggedX + (draggedBlock.w || 4)) - (otherX + (otherBlock.w || 4))) < 0.5
-    ) {
-      alignedBlocks.push({ blockId: otherBlock.i, x: otherX, type: 'vertical' })
-    }
-    if (
-      Math.abs(draggedY - otherY) < 0.5 ||
-      Math.abs((draggedY + (draggedBlock.h || 4)) - (otherY + (otherBlock.h || 4))) < 0.5
-    ) {
-      alignedBlocks.push({ blockId: otherBlock.i, y: otherY, type: 'horizontal' })
-    }
-  })
-
-  return (
-    <div className="absolute inset-0 pointer-events-none z-40">
-      {alignedBlocks.map((aligned, idx) => {
-        if (aligned.type === 'vertical' && aligned.x !== undefined) {
-          const xPosition = aligned.x * colWidth + aligned.x * margin[0] + margin[0]
-          return (
-            <div
-              key={`align-v-${aligned.blockId}-${idx}`}
-              className="absolute top-0 bottom-0 w-px bg-green-400 opacity-40"
-              style={{ left: `${xPosition}px` }}
-            />
-          )
-        }
-        if (aligned.type === 'horizontal' && aligned.y !== undefined) {
-          const yPosition = aligned.y * rowHeight + aligned.y * margin[1] + margin[1]
-          return (
-            <div
-              key={`align-h-${aligned.blockId}-${idx}`}
-              className="absolute left-0 right-0 h-px bg-green-400 opacity-40"
-              style={{ top: `${yPosition}px` }}
-            />
-          )
-        }
-        return null
-      })}
-    </div>
-  )
-}
-
-function CanvasSnapGuideOverlay({
-  activeSnapTargets,
-  layoutSettings,
-  containerWidth,
-}: {
-  activeSnapTargets: { vertical?: { x: number }; horizontal?: { y: number } }
-  layoutSettings?: { cols?: number; rowHeight?: number; margin?: [number, number] }
-  containerWidth: number
-}) {
-  const cols = layoutSettings?.cols || 12
-  const rowHeight = layoutSettings?.rowHeight || 30
-  const margin = layoutSettings?.margin || [10, 10]
-  const colWidth = (containerWidth - (margin[0] * (cols + 1))) / cols
-  return (
-    <div className="absolute inset-0 pointer-events-none z-50">
-      {activeSnapTargets.vertical && (
-        <div
-          className="absolute top-0 bottom-0 w-0.5 bg-blue-500 opacity-60 transition-opacity duration-150"
-          style={{
-            left: `${(activeSnapTargets.vertical.x || 0) * colWidth + (activeSnapTargets.vertical.x || 0) * margin[0] + margin[0]}px`,
-            transform: 'translateX(-50%)',
-          }}
-        />
-      )}
-      {activeSnapTargets.horizontal && (
-        <div
-          className="absolute left-0 right-0 h-0.5 bg-blue-500 opacity-60 transition-opacity duration-150"
-          style={{
-            top: `${(activeSnapTargets.horizontal.y || 0) * rowHeight + (activeSnapTargets.horizontal.y || 0) * margin[1] + margin[1]}px`,
-          }}
-        />
-      )}
-    </div>
-  )
-}
 
 interface CanvasProps {
   blocks: PageBlock[]
@@ -418,16 +284,12 @@ export default function Canvas({
 
   // Dev assertion: verify edit mode toggle does NOT cause Canvas remount
   useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[Canvas] mode:', isEditing)
-    }
+    devLog('[Canvas] mode:', isEditing)
   }, [isEditing])
 
   useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[Canvas] Mounted')
-      return () => console.log('[Canvas] Unmounting')
-    }
+    devLog('[Canvas] Mounted')
+    return () => devLog('[Canvas] Unmounting')
   }, [])
   
   // CRITICAL: Convert pixels to grid units (React Grid Layout height includes margins)
@@ -474,12 +336,10 @@ export default function Canvas({
     // Increment layout version to prevent stale sync overwrites
     layoutVersionRef.current += 1
     
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[Canvas] User layout change persisted', {
-        version: layoutVersionRef.current,
-        blockCount: newLayout.length,
-      })
-    }
+    devLog('[Canvas] User layout change persisted', {
+      version: layoutVersionRef.current,
+      blockCount: newLayout.length,
+    })
     
     // Update local state
     setLayout(newLayout)
@@ -520,7 +380,7 @@ export default function Canvas({
     const deltaChange = deltaH - previousDelta
     
     if (process.env.NODE_ENV === 'development') {
-      console.log('[Canvas] Ephemeral height delta', {
+      devLog('[Canvas] Ephemeral height delta', {
         blockId,
         deltaPx,
         deltaH,
@@ -539,14 +399,14 @@ export default function Canvas({
         // Block expanding - push blocks below down using the change in delta
         const updatedLayout = pushBlocksDown(currentLayout, blockId, deltaChange)
         if (process.env.NODE_ENV === 'development') {
-          console.log('[Canvas] Pushed blocks down after ephemeral expand', { blockId, deltaChange })
+          devLog('[Canvas] Pushed blocks down after ephemeral expand', { blockId, deltaChange })
         }
         return updatedLayout
       } else if (isCollapsing) {
         // Block collapsing - compact vertically
         const compactedLayout = compactLayoutVertically(currentLayout, blocks)
         if (process.env.NODE_ENV === 'development') {
-          console.log('[Canvas] Compacted layout after ephemeral collapse', { blockId, deltaH })
+          devLog('[Canvas] Compacted layout after ephemeral collapse', { blockId, deltaH })
         }
         return compactedLayout
       }
@@ -561,13 +421,13 @@ export default function Canvas({
     // Ignore if user is manually resizing or dragging
     if (currentlyResizingBlockIdRef.current === blockId) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('[Canvas] Ignored ephemeral delta - user resizing', { blockId })
+        devLog('[Canvas] Ignored ephemeral delta - user resizing', { blockId })
       }
       return
     }
     if (currentlyDraggingBlockIdRef.current === blockId) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('[Canvas] Ignored ephemeral delta - user dragging', { blockId })
+        devLog('[Canvas] Ignored ephemeral delta - user dragging', { blockId })
       }
       return
     }
@@ -582,10 +442,10 @@ export default function Canvas({
     if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
       // @ts-expect-error - Dev utility
       window.resetCanvasHeights = async () => {
-        console.log('[Canvas] PHASE 4: Resetting layout heights for all blocks...')
+        devLog('[Canvas] PHASE 4: Resetting layout heights for all blocks...')
         
         if (!pageId) {
-          console.error('[Canvas] Cannot reset heights: pageId is required')
+          devError('[Canvas] Cannot reset heights: pageId is required')
           return
         }
         
@@ -604,14 +464,14 @@ export default function Canvas({
           }
           
           const result = await response.json()
-          console.log('[Canvas] Heights reset complete:', result)
-          console.log('[Canvas] Refreshing page to see changes...')
+          devLog('[Canvas] Heights reset complete:', result)
+          devLog('[Canvas] Refreshing page to see changes...')
           
           // Reload page to see the reset take effect
           window.location.reload()
         } catch (error) {
-          console.error('[Canvas] Error resetting heights:', error)
-          console.log('[Canvas] Falling back to manual reset via layout update...')
+          devError('[Canvas] Error resetting heights:', error)
+          devLog('[Canvas] Falling back to manual reset via layout update...')
           
           // Fallback: Update layout with default heights (4) and let content re-measure
           if (onLayoutChange) {
@@ -624,7 +484,7 @@ export default function Canvas({
             }))
             
             onLayoutChange(resetLayout)
-            console.log('[Canvas] Layout updated with default heights. Content will re-measure.')
+            devLog('[Canvas] Layout updated with default heights. Content will re-measure.')
           }
         }
       }
@@ -712,7 +572,7 @@ export default function Canvas({
   useEffect(() => {
     // #region agent log
     if (process.env.NODE_ENV === 'development') {
-      console.log('[Canvas] Layout sync effect RUN', { blocksLen: blocks.length, layoutLen: layout.length, pageId })
+      devLog('[Canvas] Layout sync effect RUN', { blocksLen: blocks.length, layoutLen: layout.length, pageId })
     }
     // #endregion
     // Don't sync if no blocks
@@ -769,7 +629,7 @@ export default function Canvas({
     if (shouldSync) {
       // #region agent log
       if (process.env.NODE_ENV === 'development') {
-        console.log('[Canvas] Layout sync calling setLayout', { blocksLen: blocks.length, pageId })
+        devLog('[Canvas] Layout sync calling setLayout', { blocksLen: blocks.length, pageId })
       }
       // #endregion
       // Hydrate from blocks prop - always use persistent h from DB
@@ -1201,7 +1061,7 @@ export default function Canvas({
     }
     
     if (process.env.NODE_ENV === 'development') {
-      console.log('[Canvas] Applying smart snap', {
+      devLog('[Canvas] Applying smart snap', {
         blockId: draggedBlock.i,
         dragVector,
         layoutCount: allLayout.length,
@@ -1212,7 +1072,7 @@ export default function Canvas({
     const cornerSnapped = applyCornerSnap(persistentDraggedBlock, persistentLayout, dragVector, cols)
     if (cornerSnapped) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('[Canvas] Applied corner snap', {
+        devLog('[Canvas] Applied corner snap', {
           blockId: draggedBlock.i,
           originalPos: { x: draggedBlock.x, y: draggedBlock.y },
           snappedPos: { x: cornerSnapped.x, y: cornerSnapped.y },
@@ -1236,7 +1096,7 @@ export default function Canvas({
       const verticalSnapped = applyVerticalSnap(persistentDraggedBlock, persistentLayout)
       if (verticalSnapped) {
         if (process.env.NODE_ENV === 'development') {
-          console.log('[Canvas] Applied vertical snap', {
+          devLog('[Canvas] Applied vertical snap', {
             blockId: draggedBlock.i,
             originalY: draggedBlock.y,
             snappedY: verticalSnapped.y,
@@ -1254,7 +1114,7 @@ export default function Canvas({
       const horizontalSnapped = applyHorizontalSnap(persistentDraggedBlock, persistentLayout, dragVector, cols)
       if (horizontalSnapped) {
         if (process.env.NODE_ENV === 'development') {
-          console.log('[Canvas] Applied horizontal snap (fallback)', {
+          devLog('[Canvas] Applied horizontal snap (fallback)', {
             blockId: draggedBlock.i,
             originalX: draggedBlock.x,
             snappedX: horizontalSnapped.x,
@@ -1272,7 +1132,7 @@ export default function Canvas({
       const horizontalSnapped = applyHorizontalSnap(persistentDraggedBlock, persistentLayout, dragVector, cols)
       if (horizontalSnapped) {
         if (process.env.NODE_ENV === 'development') {
-          console.log('[Canvas] Applied horizontal snap', {
+          devLog('[Canvas] Applied horizontal snap', {
             blockId: draggedBlock.i,
             originalX: draggedBlock.x,
             snappedX: horizontalSnapped.x,
@@ -1290,7 +1150,7 @@ export default function Canvas({
       const verticalSnapped = applyVerticalSnap(persistentDraggedBlock, persistentLayout)
       if (verticalSnapped) {
         if (process.env.NODE_ENV === 'development') {
-          console.log('[Canvas] Applied vertical snap', {
+          devLog('[Canvas] Applied vertical snap', {
             blockId: draggedBlock.i,
             originalY: draggedBlock.y,
             snappedY: verticalSnapped.y,
@@ -1307,7 +1167,7 @@ export default function Canvas({
     
     // No snap available - return original position
     if (process.env.NODE_ENV === 'development') {
-      console.log('[Canvas] No snap available', { blockId: draggedBlock.i })
+      devLog('[Canvas] No snap available', { blockId: draggedBlock.i })
     }
     // Vertical compaction will be applied separately if needed
     return draggedBlock
@@ -1577,7 +1437,7 @@ export default function Canvas({
     (newLayout: Layout[]) => {
       // #region agent log
       if (process.env.NODE_ENV === 'development') {
-        console.log('[Canvas] handleLayoutChange called', { layoutLen: newLayout?.length, isEditing })
+        devLog('[Canvas] handleLayoutChange called', { layoutLen: newLayout?.length, isEditing })
       }
       // #endregion
       // Ignore when not in edit mode
@@ -1665,14 +1525,14 @@ export default function Canvas({
   useEffect(() => {
     // #region agent log
     if (process.env.NODE_ENV === 'development') {
-      console.log('[Canvas] Block-deleted effect RUN', { blocksLen: blocks.length, layoutLen: layout.length, prevCount: previousBlockCountRef.current, isEditing })
+      devLog('[Canvas] Block-deleted effect RUN', { blocksLen: blocks.length, layoutLen: layout.length, prevCount: previousBlockCountRef.current, isEditing })
     }
     // #endregion
     const blockCountDecreased = blocks.length < previousBlockCountRef.current
     
     if (blockCountDecreased && isEditing && layout.length > 0) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('[Canvas] Block deleted - compacting layout', {
+        devLog('[Canvas] Block deleted - compacting layout', {
           previousCount: previousBlockCountRef.current,
           currentCount: blocks.length,
         })
@@ -1980,7 +1840,7 @@ export default function Canvas({
     fullPageBlock?.type === "record_context" &&
     fullPageDef?.fullPageLayout !== "rail"
   ) {
-    console.warn("[Canvas] record_context must use rail layout")
+    devWarn("[Canvas] record_context must use rail layout")
   }
 
   return (
@@ -2066,7 +1926,7 @@ export default function Canvas({
               const cols = layoutSettings?.cols || 12
               
               if (process.env.NODE_ENV === 'development') {
-                console.log('[Canvas] Resize stopped - persisting user layout change', {
+                devLog('[Canvas] Resize stopped - persisting user layout change', {
                   blockId,
                   previousHeight,
                   newHeight,
@@ -2105,7 +1965,7 @@ export default function Canvas({
               
               if (process.env.NODE_ENV === 'development') {
                 if (clampedX !== blockX || clampedW !== blockW) {
-                  console.log('[Canvas] Clamped resize bounds', {
+                  devLog('[Canvas] Clamped resize bounds', {
                     blockId,
                     original: { x: blockX, w: blockW },
                     clamped: { x: clampedX, w: clampedW },
@@ -2134,13 +1994,13 @@ export default function Canvas({
                 // Block grew - push blocks below down to make room
                 finalLayout = pushBlocksDown(finalLayout, blockId, 0) // No ephemeral delta for manual resize
                 if (process.env.NODE_ENV === 'development') {
-                  console.log('[Canvas] Pushed blocks down after resize grow', { blockId, newHeight })
+                  devLog('[Canvas] Pushed blocks down after resize grow', { blockId, newHeight })
                 }
               } else if (newHeight < previousHeight) {
                 // Block shrunk - compact vertically to close gaps (stacks close gaps)
                 finalLayout = compactLayoutVertically(finalLayout, blocks)
                 if (process.env.NODE_ENV === 'development') {
-                  console.log('[Canvas] Compacted layout after resize shrink', { blockId, newHeight })
+                  devLog('[Canvas] Compacted layout after resize shrink', { blockId, newHeight })
                 }
               }
               
@@ -2150,7 +2010,7 @@ export default function Canvas({
               // Clear resize tracking
               currentlyResizingBlockIdRef.current = null
             } catch (error) {
-              console.error('[Canvas] Error in onResizeStop:', error)
+              devError('[Canvas] Error in onResizeStop:', error)
               currentlyResizingBlockIdRef.current = null
             }
           }}
@@ -2374,7 +2234,7 @@ export default function Canvas({
               )
               
               if (process.env.NODE_ENV === 'development') {
-                console.log('[Canvas] Snapping applied after drag', {
+                devLog('[Canvas] Snapping applied after drag', {
                   blockId,
                   originalPos: { x: draggedBlock.x, y: draggedBlock.y },
                   snappedPos: { x: snappedBlock.x, y: snappedBlock.y },
@@ -2392,7 +2252,7 @@ export default function Canvas({
             finalLayout = compactLayoutVertically(persistentLayoutForCompaction, blocks)
             
             if (process.env.NODE_ENV === 'development') {
-              console.log('[Canvas] Compacted layout after drag', { 
+              devLog('[Canvas] Compacted layout after drag', { 
                 blockId,
                 layoutChanged: finalLayout.some((item, idx) => {
                   const original = persistentLayoutForCompaction[idx]
@@ -2569,8 +2429,14 @@ export default function Canvas({
             </div>
             
             {/* Block Content - ALWAYS visible; never conditional on isEditing. No transition/willChange - immediate paint. */}
+            {/* overflow-hidden in both modes for most blocks: prevents layout shift; filter/text get special handling */}
             <div
-              className={`block-content h-full w-full min-h-0 rounded-lg ${block.config?.locked ? 'pointer-events-none opacity-75' : ''} ${block.type === 'field' ? 'overflow-visible' : isEditing ? 'overflow-hidden' : 'overflow-auto'}`}
+              className={`block-content h-full w-full min-h-0 rounded-lg ${block.config?.locked ? 'pointer-events-none opacity-75' : ''} ${
+                block.type === 'field' ? 'overflow-visible' :
+                block.type === 'filter' ? 'overflow-hidden' :
+                block.type === 'text' ? 'overflow-auto' :
+                'overflow-hidden'
+              }`}
               data-block-id={block.id}
             >
               {isFullPageMode && fullPageBlock && block.id === fullPageBlock.id ? (
@@ -2697,8 +2563,7 @@ export default function Canvas({
               )}
             </div>
           </div>
-            )
-          })}
+        )})}
         </ResponsiveGridLayout>
         </div>
       </div>

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"
+import { useInterfaceBuilderSelection } from "./useInterfaceBuilderSelection"
 import { useUndoRedo } from "@/hooks/useUndoRedo"
 import { Save, Eye, Edit2, Plus, Trash2, Settings, MoreVertical, Undo2, Redo2 } from "lucide-react"
 import { useBranding } from "@/contexts/BrandingContext"
@@ -36,6 +37,7 @@ import SaveStatusIndicator from "@/components/save-status/SaveStatusIndicator"
 import { createClient } from "@/lib/supabase/client"
 import type { FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
+import { debugLog, debugError } from "@/lib/debug"
 
 function isBlockEligibleForFullPage(block: PageBlock): boolean {
   if (!block.config?.is_full_page) return false
@@ -170,7 +172,7 @@ export default function InterfaceBuilder({
       (blocks.length === 0 && initialBlocks.length > 0)
 
     if (shouldInit) {
-      console.log(`[InterfaceBuilder] First-time initialization (one-way gate): pageId=${page.id}`, {
+      debugLog(`[InterfaceBuilder] First-time initialization (one-way gate): pageId=${page.id}`, {
         initialBlocksCount: initialBlocks.length,
         initialBlockIds: initialBlocks.map(b => b.id),
         isEmpty: initialBlocks.length === 0,
@@ -194,14 +196,15 @@ export default function InterfaceBuilder({
     // This prevents the "edit vs publish" drift issue
   }, [page.id, initialBlocks?.length, blocks.length])
 
-  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
-  const [selectedBlockIds, setSelectedBlockIds] = useState<Set<string>>(new Set())
-  // Track which block should open a record in edit mode: { blockId, recordId, tableId }
-  const [openRecordInEditModeForBlock, setOpenRecordInEditModeForBlock] = useState<{
-    blockId: string
-    recordId: string
-    tableId: string
-  } | null>(null)
+  const {
+    selectedBlockId,
+    selectedBlockIds,
+    openRecordInEditModeForBlock,
+    setSelectedBlockId,
+    setSelectedBlockIds,
+    setOpenRecordInEditModeForBlock,
+    clearSelection: clearSelectionState,
+  } = useInterfaceBuilderSelection()
 
   // Callback to open a record in edit mode for layout editing
   const handleOpenRecordForLayoutEdit = useCallback(async (tableId: string): Promise<string | null> => {
@@ -300,22 +303,22 @@ export default function InterfaceBuilder({
   // Register mount time for editor safety guards
   useEffect(() => {
     registerMount(componentIdRef.current)
-    console.log(`[Lifecycle] InterfaceBuilder MOUNT: pageId=${page.id}, blocks=${initialBlocks?.length || 0}, isViewer=${isViewer}, effectiveIsEditing=${effectiveIsEditing}`)
+    debugLog(`[Lifecycle] InterfaceBuilder MOUNT: pageId=${page.id}, blocks=${initialBlocks?.length || 0}, isViewer=${isViewer}, effectiveIsEditing=${effectiveIsEditing}`)
     return () => {
-      console.log(`[Lifecycle] InterfaceBuilder UNMOUNT: pageId=${page.id}`)
+      debugLog(`[Lifecycle] InterfaceBuilder UNMOUNT: pageId=${page.id}`)
     }
   }, [])
   // #region agent log – page-level remount (if "InterfaceBuilder mount" logs repeatedly, page-level remount)
   useEffect(() => {
-    console.log("InterfaceBuilder mount")
-    return () => { console.log("InterfaceBuilder unmount") }
+    debugLog("InterfaceBuilder mount")
+    return () => { debugLog("InterfaceBuilder unmount") }
   }, [])
   // #endregion
   
   // Debug: Log when blocks state changes
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
-      console.log(`[InterfaceBuilder] Blocks state changed: count=${blocks.length}, effectiveIsEditing=${effectiveIsEditing}`)
+      debugLog(`[InterfaceBuilder] Blocks state changed: count=${blocks.length}, effectiveIsEditing=${effectiveIsEditing}`)
     }
   }, [blocks.length, effectiveIsEditing])
 
@@ -376,7 +379,7 @@ export default function InterfaceBuilder({
 
       // PHASE 1 - Layout write verification: Log before save (client)
       if (process.env.NODE_ENV === 'development') {
-        console.log(`[Layout Write] BEFORE SAVE (client)`, {
+        debugLog(`[Layout Write] BEFORE SAVE (client)`, {
           pageId: page.id,
           layout,
           layoutItems: layout.map(item => ({
@@ -393,7 +396,7 @@ export default function InterfaceBuilder({
       try {
         // PHASE 1 - Layout write verification: Log API payload
         if (process.env.NODE_ENV === 'development') {
-          console.log(`[Layout Write] API PAYLOAD`, {
+          debugLog(`[Layout Write] API PAYLOAD`, {
             pageId: page.id,
             payload: { layout },
             layoutItems: layout.map(item => ({
@@ -417,7 +420,7 @@ export default function InterfaceBuilder({
           
           // PHASE 1 - Layout write verification: Log API response
           if (process.env.NODE_ENV === 'development') {
-            console.log(`[Layout Write] API RESPONSE`, {
+            debugLog(`[Layout Write] API RESPONSE`, {
               pageId: page.id,
               responseData,
               success: response.ok,
@@ -434,7 +437,7 @@ export default function InterfaceBuilder({
           // Only reload on explicit refresh, page change, or data change
           // Only log in dev mode to reduce console noise
           if (process.env.NODE_ENV === 'development') {
-            console.log('🔥 saveLayout COMPLETE – not reloading (blocks already correct)')
+            debugLog('🔥 saveLayout COMPLETE – not reloading (blocks already correct)')
           }
           
           // Show success feedback briefly, then reset to idle
@@ -445,7 +448,7 @@ export default function InterfaceBuilder({
           throw new Error(error || "Failed to save layout")
         }
       } catch (error: any) {
-        console.error("Failed to save layout:", error)
+        debugError("Failed to save layout:", error)
         setSaveStatus("error")
         toast({
           variant: "destructive",
@@ -555,7 +558,7 @@ export default function InterfaceBuilder({
       setIsSaving(true)
       try {
         if (process.env.NODE_ENV === 'development') {
-          console.log('[Layout] Saving layout (from grid ref):', {
+          debugLog('[Layout] Saving layout (from grid ref):', {
             pageId: page.id,
             layoutCount: layoutToSave.length,
             layoutItems: layoutToSave,
@@ -576,7 +579,7 @@ export default function InterfaceBuilder({
         }
         
         if (process.env.NODE_ENV === 'development') {
-          console.log('[Layout] Layout saved successfully')
+          debugLog('[Layout] Layout saved successfully')
         }
         
         setSaveStatus("saved")
@@ -591,7 +594,7 @@ export default function InterfaceBuilder({
           setTimeout(() => setSaveStatus("idle"), 2000)
         }
       } catch (error) {
-        console.error("Failed to save layout:", error)
+        debugError("Failed to save layout:", error)
         setSaveStatus("error")
         // Don't exit if save failed
         return
@@ -599,16 +602,16 @@ export default function InterfaceBuilder({
         setIsSaving(false)
       }
     } else if (process.env.NODE_ENV === 'development') {
-      console.log('[Layout] No layout to save (grid ref is empty)')
+      debugLog('[Layout] No layout to save (grid ref is empty)')
     }
 
     // Exit edit mode if requested
     if (exitAfterSave) {
       exitBlockEdit()
-      setSelectedBlockId(null)
+      clearSelectionState()
       setSelectedContext(null)
     }
-  }, [saveLayout, page.id, toast, exitBlockEdit, setSelectedContext])
+  }, [saveLayout, page.id, toast, exitBlockEdit, clearSelectionState, setSelectedContext])
 
   // Save layout and exit edit mode
   const handleExitEditMode = useCallback(async () => {
@@ -632,7 +635,7 @@ export default function InterfaceBuilder({
       
       if (layoutToSave && layoutToSave.length > 0) {
         if (process.env.NODE_ENV === 'development') {
-          console.log('[InterfaceBuilder] Auto-saving layout on edit mode exit (from grid ref):', {
+          debugLog('[InterfaceBuilder] Auto-saving layout on edit mode exit (from grid ref):', {
             pageId: page.id,
             layoutCount: layoutToSave.length,
             layoutItems: layoutToSave.map(item => ({
@@ -662,7 +665,7 @@ export default function InterfaceBuilder({
           }
         })
       } else if (process.env.NODE_ENV === 'development') {
-        console.log('[InterfaceBuilder] No layout to auto-save on exit (grid ref is empty)')
+        debugLog('[InterfaceBuilder] No layout to auto-save on exit (grid ref is empty)')
       }
     }
     prevIsEditingRef.current = effectiveIsEditing
@@ -681,7 +684,7 @@ export default function InterfaceBuilder({
     async (blockId: string, configPatch: Partial<PageBlock["config"]>) => {
       // #region agent log
       if (process.env.NODE_ENV === 'development') {
-        console.log('[InterfaceBuilder] handleBlockUpdate called', { blockId, keys: Object.keys(configPatch || {}) })
+        debugLog('[InterfaceBuilder] handleBlockUpdate called', { blockId, keys: Object.keys(configPatch || {}) })
       }
       // #endregion
       // 1) Optimistic in-place update (does not remount TipTap)
@@ -697,7 +700,7 @@ export default function InterfaceBuilder({
 
       // PHASE 1 - TextBlock write verification: Log API payload
       if (process.env.NODE_ENV === 'development' && (configPatch as any).content_json) {
-        console.log(`[TextBlock Write] Block ${blockId}: API PAYLOAD`, {
+        debugLog(`[TextBlock Write] Block ${blockId}: API PAYLOAD`, {
           blockId,
           payload: {
             id: blockId,
@@ -722,7 +725,7 @@ export default function InterfaceBuilder({
       // 3) Only recover/reload on error
       if (!res.ok) {
         // Re-sync from server if save failed
-        console.error(`[InterfaceBuilder] Block update failed, reloading from server: blockId=${blockId}`)
+        debugError(`[InterfaceBuilder] Block update failed, reloading from server: blockId=${blockId}`)
         const blocksResponse = await fetch(`/api/pages/${page.id}/blocks`, {
           cache: "no-store",
         })
@@ -757,7 +760,7 @@ export default function InterfaceBuilder({
       // PHASE 1 - TextBlock write verification: Log API response
       if (process.env.NODE_ENV === 'development' && (configPatch as any).content_json) {
         const responseData = await res.json().catch(() => ({}))
-        console.log(`[TextBlock Write] Block ${blockId}: API RESPONSE`, {
+        debugLog(`[TextBlock Write] Block ${blockId}: API RESPONSE`, {
           blockId,
           responseData,
           returnedBlocks: responseData.blocks,
@@ -766,7 +769,7 @@ export default function InterfaceBuilder({
       }
 
       if (process.env.NODE_ENV === 'development') {
-        console.log(`[InterfaceBuilder] Block updated successfully (optimistic): blockId=${blockId}`, {
+        debugLog(`[InterfaceBuilder] Block updated successfully (optimistic): blockId=${blockId}`, {
           pageId: page.id,
           updatedConfig: configPatch,
         })
@@ -952,7 +955,7 @@ export default function InterfaceBuilder({
 
         setBlocks((prev) => prev.filter((b) => b.id !== blockId))
         if (selectedBlockId === blockId) {
-          setSelectedBlockId(null)
+          clearSelectionState()
           setSelectedContext(null)
         }
         toast({
@@ -969,7 +972,7 @@ export default function InterfaceBuilder({
         })
       }
     },
-    [page.id, selectedBlockId, toast]
+    [page.id, selectedBlockId, toast, clearSelectionState, setSelectedContext]
   )
 
   const handleDuplicateBlock = useCallback(
@@ -1353,7 +1356,7 @@ export default function InterfaceBuilder({
 
   // STEP 4: Verification log - confirm stable render, blocks present, edit state consistent
   if (process.env.NODE_ENV === 'development') {
-    console.log("InterfaceBuilder render", { blocks: blocks.length, effectiveIsEditing })
+    debugLog("InterfaceBuilder render", { blocks: blocks.length, effectiveIsEditing })
   }
 
   return (
@@ -1493,10 +1496,10 @@ export default function InterfaceBuilder({
         )}
 
         {/* Canvas - flex flex-col so Canvas (flex-1) fills space */}
-        {/* Full-page: no scroll, no padding. Normal: overflow-auto p-4. */}
+        {/* Full-page: no scroll, no padding. Normal: overflow-y-auto overflow-x-hidden p-4 to prevent horizontal scroll bars */}
         <div
           ref={canvasScrollContainerRef}
-          className={`flex-1 flex flex-col min-w-0 w-full min-h-0 ${fullPageBlockId ? "overflow-hidden p-0" : "overflow-auto p-4"}`}
+          className={`flex-1 flex flex-col min-w-0 w-full min-h-0 ${fullPageBlockId ? "overflow-hidden p-0" : "overflow-y-auto overflow-x-hidden p-4"}`}
         >
           <FilterStateProvider>
             {/* Blocks always render - no conditional visibility. Edit mode changes behaviour only. */}

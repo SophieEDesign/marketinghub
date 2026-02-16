@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef, startTransition } from 'react'
+import useSWR from 'swr'
 import { supabase } from '@/lib/supabase/client'
 import type { TableField } from '@/types/fields'
 import { asArray } from '@/lib/utils/asArray'
@@ -570,18 +571,19 @@ export function useGridData({
           }
         }
         
-        setRows(normalizedRows)
-        return null
+        return normalizedRows
       }
 
       if (typeof window !== 'undefined' && (process.env.NODE_ENV === 'development' || localStorage.getItem('DEBUG_GRID_DATA') === '1')) {
         console.log('[useGridData] Running query...')
       }
-      await runQuery(0)
+      const resultRows = await runQuery(0)
+      if (resultRows) setRows(resultRows)
       if (typeof window !== 'undefined' && (process.env.NODE_ENV === 'development' || localStorage.getItem('DEBUG_GRID_DATA') === '1')) {
         console.log('[useGridData] Query completed successfully')
       }
       clearTimeout(timeoutId)
+      return resultRows ?? undefined
     } catch (err: unknown) {
       clearTimeout(timeoutId)
       if (isAbortError(err)) {
@@ -589,7 +591,7 @@ export function useGridData({
         // Retry once so initial load recovers from spurious aborts (e.g. React Strict Mode, navigation)
         if (!abortRetryScheduledRef.current) {
           abortRetryScheduledRef.current = true
-          setTimeout(() => loadData(), 100)
+          setTimeout(() => mutateRef.current?.(), 100)
         }
         return
       }
@@ -610,39 +612,37 @@ export function useGridData({
     // We use refs to access current values, and a separate effect triggers reloads when they change
   }, [tableName, tableId, refreshPhysicalColumns, safeLimit, onError, toast])
 
-  // Track table name and ID to detect changes
-  const prevTableNameRef = useRef<string | undefined>(tableName)
-  const prevTableIdRef = useRef<string | undefined>(tableId)
-  const hasLoadedRef = useRef(false)
-  
-  // Separate effect to trigger reload when filters/sorts/fields actually change
-  useEffect(() => {
-    const filtersChanged = prevFiltersStringRef.current !== filtersString
-    const sortsChanged = prevSortsStringRef.current !== sortsString
-    const fieldsChanged = prevFieldsStringRef.current !== fieldsString
-    const tableNameChanged = prevTableNameRef.current !== tableName
-    const tableIdChanged = prevTableIdRef.current !== tableId
-    
-    // Update refs
-    prevFiltersStringRef.current = filtersString
-    prevSortsStringRef.current = sortsString
-    prevFieldsStringRef.current = fieldsString
-    prevTableNameRef.current = tableName
-    prevTableIdRef.current = tableId
-    
-    // Only trigger reload if something actually changed
-    if (filtersChanged || sortsChanged || fieldsChanged || tableNameChanged || tableIdChanged) {
-      hasLoadedRef.current = true
-      loadData()
-    } else if (!hasLoadedRef.current && tableName) {
-      // Initial load on mount if tableName exists
-      hasLoadedRef.current = true
-      if (typeof window !== 'undefined' && (process.env.NODE_ENV === 'development' || localStorage.getItem('DEBUG_GRID_DATA') === '1')) {
-        console.log('[useGridData] Initial load triggered')
-      }
-      loadData()
+  // SWR cache key - changing this triggers re-fetch (deduplication, stale-while-revalidate)
+  const swrKey = tableName
+    ? `grid:${tableName}:${filtersString}:${sortsString}:${fieldsString}:${safeLimit}`
+    : null
+
+  const { data: swrData, error: swrError, isLoading: swrLoading, mutate } = useSWR<GridRow[] | undefined>(
+    swrKey,
+    loadData,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 2000,
+      keepPreviousData: true,
     }
-  }, [filtersString, sortsString, fieldsString, tableName, tableId, loadData])
+  )
+
+  const mutateRef = useRef(mutate)
+  mutateRef.current = mutate
+
+  // Sync SWR data to local rows state (SWR provides caching; we keep rows for mutations)
+  useEffect(() => {
+    if (swrData && Array.isArray(swrData)) {
+      setRows(swrData)
+    }
+  }, [swrData])
+
+  // Use SWR loading/error when available
+  useEffect(() => {
+    if (swrError) {
+      setError((swrError as Error)?.message ?? 'Failed to load data')
+    }
+  }, [swrError])
 
   const updateCell = useCallback(
     async (rowId: string, fieldName: string, value: unknown) => {
@@ -878,7 +878,7 @@ export function useGridData({
           error: err,
         })
         // Reload on error to sync with server
-        await loadData()
+        await mutate()
         // Show error toast
         const errorMessage = err instanceof Error ? err.message : String(err)
         if (onError) {
@@ -893,7 +893,7 @@ export function useGridData({
         throw err
       }
     },
-    [tableName, tableId, loadData, onError, toast]
+    [tableName, tableId, mutate, onError, toast]
   )
 
   const insertRow = useCallback(
@@ -959,17 +959,17 @@ export function useGridData({
   )
 
   const refresh = useCallback(async () => {
-    await loadData()
-  }, [loadData])
+    await mutate()
+  }, [mutate])
 
   const retry = useCallback(async () => {
     setError(null)
-    await loadData()
-  }, [loadData])
+    await mutate()
+  }, [mutate])
 
   return {
     rows,
-    loading,
+    loading: loading || swrLoading,
     error,
     refresh,
     retry,

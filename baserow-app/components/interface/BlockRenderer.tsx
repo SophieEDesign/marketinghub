@@ -12,12 +12,26 @@ import { normalizeBlockConfig, isBlockConfigComplete } from "@/lib/interface/blo
 import { assertBlockConfig, shouldShowBlockSetupUI } from "@/lib/interface/assertBlockConfig"
 import { useMemo, useEffect } from "react"
 import dynamic from "next/dynamic"
-import GridBlock from "./blocks/GridBlock"
 import FormBlock from "./blocks/FormBlock"
 import RecordBlock from "./blocks/RecordBlock"
-import ChartBlock from "./blocks/ChartBlock"
 import KPIBlock from "./blocks/KPIBlock"
 import TextBlock from "./blocks/TextBlock"
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
+
+const BlockLoadingPlaceholder = () => (
+  <div className="h-full min-h-[120px] flex items-center justify-center bg-gray-50/50 rounded-lg animate-pulse">
+    <LoadingSpinner size="sm" />
+  </div>
+)
+
+const GridBlock = dynamic(() => import("./blocks/GridBlock"), {
+  ssr: false,
+  loading: () => <BlockLoadingPlaceholder />,
+})
+const ChartBlock = dynamic(() => import("./blocks/ChartBlock"), {
+  ssr: false,
+  loading: () => <BlockLoadingPlaceholder />,
+})
 import ImageBlock from "./blocks/ImageBlock"
 import DividerBlock from "./blocks/DividerBlock"
 import ButtonBlock from "./blocks/ButtonBlock"
@@ -26,7 +40,10 @@ import LinkPreviewBlock from "./blocks/LinkPreviewBlock"
 import FilterBlock from "./blocks/FilterBlock"
 import FieldBlock from "./blocks/FieldBlock"
 import FieldSectionBlock from "./blocks/FieldSectionBlock"
-import KanbanBlock from "./blocks/KanbanBlock"
+const KanbanBlock = dynamic(() => import("./blocks/KanbanBlock"), {
+  ssr: false,
+  loading: () => <BlockLoadingPlaceholder />,
+})
 
 // CRITICAL: Calendar-related blocks use FullCalendar which causes hydration mismatches
 // Disable SSR to prevent React error #185
@@ -49,18 +66,30 @@ const MultiCalendarBlock = dynamic(() => import("./blocks/MultiCalendarBlock"), 
     </div>
   )
 })
-import TimelineBlock from "./blocks/TimelineBlock"
-import MultiTimelineBlock from "./blocks/MultiTimelineBlock"
-import GalleryBlock from "./blocks/GalleryBlock"
+const TimelineBlock = dynamic(() => import("./blocks/TimelineBlock"), {
+  ssr: false,
+  loading: () => <BlockLoadingPlaceholder />,
+})
+const MultiTimelineBlock = dynamic(() => import("./blocks/MultiTimelineBlock"), {
+  ssr: false,
+  loading: () => <BlockLoadingPlaceholder />,
+})
+const GalleryBlock = dynamic(() => import("./blocks/GalleryBlock"), {
+  ssr: false,
+  loading: () => <BlockLoadingPlaceholder />,
+})
 import ListBlock from "./blocks/ListBlock"
 import NumberBlock from "./blocks/NumberBlock"
-import HorizontalGroupedBlock from "./blocks/HorizontalGroupedBlock"
+const HorizontalGroupedBlock = dynamic(() => import("./blocks/HorizontalGroupedBlock"), {
+  ssr: false,
+  loading: () => <BlockLoadingPlaceholder />,
+})
 import RecordContextBlock from "./blocks/RecordContextBlock"
 import { ErrorBoundary } from "./ErrorBoundary"
 import type { FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import LazyBlockWrapper from "./LazyBlockWrapper"
-import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
+import { debugLog, debugWarn, debugError } from "@/lib/debug"
 import { runBlockDriftChecks } from "@/lib/interface/block-drift"
 import { assertBlockSizingInvariant } from "@/lib/interface/block-sizing"
 
@@ -141,7 +170,7 @@ export default function BlockRenderer({
   
   // #region HOOK CHECK - Before useEffect blockDriftChecks
   if (process.env.NODE_ENV === 'development') {
-    console.log('[HOOK CHECK]', 'BlockRenderer before useEffect blockDriftChecks')
+    debugLog('[HOOK CHECK]', 'BlockRenderer before useEffect blockDriftChecks')
   }
   // #endregion
   useEffect(() => {
@@ -151,13 +180,13 @@ export default function BlockRenderer({
   }, [])
   // #region agent log – mount stability (if this logs repeatedly, parent is recreated)
   useEffect(() => {
-    console.log("BlockRenderer mount", block.id)
-    return () => { console.log("BlockRenderer unmount", block.id) }
+    debugLog("BlockRenderer mount", block.id)
+    return () => { debugLog("BlockRenderer unmount", block.id) }
   }, [])
   // #endregion
   // #region HOOK CHECK - After useEffect blockDriftChecks
   if (process.env.NODE_ENV === 'development') {
-    console.log('[HOOK CHECK]', 'BlockRenderer after useEffect blockDriftChecks')
+    debugLog('[HOOK CHECK]', 'BlockRenderer after useEffect blockDriftChecks')
   }
   // #endregion
 
@@ -178,7 +207,7 @@ export default function BlockRenderer({
 
   // #region HOOK CHECK - Before useMemo safeBlock
   if (process.env.NODE_ENV === 'development') {
-    console.log('[HOOK CHECK]', 'BlockRenderer before useMemo safeBlock')
+    debugLog('[HOOK CHECK]', 'BlockRenderer before useMemo safeBlock')
   }
   // #endregion
   // CRITICAL: Memoize safeBlock so block components receive a stable reference.
@@ -198,7 +227,7 @@ export default function BlockRenderer({
   ])
   // #region HOOK CHECK - After useMemo safeBlock
   if (process.env.NODE_ENV === 'development') {
-    console.log('[HOOK CHECK]', 'BlockRenderer after useMemo safeBlock')
+    debugLog('[HOOK CHECK]', 'BlockRenderer after useMemo safeBlock')
   }
   // #endregion
 
@@ -217,8 +246,7 @@ export default function BlockRenderer({
         assertBlockSizingInvariant(block)
       } catch (error) {
         // Surface invariant violations loudly in dev without crashing the entire canvas.
-        // eslint-disable-next-line no-console
-        console.error(error)
+        debugError(error)
       }
     }
     
@@ -249,7 +277,7 @@ export default function BlockRenderer({
       // Return setup UI component (blocks handle this internally)
       // But log for diagnostics
       if (diagnosticsEnabled && canEdit && !warnedBlocks.has(block.id)) {
-        console.warn(`[BlockGuard] Block ${block.id} (${normalizedBlockType}) showing setup UI: ${blockValidity.reason}`)
+        debugWarn(`[BlockGuard] Block ${block.id} (${normalizedBlockType}) showing setup UI: ${blockValidity.reason}`)
         warnedBlocks.add(block.id)
       }
     }
@@ -262,7 +290,7 @@ export default function BlockRenderer({
     // Image blocks are always valid (can be empty), so skip warning for them
     if (diagnosticsEnabled && canEdit && !isComplete && normalizedBlockType !== 'image' && !warnedBlocks.has(block.id)) {
       // In view mode, log warning but still attempt to render
-      console.warn(`[BlockGuard] Block ${block.id} (${normalizedBlockType}) has incomplete config:`, safeConfig)
+      debugWarn(`[BlockGuard] Block ${block.id} (${normalizedBlockType}) has incomplete config:`, safeConfig)
       warnedBlocks.add(block.id)
     }
     
@@ -271,9 +299,9 @@ export default function BlockRenderer({
         // CRITICAL: Pass pageTableId to GridBlock for table resolution fallback
         // Table resolution order: block.config.table_id → page.base_table (pageTableId) → block.config.base_table → null
         // pageTableId must flow to blocks for base_table fallback
-        // Lazy-load GridBlock - CRITICAL: enabled=false for mount stability (edit mode must not change mount structure)
+        // Lazy-load GridBlock - below-the-fold blocks load when scrolled into view
         return (
-          <LazyBlockWrapper enabled={false}>
+          <LazyBlockWrapper enabled={true}>
             <GridBlock
               block={safeBlock}
               isEditing={canEdit}
@@ -344,7 +372,11 @@ export default function BlockRenderer({
         )
 
       case "chart":
-        return <ChartBlock block={safeBlock} isEditing={canEdit} pageId={pageId} filters={filters} filterTree={filterTree} />
+        return (
+          <LazyBlockWrapper enabled={true}>
+            <ChartBlock block={safeBlock} isEditing={canEdit} pageId={pageId} filters={filters} filterTree={filterTree} />
+          </LazyBlockWrapper>
+        )
 
       case "kpi":
         // CRITICAL: Pass pre-fetched aggregate data to prevent duplicate requests
@@ -432,7 +464,7 @@ export default function BlockRenderer({
       
       case "multi_calendar":
         return (
-          <LazyBlockWrapper enabled={false}>
+          <LazyBlockWrapper enabled={true}>
             <MultiCalendarBlock
               block={safeBlock}
               isEditing={canEdit}
@@ -449,7 +481,7 @@ export default function BlockRenderer({
       case "kanban":
         // Kanban block - wrapper around GridBlock with view_type='kanban'
         return (
-          <LazyBlockWrapper enabled={false}>
+          <LazyBlockWrapper enabled={true}>
             <KanbanBlock
               block={safeBlock}
               isEditing={canEdit}
@@ -466,7 +498,7 @@ export default function BlockRenderer({
       case "timeline":
         // Timeline block - wrapper around GridBlock with view_type='timeline'
         return (
-          <LazyBlockWrapper enabled={false}>
+          <LazyBlockWrapper enabled={true}>
             <TimelineBlock
               block={safeBlock}
               isEditing={canEdit}
@@ -482,7 +514,7 @@ export default function BlockRenderer({
       
       case "multi_timeline":
         return (
-          <LazyBlockWrapper enabled={false}>
+          <LazyBlockWrapper enabled={true}>
             <MultiTimelineBlock
               block={safeBlock}
               isEditing={canEdit}
@@ -499,7 +531,7 @@ export default function BlockRenderer({
       case "gallery":
         // Gallery block - wrapper around GridBlock with view_type='gallery'
         return (
-          <LazyBlockWrapper enabled={false}>
+          <LazyBlockWrapper enabled={true}>
             <GalleryBlock
               block={safeBlock}
               isEditing={canEdit}
@@ -549,7 +581,7 @@ export default function BlockRenderer({
       case "horizontal_grouped":
         // Tabs block - displays records grouped by field in tabs
         return (
-          <LazyBlockWrapper enabled={false}>
+          <LazyBlockWrapper enabled={true}>
             <HorizontalGroupedBlock
               block={safeBlock}
               isEditing={canEdit}

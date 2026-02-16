@@ -50,7 +50,8 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
       }
     : null
 }
-import { getRowHeightPixels } from "@/lib/grid/row-height-utils"
+import { getRowHeightPixels, ROW_HEIGHT_STANDARD } from "@/lib/grid/row-height-utils"
+import { useVirtualizer } from "@tanstack/react-virtual"
 import { useIsMobile } from "@/hooks/useResponsive"
 import { createClient } from "@/lib/supabase/client"
 import { buildSelectClause, toPostgrestColumn } from "@/lib/supabase/postgrest"
@@ -2766,6 +2767,16 @@ export default function GridView({
     return flattenGroupTree(groupModel.rootGroups, collapsedGroups)
   }, [collapsedGroups, groupModel])
 
+  const ROW_VIRTUALIZATION_THRESHOLD = 50
+  const useRowVirtualization = !flattenedGroups && filteredRows.length > ROW_VIRTUALIZATION_THRESHOLD
+
+  const rowVirtualizer = useVirtualizer({
+    count: useRowVirtualization ? filteredRows.length : 0,
+    getScrollElement: () => scrollContainerRef.current,
+    estimateSize: (index) => getEffectiveRowHeight(filteredRows[index]?.id) || ROW_HEIGHT_STANDARD,
+    overscan: 10,
+  })
+
   // When grouping, allow "start collapsed" behavior (default: collapsed).
   // This is intentionally applied only on initial load / when the groupBy field changes / when the setting flips,
   // so we don't override the user's manual expand/collapse interactions mid-session.
@@ -3644,9 +3655,20 @@ export default function GridView({
                   )
                 })
               ) : (
-                // Render ungrouped rows
-                // CRITICAL: filteredRows is already normalized, but guard for safety
-                filteredRows.map((row, rowIndex) => {
+                // Render ungrouped rows (with optional virtualization for large datasets)
+                <>
+                {/* Top spacer for virtualized scroll */}
+                {useRowVirtualization && rowVirtualizer.getVirtualItems().length > 0 && rowVirtualizer.getVirtualItems()[0].start > 0 && (
+                  <tr aria-hidden="true">
+                    <td
+                      colSpan={1 + safeVisibleFields.length + (enableRecordOpen && allowOpenRecord ? 1 : 0) + (imageField ? 1 : 0)}
+                      style={{ height: rowVirtualizer.getVirtualItems()[0].start, padding: 0, border: 'none', lineHeight: 0 }}
+                    />
+                  </tr>
+                )}
+                {(useRowVirtualization ? rowVirtualizer.getVirtualItems() : filteredRows.map((_, i) => ({ index: i, start: 0, size: ROW_HEIGHT_STANDARD }))).map((virtualItem) => {
+                  const row = filteredRows[virtualItem.index]
+                  const rowIndex = virtualItem.index
                   const rowColor = getRowColor ? getRowColor(row) : null
                   const rowImage = getRowImage ? getRowImage(row) : null
                   const borderColor = rowColor ? { borderLeftColor: rowColor, borderLeftWidth: '4px' } : {}
@@ -3850,7 +3872,23 @@ export default function GridView({
                       : null}
                   </tr>
                   )
-                })
+                })}
+                {/* Bottom spacer for virtualized scroll */}
+                {useRowVirtualization && rowVirtualizer.getVirtualItems().length > 0 && (() => {
+                  const items = rowVirtualizer.getVirtualItems()
+                  const lastItem = items[items.length - 1]
+                  const bottomSpace = rowVirtualizer.getTotalSize() - lastItem.start - lastItem.size
+                  if (bottomSpace <= 0) return null
+                  return (
+                    <tr aria-hidden="true">
+                      <td
+                        colSpan={1 + safeVisibleFields.length + (enableRecordOpen && allowOpenRecord ? 1 : 0) + (imageField ? 1 : 0)}
+                        style={{ height: bottomSpace, padding: 0, border: 'none', lineHeight: 0 }}
+                      />
+                    </tr>
+                  )
+                })()}
+                </>
               )}
               {/* Spreadsheet-style: click last row to add a record */}
               {filteredRows.length > 0 && allowInlineCreate && !isEditing && (

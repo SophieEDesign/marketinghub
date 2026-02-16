@@ -47,6 +47,7 @@ import CellContextMenu from './CellContextMenu'
 import { formatCellValue } from '@/lib/dataView/clipboard'
 import FieldBuilderModal from './FieldBuilderModal'
 import { getFieldDisplayName } from '@/lib/fields/display'
+import { debugLog, debugWarn, debugError } from '@/lib/debug'
 
 type Sort = { field: string; direction: 'asc' | 'desc' }
 
@@ -148,7 +149,7 @@ export default function AirtableGridView({
   // Diagnostic logging on mount
   useEffect(() => {
     if (typeof window !== 'undefined' && (process.env.NODE_ENV === 'development' || localStorage.getItem('DEBUG_GRID') === '1')) {
-      console.log('[AirtableGridView] Component mounted:', {
+      debugLog('[AirtableGridView] Component mounted:', {
         tableName,
         tableId: tableId || tableIdState,
         viewId,
@@ -175,11 +176,11 @@ export default function AirtableGridView({
           if (data) {
             setTableIdState(data.id)
             if (typeof window !== 'undefined' && (process.env.NODE_ENV === 'development' || localStorage.getItem('DEBUG_GRID') === '1')) {
-              console.log('[AirtableGridView] Loaded tableId:', data.id)
+              debugLog('[AirtableGridView] Loaded tableId:', data.id)
             }
           }
         } catch (error) {
-          console.warn("Could not load table ID:", error)
+          debugWarn("Could not load table ID:", error)
         }
       }
       loadTableId()
@@ -357,7 +358,7 @@ export default function AirtableGridView({
         const isVirtual = f.type === 'formula' || f.type === 'lookup'
         if (isVirtual) return true // Virtual fields are OK
         if (!physicalColumns.has(f.name)) {
-          console.warn(`[AirtableGridView] Filtering out field "${f.name}" - exists in metadata but not in physical table`)
+          debugWarn(`[AirtableGridView] Filtering out field "${f.name}" - exists in metadata but not in physical table`)
           return false
         }
         return true
@@ -441,7 +442,7 @@ export default function AirtableGridView({
       // Show warnings if any (non-blocking)
       if (result.warnings && result.warnings.length > 0) {
         const warningMsg = result.warnings.slice(0, 3).join('\n')
-        console.warn('Paste warnings:', warningMsg)
+        debugWarn('Paste warnings:', warningMsg)
       }
       
       // Show errors if any (only if there are errors)
@@ -471,9 +472,9 @@ export default function AirtableGridView({
         
         if (isDevelopment || errorLoggingEnabled) {
           console.group('Paste Errors')
-          console.error(`Total errors: ${errorCount}, Applied: ${appliedCount}`)
+          debugError(`Total errors: ${errorCount}, Applied: ${appliedCount}`)
           result.errors.forEach((error, index) => {
-            console.error(`[${index + 1}] ${error.fieldName || 'Unknown field'}:`, {
+            debugError(`[${index + 1}] ${error.fieldName || 'Unknown field'}:`, {
               rowId: error.rowId,
               columnId: error.columnId,
               value: error.value,
@@ -487,11 +488,11 @@ export default function AirtableGridView({
       } else if (result.appliedCount > 0) {
         // Success feedback (optional - can be removed if too noisy)
         // Only log to console to avoid interrupting workflow
-        console.log(`Successfully pasted ${result.appliedCount} value${result.appliedCount !== 1 ? 's' : ''}`)
+        debugLog(`Successfully pasted ${result.appliedCount} value${result.appliedCount !== 1 ? 's' : ''}`)
       }
     },
     onError: (error) => {
-      console.error('Data view error:', error)
+      debugError('Data view error:', error)
       alert(`Error: ${error.message}`)
     },
   })
@@ -542,7 +543,7 @@ export default function AirtableGridView({
 
   // Defensive logging (temporary - remove after fixing all upstream issues)
   if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-    console.log('AirtableGridView input types', {
+    debugLog('AirtableGridView input types', {
       rows: Array.isArray(allRows),
       fields: Array.isArray(fields),
       sorts: Array.isArray(sorts),
@@ -573,7 +574,7 @@ export default function AirtableGridView({
 
         if (error && error.code !== 'PGRST116') {
           if (!isAbortError(error as unknown)) {
-            console.error('Error loading grid view settings:', error)
+            debugError('Error loading grid view settings:', error)
           }
           // Fallback to localStorage
           loadFromLocalStorage()
@@ -654,7 +655,7 @@ export default function AirtableGridView({
         })
       } catch (error) {
         if (!isAbortError(error)) {
-          console.error('Error loading grid view settings:', error)
+          debugError('Error loading grid view settings:', error)
         }
         loadFromLocalStorage()
       }
@@ -803,7 +804,7 @@ export default function AirtableGridView({
               }])
           }
         } catch (error) {
-          console.error('Error saving grid view settings:', error)
+          debugError('Error saving grid view settings:', error)
           // Non-critical, continue
         } finally {
           layoutDirtyRef.current = false
@@ -860,7 +861,7 @@ export default function AirtableGridView({
         }
       }
     } catch (error) {
-      console.error('Error saving row heights:', error)
+      debugError('Error saving row heights:', error)
     }
   }, [columnOrder, columnWidths, columnWrapText, tableName, viewUuid, viewName])
 
@@ -1216,7 +1217,7 @@ export default function AirtableGridView({
         // It will attempt to sync the schema if the column is missing
         await updateCell(rowId, fieldName, value)
       } catch (error: any) {
-        console.error('Error saving cell:', error)
+        debugError('Error saving cell:', error)
         // Show user-friendly error message
         if (error?.message) {
           handleError(error, "Failed to save cell", error.message)
@@ -1290,7 +1291,7 @@ export default function AirtableGridView({
   // Handle insert left/right
   const handleInsertLeft = useCallback((fieldName: string) => {
     if (!tableId) {
-      console.warn('Cannot insert field: tableId is required')
+      debugWarn('Cannot insert field: tableId is required')
       return
     }
     setInsertTargetField({ fieldName, position: 'left' })
@@ -1299,7 +1300,7 @@ export default function AirtableGridView({
 
   const handleInsertRight = useCallback((fieldName: string) => {
     if (!tableId) {
-      console.warn('Cannot insert field: tableId is required')
+      debugWarn('Cannot insert field: tableId is required')
       return
     }
     setInsertTargetField({ fieldName, position: 'right' })
@@ -1331,7 +1332,7 @@ export default function AirtableGridView({
         .order('order_index', { ascending: true })
 
       if (fieldsError) {
-        console.error('Error loading fields for reordering:', fieldsError)
+        debugError('Error loading fields for reordering:', fieldsError)
         if (onTableFieldsRefresh) {
           onTableFieldsRefresh()
         }
@@ -1343,7 +1344,7 @@ export default function AirtableGridView({
       // Find the target field
       const targetField = allFields?.find(f => f.name === insertTargetField.fieldName)
       if (!targetField) {
-        console.warn('Target field not found for reordering')
+        debugWarn('Target field not found for reordering')
         if (onTableFieldsRefresh) {
           onTableFieldsRefresh()
         }
@@ -1367,7 +1368,7 @@ export default function AirtableGridView({
 
       if (!newField) {
         // Couldn't find new field - might have been created with a different name
-        console.warn('Could not find newly created field for reordering')
+        debugWarn('Could not find newly created field for reordering')
         if (onTableFieldsRefresh) {
           onTableFieldsRefresh()
         }
@@ -1409,7 +1410,7 @@ export default function AirtableGridView({
 
         if (!response.ok) {
           const error = await response.json()
-          console.error('Error reordering fields:', error)
+          debugError('Error reordering fields:', error)
         }
       }
 
@@ -1418,7 +1419,7 @@ export default function AirtableGridView({
         onTableFieldsRefresh()
       }
     } catch (error) {
-      console.error('Error handling field save with reordering:', error)
+      debugError('Error handling field save with reordering:', error)
     } finally {
       setFieldBuilderOpen(false)
       setInsertTargetField(null)
@@ -1464,7 +1465,7 @@ export default function AirtableGridView({
           
           await navigator.clipboard.writeText(clipboardText)
         } catch (error) {
-          console.error('Error copying to clipboard:', error)
+          debugError('Error copying to clipboard:', error)
           // Silently fail - clipboard access may be denied
         }
       }
@@ -1491,7 +1492,7 @@ export default function AirtableGridView({
                   await dataView.paste(cellSelection, clipboardText)
                 }
               } catch (error) {
-                console.error('Error pasting:', error)
+                debugError('Error pasting:', error)
               }
             }
           }
@@ -1515,7 +1516,7 @@ export default function AirtableGridView({
           // Validate selection is still valid
           const currentSelection = getCurrentSelection()
           if (!currentSelection) {
-            console.warn('No valid selection for paste operation')
+            debugWarn('No valid selection for paste operation')
             return
           }
           
@@ -1544,16 +1545,16 @@ export default function AirtableGridView({
           // Additional validation can be done here if needed
           if (result.appliedCount === 0 && result.errors.length === 0) {
             // No changes applied and no errors - likely empty or invalid clipboard
-            console.warn('No data was pasted. Clipboard may be empty or contain only whitespace.')
+            debugWarn('No data was pasted. Clipboard may be empty or contain only whitespace.')
           }
         } catch (error: any) {
-          console.error('Error pasting:', error)
+          debugError('Error pasting:', error)
           
           // Provide user-friendly error message
           const errorMessage = error?.message || 'Failed to paste data'
           if (errorMessage.includes('clipboard') || errorMessage.includes('permission')) {
             // Clipboard permission denied - don't show alert, just log
-            console.warn('Clipboard access denied. Please ensure clipboard permissions are granted.')
+            debugWarn('Clipboard access denied. Please ensure clipboard permissions are granted.')
           } else if (errorMessage.includes('Too many changes')) {
             // Large paste operation - show user-friendly message
             alert(`Paste operation too large. Please paste smaller amounts of data at a time.`)
@@ -1571,7 +1572,7 @@ export default function AirtableGridView({
           try {
             await dataView.undo()
           } catch (error) {
-            console.error('Error undoing:', error)
+            debugError('Error undoing:', error)
           }
         }
       }
@@ -1583,7 +1584,7 @@ export default function AirtableGridView({
           try {
             await dataView.redo()
           } catch (error) {
-            console.error('Error redoing:', error)
+            debugError('Error redoing:', error)
           }
         }
       }
@@ -1681,7 +1682,7 @@ export default function AirtableGridView({
   if (visibleFields.length === 0) {
     // Log diagnostic info in development
     if (typeof window !== 'undefined' && (process.env.NODE_ENV === 'development' || localStorage.getItem('DEBUG_GRID') === '1')) {
-      console.warn('[AirtableGridView] No visible fields found:', {
+      debugWarn('[AirtableGridView] No visible fields found:', {
         tableName,
         tableId: tableIdState || tableId,
         fieldsCount: safeFields.length,
@@ -2089,7 +2090,7 @@ export default function AirtableGridView({
                           const textToCopy = formatCellValue(row[field.name], fieldObj)
                           if (textToCopy) {
                             navigator.clipboard.writeText(textToCopy).catch(err => {
-                              console.error('Failed to copy:', err)
+                              debugError('Failed to copy:', err)
                             })
                           }
                           
@@ -2127,7 +2128,7 @@ export default function AirtableGridView({
                                 await dataView.paste(cellSelection, text)
                               }
                             } catch (err) {
-                              console.error('Failed to paste:', err)
+                              debugError('Failed to paste:', err)
                             }
                           }}
                           onDelete={() => {
@@ -2175,7 +2176,7 @@ export default function AirtableGridView({
                                     )
                                     setFillTargetRowIds(new Set())
                                   } catch (err) {
-                                    console.error('Error filling cells:', err)
+                                    debugError('Error filling cells:', err)
                                   }
                                 }}
                               />

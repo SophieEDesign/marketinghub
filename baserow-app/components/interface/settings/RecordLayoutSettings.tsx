@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { GripVertical, Eye, EyeOff } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
@@ -117,6 +117,14 @@ export default function RecordLayoutSettings({
   const [draftLayout, setDraftLayout] = useState<FieldLayoutItem[]>(() => [
     ...resolvedLayout,
   ])
+
+  // Sync draftLayout when fields or fieldLayout load asynchronously (e.g. tableFields fetch completes)
+  const layoutSignature = `${fields.length}-${fieldLayout.length}-${fieldLayout.length > 0 ? fieldLayout.map((i) => i.field_id).sort().join(",") : fields.map((f) => f.id).sort().join(",")}`
+  useEffect(() => {
+    if (resolvedLayout.length > 0) {
+      setDraftLayout([...resolvedLayout])
+    }
+  }, [layoutSignature])
 
   const visibleFields = getVisibleFieldsFromLayout(draftLayout, fields, "canvas")
   const fieldMap = new Map(fields.map((f) => [f.name, f]))

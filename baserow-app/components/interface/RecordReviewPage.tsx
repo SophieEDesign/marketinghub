@@ -85,7 +85,7 @@ export default function RecordReviewPage({
     null
 
   useEffect(() => {
-    if (!pageTableId || !isRecordView) return
+    if (!pageTableId) return
     let cancelled = false
     const supabase = createClient()
     supabase
@@ -109,7 +109,7 @@ export default function RecordReviewPage({
     return () => {
       cancelled = true
     }
-  }, [pageTableId, isRecordView])
+  }, [pageTableId])
 
   // Check both left_panel (snake_case) and leftPanel (camelCase) for backward compatibility
   const leftPanelSettings =
@@ -131,9 +131,8 @@ export default function RecordReviewPage({
     (page.settings as any)?.show_add_record === true ||
     (page.settings as any)?.showAddRecord === true
 
-  // Sync selected record to RightSettingsPanel and SelectionContext (for record_view)
+  // Sync selected record to RightSettingsPanel and SelectionContext (record_view and record_review)
   useEffect(() => {
-    if (!isRecordView) return
     if (selectedRecordId && pageTableId) {
       setSelectedContext({ type: "record", recordId: selectedRecordId, tableId: pageTableId })
       setRightPanelData({
@@ -148,7 +147,7 @@ export default function RecordReviewPage({
       setSelectedContext(null)
       setRightPanelData({ recordId: null, recordTableId: null, fieldLayout: [], onLayoutSave: null, tableFields: [] })
     }
-  }, [isRecordView, selectedRecordId, pageTableId, fieldLayout, onLayoutSave, tableFields, setSelectedContext, setRightPanelData])
+  }, [selectedRecordId, pageTableId, fieldLayout, onLayoutSave, tableFields, setSelectedContext, setRightPanelData])
 
   // Handle record selection - reset to view mode when switching records (Airtable-style)
   const handleRecordSelect = useCallback((recordId: string) => {

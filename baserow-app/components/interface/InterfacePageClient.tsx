@@ -26,6 +26,7 @@ import { normalizeUuid } from "@/lib/utils/ids"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 import { isAbortError } from "@/lib/api/error-handling"
 import PageActionsRegistrar from "./PageActionsRegistrar"
+import { debugLog, debugWarn, debugError } from "@/lib/debug"
 // Lazy load InterfaceBuilder for dashboard/overview pages
 const InterfaceBuilder = dynamic(() => import("./InterfaceBuilder"), { ssr: false })
 // Lazy load RecordReviewPage for record_review pages
@@ -150,7 +151,7 @@ function InterfacePageClientInternal({
   useEffect(() => {
     if (previousRoutePageIdRef.current !== null && previousRoutePageIdRef.current !== pageId) {
       if (process.env.NODE_ENV === "development") {
-        console.log("[Nav] Route pageId changed:", { from: previousRoutePageIdRef.current, to: pageId })
+        debugLog("[Nav] Route pageId changed:", { from: previousRoutePageIdRef.current, to: pageId })
       }
       setPage(null)
       setBlocks([])
@@ -163,14 +164,6 @@ function InterfacePageClientInternal({
     }
     previousRoutePageIdRef.current = pageId
   }, [pageId, setSelectedContext])
-
-  useEffect(() => {
-    // CRITICAL: Only load if we don't have initial page and haven't loaded yet
-    if (!initialPageRef.current && !pageLoadedRef.current && !loading) {
-      loadPage()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageId])
 
   // Listen for custom event to open settings panel (context-driven)
   useEffect(() => {
@@ -337,7 +330,7 @@ function InterfacePageClientInternal({
           // If view was updated, reload data AND blocks
           // This ensures that blocks using the view are refreshed immediately
           if (previousUpdatedAt && currentUpdatedAt !== previousUpdatedAt) {
-            console.log(`[InterfacePageClient] View updated detected - reloading data and blocks: viewId=${page.saved_view_id}`)
+            debugLog(`[InterfacePageClient] View updated detected - reloading data and blocks: viewId=${page.saved_view_id}`)
             savedViewUpdatedAtRef.current = currentUpdatedAt
             // Reload both data and blocks to ensure everything reflects the saved view
             loadListViewData()
@@ -351,7 +344,7 @@ function InterfacePageClientInternal({
           }
         }
       } catch (error) {
-        console.error('Error checking view updates:', error)
+        debugError('Error checking view updates:', error)
       }
     }
     
@@ -385,20 +378,24 @@ function InterfacePageClientInternal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page?.saved_view_id])
 
-  // CRITICAL: loadBlocks runs ONLY when pageId changes - nothing else
-  // Does NOT depend on: blocks, page, edit mode, loading state
+  // CRITICAL: loadPage + loadBlocks run in parallel when pageId changes
+  // Both fetches are independent (only need pageId) - parallelizing reduces initial load time
   useEffect(() => {
     if (!pageId) return
 
     const abortController = new AbortController()
     const signal = abortController.signal
 
-    loadBlocks(false, signal)
+    const needsPage = !initialPageRef.current && !pageLoadedRef.current && !loading
+    Promise.all([
+      needsPage ? loadPage() : Promise.resolve(),
+      loadBlocks(false, signal),
+    ]).catch(() => {})
 
     return () => {
       abortController.abort()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadBlocks intentionally excluded; only pageId should trigger
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadPage/loadBlocks intentionally excluded; only pageId should trigger
   }, [pageId])
 
   // CRITICAL: Mode changes must NEVER trigger block reloads
@@ -431,7 +428,7 @@ function InterfacePageClientInternal({
         pageLoadedRef.current = true
       }
     } catch (error) {
-      console.error("Error loading page:", error)
+      debugError("Error loading page:", error)
       // Set page to null on error - component will show error UI
       // DO NOT redirect - always render UI
       setPage(null)
@@ -463,7 +460,7 @@ function InterfacePageClientInternal({
       const viewData = await res.json()
       setData(viewData.data || [])
     } catch (error) {
-      console.error("Error loading SQL view data:", error)
+      debugError("Error loading SQL view data:", error)
       setData([])
     } finally {
       dataLoadingRef.current = false
@@ -507,7 +504,7 @@ function InterfacePageClientInternal({
       }
 
       if (!tableId) {
-        console.error("No table ID found for record review page")
+        debugError("No table ID found for record review page")
         setData([])
         dataLoadingRef.current = false
         setDataLoading(false)
@@ -522,7 +519,7 @@ function InterfacePageClientInternal({
         .single()
 
       if (tableError || !table?.supabase_table) {
-        console.error("Error loading table:", tableError)
+        debugError("Error loading table:", tableError)
         setData([])
         dataLoadingRef.current = false
         setDataLoading(false)
@@ -533,7 +530,7 @@ function InterfacePageClientInternal({
 
       // Ensure we have a valid table name before querying
       if (!supabaseTableName) {
-        console.error("No table name found")
+        debugError("No table name found")
         setData([])
         dataLoadingRef.current = false
         setDataLoading(false)
@@ -548,7 +545,7 @@ function InterfacePageClientInternal({
         .limit(1000)
 
       if (tableDataError) {
-        console.error("Error loading table data:", tableDataError)
+        debugError("Error loading table data:", tableDataError)
         setData([])
         dataLoadingRef.current = false
         setDataLoading(false)
@@ -573,7 +570,7 @@ function InterfacePageClientInternal({
 
       setData(records)
     } catch (error) {
-      console.error("Error loading record review data:", error)
+      debugError("Error loading record review data:", error)
       setData([])
     } finally {
       dataLoadingRef.current = false
@@ -609,7 +606,7 @@ function InterfacePageClientInternal({
         .single()
 
       if (viewError || !view?.table_id) {
-        console.error("Error loading view:", viewError)
+        debugError("Error loading view:", viewError)
         setData([])
         dataLoadingRef.current = false
         setDataLoading(false)
@@ -627,7 +624,7 @@ function InterfacePageClientInternal({
         .single()
 
       if (tableError || !table?.supabase_table) {
-        console.error("Error loading table:", tableError)
+        debugError("Error loading table:", tableError)
         setData([])
         dataLoadingRef.current = false
         setDataLoading(false)
@@ -708,13 +705,13 @@ function InterfacePageClientInternal({
       const { data: tableData, error: tableDataError } = await query
 
       if (tableDataError) {
-        console.error("Error loading table data:", tableDataError)
+        debugError("Error loading table data:", tableDataError)
         setData([])
       } else {
         setData(tableData || [])
       }
     } catch (error) {
-      console.error("Error loading list view data:", error)
+      debugError("Error loading list view data:", error)
       setData([])
     } finally {
       dataLoadingRef.current = false
@@ -723,7 +720,7 @@ function InterfacePageClientInternal({
   }
 
   async function loadBlocks(forceReload = false, signal?: AbortSignal) {
-    console.log('🔥 loadBlocks CALLED', { pageId, forceReload, previousPageId: previousPageIdRef.current, alreadyLoading: blocksLoadingRef.current })
+    debugLog('🔥 loadBlocks CALLED', { pageId, forceReload, previousPageId: previousPageIdRef.current, alreadyLoading: blocksLoadingRef.current })
     if (!pageId) {
       blocksLoadingRef.current = false
       return
@@ -732,14 +729,14 @@ function InterfacePageClientInternal({
     // CRITICAL: Prevent concurrent calls - check ref at function entry
     if (!forceReload && blocksLoadingRef.current) {
       if (process.env.NODE_ENV === 'development') {
-        console.log(`[loadBlocks] Already loading - skipping duplicate call: pageId=${pageId}`)
+        debugLog(`[loadBlocks] Already loading - skipping duplicate call: pageId=${pageId}`)
       }
       return
     }
 
     // CRITICAL: Only reset loaded state if pageId actually changed (not just on every call)
     if (blocksLoadedRef.current.pageId !== pageId) {
-      console.log(`[loadBlocks] PageId changed in loadBlocks: old=${blocksLoadedRef.current.pageId}, new=${pageId}`)
+      debugLog(`[loadBlocks] PageId changed in loadBlocks: old=${blocksLoadedRef.current.pageId}, new=${pageId}`)
       blocksLoadedRef.current = { pageId, loaded: false }
     } else if (!forceReload && blocksLoadedRef.current.loaded && blocks.length > 0) {
       blocksLoadingRef.current = false
@@ -756,7 +753,7 @@ function InterfacePageClientInternal({
 
       if (!res.ok) {
         const errorText = await res.text()
-        console.error(`[loadBlocks] API ERROR: pageId=${pageId}`, {
+        debugError(`[loadBlocks] API ERROR: pageId=${pageId}`, {
           status: res.status,
           statusText: res.statusText,
           errorText,
@@ -768,7 +765,7 @@ function InterfacePageClientInternal({
       if (signal?.aborted) return
 
       // CRITICAL: Log API response for debugging - show full response structure
-      console.log(`[loadBlocks] API returned: pageId=${pageId}`, {
+      debugLog(`[loadBlocks] API returned: pageId=${pageId}`, {
         responseStatus: res.status,
         responseOk: res.ok,
         apiResponseRaw: data,
@@ -793,7 +790,7 @@ function InterfacePageClientInternal({
             (block.height == null && block.h == null)
           
           if (hasNullLayout) {
-            console.warn(`[Layout Load] Block ${block.id}: NULL layout values for existing block`, {
+            debugWarn(`[Layout Load] Block ${block.id}: NULL layout values for existing block`, {
               blockId: block.id,
               position_x: block.position_x,
               position_y: block.position_y,
@@ -832,7 +829,7 @@ function InterfacePageClientInternal({
       if (pageBlocks.length === 0 && blocks.length > 0 && !forceReload) {
         if (!signal?.aborted) {
           if (process.env.NODE_ENV === 'development') {
-            console.warn('[Blocks] Reload returned empty blocks, preserving existing blocks', {
+            debugWarn('[Blocks] Reload returned empty blocks, preserving existing blocks', {
               prevBlocksCount: blocks.length,
               forceReload,
               pageId
@@ -876,7 +873,7 @@ function InterfacePageClientInternal({
       
       const blocksChanged = blockIdsChanged || blockContentChanged
       
-      console.log(`[loadBlocks] setBlocks CHECK: pageId=${pageId}`, {
+      debugLog(`[loadBlocks] setBlocks CHECK: pageId=${pageId}`, {
         forceReload,
         oldBlocksCount: blocks.length,
         newBlocksCount: pageBlocks.length,
@@ -893,14 +890,14 @@ function InterfacePageClientInternal({
         if (blocksChanged || forceReload) {
           setBlocks(pageBlocks)
         } else if (process.env.NODE_ENV === 'development') {
-          console.log(`[loadBlocks] Blocks unchanged - skipping setBlocks to prevent re-render`)
+          debugLog(`[loadBlocks] Blocks unchanged - skipping setBlocks to prevent re-render`)
         }
         blocksLoadedRef.current = { pageId, loaded: true }
       }
     } catch (error) {
       // Ignore abort errors (expected during navigation/unmount) - prevents "Uncaught (in promise)"
       if (!isAbortError(error)) {
-        console.error("Error loading blocks:", error)
+        debugError("Error loading blocks:", error)
       }
       // CRITICAL: Never clear blocks on error - preserve existing blocks
       if (!signal?.aborted) {
@@ -1052,7 +1049,7 @@ function InterfacePageClientInternal({
         window.dispatchEvent(new CustomEvent('pages-updated'))
         return true
       } catch (error: any) {
-        console.error('Error saving page title:', error)
+        debugError('Error saving page title:', error)
         setTitleError(true)
         // Revert to last saved title
         setTitleValue(lastSavedTitleRef.current)

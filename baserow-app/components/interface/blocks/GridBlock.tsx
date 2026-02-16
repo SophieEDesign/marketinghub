@@ -1327,7 +1327,8 @@ export default function GridBlock({
       )}
 
       {/* Scroll lives here in full-page mode so table/calendar fills viewport and content scrolls inside */}
-      <div className="flex-1 min-h-0 overflow-auto">
+      {/* min-h-[400px] ensures calendar renders on first load when flex parent height isn't established yet */}
+      <div className={`flex-1 min-h-0 overflow-auto ${viewType === 'calendar' ? 'min-h-[400px]' : ''}`}>
         {renderView()}
       </div>
     </div>

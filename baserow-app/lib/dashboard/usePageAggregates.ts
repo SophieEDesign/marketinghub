@@ -11,6 +11,7 @@ import type { AggregateRequest } from './useAggregateData'
 import type { PageBlock } from '@/lib/interface/types'
 import type { FilterConfig } from '@/lib/interface/filters'
 import { mergeFilters } from '@/lib/interface/filters'
+import { debugLog } from '@/lib/debug'
 
 export interface AggregateDataMap {
   [blockId: string]: {
@@ -105,7 +106,7 @@ export function usePageAggregates(
     const result = extractAggregateRequests(blocks, pageFilters)
     // #region agent log
     const duration = performance.now() - start
-    if (duration > 5) console.log("usePageAggregates extractRequests duration:", duration.toFixed(1), "ms", { requestCount: result.size })
+    if (duration > 5) debugLog("usePageAggregates extractRequests duration:", duration.toFixed(1), "ms", { requestCount: result.size })
     // #endregion
     return result
   }, [blocks, pageFilters])
@@ -183,7 +184,7 @@ export function usePageAggregates(
     }
     // #region agent log
     const duration = performance.now() - start
-    if (duration > 5) console.log("usePageAggregates aggregateMap duration:", duration.toFixed(1), "ms")
+    if (duration > 5) debugLog("usePageAggregates aggregateMap duration:", duration.toFixed(1), "ms")
     // #endregion
     return map
   }, [batchResults, requestGroups, error, isLoading])

@@ -341,7 +341,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         requestAnimationFrame(() => {
           setSaveStatus("saving")
           if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
-          saveTimeoutRef.current = setTimeout(() => handleSaveContentRef.current?.(ed.getJSON()), 1000)
+          saveTimeoutRef.current = setTimeout(() => handleSaveContentRef.current?.(ed.getJSON()), 500)
         })
       },
     }),

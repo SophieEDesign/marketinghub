@@ -255,12 +255,14 @@ export default function FilterBlock({
   // Emit filter state to context whenever filters change.
   // CRITICAL: Depend only on emitSignature and block.id to prevent React #185.
   // Use ref for updateFilterBlock so context identity changes don't re-run this effect.
+  // Debounce 300ms to prevent cascading re-renders and React #185 from rapid filter changes.
   useEffect(() => {
     if (!block.id) return
     const blockTitle = config?.title || block.id
-    requestAnimationFrame(() => {
+    const timeoutId = setTimeout(() => {
       updateFilterBlockRef.current(block.id, emittedFilters, effectiveTargetBlocks, blockTitle, filterTree, tableId)
-    })
+    }, 300)
+    return () => clearTimeout(timeoutId)
   }, [emitSignature, block.id])
 
   // Cleanup only on unmount / blockId change.
@@ -418,7 +420,7 @@ export default function FilterBlock({
   const isAtDefaults = JSON.stringify(filterTree) === JSON.stringify(defaultFilterTree)
 
   return (
-    <div className="h-full w-full overflow-auto flex flex-col rounded-lg border border-gray-200" style={blockStyle}>
+    <div className="h-full w-full overflow-hidden flex flex-col rounded-lg border border-gray-200 min-w-0" style={blockStyle}>
       {/* Header with title and Filtered button */}
       <div className={`flex items-center justify-between px-4 pt-4 ${isEditing ? "mb-2" : "mb-4"}`}>
         <h3 className="text-base font-semibold text-gray-900">{title}</h3>
