@@ -359,6 +359,12 @@ export default function InterfaceBuilder({
       console.log(`[Lifecycle] InterfaceBuilder UNMOUNT: pageId=${page.id}`)
     }
   }, [])
+  // #region agent log – page-level remount (if "InterfaceBuilder mount" logs repeatedly, page-level remount)
+  useEffect(() => {
+    console.log("InterfaceBuilder mount")
+    return () => { console.log("InterfaceBuilder unmount") }
+  }, [])
+  // #endregion
   
   // Debug: Log when blocks state changes
   useEffect(() => {

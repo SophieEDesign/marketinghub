@@ -206,6 +206,8 @@ function InterfacePageClientInternal({
   // CRITICAL: Skip redundant setRightPanelData to prevent render loop
   // Effect → setRightPanelData → context update → re-render → effect runs again (same deps) → setRightPanelData again → loop
   const lastRightPanelSyncRef = useRef<{ pageRef: InterfacePage | null; blocksRef: any[]; selectedBlockId: string | undefined } | null>(null)
+  // Stabilize blocks reference: same content => same array ref to prevent Canvas/BlockRenderer remounts
+  const prevBlocksRef = useRef<{ blocks: any[]; signature: string }>({ blocks: [], signature: "" })
   useEffect(() => {
     if (!page) {
       lastRightPanelSyncRef.current = null
@@ -993,20 +995,17 @@ function InterfacePageClientInternal({
     } as any
   }, [page?.id, page?.name, page?.base_table, pageTableId]) // CRITICAL: NOT page?.page_type, NOT page?.config
 
-  // CRITICAL: Memoize blocks array to prevent remounts
-  // Only create new reference if blocks actually changed
-  // CRITICAL: Do NOT include page?.page_type in dependencies - it causes remounts when page type changes
-  // CRITICAL: Do NOT log during render to prevent hydration issues
+  // CRITICAL: Stabilize blocks reference so same content => same array ref (prevents Canvas/BlockRenderer remounts)
+  // If blocks is replaced with a new array every time (e.g. from API) but content is unchanged, return previous ref
   const memoizedBlocks = useMemo(() => {
     const result = blocks || []
-    // Only log in development to avoid hydration issues in production
-    if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
-      console.log(`[InterfacePageClient] memoizedBlocks: pageId=${page?.id}, page_type=${page?.page_type}`, {
-        blocksCount: result.length,
-        blockIds: result.map(b => b.id),
-        rawBlocksCount: blocks.length,
-      })
+    const signature = result.length === 0
+      ? ""
+      : result.map((b: any) => `${b.id}:${b.x ?? ""}:${b.y ?? ""}:${b.w ?? ""}:${b.h ?? ""}`).join("|")
+    if (prevBlocksRef.current.signature === signature && prevBlocksRef.current.blocks.length === result.length) {
+      return prevBlocksRef.current.blocks
     }
+    prevBlocksRef.current = { blocks: result, signature }
     return result
   }, [blocks, page?.id]) // ONLY page.id - NOT page_type, NOT mode, NOT isViewer
   
