@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useParams, useSearchParams } from "next/navigation"
 import { useBranding } from "@/contexts/BrandingContext"
 import { useUIState } from "@/contexts/UIStateContext"
 import { Plus, ChevronDown, ChevronRight, Home } from "lucide-react"
@@ -13,8 +13,10 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ shellData }: SidebarProps) {
+  const params = useParams()
   const searchParams = useSearchParams()
-  const currentPageId = searchParams.get("pageId")
+  // Single source of truth: route segment first (matches app /pages/[pageId]), then query (dev ?pageId=)
+  const currentPageId = (params?.pageId ?? searchParams.get("pageId")) ?? null
   const { primaryColor } = useBranding()
   const { uiMode } = useUIState()
 
