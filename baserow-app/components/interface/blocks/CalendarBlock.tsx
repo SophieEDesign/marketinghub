@@ -1,6 +1,8 @@
 "use client"
 
 import React, { useMemo } from "react"
+
+const EMPTY_FILTERS: import("@/lib/interface/filters").FilterConfig[] = []
 import type { PageBlock } from "@/lib/interface/types"
 import GridBlock from "./GridBlock"
 import type { FilterConfig } from "@/lib/interface/filters"
@@ -62,8 +64,8 @@ function CalendarBlock({
   // JSON.stringify creates a new string every render even if config hasn't changed
   const configSignature = useMemo(() => {
     const cfg = block.config || {}
-    return `${block.id}-${cfg.view_type || ''}-${cfg.table_id || ''}-${cfg.start_date_field || ''}-${cfg.end_date_field || ''}`
-  }, [block.id, block.config?.view_type, block.config?.table_id, block.config?.start_date_field, block.config?.end_date_field])
+    return `${block.id}-${cfg.view_type || ''}-${cfg.table_id || ''}-${cfg.start_date_field || ''}-${cfg.end_date_field || ''}-${(cfg as any).calendar_start_field || ''}-${(cfg as any).calendar_end_field || ''}`
+  }, [block.id, block.config?.view_type, block.config?.table_id, block.config?.start_date_field, block.config?.end_date_field, (block.config as any)?.calendar_start_field, (block.config as any)?.calendar_end_field])
   // #region HOOK CHECK - After useMemo configSignature
   if (process.env.NODE_ENV === 'development') {
     console.log('[HOOK CHECK]', 'CalendarBlock after useMemo configSignature')
@@ -109,7 +111,7 @@ function CalendarBlock({
       interfaceMode,
       pageTableId,
       pageId,
-      filters: filters ?? [],
+      filters: filters?.length ? filters : EMPTY_FILTERS,
       filterTree,
       onRecordClick,
       pageShowAddRecord,

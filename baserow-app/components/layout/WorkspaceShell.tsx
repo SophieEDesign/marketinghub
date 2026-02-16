@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import AirtableSidebar from "./AirtableSidebar"
 import Topbar from "./Topbar"
+import EditModeBanner from "./EditModeBanner"
 import { RecordPanelProvider } from "@/contexts/RecordPanelContext"
 import { RecordModalProvider } from "@/contexts/RecordModalContext"
 import { SelectionContextProvider } from "@/contexts/SelectionContext"
@@ -189,6 +190,7 @@ function ShellContent({
       />
       {/* Main content area - RecordPanel overlays when open (position: fixed) */}
       <div className="flex-1 flex flex-col overflow-x-hidden min-h-0 min-w-0">
+        <EditModeBanner />
         {!hideTopbar && (
           <Topbar
             title={title}
