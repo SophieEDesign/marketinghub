@@ -60,6 +60,7 @@ export function convertToFieldLayout(
   })
 
   // Get field names from various config sources
+  // modal_fields, card_fields are deprecated - prefer field_layout
   const visibleFields = config.visible_fields || config.detail_fields || []
   const editableFields = config.editable_fields || []
   const modalFields = blockConfig?.modal_fields || config.modal_fields || []

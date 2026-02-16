@@ -24,6 +24,12 @@ import {
   canDeleteRecord as cascadeCanDeleteRecord,
 } from '@/lib/interface/permission-cascade'
 import { triggerRecordAutomations } from '@/lib/automations/trigger-record-client'
+import type { FieldLayoutItem } from '@/lib/interface/field-layout-utils'
+import {
+  getVisibleFieldsFromLayout,
+  convertModalLayoutToFieldLayout,
+  convertModalFieldsToFieldLayout,
+} from '@/lib/interface/field-layout-helpers'
 
 /** Optional context for permission cascade (read-only; core does not enforce). */
 export interface RecordEditorCascadeContext {
@@ -38,8 +44,14 @@ export interface RecordEditorCoreOptions {
   supabaseTableName?: string | null
   /** When provided, skips fetching fields from API */
   tableFields?: TableField[] | null
-  /** Restrict which fields to show (empty = all) */
+  /** Restrict which fields to show (empty = all). @deprecated Use fieldLayout instead. */
   modalFields?: string[]
+  /** Unified field layout; when provided, fields are derived from getVisibleFieldsFromLayout(fieldLayout, tableFields, 'modal'). Preferred over modalFields. */
+  fieldLayout?: FieldLayoutItem[] | null
+  /** @deprecated Use fieldLayout. Backward compat: custom modal layout blocks. */
+  modalLayout?: { blocks?: Array<{ fieldName?: string; y?: number; config?: any }> } | null
+  /** Visibility context for field_layout: 'modal' or 'canvas'. Default 'modal'. */
+  visibilityContext?: "modal" | "canvas"
   /** For create mode: initial form values */
   initialData?: Record<string, any>
   /** Only load when true (e.g. modal open) */
@@ -55,6 +67,10 @@ export interface RecordEditorCoreResult {
   formData: Record<string, any>
   setFormData: React.Dispatch<React.SetStateAction<Record<string, any>>>
   fields: TableField[]
+  /** All table fields (before layout filter); for backward-compat conversion of modalLayout/modalFields. */
+  allFields: TableField[]
+  /** Resolved field layout passed to options; for shells to pass to RecordFields. */
+  fieldLayout: FieldLayoutItem[] | null | undefined
   effectiveTableName: string | null
   saving: boolean
   deleting: boolean
@@ -111,6 +127,9 @@ export function useRecordEditorCore(
     supabaseTableName: supabaseTableNameProp,
     tableFields: tableFieldsProp,
     modalFields = [],
+    fieldLayout: fieldLayoutProp,
+    modalLayout: modalLayoutProp,
+    visibilityContext: visibilityContextProp = "modal",
     initialData,
     active = true,
     onSave,
@@ -243,14 +262,37 @@ export function useRecordEditorCore(
     }
   }, [active, recordId, effectiveTableName, supabaseTableNameProp, initialData, loadRecord])
 
-  const filteredFields = modalFields.length > 0
-    ? fields.filter(
-        (f) => f && f.name !== 'id' && f.name !== 'created_at' && f.name !== 'updated_at' &&
-          (modalFields.includes(f.name) || modalFields.includes(f.id))
+  const effectiveFieldLayout = useMemo(() => {
+    if (fieldLayoutProp && fieldLayoutProp.length > 0) return fieldLayoutProp
+    if (modalLayoutProp?.blocks && modalLayoutProp.blocks.length > 0 && fields.length > 0) {
+      return convertModalLayoutToFieldLayout(modalLayoutProp, fields)
+    }
+    if (modalFields.length > 0 && fields.length > 0) {
+      return convertModalFieldsToFieldLayout(modalFields, fields)
+    }
+    return null
+  }, [fieldLayoutProp, modalLayoutProp, modalFields, fields])
+
+  const filteredFields = useMemo(() => {
+    const exclude = (f: TableField) =>
+      f && f.name !== 'id' && f.name !== 'created_at' && f.name !== 'updated_at'
+
+    if (effectiveFieldLayout && effectiveFieldLayout.length > 0) {
+      return getVisibleFieldsFromLayout(effectiveFieldLayout, fields, visibilityContextProp).filter(exclude)
+    }
+    if (modalFields.length > 0) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(
+          '[record-editor-core] modalFields is deprecated. Use fieldLayout instead for unified field layout.'
+        )
+      }
+      return fields.filter(
+        (f) =>
+          exclude(f) && (modalFields.includes(f.name) || modalFields.includes(f.id))
       )
-    : fields.filter(
-        (f) => f && f.name !== 'id' && f.name !== 'created_at' && f.name !== 'updated_at'
-      )
+    }
+    return fields.filter(exclude)
+  }, [fields, effectiveFieldLayout, modalFields, visibilityContextProp])
 
   const normalizeUpdateValue = useCallback(
     (fieldName: string, value: any): any => {
@@ -365,6 +407,8 @@ export function useRecordEditorCore(
     formData,
     setFormData,
     fields: filteredFields,
+    allFields: fields,
+    fieldLayout: effectiveFieldLayout ?? fieldLayoutProp ?? null,
     effectiveTableName,
     saving,
     deleting,

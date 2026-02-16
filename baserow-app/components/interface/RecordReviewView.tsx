@@ -25,7 +25,8 @@ import type { TableField } from '@/types/fields'
 import InterfaceBuilder from './InterfaceBuilder'
 import { useBlockEditMode } from '@/contexts/EditModeContext'
 import { applySearchToFilters, type FilterConfig } from '@/lib/interface/filters'
-import RecordDetailsPanel from './RecordDetailsPanel'
+import RecordEditor from '@/components/records/RecordEditor'
+import { useRecordModal } from '@/contexts/RecordModalContext'
 import { useToast } from '@/components/ui/use-toast'
 import { debugLog, debugWarn, debugError, isDebugEnabled } from '@/lib/interface/debug-flags'
 import { evaluateFilterTree } from '@/lib/filters/evaluation'
@@ -105,12 +106,11 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   const [searchQuery, setSearchQuery] = useState('')
   const [filters, setFilters] = useState<FilterConfig[]>(config.filters || [])
   const [tableFields, setTableFields] = useState<TableField[]>([])
-  const [fieldGroups, setFieldGroups] = useState<Record<string, string[]>>({})
-  const [formData, setFormData] = useState<Record<string, any>>({})
   const [recordListCollapsed, setRecordListCollapsed] = useState(false)
   const [tableName, setTableName] = useState<string>('')
   const { isEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(page.id)
   const { toast } = useToast()
+  const { openRecordModal } = useRecordModal()
   
   const allowEditing = config.allow_editing || false
 
@@ -546,18 +546,6 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
           fieldNames: fieldsData.map((f: any) => f.name),
         })
         setTableFields(fieldsData as TableField[])
-        // Build field groups from field metadata (for legacy support)
-        // RecordFields will use field.group_name directly, but we keep this for backward compatibility
-        const groups: Record<string, string[]> = {}
-        fieldsData.forEach((field: any) => {
-          if (field.group_name) {
-            if (!groups[field.group_name]) {
-              groups[field.group_name] = []
-            }
-            groups[field.group_name].push(field.name)
-          }
-        })
-        setFieldGroups(groups)
       } else {
         debugWarn('RECORD', 'No fields returned', {
           pageTableId,
@@ -578,59 +566,6 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     // RecordFields component uses field.group_name directly from the fields array
   }
 
-  // Update formData when selected record changes
-  useEffect(() => {
-    if (selectedRecord) {
-      debugLog('RECORD', 'Selected record changed', {
-        recordId: selectedRecord.id,
-        recordKeys: Object.keys(selectedRecord),
-        hasBlocks: loadedBlocks.length > 0,
-      })
-      setFormData({ ...selectedRecord })
-    } else {
-      debugLog('RECORD', 'No record selected', {
-        filteredDataLength: filteredData.length,
-      })
-      setFormData({})
-    }
-  }, [selectedRecord, loadedBlocks.length, filteredData.length, recordDebugEnabled])
-
-  // Handle field changes (only if field is editable based on page-level and field-level permissions)
-  const handleFieldChange = async (fieldName: string, value: any) => {
-    if (!pageEditable || !isFieldEditable(fieldName) || !selectedRecordId || !pageTableId) return
-
-    setFormData(prev => ({ ...prev, [fieldName]: value }))
-
-    try {
-      const supabase = createClient()
-      const { data: table } = await supabase
-        .from('tables')
-        .select('supabase_table')
-        .eq('id', pageTableId)
-        .single()
-
-      if (!table?.supabase_table) return
-
-      const { error } = await supabase
-        .from(table.supabase_table)
-        .update({ [fieldName]: value })
-        .eq('id', selectedRecordId)
-
-      if (error) throw error
-    } catch (error: any) {
-      console.error('Error updating field:', error)
-      toast({
-        variant: 'destructive',
-        title: 'Failed to update field',
-        description: error.message || 'Please try again',
-      })
-      // Revert formData on error
-      if (selectedRecord) {
-        setFormData({ ...selectedRecord })
-      }
-    }
-  }
-
   // Page-level permissions (declare before use in callbacks)
   const pageEditable = config.allow_editing !== false
   
@@ -646,18 +581,6 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     }
     return convertToFieldLayout(config, tableFields)
   }, [config.field_layout, config, tableFields])
-
-  // Get fields to display in detail panel - prefer field_layout, fallback to config
-  const detailVisibleFields = useMemo(() => {
-    if (fieldLayout.length > 0 && tableFields.length > 0) {
-      return getVisibleFieldsFromLayout(fieldLayout, tableFields)
-    }
-    const visibleFieldNames = config.visible_fields || config.detail_fields || []
-    if (visibleFieldNames.length > 0) {
-      return tableFields.filter(f => visibleFieldNames.includes(f.name))
-    }
-    return tableFields
-  }, [fieldLayout, tableFields, config.visible_fields, config.detail_fields])
 
   // Get fields to display in structured field list (page-level config)
   // Uses config.visible_fields (new) or config.detail_fields (backward compatibility)
@@ -683,20 +606,6 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     return tableFields
   }, [tableFields, config.visible_fields, config.detail_fields])
   
-  // Determine if a field is editable (respects both page-level and field-level permissions)
-  const isFieldEditable = useCallback((fieldName: string): boolean => {
-    if (!pageEditable) return false // Page-level view-only
-    
-    // If page is editable and no explicit editable_fields list is provided,
-    // all fields are editable by default
-    if (editableFieldNames.length === 0) {
-      return true
-    }
-    
-    // Otherwise, check if field is in the editable list
-    return editableFieldNames.includes(fieldName)
-  }, [pageEditable, editableFieldNames])
-
   // Handle field layout changes
   const handleFieldLayoutChange = useCallback(async (newLayout: FieldLayoutItem[]) => {
     try {
@@ -1141,30 +1050,63 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
         </div>
       </div>
 
-      {/* Center Panel - Record Details (layout editing moved here from removed right panel) */}
+      {/* Center Panel - Record Details via unified RecordEditor */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <RecordDetailsPanel
-          record={selectedRecord}
-          tableId={pageTableId || ''}
-          recordId={selectedRecordId}
-          tableName={tableName}
-          fields={tableFields}
-          formData={formData}
-          fieldGroups={fieldGroups}
-          visibleFields={detailVisibleFields}
-          pageEditable={pageEditable}
-          editableFieldNames={editableFieldNames}
-          titleField={config.title_field || config.left_panel?.title_field}
-          onFieldChange={handleFieldChange}
-          onRecordDelete={handleRecordDelete}
-          onRecordDuplicate={handleRecordDuplicate}
-          loading={isLoading}
-          blocks={loadedBlocks}
-          page={{ ...page, config } as any}
-          pageTableId={pageTableId}
-          isEditing={isEditing}
-          blocksLoading={blocksLoading}
-        />
+        {selectedRecordId ? (
+          <RecordEditor
+            recordId={selectedRecordId}
+            tableId={pageTableId || ''}
+            mode="review"
+            fieldLayoutConfig={fieldLayout}
+            tableFields={tableFields}
+            supabaseTableName={tableName}
+            cascadeContext={{ pageConfig: config }}
+            active={true}
+            allowEdit={pageEditable}
+            onDeleted={() => handleRecordDelete(selectedRecordId)}
+            onRecordDuplicate={handleRecordDuplicate}
+            onOpenModal={() =>
+              openRecordModal({
+                tableId: pageTableId || '',
+                recordId: selectedRecordId,
+                supabaseTableName: tableName ?? undefined,
+                fieldLayout,
+                tableFields,
+                cascadeContext: { pageConfig: config },
+                interfaceMode: isEditing ? 'edit' : 'view',
+              })
+            }
+            interfaceMode={isEditing ? 'edit' : 'view'}
+            renderHeaderActions={false}
+            renderExtraContent={
+              loadedBlocks.length > 0 ? (
+                blocksLoading ? (
+                  <div className="flex items-center justify-center py-8 text-gray-400 text-sm">
+                    Loading blocks…
+                  </div>
+                ) : (
+                  <InterfaceBuilder
+                    key={page.id}
+                    page={{ ...page, config } as any}
+                    initialBlocks={loadedBlocks.filter((b: any) => b.type !== 'record' && b.type !== 'field')}
+                    hideHeader={true}
+                    pageTableId={pageTableId || undefined}
+                    recordId={selectedRecordId || undefined}
+                    pageEditable={pageEditable}
+                    editableFieldNames={editableFieldNames}
+                  />
+                )
+              ) : null
+            }
+          />
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-gray-400 text-sm p-4">
+            <div className="text-center">
+              <p className="mb-2 font-medium">Select a record</p>
+              <p className="text-xs">Choose a record from the list to view its details.</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

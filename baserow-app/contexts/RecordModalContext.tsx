@@ -80,11 +80,11 @@ export function RecordModalProvider({ children }: { children: ReactNode }) {
 
   const closeRecordModal = useCallback(() => {
     setState(null)
-    setSelectedContext(null)
+    // CRITICAL: Do NOT clear selection - selection persists when modal closes (Record Lifecycle Contract)
     lastRecordPanelRef.current = null
     // Clear record layout data from RightSettingsPanel
     setRightPanelData({ recordId: null, recordTableId: null, fieldLayout: [], onLayoutSave: null, tableFields: [] })
-  }, [setSelectedContext, setRightPanelData])
+  }, [setRightPanelData])
 
   const handleClose = useCallback(() => {
     closeRecordModal()

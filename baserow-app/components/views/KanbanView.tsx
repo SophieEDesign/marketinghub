@@ -308,9 +308,10 @@ export default function KanbanView({
       supabaseTableName,
       (blockConfig as any)?.modal_fields,
       (blockConfig as any)?.modal_layout,
-      cascadeContext ?? undefined,
+      cascadeContext ?? (blockConfig ? { blockConfig } : undefined),
       interfaceMode,
-      onRecordDeleted
+      onRecordDeleted,
+      (blockConfig as any)?.field_layout
     )
   }, [blockConfig, cascadeContext, onRecordClick, openRecord, supabaseTableName, tableId, interfaceMode, onRecordDeleted])
 

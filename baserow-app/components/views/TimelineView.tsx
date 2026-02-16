@@ -1143,7 +1143,7 @@ export default function TimelineView({
       onRecordClick(rowId)
       return
     }
-    openRecord(tableId, rowId, supabaseTableName, (blockConfig as any)?.modal_fields, (blockConfig as any)?.modal_layout, blockConfig ? { blockConfig } : undefined, interfaceMode, onRecordDeleted)
+    openRecord(tableId, rowId, supabaseTableName, (blockConfig as any)?.modal_fields, (blockConfig as any)?.modal_layout, blockConfig ? { blockConfig } : undefined, interfaceMode, onRecordDeleted, (blockConfig as any)?.field_layout)
   }, [blockConfig, onRecordClick, openRecord, supabaseTableName, tableId, interfaceMode, onRecordDeleted])
 
   const handleEventSelect = useCallback((event: TimelineEvent, e: React.MouseEvent) => {

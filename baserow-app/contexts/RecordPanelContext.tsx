@@ -5,6 +5,7 @@ import { useSelectionContext } from "@/contexts/SelectionContext"
 
 import type { BlockConfig } from "@/lib/interface/types"
 import type { RecordEditorCascadeContext } from "@/lib/interface/record-editor-core"
+import type { FieldLayoutItem } from "@/lib/interface/field-layout-utils"
 
 interface RecordPanelState {
   isOpen: boolean
@@ -14,8 +15,9 @@ interface RecordPanelState {
   width: number
   isPinned: boolean
   isFullscreen: boolean
-  modalFields?: string[] // Fields to show in modal (if empty, show all)
-  modalLayout?: BlockConfig['modal_layout'] // Custom modal layout
+  modalFields?: string[]
+  modalLayout?: BlockConfig["modal_layout"]
+  fieldLayout?: FieldLayoutItem[]
   history: Array<{ tableId: string; recordId: string; tableName: string }> // For breadcrumb navigation
   /** When provided, RecordPanel enforces canEditRecords/canDeleteRecords from cascade. */
   cascadeContext?: RecordEditorCascadeContext | null
@@ -27,7 +29,7 @@ interface RecordPanelState {
 
 interface RecordPanelContextType {
   state: RecordPanelState
-  openRecord: (tableId: string, recordId: string, tableName: string, modalFields?: string[], modalLayout?: BlockConfig['modal_layout'], cascadeContext?: RecordEditorCascadeContext | null, interfaceMode?: 'view' | 'edit', onRecordDeleted?: () => void) => void
+  openRecord: (tableId: string, recordId: string, tableName: string, modalFields?: string[], modalLayout?: BlockConfig["modal_layout"], cascadeContext?: RecordEditorCascadeContext | null, interfaceMode?: "view" | "edit", onRecordDeleted?: () => void, fieldLayout?: FieldLayoutItem[]) => void
   /** Fetches table supabase_table by id and opens the record in the panel. Use when only tableId + recordId are available (e.g. linked record click). */
   openRecordByTableId: (tableId: string, recordId: string, interfaceMode?: 'view' | 'edit') => Promise<void>
   closeRecord: () => void
@@ -60,9 +62,19 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
     interfaceMode: 'view', // Default to view mode
   })
 
-  const openRecord = useCallback((tableId: string, recordId: string, tableName: string, modalFields?: string[], modalLayout?: BlockConfig['modal_layout'], cascadeContext?: RecordEditorCascadeContext | null, interfaceMode?: 'view' | 'edit', onRecordDeleted?: () => void) => {
-    if (process.env.NODE_ENV === 'development' && cascadeContext === undefined) {
-      console.warn('[RecordPanel] Opened without cascadeContext; block-level permissions will not be enforced.')
+  const openRecord = useCallback((
+    tableId: string,
+    recordId: string,
+    tableName: string,
+    modalFields?: string[],
+    modalLayout?: BlockConfig["modal_layout"],
+    cascadeContext?: RecordEditorCascadeContext | null,
+    interfaceMode?: "view" | "edit",
+    onRecordDeleted?: () => void,
+    fieldLayout?: FieldLayoutItem[]
+  ) => {
+    if (process.env.NODE_ENV === "development" && cascadeContext === undefined) {
+      console.warn("[RecordPanel] Opened without cascadeContext; block-level permissions will not be enforced.")
     }
     setSelectedContext({ type: "record", recordId, tableId })
     setState((prev) => ({
@@ -73,12 +85,14 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
       tableName,
       modalFields,
       modalLayout,
+      fieldLayout,
       cascadeContext,
-      interfaceMode: interfaceMode ?? prev.interfaceMode ?? 'view', // Preserve existing interfaceMode if not provided
+      interfaceMode: interfaceMode ?? prev.interfaceMode ?? "view",
       onRecordDeleted,
-      history: prev.isOpen && prev.tableId === tableId && prev.recordId === recordId
-        ? prev.history // Don't add to history if same record
-        : [...prev.history, { tableId, recordId, tableName }],
+      history:
+        prev.isOpen && prev.tableId === tableId && prev.recordId === recordId
+          ? prev.history
+          : [...prev.history, { tableId, recordId, tableName }],
     }))
   }, [setSelectedContext])
 

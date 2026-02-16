@@ -16,7 +16,7 @@
  */
 
 import { useMemo, useCallback, useState, useEffect, useRef } from "react"
-import { Copy, Trash2, X, MoreVertical, Pencil } from "lucide-react"
+import { Copy, Trash2, X, MoreVertical } from "lucide-react"
 import { formatDateUK } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import RecordFields from "@/components/records/RecordFields"
@@ -117,9 +117,6 @@ export default function RecordDetailsPanel({
     // Finally, fallback to first text field that's not "id"
     return fields.find((f) => f.type === "text" && f.name.toLowerCase() !== "id") || fields.find((f) => f.type === "text")
   }, [fields, titleField])
-
-  // Show edit mode banner when interface is in edit mode, or when page allows editing and we have fields (Airtable-style)
-  const showEditModeBanner = recordId && (isEditing || (pageEditable && visibleFields.length > 0))
 
   // Get record title from titleField or fallback to first text field (excluding "id")
   const recordTitle = useMemo(() => {
@@ -287,17 +284,7 @@ export default function RecordDetailsPanel({
   }
 
   return (
-    <div
-      className={`flex-1 border-l flex flex-col overflow-hidden bg-white ${showEditModeBanner ? "border-l-4 border-l-blue-500 border-gray-200" : "border-gray-200"}`}
-    >
-      {/* Edit mode banner - Airtable-style prominent indicator */}
-      {showEditModeBanner && (
-        <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-blue-50 border-b border-blue-200">
-          <Pencil className="h-4 w-4 text-blue-600" />
-          <span className="text-sm font-medium text-blue-700">Editing</span>
-        </div>
-      )}
-
+    <div className="flex-1 border-l border-gray-200 flex flex-col overflow-hidden bg-white">
       {/* Header - Record context */}
       <div className="border-b border-gray-200 bg-white flex-shrink-0">
         <div className="px-6 py-5">
@@ -425,7 +412,7 @@ export default function RecordDetailsPanel({
       </div>
 
       {/* Record Fields + Blocks */}
-      <div className={`flex-1 overflow-auto ${showEditModeBanner ? "bg-blue-50/20" : "bg-gray-50/30"}`}>
+      <div className="flex-1 overflow-auto bg-gray-50/30">
         {loading ? (
           <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4">
             <div className="text-center">

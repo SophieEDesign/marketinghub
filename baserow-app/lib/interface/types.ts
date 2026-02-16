@@ -290,7 +290,7 @@ export interface BlockConfig {
   list_meta_fields?: string[]
   // List view grouping behavior (choice fields)
   list_choice_groups_default_collapsed?: boolean
-  // Modal layout configuration
+  /** @deprecated Use field_layout instead. Modal layout configuration. */
   modal_layout?: {
     blocks: Array<{
       id: string

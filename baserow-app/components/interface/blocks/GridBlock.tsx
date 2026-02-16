@@ -1130,7 +1130,7 @@ function GridBlockInner({
         const handleRecordClick = allowOpenRecord
           ? (onRecordClick || ((clickedRecordId: string) => {
               if (tableId && table?.supabase_table) {
-                openRecordPanel(tableId, clickedRecordId, table.supabase_table, modalFieldsForRecord, (config as any).modal_layout, { blockConfig: config }, undefined, () => setRefreshKey((k) => k + 1))
+                openRecordPanel(tableId, clickedRecordId, table.supabase_table, modalFieldsForRecord, (config as any).modal_layout, { blockConfig: config }, undefined, () => setRefreshKey((k) => k + 1), (config as any).field_layout)
               }
             }))
           : undefined // Disable record clicks if not allowed
