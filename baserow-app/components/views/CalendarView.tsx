@@ -171,11 +171,15 @@ export default function CalendarView({
     fieldIdsPropRef.current = fieldIdsProp
   }
   // #endregion
-  // #region agent log – blockConfig stability (new ref each render = handleEventClick deps / effect loop)
+  // CRITICAL: Ref for blockConfig so handleEventClick can read latest without depending on it.
+  // blockConfig is a new object each render (from CalendarBlock's spread), causing handleEventClick
+  // to get new identity → FullCalendar reinit → React #185. Reading from ref stabilizes the handler.
   const blockConfigRef = useRef<typeof blockConfig | null>(null)
-  if (typeof window !== 'undefined' && blockConfigRef.current !== blockConfig) {
+  const prevBlockConfigForLog = blockConfigRef.current
+  blockConfigRef.current = blockConfig
+  // #region agent log – blockConfig stability (new ref each render = handleEventClick deps / effect loop)
+  if (typeof window !== 'undefined' && prevBlockConfigForLog !== blockConfig) {
     fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:blockConfig',message:'blockConfig ref changed',data:{hypothesisId:'H-blockConfig'},timestamp:Date.now()})}).catch(()=>{});
-    blockConfigRef.current = blockConfig
   }
   // #endregion
   const router = useRouter()
@@ -1739,11 +1743,12 @@ export default function CalendarView({
     }
   }, [stableLinkedValueLabelMaps])
 
-  const handleEventClick = useCallback(
+  // CRITICAL: FullCalendar's rx.set/rx.handle calls setState when eventClick prop changes.
+  // Unstable handler identity → FullCalendar reinit → setState during commit → React #185.
+  // Use ref-backed stable callback so FullCalendar ALWAYS receives the same function reference.
+  const handleEventClickImpl = useCallback(
     (info: EventClickArg) => {
       // CRITICAL: Calendar events ≠ records. Always read recordId from extendedProps.
-      // event.id may be modified by FullCalendar for multi-day events or slicing.
-      // Priority: extendedProps.recordId > extendedProps.rowId > event.id (fallback)
       const recordId = info.event.extendedProps?.recordId || info.event.extendedProps?.rowId || info.event.id
 
       // #region agent log - event click
@@ -1754,7 +1759,7 @@ export default function CalendarView({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             id: `log_${Date.now()}_calendar_event_click`,
-            runId: 'pre-fix-2',
+            runId: 'post-fix',
             hypothesisId: 'H5',
             location: 'CalendarView.tsx:onCalendarEventClick',
             message: 'Calendar event clicked',
@@ -1773,7 +1778,6 @@ export default function CalendarView({
       }
       // #endregion
       
-      // CRITICAL: Guard against missing recordId to prevent crashes
       if (!recordId) {
         const errorMsg = `[CalendarView] Cannot open record: missing recordId in event`
         console.error(errorMsg, {
@@ -1783,13 +1787,11 @@ export default function CalendarView({
           event: info.event
         })
         debugWarn('CALENDAR', "[Calendar] Event clicked but no recordId found", { event: info.event })
-        return // Do not attempt to open record modal
+        return
       }
       
       const recordIdString = String(recordId)
 
-      // DEBUG_CALENDAR: Always log event clicks in development (prove click wiring works)
-      // Standardise on localStorage.getItem("DEBUG_CALENDAR") === "1"
       const debugEnabled = typeof window !== "undefined" && localStorage.getItem("DEBUG_CALENDAR") === "1"
       if (debugEnabled || (typeof process !== 'undefined' && process.env.NODE_ENV === "development")) {
         debugLog('CALENDAR', "[Calendar] Event clicked", {
@@ -1819,39 +1821,44 @@ export default function CalendarView({
         onRecordClick(recordIdString)
         return
       }
-      // Do not setSelectedEventId when opening modal — avoids CalendarView re-render and FullCalendar #185.
-      // Defer opening modal to next tick so FullCalendar's internal state updates commit first,
-      // avoiding React #185 (fewer hooks) when calendar and modal update in the same cycle.
       queueMicrotask(() => {
+        const bc = blockConfigRef.current
         openRecordModal({
           tableId: resolvedTableId,
           recordId: recordIdString,
           tableFields: Array.isArray(loadedTableFields) ? loadedTableFields : [],
-          modalFields: Array.isArray(blockConfig?.modal_fields) ? blockConfig.modal_fields : [],
-          modalLayout: blockConfig?.modal_layout,
+          modalFields: Array.isArray(bc?.modal_fields) ? bc.modal_fields : [],
+          modalLayout: bc?.modal_layout,
           supabaseTableName,
-          cascadeContext: blockConfig ? { blockConfig } : undefined,
+          cascadeContext: bc ? { blockConfig: bc } : undefined,
           canEditLayout,
           onLayoutSave: onModalLayoutSave,
           interfaceMode,
           onSave: () => { if (resolvedTableId && supabaseTableName && loadRowsRef.current) loadRowsRef.current() },
           onDeleted: () => { if (resolvedTableId && supabaseTableName && loadRowsRef.current) loadRowsRef.current() },
           keySuffix: blockId ?? undefined,
-          forceFlatLayout: true, // Avoid React #185 (RecordFields/DndContext path)
+          forceFlatLayout: true,
         })
       })
     },
-    [allowOpenRecord, onRecordClick, resolvedDateFieldNames, openRecordModal, resolvedTableId, loadedTableFields, blockConfig, supabaseTableName, canEditLayout, onModalLayoutSave, interfaceMode, blockId]
+    [allowOpenRecord, onRecordClick, resolvedDateFieldNames, openRecordModal, resolvedTableId, loadedTableFields, supabaseTableName, canEditLayout, onModalLayoutSave, interfaceMode, blockId]
   )
-  // #region agent log – H3/H4: handleEventClick identity changes (FullCalendar reinit risk)
-  const handleEventClickRef = useRef(handleEventClick)
-  if (handleEventClickRef.current !== handleEventClick && typeof window !== 'undefined') {
-    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:handleEventClick',message:'handleEventClick identity changed',data:{hypothesisId:'H3'},timestamp:Date.now()})}).catch(()=>{});
-    handleEventClickRef.current = handleEventClick
+  const handleEventClickRef = useRef(handleEventClickImpl)
+  handleEventClickRef.current = handleEventClickImpl
+  // STABLE identity - FullCalendar never sees a new function, preventing rx.set → setState → #185
+  const handleEventClick = useCallback((info: EventClickArg) => {
+    handleEventClickRef.current(info)
+  }, [])
+  // #region agent log – H3: verify stable handler passed to FullCalendar
+  const handleEventClickStableRef = useRef(handleEventClick)
+  if (handleEventClickStableRef.current !== handleEventClick && typeof window !== 'undefined') {
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CalendarView.tsx:handleEventClick',message:'handleEventClick STABLE (identity should not change)',data:{hypothesisId:'H3-stable'},timestamp:Date.now()})}).catch(()=>{});
+    handleEventClickStableRef.current = handleEventClick
   }
   // #endregion
 
-  const handleDateClick = useCallback(
+  // Stable dateClick handler - same pattern as handleEventClick to prevent FullCalendar rx.set → #185
+  const handleDateClickImpl = useCallback(
     (info: { dateStr: string }) => {
       if (!canCreateRecord || !resolvedTableId || !resolvedDateFieldId) return
       const clickedDate = new Date(info.dateStr + "T00:00:00")
@@ -1862,14 +1869,15 @@ export default function CalendarView({
       initial[resolvedDateFieldId] = dateValue
       if (viewConfig?.calendar_start_field) initial[viewConfig.calendar_start_field] = dateValue
       if (viewConfig?.calendar_end_field) initial[viewConfig.calendar_end_field] = dateValue
+      const bc = blockConfigRef.current
       openRecordModal({
         tableId: resolvedTableId,
         recordId: null,
         tableFields: Array.isArray(loadedTableFields) ? loadedTableFields : [],
-        modalFields: Array.isArray(blockConfig?.modal_fields) ? blockConfig.modal_fields : [],
-        modalLayout: blockConfig?.modal_layout,
+        modalFields: Array.isArray(bc?.modal_fields) ? bc.modal_fields : [],
+        modalLayout: bc?.modal_layout,
         supabaseTableName,
-        cascadeContext: blockConfig ? { blockConfig } : undefined,
+        cascadeContext: bc ? { blockConfig: bc } : undefined,
         canEditLayout,
         onLayoutSave: onModalLayoutSave,
         interfaceMode,
@@ -1877,11 +1885,16 @@ export default function CalendarView({
         onSave: () => { if (resolvedTableId && supabaseTableName && loadRowsRef.current) loadRowsRef.current() },
         onDeleted: () => { if (resolvedTableId && supabaseTableName && loadRowsRef.current) loadRowsRef.current() },
         keySuffix: blockId ?? undefined,
-        forceFlatLayout: true, // Avoid React #185 (RecordFields/DndContext path)
+        forceFlatLayout: true,
       })
     },
-    [canCreateRecord, resolvedTableId, resolvedDateFieldId, openRecordModal, combinedFiltersForDefaults, loadedTableFields, viewConfig, blockConfig, supabaseTableName, canEditLayout, onModalLayoutSave, interfaceMode, blockId]
+    [canCreateRecord, resolvedTableId, resolvedDateFieldId, openRecordModal, combinedFiltersForDefaults, loadedTableFields, viewConfig, supabaseTableName, canEditLayout, onModalLayoutSave, interfaceMode, blockId]
   )
+  const handleDateClickRef = useRef(handleDateClickImpl)
+  handleDateClickRef.current = handleDateClickImpl
+  const handleDateClick = useCallback((info: { dateStr: string }) => {
+    handleDateClickRef.current(info)
+  }, [])
 
   // ---------- END OF HOOKS: No hook may be declared below this line ----------
   // From here on only conditional returns and the main render.

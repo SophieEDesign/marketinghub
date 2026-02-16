@@ -203,7 +203,14 @@ export default function RecordModal({
 
   // Layout editing state - must be declared before layoutFieldsSource which uses it
   const [localFieldLayout, setLocalFieldLayout] = useState<FieldLayoutItem[]>([])
+  // CRITICAL: Only update when layout CONTENT changes, not reference. resolvedFieldLayout is a new
+  // array each time useMemo runs (convertModalLayoutToFieldLayout returns new array). Without this
+  // guard, effect → setState → re-render → useMemo runs → new ref → effect → setState → React #185.
+  const resolvedLayoutSignatureRef = useRef<string>('')
   useEffect(() => {
+    const sig = JSON.stringify(resolvedFieldLayout.map((i) => [i.field_name, i.order, i.visible_in_modal]))
+    if (resolvedLayoutSignatureRef.current === sig) return
+    resolvedLayoutSignatureRef.current = sig
     setLocalFieldLayout(resolvedFieldLayout)
   }, [resolvedFieldLayout])
 
