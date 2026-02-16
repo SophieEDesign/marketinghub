@@ -86,6 +86,11 @@ export default function GroupedInterfaces({
   const router = useRouter()
   const currentPageId = params?.pageId as string | undefined
   console.log("Derived currentPageId:", currentPageId)
+  // #region agent log
+  if (typeof window !== "undefined") {
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GroupedInterfaces.tsx',message:'Derived currentPageId',data:{currentPageId},timestamp:Date.now(),hypothesisId:'params-fix'})}).catch(()=>{});
+  }
+  // #endregion
   const { primaryColor, sidebarTextColor } = useBranding()
   const { toast } = useToast()
   // Filter out any null/undefined groups (safety check)

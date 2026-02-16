@@ -12,9 +12,9 @@ import { LayoutDashboard } from "lucide-react"
 export default async function DashboardPage({
   params,
 }: {
-  params: Promise<{ dashboardId: string }>
+  params: { dashboardId: string }
 }) {
-  const { dashboardId } = await params
+  const { dashboardId } = params
   const page = await getInterfacePage(dashboardId)
   const admin = await isAdmin()
 

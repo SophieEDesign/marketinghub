@@ -7,8 +7,8 @@ import { redirect } from "next/navigation"
 export default async function InterfacePage({
   params,
 }: {
-  params: Promise<{ pageId: string }>
+  params: { pageId: string }
 }) {
-  const { pageId } = await params
+  const { pageId } = params
   redirect(`/pages/${pageId}`)
 }

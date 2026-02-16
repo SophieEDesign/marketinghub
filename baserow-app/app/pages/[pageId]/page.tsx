@@ -10,10 +10,12 @@ const isDev = process.env.NODE_ENV === 'development'
 export default async function PagePage({
   params,
 }: {
-  params: Promise<{ pageId: string }>
-  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>
+  params: { pageId: string }
 }) {
-  const { pageId } = await params
+  const { pageId } = params
+  // #region agent log
+  console.log('[PagePage] Server render with pageId:', pageId)
+  // #endregion
   const supabase = await createClient()
   const admin = await isAdmin()
 
