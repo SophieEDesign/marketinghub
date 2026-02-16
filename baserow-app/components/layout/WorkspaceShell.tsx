@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import AirtableSidebar from "./AirtableSidebar"
 import Topbar from "./Topbar"
 import EditModeBanner from "./EditModeBanner"
+import EditModeGuard from "./EditModeGuard"
 import { RecordPanelProvider } from "@/contexts/RecordPanelContext"
 import { RecordModalProvider } from "@/contexts/RecordModalContext"
 import { SelectionContextProvider } from "@/contexts/SelectionContext"
@@ -162,7 +163,11 @@ function ShellContent({
   const suppressMainScroll = mainScroll?.suppressMainScroll ?? false
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-x-hidden">
+    <div className="flex flex-col h-screen bg-gray-50 overflow-x-hidden">
+      {/* Edit mode banner - full app width at top, above sidebar and content */}
+      <EditModeBanner />
+      <EditModeGuard />
+      <div className="flex flex-1 min-h-0 overflow-x-hidden">
       {/* When topbar is hidden (some pages have their own toolbar), still provide a mobile hamburger toggle */}
       {hideTopbar && isMobile && (
         <div className="fixed top-3 left-3 z-50 desktop:hidden">
@@ -190,7 +195,6 @@ function ShellContent({
       />
       {/* Main content area - RecordPanel overlays when open (position: fixed) */}
       <div className="flex-1 flex flex-col overflow-x-hidden min-h-0 min-w-0">
-        <EditModeBanner />
         {!hideTopbar && (
           <Topbar
             title={title}
@@ -206,6 +210,7 @@ function ShellContent({
       </div>
       {/* Record Panel - overlay only, hidden for pages with their own record detail panel */}
       {!hideRecordPanel && <RecordPanel />}
+      </div>
     </div>
   )
 }
