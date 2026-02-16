@@ -7,7 +7,7 @@
  */
 import { useEffect, useCallback } from "react"
 import { usePageActions } from "@/contexts/PageActionsContext"
-import { useEditMode, usePageEditMode, useBlockEditMode } from "@/contexts/EditModeContext"
+import { usePageEditMode, useBlockEditMode } from "@/contexts/EditModeContext"
 import { useUIMode } from "@/contexts/UIModeContext"
 import { useSelectionContext } from "@/contexts/SelectionContext"
 
@@ -23,7 +23,6 @@ export default function PageActionsRegistrar({
   isViewer,
 }: PageActionsRegistrarProps) {
   const { registerPageActions, unregisterPageActions } = usePageActions()
-  const { clearEditingContext } = useEditMode()
   const { isEditing: isPageEditing, exit: exitPageEdit } = usePageEditMode(pageId)
   const { isEditing: isBlockEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(pageId)
   const { exitEditPages } = useUIMode()
@@ -60,9 +59,8 @@ export default function PageActionsRegistrar({
 
     return () => {
       unregisterPageActions()
-      clearEditingContext("block")
     }
-  }, [pageId, isAdmin, isViewer, isPageEditing, isBlockEditing, onOpenPageSettings, onEnterEdit, onExitEdit, registerPageActions, unregisterPageActions, clearEditingContext])
+  }, [pageId, isAdmin, isViewer, isPageEditing, isBlockEditing, onOpenPageSettings, onEnterEdit, onExitEdit, registerPageActions, unregisterPageActions])
 
   return null
 }
