@@ -332,6 +332,10 @@ export default function Canvas({
   // Persistent layout state (saved to DB)
   const [layout, setLayout] = useState<Layout[]>([])
 
+  // Ephemeral expansion deltas (runtime only, not saved)
+  // Maps blockId -> deltaH (additional height in grid units from collapsible expansion)
+  const [ephemeralDeltas, setEphemeralDeltas] = useState<Map<string, number>>(new Map())
+
   // Full-page mode: exactly one block with is_full_page (used for gridLayout and block rendering)
   const isFullPageMode = Boolean(
     fullPageBlockId && blocks.length === 1 && blocks[0].id === fullPageBlockId
@@ -411,10 +415,6 @@ export default function Canvas({
       }
     })
   }, [blocks, layout, ephemeralDeltas, layoutSettings?.cols, isFullPageMode, fullPageBlock])
-  
-  // Ephemeral expansion deltas (runtime only, not saved)
-  // Maps blockId -> deltaH (additional height in grid units from collapsible expansion)
-  const [ephemeralDeltas, setEphemeralDeltas] = useState<Map<string, number>>(new Map())
   
   // Layout version for preventing stale sync overwrites
   const layoutVersionRef = useRef<number>(0)
