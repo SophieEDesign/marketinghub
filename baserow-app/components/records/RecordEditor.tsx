@@ -262,7 +262,6 @@ export default function RecordEditor({
 
   useEffect(() => {
     if (!active) {
-      setManualEditMode(false)
       setReviewEditMode(false)
     }
   }, [active])

@@ -239,10 +239,10 @@ export default function RightSettingsPanel() {
           if (fromRecordPanel) {
             return (
               <RecordLayoutSettings
-                tableId={recordPanelState.tableId}
-                recordId={recordPanelState.recordId}
+                tableId={recordPanelState.tableId ?? ""}
+                recordId={recordPanelState.recordId ?? ""}
                 fieldLayout={recordPanelState.fieldLayout ?? []}
-                onLayoutSave={recordPanelState.onLayoutSave}
+                onLayoutSave={recordPanelState.onLayoutSave ?? null}
                 fields={recordPanelState.tableFields ?? []}
               />
             )
@@ -250,10 +250,10 @@ export default function RightSettingsPanel() {
           if (fromPageData) {
             return (
               <RecordLayoutSettings
-                tableId={data.recordTableId}
-                recordId={data.recordId}
+                tableId={data.recordTableId ?? ""}
+                recordId={data.recordId ?? ""}
                 fieldLayout={data.fieldLayout ?? []}
-                onLayoutSave={data.onLayoutSave}
+                onLayoutSave={data.onLayoutSave ?? null}
                 fields={data.tableFields ?? []}
               />
             )
