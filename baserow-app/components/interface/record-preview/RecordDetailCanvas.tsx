@@ -168,29 +168,28 @@ export default function RecordDetailCanvas({
         }))
       }
 
-      return recordFields
-        .map((fieldConfig, index) => {
-          const field = tableFields.find((f) => f.name === fieldConfig.field || f.id === fieldConfig.field)
-          if (!field) return null
-          return {
-            id: `field-${recordId}-${field.name}`,
-            page_id: blockId,
-            type: "field" as const,
-            x: index % 2 === 0 ? 0 : 6,
-            y: Math.floor(index / 2) * 2,
-            w: 6,
-            h: defaultBlockH(field),
-            config: {
-              field_id: field.id,
-              field_name: field.name,
-              table_id: tableId,
-              allow_inline_edit: fieldConfig.editable !== false,
-            },
-            order_index: index,
-            created_at: new Date().toISOString(),
-          }
-        })
-        .filter((b): b is PageBlock => b != null)
+      const mapped = recordFields.map((fieldConfig, index): PageBlock | null => {
+        const field = tableFields.find((f) => f.name === fieldConfig.field || f.id === fieldConfig.field)
+        if (!field) return null
+        return {
+          id: `field-${recordId}-${field.name}`,
+          page_id: blockId,
+          type: "field" as const,
+          x: index % 2 === 0 ? 0 : 6,
+          y: Math.floor(index / 2) * 2,
+          w: 6,
+          h: defaultBlockH(field),
+          config: {
+            field_id: field.id,
+            field_name: field.name,
+            table_id: tableId,
+            allow_inline_edit: fieldConfig.editable !== false,
+          },
+          order_index: index,
+          created_at: new Date().toISOString(),
+        } satisfies PageBlock
+      })
+      return mapped.filter((b): b is PageBlock => b != null)
     },
     [recordId, blockId, tableId, recordFields, recordFieldSet, tableFields, pageEditable]
   )
