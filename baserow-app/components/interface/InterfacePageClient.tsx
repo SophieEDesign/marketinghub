@@ -1266,9 +1266,10 @@ function InterfacePageClientInternal({
         </div>
       )}
 
-      {/* Content Area - single stable tree; never unmount based on page/loading */}
-      <div className="flex-1 overflow-x-hidden min-w-0 min-h-0 w-full relative">
-        <div className="flex-1 w-full min-w-0 min-h-0 flex flex-col overflow-x-hidden relative">
+      {/* Content Area - single stable tree; never unmount based on page/loading.
+          CRITICAL: pr-0 ensures right panel overlays without pushing blocks (no width change in edit mode). */}
+      <div className="flex-1 overflow-x-hidden min-w-0 min-h-0 w-full pr-0 relative">
+        <div className="flex-1 w-full min-w-0 min-h-0 flex flex-col overflow-x-hidden pr-0 relative">
           {useRecordReviewLayout && hasPage ? (
             <RecordReviewPage
               page={pageForRender as any}

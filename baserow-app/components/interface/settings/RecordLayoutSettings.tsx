@@ -1,11 +1,19 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useMemo } from "react"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
-import { GripVertical, Eye, EyeOff } from "lucide-react"
-import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
-import { Button } from "@/components/ui/button"
+import {
+  GripVertical,
+  Eye,
+  EyeOff,
+  Search,
+  PanelRight,
+  Maximize2,
+  MessageSquare,
+  MoreHorizontal,
+  Info,
+} from "lucide-react"
+import { Input } from "@/components/ui/input"
 import {
   DndContext,
   closestCenter,
@@ -24,11 +32,9 @@ import {
 import { CSS } from "@dnd-kit/utilities"
 import type { TableField } from "@/types/fields"
 import type { FieldLayoutItem } from "@/lib/interface/field-layout-utils"
-import {
-  createInitialFieldLayout,
-  getVisibleFieldsFromLayout,
-} from "@/lib/interface/field-layout-helpers"
+import { createInitialFieldLayout } from "@/lib/interface/field-layout-helpers"
 import { getFieldDisplayName } from "@/lib/fields/display"
+import { getFieldIcon } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 
 interface RecordLayoutSettingsProps {
@@ -46,13 +52,17 @@ function SortableFieldRow({
   item,
   field,
   onVisibilityToggle,
+  visible,
+  searchQuery,
+  isHiddenSection,
 }: {
   item: FieldLayoutItem
   field: TableField
   onVisibilityToggle: (fieldName: string, visible: boolean) => void
+  visible: boolean
+  searchQuery: string
+  isHiddenSection: boolean
 }) {
-  // Use visible_in_canvas (record_view inline panel); fallback to visible_in_modal for legacy layouts
-  const visible = ((item as any).visible_in_canvas ?? (item as any).visible_in_modal) !== false
   const {
     attributes,
     listeners,
@@ -61,6 +71,13 @@ function SortableFieldRow({
     transition,
     isDragging,
   } = useSortable({ id: item.field_id })
+
+  const displayName = getFieldDisplayName(field)
+  const matchesSearch =
+    !searchQuery ||
+    displayName.toLowerCase().includes(searchQuery.toLowerCase())
+
+  if (!matchesSearch) return null
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -73,7 +90,7 @@ function SortableFieldRow({
       style={style}
       className={cn(
         "flex items-center gap-2 py-2 px-3 rounded-md border border-gray-200 bg-white",
-        !visible && "opacity-60",
+        isHiddenSection && "opacity-60",
         isDragging && "shadow-md z-10"
       )}
     >
@@ -84,8 +101,16 @@ function SortableFieldRow({
       >
         <GripVertical className="h-4 w-4" />
       </div>
-      <span className="flex-1 text-sm font-medium truncate">
-        {getFieldDisplayName(field)}
+      <div className="flex-shrink-0 text-gray-500">
+        {getFieldIcon(field.type)}
+      </div>
+      <span
+        className={cn(
+          "flex-1 text-sm truncate",
+          isHiddenSection ? "text-gray-400" : "font-medium text-gray-900"
+        )}
+      >
+        {displayName}
       </span>
       <button
         type="button"
@@ -99,6 +124,13 @@ function SortableFieldRow({
           <EyeOff className="h-4 w-4" />
         )}
       </button>
+      <button
+        type="button"
+        className="p-1 text-gray-400 hover:text-gray-600"
+        title="More options"
+      >
+        <MoreHorizontal className="h-4 w-4" />
+      </button>
     </div>
   )
 }
@@ -110,83 +142,153 @@ export default function RecordLayoutSettings({
   onLayoutSave,
   fields,
 }: RecordLayoutSettingsProps) {
-  const { setFieldLayout: setLiveLayout } = useRecordPanel()
-  const resolvedLayout =
-    fieldLayout.length > 0
-      ? fieldLayout
-      : createInitialFieldLayout(fields, "record_review", true)
+  const { state: recordPanelState, setFieldLayout: setLiveLayout, toggleFullscreen } =
+    useRecordPanel()
+  const resolvedLayout = useMemo(() => {
+    const base =
+      fieldLayout.length > 0
+        ? fieldLayout
+        : createInitialFieldLayout(fields, "record_review", true)
+    const layoutNames = new Set(base.map((i) => i.field_name))
+    const missing = fields.filter(
+      (f) => !layoutNames.has(f.name) && !f.options?.system
+    )
+    if (missing.length === 0) return base
+    const maxOrder = Math.max(...base.map((i) => i.order), -1)
+    return [
+      ...base,
+      ...missing.map((f, i) => ({
+        field_id: f.id,
+        field_name: f.name,
+        order: maxOrder + 1 + i,
+        editable: true,
+        visible_in_canvas: false,
+        visible_in_modal: false,
+      })),
+    ]
+  }, [fieldLayout, fields])
 
   const [draftLayout, setDraftLayout] = useState<FieldLayoutItem[]>(() => [
     ...resolvedLayout,
   ])
+  const [searchQuery, setSearchQuery] = useState("")
 
-  // Sync draftLayout when fields or fieldLayout load asynchronously (e.g. tableFields fetch completes)
-  const layoutSignature = `${fields.length}-${fieldLayout.length}-${fieldLayout.length > 0 ? fieldLayout.map((i) => i.field_id).sort().join(",") : fields.map((f) => f.id).sort().join(",")}`
+  const layoutSignature = `${resolvedLayout.length}-${resolvedLayout.map((i) => i.field_id).sort().join(",")}`
   useEffect(() => {
     if (resolvedLayout.length > 0) {
       setDraftLayout([...resolvedLayout])
     }
-  }, [layoutSignature])
+  }, [layoutSignature, resolvedLayout])
 
-  const visibleFields = getVisibleFieldsFromLayout(draftLayout, fields, "canvas")
-  const fieldMap = new Map(fields.map((f) => [f.name, f]))
+  const fieldMap = useMemo(
+    () => new Map(fields.map((f) => [f.name, f])),
+    [fields]
+  )
 
-  const handleVisibilityToggle = useCallback((fieldName: string, visible: boolean) => {
-    setDraftLayout((prev) => {
-      const existing = prev.find(
-        (i) => i.field_name === fieldName || i.field_id === fieldName
-      )
-      let next: FieldLayoutItem[]
-      if (existing) {
-        next = prev.map((i) =>
-          i.field_name === fieldName || i.field_id === fieldName
-            ? {
-                ...i,
-                visible_in_canvas: visible,
-                visible_in_modal: visible,
-              }
-            : i
+  const visibleItems = useMemo(() => {
+    const sorted = [...draftLayout].sort((a, b) => a.order - b.order)
+    return sorted.filter(
+      (item) =>
+        ((item as any).visible_in_canvas ?? (item as any).visible_in_modal) !==
+        false
+    )
+  }, [draftLayout])
+
+  const hiddenItems = useMemo(() => {
+    const sorted = [...draftLayout].sort((a, b) => a.order - b.order)
+    return sorted.filter(
+      (item) =>
+        ((item as any).visible_in_canvas ?? (item as any).visible_in_modal) ===
+        false
+    )
+  }, [draftLayout])
+
+  const handleVisibilityToggle = useCallback(
+    (fieldName: string, visible: boolean) => {
+      setDraftLayout((prev) => {
+        const existing = prev.find(
+          (i) => i.field_name === fieldName || i.field_id === fieldName
         )
-      } else {
-        const field = fieldMap.get(fieldName)
-        if (!field) return prev
-        const newItem: FieldLayoutItem = {
-          field_id: field.id,
-          field_name: field.name,
-          order: Math.max(...prev.map((i) => i.order), -1) + 1,
-          editable: true,
-          visible_in_canvas: visible,
-          visible_in_modal: visible,
+        let next: FieldLayoutItem[]
+        if (existing) {
+          next = prev.map((i) =>
+            i.field_name === fieldName || i.field_id === fieldName
+              ? {
+                  ...i,
+                  visible_in_canvas: visible,
+                  visible_in_modal: visible,
+                }
+              : i
+          )
+        } else {
+          const field = fieldMap.get(fieldName)
+          if (!field) return prev
+          const newItem: FieldLayoutItem = {
+            field_id: field.id,
+            field_name: field.name,
+            order: Math.max(...prev.map((i) => i.order), -1) + 1,
+            editable: true,
+            visible_in_canvas: visible,
+            visible_in_modal: visible,
+          }
+          next = [...prev, newItem]
         }
-        next = [...prev, newItem]
-      }
-      setLiveLayout(next)
-      return next
-    })
-  }, [fieldMap, setLiveLayout])
+        setLiveLayout(next)
+        return next
+      })
+    },
+    [fieldMap, setLiveLayout]
+  )
 
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-
+  const handleHideAll = useCallback(() => {
     setDraftLayout((prev) => {
-      const ids = prev.map((i) => i.field_id)
-      const oldIndex = ids.indexOf(active.id as string)
-      const newIndex = ids.indexOf(over.id as string)
-      if (oldIndex === -1 || newIndex === -1) return prev
-
-      const reordered = [...prev]
-      const [moved] = reordered.splice(oldIndex, 1)
-      reordered.splice(newIndex, 0, moved)
-
-      const next = reordered.map((item, index) => ({
-        ...item,
-        order: index,
+      const next = prev.map((i) => ({
+        ...i,
+        visible_in_canvas: false,
+        visible_in_modal: false,
       }))
       setLiveLayout(next)
       return next
     })
   }, [setLiveLayout])
+
+  const handleShowAll = useCallback(() => {
+    setDraftLayout((prev) => {
+      const next = prev.map((i) => ({
+        ...i,
+        visible_in_canvas: true,
+        visible_in_modal: true,
+      }))
+      setLiveLayout(next)
+      return next
+    })
+  }, [setLiveLayout])
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event
+      if (!over || active.id === over.id) return
+
+      setDraftLayout((prev) => {
+        const ids = prev.map((i) => i.field_id)
+        const oldIndex = ids.indexOf(active.id as string)
+        const newIndex = ids.indexOf(over.id as string)
+        if (oldIndex === -1 || newIndex === -1) return prev
+
+        const reordered = [...prev]
+        const [moved] = reordered.splice(oldIndex, 1)
+        reordered.splice(newIndex, 0, moved)
+
+        const next = reordered.map((item, index) => ({
+          ...item,
+          order: index,
+        }))
+        setLiveLayout(next)
+        return next
+      })
+    },
+    [setLiveLayout]
+  )
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -197,26 +299,62 @@ export default function RecordLayoutSettings({
     })
   )
 
-  const handleSave = useCallback(() => {
-    if (onLayoutSave) {
-      const result = onLayoutSave(draftLayout)
-      if (result instanceof Promise) {
-        result.catch((err) => console.error("Failed to save layout:", err))
-      }
-    }
-  }, [draftLayout, onLayoutSave])
+  const isFullscreen = recordPanelState.isFullscreen
 
   return (
-    <div className="p-4 space-y-6">
-      <div>
-        <h3 className="text-sm font-semibold text-gray-900 mb-1">
-          Field order and visibility
-        </h3>
-        <p className="text-xs text-gray-500 mb-4">
-          Drag to reorder fields. Toggle visibility for each field in the record
-          view.
+    <div className="flex flex-col h-full">
+      {/* Show as section */}
+      <div className="p-4 border-b border-gray-200">
+        <p className="text-sm font-medium text-gray-700 mb-3">Show as</p>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => isFullscreen && toggleFullscreen()}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg border-2 transition-colors",
+              !isFullscreen
+                ? "border-blue-500 bg-blue-50 text-blue-700"
+                : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+            )}
+          >
+            <PanelRight className="h-5 w-5" />
+            <span className="font-medium">Sidesheet</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => !isFullscreen && toggleFullscreen()}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg border-2 transition-colors",
+              isFullscreen
+                ? "border-blue-500 bg-blue-50 text-blue-700"
+                : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+            )}
+          >
+            <Maximize2 className="h-5 w-5" />
+            <span className="font-medium">Full-screen</span>
+          </button>
+        </div>
+        <p className="flex items-center gap-1.5 mt-2 text-xs text-gray-500">
+          <Info className="h-3.5 w-3.5" />
+          This layout is shared across this block
         </p>
+      </div>
 
+      {/* Search */}
+      <div className="p-4 border-b border-gray-200">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 h-9 bg-gray-50 border-gray-200"
+          />
+        </div>
+      </div>
+
+      {/* Visible & Hidden sections */}
+      <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4">
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -226,10 +364,34 @@ export default function RecordLayoutSettings({
             items={draftLayout.map((i) => i.field_id)}
             strategy={verticalListSortingStrategy}
           >
-            <div className="space-y-2">
-              {draftLayout
-                .sort((a, b) => a.order - b.order)
-                .map((item) => {
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-gray-700">Visible</p>
+                {visibleItems.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleHideAll}
+                    className="text-xs text-blue-600 hover:underline"
+                  >
+                    Hide all
+                  </button>
+                )}
+              </div>
+
+              {/* Record comments - special row */}
+              {(!searchQuery ||
+                "record comments".includes(searchQuery.toLowerCase())) && (
+                <div className="flex items-center gap-2 py-2 px-3 rounded-md border border-gray-200 bg-white mb-2">
+                  <div className="w-4 flex-shrink-0" />
+                  <MessageSquare className="h-3.5 w-3.5 text-gray-500 flex-shrink-0" />
+                  <span className="flex-1 text-sm font-medium text-gray-900">
+                    Record comments
+                  </span>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                {visibleItems.map((item) => {
                   const field =
                     fieldMap.get(item.field_name) ||
                     fields.find((f) => f.id === item.field_id)
@@ -240,21 +402,52 @@ export default function RecordLayoutSettings({
                       item={item}
                       field={field}
                       onVisibilityToggle={handleVisibilityToggle}
+                      visible={true}
+                      searchQuery={searchQuery}
+                      isHiddenSection={false}
                     />
                   )
                 })}
+              </div>
             </div>
+
+            {/* Hidden section */}
+            {hiddenItems.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium text-gray-700">Hidden</p>
+                  <button
+                    type="button"
+                    onClick={handleShowAll}
+                    className="text-xs text-blue-600 hover:underline"
+                  >
+                    Show all
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {hiddenItems.map((item) => {
+                    const field =
+                      fieldMap.get(item.field_name) ||
+                      fields.find((f) => f.id === item.field_id)
+                    if (!field) return null
+                    return (
+                      <SortableFieldRow
+                        key={item.field_id}
+                        item={item}
+                        field={field}
+                        onVisibilityToggle={handleVisibilityToggle}
+                        visible={false}
+                        searchQuery={searchQuery}
+                        isHiddenSection={true}
+                      />
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </SortableContext>
         </DndContext>
       </div>
-
-      {onLayoutSave && (
-        <div className="pt-4 border-t">
-          <Button onClick={handleSave} size="sm">
-            Save layout
-          </Button>
-        </div>
-      )}
     </div>
   )
 }

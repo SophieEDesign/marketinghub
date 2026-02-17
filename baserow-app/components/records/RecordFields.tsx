@@ -48,6 +48,8 @@ interface RecordFieldsProps {
   onFieldLabelClick?: (fieldId: string) => void
   /** Visibility context: 'modal' uses visible_in_modal, 'canvas' uses visible_in_canvas (for RecordDetailPanelInline) */
   visibilityContext?: 'modal' | 'canvas'
+  /** When set, the field with this id gets a blue border (selected for settings) */
+  selectedFieldId?: string | null
 }
 
 const DEFAULT_GROUP_NAME = "General"
@@ -77,6 +79,7 @@ export default function RecordFields({
   pageEditable = true,
   onFieldLabelClick,
   visibilityContext = 'modal',
+  selectedFieldId,
 }: RecordFieldsProps) {
   const { navigateToLinkedRecord, openRecordByTableId, state: recordPanelState } = useRecordPanel()
   const { toast } = useToast()
@@ -256,15 +259,13 @@ export default function RecordFields({
     fieldLayout.forEach((item) => {
       if ((item as any)[visKey] === false) return
 
-      const colId = item.modal_column_id || "col-1"
+      const colId = item.modal_column_span === 2 ? "col-full" : (item.modal_column_id || "col-1")
       const colOrder = item.modal_column_order ?? 0
-      const colWidth = item.modal_column_width ?? 1
+      const colWidth = item.modal_column_span === 2 ? 2 : (item.modal_column_width ?? 1)
       const field = fieldMap.get(item.field_name) || fieldMap.get(item.field_id)
       if (!field || isSystemFieldName(field.name) || field.options?.system) {
         return
       }
-      // Ensure each logical field participates in the modal canvas at most once,
-      // even if field_layout contains duplicate items.
       if (seenFieldNames.has(field.name)) {
         return
       }
@@ -306,6 +307,66 @@ export default function RecordFields({
 
     return columns
   }, [fieldLayout, fields, visibilityContext])
+
+  // Row-major ordered field list for grid layout.
+  // When modal_row_order is used: sort by row, then full-width first, then column.
+  // Otherwise: interleave col-1 and col-2 by row (zip columns) for 2-column layout.
+  const hasRowOrder = fieldLayout.some((i) => i.modal_row_order != null)
+  const modalGridItems = useMemo(() => {
+    if (!showModalColumns) return null
+    const fieldMap = new Map<string, TableField>()
+    fields.forEach((f) => {
+      fieldMap.set(f.name, f)
+      fieldMap.set(f.id, f)
+    })
+    const visKey = visibilityContext === 'canvas' ? 'visible_in_canvas' : 'visible_in_modal'
+    const items = fieldLayout
+      .filter((i) => (i as any)[visKey] !== false)
+      .map((item) => {
+        const field = fieldMap.get(item.field_name) || fieldMap.get(item.field_id)
+        return field && !isSystemFieldName(field.name) ? { field, item } : null
+      })
+      .filter((x): x is { field: TableField; item: FieldLayoutItem } => x != null)
+
+    if (hasRowOrder) {
+      items.sort((a, b) => {
+        const rowA = a.item.modal_row_order ?? 0
+        const rowB = b.item.modal_row_order ?? 0
+        if (rowA !== rowB) return rowA - rowB
+        const spanA = a.item.modal_column_span === 2 ? 0 : 1
+        const spanB = b.item.modal_column_span === 2 ? 0 : 1
+        if (spanA !== spanB) return spanA - spanB
+        const colA = a.item.modal_column_id === "col-2" ? 2 : 1
+        const colB = b.item.modal_column_id === "col-2" ? 2 : 1
+        return colA - colB
+      })
+    } else {
+      // Interleave col-1 and col-2 for row-major placement
+      const col1 = modalColumns.find((c) => c.id === "col-1")?.fields ?? []
+      const col2 = modalColumns.find((c) => c.id === "col-2")?.fields ?? []
+      const colFull = modalColumns.find((c) => c.id === "col-full")?.fields ?? []
+      const fieldToItem = new Map(items.map((x) => [x.field.id, x]))
+      const ordered: typeof items = []
+      const maxRows = Math.max(col1.length, col2.length)
+      for (let r = 0; r < maxRows; r++) {
+        if (col1[r]) {
+          const x = fieldToItem.get(col1[r].id)
+          if (x) ordered.push(x)
+        }
+        if (col2[r]) {
+          const x = fieldToItem.get(col2[r].id)
+          if (x) ordered.push(x)
+        }
+      }
+      colFull.forEach((f) => {
+        const x = fieldToItem.get(f.id)
+        if (x) ordered.push(x)
+      })
+      items.length = 0
+      ordered.forEach((x) => items.push(x))
+    }
+    return items
+  }, [showModalColumns, hasRowOrder, fieldLayout, fields, visibilityContext, modalColumns])
 
   const toggleGroup = (groupName: string) => {
     setCollapsedGroups((prev) => {
@@ -569,12 +630,14 @@ export default function RecordFields({
       const isThisEditing = editingField === field.id
       const isVisible = layoutMode ? isFieldVisibleInLayout(field.name) : true
 
+      const isSelected = selectedFieldId === field.id
       const fieldContent = (
         <div
           className={cn(
             "rounded-md hover:bg-gray-50/50 transition-colors px-1 py-0.5 -mx-1 min-w-0",
             FIELD_LABEL_GAP_CLASS,
-            layoutMode && !isVisible && "opacity-50"
+            layoutMode && !isVisible && "opacity-50",
+            isSelected && "ring-2 ring-blue-500 ring-offset-1 rounded-md"
           )}
         >
           {showFieldNames && (
@@ -654,14 +717,15 @@ export default function RecordFields({
   const showModalColumns = modalColumns.length > 0
 
   // Stable canonical field list: same set/order every time so SortableFieldItem count never changes.
-  // We also keep groupName here so group headers are purely cosmetic and do NOT affect hook call order.
-  const canonicalFieldItems = useMemo(
-    () =>
-      Object.entries(groupedFields).flatMap(([groupName, groupFields]) =>
-        groupFields.map((field) => ({ field, groupName }))
-      ),
-    [groupedFields]
-  )
+  // When modal grid has row order, use modalGridItems; otherwise use groupedFields.
+  const canonicalFieldItems = useMemo(() => {
+    if (modalGridItems && modalGridItems.length > 0) {
+      return modalGridItems.map(({ field }) => ({ field, groupName: DEFAULT_GROUP_NAME }))
+    }
+    return Object.entries(groupedFields).flatMap(([groupName, groupFields]) =>
+      groupFields.map((field) => ({ field, groupName }))
+    )
+  }, [modalGridItems, groupedFields])
   const canonicalFieldIds = useMemo(
     () => canonicalFieldItems.map((item) => item.field.id),
     [canonicalFieldItems]
@@ -694,25 +758,36 @@ export default function RecordFields({
   }, [canonicalFieldItems.length, canonicalFieldIds.length, tableId, recordId, fields.length, layoutMode])
   // #endregion
 
-  // For modal column layout: which grid column (1-based) each field belongs to.
+  // For modal column layout: which grid column (1-based) each field belongs to, or span 2 for full-width.
   const fieldToColumnIndex = useMemo(() => {
     const map: Record<string, number> = {}
-    modalColumns.forEach((col, i) =>
+    modalColumns.forEach((col, i) => {
+      if (col.id === "col-full") return
       col.fields.forEach((f) => {
         map[f.id] = i + 1
       })
-    )
+    })
     return map
   }, [modalColumns])
 
-  // Compute CSS grid template for modal columns based on relative widths.
+  const fieldToLayoutItem = useMemo(() => {
+    const map = new Map<string, FieldLayoutItem>()
+    fieldLayout.forEach((item) => {
+      const field = fields.find((f) => f.id === item.field_id || f.name === item.field_name)
+      if (field) map.set(field.id, item)
+    })
+    return map
+  }, [fieldLayout, fields])
+
+  // Compute CSS grid template: 2 equal columns for grid layout.
+  // Full-width fields use gridColumn: 1 / -1 to span both.
   const gridTemplateColumns = useMemo(() => {
     if (!showModalColumns) return undefined
-    const total = modalColumns.reduce((sum, col) => sum + (col.width || 1), 0)
-    if (!total) return undefined
-    return modalColumns
-      .map((col) => `${(col.width || 1) / total}fr`)
-      .join(" ")
+    const cols = modalColumns.filter((c) => c.id !== "col-full")
+    if (cols.length <= 1) return "1fr 1fr"
+    const total = cols.reduce((sum, col) => sum + (col.width || 1), 0)
+    if (!total) return "1fr 1fr"
+    return cols.map((col) => `${(col.width || 1) / total}fr`).join(" ")
   }, [showModalColumns, modalColumns])
 
   // Column resize handler (layout mode only)
@@ -796,10 +871,10 @@ export default function RecordFields({
             <>
               <div
                 ref={columnsContainerRef}
-                className={showModalColumns ? "grid gap-6" : "space-y-3"}
+                className={showModalColumns ? "grid gap-4" : "space-y-3"}
                 style={
                   showModalColumns && gridTemplateColumns
-                    ? { gridTemplateColumns }
+                    ? { gridTemplateColumns, gridAutoFlow: "row" }
                     : undefined
                 }
               >
@@ -809,18 +884,23 @@ export default function RecordFields({
                   const isFirstInGroup = item.groupName !== prevGroupName
                   const isCollapsed = collapsedGroups.has(item.groupName)
 
+                  const layoutItem = fieldToLayoutItem.get(item.field.id)
+                  const isFullWidth = layoutItem?.modal_column_span === 2
+                  const gridColStyle = showModalColumns
+                    ? isFullWidth
+                      ? { gridColumn: "1 / -1" as const }
+                      : fieldToColumnIndex[item.field.id]
+                        ? { gridColumn: fieldToColumnIndex[item.field.id] }
+                        : undefined
+                    : undefined
                   return (
                     <div
                       key={item.field.id}
                       className={cn(
-                        showModalColumns &&
-                          "min-w-0 border-l border-gray-200 first:border-l-0 pl-4"
+                        showModalColumns && "min-w-0 p-4 rounded-lg border border-dashed border-gray-200",
+                        !showModalColumns && isFirstInGroup && index > 0 && "pt-4 mt-4 border-t border-dashed border-gray-200"
                       )}
-                      style={
-                        showModalColumns && fieldToColumnIndex[item.field.id]
-                          ? { gridColumn: fieldToColumnIndex[item.field.id] }
-                          : undefined
-                      }
+                      style={gridColStyle}
                     >
                       {/* Group header slot: always present so hook tree is stable; visibility via CSS only. */}
                       <div

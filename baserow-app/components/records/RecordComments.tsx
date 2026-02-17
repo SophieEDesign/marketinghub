@@ -302,7 +302,10 @@ export default function RecordComments({
           ) : (
             <div className="space-y-3">
               {comments.length === 0 ? (
-                <p className="text-sm text-gray-500">No comments yet.</p>
+                <div className="flex flex-col items-center justify-center py-12 px-4 rounded-lg bg-gray-50 border border-dashed border-gray-200">
+                  <MessageSquare className="h-10 w-10 text-gray-400 mb-3" />
+                  <p className="text-sm text-gray-500">Start a conversation</p>
+                </div>
               ) : (
                 comments.map((c) => (
                   <div

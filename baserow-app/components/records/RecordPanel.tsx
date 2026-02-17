@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { X, Pin, PinOff, Maximize2, Minimize2, Copy as CopyIcon, ChevronLeft } from "lucide-react"
+import { X, Pin, PinOff, Maximize2, Minimize2, Link2, ChevronLeft } from "lucide-react"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { useToast } from "@/components/ui/use-toast"
 import RecordEditor from "./RecordEditor"
@@ -133,12 +133,12 @@ export default function RecordPanel() {
           />
         )}
 
-        <div className="h-10 border-b border-gray-200 flex items-center justify-between px-4 bg-gray-50 flex-shrink-0">
+        <div className="h-10 border-b border-gray-200 flex items-center justify-between px-4 bg-white flex-shrink-0">
           <div className="flex items-center gap-2">
             {canGoBack && (
               <button
                 onClick={handleBack}
-                className="p-1 hover:bg-gray-200 rounded transition-colors"
+                className="p-1.5 hover:bg-gray-100 rounded transition-colors"
                 title="Go back"
               >
                 <ChevronLeft className="h-4 w-4 text-gray-600" />
@@ -149,16 +149,16 @@ export default function RecordPanel() {
             {state.recordId && (
               <button
                 onClick={handleCopyLink}
-                className="p-1.5 hover:bg-gray-200 rounded transition-colors"
+                className="p-1.5 hover:bg-gray-100 rounded transition-colors"
                 title="Copy link"
               >
-                <CopyIcon className="h-4 w-4 text-gray-600" />
+                <Link2 className="h-4 w-4 text-gray-600" />
               </button>
             )}
             <button
               onClick={togglePin}
-              className={`p-1.5 hover:bg-gray-200 rounded transition-colors ${
-                state.isPinned ? "bg-blue-100 text-blue-600" : ""
+              className={`p-1.5 hover:bg-gray-100 rounded transition-colors ${
+                state.isPinned ? "bg-blue-50 text-blue-600" : ""
               }`}
               title={state.isPinned ? "Unpin panel" : "Pin panel"}
             >
@@ -170,7 +170,7 @@ export default function RecordPanel() {
             </button>
             <button
               onClick={toggleFullscreen}
-              className="p-1.5 hover:bg-gray-200 rounded transition-colors"
+              className="p-1.5 hover:bg-gray-100 rounded transition-colors"
               title={state.isFullscreen ? "Exit fullscreen" : "Fullscreen"}
             >
               {state.isFullscreen ? (
@@ -182,7 +182,7 @@ export default function RecordPanel() {
             {!state.isPinned && (
               <button
                 onClick={closeRecord}
-                className="p-1.5 hover:bg-gray-200 rounded transition-colors"
+                className="p-1.5 hover:bg-gray-100 rounded transition-colors"
                 title="Close"
               >
                 <X className="h-4 w-4 text-gray-600" />

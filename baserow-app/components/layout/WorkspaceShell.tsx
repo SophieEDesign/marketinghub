@@ -193,8 +193,9 @@ function ShellContent({
         onClose={isMobile ? () => setSidebarOpen(false) : undefined}
         defaultPageId={defaultPageId}
       />
-      {/* Main content area - RecordPanel overlays when open (position: fixed) */}
-      <div className="flex-1 flex flex-col overflow-x-hidden min-h-0 min-w-0">
+      {/* Main content area - RecordPanel and RightSettingsPanel overlay when open (position: fixed).
+          CRITICAL: Main content must keep full width so blocks don't shift when right panel opens in edit mode. */}
+      <div className="flex-1 flex flex-col overflow-x-hidden min-h-0 min-w-0 w-full">
         {!hideTopbar && (
           <Topbar
             title={title}
@@ -203,7 +204,7 @@ function ShellContent({
           />
         )}
         <main
-          className={`flex-1 min-h-0 min-w-0 overflow-x-hidden ${suppressMainScroll ? "overflow-y-hidden" : "overflow-y-auto"}`}
+          className={`flex-1 min-h-0 min-w-0 w-full pr-0 overflow-x-hidden ${suppressMainScroll ? "overflow-y-hidden" : "overflow-y-auto"}`}
         >
           {children}
         </main>

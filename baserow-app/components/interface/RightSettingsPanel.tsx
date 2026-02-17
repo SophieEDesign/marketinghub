@@ -1,14 +1,17 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { useSelectionContext } from "@/contexts/SelectionContext"
 import { useRightSettingsPanelData } from "@/contexts/RightSettingsPanelDataContext"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
-import { ChevronRight, X } from "lucide-react"
+import { ChevronRight, ChevronLeft, X, MoreVertical } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import PageDisplaySettingsPanel from "./PageDisplaySettingsPanel"
 import SettingsPanel from "./SettingsPanel"
 import RecordLayoutSettings from "./settings/RecordLayoutSettings"
+import FieldBlockSettings from "./settings/FieldBlockSettings"
 import FieldSchemaSettings from "./settings/FieldSchemaSettings"
+import { getFieldDisplayName } from "@/lib/fields/display"
 import type { SelectedContext } from "@/contexts/SelectionContext"
 
 function Breadcrumb({ context, onNavigate }: { context: SelectedContext; onNavigate: (ctx: SelectedContext) => void }) {
@@ -52,6 +55,11 @@ export default function RightSettingsPanel() {
   const { selectedContext, setSelectedContext } = useSelectionContext()
   const { data } = useRightSettingsPanelData()
   const { state: recordPanelState } = useRecordPanel()
+  const [fieldViewMode, setFieldViewMode] = useState<"block" | "schema">("block")
+
+  useEffect(() => {
+    if (selectedContext?.type !== "field") setFieldViewMode("block")
+  }, [selectedContext?.type, selectedContext?.fieldId])
 
   // Show when: (1) user selected page/block/record, OR (2) RecordPanel is open (Airtable-style: settings next to record)
   const isVisible =
@@ -64,29 +72,104 @@ export default function RightSettingsPanel() {
 
   const handleClose = () => setSelectedContext(null)
 
+  // CRITICAL: This panel must OVERLAY (position: fixed) and never push main content.
+  // If it pushed content, the canvas width would change in edit mode and saved block positions would shift.
   return (
     <div
-      className={`fixed top-0 h-full w-[400px] bg-white border-l border-gray-200 shadow-xl z-40 flex flex-col transition-all duration-200 ${
+      className={`fixed top-0 right-0 h-full w-[400px] bg-white border-l border-gray-200 shadow-xl z-40 flex flex-col transition-all duration-200 ${
         isVisible ? "translate-x-0" : "translate-x-full pointer-events-none"
       }`}
       style={{ height: "100vh", right: rightOffset }}
       aria-hidden={!isVisible}
     >
-      {/* Header with breadcrumb and close */}
+      {/* Header: Back + title + ellipsis for record/field; breadcrumb + close otherwise */}
       <div className="border-b border-gray-200 px-4 py-3 flex-shrink-0">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <Breadcrumb context={selectedContext} onNavigate={setSelectedContext} />
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleClose}
-            className="h-8 w-8 p-0 flex-shrink-0"
-            aria-label="Close"
-          >
-            <X className="h-4 w-4" />
-          </Button>
+        <div className="flex items-center justify-between gap-2">
+          {selectedContext?.type === "field" &&
+          selectedContext.fieldId &&
+          recordPanelState.isOpen ? (
+            <>
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    fieldViewMode === "schema"
+                      ? setFieldViewMode("block")
+                      : setSelectedContext({
+                          type: "record",
+                          recordId: recordPanelState.recordId ?? "",
+                          tableId: recordPanelState.tableId ?? "",
+                        })
+                  }
+                  className="h-8 w-8 p-0 flex-shrink-0"
+                  aria-label="Back"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="font-semibold text-gray-900 truncate">
+                  {fieldViewMode === "schema"
+                    ? "Field settings"
+                    : (() => {
+                        const f = recordPanelState.tableFields?.find(
+                          (x) => x.id === selectedContext.fieldId
+                        )
+                        return f ? `${getFieldDisplayName(f)} Field` : "Field"
+                      })()}
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 flex-shrink-0"
+                aria-label="More options"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </>
+          ) : selectedContext?.type === "record" &&
+            recordPanelState.isOpen &&
+            recordPanelState.recordId ? (
+            <>
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedContext({ type: "page" })}
+                  className="h-8 w-8 p-0 flex-shrink-0"
+                  aria-label="Back"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="font-semibold text-gray-900 truncate">
+                  Record layout
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 flex-shrink-0"
+                aria-label="More options"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </>
+          ) : (
+            <>
+              <div className="min-w-0 flex-1">
+                <Breadcrumb context={selectedContext} onNavigate={setSelectedContext} />
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClose}
+                className="h-8 w-8 p-0 flex-shrink-0"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -159,10 +242,31 @@ export default function RightSettingsPanel() {
         )}
 
         {selectedContext && selectedContext.type === "field" && selectedContext.fieldId && (
-          <FieldSchemaSettings
-            fieldId={selectedContext.fieldId}
-            tableId={selectedContext.tableId ?? data?.recordTableId ?? data?.pageTableId ?? ""}
-          />
+          fieldViewMode === "schema" ||
+          !recordPanelState.isOpen ||
+          !recordPanelState.onLayoutSave ? (
+            <FieldSchemaSettings
+              fieldId={selectedContext.fieldId}
+              tableId={selectedContext.tableId ?? data?.recordTableId ?? data?.pageTableId ?? ""}
+            />
+          ) : (
+            <FieldBlockSettings
+              fieldId={selectedContext.fieldId}
+              tableId={selectedContext.tableId ?? recordPanelState.tableId ?? ""}
+              tableName={recordPanelState.tableName}
+              fieldLayout={recordPanelState.fieldLayout ?? []}
+              onLayoutSave={recordPanelState.onLayoutSave}
+              fields={recordPanelState.tableFields ?? []}
+              onEditField={() => setFieldViewMode("schema")}
+              onFieldChange={(newFieldId) =>
+                setSelectedContext({
+                  type: "field",
+                  fieldId: newFieldId,
+                  tableId: selectedContext.tableId ?? recordPanelState.tableId ?? "",
+                })
+              }
+            />
+          )
         )}
       </div>
     </div>

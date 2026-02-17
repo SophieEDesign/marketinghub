@@ -269,20 +269,22 @@ export function createInitialFieldLayout(
   mode: 'modal' | 'record_review' = 'modal',
   pageEditable: boolean = true
 ): FieldLayoutItem[] {
-  // For modal layouts we start with a single full-width column (col-1).
+  // For modal and record_review we use a 2-column grid: first half col-1, second half col-2.
   // Column metadata is modal-only and is ignored by page canvas / card layouts.
-  const isModal = mode === 'modal'
+  const useGrid = mode === 'modal' || mode === 'record_review'
+  const half = Math.ceil(allFields.length / 2)
   return allFields.map((field, index) => ({
     field_id: field.id,
     field_name: field.name,
     order: index,
-    visible_in_modal: isModal ? true : undefined,
-    visible_in_canvas: !isModal ? true : undefined,
+    visible_in_modal: mode === 'modal' ? true : undefined,
+    visible_in_canvas: mode === 'record_review' ? true : undefined,
     visible_in_card: false,
     editable: pageEditable,
     group_name: field.group_name ?? undefined,
-    modal_column_id: isModal ? 'col-1' : undefined,
-    modal_column_order: isModal ? 0 : undefined,
-    modal_column_width: isModal ? 1 : undefined,
+    modal_column_id: useGrid ? (index < half ? 'col-1' : 'col-2') : undefined,
+    modal_column_order: useGrid ? (index < half ? index : index - half) : undefined,
+    modal_column_width: useGrid ? 1 : undefined,
+    modal_row_order: useGrid ? (index < half ? index : index - half) : undefined,
   }))
 }

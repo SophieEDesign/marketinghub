@@ -443,6 +443,7 @@ export default function RecordEditor({
             onFieldLayoutChange={isEditingLayout ? handleFieldLayoutChange : undefined}
             onFieldVisibilityToggle={isEditingLayout ? handleFieldVisibilityToggle : undefined}
             visibilityContext={visibilityContext}
+            selectedFieldId={selectedContext?.type === "field" ? selectedContext.fieldId : null}
           />
         </div>
       )
@@ -467,6 +468,8 @@ export default function RecordEditor({
             layoutMode={isEditingLayout && !isViewOnly}
             onFieldLayoutChange={isEditingLayout ? handleFieldLayoutChange : undefined}
             onFieldVisibilityToggle={isEditingLayout ? handleFieldVisibilityToggle : undefined}
+            visibilityContext={visibilityContext}
+            selectedFieldId={selectedContext?.type === "field" ? selectedContext.fieldId : null}
           />
         </div>
       )
@@ -683,17 +686,17 @@ export default function RecordEditor({
       </div>
 
       {mode === "modal" && showComments && recordId && !loading && formData && Object.keys(formData).length > 0 && (
-        <div className="border-t px-6 py-4 flex-shrink-0">
+        <div className="border-t border-dashed border-gray-200 px-6 py-4 flex-shrink-0">
           <RecordComments tableId={tableId} recordId={recordId} canAddComment={effectiveEditable} />
         </div>
       )}
 
       {mode === "review" && recordId && (
         <>
-          <div className="border-t px-6 py-4 flex-shrink-0">
+          <div className="border-t border-dashed border-gray-200 px-6 py-4 flex-shrink-0">
             <RecordActivity record={formData} tableId={tableId} />
           </div>
-          <div className="border-t px-6 py-4 flex-shrink-0">
+          <div className="border-t border-dashed border-gray-200 px-6 py-4 flex-shrink-0">
             <RecordComments tableId={tableId} recordId={recordId} canAddComment={effectiveEditable} />
           </div>
           {renderExtraContent && (

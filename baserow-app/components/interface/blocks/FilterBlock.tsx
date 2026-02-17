@@ -255,13 +255,20 @@ export default function FilterBlock({
   // Emit filter state to context whenever filters change.
   // CRITICAL: Depend only on emitSignature and block.id to prevent React #185.
   // Use ref for updateFilterBlock so context identity changes don't re-run this effect.
-  // Debounce 300ms to prevent cascading re-renders and React #185 from rapid filter changes.
+  // Emit immediately on mount/remount so filters apply right away (fixes "filters break after edit mode").
+  // Debounce 300ms for subsequent updates to prevent cascading re-renders and React #185 from rapid filter changes.
+  const hasEmittedRef = useRef(false)
   useEffect(() => {
     if (!block.id) return
     const blockTitle = config?.title || block.id
-    const timeoutId = setTimeout(() => {
+    const doEmit = () => {
       updateFilterBlockRef.current(block.id, emittedFilters, effectiveTargetBlocks, blockTitle, filterTree, tableId)
-    }, 300)
+      hasEmittedRef.current = true
+    }
+    if (!hasEmittedRef.current) {
+      doEmit()
+    }
+    const timeoutId = setTimeout(doEmit, 300)
     return () => clearTimeout(timeoutId)
   }, [emitSignature, block.id])
 
