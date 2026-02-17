@@ -32,6 +32,8 @@ import { isAbortError } from "@/lib/api/error-handling"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { startOfWeek, endOfWeek, startOfDay, addWeeks, startOfMonth, endOfMonth, addMonths } from "date-fns"
 import type { GroupRule } from "@/lib/grouping/types"
+import { getVisibleFieldsFromLayout } from "@/lib/interface/field-layout-helpers"
+import type { FieldLayoutItem } from "@/lib/interface/field-layout-utils"
 
 interface GridBlockProps {
   block: PageBlock
@@ -274,6 +276,7 @@ export default function GridBlock({
   // #endregion
   
   // Visible fields from config (required) - ensure it's always an array
+  // NOTE: Prefer block.field_layout when available (unified layout source)
   const visibleFieldsConfig = Array.isArray(config?.visible_fields) 
     ? config.visible_fields 
     : (config?.visible_fields ? [config.visible_fields] : [])
@@ -503,8 +506,7 @@ export default function GridBlock({
   // Combine loading states
   const isLoading = loading || metaLoading
 
-  // Determine visible fields: use config.visible_fields if provided, otherwise use view_fields
-  // Ensure all values are arrays to prevent runtime errors
+  // Determine visible fields: block.field_layout is single source of truth; legacy visible_fields deprecated
   // CRITICAL: Must run before any early return so useMemo (fieldIds) is always called (Rules of Hooks)
   type ViewFieldType = {
     field_name: string
@@ -512,14 +514,22 @@ export default function GridBlock({
     position: number
   }
   const safeViewFields = asArray<ViewFieldType>(viewFields)
-  const visibleFields = visibleFieldsConfig.length > 0
-    ? visibleFieldsConfig.map((fieldName: string) => {
-        const field = safeTableFields.find(
-          f => f && (f.name === fieldName || f.id === fieldName || getFieldDisplayName(f) === fieldName)
-        )
-        return field ? { field_name: field.name, visible: true, position: 0 } : null
-      }).filter(Boolean) as Array<{ field_name: string; visible: boolean; position: number }>
-    : safeViewFields.filter(f => f && f.visible)
+  const fieldLayout = (config as any)?.field_layout as FieldLayoutItem[] | undefined
+  const hasFieldLayout = Array.isArray(fieldLayout) && fieldLayout.length > 0
+  const visibleFieldsFromLayout = useMemo(() => {
+    if (!hasFieldLayout || !safeTableFields.length) return []
+    return getVisibleFieldsFromLayout(fieldLayout!, safeTableFields, 'modal')
+  }, [hasFieldLayout, fieldLayout, safeTableFields])
+  const visibleFields = hasFieldLayout
+    ? visibleFieldsFromLayout.map((f, i) => ({ field_name: f.name, visible: true, position: i }))
+    : (visibleFieldsConfig.length > 0
+      ? visibleFieldsConfig.map((fieldName: string) => {
+          const field = safeTableFields.find(
+            f => f && (f.name === fieldName || f.id === fieldName || getFieldDisplayName(f) === fieldName)
+          )
+          return field ? { field_name: field.name, visible: true, position: 0 } : null
+        }).filter(Boolean) as Array<{ field_name: string; visible: boolean; position: number }>
+      : safeViewFields.filter(f => f && f.visible))
 
   // CRITICAL: Memoize fieldIds so CalendarView (and other views) receive a stable array reference.
   // Without this, visibleFields.map(...) creates a new array every render → CalendarView's
@@ -555,10 +565,10 @@ export default function GridBlock({
     })
   }
 
-  // Modal uses same field set as Data (single source of truth)
-  const modalFieldsForRecord = (visibleFieldsConfig.length > 0
-    ? visibleFieldsConfig
-    : (config as any).modal_fields) as string[] | undefined
+  // Modal uses same field set as Data: field_layout when available, else legacy modal_fields
+  const modalFieldsForRecord = hasFieldLayout
+    ? visibleFieldsFromLayout.map((f) => f.name)
+    : (visibleFieldsConfig.length > 0 ? visibleFieldsConfig : (config as any).modal_fields) as string[] | undefined
 
   // Convert merged filters to legacy format for GridViewWrapper (backward compatibility)
   const activeFilters = allFilters.map((f, idx) => ({
@@ -1331,9 +1341,8 @@ export default function GridBlock({
         />
       )}
 
-      {/* Scroll lives here in full-page mode so table/calendar fills viewport and content scrolls inside */}
-      {/* min-h-[400px] ensures calendar renders on first load when flex parent height isn't established yet */}
-      <div className={`flex-1 min-h-0 overflow-auto ${viewType === 'calendar' ? 'min-h-[400px]' : ''}`}>
+      {/* Single scroll container: table/calendar fills viewport; content scrolls here only */}
+      <div className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden ${viewType === 'calendar' ? 'min-h-[400px]' : ''}`}>
         {renderView()}
       </div>
     </div>

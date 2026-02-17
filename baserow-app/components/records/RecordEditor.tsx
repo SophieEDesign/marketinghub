@@ -27,6 +27,7 @@ import {
 import { getPrimaryFieldName } from "@/lib/fields/primary"
 import { sectionAndSortFields } from "@/lib/fields/sectioning"
 import { useSelectionContext } from "@/contexts/SelectionContext"
+import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { useToast } from "@/components/ui/use-toast"
 import { isAbortError } from "@/lib/api/error-handling"
 import { createClient } from "@/lib/supabase/client"
@@ -106,6 +107,7 @@ export default function RecordEditor({
 }: RecordEditorProps) {
   const { selectedContext, setSelectedContext } = useSelectionContext()
   const { toast } = useToast()
+  const { setFieldLayout: setLiveFieldLayout } = useRecordPanel()
   const [sections, setSections] = useState<any[]>([])
 
   const core = useRecordEditorCore({
@@ -282,9 +284,10 @@ export default function RecordEditor({
   const handleFieldLayoutChange = useCallback(
     (newLayout: FieldLayoutItem[]) => {
       setLocalFieldLayout(newLayout)
+      setLiveFieldLayout(newLayout)
       onLayoutSave?.(newLayout)
     },
-    [onLayoutSave]
+    [onLayoutSave, setLiveFieldLayout]
   )
 
   const handleFieldVisibilityToggle = useCallback(
@@ -294,9 +297,10 @@ export default function RecordEditor({
         item.field_name === fieldName ? { ...item, [key]: visible } : item
       )
       setLocalFieldLayout(updated)
+      setLiveFieldLayout(updated)
       onLayoutSave?.(updated)
     },
-    [localFieldLayout, onLayoutSave, visibilityContext]
+    [localFieldLayout, onLayoutSave, visibilityContext, setLiveFieldLayout]
   )
 
   const handleDoneEditLayout = useCallback(async () => {
@@ -532,7 +536,7 @@ export default function RecordEditor({
   const showReviewHeader = mode === "review"
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col min-h-full w-full">
       {showHeader && (
         <div className="flex items-center justify-between gap-2 px-4 py-3 border-b bg-white">
           <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -673,13 +677,8 @@ export default function RecordEditor({
         </div>
       )}
 
-      <div
-        className={
-          isEditingLayout && mode === "modal"
-            ? "flex-1 flex overflow-hidden"
-            : "flex-1 overflow-y-auto px-6"
-        }
-      >
+      {/* Single scroll container: parent (RecordPanel) has flex-1 overflow-y-auto; inner content must NOT scroll */}
+      <div className="flex-1 flex flex-col min-h-0 overflow-visible px-6">
         {renderFieldsContent()}
       </div>
 
@@ -691,14 +690,14 @@ export default function RecordEditor({
 
       {mode === "review" && recordId && (
         <>
-          <div className="border-t px-6 py-4">
+          <div className="border-t px-6 py-4 flex-shrink-0">
             <RecordActivity record={formData} tableId={tableId} />
           </div>
-          <div className="border-t px-6 py-4">
+          <div className="border-t px-6 py-4 flex-shrink-0">
             <RecordComments tableId={tableId} recordId={recordId} canAddComment={effectiveEditable} />
           </div>
           {renderExtraContent && (
-            <div className="border-t flex-1 min-h-0 overflow-auto">
+            <div className="border-t flex-1 min-h-0 overflow-visible">
               {renderExtraContent}
             </div>
           )}
@@ -708,7 +707,7 @@ export default function RecordEditor({
       {showFieldSettingsDrawer && selectedFieldForDrawer && (
         <>
           <div
-            className="fixed inset-0 z-[59] bg-black/20"
+            className="fixed inset-0 md:left-64 z-[59] bg-black/20"
             onClick={() => setSelectedContext(null)}
             aria-hidden="true"
           />

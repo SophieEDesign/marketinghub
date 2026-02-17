@@ -171,6 +171,12 @@ export default function InterfaceBuilder({
       !hasInitializedRef.current ||
       (blocks.length === 0 && initialBlocks.length > 0)
 
+    if (!shouldInit && initialBlocks?.length > 0 && blocks.length > 0) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:oneWayGate:skipped',message:'One-way gate SKIPPED update - keeping internal blocks',data:{pageId:page.id,initialBlocksCount:initialBlocks?.length,blocksCount:blocks.length,initialBlockIds:initialBlocks?.map((b:any)=>b.id),blockIds:blocks.map(b=>b.id)},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
+    }
+
     if (shouldInit) {
       debugLog(`[InterfaceBuilder] First-time initialization (one-way gate): pageId=${page.id}`, {
         initialBlocksCount: initialBlocks.length,
@@ -683,9 +689,7 @@ export default function InterfaceBuilder({
   const handleBlockUpdate = useCallback(
     async (blockId: string, configPatch: Partial<PageBlock["config"]>) => {
       // #region agent log
-      if (process.env.NODE_ENV === 'development') {
-        debugLog('[InterfaceBuilder] handleBlockUpdate called', { blockId, keys: Object.keys(configPatch || {}) })
-      }
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:handleBlockUpdate:entry',message:'Block update started',data:{blockId,configKeys:Object.keys(configPatch||{})},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
       // #endregion
       // 1) Optimistic in-place update (does not remount TipTap)
       // This preserves the same array length, same objects for other blocks,
@@ -724,6 +728,9 @@ export default function InterfaceBuilder({
 
       // 3) Only recover/reload on error
       if (!res.ok) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:handleBlockUpdate:apiFailed',message:'Block update API failed',data:{blockId,status:res.status},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         // Re-sync from server if save failed
         debugError(`[InterfaceBuilder] Block update failed, reloading from server: blockId=${blockId}`)
         const blocksResponse = await fetch(`/api/pages/${page.id}/blocks`, {
@@ -768,6 +775,9 @@ export default function InterfaceBuilder({
         })
       }
 
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:handleBlockUpdate:success',message:'Block update API success',data:{blockId},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       if (process.env.NODE_ENV === 'development') {
         debugLog(`[InterfaceBuilder] Block updated successfully (optimistic): blockId=${blockId}`, {
           pageId: page.id,

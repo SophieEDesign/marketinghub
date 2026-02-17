@@ -160,10 +160,11 @@ export default function RecordDrawer({
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Backdrop - exclude sidebar (left 256px) on md+ so navigation remains clickable */}
       <div
-        className="fixed inset-0 bg-black/20 z-40 transition-opacity"
+        className="fixed inset-0 md:left-64 bg-black/20 z-40 transition-opacity"
         onClick={onClose}
+        aria-hidden="true"
       />
 
       {/* Drawer */}

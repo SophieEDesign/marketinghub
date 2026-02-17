@@ -24,5 +24,5 @@ All commits after 868b674 show Error or broken pages on Vercel.
 1. **Baseline:** `868b674` is the last known working state — use `git diff 868b674` to compare
 2. Break introduced in `6294cdd` (RecordModal global context) — compare that commit's changes
 3. Check InterfacePageClient loadBlocks/setBlocks flow and `willUpdate` in logs
-4. Check for overlays (RightSettingsPanel, modals) blocking clicks
+4. **Overlays blocking navigation:** Full-screen overlays (`fixed inset-0`) must use `md:left-64` to exclude the sidebar so navigation links remain clickable. See `navigation-overlay-must-not-block-sidebar.mdc`
 5. Verify RightSettingsPanelDataContext and related components

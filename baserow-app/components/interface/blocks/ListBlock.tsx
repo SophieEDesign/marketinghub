@@ -57,9 +57,11 @@ export default function ListBlock({
 }: ListBlockProps) {
   const { toast } = useToast()
   const { config } = block
+  const configContentKey = config ? JSON.stringify(config) : ''
+  const stableBlockConfig = useMemo(() => config ?? {}, [configContentKey])
   const cascadeContext = useMemo(
-    () => (config ? { blockConfig: config } : undefined),
-    [config]
+    () => (stableBlockConfig ? { blockConfig: stableBlockConfig } : undefined),
+    [stableBlockConfig]
   )
 
   // Track base height (collapsed state) to calculate deltas

@@ -1,0 +1,43 @@
+---
+description: Overlays must not block sidebar navigation - sidebar must remain clickable
+globs: **/RecordPanel*.tsx,**/RightSettingsPanel*.tsx,**/*Overlay*.tsx,**/*modal*.tsx
+alwaysApply: true
+---
+
+# Navigation: Overlays Must Not Block Sidebar
+
+**CRITICAL:** The sidebar (left 256px / `w-64`) must always remain clickable for navigation. Users must be able to click page links to navigate even when modals, record panels, or settings panels are open.
+
+## Rule
+
+Any full-screen overlay (`fixed inset-0` or similar) that dims the background **must exclude the sidebar area** on desktop/tablet so navigation links remain clickable.
+
+## Implementation
+
+- **Desktop/tablet (≥768px):** Use `md:left-64` so the overlay starts at 256px from the left, leaving the sidebar area uncovered.
+- **Mobile (<768px):** Full overlay (`inset-0`) is acceptable when the sidebar is hidden.
+
+## Example (RecordPanel)
+
+```tsx
+// ✅ CORRECT - overlay excludes sidebar on md+
+<div
+  className="fixed inset-0 md:left-64 bg-black/20 z-40"
+  onClick={closeRecord}
+/>
+
+// ❌ WRONG - blocks sidebar, blocks navigation
+<div className="fixed inset-0 bg-black/20 z-40" onClick={closeRecord} />
+```
+
+## Related Components
+
+- `RecordPanel` - overlay when record detail is open
+- `RightSettingsPanel` - uses `translate-x-full` when hidden (no overlay)
+- Mobile sidebar overlay - `desktop:hidden` so only on mobile
+
+## Regression Prevention
+
+If adding a new overlay or changing overlay behavior, verify:
+1. Sidebar links remain clickable when overlay is open
+2. Use `md:left-64` for any overlay that covers the main content area

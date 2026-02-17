@@ -181,6 +181,9 @@ function InterfacePageClientInternal({
       : undefined
   // handlePageUpdate changes when page loads (page?.id, page?.source_view) - must not be in sync effect deps
   const handlePageUpdate = useCallback(async () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfacePageClient.tsx:handlePageUpdate:entry',message:'Page update triggered - will reload page and blocks',data:{pageId},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
     pageLoadedRef.current = false
     if (pageId) {
       blocksLoadedRef.current = { pageId, loaded: false }
@@ -889,6 +892,9 @@ function InterfacePageClientInternal({
       // Only update if blocks actually changed or forceReload is true (and not aborted)
       if (!signal?.aborted) {
         if (blocksChanged || forceReload) {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfacePageClient.tsx:loadBlocks:setBlocks',message:'loadBlocks updating blocks state',data:{pageId,blocksCount:pageBlocks.length,blockIds:pageBlocks.map((b:any)=>b.id),blockLayouts:pageBlocks.map((b:any)=>({id:b.id,x:b.x,y:b.y,w:b.w,h:b.h})),forceReload,blocksChanged},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
+          // #endregion
           setBlocks(pageBlocks)
         } else if (process.env.NODE_ENV === 'development') {
           debugLog(`[loadBlocks] Blocks unchanged - skipping setBlocks to prevent re-render`)
@@ -959,6 +965,15 @@ function InterfacePageClientInternal({
       },
     }
   }, [page, isGridMode])
+
+  // CRITICAL: Memoize InterfaceBuilder page prop to prevent remounts
+  // Stable fallback when page not yet loaded - ensures single render tree
+  const fallbackPage = useMemo(() => ({
+    id: pageId,
+    name: '',
+    page_type: 'content' as const,
+    settings: { tableId: null, leftPanel: null, left_panel: null, primary_table_id: null, show_add_record: false, showAddRecord: false },
+  }), [pageId])
 
   // CRITICAL: Memoize InterfaceBuilder page prop to prevent remounts
   // Creating new object on every render causes component remounts
@@ -1117,19 +1132,11 @@ function InterfacePageClientInternal({
     [page?.id, page?.config]
   )
 
-  // ALWAYS render UI - never return null or redirect (early returns AFTER all hooks)
-  if (loading && !page) {
-    return <div className="h-screen flex items-center justify-center">Loading interface page...</div>
-  }
-
-  if (!page || !pageWithConfig) {
-    return <div className="h-screen flex items-center justify-center">Page not found</div>
-  }
-
-  const isViewer = searchParams?.get("view") === "true"
   const isRecordView = page?.page_type === 'record_view'
   const isRecordReview = page?.page_type === 'record_review'
   const useRecordReviewLayout = isRecordReview || isRecordView
+  const hasPage = Boolean(page && page.id)
+  const pageForRender = pageWithConfig
 
   const handleTitleChange = (value: string) => {
     setTitleValue(value)
@@ -1177,12 +1184,27 @@ function InterfacePageClientInternal({
 
   return (
     <div className={`h-screen flex flex-col ${!useRecordReviewLayout ? "overflow-x-hidden" : ""}`}>
+      {/* Loading overlay: single scroll surface; do not unmount tree */}
+      {loading && !hasPage && (
+        <div className="absolute inset-0 flex items-center justify-center z-20 bg-white">
+          <LoadingSpinner size="lg" text="Loading interface page..." />
+        </div>
+      )}
+      {/* Page not found overlay */}
+      {!loading && !hasPage && (
+        <div className="absolute inset-0 flex items-center justify-center z-20 bg-white">
+          <div className="text-center">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Page not found</h2>
+            <p className="text-sm text-gray-500">The page you&apos;re looking for doesn&apos;t exist.</p>
+          </div>
+        </div>
+      )}
       {/* PageActionsRegistrar: tied to page existence, inside InterfacePageClient per unified architecture */}
-      {page && isAdmin && (
+      {hasPage && isAdmin && (
         <PageActionsRegistrar pageId={pageId} isAdmin={isAdmin} isViewer={isViewer} />
       )}
       {/* Header with Edit Button - Admin Only */}
-      {!isViewer && page && isAdmin && (
+      {!isViewer && hasPage && isAdmin && (
         <div className="border-b bg-white px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             {isEditingTitle ? (
@@ -1224,7 +1246,7 @@ function InterfacePageClientInternal({
       )}
       
       {/* Header without Edit Button - Non-admin with View Only badge */}
-      {!isViewer && page && !isAdmin && (
+      {!isViewer && hasPage && !isAdmin && (
         <div className="border-b bg-white px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <h1 className="text-lg font-semibold flex-1 min-w-0 truncate">{page.name}</h1>
@@ -1243,53 +1265,38 @@ function InterfacePageClientInternal({
         </div>
       )}
 
-      {/* Content Area - single stable tree; loading/error as overlays */}
+      {/* Content Area - single stable tree; never unmount based on page/loading */}
       <div className="flex-1 overflow-x-hidden min-w-0 min-h-0 w-full relative">
-        {loading && !page && (
-          <div className="absolute inset-0 flex items-center justify-center z-10">
-            <LoadingSpinner size="lg" text="Loading page..." />
-          </div>
-        )}
-        {!loading && !page && (
-          <div className="flex-1 min-h-[200px] flex items-center justify-center">
-            <div className="text-center">
-              <h2 className="text-lg font-semibold text-gray-900 mb-2">Page not found</h2>
-              <p className="text-sm text-gray-500">The page you&apos;re looking for doesn&apos;t exist.</p>
-            </div>
-          </div>
-        )}
-        {page && (
-          <div className="flex-1 w-full min-w-0 min-h-0 flex flex-col overflow-x-hidden relative">
-            {useRecordReviewLayout ? (
-              <RecordReviewPage
-                page={page as any}
+        <div className="flex-1 w-full min-w-0 min-h-0 flex flex-col overflow-x-hidden relative">
+          {useRecordReviewLayout && hasPage ? (
+            <RecordReviewPage
+              page={pageForRender as any}
+              initialBlocks={memoizedBlocks}
+              isViewer={isViewer}
+              hideHeader={true}
+              onLayoutSave={page?.page_type === "record_view" ? handleRecordViewLayoutSave : undefined}
+            />
+          ) : (
+            <div className="min-h-screen w-full min-w-0 flex flex-col">
+              <InterfaceBuilder
+                page={interfaceBuilderPage ?? fallbackPage}
                 initialBlocks={memoizedBlocks}
                 isViewer={isViewer}
                 hideHeader={true}
-                onLayoutSave={page?.page_type === "record_view" ? handleRecordViewLayoutSave : undefined}
+                pageTableId={pageTableId}
+                recordId={recordContext?.recordId ?? null}
+                recordTableId={recordContext?.tableId ?? null}
+                onRecordContextChange={setRecordContext}
+                mode="view"
               />
-            ) : interfaceBuilderPage ? (
-              <div className="min-h-screen w-full min-w-0 flex flex-col">
-                <InterfaceBuilder
-                  page={interfaceBuilderPage}
-                  initialBlocks={memoizedBlocks}
-                  isViewer={isViewer}
-                  hideHeader={true}
-                  pageTableId={pageTableId}
-                  recordId={recordContext?.recordId ?? null}
-                  recordTableId={recordContext?.tableId ?? null}
-                  onRecordContextChange={setRecordContext}
-                  mode="view"
-                />
-              </div>
-            ) : null}
-            {blocksLoading && (
-              <div className="absolute inset-0 bg-white/60 flex items-center justify-center z-10 pointer-events-none">
-                <LoadingSpinner size="lg" text="Loading blocks..." />
-              </div>
-            )}
-          </div>
-        )}
+            </div>
+          )}
+          {blocksLoading && (
+            <div className="absolute inset-0 bg-white/60 flex items-center justify-center z-10 pointer-events-none">
+              <LoadingSpinner size="lg" text="Loading blocks..." />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Page settings now in RightSettingsPanel */}

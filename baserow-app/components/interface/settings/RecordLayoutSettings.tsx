@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect } from "react"
+import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { GripVertical, Eye, EyeOff } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
@@ -109,6 +110,7 @@ export default function RecordLayoutSettings({
   onLayoutSave,
   fields,
 }: RecordLayoutSettingsProps) {
+  const { setFieldLayout: setLiveLayout } = useRecordPanel()
   const resolvedLayout =
     fieldLayout.length > 0
       ? fieldLayout
@@ -134,8 +136,9 @@ export default function RecordLayoutSettings({
       const existing = prev.find(
         (i) => i.field_name === fieldName || i.field_id === fieldName
       )
+      let next: FieldLayoutItem[]
       if (existing) {
-        return prev.map((i) =>
+        next = prev.map((i) =>
           i.field_name === fieldName || i.field_id === fieldName
             ? {
                 ...i,
@@ -144,20 +147,23 @@ export default function RecordLayoutSettings({
               }
             : i
         )
+      } else {
+        const field = fieldMap.get(fieldName)
+        if (!field) return prev
+        const newItem: FieldLayoutItem = {
+          field_id: field.id,
+          field_name: field.name,
+          order: Math.max(...prev.map((i) => i.order), -1) + 1,
+          editable: true,
+          visible_in_canvas: visible,
+          visible_in_modal: visible,
+        }
+        next = [...prev, newItem]
       }
-      const field = fieldMap.get(fieldName)
-      if (!field) return prev
-      const newItem: FieldLayoutItem = {
-        field_id: field.id,
-        field_name: field.name,
-        order: Math.max(...prev.map((i) => i.order), -1) + 1,
-        editable: true,
-        visible_in_canvas: visible,
-        visible_in_modal: visible,
-      }
-      return [...prev, newItem]
+      setLiveLayout(next)
+      return next
     })
-  }, [fieldMap])
+  }, [fieldMap, setLiveLayout])
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event
@@ -173,12 +179,14 @@ export default function RecordLayoutSettings({
       const [moved] = reordered.splice(oldIndex, 1)
       reordered.splice(newIndex, 0, moved)
 
-      return reordered.map((item, index) => ({
+      const next = reordered.map((item, index) => ({
         ...item,
         order: index,
       }))
+      setLiveLayout(next)
+      return next
     })
-  }, [])
+  }, [setLiveLayout])
 
   const sensors = useSensors(
     useSensor(PointerSensor, {

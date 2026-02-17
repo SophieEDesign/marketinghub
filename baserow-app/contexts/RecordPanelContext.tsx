@@ -43,6 +43,8 @@ interface RecordPanelContextType {
   goBack: () => void
   /** Set interface mode for RecordPanel (called by InterfaceBuilder when edit mode changes). */
   setInterfaceMode: (interfaceMode: 'view' | 'edit') => void
+  /** Live layout update: immediately reflects in RecordEditor without save. Right panel calls this when draft changes. */
+  setFieldLayout: (layout: FieldLayoutItem[]) => void
 }
 
 const RecordPanelContext = createContext<RecordPanelContextType | undefined>(undefined)
@@ -169,6 +171,14 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  const setFieldLayout = useCallback((layout: FieldLayoutItem[]) => {
+    setState((prev) => {
+      if (!prev.isOpen || !prev.recordId) return prev
+      if (prev.fieldLayout === layout) return prev
+      return { ...prev, fieldLayout: layout }
+    })
+  }, [])
+
   const goBack = useCallback(() => {
     setState((prev) => {
       if (prev.history.length <= 1) {
@@ -199,6 +209,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
     navigateToLinkedRecord,
     goBack,
     setInterfaceMode,
+    setFieldLayout,
   }), [
     state,
     openRecord,
@@ -210,6 +221,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
     navigateToLinkedRecord,
     goBack,
     setInterfaceMode,
+    setFieldLayout,
   ])
 
   return (

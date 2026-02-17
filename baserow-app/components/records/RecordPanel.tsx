@@ -75,8 +75,9 @@ export default function RecordPanel() {
     <>
       {useOverlayLayout && !state.isPinned && state.isOpen && (
         <div
-          className="fixed inset-0 bg-black/20 z-40 transition-opacity"
+          className="fixed inset-0 md:left-64 bg-black/20 z-40 transition-opacity"
           onClick={closeRecord}
+          aria-hidden="true"
         />
       )}
 
@@ -190,7 +191,8 @@ export default function RecordPanel() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+        {/* Single scroll container: only this area scrolls; RecordEditor inner content uses overflow-visible */}
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col">
           <RecordEditor
             recordId={state.recordId}
             tableId={state.tableId ?? ""}
