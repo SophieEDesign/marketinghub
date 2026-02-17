@@ -126,6 +126,17 @@ function InterfacePageClientInternal({
   // Determine if we're in edit mode (page or block editing)
   const isEditing = isPageEditing || isBlockEditing
 
+  // Auto-open Right Settings Panel with Page Settings when entering Edit Mode
+  const prevIsEditingRef = useRef(isEditing)
+  useEffect(() => {
+    if (prevIsEditingRef.current && !isEditing) {
+      setSelectedContext(null)
+    } else if (!prevIsEditingRef.current && isEditing) {
+      setSelectedContext({ type: "page" })
+    }
+    prevIsEditingRef.current = isEditing
+  }, [isEditing, setSelectedContext])
+
   // CRITICAL: Extract pageTableId from page - only update when page changes
   useEffect(() => {
     if (!page) {

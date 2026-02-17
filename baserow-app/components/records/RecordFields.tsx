@@ -50,6 +50,8 @@ interface RecordFieldsProps {
   visibilityContext?: 'modal' | 'canvas'
   /** When set, the field with this id gets a blue border (selected for settings) */
   selectedFieldId?: string | null
+  /** When true, always use stacked layout (no grid/columns). Modal must use stacked layout only. */
+  forceStackedLayout?: boolean
 }
 
 const DEFAULT_GROUP_NAME = "General"
@@ -80,6 +82,7 @@ export default function RecordFields({
   onFieldLabelClick,
   visibilityContext = 'modal',
   selectedFieldId,
+  forceStackedLayout = false,
 }: RecordFieldsProps) {
   const { navigateToLinkedRecord, openRecordByTableId, state: recordPanelState } = useRecordPanel()
   const { toast } = useToast()
@@ -308,7 +311,7 @@ export default function RecordFields({
     return columns
   }, [fieldLayout, fields, visibilityContext])
 
-  const showModalColumns = modalColumns.length > 0
+  const showModalColumns = !forceStackedLayout && modalColumns.length > 0
 
   // Row-major ordered field list for grid layout.
   // When modal_row_order is used: sort by row, then full-width first, then column.
@@ -717,15 +720,20 @@ export default function RecordFields({
   )
 
   // Stable canonical field list: same set/order every time so SortableFieldItem count never changes.
-  // When modal grid has row order, use modalGridItems; otherwise use groupedFields.
+  // When forceStackedLayout, always use groupedFields. When modal grid has row order, use modalGridItems; otherwise use groupedFields.
   const canonicalFieldItems = useMemo(() => {
+    if (forceStackedLayout) {
+      return Object.entries(groupedFields).flatMap(([groupName, groupFields]) =>
+        groupFields.map((field) => ({ field, groupName }))
+      )
+    }
     if (modalGridItems && modalGridItems.length > 0) {
       return modalGridItems.map(({ field }) => ({ field, groupName: DEFAULT_GROUP_NAME }))
     }
     return Object.entries(groupedFields).flatMap(([groupName, groupFields]) =>
       groupFields.map((field) => ({ field, groupName }))
     )
-  }, [modalGridItems, groupedFields])
+  }, [forceStackedLayout, modalGridItems, groupedFields])
   const canonicalFieldIds = useMemo(
     () => canonicalFieldItems.map((item) => item.field.id),
     [canonicalFieldItems]

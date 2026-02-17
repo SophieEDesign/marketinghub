@@ -33,7 +33,7 @@ Any full-screen overlay (`fixed inset-0` or similar) that dims the background **
 ## Related Components
 
 - `RecordPanel` - overlay when record detail is open
-- `RightSettingsPanel` - uses `translate-x-full` when hidden (no overlay)
+- `RightSettingsPanel` - conditionally rendered when isEditMode; not an overlay
 - Mobile sidebar overlay - `desktop:hidden` so only on mobile
 
 ## Regression Prevention

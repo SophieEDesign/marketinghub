@@ -13,8 +13,6 @@ import FieldEditor from "@/components/fields/FieldEditor"
 import RecordFields from "@/components/records/RecordFields"
 import RecordActivity from "@/components/records/RecordActivity"
 import RecordComments from "@/components/records/RecordComments"
-import FieldSettingsDrawer from "@/components/layout/FieldSettingsDrawer"
-import { getTableSections } from "@/lib/core-data/section-settings"
 import { useRecordEditorCore, type RecordEditorCascadeContext } from "@/lib/interface/record-editor-core"
 import type { FieldLayoutItem } from "@/lib/interface/field-layout-utils"
 import {
@@ -108,7 +106,6 @@ export default function RecordEditor({
   const { selectedContext, setSelectedContext } = useSelectionContext()
   const { toast } = useToast()
   const { setFieldLayout: setLiveFieldLayout } = useRecordPanel()
-  const [sections, setSections] = useState<any[]>([])
 
   const core = useRecordEditorCore({
     tableId,
@@ -259,25 +256,6 @@ export default function RecordEditor({
   )
 
 
-  useEffect(() => {
-    if (active && tableId && mode === "modal") {
-      getTableSections(tableId).then(setSections).catch(() => setSections([]))
-    }
-  }, [active, tableId, mode])
-
-  const selectedFieldForDrawer = useMemo(() => {
-    if (selectedContext?.type !== "field" || selectedContext.tableId !== tableId) return null
-    return filteredFields.find((f) => f.id === selectedContext.fieldId) ?? null
-  }, [selectedContext, tableId, filteredFields])
-
-  const showFieldSettingsDrawer = Boolean(active && selectedFieldForDrawer && !isEditingLayout && mode === "modal")
-  const handleFieldSettingsDrawerOpenChange = useCallback(
-    (drawerOpen: boolean) => {
-      if (!drawerOpen) setSelectedContext(null)
-    },
-    [setSelectedContext]
-  )
-
   const handleFieldLayoutChange = useCallback(
     (newLayout: FieldLayoutItem[]) => {
       setLocalFieldLayout(newLayout)
@@ -419,7 +397,7 @@ export default function RecordEditor({
       return (
         <div className="space-y-4 py-4">
           <RecordFields
-            fields={isEditingLayout ? layoutModeFields : visibleFields}
+            fields={visibleFields}
             formData={formData}
             onFieldChange={handleFieldChange}
             fieldGroups={fieldGroups}
@@ -427,15 +405,14 @@ export default function RecordEditor({
             recordId={recordId || ""}
             tableName={effectiveTableName || ""}
             isFieldEditable={isFieldEditable}
-            fieldLayout={isEditingLayout ? localFieldLayout : resolvedFieldLayout}
+            fieldLayout={resolvedFieldLayout}
             allFields={filteredFields}
             pageEditable={effectiveEditable}
             onFieldLabelClick={handleFieldLabelClick}
-            layoutMode={isEditingLayout && !isViewOnly}
-            onFieldLayoutChange={isEditingLayout ? handleFieldLayoutChange : undefined}
-            onFieldVisibilityToggle={isEditingLayout ? handleFieldVisibilityToggle : undefined}
+            layoutMode={false}
             visibilityContext={visibilityContext}
             selectedFieldId={selectedContext?.type === "field" ? selectedContext.fieldId : null}
+            forceStackedLayout={true}
           />
         </div>
       )
@@ -445,7 +422,7 @@ export default function RecordEditor({
       return (
         <div className="space-y-4 py-4">
           <RecordFields
-            fields={isEditingLayout ? layoutModeFields : visibleFields}
+            fields={visibleFields}
             formData={formData}
             onFieldChange={handleFieldChange}
             fieldGroups={fieldGroups}
@@ -453,15 +430,14 @@ export default function RecordEditor({
             recordId={recordId}
             tableName={effectiveTableName || ""}
             isFieldEditable={isFieldEditable}
-            fieldLayout={isEditingLayout ? localFieldLayout : resolvedFieldLayout}
+            fieldLayout={resolvedFieldLayout}
             allFields={filteredFields}
             pageEditable={effectiveEditable}
             onFieldLabelClick={handleFieldLabelClick}
-            layoutMode={isEditingLayout && !isViewOnly}
-            onFieldLayoutChange={isEditingLayout ? handleFieldLayoutChange : undefined}
-            onFieldVisibilityToggle={isEditingLayout ? handleFieldVisibilityToggle : undefined}
+            layoutMode={false}
             visibilityContext={visibilityContext}
             selectedFieldId={selectedContext?.type === "field" ? selectedContext.fieldId : null}
+            forceStackedLayout={mode === "review" || mode === "modal"}
           />
         </div>
       )
@@ -640,28 +616,6 @@ export default function RecordEditor({
         </>
       )}
 
-      {showFieldSettingsDrawer && selectedFieldForDrawer && (
-        <>
-          <div
-            className="fixed inset-0 md:left-64 z-[59] bg-black/20"
-            onClick={() => setSelectedContext(null)}
-            aria-hidden="true"
-          />
-          <div className="fixed right-0 top-0 h-full w-[400px] z-[60] bg-white border-l border-gray-200 shadow-xl overflow-y-auto">
-            <FieldSettingsDrawer
-              field={selectedFieldForDrawer}
-              open={true}
-              onOpenChange={handleFieldSettingsDrawerOpenChange}
-              tableId={tableId}
-              tableFields={filteredFields}
-              sections={sections}
-              onSave={() => setSelectedContext(null)}
-              embedded
-              permissionsReadOnly={isViewOnly}
-            />
-          </div>
-        </>
-      )}
     </div>
   )
 }

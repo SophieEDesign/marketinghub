@@ -1,0 +1,27 @@
+---
+description: Layout width must be controlled only by isEditMode from UIModeContext
+globs: **/WorkspaceShell*.tsx,**/RightSettingsPanel*.tsx,**/InterfacePageClient*.tsx
+alwaysApply: true
+---
+
+# Layout Width Authority Rules
+
+**CRITICAL:** Layout width is controlled by a single boolean: `isEditMode = useUIMode().isEdit()`.
+
+## Rules
+
+1. **Single source of truth:** `isEditMode = uiMode === "edit" || uiMode === "editPages" || uiMode === "recordLayoutEdit" || uiMode === "fieldSchemaEdit"`
+
+2. **Conditional render:** RightSettingsPanel must be conditionally rendered: `{isEditMode && <RightSettingsPanel />}`. Never use translate-x, w-0, pointer-events-none, or opacity to hide the panel while keeping it mounted.
+
+3. **Width rules:**
+   - When isEditMode === false: CanvasArea width = 100%, RightSettingsPanel does NOT render.
+   - When isEditMode === true: RightSettingsPanel width = 340px (fixed), CanvasArea width = flex-1 (remaining space).
+
+4. **Forbidden:**
+   - Keeping panel mounted with translate-x-full
+   - Keeping panel mounted with pointer-events-none or w-0
+   - CSS that depends on selectedContext for layout width
+   - Storing panelWidth in state that persists across modes
+
+5. **Principle:** Panel visibility controls layout. Block selection controls content. Never tie them together.

@@ -114,6 +114,15 @@ export default function InterfaceBuilder({
     onEditModeChange?.(effectiveIsEditing)
   }, [effectiveIsEditing, onEditModeChange])
 
+  // Auto-open Right Settings Panel with Page Settings when entering Edit Mode
+  const prevEffectiveIsEditingRef = useRef(effectiveIsEditing)
+  useEffect(() => {
+    if (!prevEffectiveIsEditingRef.current && effectiveIsEditing) {
+      setSelectedContext({ type: "page" })
+    }
+    prevEffectiveIsEditingRef.current = effectiveIsEditing
+  }, [effectiveIsEditing, setSelectedContext])
+
   // CRITICAL: One-way gate - blocks are set from initialBlocks ONCE per pageId, then never replaced
   // After first load, initialBlocks must NEVER overwrite live state
   // This prevents edit/view drift, layout resets, and state loss
@@ -624,13 +633,15 @@ export default function InterfaceBuilder({
     await handleSave(true)
   }, [handleSave])
 
-  // CRITICAL: Save layout when exiting edit mode (even if exitBlockEdit is called from parent)
-  // This ensures layout is saved regardless of where "Done Editing" is clicked
+  // CRITICAL: Save layout and clear selection when exiting edit mode (even if exitBlockEdit is called from parent)
+  // This ensures layout is saved and panel unmounts cleanly regardless of where "Done Editing" is clicked
   // Must be after saveLayout and latestLayoutRef are declared
   const prevIsEditingRef = useRef(effectiveIsEditing)
   useEffect(() => {
     // Detect when exiting edit mode (isEditing changes from true to false)
     if (prevIsEditingRef.current && !effectiveIsEditing) {
+      clearSelectionState()
+      setSelectedContext(null)
       // User just exited edit mode - save layout immediately
       // This handles the case where exitBlockEdit() is called from InterfacePageClient
       // We need to save layout even though handleExitEditMode wasn't called
@@ -675,7 +686,7 @@ export default function InterfaceBuilder({
       }
     }
     prevIsEditingRef.current = effectiveIsEditing
-  }, [effectiveIsEditing, saveLayout, page.id, toast])
+  }, [effectiveIsEditing, saveLayout, page.id, toast, clearSelectionState, setSelectedContext])
 
   // Cleanup timeout on unmount
   useEffect(() => {

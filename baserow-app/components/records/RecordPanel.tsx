@@ -4,8 +4,10 @@ import { useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { X, Pin, PinOff, Maximize2, Minimize2, Link2, ChevronLeft } from "lucide-react"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
+import { useUIMode } from "@/contexts/UIModeContext"
 import { useToast } from "@/components/ui/use-toast"
 import RecordEditor from "./RecordEditor"
+import ModalRightSettingsPanel from "@/components/interface/ModalRightSettingsPanel"
 import { useIsMobile } from "@/hooks/useResponsive"
 
 const MIN_WIDTH = 320
@@ -20,9 +22,21 @@ export default function RecordPanel() {
     toggleFullscreen,
     goBack,
   } = useRecordPanel()
+  const { enterRecordLayoutEdit, exitRecordLayoutEdit, uiMode } = useUIMode()
   const { toast } = useToast()
   const router = useRouter()
   const isMobile = useIsMobile()
+
+  // Sync UIMode with RecordPanel edit state so RightSettingsPanel shows when editing record layout
+  useEffect(() => {
+    if (state.isOpen && state.interfaceMode === "edit") {
+      if (uiMode === "view") {
+        enterRecordLayoutEdit()
+      }
+    } else if (uiMode === "recordLayoutEdit") {
+      exitRecordLayoutEdit()
+    }
+  }, [state.isOpen, state.interfaceMode, uiMode, enterRecordLayoutEdit, exitRecordLayoutEdit])
   const resizeRef = useRef<HTMLDivElement>(null)
   const isResizingRef = useRef(false)
   const resizeCleanupRef = useRef<null | (() => void)>(null)
@@ -76,7 +90,6 @@ export default function RecordPanel() {
       {useOverlayLayout && !state.isPinned && state.isOpen && (
         <div
           className="fixed inset-0 md:left-64 bg-black/20 z-40 transition-opacity"
-          onClick={closeRecord}
           aria-hidden="true"
         />
       )}
@@ -91,7 +104,6 @@ export default function RecordPanel() {
         } bg-white shadow-xl flex flex-col transition-all duration-300 ease-out`}
         style={{
           width: state.isOpen ? panelWidth : "0px",
-          right: useOverlayLayout ? 400 : undefined,
           transform: useOverlayLayout && !state.isOpen ? "translateX(100%)" : "none",
           minWidth: !useOverlayLayout && state.isOpen ? `${state.width}px` : undefined,
           maxWidth: !useOverlayLayout && state.isOpen ? `${state.width}px` : undefined,
@@ -113,8 +125,7 @@ export default function RecordPanel() {
 
               const handleMouseMove = (ev: MouseEvent) => {
                 if (!isResizingRef.current) return
-                const rightEdge = 400
-                const raw = (window.innerWidth - rightEdge) - ev.clientX
+                const raw = window.innerWidth - ev.clientX
                 const clamped = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, raw))
                 setWidth(clamped)
               }
@@ -193,9 +204,10 @@ export default function RecordPanel() {
           </div>
         </div>
 
-        {/* Single scroll container: only this area scrolls; RecordEditor inner content uses overflow-visible */}
-        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col">
-          <RecordEditor
+        {/* Body: flex row - RecordEditor (scrollable) + ModalRightSettingsPanel (when edit mode) */}
+        <div className="flex-1 min-h-0 flex flex-row overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col">
+            <RecordEditor
             recordId={state.recordId}
             tableId={state.tableId ?? ""}
             mode="review"
@@ -216,6 +228,14 @@ export default function RecordPanel() {
             canEditLayout={!!state.onLayoutSave}
             onLayoutSave={state.onLayoutSave}
           />
+          </div>
+          {state.isOpen &&
+            interfaceMode === "edit" &&
+            state.onLayoutSave &&
+            state.recordId &&
+            state.tableId && (
+              <ModalRightSettingsPanel />
+            )}
         </div>
       </div>
     </>

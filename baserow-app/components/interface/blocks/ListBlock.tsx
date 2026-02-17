@@ -481,10 +481,10 @@ export default function ListBlock({
   const showHeader = ((appearance.showTitle ?? (appearance as any).show_title) !== false && (appearance.title || (isEditing ? config.title : table?.name))) || showAddRecord
 
   return (
-    <div className="h-full w-full overflow-auto" style={blockStyle}>
+    <div className="h-full w-full flex flex-col min-h-0" style={blockStyle}>
       {showHeader && (
         <div
-          className="mb-3 flex items-center justify-between gap-3"
+          className="mb-3 flex-shrink-0 flex items-center justify-between gap-3"
           style={{
             backgroundColor: appearance.header_background,
             color: appearance.header_text_color || appearance.title_color,
@@ -513,15 +513,18 @@ export default function ListBlock({
 
       {/* Quick filters (session-only; never saved to the view) */}
       {!isEditing && (
-        <QuickFilterBar
-          storageKey={`mh:quickFilters:${pageId || "page"}:${block.id}`}
-          tableFields={safeTableFields}
-          viewDefaultFilters={viewDefaultFilters}
-          onChange={setUserQuickFilters}
-        />
+        <div className="flex-shrink-0">
+          <QuickFilterBar
+            storageKey={`mh:quickFilters:${pageId || "page"}:${block.id}`}
+            tableFields={safeTableFields}
+            viewDefaultFilters={viewDefaultFilters}
+            onChange={setUserQuickFilters}
+          />
+        </div>
       )}
 
-      <ListView
+      <div className="flex-1 min-h-0 min-w-0">
+        <ListView
         highlightRules={config.highlight_rules}
         colorField={colorField || undefined}
         tableId={table.id}
@@ -555,6 +558,7 @@ export default function ListBlock({
         rowHeight={rowHeight}
         cascadeContext={cascadeContext}
       />
+      </div>
     </div>
   )
 }

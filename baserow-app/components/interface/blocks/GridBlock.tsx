@@ -1341,8 +1341,8 @@ export default function GridBlock({
         />
       )}
 
-      {/* Single scroll container: table/calendar fills viewport; content scrolls here only */}
-      <div className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden ${viewType === 'calendar' ? 'min-h-[400px]' : ''}`}>
+      {/* Single scroll container: GridView/CalendarView owns scroll; flex so child can flex-1 */}
+      <div className={`flex-1 min-h-0 min-w-0 flex flex-col ${viewType === 'calendar' ? 'min-h-[400px]' : ''}`}>
         {renderView()}
       </div>
     </div>

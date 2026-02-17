@@ -166,9 +166,9 @@ export default function PageRenderer({
   }
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Content - always Canvas */}
-      <div className="flex-1 overflow-auto">
+    <div className="h-full flex flex-col min-h-0">
+      {/* Content - no overflow here; WorkspaceShell main is the single scroll owner */}
+      <div className="flex-1 min-h-0 min-w-0">
         {content}
       </div>
     </div>

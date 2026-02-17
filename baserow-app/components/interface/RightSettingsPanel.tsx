@@ -66,26 +66,17 @@ export default function RightSettingsPanel({ position = "right" }: RightSettings
     if (selectedContext?.type !== "field") setFieldViewMode("block")
   }, [selectedContext?.type, selectedContext?.type === "field" ? selectedContext.fieldId : undefined])
 
-  // Panel only shows in edit mode (Airtable-style)
   const hasInterfacePageContext = data?.page != null && data?.blocks != null
-  const isRecordPanelOpen = recordPanelState.isOpen && recordPanelState.recordId
-  const isRecordPanelEditMode = recordPanelState.interfaceMode === "edit"
-  const isDataEditMode = data?.isEditing === true
-  const isVisible =
-    (hasInterfacePageContext && isDataEditMode) ||
-    (isRecordPanelOpen && isRecordPanelEditMode) ||
-    (data?.recordId && data?.recordTableId && !isRecordPanelOpen && isDataEditMode)
 
-  const handleClose = () => setSelectedContext(null)
+  // Repurpose "close" to show Page Settings (panel cannot be closed in Edit Mode)
+  const handleShowPageSettings = () => setSelectedContext({ type: "page" })
 
   // Stacks left or right based on position. Left = record list settings; right = field block settings.
+  // Panel is only mounted when visible (WorkspaceShell gates it) — no visibility CSS needed.
   const borderClass = position === "left" ? "border-r border-gray-200" : "border-l border-gray-200"
   return (
     <div
-      className={`flex-shrink-0 h-full flex flex-col bg-white ${borderClass} shadow-lg transition-all duration-200 overflow-hidden ${
-        isVisible ? "w-[340px]" : "w-0 border-0 shadow-none pointer-events-none"
-      }`}
-      aria-hidden={!isVisible}
+      className={`flex-shrink-0 w-[340px] h-full flex flex-col bg-white ${borderClass} shadow-lg overflow-hidden`}
     >
       {/* Header: Back + title + ellipsis for record/field; breadcrumb + close otherwise */}
       <div className="border-b border-gray-200 px-4 py-3 flex-shrink-0">
@@ -166,9 +157,9 @@ export default function RightSettingsPanel({ position = "right" }: RightSettings
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={handleClose}
+                onClick={handleShowPageSettings}
                 className="h-8 w-8 p-0 flex-shrink-0"
-                aria-label="Close"
+                aria-label="Show page settings"
               >
                 <X className="h-4 w-4" />
               </Button>
@@ -190,7 +181,7 @@ export default function RightSettingsPanel({ position = "right" }: RightSettings
             <PageDisplaySettingsPanel
               page={data.page}
               isOpen={true}
-              onClose={handleClose}
+              onClose={handleShowPageSettings}
               onUpdate={data.onPageUpdate}
               embedded
             />
@@ -204,7 +195,7 @@ export default function RightSettingsPanel({ position = "right" }: RightSettings
             <SettingsPanel
               block={data.selectedBlock}
               isOpen={true}
-              onClose={handleClose}
+              onClose={handleShowPageSettings}
               onSave={data.onBlockSave}
               onMoveToTop={data.onBlockMoveToTop}
               onMoveToBottom={data.onBlockMoveToBottom}
@@ -223,7 +214,7 @@ export default function RightSettingsPanel({ position = "right" }: RightSettings
             <SettingsPanel
               block={data.selectedBlock}
               isOpen={true}
-              onClose={handleClose}
+              onClose={handleShowPageSettings}
               onSave={data.onBlockSave}
               onMoveToTop={data.onBlockMoveToTop}
               onMoveToBottom={data.onBlockMoveToBottom}
@@ -238,6 +229,15 @@ export default function RightSettingsPanel({ position = "right" }: RightSettings
         )}
 
         {selectedContext?.type === "record" && (() => {
+          const recordPanelShowsSettings =
+            recordPanelState.isOpen && recordPanelState.interfaceMode === "edit"
+          if (recordPanelShowsSettings) {
+            return (
+              <div className="p-4 text-sm text-muted-foreground">
+                Record layout settings are in the record panel.
+              </div>
+            )
+          }
           const fromRecordPanel = recordPanelState.isOpen && recordPanelState.recordId && recordPanelState.tableId && recordPanelState.onLayoutSave
           const fromPageData = data?.recordId && data?.recordTableId
           if (fromRecordPanel) {
@@ -269,15 +269,25 @@ export default function RightSettingsPanel({ position = "right" }: RightSettings
           )
         })()}
 
-        {selectedContext && selectedContext.type === "field" && selectedContext.fieldId && (
-          fieldViewMode === "schema" ||
-          !recordPanelState.isOpen ||
-          !recordPanelState.onLayoutSave ? (
-            <FieldSchemaSettings
-              fieldId={selectedContext.fieldId}
-              tableId={selectedContext.tableId ?? data?.recordTableId ?? data?.pageTableId ?? ""}
-            />
-          ) : (
+        {selectedContext && selectedContext.type === "field" && selectedContext.fieldId && (() => {
+          const recordPanelShowsSettings =
+            recordPanelState.isOpen && recordPanelState.interfaceMode === "edit"
+          if (recordPanelShowsSettings) {
+            return (
+              <div className="p-4 text-sm text-muted-foreground">
+                Field settings are in the record panel.
+              </div>
+            )
+          }
+          if (fieldViewMode === "schema" || !recordPanelState.isOpen || !recordPanelState.onLayoutSave) {
+            return (
+              <FieldSchemaSettings
+                fieldId={selectedContext.fieldId}
+                tableId={selectedContext.tableId ?? data?.recordTableId ?? data?.pageTableId ?? ""}
+              />
+            )
+          }
+          return (
             <FieldBlockSettings
               fieldId={selectedContext.fieldId}
               tableId={selectedContext.tableId ?? recordPanelState.tableId ?? ""}
@@ -295,7 +305,7 @@ export default function RightSettingsPanel({ position = "right" }: RightSettings
               }
             />
           )
-        )}
+        })()}
       </div>
     </div>
   )

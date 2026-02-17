@@ -23,8 +23,9 @@
  * - field_layout is single source of truth for cards + detail panel
  */
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useBlockEditMode } from "@/contexts/EditModeContext"
+import { useUIMode } from "@/contexts/UIModeContext"
 import RecordReviewLeftColumn from "./RecordReviewLeftColumn"
 import InterfaceBuilder from "./InterfaceBuilder"
 import RecordDetailPanelInline from "./RecordDetailPanelInline"
@@ -71,6 +72,7 @@ export default function RecordReviewPage({
   const { role: userRole } = useUserRole()
   const { setSelectedContext } = useSelectionContext()
   const { setData: setRightPanelData } = useRightSettingsPanelData()
+  const { enterRecordLayoutEdit, exitRecordLayoutEdit, uiMode } = useUIMode()
 
   const pageType = (page as any).page_type || (page as any).type || "record_review"
   const isRecordView = pageType === "record_view"
@@ -148,6 +150,30 @@ export default function RecordReviewPage({
       setRightPanelData({ recordId: null, recordTableId: null, fieldLayout: [], onLayoutSave: null, tableFields: [], isEditing: false })
     }
   }, [selectedRecordId, pageTableId, fieldLayout, onLayoutSave, tableFields, recordInterfaceMode, setSelectedContext, setRightPanelData])
+
+  // Sync UIMode with record layout edit so RightSettingsPanel shows when editing record layout (record_view)
+  useEffect(() => {
+    if (isRecordView && selectedRecordId && recordInterfaceMode === "edit") {
+      if (uiMode === "view") {
+        enterRecordLayoutEdit()
+      }
+    } else if (uiMode === "recordLayoutEdit") {
+      exitRecordLayoutEdit()
+    }
+  }, [isRecordView, selectedRecordId, recordInterfaceMode, uiMode, enterRecordLayoutEdit, exitRecordLayoutEdit])
+
+  // Auto-open Right Settings Panel with Record Layout when entering Edit Mode; clear selection when exiting
+  const prevRecordInterfaceModeRef = useRef(recordInterfaceMode)
+  useEffect(() => {
+    if (prevRecordInterfaceModeRef.current === "edit" && recordInterfaceMode === "view") {
+      setSelectedContext(null)
+    } else if (prevRecordInterfaceModeRef.current !== "edit" && recordInterfaceMode === "edit") {
+      if (selectedRecordId && pageTableId) {
+        setSelectedContext({ type: "record", recordId: selectedRecordId, tableId: pageTableId })
+      }
+    }
+    prevRecordInterfaceModeRef.current = recordInterfaceMode
+  }, [recordInterfaceMode, selectedRecordId, pageTableId, setSelectedContext])
 
   // Handle record selection - reset to view mode when switching records (Airtable-style)
   const handleRecordSelect = useCallback((recordId: string) => {

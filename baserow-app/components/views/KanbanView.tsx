@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from "react"
 import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { ChevronRight, Plus, Settings, Columns, FileText } from "lucide-react"
+import { ChevronRight, Plus, Settings, Columns } from "lucide-react"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
 import type { TableRow } from "@/types/database"
 import type { TableField } from "@/types/fields"
@@ -519,8 +519,6 @@ export default function KanbanView({
                   const pillMetaFields = otherFields.length >= 2 ? otherFields.slice(0, -1) : otherFields
                   const contentField = otherFields.length >= 2 ? otherFields[otherFields.length - 1] : null
                   const data = row.data || {}
-                  const contentValue = contentField ? data[contentField.name] : null
-                  const hasContent = contentValue != null && String(contentValue).trim() !== ""
 
                   return (
                 <Card 
@@ -622,34 +620,20 @@ export default function KanbanView({
                         </div>
                       )}
 
-                      {/* Content preview (Airtable-style: larger, 2-3 lines) or + Add content */}
-                      {contentField ? (
-                        hasContent ? (
-                          <div className="text-sm text-gray-600 line-clamp-3 min-w-0" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
-                            <CellFactory
-                              field={contentField}
-                              value={contentValue}
-                              rowId={String(row.id)}
-                              tableName={supabaseTableName || ""}
-                              editable={!contentField.options?.read_only && contentField.type !== "formula" && contentField.type !== "lookup" && !!supabaseTableName}
-                              wrapText={wrapText}
-                              rowHeight={undefined}
-                              onSave={(value) => handleCellSave(String(row.id), contentField.name, value)}
-                            />
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              if (row.id != null) handleOpenRecord(String(row.id))
-                            }}
-                            className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 hover:underline"
-                          >
-                            <FileText className="h-3.5 w-3.5" />
-                            + Add content
-                          </button>
-                        )
+                      {/* Content preview (larger, 2-3 lines) - leave blank when empty */}
+                      {contentField && data[contentField.name] != null && String(data[contentField.name]).trim() !== "" ? (
+                        <div className="text-sm text-gray-600 line-clamp-3 min-w-0" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+                          <CellFactory
+                            field={contentField}
+                            value={data[contentField.name]}
+                            rowId={String(row.id)}
+                            tableName={supabaseTableName || ""}
+                            editable={!contentField.options?.read_only && contentField.type !== "formula" && contentField.type !== "lookup" && !!supabaseTableName}
+                            wrapText={wrapText}
+                            rowHeight={undefined}
+                            onSave={(value) => handleCellSave(String(row.id), contentField.name, value)}
+                          />
+                        </div>
                       ) : null}
                     </div>
                   </CardContent>

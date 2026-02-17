@@ -13,6 +13,7 @@ import { RightSettingsPanelDataProvider, useRightSettingsPanelData } from "@/con
 import RightSettingsPanel from "@/components/interface/RightSettingsPanel"
 import RecordPanel from "@/components/records/RecordPanel"
 import { MainScrollProvider, useMainScroll } from "@/contexts/MainScrollContext"
+import { useUIMode } from "@/contexts/UIModeContext"
 import { useIsMobile } from "@/hooks/useResponsive"
 import { useBranding } from "@/contexts/BrandingContext"
 import { Button } from "@/components/ui/button"
@@ -160,6 +161,10 @@ function ShellContent({
   const suppressMainScroll = mainScroll?.suppressMainScroll ?? false
   const { selectedContext } = useSelectionContext()
   const { data } = useRightSettingsPanelData()
+  const { isEdit } = useUIMode()
+
+  // Single source of truth for layout width: panel only renders when in edit mode
+  const isEditMode = isEdit()
 
   // When record list (left panel / record_context block) is selected for settings, show settings on LEFT; right panel = field blocks
   const isRecordListSelected =
@@ -198,10 +203,12 @@ function ShellContent({
         onClose={isMobile ? () => setSidebarOpen(false) : undefined}
         defaultPageId={defaultPageId}
       />
-      {/* Settings on LEFT when record list selected; otherwise on right. Right = field blocks. */}
-      <div className={`flex-shrink-0 ${isSettingsOnLeft ? "order-1" : "order-3"}`}>
-        <RightSettingsPanel position={isSettingsOnLeft ? "left" : "right"} />
-      </div>
+      {/* Settings panel: conditional render - only in DOM when isEditMode. Layout width depends ONLY on isEditMode. */}
+      {isEditMode && (
+        <div className={`flex-shrink-0 w-[340px] ${isSettingsOnLeft ? "order-1" : "order-3"}`}>
+          <RightSettingsPanel position={isSettingsOnLeft ? "left" : "right"} />
+        </div>
+      )}
       {/* Main content - field blocks (record detail) */}
       <div className="flex-1 flex flex-col overflow-x-hidden min-h-0 min-w-0 order-2">
         {!hideTopbar && (

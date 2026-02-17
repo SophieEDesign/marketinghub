@@ -60,7 +60,11 @@ export default function RecordModal({
 
   return (
     <Dialog open={open} onOpenChange={onClose} key={`record-modal-${recordId || "new"}`}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
+      <DialogContent
+        className="max-w-2xl max-h-[90vh] flex flex-col p-0 overflow-hidden"
+        onInteractOutside={(e) => e.preventDefault()}
+        onPointerDownOutside={(e) => e.preventDefault()}
+      >
         {/* Single scroll container: modal content scrolls; no nested scrollbars */}
         <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
           <RecordEditor
