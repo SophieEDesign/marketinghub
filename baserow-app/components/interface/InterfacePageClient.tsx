@@ -52,7 +52,7 @@ function InterfacePageContent({
   isViewer: boolean
   onRecordViewLayoutSave?: (fieldLayout: FieldLayoutItem[]) => Promise<void>
   interfaceBuilderPage: InterfacePage | null | undefined
-  fallbackPage: InterfacePage
+  fallbackPage: { id: string; name: string; page_type: string; settings?: Record<string, unknown> }
   pageTableId: string | null
   recordContext: RecordContext
   setRecordContext: (ctx: RecordContext) => void
@@ -71,7 +71,7 @@ function InterfacePageContent({
   return (
     <div className="min-h-screen w-full min-w-0 flex flex-col">
       <InterfaceBuilder
-        page={interfaceBuilderPage ?? fallbackPage}
+        page={(interfaceBuilderPage ?? fallbackPage) as any}
         initialBlocks={memoizedBlocks}
         isViewer={isViewer}
         hideHeader={true}
@@ -1171,6 +1171,7 @@ function InterfacePageClientInternal({
 
   // Full-page content: suppress workspace main scroll (Airtable-style). MUST be before early returns (React Hooks rule).
   const mainScroll = useMainScroll()
+  const suppressMainScroll = mainScroll?.suppressMainScroll ?? false
   useEffect(() => {
     if (!mainScroll) return
     const isRecordView = page?.page_type === 'record_view'
@@ -1254,9 +1255,6 @@ function InterfacePageClientInternal({
     setIsEditingTitle(true)
     setTitleValue(page?.name || "")
   }
-
-  const mainScroll = useMainScroll()
-  const suppressMainScroll = mainScroll?.suppressMainScroll ?? false
 
   return (
     <div className="flex flex-col flex-1 min-h-0 min-w-0 overflow-x-hidden">
