@@ -9,7 +9,7 @@ import { RecordPanelProvider } from "@/contexts/RecordPanelContext"
 import { RecordModalProvider } from "@/contexts/RecordModalContext"
 import { SelectionContextProvider } from "@/contexts/SelectionContext"
 import { PageActionsProvider } from "@/contexts/PageActionsContext"
-import { RightSettingsPanelDataProvider } from "@/contexts/RightSettingsPanelDataContext"
+import { RightSettingsPanelDataProvider, useRightSettingsPanelData } from "@/contexts/RightSettingsPanelDataContext"
 import RightSettingsPanel from "@/components/interface/RightSettingsPanel"
 import RecordPanel from "@/components/records/RecordPanel"
 import { MainScrollProvider, useMainScroll } from "@/contexts/MainScrollContext"
@@ -129,7 +129,6 @@ export default function Shell({
         </ShellContent>
       </MainScrollProvider>
       </PageActionsProvider>
-      <RightSettingsPanel />
       <WelcomeScreen />
       </RecordModalProvider>
       </RecordPanelProvider>
@@ -161,6 +160,14 @@ function ShellContent({
 }) {
   const mainScroll = useMainScroll()
   const suppressMainScroll = mainScroll?.suppressMainScroll ?? false
+  const { selectedContext } = useSelectionContext()
+  const { data } = useRightSettingsPanelData()
+
+  // When record list (left panel / record_context block) is selected for settings, show settings on LEFT; right panel = field blocks
+  const isRecordListSelected =
+    selectedContext?.type === "recordList" ||
+    (selectedContext?.type === "block" && data?.selectedBlock?.type === "record_context")
+  const isSettingsOnLeft = isRecordListSelected
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 overflow-x-hidden">
@@ -193,9 +200,12 @@ function ShellContent({
         onClose={isMobile ? () => setSidebarOpen(false) : undefined}
         defaultPageId={defaultPageId}
       />
-      {/* Main content area - RecordPanel and RightSettingsPanel overlay when open (position: fixed).
-          CRITICAL: Main content must keep full width so blocks don't shift when right panel opens in edit mode. */}
-      <div className="flex-1 flex flex-col overflow-x-hidden min-h-0 min-w-0 w-full">
+      {/* Settings on LEFT when record list selected; otherwise on right. Right = field blocks. */}
+      <div className={`flex-shrink-0 ${isSettingsOnLeft ? "order-1" : "order-3"}`}>
+        <RightSettingsPanel position={isSettingsOnLeft ? "left" : "right"} />
+      </div>
+      {/* Main content - field blocks (record detail) */}
+      <div className="flex-1 flex flex-col overflow-x-hidden min-h-0 min-w-0 order-2">
         {!hideTopbar && (
           <Topbar
             title={title}
@@ -204,7 +214,7 @@ function ShellContent({
           />
         )}
         <main
-          className={`flex-1 min-h-0 min-w-0 w-full pr-0 overflow-x-hidden ${suppressMainScroll ? "overflow-y-hidden" : "overflow-y-auto"}`}
+          className={`flex-1 min-h-0 min-w-0 overflow-x-hidden ${suppressMainScroll ? "overflow-y-hidden" : "overflow-y-auto"}`}
         >
           {children}
         </main>

@@ -615,7 +615,10 @@ export default function FieldBlock({
 
   return (
     <>
-      <div className={cn("p-3 flex flex-col overflow-visible", FIELD_LABEL_GAP_CLASS)}>
+      <div
+        className={cn("p-3 flex flex-col overflow-visible", FIELD_LABEL_GAP_CLASS)}
+        data-block-selectable
+      >
         {showLabel ? (
           <>
             <label className={cn(FIELD_LABEL_CLASS_NO_MARGIN, "flex-shrink-0")}>

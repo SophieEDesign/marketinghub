@@ -276,7 +276,7 @@ export default function FieldSectionBlock({
   }
 
   return (
-    <div className="h-full p-3">
+    <div className="h-full p-3" data-block-selectable>
       <div className="space-y-2">
         {/* Section Header */}
         <button

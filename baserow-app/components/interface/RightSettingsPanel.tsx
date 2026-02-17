@@ -51,7 +51,12 @@ function Breadcrumb({ context, onNavigate }: { context: SelectedContext; onNavig
   )
 }
 
-export default function RightSettingsPanel() {
+interface RightSettingsPanelProps {
+  /** When "left", panel appears on left (record list settings); when "right", on right (field block settings) */
+  position?: "left" | "right"
+}
+
+export default function RightSettingsPanel({ position = "right" }: RightSettingsPanelProps) {
   const { selectedContext, setSelectedContext } = useSelectionContext()
   const { data } = useRightSettingsPanelData()
   const { state: recordPanelState } = useRecordPanel()
@@ -68,19 +73,15 @@ export default function RightSettingsPanel() {
     selectedContext ||
     (recordPanelState.isOpen && recordPanelState.recordId)
 
-  // Settings panel is always on the far right; RecordPanel sits to its left when open
-  const panelWidth = 400
-
   const handleClose = () => setSelectedContext(null)
 
-  // CRITICAL: This panel must OVERLAY (position: fixed) and never push main content.
-  // If it pushed content, the canvas width would change in edit mode and saved block positions would shift.
+  // Stacks left or right based on position. Left = record list settings; right = field block settings.
+  const borderClass = position === "left" ? "border-r border-gray-200" : "border-l border-gray-200"
   return (
     <div
-      className={`fixed top-0 right-0 h-full w-[400px] bg-white border-l border-gray-200 shadow-xl z-40 flex flex-col transition-all duration-200 ${
-        isVisible ? "translate-x-0" : "translate-x-full pointer-events-none"
+      className={`flex-shrink-0 h-full flex flex-col bg-white ${borderClass} shadow-lg transition-all duration-200 overflow-hidden ${
+        isVisible ? "w-[340px]" : "w-0 border-0 shadow-none pointer-events-none"
       }`}
-      style={{ height: "100vh", right: 0 }}
       aria-hidden={!isVisible}
     >
       {/* Header: Back + title + ellipsis for record/field; breadcrumb + close otherwise */}
