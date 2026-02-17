@@ -5,7 +5,7 @@ import AirtableSidebar from "./AirtableSidebar"
 import Topbar from "./Topbar"
 import EditModeBanner from "./EditModeBanner"
 import EditModeGuard from "./EditModeGuard"
-import { RecordPanelProvider } from "@/contexts/RecordPanelContext"
+import { RecordPanelProvider, useRecordPanel } from "@/contexts/RecordPanelContext"
 import { RecordModalProvider } from "@/contexts/RecordModalContext"
 import { SelectionContextProvider, useSelectionContext } from "@/contexts/SelectionContext"
 import { PageActionsProvider } from "@/contexts/PageActionsContext"
@@ -13,7 +13,6 @@ import { RightSettingsPanelDataProvider, useRightSettingsPanelData } from "@/con
 import RightSettingsPanel from "@/components/interface/RightSettingsPanel"
 import RecordPanel from "@/components/records/RecordPanel"
 import { MainScrollProvider, useMainScroll } from "@/contexts/MainScrollContext"
-import { useUIMode } from "@/contexts/UIModeContext"
 import { useIsMobile } from "@/hooks/useResponsive"
 import { useBranding } from "@/contexts/BrandingContext"
 import { Button } from "@/components/ui/button"
@@ -161,10 +160,18 @@ function ShellContent({
   const suppressMainScroll = mainScroll?.suppressMainScroll ?? false
   const { selectedContext } = useSelectionContext()
   const { data } = useRightSettingsPanelData()
-  const { isEdit } = useUIMode()
+  const { state: recordPanelState } = useRecordPanel()
 
-  // Single source of truth for layout width: panel only renders when in edit mode
-  const isEditMode = isEdit()
+  // Right Settings Panel: only mount in Edit Mode. Use data from page consumers (InterfacePageClient, RecordReviewPage)
+  // NOT UIModeContext - sidebar Edit button uses EditModeContext, which syncs to RightPanelData.isEditing
+  const hasInterfacePageContext = data?.page != null && data?.blocks != null
+  const isRecordPanelOpen = recordPanelState.isOpen && recordPanelState.recordId
+  const isRecordPanelEditMode = recordPanelState.interfaceMode === "edit"
+  const isDataEditMode = data?.isEditing === true
+  const isPanelVisible =
+    (hasInterfacePageContext && isDataEditMode) ||
+    (isRecordPanelOpen && isRecordPanelEditMode) ||
+    (data?.recordId != null && data?.recordTableId != null && !isRecordPanelOpen && isDataEditMode)
 
   // When record list (left panel / record_context block) is selected for settings, show settings on LEFT; right panel = field blocks
   const isRecordListSelected =
@@ -203,8 +210,8 @@ function ShellContent({
         onClose={isMobile ? () => setSidebarOpen(false) : undefined}
         defaultPageId={defaultPageId}
       />
-      {/* Settings panel: conditional render - only in DOM when isEditMode. Layout width depends ONLY on isEditMode. */}
-      {isEditMode && (
+      {/* Settings panel: conditional render - only in DOM when in Edit Mode (data.isEditing from page consumers). */}
+      {isPanelVisible && (
         <div className={`flex-shrink-0 w-[340px] ${isSettingsOnLeft ? "order-1" : "order-3"}`}>
           <RightSettingsPanel position={isSettingsOnLeft ? "left" : "right"} />
         </div>

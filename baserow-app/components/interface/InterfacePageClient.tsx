@@ -64,7 +64,7 @@ function InterfacePageClientInternal({
   // Use unified editing context (block scope kept in sync with UIMode editPages)
   const { isEditing: isPageEditing, enter: enterPageEdit, exit: exitPageEdit } = usePageEditMode(pageId)
   const { isEditing: isBlockEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(pageId)
-  const { exitEditPages } = useUIMode()
+  const { enterEditPages, exitEditPages } = useUIMode()
   const { selectedContext, setSelectedContext } = useSelectionContext()
   const { setData: setRightPanelData } = useRightSettingsPanelData()
   const { state: recordPanelState } = useRecordPanel()
@@ -97,8 +97,9 @@ function InterfacePageClientInternal({
     const saved = localStorage.getItem(`block-edit-mode-${pageId}`)
     if (saved === "true") {
       enterBlockEdit()
+      enterEditPages(pageId)
     }
-  }, [pageId, enterBlockEdit])
+  }, [pageId, enterBlockEdit, enterEditPages])
 
   // CRITICAL: Edit state is NOT reset on navigation - only when user explicitly exits
   // Do NOT add effects that depend on blocks, page, or edit mode - they cause remount loops
@@ -214,8 +215,8 @@ function InterfacePageClientInternal({
     await handlePageUpdateRef.current()
   }, [])
 
-  // CRITICAL: RightPanel sync depends ONLY on page.id, page, blocks, selectedContext - NOT handlePageUpdate
-  const lastRightPanelSyncRef = useRef<{ pageRef: InterfacePage | null; blocksRef: any[]; selectedBlockId: string | undefined } | null>(null)
+  // CRITICAL: RightPanel sync depends ONLY on page.id, page, blocks, selectedContext, isEditing - NOT handlePageUpdate
+  const lastRightPanelSyncRef = useRef<{ pageRef: InterfacePage | null; blocksRef: any[]; selectedBlockId: string | undefined; isEditing: boolean } | null>(null)
   const prevBlocksRef = useRef<{ blocks: any[]; signature: string }>({ blocks: [], signature: "" })
 
   // Clear right panel data when navigating away from interface page (Airtable-style: panel only on interface pages)
@@ -226,8 +227,8 @@ function InterfacePageClientInternal({
     }
     const selectedBlock = selectedBlockIdForPanel != null ? blocks.find((b) => b.id === selectedBlockIdForPanel) ?? null : null
     const prev = lastRightPanelSyncRef.current
-    if (prev?.pageRef === page && prev?.blocksRef === blocks && prev?.selectedBlockId === selectedBlockIdForPanel) return
-    lastRightPanelSyncRef.current = { pageRef: page, blocksRef: blocks, selectedBlockId: selectedBlockIdForPanel }
+    if (prev?.pageRef === page && prev?.blocksRef === blocks && prev?.selectedBlockId === selectedBlockIdForPanel && prev?.isEditing === isEditing) return
+    lastRightPanelSyncRef.current = { pageRef: page, blocksRef: blocks, selectedBlockId: selectedBlockIdForPanel, isEditing }
     const updates: Parameters<typeof setRightPanelData>[0] = {
       page,
       onPageUpdate: stableHandlePageUpdate,

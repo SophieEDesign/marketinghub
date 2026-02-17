@@ -5,12 +5,19 @@
  * Makes edit mode unmistakably obvious across the app.
  */
 import { useEditMode } from "@/contexts/EditModeContext"
+import { useUIMode } from "@/contexts/UIModeContext"
 import { Button } from "@/components/ui/button"
 import { Check, Pencil } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export default function EditModeBanner() {
   const { isAnyEditing, exitAllEditModes } = useEditMode()
+  const { exitEditPages } = useUIMode()
+
+  const handleDone = () => {
+    exitAllEditModes()
+    exitEditPages()
+  }
 
   if (!isAnyEditing()) return null
 
@@ -35,7 +42,7 @@ export default function EditModeBanner() {
       <Button
         variant="default"
         size="sm"
-        onClick={exitAllEditModes}
+        onClick={handleDone}
         className={cn(
           "gap-1.5 font-medium",
           "bg-amber-600 hover:bg-amber-700 text-white",

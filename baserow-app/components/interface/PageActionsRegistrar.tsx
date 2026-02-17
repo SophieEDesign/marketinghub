@@ -25,7 +25,7 @@ export default function PageActionsRegistrar({
   const { registerPageActions, unregisterPageActions } = usePageActions()
   const { isEditing: isPageEditing, exit: exitPageEdit } = usePageEditMode(pageId)
   const { isEditing: isBlockEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(pageId)
-  const { exitEditPages } = useUIMode()
+  const { enterEditPages, exitEditPages } = useUIMode()
   const { setSelectedContext } = useSelectionContext()
 
   const onOpenPageSettings = useCallback(() => {
@@ -34,7 +34,8 @@ export default function PageActionsRegistrar({
 
   const onEnterEdit = useCallback(() => {
     enterBlockEdit()
-  }, [enterBlockEdit])
+    enterEditPages(pageId)
+  }, [enterBlockEdit, enterEditPages, pageId])
 
   const onExitEdit = useCallback(() => {
     exitPageEdit()

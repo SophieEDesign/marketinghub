@@ -1341,8 +1341,8 @@ export default function GridBlock({
         />
       )}
 
-      {/* Single scroll container: GridView/CalendarView owns scroll; flex so child can flex-1 */}
-      <div className={`flex-1 min-h-0 min-w-0 flex flex-col ${viewType === 'calendar' ? 'min-h-[400px]' : ''}`}>
+      {/* Single scroll container: GridView/CalendarView owns scroll; flex so child can flex-1. Kanban needs overflow-x-auto for horizontal column scroll. */}
+      <div className={`flex-1 min-h-0 min-w-0 flex flex-col ${viewType === 'calendar' ? 'min-h-[400px]' : ''} ${viewType === 'kanban' ? 'overflow-x-auto' : ''}`}>
         {renderView()}
       </div>
     </div>
