@@ -1,0 +1,29 @@
+# Panel Separation: Left (Block Config) vs Right (Field Layout)
+
+## Clear Separation
+
+### LEFT PANEL (LeftSettingsPanel)
+- **Purpose:** Block config – configures the Record List / block itself (Airtable-style sidebar)
+- **Shows when:** `selectedContext` is `page`, `block`, or `recordList` + edit mode
+- **Layout:** Flex sibling – interface **shrinks** when open
+- **Controls:** Data (table, view, filter, sort, group), List item/card, User controls
+- **Must NOT:** Field editability at schema level, record layout builder
+
+### RIGHT PANEL (RightSettingsPanel)
+- **Purpose:** Field layout editor (drag & drop) – edits `field_layout` only
+- **Shows when:** Record layout context (RecordPanel edit or record_view page with record) + edit mode
+- **Layout:** Absolute overlay – main content stays full width
+- **Controls:** All fields, drag & drop ordering, sections, columns, hide/show
+- **Must NOT:** Dataset, sort, filter, group, permissions
+
+## Behavior Rules
+
+**Edit Mode ON:**
+- Left panel: block config (interface shrinks)
+- Right panel: field layout (overlays)
+- No scroll duplication, no layout jumping
+
+**Edit Mode OFF:**
+- Interface full width
+- No panels visible
+- No ghost shrink, no leftover padding, no persistent flex gap

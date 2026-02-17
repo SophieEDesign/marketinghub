@@ -10,6 +10,8 @@ import { RecordModalProvider } from "@/contexts/RecordModalContext"
 import { SelectionContextProvider } from "@/contexts/SelectionContext"
 import { PageActionsProvider } from "@/contexts/PageActionsContext"
 import { RightSettingsPanelDataProvider, useRightSettingsPanelData } from "@/contexts/RightSettingsPanelDataContext"
+import { useSelectionContext } from "@/contexts/SelectionContext"
+import LeftSettingsPanel from "@/components/interface/LeftSettingsPanel"
 import RightSettingsPanel from "@/components/interface/RightSettingsPanel"
 import RecordPanel from "@/components/records/RecordPanel"
 import { MainScrollProvider } from "@/contexts/MainScrollContext"
@@ -157,20 +159,27 @@ function ShellContent({
   setSidebarOpen: (v: boolean) => void
   primaryColor: string
 }) {
+  const { selectedContext } = useSelectionContext()
   const { data } = useRightSettingsPanelData()
   const { state: recordPanelState } = useRecordPanel()
   const isEditMode = useUIMode().isEdit()
 
-  // Right Settings Panel: only mount in Edit Mode. UIModeContext is single source of truth.
   const hasInterfacePageContext = data?.page != null && data?.blocks != null
   const isRecordPanelOpen = recordPanelState.isOpen && recordPanelState.recordId
   const isRecordPanelEditMode = recordPanelState.interfaceMode === "edit"
   const hasRecordContextBlock = data?.recordId != null && data?.recordTableId != null && !isRecordPanelOpen
-  const hasPanelContext =
-    hasInterfacePageContext ||
-    (isRecordPanelOpen && isRecordPanelEditMode) ||
-    hasRecordContextBlock
-  const isPanelVisible = hasPanelContext && isEditMode
+
+  // LEFT panel (block config): page/block/recordList selected. Interface shrinks.
+  const isBlockConfigContext =
+    selectedContext?.type === "page" ||
+    selectedContext?.type === "block" ||
+    selectedContext?.type === "recordList"
+  const isLeftPanelVisible = isBlockConfigContext && hasInterfacePageContext && isEditMode
+
+  // RIGHT panel (field layout): record layout context (RecordPanel edit or record_view). Overlays.
+  const hasRecordLayoutContext =
+    (isRecordPanelOpen && isRecordPanelEditMode) || hasRecordContextBlock
+  const isRightPanelVisible = hasRecordLayoutContext && isEditMode
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 overflow-x-hidden">
@@ -203,10 +212,16 @@ function ShellContent({
         onClose={isMobile ? () => setSidebarOpen(false) : undefined}
         defaultPageId={defaultPageId}
       />
-      {/* MainArea: InterfaceContainer full width; RightSettingsPanel overlays on right (separate container) */}
+      {/* MainArea: LeftSettingsPanel (shrinks) | InterfaceContainer (flex-1) | RightSettingsPanel (overlay) */}
       <div className="flex flex-1 min-w-0 overflow-hidden relative">
-        {/* InterfaceContainer - always full width; layout stays same in edit mode */}
-        <div className="flex flex-1 flex flex-col min-w-0 overflow-hidden w-full">
+        {/* LeftSettingsPanel: block config - flex sibling, interface shrinks when open */}
+        {isLeftPanelVisible && (
+          <div className="w-[360px] flex-shrink-0 h-full overflow-hidden">
+            <LeftSettingsPanel />
+          </div>
+        )}
+        {/* InterfaceContainer - flex-1; shrinks when left panel open */}
+        <div className="flex flex-1 flex flex-col min-w-0 overflow-hidden">
           {!hideTopbar && (
             <Topbar
               title={title}
@@ -218,8 +233,8 @@ function ShellContent({
             {children}
           </main>
         </div>
-        {/* RightSettingsPanel: overlay on right, not in same flex container - page layout stays full width */}
-        {isPanelVisible && (
+        {/* RightSettingsPanel: field layout editor - overlay on right */}
+        {isRightPanelVisible && (
           <div className="absolute right-0 top-0 bottom-0 w-[360px] flex-shrink-0 border-l border-gray-200 bg-white z-30 shadow-lg">
             <RightSettingsPanel />
           </div>
