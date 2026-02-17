@@ -1132,6 +1132,7 @@ function InterfacePageClientInternal({
     [page?.id, page?.config]
   )
 
+  const isViewer = searchParams?.get("view") === "true"
   const isRecordView = page?.page_type === 'record_view'
   const isRecordReview = page?.page_type === 'record_review'
   const useRecordReviewLayout = isRecordReview || isRecordView
@@ -1232,11 +1233,11 @@ function InterfacePageClientInternal({
                   onClick={handleStartEditTitle}
                   title="Click to edit page title"
                 >
-                  {page.name}
+                  {page?.name}
                 </h1>
-                {page.updated_at && (
+                {page?.updated_at && (
                   <span className="text-xs text-gray-500 flex-shrink-0" suppressHydrationWarning>
-                    Updated {formatDateUK(page.updated_at)}
+                    Updated {formatDateUK(page?.updated_at ?? "")}
                   </span>
                 )}
               </>
@@ -1249,16 +1250,16 @@ function InterfacePageClientInternal({
       {!isViewer && hasPage && !isAdmin && (
         <div className="border-b bg-white px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <h1 className="text-lg font-semibold flex-1 min-w-0 truncate">{page.name}</h1>
+            <h1 className="text-lg font-semibold flex-1 min-w-0 truncate">{page?.name}</h1>
             <span 
               className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded flex-shrink-0"
               title="Ask an admin to edit this page"
             >
               View only
             </span>
-            {page.updated_at && (
+            {page?.updated_at && (
               <span className="text-xs text-gray-500 flex-shrink-0" suppressHydrationWarning>
-                Updated {formatDateUK(page.updated_at)}
+                Updated {formatDateUK(page?.updated_at ?? "")}
               </span>
             )}
           </div>
