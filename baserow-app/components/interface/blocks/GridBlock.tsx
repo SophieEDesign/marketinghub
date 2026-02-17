@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client"
 import type { PageBlock, ViewType } from "@/lib/interface/types"
 import GridViewWrapper from "@/components/grid/GridViewWrapper"
 import CalendarView from "@/components/views/CalendarView"
+import { ErrorBoundary } from "@/components/interface/ErrorBoundary"
 import KanbanView from "@/components/views/KanbanView"
 import TimelineView from "@/components/views/TimelineView"
 import GalleryView from "@/components/views/GalleryView"
@@ -821,6 +822,16 @@ export default function GridBlock({
         
         // CalendarView will load view config and use that; it shows empty state if tableId or date field is missing
         return (
+          <ErrorBoundary
+            fallback={
+              <div className="h-full flex items-center justify-center p-4 border border-red-200 bg-red-50 rounded-lg">
+                <div className="text-center">
+                  <p className="text-sm font-medium text-red-800 mb-1">Calendar error</p>
+                  <p className="text-xs text-red-600">This calendar block encountered an error. Please refresh or configure the date field.</p>
+                </div>
+              </div>
+            }
+          >
           <CalendarView
             key={block.id}
             tableId={tableId ?? ''}
@@ -847,6 +858,7 @@ export default function GridBlock({
             interfaceMode={interfaceMode}
             blockId={block.id}
           />
+          </ErrorBoundary>
         )
       }
       
@@ -1145,7 +1157,19 @@ export default function GridBlock({
         const handleRecordClick = allowOpenRecord
           ? (onRecordClick || ((clickedRecordId: string) => {
               if (tableId && table?.supabase_table) {
-                openRecordPanel(tableId, clickedRecordId, table.supabase_table, modalFieldsForRecord, (config as any).modal_layout, { blockConfig: config }, undefined, () => setRefreshKey((k) => k + 1), (config as any).field_layout)
+                openRecordPanel(
+                  tableId,
+                  clickedRecordId,
+                  table.supabase_table,
+                  modalFieldsForRecord,
+                  (config as any).modal_layout,
+                  { blockConfig: config },
+                  undefined,
+                  () => setRefreshKey((k) => k + 1),
+                  (config as any).field_layout,
+                  onModalLayoutSave ?? undefined,
+                  tableFields
+                )
               }
             }))
           : undefined // Disable record clicks if not allowed

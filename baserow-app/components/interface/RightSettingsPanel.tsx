@@ -74,7 +74,7 @@ export default function RightSettingsPanel() {
         <div className="flex items-center justify-between gap-2">
           {selectedContext?.type === "field" &&
           selectedContext.fieldId &&
-          recordPanelState.isOpen ? (
+          (recordPanelState.isOpen || (data?.recordId && data?.recordTableId && data?.onLayoutSave)) ? (
             <>
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <Button
@@ -85,8 +85,8 @@ export default function RightSettingsPanel() {
                       ? setFieldViewMode("block")
                       : setSelectedContext({
                           type: "record",
-                          recordId: recordPanelState.recordId ?? "",
-                          tableId: recordPanelState.tableId ?? "",
+                          recordId: recordPanelState.recordId ?? data?.recordId ?? "",
+                          tableId: recordPanelState.tableId ?? data?.recordTableId ?? "",
                         })
                   }
                   className="h-8 w-8 p-0 flex-shrink-0"
@@ -98,9 +98,8 @@ export default function RightSettingsPanel() {
                   {fieldViewMode === "schema"
                     ? "Field settings"
                     : (() => {
-                        const f = recordPanelState.tableFields?.find(
-                          (x) => x.id === selectedContext.fieldId
-                        )
+                        const fields = recordPanelState.tableFields ?? data?.tableFields ?? []
+                        const f = fields.find((x) => x.id === selectedContext.fieldId)
                         return f ? `${getFieldDisplayName(f)} Field` : "Field"
                       })()}
                 </span>
@@ -252,7 +251,10 @@ export default function RightSettingsPanel() {
         })()}
 
         {selectedContext && selectedContext.type === "field" && selectedContext.fieldId && (() => {
-          if (fieldViewMode === "schema" || !recordPanelState.isOpen || !recordPanelState.onLayoutSave) {
+          const fromRecordPanel = recordPanelState.isOpen && recordPanelState.onLayoutSave
+          const fromPageData = data?.recordId && data?.recordTableId && data?.onLayoutSave && data?.fieldLayout
+          const canShowFieldBlockSettings = fromRecordPanel || fromPageData
+          if (fieldViewMode === "schema" || !canShowFieldBlockSettings) {
             return (
               <FieldSchemaSettings
                 fieldId={selectedContext.fieldId}
@@ -260,20 +262,21 @@ export default function RightSettingsPanel() {
               />
             )
           }
+          const tableIdForField = selectedContext.tableId ?? recordPanelState.tableId ?? data?.recordTableId ?? ""
           return (
             <FieldBlockSettings
               fieldId={selectedContext.fieldId}
-              tableId={selectedContext.tableId ?? recordPanelState.tableId ?? ""}
+              tableId={tableIdForField}
               tableName={recordPanelState.tableName}
-              fieldLayout={recordPanelState.fieldLayout ?? []}
-              onLayoutSave={recordPanelState.onLayoutSave}
-              fields={recordPanelState.tableFields ?? []}
+              fieldLayout={recordPanelState.fieldLayout ?? data?.fieldLayout ?? []}
+              onLayoutSave={recordPanelState.onLayoutSave ?? data?.onLayoutSave ?? null}
+              fields={recordPanelState.tableFields ?? data?.tableFields ?? []}
               onEditField={() => setFieldViewMode("schema")}
               onFieldChange={(newFieldId) =>
                 setSelectedContext({
                   type: "field",
                   fieldId: newFieldId,
-                  tableId: selectedContext.tableId ?? recordPanelState.tableId ?? "",
+                  tableId: selectedContext.tableId ?? recordPanelState.tableId ?? data?.recordTableId ?? "",
                 })
               }
             />

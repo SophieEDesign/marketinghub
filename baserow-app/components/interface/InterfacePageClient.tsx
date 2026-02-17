@@ -1188,11 +1188,29 @@ function InterfacePageClientInternal({
   const handleRecordViewLayoutSave = useCallback(
     async (fieldLayout: FieldLayoutItem[]) => {
       if (!page?.id) return
+      // Sync left_panel (title_field, field_1, field_2) from first 3 visible_in_card fields so cards render correctly
+      const cardFields = fieldLayout
+        .filter((i) => i.visible_in_card !== false)
+        .sort((a, b) => a.order - b.order)
+        .slice(0, 3)
+      const [titleField, field1, field2] = cardFields.map((i) => i.field_name)
+      const existingLeftPanel = page.config?.left_panel || page.config?.leftPanel || {}
+      const leftPanel = {
+        ...existingLeftPanel,
+        ...(titleField != null && { title_field: titleField }),
+        ...(field1 != null && { field_1: field1 }),
+        ...(field2 != null && { field_2: field2 }),
+      }
       const res = await fetch(`/api/interface-pages/${page.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          config: { ...(page.config || {}), field_layout: fieldLayout },
+          config: {
+            ...(page.config || {}),
+            field_layout: fieldLayout,
+            left_panel: leftPanel,
+            title_field: titleField ?? page.config?.title_field,
+          },
         }),
       })
       if (!res.ok) {

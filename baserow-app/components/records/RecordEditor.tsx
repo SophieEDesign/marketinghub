@@ -394,10 +394,15 @@ export default function RecordEditor({
           </div>
         )
       }
+      // Allow grid layout when field_layout has column metadata (modal_column_id, etc.) so users can drag/resize
+      const hasColumnMetadata = resolvedFieldLayout.some(
+        (i) => i.modal_column_id != null || i.modal_column_span != null || i.modal_row_order != null
+      )
+      const useGridLayout = resolvedFieldLayout.length > 0 && (hasColumnMetadata || isEditingLayout)
       return (
         <div className="space-y-4 py-4">
           <RecordFields
-            fields={visibleFields}
+            fields={isEditingLayout ? layoutModeFields : visibleFields}
             formData={formData}
             onFieldChange={handleFieldChange}
             fieldGroups={fieldGroups}
@@ -405,14 +410,15 @@ export default function RecordEditor({
             recordId={recordId || ""}
             tableName={effectiveTableName || ""}
             isFieldEditable={isFieldEditable}
-            fieldLayout={resolvedFieldLayout}
+            fieldLayout={localFieldLayout.length > 0 ? localFieldLayout : resolvedFieldLayout}
             allFields={filteredFields}
             pageEditable={effectiveEditable}
             onFieldLabelClick={handleFieldLabelClick}
-            layoutMode={false}
+            layoutMode={isEditingLayout}
+            onFieldLayoutChange={isEditingLayout ? handleFieldLayoutChange : undefined}
             visibilityContext={visibilityContext}
             selectedFieldId={selectedContext?.type === "field" ? selectedContext.fieldId : null}
-            forceStackedLayout={true}
+            forceStackedLayout={!useGridLayout}
           />
         </div>
       )
@@ -602,14 +608,14 @@ export default function RecordEditor({
 
       {mode === "review" && recordId && (
         <>
-          <div className="border-t border-dashed border-gray-200 px-6 py-4 flex-shrink-0">
-            <RecordActivity record={formData} tableId={tableId} />
-          </div>
           {renderExtraContent && (
             <div className="border-t flex-1 min-h-0 overflow-visible">
               {renderExtraContent}
             </div>
           )}
+          <div className="border-t border-dashed border-gray-200 px-6 py-4 flex-shrink-0">
+            <RecordActivity record={formData} tableId={tableId} />
+          </div>
           <div className="border-t border-dashed border-gray-200 px-6 py-4 flex-shrink-0">
             <RecordComments tableId={tableId} recordId={recordId} canAddComment={effectiveEditable} />
           </div>
