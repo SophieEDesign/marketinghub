@@ -437,7 +437,7 @@ export default function RecordEditor({
             layoutMode={false}
             visibilityContext={visibilityContext}
             selectedFieldId={selectedContext?.type === "field" ? selectedContext.fieldId : null}
-            forceStackedLayout={mode === "review" || mode === "modal"}
+            forceStackedLayout={true}
           />
         </div>
       )
