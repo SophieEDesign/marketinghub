@@ -59,7 +59,7 @@ export default function RightSettingsPanel() {
 
   useEffect(() => {
     if (selectedContext?.type !== "field") setFieldViewMode("block")
-  }, [selectedContext?.type, selectedContext?.fieldId])
+  }, [selectedContext?.type, selectedContext?.type === "field" ? selectedContext.fieldId : undefined])
 
   // Show when: (1) user selected page/block/record, OR (2) RecordPanel is open (Airtable-style: settings next to record)
   const isVisible =

@@ -12,8 +12,7 @@ import { sortLabelsByManualOrder } from "@/lib/fields/select-options"
 import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig, normalizeFilter } from "@/lib/interface/filters"
 import { sortRowsByFieldType, shouldUseClientSideSorting, type ViewSort } from "@/lib/sorting/fieldTypeAwareSort"
 import type { FilterType } from "@/types/database"
-import { ChevronDown, ChevronRight, Filter, Group, MapPin, MoreHorizontal, Plus, Database } from "lucide-react"
-import { useIsMobile } from "@/hooks/useResponsive"
+import { ChevronDown, ChevronRight, Filter, Group, Plus, Database } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import EmptyState from "@/components/empty-states/EmptyState"
 import { useRecordModal } from "@/contexts/RecordModalContext"
@@ -110,7 +109,6 @@ export default function ListView({
   onRecordDeleted,
 }: ListViewProps) {
   const { openRecord } = useRecordPanel()
-  const isMobile = useIsMobile()
   const viewUuid = useMemo(() => normalizeUuid(viewId), [viewId])
   const [rows, setRows] = useState<Record<string, any>[]>([])
   const [loading, setLoading] = useState(true)
@@ -591,37 +589,6 @@ export default function ListView({
     }
   }, [onFiltersChange])
 
-  // Helper to get image from image field
-  const getRowValue = useCallback(
-    (row: Record<string, any>, fieldNameOrId?: string | null) => {
-      if (!fieldNameOrId) return null
-      const f = tableFields.find((tf) => tf.name === fieldNameOrId || tf.id === fieldNameOrId)
-      const key = f?.name || fieldNameOrId
-      return row?.[key] ?? null
-    },
-    [tableFields]
-  )
-
-  const getImageUrlFromValue = useCallback((imageValue: any): string | null => {
-    if (!imageValue) return null
-
-    // Handle attachment field (array of URLs/objects) or URL field (single URL)
-    if (Array.isArray(imageValue) && imageValue.length > 0) {
-      const firstItem = imageValue[0]
-      if (typeof firstItem === 'string') {
-        return firstItem
-      }
-      if (typeof firstItem === 'object' && firstItem?.url) {
-        return firstItem.url
-      }
-    }
-    if (typeof imageValue === 'string' && (imageValue.startsWith('http') || imageValue.startsWith('/'))) {
-      return imageValue
-    }
-
-    return null
-  }, [])
-
   // Helper to format field value for display
   const formatFieldValue = useCallback((field: TableField, value: any): string => {
     if (value === null || value === undefined || value === '') {
@@ -785,217 +752,105 @@ export default function ListView({
     })
   }, [showAddRecord, canCreateRecord, tableId, supabaseTableName, filters, tableFields, openRecordModal, modalFields, cascadeContext, interfaceMode, loadRows])
 
-  // Render a list item
-  const renderListItem = useCallback((row: Record<string, any>) => {
-    const recordId = row.id
-
-    // Get title field
-    const titleFieldObj = tableFields.find(f => f.name === titleField || f.id === titleField)
-    const titleRaw = titleFieldObj ? row?.[titleFieldObj.name] : null
-    const titleText = titleFieldObj ? formatFieldValue(titleFieldObj, titleRaw) : 'Untitled'
-
-    // Get image
-    const imageRaw = imageField ? getRowValue(row, imageField) : null
-    const imageUrl = imageField ? getImageUrlFromValue(imageRaw) : null
-
-    // Subtitle mapping (to match card style)
-    const descriptionKey = subtitleFields?.[0]
-    const locationKey = subtitleFields?.[1]
-    const extraSubtitleKeys = (subtitleFields || []).slice(2, 3)
-
-    const descriptionField = descriptionKey ? tableFields.find((f) => f.name === descriptionKey || f.id === descriptionKey) : null
-    const locationField = locationKey ? tableFields.find((f) => f.name === locationKey || f.id === locationKey) : null
-    const descriptionText = descriptionField ? formatFieldValue(descriptionField, row?.[descriptionField.name]) : ''
-    const locationText = locationField ? formatFieldValue(locationField, row?.[locationField.name]) : ''
-
-    const extraSubtitle = extraSubtitleKeys
-      .map((k) => {
-        const f = tableFields.find((tf) => tf.name === k || tf.id === k)
-        if (!f) return null
-        const t = formatFieldValue(f, row?.[f.name])
-        if (!t || t === '—') return null
-        return { key: k, label: f.name, text: t }
+  // Table columns: title, pills, subtitles, meta (matches reference: Content Name, Content Type, Status, Notes, Created, Date, Date to)
+  const tableColumns = useMemo(() => {
+    const cols: Array<{ key: string; field: TableField; type: 'title' | 'pill' | 'subtitle' | 'meta' }> = []
+    if (titleField) {
+      const f = tableFields.find(x => x.name === titleField || x.id === titleField)
+      if (f) cols.push({ key: `title:${f.name}`, field: f, type: 'title' })
+    }
+    pillFields.forEach(fn => {
+      const f = tableFields.find(x => x.name === fn || x.id === fn)
+      if (f) cols.push({ key: `pill:${f.name}`, field: f, type: 'pill' })
+    })
+    subtitleFields.forEach(fn => {
+      const f = tableFields.find(x => x.name === fn || x.id === fn)
+      if (f) cols.push({ key: `subtitle:${f.name}`, field: f, type: 'subtitle' })
+    })
+    metaFields.forEach(fn => {
+      const f = tableFields.find(x => x.name === fn || x.id === fn)
+      if (f) cols.push({ key: `meta:${f.name}`, field: f, type: 'meta' })
+    })
+    // Fallback: if no columns from config, use first few table fields
+    if (cols.length === 0 && tableFields.length > 0) {
+      tableFields.slice(0, 6).forEach(f => {
+        if (f.name && f.name !== 'id') {
+          const t: 'title' | 'pill' | 'subtitle' | 'meta' = cols.length === 0 ? 'title' : (f.type === 'single_select' || f.type === 'multi_select' ? 'pill' : 'subtitle')
+          cols.push({ key: `fallback:${f.name}`, field: f, type: t })
+        }
       })
-      .filter(Boolean) as Array<{ key: string; label: string; text: string }>
+    }
+    return cols
+  }, [titleField, pillFields, subtitleFields, metaFields, tableFields])
+
+  // Render a table row (basic list style)
+  const renderTableRow = useCallback((row: Record<string, any>) => {
+    const recordId = row.id
 
     // Evaluate conditional formatting rules
     const matchingRule = highlightRules && highlightRules.length > 0
       ? evaluateHighlightRules(highlightRules, row, tableFields)
       : null
-    
-    // Get formatting style for row-level rules
     const rowFormattingStyle = matchingRule && matchingRule.scope !== 'cell'
       ? getFormattingStyle(matchingRule)
       : {}
-
-    // Status-based color (left border, matches Grid/Gallery)
     const rowColor = getRowColor(row)
     const borderColor = rowColor ? { borderLeftColor: rowColor, borderLeftWidth: '4px' } : {}
 
+    const renderCellValue = (col: { key: string; field: TableField; type: string }) => {
+      const raw = row?.[col.field.name]
+      if (col.type === 'pill') {
+        if (raw == null || raw === '' || (Array.isArray(raw) && raw.length === 0)) return '—'
+        if (col.field.type === 'multi_select') {
+          const values = Array.isArray(raw) ? raw : []
+          const validValues = values.filter((v) => v != null && String(v).trim() !== '')
+          if (validValues.length === 0) return '—'
+          const sortedValues = sortLabelsByManualOrder(
+            validValues.map(v => String(v).trim()),
+            'multi_select',
+            col.field.options
+          )
+          return (
+            <span className="flex flex-wrap gap-1.5">
+              {renderPills(col.field, sortedValues, { density: 'compact' })}
+            </span>
+          )
+        }
+        if (col.field.type === 'single_select' || col.field.type === 'link_to_table' || col.field.type === 'lookup') {
+          return renderPill({ field: col.field, value: String(raw).trim(), density: 'compact' })
+        }
+      }
+      return formatFieldValue(col.field, raw)
+    }
+
     return (
-      <div
+      <tr
         key={recordId}
         onClick={() => setSelectedRecordId(String(recordId))}
         onDoubleClick={() => handleOpenRecord(String(recordId))}
-        className={`group touch-manipulation cursor-default rounded-xl border bg-white shadow-sm transition-all ${
+        className={`border-b border-gray-200 last:border-b-0 cursor-pointer transition-colors ${
           selectedRecordId === String(recordId)
-            ? "border-blue-200 ring-2 ring-blue-100"
-            : "border-gray-200 hover:border-gray-300 hover:shadow-md active:shadow-sm"
+            ? 'bg-blue-50'
+            : 'hover:bg-gray-50'
         }`}
         style={{ ...borderColor, ...rowFormattingStyle }}
       >
-        <div className={`flex items-start gap-4 ${isMobile ? 'p-3' : 'p-4'}`}>
-          {/* Thumbnail (always reserved, matches card style) */}
-          <div className={`flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 ${isMobile ? 'w-14 h-14' : 'w-20 h-20'}`}>
-            {imageUrl ? (
-              <img
-                src={imageUrl}
-                alt=""
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none'
-                }}
-              />
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200" />
-            )}
-          </div>
-
-          {/* Content */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <div className={`font-semibold text-gray-900 ${isMobile ? 'text-sm' : 'text-base'} leading-snug line-clamp-2`}>
-                  {titleText && titleText !== '—' ? titleText : 'Untitled'}
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleOpenRecord(String(recordId))
-                }}
-                className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
-                title="Open"
-                aria-label="Open"
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </button>
-            </div>
-
-            {/* Description */}
-            {descriptionText && descriptionText !== '—' && (
-              <div className={`mt-1 text-gray-600 ${isMobile ? 'text-xs' : 'text-sm'} leading-snug line-clamp-2`}>
-                {descriptionText}
-              </div>
-            )}
-
-            {/* Location */}
-            {locationText && locationText !== '—' && (
-              <div className={`mt-2 flex items-center gap-1.5 text-gray-500 ${isMobile ? 'text-xs' : 'text-sm'} min-w-0`}>
-                <MapPin className="h-4 w-4 flex-shrink-0 text-gray-400" />
-                <span className="truncate">{locationText}</span>
-              </div>
-            )}
-
-            {/* Extra subtitle (optional) */}
-            {extraSubtitle.length > 0 && (
-              <div className="mt-1 space-y-1">
-                {extraSubtitle.map((s) => (
-                  <div key={s.key} className={`text-gray-500 ${isMobile ? 'text-xs' : 'text-sm'} truncate`}>
-                    {s.text}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Tags (pills) - Use standardized pill rendering with proper sort order */}
-            {pillFields.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {pillFields.map((fieldNameOrId) => {
-                  const field = tableFields.find((f) => f.name === fieldNameOrId || f.id === fieldNameOrId)
-                  if (!field) return null
-                  
-                  const raw = row?.[field.name]
-                  if (raw == null || raw === '' || (Array.isArray(raw) && raw.length === 0)) return null
-
-                  // Use standardized pill rendering which respects sort_index order
-                  if (field.type === 'multi_select') {
-                    const values = Array.isArray(raw) ? raw : []
-                    const validValues = values.filter((v) => v != null && String(v).trim() !== '')
-                    if (validValues.length === 0) return null
-                    
-                    // Sort by manual order (sort_index) before rendering
-                    const sortedValues = sortLabelsByManualOrder(
-                      validValues.map(v => String(v).trim()),
-                      'multi_select',
-                      field.options
-                    )
-                    
-                    return (
-                      <React.Fragment key={field.name}>
-                        {renderPills(field, sortedValues, { density: 'default' })}
-                      </React.Fragment>
-                    )
-                  } else if (field.type === 'single_select') {
-                    const value = String(raw).trim()
-                    if (!value) return null
-                    return (
-                      <React.Fragment key={field.name}>
-                        {renderPill({ field, value, density: 'default' })}
-                      </React.Fragment>
-                    )
-                  } else if (field.type === 'link_to_table' || field.type === 'lookup') {
-                    // For linked fields, render as pills if they support it
-                    const value = String(raw).trim()
-                    if (!value) return null
-                    return (
-                      <React.Fragment key={field.name}>
-                        {renderPill({ field, value, density: 'default' })}
-                      </React.Fragment>
-                    )
-                  }
-                  
-                  return null
-                })}
-              </div>
-            )}
-
-            {/* Metadata (optional) */}
-            {metaFields.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
-                {metaFields.map((fieldNameOrId) => {
-                  const field = tableFields.find((f) => f.name === fieldNameOrId || f.id === fieldNameOrId)
-                  if (!field) return null
-                  const text = formatFieldValue(field, row?.[field.name])
-                  if (!text || text === '—') return null
-                  return (
-                    <span key={`meta:${field.name}`} className="truncate">
-                      <span className="text-gray-400">{getFieldDisplayName(field)}:</span> {text}
-                    </span>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+        {tableColumns.map((col) => (
+          <td
+            key={col.key}
+            className="px-3 py-2 text-sm text-gray-900 align-top"
+          >
+            {renderCellValue(col)}
+          </td>
+        ))}
+      </tr>
     )
   }, [
     tableFields,
-    titleField,
-    subtitleFields,
-    imageField,
-    pillFields,
-    metaFields,
-    getRowValue,
-    getImageUrlFromValue,
+    tableColumns,
     handleOpenRecord,
-    isMobile,
     selectedRecordId,
     formatFieldValue,
-    getPillColor,
     getRowColor,
     highlightRules,
   ])
@@ -1051,153 +906,132 @@ export default function ListView({
           )}
         </div>
 
-        {/* Grouped Content */}
+        {/* Grouped Content - table with group header rows */}
         <div className="flex-1 overflow-y-auto">
-          {flattenedGroups.map((it, idx) => {
-            if (it.type === 'group') {
-              const node = it.node
-              const isCollapsed = collapsedGroups.has(node.pathKey)
-              const groupFieldForLabel = node.rule.type === 'field'
-                ? tableFields.find((f) => f.name === node.rule.field || f.id === node.rule.field)
-                : null
-              const ruleLabel =
-                node.rule.type === 'date'
-                  ? node.rule.granularity === 'year'
-                    ? 'Year'
-                    : 'Month'
-                  : (groupFieldForLabel ? getFieldDisplayName(groupFieldForLabel) : node.rule.field)
-
-              // Group color - generate for ALL groups
-              let groupColor: string | null = null
-              if (node.rule.type === 'field') {
-                const groupField = groupFieldForLabel ?? tableFields.find((f) => f.name === node.rule.field || f.id === node.rule.field)
-                if (groupField && (groupField.type === 'single_select' || groupField.type === 'multi_select')) {
-                  // Use field-specific color for select fields
-                  groupColor = getPillColor(groupField, node.key)
-                } else {
-                  // Generate hash-based color for all other field types
-                  groupColor = getGroupColor(node.key)
-                }
-              } else {
-                // For date-based grouping, generate color from the date value
-                groupColor = getGroupColor(node.key)
-              }
-
-              // Evaluate conditional formatting rules for group headers
-              // Create a mock row with the group value for evaluation
-              const groupMockRow: Record<string, any> = {}
-              if (node.rule.type === 'field') {
-                const groupField = tableFields.find((f) => f.name === node.rule.field || f.id === node.rule.field)
-                if (groupField && node.label) {
-                  groupMockRow[groupField.name] = node.key
-                }
-              }
-              const groupMatchingRule = highlightRules && highlightRules.length > 0 && Object.keys(groupMockRow).length > 0
-                ? evaluateHighlightRules(
-                    highlightRules.filter(r => r.scope === 'group'),
-                    groupMockRow,
-                    tableFields
-                  )
-                : null
-              
-              // Get formatting style for group-level rules
-              const groupFormattingStyle = groupMatchingRule
-                ? getFormattingStyle(groupMatchingRule)
-                : {}
-              
-              // Combine group color with conditional formatting (conditional formatting takes precedence)
-              const finalHeaderBgColor = groupFormattingStyle.backgroundColor || (groupColor ? `${groupColor}80` : 'rgb(249, 250, 251)')
-              const finalHeaderTextColor = groupFormattingStyle.color || (groupColor ? undefined : undefined)
-              
-              // Determine text color for contrast (only if no conditional formatting text color)
-              const textColorClass = finalHeaderTextColor ? '' : (groupColor ? getTextColorForBackground(groupColor) : 'text-gray-900')
-              const textColorStyle = finalHeaderTextColor ? { color: finalHeaderTextColor } : (groupColor ? {} : { color: undefined })
-              
-              return (
-                <div key={node.pathKey} className="border-b border-gray-200 last:border-b-0">
-                  <div 
-                    className="flex items-center justify-between px-4 py-2 transition-colors"
-                    style={{
-                      backgroundColor: finalHeaderBgColor,
-                      ...textColorStyle,
-                    }}
-                    onMouseEnter={(e) => {
-                      if (groupColor) {
-                        e.currentTarget.style.backgroundColor = `${groupColor}90`
-                      } else {
-                        e.currentTarget.style.backgroundColor = 'rgb(243, 244, 246)'
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (groupColor) {
-                        e.currentTarget.style.backgroundColor = `${groupColor}80`
-                      } else {
-                        e.currentTarget.style.backgroundColor = 'rgb(249, 250, 251)'
-                      }
-                    }}
-                  >
-                    <button
-                      onClick={() => {
-                        setCollapsedGroups((prev) => {
-                          const next = new Set(prev)
-                          if (next.has(node.pathKey)) next.delete(node.pathKey)
-                          else next.add(node.pathKey)
-                          return next
-                        })
-                      }}
-                      className="flex items-center gap-2 text-left flex-1"
-                      style={{ paddingLeft: 8 + (it.level || 0) * 16 }}
+          <div className="border border-gray-200 rounded-lg bg-white">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b border-gray-200 bg-gray-50">
+                  {tableColumns.map((col) => (
+                    <th
+                      key={col.key}
+                      className="px-3 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider"
                     >
-                      {isCollapsed ? (
-                        <ChevronRight className={`h-4 w-4 ${textColorClass}`} style={{ opacity: 0.7 }} />
-                      ) : (
-                        <ChevronDown className={`h-4 w-4 ${textColorClass}`} style={{ opacity: 0.7 }} />
-                      )}
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-sm font-medium ${textColorClass}`}
-                        style={{
-                          backgroundColor: groupColor ? `${groupColor}CC` : undefined,
-                          border: groupColor ? `1px solid ${groupColor}FF` : undefined,
-                          ...textColorStyle,
-                        }}
-                      >
-                        {ruleLabel}: {node.label}
-                      </span>
-                      <span className={`text-sm ml-2 ${textColorClass}`} style={{ opacity: 0.8 }}>{node.size}</span>
-                    </button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        handleAddRecordToGroup(node.pathKey)
-                      }}
-                      className="h-7 text-xs"
-                      disabled={!showAddRecord || !canCreateRecord}
-                      title={
-                        !showAddRecord
-                          ? 'Enable "Show Add record button" in block settings to add records'
-                          : !canCreateRecord
-                            ? 'Adding records is disabled for this block'
-                            : 'Add a new record to this group'
-                      }
-                    >
-                      <Plus className="h-3 w-3 mr-1" />
-                      Add content
-                    </Button>
-                  </div>
-                </div>
-              )
-            }
+                      {getFieldDisplayName(col.field)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {flattenedGroups.map((it, idx) => {
+                  if (it.type === 'group') {
+                    const node = it.node
+                    const isCollapsed = collapsedGroups.has(node.pathKey)
+                    const groupFieldForLabel = node.rule.type === 'field'
+                      ? tableFields.find((f) => f.name === node.rule.field || f.id === node.rule.field)
+                      : null
+                    const ruleLabel =
+                      node.rule.type === 'date'
+                        ? node.rule.granularity === 'year'
+                          ? 'Year'
+                          : 'Month'
+                        : (groupFieldForLabel ? getFieldDisplayName(groupFieldForLabel) : node.rule.field)
 
-            // Item row (card)
-            const row = it.item as any
-            const key = `${String(row?.id ?? `idx-${idx}`)}::${it.groupPathKey}`
-            return (
-              <div key={key} className="px-4 py-3">
-                {renderListItem(row)}
-              </div>
-            )
-          })}
+                    let groupColor: string | null = null
+                    if (node.rule.type === 'field') {
+                      const groupField = groupFieldForLabel ?? tableFields.find((f) => f.name === node.rule.field || f.id === node.rule.field)
+                      if (groupField && (groupField.type === 'single_select' || groupField.type === 'multi_select')) {
+                        groupColor = getPillColor(groupField, node.key)
+                      } else {
+                        groupColor = getGroupColor(node.key)
+                      }
+                    } else {
+                      groupColor = getGroupColor(node.key)
+                    }
+
+                    const groupMockRow: Record<string, any> = {}
+                    if (node.rule.type === 'field') {
+                      const groupField = tableFields.find((f) => f.name === node.rule.field || f.id === node.rule.field)
+                      if (groupField && node.label) {
+                        groupMockRow[groupField.name] = node.key
+                      }
+                    }
+                    const groupMatchingRule = highlightRules && highlightRules.length > 0 && Object.keys(groupMockRow).length > 0
+                      ? evaluateHighlightRules(
+                          highlightRules.filter(r => r.scope === 'group'),
+                          groupMockRow,
+                          tableFields
+                        )
+                      : null
+                    const groupFormattingStyle = groupMatchingRule
+                      ? getFormattingStyle(groupMatchingRule)
+                      : {}
+                    const finalHeaderBgColor = groupFormattingStyle.backgroundColor || (groupColor ? `${groupColor}80` : 'rgb(249, 250, 251)')
+                    const finalHeaderTextColor = groupFormattingStyle.color || (groupColor ? undefined : undefined)
+                    const textColorClass = finalHeaderTextColor ? '' : (groupColor ? getTextColorForBackground(groupColor) : 'text-gray-900')
+                    const textColorStyle = finalHeaderTextColor ? { color: finalHeaderTextColor } : {}
+
+                    return (
+                      <tr key={node.pathKey} className="border-b border-gray-200">
+                        <td
+                          colSpan={tableColumns.length}
+                          className="px-3 py-2"
+                          style={{ backgroundColor: finalHeaderBgColor, ...textColorStyle }}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <button
+                              onClick={() => {
+                                setCollapsedGroups((prev) => {
+                                  const next = new Set(prev)
+                                  if (next.has(node.pathKey)) next.delete(node.pathKey)
+                                  else next.add(node.pathKey)
+                                  return next
+                                })
+                              }}
+                              className={`flex items-center gap-2 text-left flex-1 min-w-0 ${textColorClass}`}
+                              style={{ paddingLeft: (it.level || 0) * 16 }}
+                            >
+                              {isCollapsed ? (
+                                <ChevronRight className="h-4 w-4 flex-shrink-0" style={{ opacity: 0.7 }} />
+                              ) : (
+                                <ChevronDown className="h-4 w-4 flex-shrink-0" style={{ opacity: 0.7 }} />
+                              )}
+                              <span
+                                className="inline-flex items-center px-2 py-0.5 rounded-full text-sm font-medium truncate"
+                                style={{
+                                  backgroundColor: groupColor ? `${groupColor}CC` : undefined,
+                                  border: groupColor ? `1px solid ${groupColor}FF` : undefined,
+                                  ...textColorStyle,
+                                }}
+                              >
+                                {ruleLabel}: {node.label}
+                              </span>
+                              <span className="text-sm flex-shrink-0" style={{ opacity: 0.8 }}>{node.size}</span>
+                            </button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleAddRecordToGroup(node.pathKey)}
+                              className="h-7 text-xs flex-shrink-0"
+                              disabled={!showAddRecord || !canCreateRecord}
+                              title={!showAddRecord ? 'Enable "Show Add record button" in block settings' : !canCreateRecord ? 'Adding records is disabled' : 'Add a new record to this group'}
+                            >
+                              <Plus className="h-3 w-3 mr-1" />
+                              Add content
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  }
+
+                  const row = it.item as any
+                  const key = `${String(row?.id ?? `idx-${idx}`)}::${it.groupPathKey}`
+                  return <React.Fragment key={key}>{renderTableRow(row)}</React.Fragment>
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Dialogs */}
@@ -1252,44 +1086,6 @@ export default function ListView({
   if (rowsToRender.length === 0) {
     return (
       <div ref={contentRef} className="h-full flex flex-col">
-        {/* Toolbar */}
-        <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 border-b bg-white">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setGroupDialogOpen(true)}
-            className="h-8"
-          >
-            <Group className="h-4 w-4 mr-2" />
-            Group
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setFilterDialogOpen(true)}
-            className="h-8"
-          >
-            <Filter className="h-4 w-4 mr-2" />
-            Filter
-            {currentFilters.length > 0 && (
-              <span className="ml-2 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
-                {currentFilters.length}
-              </span>
-            )}
-          </Button>
-          {showAddRecord && canCreateRecord && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleOpenCreateModal}
-              className="h-8 ml-auto"
-              title="Add a new record"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add record
-            </Button>
-          )}
-        </div>
         <div className="flex-1 flex items-center justify-center p-4">
           <EmptyState
             icon={<Database className="h-12 w-12" />}
@@ -1310,139 +1106,33 @@ export default function ListView({
             } : undefined}
           />
         </div>
-        {/* Dialogs */}
-        {viewId ? (
-          <>
-            <GroupDialog
-              isOpen={groupDialogOpen}
-              onClose={() => setGroupDialogOpen(false)}
-              viewId={viewId}
-              tableFields={tableFields}
-              groupBy={currentGroupBy}
-              onGroupChange={handleGroupChange}
-            />
-            <FilterDialog
-              isOpen={filterDialogOpen}
-              onClose={() => setFilterDialogOpen(false)}
-              viewId={viewId}
-              tableFields={tableFields}
-              filters={currentFilters.map((f, idx) => ({
-                id: `filter-${idx}`,
-                field_name: f.field,
-                operator: f.operator as FilterType,
-                value: f.value,
-              }))}
-              onFiltersChange={handleFiltersChange}
-            />
-          </>
-        ) : (groupDialogOpen || filterDialogOpen) && (
-          // Simple dialog for when there's no viewId
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-md">
-              <h3 className="text-lg font-semibold mb-2">
-                {groupDialogOpen ? 'Grouping Settings' : 'Filter Settings'}
-              </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Configure {groupDialogOpen ? 'grouping' : 'filter'} settings in the block settings panel (Data tab).
-              </p>
-              <Button onClick={() => {
-                setGroupDialogOpen(false)
-                setFilterDialogOpen(false)
-              }}>Close</Button>
-            </div>
-          </div>
-        )}
       </div>
     )
   }
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Toolbar */}
-      <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 border-b bg-white">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setGroupDialogOpen(true)}
-          className="h-8"
-        >
-          <Group className="h-4 w-4 mr-2" />
-          Group
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setFilterDialogOpen(true)}
-          className="h-8"
-        >
-          <Filter className="h-4 w-4 mr-2" />
-          Filter
-          {currentFilters.length > 0 && (
-            <span className="ml-2 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
-              {currentFilters.length}
-            </span>
-          )}
-        </Button>
-        {showAddRecord && canCreateRecord && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleOpenCreateModal}
-            className="h-8 ml-auto"
-            title="Add a new record"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add record
-          </Button>
-        )}
-      </div>
-      <div className="flex-1 overflow-y-auto">
-        <div className="p-3 space-y-3">
-          {rowsToRender.map((row) => renderListItem(row))}
+    <div ref={contentRef} className="h-full flex flex-col">
+      <div className="flex-1 overflow-auto">
+        <div className="border border-gray-200 rounded-lg bg-white">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b border-gray-200 bg-gray-50">
+                {tableColumns.map((col) => (
+                  <th
+                    key={col.key}
+                    className="px-3 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider"
+                  >
+                    {getFieldDisplayName(col.field)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rowsToRender.map((row) => renderTableRow(row))}
+            </tbody>
+          </table>
         </div>
       </div>
-      {/* Dialogs */}
-      {viewId ? (
-        <>
-          <GroupDialog
-            isOpen={groupDialogOpen}
-            onClose={() => setGroupDialogOpen(false)}
-            viewId={viewId}
-            tableFields={tableFields}
-            groupBy={currentGroupBy}
-            onGroupChange={handleGroupChange}
-          />
-          <FilterDialog
-            isOpen={filterDialogOpen}
-            onClose={() => setFilterDialogOpen(false)}
-            viewId={viewId}
-            tableFields={tableFields}
-            filters={currentFilters.map((f, idx) => ({
-              id: `filter-${idx}`,
-              field_name: f.field,
-              operator: f.operator,
-              value: f.value,
-            }))}
-            onFiltersChange={handleFiltersChange}
-          />
-        </>
-      ) : (groupDialogOpen || filterDialogOpen) && (
-        // Simple dialog for when there's no viewId
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md">
-            <h3 className="text-lg font-semibold mb-2">
-              {groupDialogOpen ? 'Grouping Settings' : 'Filter Settings'}
-            </h3>
-            <p className="text-sm text-gray-600 mb-4">
-              {groupDialogOpen ? 'Grouping' : 'Filter'} settings require a view to be configured. Please configure a view in the block settings.
-            </p>
-            <Button onClick={() => {
-              setGroupDialogOpen(false)
-              setFilterDialogOpen(false)
-            }}>Close</Button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

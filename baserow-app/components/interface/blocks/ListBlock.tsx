@@ -360,11 +360,11 @@ export default function ListBlock({
   // Apply appearance settings (must be declared before any early return)
   const appearance = config.appearance || {}
   const blockStyle: React.CSSProperties = {
-    backgroundColor: appearance.background_color,
-    borderColor: appearance.border_color,
-    borderWidth: appearance.border_width !== undefined ? `${appearance.border_width}px` : "1px",
-    borderRadius: appearance.border_radius !== undefined ? `${appearance.border_radius}px` : "8px",
-    padding: appearance.padding !== undefined ? `${appearance.padding}px` : "16px",
+    backgroundColor: appearance.background_color ?? undefined,
+    borderColor: appearance.border_color ?? undefined,
+    borderWidth: appearance.border_width !== undefined ? `${appearance.border_width}px` : undefined,
+    borderRadius: appearance.border_radius !== undefined ? `${appearance.border_radius}px` : undefined,
+    padding: appearance.padding !== undefined ? `${appearance.padding}px` : "0",
   }
 
   // Add record button: when Appearance toggle was removed, default to Data > Permissions (allowInlineCreate)
@@ -478,11 +478,13 @@ export default function ListBlock({
     )
   }
 
+  const showHeader = ((appearance.showTitle ?? (appearance as any).show_title) !== false && (appearance.title || (isEditing ? config.title : table?.name))) || showAddRecord
+
   return (
     <div className="h-full w-full overflow-auto" style={blockStyle}>
-      {(((appearance.showTitle ?? (appearance as any).show_title) !== false && (appearance.title || (isEditing ? config.title : table?.name))) || showAddRecord) && (
+      {showHeader && (
         <div
-          className="mb-4 pb-2 border-b flex items-center justify-between gap-3"
+          className="mb-3 flex items-center justify-between gap-3"
           style={{
             backgroundColor: appearance.header_background,
             color: appearance.header_text_color || appearance.title_color,
@@ -490,7 +492,7 @@ export default function ListBlock({
         >
           <div className="min-w-0 flex-1">
             {((appearance.showTitle ?? (appearance as any).show_title) !== false && (appearance.title || (isEditing ? config.title : table?.name))) && (
-              <h3 className="text-lg font-semibold truncate">{appearance.title || (isEditing ? config.title : table?.name)}</h3>
+              <h3 className="text-xl font-bold text-gray-900 truncate">{appearance.title || (isEditing ? config.title : table?.name)}</h3>
             )}
           </div>
           {showAddRecord && (
@@ -509,7 +511,7 @@ export default function ListBlock({
         </div>
       )}
 
-      {/* Airtable-style quick filters (session-only; never saved to the view) */}
+      {/* Quick filters (session-only; never saved to the view) */}
       {!isEditing && (
         <QuickFilterBar
           storageKey={`mh:quickFilters:${pageId || "page"}:${block.id}`}

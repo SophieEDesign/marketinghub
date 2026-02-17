@@ -308,6 +308,8 @@ export default function RecordFields({
     return columns
   }, [fieldLayout, fields, visibilityContext])
 
+  const showModalColumns = modalColumns.length > 0
+
   // Row-major ordered field list for grid layout.
   // When modal_row_order is used: sort by row, then full-width first, then column.
   // Otherwise: interleave col-1 and col-2 by row (zip columns) for 2-column layout.
@@ -713,8 +715,6 @@ export default function RecordFields({
       onFieldLabelClick,
     ]
   )
-
-  const showModalColumns = modalColumns.length > 0
 
   // Stable canonical field list: same set/order every time so SortableFieldItem count never changes.
   // When modal grid has row order, use modalGridItems; otherwise use groupedFields.
