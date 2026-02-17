@@ -177,7 +177,7 @@ function ShellContent({
       {/* Edit mode banner - full app width at top, above sidebar and content */}
       <EditModeBanner />
       <EditModeGuard />
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden">
       {/* When topbar is hidden (some pages have their own toolbar), still provide a mobile hamburger toggle */}
       {hideTopbar && isMobile && (
         <div className="fixed top-3 left-3 z-50 desktop:hidden">
@@ -204,9 +204,9 @@ function ShellContent({
         defaultPageId={defaultPageId}
       />
       {/* MainArea: InterfaceContainer + RightSettingsPanel (edit mode only) */}
-      <div className="flex flex-1 flex min-w-0 overflow-hidden">
-        {/* InterfaceContainer - flex-1, owns its scroll via children */}
-        <div className="flex flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex flex-1 min-w-0 overflow-hidden">
+        {/* InterfaceContainer - flex-1 fills remaining space; w-full when panel unmounted (view mode) */}
+        <div className="flex flex-1 flex flex-col min-w-0 overflow-hidden w-full">
           {!hideTopbar && (
             <Topbar
               title={title}

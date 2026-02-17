@@ -1257,7 +1257,7 @@ function InterfacePageClientInternal({
   }
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 min-w-0 overflow-x-hidden">
+    <div className="flex flex-col flex-1 min-h-0 min-w-0 overflow-x-hidden w-full">
       {/* Loading overlay: single scroll surface; do not unmount tree */}
       {loading && !hasPage && (
         <div className="absolute inset-0 flex items-center justify-center z-20 bg-white">
