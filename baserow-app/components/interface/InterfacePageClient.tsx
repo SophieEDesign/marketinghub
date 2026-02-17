@@ -222,6 +222,7 @@ function InterfacePageClientInternal({
       onPageUpdate: stableHandlePageUpdate,
       pageTableId,
       blocks,
+      isEditing,
     }
     if (selectedBlockIdForPanel == null) {
       updates.selectedBlock = null
@@ -229,7 +230,7 @@ function InterfacePageClientInternal({
       updates.selectedBlock = selectedBlock
     }
     setRightPanelData(updates)
-  }, [page?.id, page, pageTableId, blocks, selectedContext?.type, selectedBlockIdForPanel, setRightPanelData, stableHandlePageUpdate])
+  }, [page?.id, page, pageTableId, blocks, selectedContext?.type, selectedBlockIdForPanel, isEditing, setRightPanelData, stableHandlePageUpdate])
 
   // Initialize title value when page loads
   useEffect(() => {

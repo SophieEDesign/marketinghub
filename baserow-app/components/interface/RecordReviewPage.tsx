@@ -141,12 +141,13 @@ export default function RecordReviewPage({
         fieldLayout,
         onLayoutSave: onLayoutSave ?? null,
         tableFields,
+        isEditing: recordInterfaceMode === "edit",
       })
     } else {
       setSelectedContext(null)
-      setRightPanelData({ recordId: null, recordTableId: null, fieldLayout: [], onLayoutSave: null, tableFields: [] })
+      setRightPanelData({ recordId: null, recordTableId: null, fieldLayout: [], onLayoutSave: null, tableFields: [], isEditing: false })
     }
-  }, [selectedRecordId, pageTableId, fieldLayout, onLayoutSave, tableFields, setSelectedContext, setRightPanelData])
+  }, [selectedRecordId, pageTableId, fieldLayout, onLayoutSave, tableFields, recordInterfaceMode, setSelectedContext, setRightPanelData])
 
   // Handle record selection - reset to view mode when switching records (Airtable-style)
   const handleRecordSelect = useCallback((recordId: string) => {

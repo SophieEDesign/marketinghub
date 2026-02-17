@@ -66,12 +66,15 @@ export default function RightSettingsPanel({ position = "right" }: RightSettings
     if (selectedContext?.type !== "field") setFieldViewMode("block")
   }, [selectedContext?.type, selectedContext?.type === "field" ? selectedContext.fieldId : undefined])
 
-  // Airtable-style: show panel when on interface page (with page data) OR when user selected something OR RecordPanel is open
+  // Panel only shows in edit mode (Airtable-style)
   const hasInterfacePageContext = data?.page != null && data?.blocks != null
+  const isRecordPanelOpen = recordPanelState.isOpen && recordPanelState.recordId
+  const isRecordPanelEditMode = recordPanelState.interfaceMode === "edit"
+  const isDataEditMode = data?.isEditing === true
   const isVisible =
-    hasInterfacePageContext ||
-    selectedContext ||
-    (recordPanelState.isOpen && recordPanelState.recordId)
+    (hasInterfacePageContext && isDataEditMode) ||
+    (isRecordPanelOpen && isRecordPanelEditMode) ||
+    (data?.recordId && data?.recordTableId && !isRecordPanelOpen && isDataEditMode)
 
   const handleClose = () => setSelectedContext(null)
 

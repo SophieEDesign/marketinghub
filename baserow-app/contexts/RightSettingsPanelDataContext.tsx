@@ -28,6 +28,8 @@ export interface RightSettingsPanelData {
   fieldLayout: FieldLayoutItem[]
   onLayoutSave: ((layout: FieldLayoutItem[]) => void) | ((layout: FieldLayoutItem[]) => Promise<void>) | null
   tableFields: TableField[]
+  /** When true, settings panel is visible. Panel only shows in edit mode. */
+  isEditing?: boolean
 }
 
 interface RightSettingsPanelDataContextType {
@@ -69,7 +71,7 @@ export function RightSettingsPanelDataProvider({ children }: { children: ReactNo
           prev.onBlockLock === next.onBlockLock && prev.pageTableId === next.pageTableId &&
           prev.recordId === next.recordId && prev.recordTableId === next.recordTableId &&
           prev.fieldLayout === next.fieldLayout && prev.onLayoutSave === next.onLayoutSave &&
-          prev.tableFields === next.tableFields) {
+          prev.tableFields === next.tableFields && prev.isEditing === next.isEditing) {
         return prev
       }
       return next
