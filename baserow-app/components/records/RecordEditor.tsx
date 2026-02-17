@@ -7,7 +7,7 @@
  */
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
-import { Maximize2, Check, ChevronDown, ChevronRight, ArrowLeft, Save, Trash2, X, Pencil, Copy } from "lucide-react"
+import { Maximize2, ChevronDown, ChevronRight, ArrowLeft, Save, Trash2, X, Copy } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import FieldEditor from "@/components/fields/FieldEditor"
 import RecordFields from "@/components/records/RecordFields"
@@ -142,14 +142,12 @@ export default function RecordEditor({
     canDeleteRecords,
   } = core
 
-  const [reviewEditMode, setReviewEditMode] = useState(false)
-
   const canSave = recordId ? canEditRecords : canCreateRecords
   const effectiveEditable =
     !allowEdit
       ? false
       : mode === "review"
-        ? canSave && (interfaceMode === "edit" || reviewEditMode)
+        ? canSave && interfaceMode === "edit"
         : canSave
   const [contentReady, setContentReady] = useState(false)
   const contentReadyRef = useRef(false)
@@ -260,11 +258,6 @@ export default function RecordEditor({
     [setSelectedContext, tableId, isEditingLayout]
   )
 
-  useEffect(() => {
-    if (!active) {
-      setReviewEditMode(false)
-    }
-  }, [active])
 
   useEffect(() => {
     if (active && tableId && mode === "modal") {
@@ -586,39 +579,16 @@ export default function RecordEditor({
             {recordTitle || "Record Details"}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            {interfaceMode === "view" && canSave && (
+            {interfaceMode === "edit" && canSave && (
               <Button
-                variant={reviewEditMode ? "default" : "outline"}
+                variant="default"
                 size="sm"
-                onClick={async () => {
-                  if (reviewEditMode) {
-                    try {
-                      await save()
-                    } catch (e: any) {
-                      if (!isAbortError(e)) {
-                        toast({
-                          variant: "destructive",
-                          title: "Failed to save",
-                          description: e?.message || "Please try again",
-                        })
-                      }
-                    }
-                  }
-                  setReviewEditMode((v) => !v)
-                }}
+                onClick={handleSave}
+                disabled={saving || loading}
                 className="gap-1.5"
               >
-                {reviewEditMode ? (
-                  <>
-                    <Check className="h-4 w-4" />
-                    Done
-                  </>
-                ) : (
-                  <>
-                    <Pencil className="h-4 w-4" />
-                    Edit
-                  </>
-                )}
+                <Save className="h-4 w-4" />
+                Save
               </Button>
             )}
             {onRecordDuplicate && recordId && canEditRecords && (

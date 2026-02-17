@@ -302,7 +302,7 @@ export default function FieldSectionBlock({
             {fields.map((field) => {
               const value = fieldValues[field.id]
               const isThisEditing = editingField === field.id
-              const isEditable = !field.options?.system && field.type !== "formula" && field.type !== "lookup"
+              const isEditable = isEditing && !field.options?.system && field.type !== "formula" && field.type !== "lookup"
 
               return (
                 <div
