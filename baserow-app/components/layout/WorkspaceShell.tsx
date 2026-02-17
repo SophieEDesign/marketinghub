@@ -203,9 +203,9 @@ function ShellContent({
         onClose={isMobile ? () => setSidebarOpen(false) : undefined}
         defaultPageId={defaultPageId}
       />
-      {/* MainArea: InterfaceContainer + RightSettingsPanel (edit mode only) */}
-      <div className="flex flex-1 min-w-0 overflow-hidden">
-        {/* InterfaceContainer - flex-1 fills remaining space; w-full when panel unmounted (view mode) */}
+      {/* MainArea: InterfaceContainer full width; RightSettingsPanel overlays on right (separate container) */}
+      <div className="flex flex-1 min-w-0 overflow-hidden relative">
+        {/* InterfaceContainer - always full width; layout stays same in edit mode */}
         <div className="flex flex-1 flex flex-col min-w-0 overflow-hidden w-full">
           {!hideTopbar && (
             <Topbar
@@ -218,9 +218,9 @@ function ShellContent({
             {children}
           </main>
         </div>
-        {/* RightSettingsPanel: conditional mount, always on right, flex sibling */}
+        {/* RightSettingsPanel: overlay on right, not in same flex container - page layout stays full width */}
         {isPanelVisible && (
-          <div className="flex-shrink-0 w-[360px]">
+          <div className="absolute right-0 top-0 bottom-0 w-[360px] flex-shrink-0 border-l border-gray-200 bg-white z-30 shadow-lg">
             <RightSettingsPanel />
           </div>
         )}

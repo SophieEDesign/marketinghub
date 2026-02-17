@@ -113,8 +113,8 @@ export default function AirtableSidebar({
   const isCollapsed = isMobile ? !isOpen : internalCollapsed
   
   const isAdmin = userRole === 'admin'
-  // Context-driven editing: no global edit mode; sidebar page reorder disabled for now
-  const isEditMode = false
+  // When in edit mode, show Add page and reorder UI in sidebar
+  const isEditMode = pageActions?.isEditing ?? false
 
   const params = useParams()
   const isInterfacePage = (params?.pageId as string) != null

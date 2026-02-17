@@ -317,6 +317,8 @@ export default function BlockRenderer({
               rowHeight={rowHeight}
               isFullPage={isFullPage}
               openRecordInEditModeForBlock={openRecordInEditModeForBlock}
+              onModalLayoutSave={onUpdate ? (fieldLayout) => onUpdate(block.id, { field_layout: fieldLayout }) : undefined}
+              canEditLayout={canEdit}
             />
           </LazyBlockWrapper>
         )
@@ -574,6 +576,8 @@ export default function BlockRenderer({
               rowHeight={rowHeight}
               isFullPage={isFullPage}
               openRecordInEditModeForBlock={openRecordInEditModeForBlock}
+              onModalLayoutSave={onUpdate ? (fieldLayout) => onUpdate(block.id, { field_layout: fieldLayout }) : undefined}
+              canEditLayout={canEdit}
             />
           </LazyBlockWrapper>
         )

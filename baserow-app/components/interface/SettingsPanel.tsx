@@ -592,9 +592,9 @@ export default function SettingsPanel({
     <div className="p-4">{panelContent}</div>
   ) : (
     <>
-      {/* Backdrop: click outside to close */}
+      {/* Backdrop: click outside to close. Exclude sidebar (md:left-64) so navigation stays clickable. */}
       <div
-        className="fixed inset-0 bg-black/20 z-40"
+        className="fixed inset-0 md:left-64 bg-black/20 z-40"
         aria-hidden="true"
         onClick={onClose}
       />
