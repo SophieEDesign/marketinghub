@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react"
 import type { PageBlock } from "@/lib/interface/types"
-import { Image as ImageIcon, Upload } from "lucide-react"
+import { Image as ImageIcon, Upload, Download } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -123,7 +123,18 @@ export default function ImageBlock({ block, isEditing = false, onUpdate }: Image
     const maxWidthStyle = maxWidth ? { maxWidth: `${maxWidth}px` } : {}
 
     return (
-      <div className={`h-full w-full p-4 flex items-center ${alignment} min-h-[100px]`} onClick={(e) => e.stopPropagation()}>
+      <div className={`h-full w-full p-4 flex items-center ${alignment} min-h-[100px] relative group`} onClick={(e) => e.stopPropagation()}>
+        <a
+          href={imageUrl}
+          download={(imageUrl.split("/").pop() || "image").split("?")[0]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="absolute top-2 right-2 p-1.5 rounded-full bg-white/80 hover:bg-gray-200 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-10"
+          aria-label="Download image"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Download className="h-4 w-4 text-gray-600" />
+        </a>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={imageUrl}

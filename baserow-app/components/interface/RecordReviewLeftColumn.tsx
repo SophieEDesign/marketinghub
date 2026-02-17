@@ -28,6 +28,7 @@ import { useUserRole } from "@/lib/hooks/useUserRole"
 import { canCreateRecord } from "@/lib/interface/record-actions"
 import { evaluateFilterTree } from "@/lib/filters/evaluation"
 import { filterConfigsToFilterTree } from "@/lib/filters/converters"
+import { flattenFilterTree } from "@/lib/filters/canonical-model"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import { isAbortError } from "@/lib/api/error-handling"
 import type { GroupRule } from "@/lib/grouping/types"
@@ -200,6 +201,23 @@ export default function RecordReviewLeftColumn({
     }
     return null
   }, [effectiveLeftPanelConfig?.filter_by, effectiveLeftPanelConfig?.filter_tree])
+
+  // Airtable-style: filter badges for display (e.g. "Status: Sponsorship")
+  const filterBadges = useMemo(() => {
+    if (!leftPanelFilterTree) return []
+    const conditions = flattenFilterTree(leftPanelFilterTree)
+    return conditions.map((c) => {
+      const field = fields.find((f) => f.name === c.field_id || f.id === c.field_id)
+      const fieldLabel = field ? getFieldDisplayName(field) : c.field_id
+      const valueStr =
+        c.operator === "equal" || c.operator === "is_any_of"
+          ? Array.isArray(c.value)
+            ? (c.value as string[]).join(", ")
+            : String(c.value ?? "")
+          : c.operator
+      return { label: `${fieldLabel}: ${valueStr}`, fieldId: c.field_id }
+    })
+  }, [leftPanelFilterTree, fields])
 
   const leftPanelSorts: Array<{ field: string; direction: "asc" | "desc" }> = useMemo(() => {
     const sorts = effectiveLeftPanelConfig?.sort_by
@@ -878,6 +896,20 @@ export default function RecordReviewLeftColumn({
             </Button>
           )}
         </div>
+        {/* Airtable-style: filter badges (e.g. Status: Sponsorship) */}
+        {filterBadges.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-3">
+            {filterBadges.map((badge, i) => (
+              <Badge
+                key={`${badge.fieldId}-${i}`}
+                variant="secondary"
+                className="text-xs font-medium bg-pink-100 text-pink-800 border-pink-200 hover:bg-pink-100"
+              >
+                ✓ {badge.label}
+              </Badge>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Record List */}

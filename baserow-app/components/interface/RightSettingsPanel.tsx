@@ -61,14 +61,15 @@ export default function RightSettingsPanel() {
     if (selectedContext?.type !== "field") setFieldViewMode("block")
   }, [selectedContext?.type, selectedContext?.type === "field" ? selectedContext.fieldId : undefined])
 
-  // Show when: (1) user selected page/block/record, OR (2) RecordPanel is open (Airtable-style: settings next to record)
+  // Airtable-style: show panel when on interface page (with page data) OR when user selected something OR RecordPanel is open
+  const hasInterfacePageContext = data?.page != null && data?.blocks != null
   const isVisible =
-    selectedContext || (recordPanelState.isOpen && recordPanelState.recordId)
+    hasInterfacePageContext ||
+    selectedContext ||
+    (recordPanelState.isOpen && recordPanelState.recordId)
 
-  // When RecordPanel is open, position settings panel to the left of it (no overlap)
+  // Settings panel is always on the far right; RecordPanel sits to its left when open
   const panelWidth = 400
-  const recordPanelWidth = recordPanelState.isOpen ? recordPanelState.width : 0
-  const rightOffset = recordPanelState.isOpen ? recordPanelWidth : 0
 
   const handleClose = () => setSelectedContext(null)
 
@@ -79,7 +80,7 @@ export default function RightSettingsPanel() {
       className={`fixed top-0 right-0 h-full w-[400px] bg-white border-l border-gray-200 shadow-xl z-40 flex flex-col transition-all duration-200 ${
         isVisible ? "translate-x-0" : "translate-x-full pointer-events-none"
       }`}
-      style={{ height: "100vh", right: rightOffset }}
+      style={{ height: "100vh", right: 0 }}
       aria-hidden={!isVisible}
     >
       {/* Header: Back + title + ellipsis for record/field; breadcrumb + close otherwise */}
@@ -128,8 +129,7 @@ export default function RightSettingsPanel() {
               </Button>
             </>
           ) : selectedContext?.type === "record" &&
-            recordPanelState.isOpen &&
-            recordPanelState.recordId ? (
+            (recordPanelState.isOpen && recordPanelState.recordId || data?.recordId) ? (
             <>
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <Button
@@ -175,8 +175,10 @@ export default function RightSettingsPanel() {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto min-h-0">
-        {!selectedContext && (
-          <div className="p-4 text-sm text-muted-foreground">No selection</div>
+        {!selectedContext && !(recordPanelState.isOpen && recordPanelState.recordId) && (
+          <div className="p-4 text-sm text-muted-foreground">
+            {hasInterfacePageContext ? "Select an element to configure." : "No selection"}
+          </div>
         )}
 
         {selectedContext?.type === "page" && (
@@ -231,15 +233,37 @@ export default function RightSettingsPanel() {
           )
         )}
 
-        {selectedContext?.type === "record" && recordPanelState.isOpen && recordPanelState.recordId && recordPanelState.tableId && recordPanelState.onLayoutSave && (
-          <RecordLayoutSettings
-            tableId={recordPanelState.tableId}
-            recordId={recordPanelState.recordId}
-            fieldLayout={recordPanelState.fieldLayout ?? []}
-            onLayoutSave={recordPanelState.onLayoutSave}
-            fields={recordPanelState.tableFields ?? []}
-          />
-        )}
+        {selectedContext?.type === "record" && (() => {
+          const fromRecordPanel = recordPanelState.isOpen && recordPanelState.recordId && recordPanelState.tableId && recordPanelState.onLayoutSave
+          const fromPageData = data?.recordId && data?.recordTableId
+          if (fromRecordPanel) {
+            return (
+              <RecordLayoutSettings
+                tableId={recordPanelState.tableId}
+                recordId={recordPanelState.recordId}
+                fieldLayout={recordPanelState.fieldLayout ?? []}
+                onLayoutSave={recordPanelState.onLayoutSave}
+                fields={recordPanelState.tableFields ?? []}
+              />
+            )
+          }
+          if (fromPageData) {
+            return (
+              <RecordLayoutSettings
+                tableId={data.recordTableId}
+                recordId={data.recordId}
+                fieldLayout={data.fieldLayout ?? []}
+                onLayoutSave={data.onLayoutSave}
+                fields={data.tableFields ?? []}
+              />
+            )
+          }
+          return (
+            <div className="p-4 text-sm text-muted-foreground">
+              Record layout settings require a record with layout configuration.
+            </div>
+          )
+        })()}
 
         {selectedContext && selectedContext.type === "field" && selectedContext.fieldId && (
           fieldViewMode === "schema" ||

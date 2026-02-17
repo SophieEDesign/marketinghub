@@ -145,6 +145,19 @@ export default function PermissionsSettings({
             Control who can create and delete records from this Record View page UI.
           </p>
         </div>
+
+        {/* Allow users to create new records (Airtable-style toggle) */}
+        <div className="flex items-center justify-between">
+          <Label htmlFor="allow-inline-create" className="text-sm text-gray-700">
+            Allow users to create new records
+          </Label>
+          <Switch
+            id="allow-inline-create"
+            checked={allowInlineCreate}
+            onCheckedChange={handleInlineCreateChange}
+            disabled={isViewOnly}
+          />
+        </div>
         
         {/* Create Records */}
         <div className="flex items-center justify-between">

@@ -731,44 +731,25 @@ export default function RecordFields({
     [canonicalFieldItems]
   )
 
-  // #region agent log
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: `log_${Date.now()}_recordfields_canonical`,
-          runId: 'pre-fix-2',
-          hypothesisId: 'H3',
-          location: 'RecordFields.tsx:canonicalFieldItems',
-          message: 'RecordFields canonicalFieldItems computed',
-          data: {
-            tableId,
-            recordId,
-            canonicalFieldItemsLength: canonicalFieldItems.length,
-            canonicalFieldIdsLength: canonicalFieldIds.length,
-            fieldsLength: fields.length,
-            layoutMode
-          },
-          timestamp: Date.now()
-        })
-      }).catch(() => {})
-    }
-  }, [canonicalFieldItems.length, canonicalFieldIds.length, tableId, recordId, fields.length, layoutMode])
-  // #endregion
+  const dataColumns = useMemo(
+    () => modalColumns.filter((c) => c.id !== "col-full"),
+    [modalColumns]
+  )
 
   // For modal column layout: which grid column (1-based) each field belongs to, or span 2 for full-width.
+  // When layoutMode and 2+ columns, we inject a resize handle so col-2 maps to grid column 3.
   const fieldToColumnIndex = useMemo(() => {
     const map: Record<string, number> = {}
+    const hasResizeHandle = layoutMode && dataColumns.length >= 2
     modalColumns.forEach((col, i) => {
       if (col.id === "col-full") return
+      const gridCol = hasResizeHandle ? i * 2 + 1 : i + 1
       col.fields.forEach((f) => {
-        map[f.id] = i + 1
+        map[f.id] = gridCol
       })
     })
     return map
-  }, [modalColumns])
+  }, [modalColumns, layoutMode, dataColumns.length])
 
   const fieldToLayoutItem = useMemo(() => {
     const map = new Map<string, FieldLayoutItem>()
@@ -780,15 +761,19 @@ export default function RecordFields({
   }, [fieldLayout, fields])
 
   // Compute CSS grid template: 2 equal columns for grid layout.
-  // Full-width fields use gridColumn: 1 / -1 to span both.
+  // When layoutMode and 2+ columns, inject 4px resize handle between columns.
   const gridTemplateColumns = useMemo(() => {
     if (!showModalColumns) return undefined
-    const cols = modalColumns.filter((c) => c.id !== "col-full")
+    const cols = dataColumns
     if (cols.length <= 1) return "1fr 1fr"
     const total = cols.reduce((sum, col) => sum + (col.width || 1), 0)
     if (!total) return "1fr 1fr"
-    return cols.map((col) => `${(col.width || 1) / total}fr`).join(" ")
-  }, [showModalColumns, modalColumns])
+    const fractions = cols.map((col) => `${(col.width || 1) / total}fr`)
+    if (layoutMode && cols.length >= 2) {
+      return fractions.join(" 8px ")
+    }
+    return fractions.join(" ")
+  }, [showModalColumns, modalColumns, dataColumns, layoutMode])
 
   // Column resize handler (layout mode only)
   const startResize = (leftColIndex: number) => {
@@ -878,6 +863,18 @@ export default function RecordFields({
                     : undefined
                 }
               >
+                {layoutMode && showModalColumns && dataColumns.length >= 2 && (
+                  <div
+                    role="separator"
+                    aria-orientation="vertical"
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      startResize(0)
+                    }}
+                    className="cursor-col-resize hover:bg-blue-200/60 rounded transition-colors bg-gray-200 self-stretch"
+                    style={{ gridColumn: 2, gridRow: "1 / -1", minHeight: 40, width: 8, minWidth: 8 }}
+                  />
+                )}
                 {canonicalFieldItems.map((item, index) => {
                   const prevGroupName =
                     index > 0 ? canonicalFieldItems[index - 1].groupName : null

@@ -38,6 +38,7 @@ import { Button } from "@/components/ui/button"
 import { Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useSelectionContext } from "@/contexts/SelectionContext"
+import { useRightSettingsPanelData } from "@/contexts/RightSettingsPanelDataContext"
 
 interface RecordReviewPageProps {
   page: Page
@@ -69,6 +70,7 @@ export default function RecordReviewPage({
   const { toast } = useToast()
   const { role: userRole } = useUserRole()
   const { setSelectedContext } = useSelectionContext()
+  const { setData: setRightPanelData } = useRightSettingsPanelData()
 
   const pageType = (page as any).page_type || (page as any).type || "record_review"
   const isRecordView = pageType === "record_view"
@@ -129,14 +131,22 @@ export default function RecordReviewPage({
     (page.settings as any)?.show_add_record === true ||
     (page.settings as any)?.showAddRecord === true
 
-  // Sync selected record to SelectionContext only (per architectural contract: no setRightPanelData)
+  // Sync selected record to SelectionContext and RightSettingsPanel (for Record Layout Settings)
   useEffect(() => {
     if (selectedRecordId && pageTableId) {
       setSelectedContext({ type: "record", recordId: selectedRecordId, tableId: pageTableId })
+      setRightPanelData({
+        recordId: selectedRecordId,
+        recordTableId: pageTableId,
+        fieldLayout,
+        onLayoutSave: onLayoutSave ?? null,
+        tableFields,
+      })
     } else {
       setSelectedContext(null)
+      setRightPanelData({ recordId: null, recordTableId: null, fieldLayout: [], onLayoutSave: null, tableFields: [] })
     }
-  }, [selectedRecordId, pageTableId, setSelectedContext])
+  }, [selectedRecordId, pageTableId, fieldLayout, onLayoutSave, tableFields, setSelectedContext, setRightPanelData])
 
   // Handle record selection - reset to view mode when switching records (Airtable-style)
   const handleRecordSelect = useCallback((recordId: string) => {

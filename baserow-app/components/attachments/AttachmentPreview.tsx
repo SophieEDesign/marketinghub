@@ -491,13 +491,28 @@ function AttachmentModal({
         className="bg-white rounded-lg p-4 max-w-4xl w-full mx-4 relative max-h-[90vh] overflow-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <button
-          onClick={onClose}
-          className="absolute top-2 right-2 z-10 p-1 rounded-full hover:bg-gray-200 transition-colors"
-          aria-label="Close"
-        >
-          <X className="h-5 w-5 text-gray-600" />
-        </button>
+        <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
+          {isImage && (
+            <a
+              href={attachment.url}
+              download={attachment.name || 'image'}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1.5 rounded-full hover:bg-gray-200 transition-colors"
+              aria-label="Download"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Download className="h-4 w-4 text-gray-600" />
+            </a>
+          )}
+          <button
+            onClick={onClose}
+            className="p-1 rounded-full hover:bg-gray-200 transition-colors"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5 text-gray-600" />
+          </button>
+        </div>
 
         {isImage ? (
           <img

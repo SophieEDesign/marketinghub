@@ -542,6 +542,13 @@ export default function ListBlock({
         imageField={imageField}
         pillFields={pillFields}
         metaFields={metaFields}
+        visibleFieldsInOrder={
+          layoutCardFields.length > 0
+            ? layoutCardFields.map((f) => f.name)
+            : visibleFields.length > 0
+              ? visibleFields
+              : undefined
+        }
         modalFields={modalFields}
         reloadKey={refreshKey}
         onHeightChange={(groupBy || (groupByRulesFromConfig && groupByRulesFromConfig.length > 0)) ? handleHeightChange : undefined}

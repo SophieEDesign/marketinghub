@@ -12,7 +12,7 @@ import { sortLabelsByManualOrder } from "@/lib/fields/select-options"
 import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig, normalizeFilter } from "@/lib/interface/filters"
 import { sortRowsByFieldType, shouldUseClientSideSorting, type ViewSort } from "@/lib/sorting/fieldTypeAwareSort"
 import type { FilterType } from "@/types/database"
-import { ChevronDown, ChevronRight, Filter, Group, Plus, Database } from "lucide-react"
+import { ChevronDown, ChevronRight, ExternalLink, Filter, Group, Plus, Database } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import EmptyState from "@/components/empty-states/EmptyState"
 import { useRecordModal } from "@/contexts/RecordModalContext"
@@ -55,6 +55,8 @@ interface ListViewProps {
   imageField?: string // Optional: field name for image/attachment
   pillFields?: string[] // Optional: select/multi-select fields to show as pills
   metaFields?: string[] // Optional: date, number, etc. for metadata
+  /** All visible fields in display order. When provided, used for table columns (overrides title/subtitle/pill/meta split). */
+  visibleFieldsInOrder?: string[]
   modalFields?: string[] // Optional: fields to show in record modal (empty = show all)
   // Callbacks for block config updates (when not using views)
   onGroupByChange?: (fieldName: string | null) => void
@@ -96,6 +98,7 @@ export default function ListView({
   imageField,
   pillFields = [],
   metaFields = [],
+  visibleFieldsInOrder,
   modalFields,
   onGroupByChange,
   onFiltersChange,
@@ -752,25 +755,43 @@ export default function ListView({
     })
   }, [showAddRecord, canCreateRecord, tableId, supabaseTableName, filters, tableFields, openRecordModal, modalFields, cascadeContext, interfaceMode, loadRows])
 
-  // Table columns: title, pills, subtitles, meta (matches reference: Content Name, Content Type, Status, Notes, Created, Date, Date to)
+  // Table columns: use visibleFieldsInOrder when provided (all selected fields), else fall back to title/pill/subtitle/meta split
   const tableColumns = useMemo(() => {
     const cols: Array<{ key: string; field: TableField; type: 'title' | 'pill' | 'subtitle' | 'meta' }> = []
-    if (titleField) {
-      const f = tableFields.find(x => x.name === titleField || x.id === titleField)
-      if (f) cols.push({ key: `title:${f.name}`, field: f, type: 'title' })
+
+    if (visibleFieldsInOrder && visibleFieldsInOrder.length > 0) {
+      // Use all visible fields in order - single source of truth from Fields panel
+      visibleFieldsInOrder.forEach((fn, idx) => {
+        const f = tableFields.find(x => x.name === fn || x.id === fn)
+        if (f) {
+          const t: 'title' | 'pill' | 'subtitle' | 'meta' =
+            f.type === 'single_select' || f.type === 'multi_select' ? 'pill'
+            : ['date', 'number', 'percent', 'currency'].includes(f.type as string) ? 'meta'
+            : idx === 0 ? 'title'
+            : 'subtitle'
+          cols.push({ key: `visible:${f.name}`, field: f, type: t })
+        }
+      })
+    } else {
+      // Legacy: title, pills, subtitles, meta
+      if (titleField) {
+        const f = tableFields.find(x => x.name === titleField || x.id === titleField)
+        if (f) cols.push({ key: `title:${f.name}`, field: f, type: 'title' })
+      }
+      pillFields.forEach(fn => {
+        const f = tableFields.find(x => x.name === fn || x.id === fn)
+        if (f) cols.push({ key: `pill:${f.name}`, field: f, type: 'pill' })
+      })
+      subtitleFields.forEach(fn => {
+        const f = tableFields.find(x => x.name === fn || x.id === fn)
+        if (f) cols.push({ key: `subtitle:${f.name}`, field: f, type: 'subtitle' })
+      })
+      metaFields.forEach(fn => {
+        const f = tableFields.find(x => x.name === fn || x.id === fn)
+        if (f) cols.push({ key: `meta:${f.name}`, field: f, type: 'meta' })
+      })
     }
-    pillFields.forEach(fn => {
-      const f = tableFields.find(x => x.name === fn || x.id === fn)
-      if (f) cols.push({ key: `pill:${f.name}`, field: f, type: 'pill' })
-    })
-    subtitleFields.forEach(fn => {
-      const f = tableFields.find(x => x.name === fn || x.id === fn)
-      if (f) cols.push({ key: `subtitle:${f.name}`, field: f, type: 'subtitle' })
-    })
-    metaFields.forEach(fn => {
-      const f = tableFields.find(x => x.name === fn || x.id === fn)
-      if (f) cols.push({ key: `meta:${f.name}`, field: f, type: 'meta' })
-    })
+
     // Fallback: if no columns from config, use first few table fields
     if (cols.length === 0 && tableFields.length > 0) {
       tableFields.slice(0, 6).forEach(f => {
@@ -781,7 +802,7 @@ export default function ListView({
       })
     }
     return cols
-  }, [titleField, pillFields, subtitleFields, metaFields, tableFields])
+  }, [visibleFieldsInOrder, titleField, pillFields, subtitleFields, metaFields, tableFields])
 
   // Render a table row (basic list style)
   const renderTableRow = useCallback((row: Record<string, any>) => {
@@ -843,6 +864,20 @@ export default function ListView({
             {renderCellValue(col)}
           </td>
         ))}
+        <td className="px-3 py-2 text-right align-top w-12">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleOpenRecord(String(recordId))
+            }}
+            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 hover:underline"
+            title="Open full record"
+          >
+            <ExternalLink className="h-4 w-4 shrink-0" />
+            Open
+          </button>
+        </td>
       </tr>
     )
   }, [
@@ -920,6 +955,7 @@ export default function ListView({
                       {getFieldDisplayName(col.field)}
                     </th>
                   ))}
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-600 uppercase tracking-wider w-12" />
                 </tr>
               </thead>
               <tbody>
@@ -974,7 +1010,7 @@ export default function ListView({
                     return (
                       <tr key={node.pathKey} className="border-b border-gray-200">
                         <td
-                          colSpan={tableColumns.length}
+                          colSpan={tableColumns.length + 1}
                           className="px-3 py-2"
                           style={{ backgroundColor: finalHeaderBgColor, ...textColorStyle }}
                         >

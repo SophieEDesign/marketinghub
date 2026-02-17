@@ -426,18 +426,24 @@ export default function SettingsPanel({
 
   const blockTypeLabel = block ? BLOCK_REGISTRY[block.type]?.label || block.type : ''
   const isDataViewBlock = block && DATA_VIEW_BLOCK_TYPES.includes(block.type)
+  // Airtable-style: show table name + block type (e.g. "Sponsorships Record list")
+  const tableId = config?.table_id || (block?.config as any)?.table_id
+  const tableName = tableId ? tables.find((t) => t.id === tableId)?.name : null
+  const displayLabel =
+    block?.type === "record_context"
+      ? tableName
+        ? `${tableName} Record list`
+        : "Record list"
+      : tableName && blockTypeLabel
+        ? `${tableName} ${blockTypeLabel}`
+        : blockTypeLabel || "Block Settings"
 
   const panelContent = (
       <div className={embedded ? "w-full flex flex-col" : "fixed inset-y-0 right-0 w-96 bg-white border-l border-gray-200 shadow-xl z-50 flex flex-col"}>
-      {/* Header */}
+      {/* Header - Airtable-style: table name + block type (e.g. Sponsorships Record list) */}
       <div className="border-b border-gray-200 px-4 py-3">
-        {blockTypeLabel && (
-          <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-            {blockTypeLabel}
-          </div>
-        )}
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Block Settings</h2>
+          <h2 className="text-lg font-semibold truncate">{displayLabel}</h2>
           <button
             onClick={onClose}
             className="p-1 rounded-md hover:bg-gray-100 text-gray-500"

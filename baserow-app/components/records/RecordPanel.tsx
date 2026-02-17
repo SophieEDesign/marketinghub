@@ -91,6 +91,7 @@ export default function RecordPanel() {
         } bg-white shadow-xl flex flex-col transition-all duration-300 ease-out`}
         style={{
           width: state.isOpen ? panelWidth : "0px",
+          right: useOverlayLayout ? 400 : undefined,
           transform: useOverlayLayout && !state.isOpen ? "translateX(100%)" : "none",
           minWidth: !useOverlayLayout && state.isOpen ? `${state.width}px` : undefined,
           maxWidth: !useOverlayLayout && state.isOpen ? `${state.width}px` : undefined,
@@ -112,7 +113,8 @@ export default function RecordPanel() {
 
               const handleMouseMove = (ev: MouseEvent) => {
                 if (!isResizingRef.current) return
-                const raw = window.innerWidth - ev.clientX
+                const rightEdge = 400
+                const raw = (window.innerWidth - rightEdge) - ev.clientX
                 const clamped = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, raw))
                 setWidth(clamped)
               }

@@ -12,8 +12,8 @@ import {
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { X } from "lucide-react"
-import type { BlockConfig } from "@/lib/interface/types"
-import type { Table, View, TableField } from "@/types/database"
+import type { BlockConfig, BlockFilter } from "@/lib/interface/types"
+import type { Table, View, ViewFilter, ViewSort, ViewField } from "@/types/database"
 import { getFieldDisplayName } from "@/lib/fields/display"
 import TableSelector from "./shared/TableSelector"
 import ViewSelector from "./shared/ViewSelector"
@@ -22,6 +22,8 @@ import SortSelector from "./shared/SortSelector"
 import NestedGroupBySelector from "./shared/NestedGroupBySelector"
 import CardFieldsSelector from "./shared/CardFieldsSelector"
 import ModalFieldsSelector from "./shared/ModalFieldsSelector"
+import PermissionsSettings from "./PermissionsSettings"
+import { useViewMeta } from "@/hooks/useViewMeta"
 
 interface RecordContextDataSettingsProps {
   config: BlockConfig
@@ -58,6 +60,30 @@ export default function RecordContextDataSettings({
 
   const hasTableAndFields = config.table_id && fields.length > 0
   const isListMode = displayMode === "list"
+  const { metadata: viewMetaData } = useViewMeta(config.view_id, config.table_id)
+
+  const handleCopySettingsFromView = () => {
+    if (!viewMetaData) return
+    const filters: BlockFilter[] = (viewMetaData.filters || []).map((f: ViewFilter) => ({
+      field: f.field_name,
+      operator: (f.operator || "equal") as BlockFilter["operator"],
+      value: f.value,
+    }))
+    const sorts = (viewMetaData.sorts || []).map((s: ViewSort) => ({
+      field: s.field_name,
+      direction: (s.direction || "asc") as "asc" | "desc",
+    }))
+    const visibleFields = (viewMetaData.fields || [])
+      .filter((f: ViewField) => f.visible !== false)
+      .sort((a: ViewField, b: ViewField) => (a.position ?? 0) - (b.position ?? 0))
+      .map((f: ViewField) => f.field_name)
+    onUpdate({
+      filters,
+      sorts: sorts as any,
+      visible_fields: visibleFields.length > 0 ? visibleFields : undefined,
+      filter_mode: filters.length > 0 ? "specific" : (config as any).filter_mode,
+    } as any)
+  }
 
   return (
     <div className="space-y-4">
@@ -80,6 +106,52 @@ export default function RecordContextDataSettings({
           views={views}
           tableId={config.table_id}
         />
+      )}
+
+      {/* Records: filter mode + Copy from view (Airtable-style) */}
+      {hasTableAndFields && (
+        <div className="space-y-3 border-t pt-4">
+          <h3 className="text-sm font-semibold text-gray-900">Records</h3>
+          <div className="space-y-2">
+            <Label>Records to show</Label>
+            <Select
+              value={(config as any).filter_mode || "all"}
+              onValueChange={(value) => onUpdate({ filter_mode: value } as any)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All records</SelectItem>
+                <SelectItem value="viewer">Viewer&apos;s records only</SelectItem>
+                <SelectItem value="specific">Specific records</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-gray-500">
+              {(config as any).filter_mode === "viewer" &&
+                "Only records associated with the current user (e.g. created by, assigned to)."}
+              {(config as any).filter_mode === "specific" &&
+                "Define conditions below. Only matching records are shown."}
+              {((config as any).filter_mode || "all") === "all" && "Show all records from the table."}
+            </p>
+          </div>
+          {config.view_id && (
+            <div className="space-y-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleCopySettingsFromView}
+                disabled={!viewMetaData}
+              >
+                {viewMetaData ? "Copy settings from a view" : "Loading view…"}
+              </Button>
+              <p className="text-xs text-gray-500">
+                Copy this view&apos;s filters, sort, and visible fields into the block.
+              </p>
+            </div>
+          )}
+        </div>
       )}
 
       {hasTableAndFields && (
@@ -127,7 +199,7 @@ export default function RecordContextDataSettings({
         </Select>
       </div>
 
-      {hasTableAndFields && (
+      {(config as any).filter_mode === "specific" && hasTableAndFields && (
         <div className="space-y-2 border-t pt-4">
           <Label>Filters</Label>
           <BlockFilterEditor
@@ -467,6 +539,14 @@ export default function RecordContextDataSettings({
               </p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Permissions (Airtable-style: Allow users to create new records, etc.) */}
+      {hasTableAndFields && (
+        <div className="space-y-4 border-t pt-4">
+          <h3 className="text-sm font-semibold text-gray-900">Permissions</h3>
+          <PermissionsSettings config={config} onUpdate={onUpdate} />
         </div>
       )}
 

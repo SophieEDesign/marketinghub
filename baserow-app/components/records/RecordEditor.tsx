@@ -7,7 +7,7 @@
  */
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
-import { Maximize2, Check, LayoutGrid, ChevronDown, ChevronRight, ArrowLeft, Save, Trash2, X, Pencil, Copy } from "lucide-react"
+import { Maximize2, Check, ChevronDown, ChevronRight, ArrowLeft, Save, Trash2, X, Pencil, Copy } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import FieldEditor from "@/components/fields/FieldEditor"
 import RecordFields from "@/components/records/RecordFields"
@@ -142,7 +142,6 @@ export default function RecordEditor({
     canDeleteRecords,
   } = core
 
-  const [manualEditMode, setManualEditMode] = useState(false)
   const [reviewEditMode, setReviewEditMode] = useState(false)
 
   const canSave = recordId ? canEditRecords : canCreateRecords
@@ -216,7 +215,13 @@ export default function RecordEditor({
     setLocalFieldLayout(resolvedFieldLayout)
   }, [resolvedFieldLayout, visibilityContext])
 
-  const isEditingLayout = manualEditMode && Boolean(onLayoutSave) && resolvedFieldLayout.length > 0
+  const isEditingLayout =
+    interfaceMode === "edit" &&
+    canEditLayout &&
+    !isViewOnly &&
+    Boolean(onLayoutSave) &&
+    resolvedFieldLayout.length > 0 &&
+    !!recordId
   const layoutFieldsSource = localFieldLayout.length > 0 ? localFieldLayout : resolvedFieldLayout
   const layoutModeFields = useMemo(() => {
     if (!isEditingLayout || layoutFieldsSource.length === 0) return visibleFields
@@ -303,18 +308,13 @@ export default function RecordEditor({
     [localFieldLayout, onLayoutSave, visibilityContext, setLiveFieldLayout]
   )
 
-  const handleDoneEditLayout = useCallback(async () => {
-    await onLayoutSave?.(localFieldLayout)
-    setManualEditMode(false)
-  }, [onLayoutSave, localFieldLayout])
-
-  const showCustomizeLayoutButton =
-    interfaceMode === "edit" &&
-    canEditLayout &&
-    !isViewOnly &&
-    Boolean(onLayoutSave) &&
-    resolvedFieldLayout.length > 0 &&
-    !!recordId
+  const prevInterfaceModeRef = useRef(interfaceMode)
+  useEffect(() => {
+    if (prevInterfaceModeRef.current === "edit" && interfaceMode !== "edit") {
+      onLayoutSave?.(localFieldLayout)
+    }
+    prevInterfaceModeRef.current = interfaceMode
+  }, [interfaceMode, localFieldLayout, onLayoutSave])
 
   const sectionedFields = useMemo(() => {
     if (!showFieldSections) return null
@@ -553,24 +553,6 @@ export default function RecordEditor({
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            {showCustomizeLayoutButton &&
-              (isEditingLayout ? (
-                <Button variant="default" size="sm" onClick={handleDoneEditLayout} className="gap-1.5">
-                  <Check className="h-4 w-4" />
-                  Done
-                </Button>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setManualEditMode(true)}
-                  className="gap-1.5"
-                  title="Customize which fields appear and their order"
-                >
-                  <LayoutGrid className="h-4 w-4" />
-                  Customize layout
-                </Button>
-              ))}
             {recordId && (
               <Button
                 variant="destructive"
@@ -605,24 +587,6 @@ export default function RecordEditor({
             {recordTitle || "Record Details"}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            {showCustomizeLayoutButton &&
-              (isEditingLayout ? (
-                <Button variant="default" size="sm" onClick={handleDoneEditLayout} className="gap-1.5">
-                  <Check className="h-4 w-4" />
-                  Done
-                </Button>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setManualEditMode(true)}
-                  className="gap-1.5"
-                  title="Customize which fields appear and their order"
-                >
-                  <LayoutGrid className="h-4 w-4" />
-                  Customize layout
-                </Button>
-              ))}
             {interfaceMode === "view" && canSave && (
               <Button
                 variant={reviewEditMode ? "default" : "outline"}
@@ -696,14 +660,14 @@ export default function RecordEditor({
           <div className="border-t border-dashed border-gray-200 px-6 py-4 flex-shrink-0">
             <RecordActivity record={formData} tableId={tableId} />
           </div>
-          <div className="border-t border-dashed border-gray-200 px-6 py-4 flex-shrink-0">
-            <RecordComments tableId={tableId} recordId={recordId} canAddComment={effectiveEditable} />
-          </div>
           {renderExtraContent && (
             <div className="border-t flex-1 min-h-0 overflow-visible">
               {renderExtraContent}
             </div>
           )}
+          <div className="border-t border-dashed border-gray-200 px-6 py-4 flex-shrink-0">
+            <RecordComments tableId={tableId} recordId={recordId} canAddComment={effectiveEditable} />
+          </div>
         </>
       )}
 

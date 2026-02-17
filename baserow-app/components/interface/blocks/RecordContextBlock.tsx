@@ -50,6 +50,7 @@ export default function RecordContextBlock({
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const { toast } = useToast()
 
+  const filterMode = (config as any).filter_mode || "all"
   const filterTree = (config as any).filter_tree as FilterTree | undefined
   const blockFilters = (config.filters || []) as Array<{ field: string; operator: string; value: unknown }>
   const sortsConfig = Array.isArray(config.sorts) ? config.sorts : []
@@ -146,7 +147,11 @@ export default function RecordContextBlock({
         .select(selectCols.join(", "))
         .limit(200)
 
-      const filtersToApply = filterTree ?? (blockFilters.length > 0 ? blockFilters.map((f) => normalizeFilter(f as BlockFilter | FilterConfig)) : null)
+      // Respect filter_mode: "all" = no filters, "specific" = use config filters, "viewer" = user-scoped (TODO)
+      const filtersToApply =
+        filterMode === "specific"
+          ? filterTree ?? (blockFilters.length > 0 ? blockFilters.map((f) => normalizeFilter(f as BlockFilter | FilterConfig)) : null)
+          : null
       if (filtersToApply) {
         query = applyFiltersToQuery(query, filtersToApply, fieldList)
       }
@@ -175,6 +180,7 @@ export default function RecordContextBlock({
     }
   }, [
     tableId,
+    filterMode,
     filterTree ? JSON.stringify(filterTree) : null,
     blockFilters.length,
     JSON.stringify(blockFilters),

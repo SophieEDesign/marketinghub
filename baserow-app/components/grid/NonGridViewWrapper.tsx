@@ -240,6 +240,7 @@ export default function NonGridViewWrapper({
         tableId={tableId}
         views={views}
         tableFields={tableFields}
+        tableName={viewType === "kanban" ? tableInfo?.name ?? undefined : undefined}
         onCustomizeCards={() => setCustomizeCardsDialogOpen(true)}
         onSearch={() => {}} // Handled via URL params
         onFilter={() => setFilterDialogOpen(true)}

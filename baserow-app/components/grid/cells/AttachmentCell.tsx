@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Paperclip } from 'lucide-react'
+import { Paperclip, Download } from 'lucide-react'
 import AttachmentPreview, { type Attachment } from '@/components/attachments/AttachmentPreview'
 
 // Using crypto.randomUUID() instead of uuid package for browser compatibility
@@ -255,13 +255,28 @@ function AttachmentPreviewModal({
         className="bg-white rounded-lg p-4 max-w-3xl w-full relative max-h-[90vh] overflow-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <button
-          onClick={onClose}
-          className="absolute top-2 right-2 text-xl text-gray-600 hover:text-black z-10"
-          aria-label="Close"
-        >
-          ✕
-        </button>
+        <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
+          {isImage && (
+            <a
+              href={file.url}
+              download={file.name || 'image'}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1.5 rounded hover:bg-gray-200 text-gray-600 hover:text-black transition-colors"
+              aria-label="Download"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Download className="h-4 w-4" />
+            </a>
+          )}
+          <button
+            onClick={onClose}
+            className="p-1 text-xl text-gray-600 hover:text-black rounded"
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
 
         {isImage ? (
           // eslint-disable-next-line @next/next/no-img-element

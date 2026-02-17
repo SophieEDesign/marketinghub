@@ -206,8 +206,13 @@ function InterfacePageClientInternal({
   // CRITICAL: RightPanel sync depends ONLY on page.id, page, blocks, selectedContext - NOT handlePageUpdate
   const lastRightPanelSyncRef = useRef<{ pageRef: InterfacePage | null; blocksRef: any[]; selectedBlockId: string | undefined } | null>(null)
   const prevBlocksRef = useRef<{ blocks: any[]; signature: string }>({ blocks: [], signature: "" })
+
+  // Clear right panel data when navigating away from interface page (Airtable-style: panel only on interface pages)
   useEffect(() => {
-    if (!page) return
+    if (!page) {
+      setRightPanelData(null)
+      return
+    }
     const selectedBlock = selectedBlockIdForPanel != null ? blocks.find((b) => b.id === selectedBlockIdForPanel) ?? null : null
     const prev = lastRightPanelSyncRef.current
     if (prev?.pageRef === page && prev?.blocksRef === blocks && prev?.selectedBlockId === selectedBlockIdForPanel) return

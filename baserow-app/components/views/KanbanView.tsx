@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from "react"
 import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { ChevronRight, Plus, Settings, Columns } from "lucide-react"
+import { ChevronRight, Plus, Settings, Columns, FileText } from "lucide-react"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
 import type { TableRow } from "@/types/database"
 import type { TableField } from "@/types/fields"
@@ -130,6 +130,22 @@ export default function KanbanView({
       (f: any) => f && (f.name === groupingFieldName || f.id === groupingFieldName)
     ) as TableField | undefined
   }, [tableFields, groupingFieldName])
+
+  // Airtable-style: resolve column header color from grouping field options
+  const getColumnHeaderColor = useCallback((groupValue: string): string | null => {
+    if (!groupingField || (groupingField.type !== "single_select" && groupingField.type !== "multi_select")) {
+      return null
+    }
+    const hex = normalizeHexColor(
+      resolveChoiceColor(
+        groupValue,
+        groupingField.type as "single_select" | "multi_select",
+        groupingField.options,
+        true
+      )
+    )
+    return hex
+  }, [groupingField])
 
   // Filter rows by search query
   const filteredRows = useMemo(() => {
@@ -455,11 +471,23 @@ export default function KanbanView({
             groupValueToLabel.get(groupName) ??
             groupValueLabelMaps[groupingFieldName]?.[groupName] ??
             groupName
+          const headerColor = getColumnHeaderColor(groupName)
           return (
           <div key={groupName} className="flex-shrink-0 w-80">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 mb-3">
-              <h3 className="text-sm font-semibold text-gray-900">{displayName}</h3>
-              <p className="text-xs text-gray-500 mt-0.5">{groupedRows[groupName].length} items</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                {headerColor ? (
+                  <span
+                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white shrink-0"
+                    style={{ backgroundColor: headerColor }}
+                  >
+                    {displayName}
+                  </span>
+                ) : (
+                  <h3 className="text-sm font-semibold text-gray-900">{displayName}</h3>
+                )}
+                <span className="text-xs text-gray-500">{groupedRows[groupName].length} items</span>
+              </div>
             </div>
             <div className="space-y-2">
               {groupedRows[groupName].map((row) => {
@@ -480,7 +508,7 @@ export default function KanbanView({
                 return (() => {
                   const cardFieldIds = (Array.isArray(fieldIds) ? fieldIds : [])
                     .filter((fid) => fid !== groupingFieldId)
-                    .slice(0, 5)
+                    .slice(0, 6)
                   const cardFields = cardFieldIds
                     .map((fieldId) => (Array.isArray(tableFields) ? tableFields : []).find(
                       (f: any) => f?.name === fieldId || f?.id === fieldId
@@ -489,8 +517,10 @@ export default function KanbanView({
                   const titleField = cardFields[0]
                   const otherFields = cardFields.slice(1)
                   const pillMetaFields = otherFields.length >= 2 ? otherFields.slice(0, -1) : otherFields
-                  const footerField = otherFields.length >= 2 ? otherFields[otherFields.length - 1] : null
+                  const contentField = otherFields.length >= 2 ? otherFields[otherFields.length - 1] : null
                   const data = row.data || {}
+                  const contentValue = contentField ? data[contentField.name] : null
+                  const hasContent = contentValue != null && String(contentValue).trim() !== ""
 
                   return (
                 <Card 
@@ -504,11 +534,11 @@ export default function KanbanView({
                 >
                   <CardContent className="p-3 min-w-0">
                     <div className="space-y-2 min-w-0">
-                      {/* Title row: primary value only + open button (Airtable-style) */}
+                      {/* Title row: primary value + open button (Airtable-style) */}
                       <div className="flex items-start gap-1.5 min-w-0">
                         {titleField && (
                           <div
-                            className="flex-1 min-w-0 line-clamp-3 overflow-hidden font-semibold text-sm text-gray-900 leading-tight"
+                            className="flex-1 min-w-0 line-clamp-2 overflow-hidden font-semibold text-sm text-gray-900 leading-tight"
                             onClick={(e) => e.stopPropagation()}
                             onDoubleClick={(e) => e.stopPropagation()}
                           >
@@ -540,11 +570,11 @@ export default function KanbanView({
 
                       {/* Image if configured */}
                       {cardImage && (
-                        <div className={`w-full min-w-0 ${fitImageSize ? 'h-auto' : 'h-32'} rounded overflow-hidden bg-gray-100`}>
+                        <div className={`w-full min-w-0 ${fitImageSize ? 'h-auto' : 'h-28'} rounded overflow-hidden bg-gray-100`}>
                           <img
                             src={cardImage}
                             alt=""
-                            className={`w-full ${fitImageSize ? 'h-auto object-contain' : 'h-32 object-cover'}`}
+                            className={`w-full ${fitImageSize ? 'h-auto object-contain' : 'h-28 object-cover'}`}
                             onError={(e) => {
                               (e.target as HTMLImageElement).style.display = 'none'
                             }}
@@ -552,44 +582,75 @@ export default function KanbanView({
                         </div>
                       )}
 
-                      {/* Pills / meta: values only, no labels */}
+                      {/* Category/Date pills (Airtable-style colored tags) */}
                       {pillMetaFields.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 min-w-0" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
                           {pillMetaFields.map((fieldObj) => {
                             const isVirtual = fieldObj.type === "formula" || fieldObj.type === "lookup"
+                            const isSelect = fieldObj.type === "single_select" || fieldObj.type === "multi_select"
+                            const rawVal = data[fieldObj.name]
+                            const pillLabel = isSelect && rawVal
+                              ? (getOptionValueToLabelMap(fieldObj.type as "single_select" | "multi_select", fieldObj.options).get(String(rawVal).trim()) ?? String(rawVal)
+                              : null
+                            const pillColor = isSelect && rawVal
+                              ? normalizeHexColor(resolveChoiceColor(String(rawVal).trim(), fieldObj.type as "single_select" | "multi_select", fieldObj.options, true))
+                              : null
                             return (
                               <div key={fieldObj.id ?? fieldObj.name} className="min-w-0 max-w-full">
-                                <CellFactory
-                                  field={fieldObj}
-                                  value={data[fieldObj.name]}
-                                  rowId={String(row.id)}
-                                  tableName={supabaseTableName || ""}
-                                  editable={!fieldObj.options?.read_only && !isVirtual && !!supabaseTableName}
-                                  wrapText={wrapText}
-                                  rowHeight={22}
-                                  onSave={(value) => handleCellSave(String(row.id), fieldObj.name, value)}
-                                />
+                                {isSelect && pillColor && pillLabel ? (
+                                  <span
+                                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white truncate max-w-full"
+                                    style={{ backgroundColor: pillColor }}
+                                  >
+                                    {pillLabel}
+                                  </span>
+                                ) : (
+                                  <CellFactory
+                                    field={fieldObj}
+                                    value={data[fieldObj.name]}
+                                    rowId={String(row.id)}
+                                    tableName={supabaseTableName || ""}
+                                    editable={!fieldObj.options?.read_only && !isVirtual && !!supabaseTableName}
+                                    wrapText={wrapText}
+                                    rowHeight={22}
+                                    onSave={(value) => handleCellSave(String(row.id), fieldObj.name, value)}
+                                  />
+                                )}
                               </div>
                             )
                           })}
                         </div>
                       )}
 
-                      {/* Footer: optional last field as subtle meta */}
-                      {footerField && (
-                        <div className="border-t border-gray-100 pt-1.5 mt-0.5 text-xs text-gray-500 min-w-0" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
-                          <CellFactory
-                            field={footerField}
-                            value={data[footerField.name]}
-                            rowId={String(row.id)}
-                            tableName={supabaseTableName || ""}
-                            editable={!footerField.options?.read_only && footerField.type !== "formula" && footerField.type !== "lookup" && !!supabaseTableName}
-                            wrapText={wrapText}
-                            rowHeight={20}
-                            onSave={(value) => handleCellSave(String(row.id), footerField.name, value)}
-                          />
-                        </div>
-                      )}
+                      {/* Content preview (Airtable-style: larger, 2-3 lines) or + Add content */}
+                      {contentField ? (
+                        hasContent ? (
+                          <div className="text-sm text-gray-600 line-clamp-3 min-w-0" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+                            <CellFactory
+                              field={contentField}
+                              value={contentValue}
+                              rowId={String(row.id)}
+                              tableName={supabaseTableName || ""}
+                              editable={!contentField.options?.read_only && contentField.type !== "formula" && contentField.type !== "lookup" && !!supabaseTableName}
+                              wrapText={wrapText}
+                              rowHeight={undefined}
+                              onSave={(value) => handleCellSave(String(row.id), contentField.name, value)}
+                            />
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (row.id != null) handleOpenRecord(String(row.id))
+                            }}
+                            className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 hover:underline"
+                          >
+                            <FileText className="h-3.5 w-3.5" />
+                            + Add content
+                          </button>
+                        )
+                      ) : null}
                     </div>
                   </CardContent>
                 </Card>
