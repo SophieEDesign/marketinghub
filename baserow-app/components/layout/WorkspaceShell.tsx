@@ -7,12 +7,13 @@ import EditModeBanner from "./EditModeBanner"
 import EditModeGuard from "./EditModeGuard"
 import { RecordPanelProvider, useRecordPanel } from "@/contexts/RecordPanelContext"
 import { RecordModalProvider } from "@/contexts/RecordModalContext"
-import { SelectionContextProvider, useSelectionContext } from "@/contexts/SelectionContext"
+import { SelectionContextProvider } from "@/contexts/SelectionContext"
 import { PageActionsProvider } from "@/contexts/PageActionsContext"
 import { RightSettingsPanelDataProvider, useRightSettingsPanelData } from "@/contexts/RightSettingsPanelDataContext"
 import RightSettingsPanel from "@/components/interface/RightSettingsPanel"
 import RecordPanel from "@/components/records/RecordPanel"
-import { MainScrollProvider, useMainScroll } from "@/contexts/MainScrollContext"
+import { MainScrollProvider } from "@/contexts/MainScrollContext"
+import { useUIMode } from "@/contexts/UIModeContext"
 import { useIsMobile } from "@/hooks/useResponsive"
 import { useBranding } from "@/contexts/BrandingContext"
 import { Button } from "@/components/ui/button"
@@ -156,35 +157,27 @@ function ShellContent({
   setSidebarOpen: (v: boolean) => void
   primaryColor: string
 }) {
-  const mainScroll = useMainScroll()
-  const suppressMainScroll = mainScroll?.suppressMainScroll ?? false
-  const { selectedContext } = useSelectionContext()
   const { data } = useRightSettingsPanelData()
   const { state: recordPanelState } = useRecordPanel()
+  const isEditMode = useUIMode().isEdit()
 
-  // Right Settings Panel: only mount in Edit Mode. Use data from page consumers (InterfacePageClient, RecordReviewPage)
-  // NOT UIModeContext - sidebar Edit button uses EditModeContext, which syncs to RightPanelData.isEditing
+  // Right Settings Panel: only mount in Edit Mode. UIModeContext is single source of truth.
   const hasInterfacePageContext = data?.page != null && data?.blocks != null
   const isRecordPanelOpen = recordPanelState.isOpen && recordPanelState.recordId
   const isRecordPanelEditMode = recordPanelState.interfaceMode === "edit"
-  const isDataEditMode = data?.isEditing === true
-  const isPanelVisible =
-    (hasInterfacePageContext && isDataEditMode) ||
+  const hasRecordContextBlock = data?.recordId != null && data?.recordTableId != null && !isRecordPanelOpen
+  const hasPanelContext =
+    hasInterfacePageContext ||
     (isRecordPanelOpen && isRecordPanelEditMode) ||
-    (data?.recordId != null && data?.recordTableId != null && !isRecordPanelOpen && isDataEditMode)
-
-  // When record list (left panel / record_context block) is selected for settings, show settings on LEFT; right panel = field blocks
-  const isRecordListSelected =
-    selectedContext?.type === "recordList" ||
-    (selectedContext?.type === "block" && data?.selectedBlock?.type === "record_context")
-  const isSettingsOnLeft = isRecordListSelected
+    hasRecordContextBlock
+  const isPanelVisible = hasPanelContext && isEditMode
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 overflow-x-hidden">
       {/* Edit mode banner - full app width at top, above sidebar and content */}
       <EditModeBanner />
       <EditModeGuard />
-      <div className="flex flex-1 min-h-0 overflow-x-hidden">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
       {/* When topbar is hidden (some pages have their own toolbar), still provide a mobile hamburger toggle */}
       {hideTopbar && isMobile && (
         <div className="fixed top-3 left-3 z-50 desktop:hidden">
@@ -210,26 +203,27 @@ function ShellContent({
         onClose={isMobile ? () => setSidebarOpen(false) : undefined}
         defaultPageId={defaultPageId}
       />
-      {/* Settings panel: conditional render - only in DOM when in Edit Mode (data.isEditing from page consumers). */}
-      {isPanelVisible && (
-        <div className={`flex-shrink-0 w-[340px] ${isSettingsOnLeft ? "order-1" : "order-3"}`}>
-          <RightSettingsPanel position={isSettingsOnLeft ? "left" : "right"} />
+      {/* MainArea: InterfaceContainer + RightSettingsPanel (edit mode only) */}
+      <div className="flex flex-1 flex min-w-0 overflow-hidden">
+        {/* InterfaceContainer - flex-1, owns its scroll via children */}
+        <div className="flex flex-1 flex flex-col min-w-0 overflow-hidden">
+          {!hideTopbar && (
+            <Topbar
+              title={title}
+              onSidebarToggle={isMobile ? () => setSidebarOpen(!sidebarOpen) : undefined}
+              isAdmin={userRole === "admin"}
+            />
+          )}
+          <main className="flex-1 min-h-0 min-w-0 overflow-hidden">
+            {children}
+          </main>
         </div>
-      )}
-      {/* Main content - field blocks (record detail) */}
-      <div className="flex-1 flex flex-col overflow-x-hidden min-h-0 min-w-0 order-2">
-        {!hideTopbar && (
-          <Topbar
-            title={title}
-            onSidebarToggle={isMobile ? () => setSidebarOpen(!sidebarOpen) : undefined}
-            isAdmin={userRole === "admin"}
-          />
+        {/* RightSettingsPanel: conditional mount, always on right, flex sibling */}
+        {isPanelVisible && (
+          <div className="flex-shrink-0 w-[360px]">
+            <RightSettingsPanel />
+          </div>
         )}
-        <main
-          className={`flex-1 min-h-0 min-w-0 overflow-x-hidden ${suppressMainScroll ? "overflow-y-hidden" : "overflow-y-auto"}`}
-        >
-          {children}
-        </main>
       </div>
       {/* Record Panel - overlay only, hidden for pages with their own record detail panel */}
       {!hideRecordPanel && <RecordPanel />}

@@ -31,6 +31,60 @@ const InterfaceBuilder = dynamic(() => import("./InterfaceBuilder"), { ssr: fals
 // Lazy load RecordReviewPage for record_review pages
 const RecordReviewPage = dynamic(() => import("./RecordReviewPage"), { ssr: false })
 
+/** Single stable wrapper for page content - avoids conditional tree swapping at InterfacePageClient level */
+function InterfacePageContent({
+  useRecordReviewLayout,
+  hasPage,
+  page,
+  memoizedBlocks,
+  isViewer,
+  onRecordViewLayoutSave,
+  interfaceBuilderPage,
+  fallbackPage,
+  pageTableId,
+  recordContext,
+  setRecordContext,
+}: {
+  useRecordReviewLayout: boolean
+  hasPage: boolean
+  page: InterfacePage | null
+  memoizedBlocks: any[]
+  isViewer: boolean
+  onRecordViewLayoutSave?: (fieldLayout: FieldLayoutItem[]) => Promise<void>
+  interfaceBuilderPage: InterfacePage | null | undefined
+  fallbackPage: InterfacePage
+  pageTableId: string | null
+  recordContext: RecordContext
+  setRecordContext: (ctx: RecordContext) => void
+}) {
+  if (useRecordReviewLayout && hasPage) {
+    return (
+      <RecordReviewPage
+        page={page as any}
+        initialBlocks={memoizedBlocks}
+        isViewer={isViewer}
+        hideHeader={true}
+        onLayoutSave={onRecordViewLayoutSave}
+      />
+    )
+  }
+  return (
+    <div className="min-h-screen w-full min-w-0 flex flex-col">
+      <InterfaceBuilder
+        page={interfaceBuilderPage ?? fallbackPage}
+        initialBlocks={memoizedBlocks}
+        isViewer={isViewer}
+        hideHeader={true}
+        pageTableId={pageTableId}
+        recordId={recordContext?.recordId ?? null}
+        recordTableId={recordContext?.tableId ?? null}
+        onRecordContextChange={setRecordContext}
+        mode="view"
+      />
+    </div>
+  )
+}
+
 // PostgREST expects unquoted identifiers in order clauses; see `lib/supabase/postgrest`.
 
 interface InterfacePageClientProps {
@@ -1201,8 +1255,11 @@ function InterfacePageClientInternal({
     setTitleValue(page?.name || "")
   }
 
+  const mainScroll = useMainScroll()
+  const suppressMainScroll = mainScroll?.suppressMainScroll ?? false
+
   return (
-    <div className={`h-screen flex flex-col ${!useRecordReviewLayout ? "overflow-x-hidden" : ""}`}>
+    <div className="flex flex-col flex-1 min-h-0 min-w-0 overflow-x-hidden">
       {/* Loading overlay: single scroll surface; do not unmount tree */}
       {loading && !hasPage && (
         <div className="absolute inset-0 flex items-center justify-center z-20 bg-white">
@@ -1224,7 +1281,7 @@ function InterfacePageClientInternal({
       )}
       {/* Header with Edit Button - Admin Only */}
       {!isViewer && hasPage && isAdmin && (
-        <div className="border-b bg-white px-4 py-3 flex items-center justify-between">
+        <div className="flex-shrink-0 border-b bg-white px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             {isEditingTitle ? (
               <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -1266,7 +1323,7 @@ function InterfacePageClientInternal({
       
       {/* Header without Edit Button - Non-admin with View Only badge */}
       {!isViewer && hasPage && !isAdmin && (
-        <div className="border-b bg-white px-4 py-3 flex items-center justify-between">
+        <div className="flex-shrink-0 border-b bg-white px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <h1 className="text-lg font-semibold flex-1 min-w-0 truncate">{page?.name}</h1>
             <span 
@@ -1284,33 +1341,26 @@ function InterfacePageClientInternal({
         </div>
       )}
 
-      {/* Content Area - single stable tree; never unmount based on page/loading.
-          CRITICAL: pr-0 ensures right panel overlays without pushing blocks (no width change in edit mode). */}
-      <div className="flex-1 overflow-x-hidden min-w-0 min-h-0 w-full pr-0 relative">
-        <div className="flex-1 w-full min-w-0 min-h-0 flex flex-col overflow-x-hidden pr-0 relative">
-          {useRecordReviewLayout && hasPage ? (
-            <RecordReviewPage
-              page={pageForRender as any}
-              initialBlocks={memoizedBlocks}
-              isViewer={isViewer}
-              hideHeader={true}
-              onLayoutSave={page?.page_type === "record_view" ? handleRecordViewLayoutSave : undefined}
-            />
-          ) : (
-            <div className="min-h-screen w-full min-w-0 flex flex-col">
-              <InterfaceBuilder
-                page={interfaceBuilderPage ?? fallbackPage}
-                initialBlocks={memoizedBlocks}
-                isViewer={isViewer}
-                hideHeader={true}
-                pageTableId={pageTableId}
-                recordId={recordContext?.recordId ?? null}
-                recordTableId={recordContext?.tableId ?? null}
-                onRecordContextChange={setRecordContext}
-                mode="view"
-              />
-            </div>
-          )}
+      {/* Interface scroll area - single vertical scroll container for interface content */}
+      <div
+        className={`flex-1 min-h-0 min-w-0 overflow-x-hidden flex flex-col ${
+          suppressMainScroll ? "overflow-y-hidden" : "overflow-y-auto"
+        }`}
+      >
+        <div className="flex-1 w-full min-w-0 min-h-0 flex flex-col overflow-x-hidden relative">
+          <InterfacePageContent
+            useRecordReviewLayout={useRecordReviewLayout}
+            hasPage={hasPage}
+            page={pageForRender}
+            memoizedBlocks={memoizedBlocks}
+            isViewer={isViewer}
+            onRecordViewLayoutSave={page?.page_type === "record_view" ? handleRecordViewLayoutSave : undefined}
+            interfaceBuilderPage={interfaceBuilderPage}
+            fallbackPage={fallbackPage}
+            pageTableId={pageTableId}
+            recordContext={recordContext}
+            setRecordContext={setRecordContext}
+          />
           {blocksLoading && (
             <div className="absolute inset-0 bg-white/60 flex items-center justify-center z-10 pointer-events-none">
               <LoadingSpinner size="lg" text="Loading blocks..." />

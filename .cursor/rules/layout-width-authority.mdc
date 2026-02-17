@@ -12,16 +12,20 @@ alwaysApply: true
 
 1. **Single source of truth:** `isEditMode = uiMode === "edit" || uiMode === "editPages" || uiMode === "recordLayoutEdit" || uiMode === "fieldSchemaEdit"`
 
-2. **Conditional render:** RightSettingsPanel must be conditionally rendered: `{isEditMode && <RightSettingsPanel />}`. Never use translate-x, w-0, pointer-events-none, or opacity to hide the panel while keeping it mounted.
+2. **Conditional render:** RightSettingsPanel must be conditionally rendered: `{isEditMode && hasPanelContext && <RightSettingsPanel />}`. Never use translate-x, w-0, pointer-events-none, or opacity to hide the panel while keeping it mounted.
 
 3. **Width rules:**
-   - When isEditMode === false: CanvasArea width = 100%, RightSettingsPanel does NOT render.
-   - When isEditMode === true: RightSettingsPanel width = 340px (fixed), CanvasArea width = flex-1 (remaining space).
+   - When isEditMode === false: InterfaceContainer width = 100%, RightSettingsPanel does NOT render.
+   - When isEditMode === true: RightSettingsPanel width = 360px (fixed), InterfaceContainer width = flex-1 (remaining space).
 
-4. **Forbidden:**
+4. **Structure (Airtable-style):**
+   - MainArea: flex row, contains InterfaceContainer (flex-1) and RightSettingsPanel (when visible).
+   - Panel always on right; flex sibling of InterfaceContainer. No order-based repositioning.
+
+5. **Forbidden:**
    - Keeping panel mounted with translate-x-full
    - Keeping panel mounted with pointer-events-none or w-0
    - CSS that depends on selectedContext for layout width
    - Storing panelWidth in state that persists across modes
 
-5. **Principle:** Panel visibility controls layout. Block selection controls content. Never tie them together.
+6. **Principle:** Panel visibility controls layout. Block selection controls content. Never tie them together.

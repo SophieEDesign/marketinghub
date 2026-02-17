@@ -6,8 +6,8 @@ import { X, Pin, PinOff, Maximize2, Minimize2, Link2, ChevronLeft } from "lucide
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { useUIMode } from "@/contexts/UIModeContext"
 import { useToast } from "@/components/ui/use-toast"
+import { createPortal } from "react-dom"
 import RecordEditor from "./RecordEditor"
-import ModalRightSettingsPanel from "@/components/interface/ModalRightSettingsPanel"
 import { useIsMobile } from "@/hooks/useResponsive"
 
 const MIN_WIDTH = 320
@@ -85,7 +85,7 @@ export default function RecordPanel() {
 
   if (!state.isOpen && useOverlayLayout) return null
 
-  return (
+  const panelContent = (
     <>
       {useOverlayLayout && !state.isPinned && state.isOpen && (
         <div
@@ -104,7 +104,6 @@ export default function RecordPanel() {
         } bg-white shadow-xl flex flex-col transition-all duration-300 ease-out`}
         style={{
           width: state.isOpen ? panelWidth : "0px",
-          transform: useOverlayLayout && !state.isOpen ? "translateX(100%)" : "none",
           minWidth: !useOverlayLayout && state.isOpen ? `${state.width}px` : undefined,
           maxWidth: !useOverlayLayout && state.isOpen ? `${state.width}px` : undefined,
           overflow: state.isOpen ? undefined : "hidden",
@@ -204,10 +203,9 @@ export default function RecordPanel() {
           </div>
         </div>
 
-        {/* Body: flex row - RecordEditor (scrollable) + ModalRightSettingsPanel (when edit mode) */}
-        <div className="flex-1 min-h-0 flex flex-row overflow-hidden">
-          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col">
-            <RecordEditor
+        {/* Body: single column - RecordEditor only. Settings in shell RightSettingsPanel. */}
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col">
+          <RecordEditor
             recordId={state.recordId}
             tableId={state.tableId ?? ""}
             mode="review"
@@ -228,16 +226,14 @@ export default function RecordPanel() {
             canEditLayout={!!state.onLayoutSave}
             onLayoutSave={state.onLayoutSave}
           />
-          </div>
-          {state.isOpen &&
-            interfaceMode === "edit" &&
-            state.onLayoutSave &&
-            state.recordId &&
-            state.tableId && (
-              <ModalRightSettingsPanel />
-            )}
         </div>
       </div>
     </>
   )
+
+  const modalRoot = typeof document !== "undefined" ? document.getElementById("modal-root") : null
+  if (modalRoot) {
+    return createPortal(panelContent, modalRoot)
+  }
+  return panelContent
 }

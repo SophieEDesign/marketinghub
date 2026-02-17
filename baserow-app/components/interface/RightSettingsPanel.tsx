@@ -51,12 +51,7 @@ function Breadcrumb({ context, onNavigate }: { context: SelectedContext; onNavig
   )
 }
 
-interface RightSettingsPanelProps {
-  /** When "left", panel appears on left (record list settings); when "right", on right (field block settings) */
-  position?: "left" | "right"
-}
-
-export default function RightSettingsPanel({ position = "right" }: RightSettingsPanelProps) {
+export default function RightSettingsPanel() {
   const { selectedContext, setSelectedContext } = useSelectionContext()
   const { data } = useRightSettingsPanelData()
   const { state: recordPanelState } = useRecordPanel()
@@ -71,13 +66,9 @@ export default function RightSettingsPanel({ position = "right" }: RightSettings
   // Repurpose "close" to show Page Settings (panel cannot be closed in Edit Mode)
   const handleShowPageSettings = () => setSelectedContext({ type: "page" })
 
-  // Stacks left or right based on position. Left = record list settings; right = field block settings.
-  // Panel is only mounted when visible (WorkspaceShell gates it) — no visibility CSS needed.
-  const borderClass = position === "left" ? "border-r border-gray-200" : "border-l border-gray-200"
+  // Panel always on right; flex sibling of InterfaceContainer. Mounted only when in edit mode.
   return (
-    <div
-      className={`flex-shrink-0 w-[340px] h-full flex flex-col bg-white ${borderClass} shadow-lg overflow-hidden`}
-    >
+    <div className="w-full h-full flex flex-col bg-white border-l border-gray-200 overflow-hidden">
       {/* Header: Back + title + ellipsis for record/field; breadcrumb + close otherwise */}
       <div className="border-b border-gray-200 px-4 py-3 flex-shrink-0">
         <div className="flex items-center justify-between gap-2">
@@ -229,15 +220,6 @@ export default function RightSettingsPanel({ position = "right" }: RightSettings
         )}
 
         {selectedContext?.type === "record" && (() => {
-          const recordPanelShowsSettings =
-            recordPanelState.isOpen && recordPanelState.interfaceMode === "edit"
-          if (recordPanelShowsSettings) {
-            return (
-              <div className="p-4 text-sm text-muted-foreground">
-                Record layout settings are in the record panel.
-              </div>
-            )
-          }
           const fromRecordPanel = recordPanelState.isOpen && recordPanelState.recordId && recordPanelState.tableId && recordPanelState.onLayoutSave
           const fromPageData = data?.recordId && data?.recordTableId
           if (fromRecordPanel) {
@@ -270,15 +252,6 @@ export default function RightSettingsPanel({ position = "right" }: RightSettings
         })()}
 
         {selectedContext && selectedContext.type === "field" && selectedContext.fieldId && (() => {
-          const recordPanelShowsSettings =
-            recordPanelState.isOpen && recordPanelState.interfaceMode === "edit"
-          if (recordPanelShowsSettings) {
-            return (
-              <div className="p-4 text-sm text-muted-foreground">
-                Field settings are in the record panel.
-              </div>
-            )
-          }
           if (fieldViewMode === "schema" || !recordPanelState.isOpen || !recordPanelState.onLayoutSave) {
             return (
               <FieldSchemaSettings

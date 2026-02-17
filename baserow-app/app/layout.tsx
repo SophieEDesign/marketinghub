@@ -90,6 +90,7 @@ export default function RootLayout({
           {children}
           <Toaster />
           <CommandPaletteProvider />
+          <div id="modal-root" />
         </SWRProvider>
       </body>
     </html>
