@@ -62,7 +62,8 @@ export default function RecordPanel() {
     }
   }, [state.isFullscreen, router, goBack])
 
-  const useOverlayLayout = true
+  // Desktop: inline (pushes content left, Airtable-style). Mobile: overlay (full-screen).
+  const useOverlayLayout = isMobile
   const panelWidth = state.isFullscreen ? "100%" : `${state.width}px`
   const canGoBack = state.isFullscreen || state.history.length > 1
 
@@ -83,7 +84,7 @@ export default function RecordPanel() {
     }
   }, [])
 
-  if (!state.isOpen && useOverlayLayout) return null
+  if (!state.isOpen) return null
 
   const panelContent = (
     <>
@@ -231,8 +232,9 @@ export default function RecordPanel() {
     </>
   )
 
+  // Inline (desktop): render in place so parent flex layout positions it. Overlay (mobile): portal to modal-root.
   const modalRoot = typeof document !== "undefined" ? document.getElementById("modal-root") : null
-  if (modalRoot) {
+  if (useOverlayLayout && modalRoot) {
     return createPortal(panelContent, modalRoot)
   }
   return panelContent

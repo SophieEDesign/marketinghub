@@ -32,7 +32,8 @@ import { Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import type { InterfacePage } from "@/lib/interface/page-types-only"
 import { PAGE_TYPE_DEFINITIONS, isRecordReviewPage } from "@/lib/interface/page-types"
-import RecordReviewLeftPanelSettings from "./RecordReviewLeftPanelSettings"
+import RecordReviewLeftPanelSettings, { type RecordReviewLeftPanelSettingsData } from "./RecordReviewLeftPanelSettings"
+import { filterConfigsToFilterTree } from "@/lib/filters/converters"
 import { getFieldDisplayName } from "@/lib/fields/display"
 import RecordViewLeftPanelSettings from "./RecordViewLeftPanelSettings"
 
@@ -68,13 +69,8 @@ export default function InterfacePageSettingsDrawer({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [loading, setLoading] = useState(true)
-  // Left panel settings for record_review pages (full field list)
-  const [leftPanelSettings, setLeftPanelSettings] = useState<{
-    visibleFieldIds: string[]
-    fieldOrder: string[]
-    showLabels: boolean
-    compact: boolean
-  } | null>(null)
+  // Left panel settings for record_review pages (full field list + filter/sort/group/color/image)
+  const [leftPanelSettings, setLeftPanelSettings] = useState<RecordReviewLeftPanelSettingsData | null>(null)
   
   // Left panel settings for record_view pages (simplified: title, subtitle, additional)
   const [recordViewSettings, setRecordViewSettings] = useState<{
@@ -131,12 +127,21 @@ export default function InterfacePageSettingsDrawer({
       const pageType = pageData.page_type as any
       
       if (pageType === 'record_review') {
-        // Full field list configuration for record_review
+        // Full field list configuration for record_review (unified with RecordViewPageSettings)
+        const lp = config.leftPanel || config.left_panel || {}
+        const filterTree = lp.filter_tree ?? (lp.filter_by?.length ? filterConfigsToFilterTree(lp.filter_by, "AND") : null)
         setLeftPanelSettings({
-          visibleFieldIds: config.leftPanel?.visibleFieldIds || [],
-          fieldOrder: config.leftPanel?.fieldOrder || [],
-          showLabels: config.leftPanel?.showLabels ?? true,
-          compact: config.leftPanel?.compact ?? false,
+          visibleFieldIds: lp.visibleFieldIds || [],
+          fieldOrder: lp.fieldOrder || [],
+          showLabels: lp.showLabels ?? true,
+          compact: lp.compact ?? false,
+          filter_tree: filterTree,
+          filter_by: lp.filter_by,
+          sort_by: lp.sort_by,
+          group_by: lp.group_by,
+          group_by_rules: lp.group_by_rules,
+          color_field: lp.color_field,
+          image_field: lp.image_field,
         })
         setRecordViewSettings(null)
       } else if (pageType === 'record_view') {

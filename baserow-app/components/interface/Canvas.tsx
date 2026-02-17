@@ -1709,7 +1709,8 @@ export default function Canvas({
     const margin = layoutSettings?.margin ?? CANVAS_LAYOUT_DEFAULTS.margin
     
     return {
-      cols: { lg: cols, md: 10, sm: 6, xs: 4, xxs: 2 },
+      // Same cols for ALL breakpoints - prevents layout reflow when settings panel appears/disappears
+      cols: { lg: cols, md: cols, sm: cols, xs: cols, xxs: cols },
       rowHeight,
       margin,
       // CRITICAL: Disable compaction - we store absolute positions in DB

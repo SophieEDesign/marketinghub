@@ -58,6 +58,10 @@ export interface PageConfig {
   show_field_list?: boolean // Toggle to show/hide structured field list (page-level)
   show_blocks_section?: boolean // Toggle to show/hide blocks section (page-level)
   show_field_names?: boolean // Toggle to show/hide field names on blocks (page-level; default true)
+  title_size?: 'large' | 'extra_large' // Record detail title size (Airtable parity)
+  comments_enabled?: boolean // Show record comments (default true)
+  revision_history_enabled?: boolean // Show revision history (default false)
+  show_as_full_width?: boolean // Expand record detail to full width on larger screens
   
   // Unified field layout configuration (replaces modal_fields, card_fields, visible_fields)
   field_layout?: Array<{
@@ -69,6 +73,10 @@ export interface PageConfig {
     visible_in_canvas?: boolean
     editable: boolean
     group_name?: string
+    label_override?: string
+    helper_text?: string
+    field_size?: 'small' | 'medium' | 'large'
+    visibility_rules?: Array<{ field: string; operator: string; value: unknown }>
   }>
 
   /**

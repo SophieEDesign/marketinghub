@@ -609,7 +609,7 @@ export default function RecordEditor({
       {mode === "review" && recordId && (
         <>
           {renderExtraContent && (
-            <div className="border-t flex-1 min-h-0 overflow-visible">
+            <div className="border-t flex-shrink-0 overflow-visible">
               {renderExtraContent}
             </div>
           )}

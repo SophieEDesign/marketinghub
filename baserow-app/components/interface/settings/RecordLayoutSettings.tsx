@@ -7,13 +7,19 @@ import {
   Eye,
   EyeOff,
   Search,
-  PanelRight,
-  Maximize2,
   MessageSquare,
   MoreHorizontal,
-  Info,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   DndContext,
   closestCenter,
@@ -35,6 +41,7 @@ import type { FieldLayoutItem } from "@/lib/interface/field-layout-utils"
 import { createInitialFieldLayout } from "@/lib/interface/field-layout-helpers"
 import { getFieldDisplayName } from "@/lib/fields/display"
 import { getFieldIcon } from "@/lib/icons"
+import { getPrimaryFieldName } from "@/lib/fields/primary"
 import { cn } from "@/lib/utils"
 
 interface RecordLayoutSettingsProps {
@@ -46,6 +53,9 @@ interface RecordLayoutSettingsProps {
     | ((layout: FieldLayoutItem[]) => Promise<void>)
     | null
   fields: TableField[]
+  /** When provided with onPageConfigSave, shows Data/Permissions/Appearance/User actions sections (record_view) */
+  pageConfig?: Record<string, unknown>
+  onPageConfigSave?: (updates: Record<string, unknown>) => Promise<void>
 }
 
 function SortableFieldRow({
@@ -141,9 +151,10 @@ export default function RecordLayoutSettings({
   fieldLayout,
   onLayoutSave,
   fields,
+  pageConfig,
+  onPageConfigSave,
 }: RecordLayoutSettingsProps) {
-  const { state: recordPanelState, setFieldLayout: setLiveLayout, toggleFullscreen } =
-    useRecordPanel()
+  const { setFieldLayout: setLiveLayout } = useRecordPanel()
   const resolvedLayout = useMemo(() => {
     const base =
       fieldLayout.length > 0
@@ -299,46 +310,114 @@ export default function RecordLayoutSettings({
     })
   )
 
-  const isFullscreen = recordPanelState.isFullscreen
+  const hasPageConfig = Boolean(pageConfig && onPageConfigSave)
+  const primaryFieldName = getPrimaryFieldName(fields) || (fields[0]?.name ?? "")
+  const titleField = (pageConfig?.title_field as string) || primaryFieldName || ""
+  const allowEditing = pageConfig?.allow_editing !== false
+  const titleSize = (pageConfig?.title_size as "large" | "extra_large") || "large"
+  const commentsEnabled = pageConfig?.comments_enabled !== false
+  const revisionHistoryEnabled = pageConfig?.revision_history_enabled === true
+
+  const handlePageConfigUpdate = useCallback(
+    (updates: Record<string, unknown>) => {
+      onPageConfigSave?.(updates)
+    },
+    [onPageConfigSave]
+  )
 
   return (
     <div className="flex flex-col h-full">
-      {/* Show as section */}
-      <div className="p-4 border-b border-gray-200">
-        <p className="text-sm font-medium text-gray-700 mb-3">Show as</p>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => isFullscreen && toggleFullscreen()}
-            className={cn(
-              "flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg border-2 transition-colors",
-              !isFullscreen
-                ? "border-blue-500 bg-blue-50 text-blue-700"
-                : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
-            )}
-          >
-            <PanelRight className="h-5 w-5" />
-            <span className="font-medium">Sidesheet</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => !isFullscreen && toggleFullscreen()}
-            className={cn(
-              "flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg border-2 transition-colors",
-              isFullscreen
-                ? "border-blue-500 bg-blue-50 text-blue-700"
-                : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
-            )}
-          >
-            <Maximize2 className="h-5 w-5" />
-            <span className="font-medium">Full-screen</span>
-          </button>
+      {/* Data: Title field, Permissions, Appearance, User actions (record_view only) */}
+      {hasPageConfig && (
+        <div className="p-4 border-b border-gray-200 space-y-4">
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-gray-700">Title field</Label>
+            <Select
+              value={titleField}
+              onValueChange={(v) => handlePageConfigUpdate({ title_field: v })}
+            >
+              <SelectTrigger className="bg-gray-50">
+                <SelectValue placeholder="Primary field" />
+              </SelectTrigger>
+              <SelectContent>
+                {fields
+                  .filter((f) => !f.options?.system)
+                  .map((f) => (
+                    <SelectItem key={f.id} value={f.name}>
+                      {getFieldDisplayName(f)}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-gray-700">Permissions</Label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => handlePageConfigUpdate({ allow_editing: false })}
+                className={cn(
+                  "flex-1 py-2.5 px-4 rounded-md text-sm font-medium transition-colors",
+                  !allowEditing
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                )}
+              >
+                View-only
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePageConfigUpdate({ allow_editing: true })}
+                className={cn(
+                  "flex-1 py-2.5 px-4 rounded-md text-sm font-medium transition-colors",
+                  allowEditing
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                )}
+              >
+                Editable
+              </button>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-gray-700">Title size</Label>
+            <Select
+              value={titleSize}
+              onValueChange={(v) => handlePageConfigUpdate({ title_size: v as "large" | "extra_large" })}
+            >
+              <SelectTrigger className="bg-gray-50">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="large">Large</SelectItem>
+                <SelectItem value="extra_large">Extra large</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="comments-enabled" className="text-sm font-medium text-gray-700">
+                Comments
+              </Label>
+              <Switch
+                id="comments-enabled"
+                checked={commentsEnabled}
+                onCheckedChange={(checked) => handlePageConfigUpdate({ comments_enabled: checked })}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="revision-history" className="text-sm font-medium text-gray-700">
+                Revision history
+              </Label>
+              <Switch
+                id="revision-history"
+                checked={revisionHistoryEnabled}
+                onCheckedChange={(checked) => handlePageConfigUpdate({ revision_history_enabled: checked })}
+              />
+            </div>
+          </div>
         </div>
-        <p className="flex items-center gap-1.5 mt-2 text-xs text-gray-500">
-          <Info className="h-3.5 w-3.5" />
-          This layout is shared across this block
-        </p>
-      </div>
+      )}
 
       {/* Search */}
       <div className="p-4 border-b border-gray-200">

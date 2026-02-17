@@ -1055,7 +1055,7 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
       </div>
 
       {/* Center Panel - Record Details via unified RecordEditor */}
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+      <div className="flex-1 flex flex-col min-h-0 overflow-y-auto min-w-0">
         {selectedRecordId ? (
           <RecordEditor
             recordId={selectedRecordId}

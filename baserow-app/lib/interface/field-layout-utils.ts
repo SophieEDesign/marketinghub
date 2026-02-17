@@ -39,6 +39,14 @@ export interface FieldLayoutItem {
   modal_column_width?: number
   modal_row_order?: number
   modal_column_span?: 1 | 2
+  /** Override the field's display label (Airtable parity) */
+  label_override?: string
+  /** Helper text shown below the field (Airtable parity) */
+  helper_text?: string
+  /** Field display size in record detail (Airtable parity) */
+  field_size?: 'small' | 'medium' | 'large'
+  /** Conditional visibility rules (Business/Enterprise in Airtable) */
+  visibility_rules?: Array<{ field: string; operator: string; value: unknown }>
 }
 
 /**

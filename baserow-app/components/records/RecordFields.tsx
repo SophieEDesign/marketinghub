@@ -634,6 +634,12 @@ export default function RecordFields({
       const fieldEditable = isFieldEditable(field.name)
       const isThisEditing = editingField === field.id
       const isVisible = layoutMode ? isFieldVisibleInLayout(field.name) : true
+      const layoutItem = fieldLayout.find(
+        (i) => i.field_id === field.id || i.field_name === field.name
+      )
+      const displayLabel = layoutItem?.label_override ?? getFieldDisplayName(field)
+      const helperText = layoutItem?.helper_text
+      const fieldSize = layoutItem?.field_size ?? "medium"
 
       const isSelected = selectedFieldId === field.id
       const fieldContent = (
@@ -642,7 +648,9 @@ export default function RecordFields({
             "rounded-md hover:bg-gray-50/50 transition-colors px-1 py-0.5 -mx-1 min-w-0",
             FIELD_LABEL_GAP_CLASS,
             layoutMode && !isVisible && "opacity-50",
-            isSelected && "ring-2 ring-blue-500 ring-offset-1 rounded-md"
+            isSelected && "ring-2 ring-blue-500 ring-offset-1 rounded-md",
+            fieldSize === "small" && "text-sm",
+            fieldSize === "large" && "text-lg"
           )}
         >
           {showFieldNames && (
@@ -653,15 +661,15 @@ export default function RecordFields({
                 className={cn(FIELD_LABEL_CLASS_NO_MARGIN, "flex-shrink-0 text-left hover:text-blue-600 hover:underline cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 focus:ring-offset-1 rounded")}
                 title="Click to open field settings"
               >
-                {getFieldDisplayName(field)}
+                {displayLabel}
               </button>
             ) : (
               <label className={cn(FIELD_LABEL_CLASS_NO_MARGIN, "flex-shrink-0")}>
-                {getFieldDisplayName(field)}
+                {displayLabel}
               </label>
             )
           )}
-          <div className="min-w-0">
+          <div className="min-w-0 space-y-1">
             <InlineFieldEditor
               field={field}
               value={formData[field.name]}
@@ -682,6 +690,9 @@ export default function RecordFields({
               recordId={recordId}
               tableName={tableName}
             />
+            {helperText && (
+              <p className="text-xs text-gray-500">{helperText}</p>
+            )}
           </div>
         </div>
       )
@@ -716,6 +727,7 @@ export default function RecordFields({
       tableName,
       validateField,
       onFieldLabelClick,
+      fieldLayout,
     ]
   )
 

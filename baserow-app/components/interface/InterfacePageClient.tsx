@@ -39,6 +39,7 @@ function InterfacePageContent({
   memoizedBlocks,
   isViewer,
   onRecordViewLayoutSave,
+  onRecordViewPageConfigSave,
   interfaceBuilderPage,
   fallbackPage,
   pageTableId,
@@ -51,6 +52,7 @@ function InterfacePageContent({
   memoizedBlocks: any[]
   isViewer: boolean
   onRecordViewLayoutSave?: (fieldLayout: FieldLayoutItem[]) => Promise<void>
+  onRecordViewPageConfigSave?: (updates: Record<string, unknown>) => Promise<void>
   interfaceBuilderPage: InterfacePage | null | undefined
   fallbackPage: { id: string; name: string; page_type: string; settings?: Record<string, unknown> }
   pageTableId: string | null
@@ -65,6 +67,7 @@ function InterfacePageContent({
         isViewer={isViewer}
         hideHeader={true}
         onLayoutSave={onRecordViewLayoutSave}
+        onPageConfigSave={onRecordViewPageConfigSave}
       />
     )
   }
@@ -1223,6 +1226,29 @@ function InterfacePageClientInternal({
     [page?.id, page?.config]
   )
 
+  const handleRecordViewPageConfigSave = useCallback(
+    async (updates: Record<string, unknown>) => {
+      if (!page?.id) return
+      const res = await fetch(`/api/interface-pages/${page.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          config: {
+            ...(page.config || {}),
+            ...updates,
+          },
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err?.error || "Failed to save page config")
+      }
+      const updated = await res.json()
+      setPage(updated)
+    },
+    [page?.id, page?.config]
+  )
+
   const isViewer = searchParams?.get("view") === "true"
   const isRecordView = page?.page_type === 'record_view'
   const isRecordReview = page?.page_type === 'record_review'
@@ -1371,6 +1397,7 @@ function InterfacePageClientInternal({
             memoizedBlocks={memoizedBlocks}
             isViewer={isViewer}
             onRecordViewLayoutSave={page?.page_type === "record_view" ? handleRecordViewLayoutSave : undefined}
+            onRecordViewPageConfigSave={useRecordReviewLayout ? handleRecordViewPageConfigSave : undefined}
             interfaceBuilderPage={interfaceBuilderPage}
             fallbackPage={fallbackPage}
             pageTableId={pageTableId}

@@ -12,6 +12,7 @@ import type { InterfacePage } from "@/lib/interface/page-types-only"
 import type { PageBlock, BlockConfig } from "@/lib/interface/types"
 import type { TableField } from "@/types/fields"
 import type { FieldLayoutItem } from "@/lib/interface/field-layout-utils"
+import type { PageConfig } from "@/lib/interface/page-config"
 
 export interface RightSettingsPanelData {
   page: InterfacePage | null
@@ -30,6 +31,10 @@ export interface RightSettingsPanelData {
   tableFields: TableField[]
   /** When true, settings panel is visible. Panel only shows in edit mode. */
   isEditing?: boolean
+  /** Page config for record_view (title field, permissions, appearance, user actions). When provided with onPageConfigSave, RecordLayoutSettings shows Data/Permissions/Appearance/User actions sections. */
+  pageConfig?: PageConfig | Record<string, unknown> | null
+  /** Save page config updates (record_view only). */
+  onPageConfigSave?: ((updates: Partial<PageConfig>) => Promise<void>) | null
 }
 
 interface RightSettingsPanelDataContextType {
@@ -49,6 +54,8 @@ const defaultData: RightSettingsPanelData = {
   fieldLayout: [],
   onLayoutSave: null,
   tableFields: [],
+  pageConfig: null,
+  onPageConfigSave: null,
 }
 
 const RightSettingsPanelDataContext =
@@ -71,7 +78,8 @@ export function RightSettingsPanelDataProvider({ children }: { children: ReactNo
           prev.onBlockLock === next.onBlockLock && prev.pageTableId === next.pageTableId &&
           prev.recordId === next.recordId && prev.recordTableId === next.recordTableId &&
           prev.fieldLayout === next.fieldLayout && prev.onLayoutSave === next.onLayoutSave &&
-          prev.tableFields === next.tableFields && prev.isEditing === next.isEditing) {
+          prev.tableFields === next.tableFields && prev.isEditing === next.isEditing &&
+          prev.pageConfig === next.pageConfig && prev.onPageConfigSave === next.onPageConfigSave) {
         return prev
       }
       return next

@@ -5,6 +5,7 @@ import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { ExternalLink } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -98,6 +99,21 @@ export default function FieldBlockSettings({
     [fieldId, field?.name, fieldLayout, layoutItem, onLayoutSave, setLiveLayout]
   )
 
+  const updateLayoutItem = useCallback(
+    (updates: Partial<FieldLayoutItem>) => {
+      if (!layoutItem || !onLayoutSave) return
+
+      const updated = fieldLayout.map((item) =>
+        item.field_id === fieldId || item.field_name === field?.name
+          ? { ...item, ...updates }
+          : item
+      )
+      setLiveLayout(updated)
+      onLayoutSave(updated)
+    },
+    [fieldId, field?.name, fieldLayout, layoutItem, onLayoutSave, setLiveLayout]
+  )
+
   if (!field) {
     return (
       <div className="p-4 text-sm text-gray-500">Field not found</div>
@@ -160,6 +176,31 @@ export default function FieldBlockSettings({
             </div>
           </div>
 
+          {/* Label override */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-gray-700">Label override</Label>
+            <Input
+              placeholder={getFieldDisplayName(field)}
+              value={layoutItem?.label_override ?? ""}
+              onChange={(e) => updateLayoutItem({ label_override: e.target.value || undefined })}
+              disabled={!onLayoutSave}
+              className="bg-gray-50"
+            />
+            <p className="text-xs text-gray-500">Leave empty to use the field&apos;s default name.</p>
+          </div>
+
+          {/* Helper text */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-gray-700">Helper text</Label>
+            <Input
+              placeholder="Add helper text..."
+              value={layoutItem?.helper_text ?? ""}
+              onChange={(e) => updateLayoutItem({ helper_text: e.target.value || undefined })}
+              disabled={!onLayoutSave}
+              className="bg-gray-50"
+            />
+          </div>
+
           {/* Permissions */}
           <div className="space-y-2">
             <Label className="text-sm font-medium text-gray-700">Permissions</Label>
@@ -194,8 +235,25 @@ export default function FieldBlockSettings({
           </div>
         </TabsContent>
 
-        <TabsContent value="appearance" className="flex-1 overflow-y-auto p-4 mt-0">
-          <p className="text-sm text-gray-500">Appearance options for this field block.</p>
+        <TabsContent value="appearance" className="flex-1 overflow-y-auto p-4 mt-0 space-y-6">
+          {/* Size */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-gray-700">Size</Label>
+            <Select
+              value={layoutItem?.field_size ?? "medium"}
+              onValueChange={(v: "small" | "medium" | "large") => updateLayoutItem({ field_size: v })}
+              disabled={!onLayoutSave}
+            >
+              <SelectTrigger className="bg-gray-50">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="small">Small</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="large">Large</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

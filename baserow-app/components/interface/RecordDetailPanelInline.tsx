@@ -25,6 +25,7 @@ interface RecordDetailPanelInlineProps {
   onInterfaceModeChange?: (mode: "view" | "edit") => void
   onLayoutSave?: (fieldLayout: FieldLayoutItem[]) => Promise<void>
   titleField?: string
+  showComments?: boolean
 }
 
 export default function RecordDetailPanelInline({
@@ -38,6 +39,7 @@ export default function RecordDetailPanelInline({
   interfaceMode = "view",
   onInterfaceModeChange,
   onLayoutSave,
+  showComments = true,
 }: RecordDetailPanelInlineProps) {
   const { openRecordModal } = useRecordModal()
   const cascadeContext = useMemo(() => ({ pageConfig: {} }), [])
@@ -60,7 +62,7 @@ export default function RecordDetailPanelInline({
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full min-h-0 overflow-y-auto">
       <RecordEditor
         recordId={recordId}
         tableId={tableId}
@@ -85,7 +87,7 @@ export default function RecordDetailPanelInline({
             interfaceMode,
           })
         }
-        showComments={true}
+        showComments={showComments}
         interfaceMode={interfaceMode}
         renderHeaderActions={false}
       />

@@ -6,7 +6,7 @@
  * This component allows users to configure which fields appear in the left column
  * of a Record Review page. This is page-level configuration, not block configuration.
  * 
- * Settings are stored in: page.settings.leftPanel
+ * Settings are stored in: page.settings.leftPanel (unified with RecordViewPageSettings)
  */
 
 import { useState, useEffect, useMemo } from "react"
@@ -16,7 +16,20 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { GripVertical, Eye, EyeOff, Settings } from "lucide-react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { useSelectionContext } from "@/contexts/SelectionContext"
+import FilterBuilder from "@/components/filters/FilterBuilder"
+import { filterConfigsToFilterTree } from "@/lib/filters/converters"
+import type { FilterTree } from "@/lib/filters/canonical-model"
+import NestedGroupBySelector from "./settings/shared/NestedGroupBySelector"
+import type { GroupRule } from "@/lib/grouping/types"
+import { getFieldDisplayName } from "@/lib/fields/display"
 import {
   DndContext,
   closestCenter,
@@ -35,20 +48,24 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
+export interface RecordReviewLeftPanelSettingsData {
+  visibleFieldIds: string[]
+  fieldOrder: string[]
+  showLabels: boolean
+  compact: boolean
+  filter_tree?: FilterTree | null
+  filter_by?: Array<{ field: string; operator: string; value: any }>
+  sort_by?: Array<{ field: string; direction: "asc" | "desc" }>
+  group_by?: string
+  group_by_rules?: GroupRule[]
+  color_field?: string
+  image_field?: string
+}
+
 interface RecordReviewLeftPanelSettingsProps {
   tableId: string | null
-  currentSettings?: {
-    visibleFieldIds: string[]
-    fieldOrder?: string[]
-    showLabels?: boolean
-    compact?: boolean
-  }
-  onSettingsChange: (settings: {
-    visibleFieldIds: string[]
-    fieldOrder: string[]
-    showLabels: boolean
-    compact: boolean
-  }) => void
+  currentSettings?: Partial<RecordReviewLeftPanelSettingsData>
+  onSettingsChange: (settings: RecordReviewLeftPanelSettingsData) => void
 }
 
 export default function RecordReviewLeftPanelSettings({
@@ -66,7 +83,34 @@ export default function RecordReviewLeftPanelSettings({
   )
   const [showLabels, setShowLabels] = useState(currentSettings?.showLabels ?? true)
   const [compact, setCompact] = useState(currentSettings?.compact ?? false)
+  const [filterTree, setFilterTree] = useState<FilterTree | null>(
+    currentSettings?.filter_tree ?? null
+  )
+  const [sortBy, setSortBy] = useState<string>(currentSettings?.sort_by?.[0]?.field || "")
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">(
+    currentSettings?.sort_by?.[0]?.direction || "asc"
+  )
+  const [groupBy, setGroupBy] = useState<string>(currentSettings?.group_by || "")
+  const [groupByRules, setGroupByRules] = useState<GroupRule[] | undefined>(
+    currentSettings?.group_by_rules || undefined
+  )
+  const [colorField, setColorField] = useState<string>(currentSettings?.color_field || "")
+  const [imageField, setImageField] = useState<string>(currentSettings?.image_field || "")
   const { setSelectedContext } = useSelectionContext()
+
+  // Sync state when currentSettings changes (e.g. load from API)
+  useEffect(() => {
+    if (!currentSettings) return
+    if (currentSettings.filter_tree !== undefined) setFilterTree(currentSettings.filter_tree)
+    if (currentSettings.sort_by?.[0]) {
+      setSortBy(currentSettings.sort_by[0].field)
+      setSortDirection(currentSettings.sort_by[0].direction)
+    }
+    if (currentSettings.group_by !== undefined) setGroupBy(currentSettings.group_by)
+    if (currentSettings.group_by_rules !== undefined) setGroupByRules(currentSettings.group_by_rules)
+    if (currentSettings.color_field !== undefined) setColorField(currentSettings.color_field)
+    if (currentSettings.image_field !== undefined) setImageField(currentSettings.image_field)
+  }, [currentSettings?.filter_tree, currentSettings?.sort_by, currentSettings?.group_by, currentSettings?.group_by_rules, currentSettings?.color_field, currentSettings?.image_field])
 
   // Load fields from table
   useEffect(() => {
@@ -153,19 +197,35 @@ export default function RecordReviewLeftPanelSettings({
     notifySettingsChange(visibleFieldIds, newOrder, showLabels, compact)
   }
 
-  // Notify parent of settings change
+  // Build full settings and notify parent
+  const buildSettings = (
+    visibleIds: string[],
+    order: string[],
+    labels: boolean,
+    compactMode: boolean,
+    overrides?: Partial<RecordReviewLeftPanelSettingsData>
+  ): RecordReviewLeftPanelSettingsData => ({
+    visibleFieldIds: visibleIds,
+    fieldOrder: order,
+    showLabels: labels,
+    compact: compactMode,
+    filter_tree: filterTree,
+    sort_by: sortBy ? [{ field: sortBy, direction: sortDirection }] : undefined,
+    group_by: groupBy || undefined,
+    group_by_rules: groupByRules,
+    color_field: colorField || undefined,
+    image_field: imageField || undefined,
+    ...overrides,
+  })
+
   const notifySettingsChange = (
     visibleIds: string[],
     order: string[],
     labels: boolean,
-    compactMode: boolean
+    compactMode: boolean,
+    overrides?: Partial<RecordReviewLeftPanelSettingsData>
   ) => {
-    onSettingsChange({
-      visibleFieldIds: visibleIds,
-      fieldOrder: order,
-      showLabels: labels,
-      compact: compactMode,
-    })
+    onSettingsChange(buildSettings(visibleIds, order, labels, compactMode, overrides))
   }
 
   // Handle display options change
@@ -201,7 +261,180 @@ export default function RecordReviewLeftPanelSettings({
 
   return (
     <div className="space-y-4">
-      <div>
+      {/* Data options: Filter, Sort, Group */}
+      <div className="space-y-4">
+        <h4 className="text-xs font-medium text-gray-700 uppercase">Data</h4>
+
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Filter by</Label>
+          <div className="border rounded-lg p-3 bg-gray-50">
+            <FilterBuilder
+              filterTree={filterTree}
+              tableFields={fields}
+              onChange={(newFilterTree) => {
+                setFilterTree(newFilterTree)
+                const flatFilters: Array<{ field: string; operator: string; value: any }> = []
+                function extractConditions(tree: FilterTree | null) {
+                  if (!tree) return
+                  if ("field_id" in tree) {
+                    flatFilters.push({
+                      field: tree.field_id,
+                      operator: tree.operator,
+                      value: tree.value !== undefined ? tree.value : null,
+                    })
+                  } else if ("operator" in tree && "children" in tree) {
+                    tree.children.forEach((child) => extractConditions(child))
+                  }
+                }
+                extractConditions(newFilterTree)
+                notifySettingsChange(visibleFieldIds, fieldOrder, showLabels, compact, {
+                  filter_tree: newFilterTree,
+                  filter_by: flatFilters,
+                })
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Sort by</Label>
+          <div className="flex gap-2">
+            <Select
+              value={sortBy || "__none__"}
+              onValueChange={(value) => {
+                const fieldName = value === "__none__" ? "" : value
+                setSortBy(fieldName)
+                notifySettingsChange(visibleFieldIds, fieldOrder, showLabels, compact, {
+                  sort_by: fieldName ? [{ field: fieldName, direction: sortDirection }] : undefined,
+                })
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="None" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">None</SelectItem>
+                {fields.map((field) => (
+                  <SelectItem key={field.id} value={field.name}>
+                    {getFieldDisplayName(field)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {sortBy && (
+              <Select
+                value={sortDirection}
+                onValueChange={(value: "asc" | "desc") => {
+                  setSortDirection(value)
+                  notifySettingsChange(visibleFieldIds, fieldOrder, showLabels, compact, {
+                    sort_by: [{ field: sortBy, direction: value }],
+                  })
+                }}
+              >
+                <SelectTrigger className="w-24">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="asc">Asc</SelectItem>
+                  <SelectItem value="desc">Desc</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Group by</Label>
+          <NestedGroupBySelector
+            value={groupBy || undefined}
+            groupByRules={groupByRules}
+            onChange={(value) => {
+              const fieldName = value === "__none__" || !value ? "" : value
+              setGroupBy(fieldName)
+              notifySettingsChange(visibleFieldIds, fieldOrder, showLabels, compact, {
+                group_by: fieldName || undefined,
+                group_by_rules: fieldName ? groupByRules : undefined,
+              })
+            }}
+            onRulesChange={(rules) => {
+              const normalizedRules = rules ?? undefined
+              setGroupByRules(normalizedRules)
+              notifySettingsChange(visibleFieldIds, fieldOrder, showLabels, compact, {
+                group_by_rules: normalizedRules,
+                group_by: normalizedRules?.[0]?.type === "field" ? normalizedRules[0].field : undefined,
+              })
+            }}
+            fields={fields}
+            filterGroupableFields={true}
+            description="Group records into collapsible sections."
+          />
+        </div>
+      </div>
+
+      {/* List item display: Color, Image */}
+      <div className="space-y-4 pt-2 border-t">
+        <h4 className="text-xs font-medium text-gray-700 uppercase">List Item</h4>
+
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Color by</Label>
+          <Select
+            value={colorField || "__none__"}
+            onValueChange={(value) => {
+              const fieldName = value === "__none__" ? "" : value
+              setColorField(fieldName)
+              notifySettingsChange(visibleFieldIds, fieldOrder, showLabels, compact, {
+                color_field: fieldName || undefined,
+              })
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="None" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">None</SelectItem>
+              {fields
+                .filter((f) => f.type === "single_select" || f.type === "multi_select")
+                .map((field) => (
+                  <SelectItem key={field.id} value={field.name}>
+                    {getFieldDisplayName(field)}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-gray-500">Field to use for item color (select fields only).</p>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Image field</Label>
+          <Select
+            value={imageField || "__none__"}
+            onValueChange={(value) => {
+              const fieldName = value === "__none__" ? "" : value
+              setImageField(fieldName)
+              notifySettingsChange(visibleFieldIds, fieldOrder, showLabels, compact, {
+                image_field: fieldName || undefined,
+              })
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="None" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">None</SelectItem>
+              {fields
+                .filter((f) => f.type === "attachment" || f.type === "url")
+                .map((field) => (
+                  <SelectItem key={field.id} value={field.name}>
+                    {getFieldDisplayName(field)}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-gray-500">Field to display as image in list items.</p>
+        </div>
+      </div>
+
+      <div className="pt-2 border-t">
         <Label className="text-sm font-semibold">Visible Fields</Label>
         <p className="text-xs text-gray-500 mt-1 mb-3">
           Choose which fields appear in the left column. Drag to reorder.

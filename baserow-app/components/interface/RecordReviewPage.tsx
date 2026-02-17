@@ -48,6 +48,7 @@ interface RecordReviewPageProps {
   onSave?: () => void
   onEditModeChange?: (isEditing: boolean) => void
   onLayoutSave?: (fieldLayout: FieldLayoutItem[]) => Promise<void>
+  onPageConfigSave?: (updates: Record<string, unknown>) => Promise<void>
   hideHeader?: boolean
 }
 
@@ -58,6 +59,7 @@ export default function RecordReviewPage({
   onSave,
   onEditModeChange,
   onLayoutSave,
+  onPageConfigSave,
   hideHeader = false,
 }: RecordReviewPageProps) {
   // CRITICAL: recordId is ephemeral UI state - never saved to blocks or page config
@@ -144,12 +146,14 @@ export default function RecordReviewPage({
         onLayoutSave: onLayoutSave ?? null,
         tableFields,
         isEditing: recordInterfaceMode === "edit",
+        pageConfig: isRecordView ? pageConfig : null,
+        onPageConfigSave: isRecordView && onPageConfigSave ? onPageConfigSave : null,
       })
     } else {
       setSelectedContext(null)
-      setRightPanelData({ recordId: null, recordTableId: null, fieldLayout: [], onLayoutSave: null, tableFields: [], isEditing: false })
+      setRightPanelData({ recordId: null, recordTableId: null, fieldLayout: [], onLayoutSave: null, tableFields: [], isEditing: false, pageConfig: null, onPageConfigSave: null })
     }
-  }, [selectedRecordId, pageTableId, fieldLayout, onLayoutSave, tableFields, recordInterfaceMode, setSelectedContext, setRightPanelData])
+  }, [selectedRecordId, pageTableId, fieldLayout, onLayoutSave, tableFields, recordInterfaceMode, isRecordView, pageConfig, onPageConfigSave, setSelectedContext, setRightPanelData])
 
   // Sync UIMode with record layout edit so RightSettingsPanel shows when editing record layout (record_view)
   useEffect(() => {
@@ -281,6 +285,7 @@ export default function RecordReviewPage({
             onInterfaceModeChange={isViewer ? undefined : setRecordInterfaceMode}
             onLayoutSave={onLayoutSave}
             titleField={pageConfig.title_field || pageConfig.left_panel?.title_field}
+            showComments={pageConfig.comments_enabled !== false}
           />
         ) : (
           <InterfaceBuilder
