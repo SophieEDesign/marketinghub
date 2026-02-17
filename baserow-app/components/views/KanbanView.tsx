@@ -590,7 +590,7 @@ export default function KanbanView({
                             const isSelect = fieldObj.type === "single_select" || fieldObj.type === "multi_select"
                             const rawVal = data[fieldObj.name]
                             const pillLabel = isSelect && rawVal
-                              ? (getOptionValueToLabelMap(fieldObj.type as "single_select" | "multi_select", fieldObj.options).get(String(rawVal).trim()) ?? String(rawVal)
+                              ? (getOptionValueToLabelMap(fieldObj.type as "single_select" | "multi_select", fieldObj.options).get(String(rawVal).trim()) ?? String(rawVal))
                               : null
                             const pillColor = isSelect && rawVal
                               ? normalizeHexColor(resolveChoiceColor(String(rawVal).trim(), fieldObj.type as "single_select" | "multi_select", fieldObj.options, true))
