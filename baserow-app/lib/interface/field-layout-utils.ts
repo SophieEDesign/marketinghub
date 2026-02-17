@@ -28,11 +28,11 @@ export interface FieldLayoutItem {
    * ignored by page canvas / block layout logic so that page blocks remain
    * unaffected.
    *
-   * - modal_column_id: stable logical column identifier (col-1, col-2, or col-full)
+   * - modal_column_id: stable logical column identifier (col-1, col-2, col-3, or col-full)
    * - modal_column_order: ordering of columns inside the modal
    * - modal_column_width: relative width (0–1) of the column inside the modal
    * - modal_row_order: row index for row-major grid layout (0 = first row)
-   * - modal_column_span: 2 = full width (spans both columns), 1 = half width
+   * - modal_column_span: 2 = full width (spans all columns), 1 = single column
    */
   modal_column_id?: string
   modal_column_order?: number

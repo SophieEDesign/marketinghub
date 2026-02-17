@@ -72,12 +72,9 @@ export async function saveBlockLayout(
         .eq('id', update.id)
         .select('id, position_x, position_y, width, height') // Select to verify update succeeded
 
-      // Ensure we're only updating blocks that belong to this page
-      if (isInterfacePage) {
-        query = query.eq('page_id', pageId)
-      } else {
-        query = query.eq('view_id', pageId)
-      }
+      // CRITICAL: Match blocks by page_id OR view_id (same as GET /blocks)
+      // Legacy blocks may have view_id; interface_pages blocks may have page_id
+      query = query.or(`page_id.eq.${pageId},view_id.eq.${pageId}`)
 
       // Execute the query and check for errors and verify update succeeded
       const { data, error } = await query

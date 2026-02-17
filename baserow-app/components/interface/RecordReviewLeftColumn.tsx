@@ -668,16 +668,31 @@ export default function RecordReviewLeftColumn({
       
       return [titleField, subtitleField, additionalField].filter((f): f is TableField => f !== null)
     } else {
-      // For record_review: use fieldOrder or table field order
+      // For record_review: field_layout.visible_in_card > fieldOrder > title_field/field_1/field_2 > all fields
+      if (fieldLayout && fieldLayout.length > 0) {
+        const cardFields = getVisibleFieldsForCard(fieldLayout, fields)
+        if (cardFields.length > 0) return cardFields
+      }
       if (fieldOrder.length > 0) {
         return fieldOrder
           .map(id => fields.find(f => f.id === id))
           .filter((f): f is TableField => f !== undefined)
           .concat(fields.filter(f => !fieldOrder.includes(f.id)))
       }
+      // Fallback: title_field, field_1, field_2 from left_panel (RecordViewPageSettings format)
+      const lpTitle = effectiveLeftPanelConfig?.title_field || pageConfig?.title_field
+      const lpField1 = effectiveLeftPanelConfig?.field_1
+      const lpField2 = effectiveLeftPanelConfig?.field_2
+      if (lpTitle || lpField1 || lpField2) {
+        const byName = (n: string) => fields.find(f => f.name === n)
+        return [lpTitle, lpField1, lpField2]
+          .filter(Boolean)
+          .map((n) => byName(n as string))
+          .filter((f): f is TableField => f != null)
+      }
       return fields
     }
-  }, [fields, fieldOrder, isRecordView, titleFieldId, subtitleFieldId, additionalFieldId, fieldLayout])
+  }, [fields, fieldOrder, isRecordView, titleFieldId, subtitleFieldId, additionalFieldId, fieldLayout, effectiveLeftPanelConfig, pageConfig?.title_field])
 
   const renderValue = useCallback((field: TableField | null | undefined, value: any) => {
     if (!field) return <span className="text-gray-400">—</span>
@@ -815,30 +830,63 @@ export default function RecordReviewLeftColumn({
       )
     }
 
-    // record_review fallback: first configured field only (existing behavior)
+    // record_review: show title + secondary fields (same structure as record_view when multiple fields)
     const displayFields = visibleFieldIds.length === 0
       ? orderedFields
       : orderedFields.filter((f) => visibleFieldIds.includes(f.id))
 
-    const displayField = displayFields[0]
-    const displayValue = displayField ? record[displayField.name] || "Untitled" : record.name || "Untitled"
+    const titleField = displayFields[0] ?? null
+    const secondaryFields = displayFields.slice(1)
+    const titleValue = titleField ? (record[titleField.name] || "Untitled") : "Untitled"
+    const hasCardFields = displayFields.length > 0
 
     return (
       <button
         key={record.id}
         onClick={() => onRecordSelect(record.id)}
-        className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors ${
-          isSelected ? "bg-blue-50 border-l-4 border-blue-500" : ""
+        className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex gap-3 border-l-4 ${
+          isSelected ? "bg-blue-50 border-blue-500" : "border-transparent"
         } ${compact ? "py-2.5" : ""}`}
+        style={borderColorStyle}
       >
-        <div className={`font-medium text-gray-900 truncate ${compact ? "text-xs" : "text-sm"}`}>
-          {String(displayValue || "Untitled")}
-        </div>
-        {showLabels && displayField && (
-          <div className="text-xs text-gray-500 mt-1.5">
-            {displayField.name}
+        {leftPanelImageField && imageValue && (
+          <div className="flex-shrink-0 w-9 h-9 rounded overflow-hidden bg-gray-100 mt-0.5">
+            {typeof imageValue === "string" && (imageValue.startsWith("http") || imageValue.startsWith("/")) ? (
+              <img
+                src={imageValue}
+                alt=""
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  ;(e.target as HTMLImageElement).style.display = "none"
+                }}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
+                {String(imageValue).substring(0, 2).toUpperCase()}
+              </div>
+            )}
           </div>
         )}
+        <div className="min-w-0 flex-1">
+          {hasCardFields ? (
+            <>
+              <div className={`font-medium text-gray-900 truncate ${compact ? "text-xs" : "text-sm"}`}>
+                {String(titleValue || "Untitled")}
+              </div>
+              {secondaryFields.map((field) => {
+                const value = record[field.name]
+                if (value === null || value === undefined || value === "") return null
+                return (
+                  <div key={field.id} className="mt-1.5 text-xs text-gray-600 truncate">
+                    {renderValue(field, value)}
+                  </div>
+                )
+              })}
+            </>
+          ) : (
+            <div className="text-sm text-gray-500 italic">No card fields configured</div>
+          )}
+        </div>
       </button>
     )
   }, [

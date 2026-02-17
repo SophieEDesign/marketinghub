@@ -595,8 +595,8 @@ export default function RecordEditor({
         </div>
       )}
 
-      {/* Single scroll container: parent (RecordPanel) has flex-1 overflow-y-auto; inner content must NOT scroll */}
-      <div className="flex-1 flex flex-col min-h-0 overflow-visible px-6">
+      {/* Content stacks naturally so section headers + fields push comments down; parent scrolls */}
+      <div className="flex-shrink-0 flex flex-col overflow-visible px-6">
         {renderFieldsContent()}
       </div>
 

@@ -21,7 +21,6 @@ import ViewSelector from "./shared/ViewSelector"
 import BlockFilterEditor from "./BlockFilterEditor"
 import SortSelector from "./shared/SortSelector"
 import NestedGroupBySelector from "./shared/NestedGroupBySelector"
-import CardFieldsSelector from "./shared/CardFieldsSelector"
 import ModalFieldsSelector from "./shared/ModalFieldsSelector"
 import PermissionsSettings from "./PermissionsSettings"
 import { useViewMeta } from "@/hooks/useViewMeta"
@@ -157,27 +156,68 @@ export default function RecordContextDataSettings({
 
       {hasTableAndFields && (
         <div className="space-y-2 border-t pt-4">
-          <CardFieldsSelector
-            value={Array.isArray(config.visible_fields) ? config.visible_fields : []}
-            onChange={(fieldNames) => onUpdate({ visible_fields: fieldNames })}
-            fields={fields}
-            label="Fields to show on canvas"
-            description="Choose which fields appear in the record list. Order determines display."
-            required={false}
-          />
-        </div>
-      )}
-
-      {hasTableAndFields && (
-        <div className="space-y-2 border-t pt-4">
           <ModalFieldsSelector
-            value={Array.isArray((config as any).modal_fields) ? (config as any).modal_fields : []}
-            onChange={(fieldNames) => onUpdate({ modal_fields: fieldNames } as any)}
+            value={(() => {
+              // Single source of truth: field_layout > modal_fields (right panel) > visible_fields (record list)
+              const fl = (config as any).field_layout
+              if (Array.isArray(fl) && fl.length > 0) {
+                return fl
+                  .filter((i: any) => i.visible_in_canvas !== false && i.visible_in_card !== false)
+                  .sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0))
+                  .map((i: any) => i.field_name)
+              }
+              const mf = Array.isArray((config as any).modal_fields) ? (config as any).modal_fields : []
+              const vf = Array.isArray(config.visible_fields) ? config.visible_fields : []
+              return mf.length > 0 ? mf : vf
+            })()}
+            onChange={(fieldNames) => {
+              const fl = (config as any).field_layout
+              const allFieldNames = fields.map((f) => f.name)
+              const visibleSet = new Set(fieldNames)
+              const hidden = allFieldNames.filter((n) => n !== "id" && !visibleSet.has(n))
+              const buildFieldLayout = () => {
+                const items: Array<{ field_id: string; field_name: string; order: number; visible_in_modal?: boolean; visible_in_card?: boolean; visible_in_canvas?: boolean; editable: boolean }> = []
+                let order = 0
+                fieldNames.forEach((name) => {
+                  const f = fields.find((x) => x.name === name || x.id === name)
+                  if (f) {
+                    items.push({
+                      field_id: f.id,
+                      field_name: f.name,
+                      order: order++,
+                      visible_in_modal: true,
+                      visible_in_card: true,
+                      visible_in_canvas: true,
+                      editable: true,
+                    })
+                  }
+                })
+                hidden.forEach((name) => {
+                  const f = fields.find((x) => x.name === name)
+                  if (f) {
+                    items.push({
+                      field_id: f.id,
+                      field_name: f.name,
+                      order: order++,
+                      visible_in_modal: false,
+                      visible_in_card: false,
+                      visible_in_canvas: false,
+                      editable: false,
+                    })
+                  }
+                })
+                return items
+              }
+              onUpdate({
+                visible_fields: fieldNames,
+                modal_fields: fieldNames,
+                field_layout: buildFieldLayout(),
+              } as any)
+            }}
             fields={fields}
+            label="Fields to show"
+            description="Visible and hidden fields for both the record list (left) and record detail panel (right). Same as Airtable: one list controls both. Leave empty to show all fields."
           />
-          <p className="text-xs text-muted-foreground">
-            Fields shown in the right panel when a record is selected (full-page mode). Leave empty to show all fields. These fields are editable when the page allows editing.
-          </p>
         </div>
       )}
 

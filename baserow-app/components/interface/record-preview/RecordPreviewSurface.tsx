@@ -2,6 +2,7 @@
 
 import type { PageBlock, BlockConfig } from "@/lib/interface/types"
 import RecordBlock from "@/components/interface/blocks/RecordBlock"
+import RecordDetailCanvas from "./RecordDetailCanvas"
 
 interface RecordPreviewSurfaceProps {
   tableId: string
@@ -10,14 +11,19 @@ interface RecordPreviewSurfaceProps {
   isEditing?: boolean
   /** When true (default), record fields in the right panel are editable. Pass from Canvas pageEditable. */
   pageEditable?: boolean
-  /** Optional record_context block config: modal_fields, modal_layout for field list and layout. */
+  /** Optional record_context block config: modal_fields, field_layout, record_field_layout. */
   blockConfig?: BlockConfig | null
+  /** When provided with onBlockUpdate, right panel becomes a canvas editor with field blocks. */
+  blockId?: string | null
+  /** Callback to persist record_field_layout to block config. */
+  onBlockUpdate?: (blockId: string, config: Partial<Record<string, unknown>>) => void
 }
 
 /**
  * Record preview slot for full-page rail layout (e.g. record_context).
  * Renders record details from page-level context; owns scrolling.
- * Uses RecordBlock with a synthetic block; respects block modal_fields/modal_layout and page editability.
+ * When blockId and onBlockUpdate are provided: canvas editor with field blocks (drag/resize).
+ * Otherwise: flat RecordBlock list.
  */
 export default function RecordPreviewSurface({
   tableId,
@@ -26,7 +32,27 @@ export default function RecordPreviewSurface({
   isEditing = false,
   pageEditable = true,
   blockConfig,
+  blockId,
+  onBlockUpdate,
 }: RecordPreviewSurfaceProps) {
+  const useCanvasEditor = Boolean(blockId && onBlockUpdate)
+
+  if (useCanvasEditor) {
+    return (
+      <div className="h-full w-full min-w-0 overflow-hidden">
+        <RecordDetailCanvas
+          tableId={tableId}
+          recordId={recordId}
+          blockConfig={blockConfig as Record<string, unknown> | null}
+          blockId={blockId!}
+          isEditing={isEditing}
+          pageEditable={pageEditable}
+          onBlockUpdate={onBlockUpdate}
+        />
+      </div>
+    )
+  }
+
   const syntheticBlock: PageBlock = {
     id: "preview-surface",
     page_id: pageId || "",
@@ -38,6 +64,7 @@ export default function RecordPreviewSurface({
     config: {
       table_id: tableId,
       record_id: recordId,
+      ...(blockConfig?.field_layout != null && { field_layout: blockConfig.field_layout }),
       ...(blockConfig?.modal_fields != null && { modal_fields: blockConfig.modal_fields }),
       ...(blockConfig?.modal_layout != null && { modal_layout: blockConfig.modal_layout }),
     },

@@ -90,6 +90,7 @@ export default function RecordFields({
   const [tableName, setTableName] = useState<string | undefined>(propTableName)
   const supabase = createClient()
   const columnsContainerRef = useRef<HTMLDivElement | null>(null)
+  const hasBootstrappedColumnsRef = useRef(false)
 
   // Load collapsed groups state from localStorage
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
@@ -226,6 +227,8 @@ export default function RecordFields({
     fields: TableField[]
   }
 
+  const GRID_COLUMN_COUNT = 3
+
   const modalColumns: ModalColumn[] = useMemo(() => {
     // If there is no layout at all, fall back to a single implicit column based on fields order.
     if (!fieldLayout.length) {
@@ -251,18 +254,25 @@ export default function RecordFields({
       fieldMap.set(field.id, field)
     })
 
-    // Build column buckets from layout metadata, defaulting missing columns to col-1.
+    // Build column buckets from layout metadata.
+    // When no modal_column_id: distribute across 3 columns (col-1, col-2, col-3) for grid layout.
     const byColumn = new Map<
       string,
       { id: string; order: number; width: number; fieldOrder: Array<{ order: number; field: TableField }> }
     >()
     const seenFieldNames = new Set<string>()
+    const hasAnyColumnId = fieldLayout.some((i) => i.modal_column_id || i.modal_column_span === 2)
+    let syntheticColIndex = 0
 
     const visKey = visibilityContext === 'canvas' ? 'visible_in_canvas' : 'visible_in_modal'
-    fieldLayout.forEach((item) => {
-      if ((item as any)[visKey] === false) return
+    const sortedForCols = [...fieldLayout]
+      .filter((i) => (i as any)[visKey] !== false)
+      .sort((a, b) => a.order - b.order)
 
-      const colId = item.modal_column_span === 2 ? "col-full" : (item.modal_column_id || "col-1")
+    sortedForCols.forEach((item) => {
+      const colId = item.modal_column_span === 2
+        ? "col-full"
+        : item.modal_column_id || (hasAnyColumnId ? "col-1" : `col-${(syntheticColIndex++ % GRID_COLUMN_COUNT) + 1}`)
       const colOrder = item.modal_column_order ?? 0
       const colWidth = item.modal_column_span === 2 ? 2 : (item.modal_column_width ?? 1)
       const field = fieldMap.get(item.field_name) || fieldMap.get(item.field_id)
@@ -275,7 +285,14 @@ export default function RecordFields({
       seenFieldNames.add(field.name)
 
       if (!byColumn.has(colId)) {
-        byColumn.set(colId, { id: colId, order: colOrder, width: colWidth, fieldOrder: [] })
+        const colOrderForNew =
+          colId === "col-2" ? 1 : colId === "col-3" ? 2 : colId === "col-full" ? -1 : colOrder
+        byColumn.set(colId, {
+          id: colId,
+          order: colId === "col-full" ? -1 : colOrderForNew,
+          width: colWidth,
+          fieldOrder: [],
+        })
       }
       byColumn.get(colId)!.fieldOrder.push({ order: item.order, field })
     })
@@ -311,6 +328,26 @@ export default function RecordFields({
     return columns
   }, [fieldLayout, fields, visibilityContext])
 
+  // Bootstrap 3-column layout when entering layout mode with no column metadata
+  useEffect(() => {
+    if (
+      !layoutMode ||
+      !onFieldLayoutChange ||
+      hasBootstrappedColumnsRef.current ||
+      fieldLayout.length === 0
+    )
+      return
+    const hasAnyColumnId = fieldLayout.some((i) => i.modal_column_id || i.modal_column_span === 2)
+    if (hasAnyColumnId) return
+    hasBootstrappedColumnsRef.current = true
+    const sorted = [...fieldLayout].sort((a, b) => a.order - b.order)
+    const bootstrapped = sorted.map((item, idx) => ({
+      ...item,
+      modal_column_id: `col-${(idx % GRID_COLUMN_COUNT) + 1}`,
+    }))
+    onFieldLayoutChange(bootstrapped)
+  }, [layoutMode, onFieldLayoutChange, fieldLayout])
+
   const showModalColumns = !forceStackedLayout && modalColumns.length > 0
 
   // Row-major ordered field list for grid layout.
@@ -341,18 +378,19 @@ export default function RecordFields({
         const spanA = a.item.modal_column_span === 2 ? 0 : 1
         const spanB = b.item.modal_column_span === 2 ? 0 : 1
         if (spanA !== spanB) return spanA - spanB
-        const colA = a.item.modal_column_id === "col-2" ? 2 : 1
-        const colB = b.item.modal_column_id === "col-2" ? 2 : 1
-        return colA - colB
+        const colOrderVal = (cid: string | undefined) =>
+          cid === "col-2" ? 2 : cid === "col-3" ? 3 : 1
+        return colOrderVal(a.item.modal_column_id) - colOrderVal(b.item.modal_column_id)
       })
     } else {
-      // Interleave col-1 and col-2 for row-major placement
+      // Interleave col-1, col-2, col-3 for row-major 3-column layout
       const col1 = modalColumns.find((c) => c.id === "col-1")?.fields ?? []
       const col2 = modalColumns.find((c) => c.id === "col-2")?.fields ?? []
+      const col3 = modalColumns.find((c) => c.id === "col-3")?.fields ?? []
       const colFull = modalColumns.find((c) => c.id === "col-full")?.fields ?? []
       const fieldToItem = new Map(items.map((x) => [x.field.id, x]))
       const ordered: typeof items = []
-      const maxRows = Math.max(col1.length, col2.length)
+      const maxRows = Math.max(col1.length, col2.length, col3.length)
       for (let r = 0; r < maxRows; r++) {
         if (col1[r]) {
           const x = fieldToItem.get(col1[r].id)
@@ -360,6 +398,10 @@ export default function RecordFields({
         }
         if (col2[r]) {
           const x = fieldToItem.get(col2[r].id)
+          if (x) ordered.push(x)
+        }
+        if (col3[r]) {
+          const x = fieldToItem.get(col3[r].id)
           if (x) ordered.push(x)
         }
       }
@@ -551,9 +593,18 @@ export default function RecordFields({
         return
       }
 
-      // Add field to layout in the target column (default first column)
+      // Add field to layout in the target column, or least-full column when 3-column grid
       const maxOrder = Math.max(...fieldLayout.map((item) => item.order), -1)
-      const columnId = targetColumnId || (modalColumns[0]?.id ?? "col-1")
+      const columnId =
+        targetColumnId ||
+        (() => {
+          const dataCols = modalColumns.filter((c) => c.id !== "col-full")
+          if (dataCols.length <= 1) return dataCols[0]?.id ?? "col-1"
+          const leastFull = dataCols.reduce((a, b) =>
+            (a.fields.length ?? 0) <= (b.fields.length ?? 0) ? a : b
+          )
+          return leastFull.id
+        })()
       const newItem: FieldLayoutItem = {
         field_id: field.id,
         field_name: field.name,
@@ -757,7 +808,7 @@ export default function RecordFields({
   )
 
   // For modal column layout: which grid column (1-based) each field belongs to, or span 2 for full-width.
-  // When layoutMode and 2+ columns, we inject a resize handle so col-2 maps to grid column 3.
+  // When layoutMode and 2+ columns, we inject 8px resize handles between columns; col-N maps to grid column 2*N-1.
   const fieldToColumnIndex = useMemo(() => {
     const map: Record<string, number> = {}
     const hasResizeHandle = layoutMode && dataColumns.length >= 2
@@ -780,8 +831,8 @@ export default function RecordFields({
     return map
   }, [fieldLayout, fields])
 
-  // Compute CSS grid template: 2 equal columns for grid layout.
-  // When layoutMode and 2+ columns, inject 4px resize handle between columns.
+  // Compute CSS grid template: 2 or 3 columns for grid layout.
+  // When layoutMode and 2+ columns, inject 8px resize handles between columns.
   const gridTemplateColumns = useMemo(() => {
     if (!showModalColumns) return undefined
     const cols = dataColumns
@@ -883,18 +934,28 @@ export default function RecordFields({
                     : undefined
                 }
               >
-                {layoutMode && showModalColumns && dataColumns.length >= 2 && (
-                  <div
-                    role="separator"
-                    aria-orientation="vertical"
-                    onMouseDown={(e) => {
-                      e.preventDefault()
-                      startResize(0)
-                    }}
-                    className="cursor-col-resize hover:bg-blue-200/60 rounded transition-colors bg-gray-200 self-stretch"
-                    style={{ gridColumn: 2, gridRow: "1 / -1", minHeight: 40, width: 8, minWidth: 8 }}
-                  />
-                )}
+                {layoutMode &&
+                  showModalColumns &&
+                  dataColumns.length >= 2 &&
+                  dataColumns.slice(0, -1).map((_, idx) => (
+                    <div
+                      key={`resize-${idx}`}
+                      role="separator"
+                      aria-orientation="vertical"
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        startResize(idx)
+                      }}
+                      className="cursor-col-resize hover:bg-blue-200/60 rounded transition-colors bg-gray-200 self-stretch"
+                      style={{
+                        gridColumn: 2 + idx * 2,
+                        gridRow: "1 / -1",
+                        minHeight: 40,
+                        width: 8,
+                        minWidth: 8,
+                      }}
+                    />
+                  ))}
                 {canonicalFieldItems.map((item, index) => {
                   const prevGroupName =
                     index > 0 ? canonicalFieldItems[index - 1].groupName : null

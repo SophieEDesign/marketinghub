@@ -89,29 +89,6 @@ export default function PermissionsSettings({
     })
   }
 
-  // Record opening: stored in appearance for backward compatibility
-  const appearance = config.appearance || {}
-  const enableRecordOpen = appearance.enable_record_open !== false
-  const recordOpenStyle = appearance.record_open_style || 'side_panel'
-
-  const handleEnableRecordOpenChange = (checked: boolean) => {
-    onUpdate({
-      appearance: {
-        ...appearance,
-        enable_record_open: checked,
-      },
-    } as any)
-  }
-
-  const handleRecordOpenStyleChange = (value: 'side_panel' | 'modal') => {
-    onUpdate({
-      appearance: {
-        ...appearance,
-        record_open_style: value,
-      },
-    } as any)
-  }
-
   return (
     <div className="space-y-6">
       {/* Page Permissions */}
@@ -205,47 +182,14 @@ export default function PermissionsSettings({
         )}
       </div>
 
-      {/* Allow open record details */}
+      {/* Record details - always enabled; no modal/none option (removed per plan) */}
       <div className="space-y-4 border-t pt-4">
         <div>
           <h3 className="text-sm font-semibold mb-1">Record details</h3>
           <p className="text-xs text-gray-500 mb-4">
-            Allow users to open records in a panel or modal to view and edit details.
+            Records open in a side panel (desktop) or modal (mobile) to view and edit details.
           </p>
         </div>
-        <div className="flex items-center justify-between">
-          <Label htmlFor="allow-open-record" className="text-sm text-gray-700">
-            Allow open record details
-          </Label>
-          <Switch
-            id="allow-open-record"
-            checked={enableRecordOpen}
-            onCheckedChange={handleEnableRecordOpenChange}
-            disabled={isViewOnly}
-          />
-        </div>
-        {enableRecordOpen && !isViewOnly && (
-          <div className="space-y-2">
-            <Label>Open style</Label>
-            <Select
-              value={recordOpenStyle}
-              onValueChange={(value) => handleRecordOpenStyleChange(value as 'side_panel' | 'modal')}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="side_panel">Side panel</SelectItem>
-                <SelectItem value="modal">Modal</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-gray-500">
-              {recordOpenStyle === 'modal'
-                ? 'Records open in a full-screen modal overlay.'
-                : 'Records open in a side panel (desktop) or modal (mobile).'}
-            </p>
-          </div>
-        )}
       </div>
 
       {/* Additional Info */}

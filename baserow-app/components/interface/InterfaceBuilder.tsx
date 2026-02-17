@@ -965,6 +965,12 @@ export default function InterfaceBuilder({
     async (blockId: string) => {
       if (!confirm("Are you sure you want to delete this block?")) return
 
+      // CRITICAL: Clear any pending layout save - it may include the deleted block
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+        saveTimeoutRef.current = null
+      }
+
       try {
         const response = await fetch(`/api/pages/${page.id}/blocks/${blockId}`, {
           method: "DELETE",

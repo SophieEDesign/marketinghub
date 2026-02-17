@@ -2510,6 +2510,8 @@ export default function Canvas({
                           isEditing={isEditing}
                           pageEditable={pageEditable}
                           blockConfig={fullPageBlock.config}
+                          blockId={fullPageBlock.id}
+                          onBlockUpdate={onBlockUpdate}
                         />
                       ) : (
                         <div className="flex-1 h-full bg-background" />
