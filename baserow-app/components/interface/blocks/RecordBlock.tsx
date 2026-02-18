@@ -11,16 +11,17 @@ interface RecordBlockProps {
   block: PageBlock
   isEditing?: boolean
   pageId?: string | null // Page ID
+  pageTableId?: string | null // Table ID from page (fallback for record review pages)
   recordId?: string | null // Record ID for record review pages
   /** When false, all fields are read-only (e.g. when page is view-only). Default true. */
   allowRecordEdit?: boolean
 }
 
-export default function RecordBlock({ block, isEditing = false, pageId = null, recordId: pageRecordId = null, allowRecordEdit = true }: RecordBlockProps) {
+export default function RecordBlock({ block, isEditing = false, pageId = null, pageTableId = null, recordId: pageRecordId = null, allowRecordEdit = true }: RecordBlockProps) {
   const { config } = block
-  // Record block MUST have table_id configured
+  // table_id: config first, then pageTableId (for record review pages where block uses page's table)
   // record_id can come from config OR from page context (for record review pages)
-  const tableId = config?.table_id
+  const tableId = config?.table_id || pageTableId
   // Use config record_id first, fallback to page context recordId prop
   const recordId = config?.record_id || pageRecordId
   const [tableName, setTableName] = useState<string | null>(null)

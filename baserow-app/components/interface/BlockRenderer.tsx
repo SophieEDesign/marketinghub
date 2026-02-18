@@ -354,10 +354,11 @@ export default function BlockRenderer({
 
       case "record":
         // record_id can come from config OR from page context (for record review pages)
+        // table_id can come from config OR from pageTableId (for record review pages)
         // Lazy-load RecordBlock - CRITICAL: enabled=false for mount stability
         return (
           <LazyBlockWrapper enabled={false}>
-            <RecordBlock block={safeBlock} isEditing={canEdit} pageId={pageId} recordId={recordId} />
+            <RecordBlock block={safeBlock} isEditing={canEdit} pageId={pageId} pageTableId={pageTableId} recordId={recordId} />
           </LazyBlockWrapper>
         )
 

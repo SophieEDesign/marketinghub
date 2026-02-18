@@ -277,12 +277,14 @@ function InterfacePageClientInternal({
   const prevBlocksRef = useRef<{ blocks: any[]; signature: string }>({ blocks: [], signature: "" })
 
   // Clear right panel data when navigating away from interface page (Airtable-style: panel only on interface pages)
+  // CRITICAL: When a block is selected, InterfaceBuilder owns blocks/selectedBlock/onBlockSave (it syncs from its state).
+  // Do NOT overwrite blocks/selectedBlock with InterfacePageClient's blocks - they become stale after settings save
+  // because InterfaceBuilder updates its blocks optimistically but InterfacePageClient's blocks only change on loadBlocks.
   useEffect(() => {
     if (!page) {
       setRightPanelData(null)
       return
     }
-    const selectedBlock = selectedBlockIdForPanel != null ? blocks.find((b) => b.id === selectedBlockIdForPanel) ?? null : null
     const prev = lastRightPanelSyncRef.current
     if (prev?.pageRef === page && prev?.blocksRef === blocks && prev?.selectedBlockId === selectedBlockIdForPanel && prev?.isEditing === isEditing) return
     lastRightPanelSyncRef.current = { pageRef: page, blocksRef: blocks, selectedBlockId: selectedBlockIdForPanel, isEditing }
@@ -290,13 +292,15 @@ function InterfacePageClientInternal({
       page,
       onPageUpdate: stableHandlePageUpdate,
       pageTableId,
-      blocks,
       isEditing,
     }
     if (selectedBlockIdForPanel == null) {
+      updates.blocks = blocks
       updates.selectedBlock = null
-    } else if (selectedBlock != null) {
-      updates.selectedBlock = selectedBlock
+    } else {
+      // Block selected: InterfaceBuilder owns blocks, selectedBlock, onBlockSave - don't overwrite with our blocks.
+      // Our blocks are stale after settings save (InterfaceBuilder updates optimistically; we only update on loadBlocks).
+      // By not passing blocks/selectedBlock, the merge keeps InterfaceBuilder's fresh values from its sync.
     }
     setRightPanelData(updates)
   }, [page?.id, page, pageTableId, blocks, selectedContext?.type, selectedBlockIdForPanel, isEditing, setRightPanelData, stableHandlePageUpdate])
