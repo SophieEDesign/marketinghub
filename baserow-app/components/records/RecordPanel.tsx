@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { X, Pin, PinOff, Maximize2, Minimize2, Link2, ChevronLeft, LayoutGrid, Check } from "lucide-react"
+import { X, Pin, PinOff, Maximize2, Minimize2, Link2, ChevronLeft } from "lucide-react"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { useUIMode } from "@/contexts/UIModeContext"
 import { useToast } from "@/components/ui/use-toast"
@@ -21,29 +21,19 @@ export default function RecordPanel() {
     togglePin,
     toggleFullscreen,
     goBack,
-    setInterfaceMode,
   } = useRecordPanel()
-  const { enterRecordLayoutEdit, exitRecordLayoutEdit, uiMode } = useUIMode()
+  const { isEdit } = useUIMode()
   const { toast } = useToast()
   const router = useRouter()
   const isMobile = useIsMobile()
 
-  // Sync UIMode with RecordPanel edit state so RightSettingsPanel shows when editing record layout
-  useEffect(() => {
-    if (state.isOpen && state.interfaceMode === "edit") {
-      if (uiMode === "view") {
-        enterRecordLayoutEdit()
-      }
-    } else if (uiMode === "recordLayoutEdit") {
-      exitRecordLayoutEdit()
-    }
-  }, [state.isOpen, state.interfaceMode, uiMode, enterRecordLayoutEdit, exitRecordLayoutEdit])
   const resizeRef = useRef<HTMLDivElement>(null)
   const isResizingRef = useRef(false)
   const resizeCleanupRef = useRef<null | (() => void)>(null)
 
   const active = Boolean(state.isOpen && state.tableId)
-  const interfaceMode = state.interfaceMode ?? "view"
+  // Layout editing when in edit mode and layout can be saved (Airtable-style)
+  const interfaceMode = isEdit() && state.onLayoutSave ? "edit" : "view"
 
   const handleCopyLink = useCallback(() => {
     if (!state.recordId) return
@@ -160,35 +150,6 @@ export default function RecordPanel() {
             )}
           </div>
           <div className="flex items-center gap-1">
-            {state.onLayoutSave && state.recordId && (
-              <button
-                onClick={() =>
-                  setInterfaceMode(interfaceMode === "edit" ? "view" : "edit")
-                }
-                className={`flex items-center gap-1.5 px-2 py-1 rounded text-sm ${
-                  interfaceMode === "edit"
-                    ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
-                    : "hover:bg-gray-100 text-gray-700"
-                }`}
-                title={
-                  interfaceMode === "edit"
-                    ? "Done editing layout"
-                    : "Edit layout"
-                }
-              >
-                {interfaceMode === "edit" ? (
-                  <>
-                    <Check className="h-4 w-4" />
-                    Done
-                  </>
-                ) : (
-                  <>
-                    <LayoutGrid className="h-4 w-4" />
-                    Edit layout
-                  </>
-                )}
-              </button>
-            )}
             {state.recordId && (
               <button
                 onClick={handleCopyLink}

@@ -727,7 +727,7 @@ export default function RecordFields({
               onChange={(value) => onFieldChange(field.name, value)}
               isEditing={isThisEditing}
               onEditStart={() => {
-                if (!fieldEditable || layoutMode) return // Lock fields in layout mode
+                if (!fieldEditable) return
                 setEditingField(field.id)
               }}
               onEditEnd={() => {
@@ -735,7 +735,7 @@ export default function RecordFields({
               }}
               onLinkedRecordClick={handleLinkedRecordClick}
               onAddLinkedRecord={handleAddLinkedRecord}
-              isReadOnly={!fieldEditable || layoutMode} // Lock fields in layout mode
+              isReadOnly={!fieldEditable}
               showLabel={false}
               tableId={tableId}
               recordId={recordId}

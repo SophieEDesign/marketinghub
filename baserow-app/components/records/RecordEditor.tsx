@@ -140,7 +140,7 @@ export default function RecordEditor({
   } = core
 
   const canSave = recordId ? canEditRecords : canCreateRecords
-  // In view mode: allow field editing when permissions allow. Edit mode = layout editing only (fields locked in layoutMode).
+  // Allow field editing when permissions allow, in both view and edit mode (Airtable-style).
   const effectiveEditable =
     !allowEdit
       ? false
