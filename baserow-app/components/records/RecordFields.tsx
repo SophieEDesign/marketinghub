@@ -52,6 +52,10 @@ interface RecordFieldsProps {
   selectedFieldId?: string | null
   /** When true, always use stacked layout (no grid/columns). Modal must use stacked layout only. */
   forceStackedLayout?: boolean
+  /** When in layout mode, called when user clicks anywhere on the field to select it for settings panel */
+  onFieldSelect?: (fieldId: string) => void
+  /** When in layout mode with grid columns, called to toggle field span (single/full width) */
+  onFieldSpanToggle?: (fieldName: string) => void
 }
 
 const DEFAULT_GROUP_NAME = "General"
@@ -83,6 +87,8 @@ export default function RecordFields({
   visibilityContext = 'modal',
   selectedFieldId,
   forceStackedLayout = false,
+  onFieldSelect,
+  onFieldSpanToggle,
 }: RecordFieldsProps) {
   const { navigateToLinkedRecord, openRecordByTableId, state: recordPanelState } = useRecordPanel()
   const { toast } = useToast()
@@ -693,13 +699,38 @@ export default function RecordFields({
       const fieldSize = layoutItem?.field_size ?? "medium"
 
       const isSelected = selectedFieldId === field.id
+      const isFullWidth = layoutItem?.modal_column_span === 2
+      const dataCols = modalColumns.filter((c) => c.id !== "col-full")
+      const canToggleSpan = layoutMode && onFieldSpanToggle && dataCols.length >= 2
       const fieldContent = (
         <div
+          role={layoutMode && onFieldSelect ? "button" : undefined}
+          tabIndex={layoutMode && onFieldSelect ? 0 : undefined}
+          onClick={
+            layoutMode && onFieldSelect
+              ? (e) => {
+                  e.stopPropagation()
+                  onFieldSelect(field.id)
+                }
+              : undefined
+          }
+          onKeyDown={
+            layoutMode && onFieldSelect
+              ? (e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault()
+                    onFieldSelect(field.id)
+                  }
+                }
+              : undefined
+          }
           className={cn(
-            "rounded-md hover:bg-gray-50/50 transition-colors px-1 py-0.5 -mx-1 min-w-0",
+            "rounded-md transition-colors px-1 py-0.5 -mx-1 min-w-0 relative",
             FIELD_LABEL_GAP_CLASS,
             layoutMode && !isVisible && "opacity-50",
-            isSelected && "ring-2 ring-blue-500 ring-offset-1 rounded-md",
+            layoutMode && onFieldSelect && "cursor-pointer hover:bg-gray-50/50",
+            isSelected && "ring-2 ring-blue-500 ring-offset-2 rounded-lg border-2 border-blue-400",
+            !isSelected && layoutMode && "border-2 border-transparent hover:border-gray-200",
             fieldSize === "small" && "text-sm",
             fieldSize === "large" && "text-lg"
           )}
@@ -745,6 +776,20 @@ export default function RecordFields({
               <p className="text-xs text-gray-500">{helperText}</p>
             )}
           </div>
+          {canToggleSpan && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onFieldSpanToggle?.(field.name)
+              }}
+              className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-blue-200/50 rounded-r flex items-center justify-center group"
+              title={isFullWidth ? "Single column" : "Full width"}
+              aria-label={isFullWidth ? "Shrink to single column" : "Expand to full width"}
+            >
+              <span className="w-1 h-6 bg-gray-300 group-hover:bg-blue-500 rounded opacity-0 group-hover:opacity-100 transition-opacity" />
+            </button>
+          )}
         </div>
       )
 
@@ -779,6 +824,10 @@ export default function RecordFields({
       validateField,
       onFieldLabelClick,
       fieldLayout,
+      selectedFieldId,
+      onFieldSelect,
+      onFieldSpanToggle,
+      modalColumns,
     ]
   )
 

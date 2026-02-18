@@ -357,22 +357,28 @@ export default function InterfaceBuilder({
 
   const saveLayout = useCallback(
     async (layout: LayoutItem[], hasUserInteraction = false) => {
+      // #region agent log
+      const mountBlocked = guardAgainstMountSave(componentIdRef.current, 'saveLayout');
+      const autoBlocked = guardAgainstAutoSave('saveLayout', hasUserInteraction || layoutModifiedByUserRef.current);
+      const noModBlocked = !layoutModifiedByUserRef.current;
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:saveLayout:entry',message:'saveLayout called',data:{pageId:page.id,layoutCount:layout.length,hasUserInteraction,mountBlocked,autoBlocked,noModBlocked,layoutModifiedByUser:layoutModifiedByUserRef.current},timestamp:Date.now(),hypothesisId:'L2'})}).catch(()=>{});
+      // #endregion
       // Only save in edit mode - view mode must never mutate layout
       if (!effectiveIsEditing) return false
 
       // Pre-deployment guard: Prevent saves during mount
-      if (guardAgainstMountSave(componentIdRef.current, 'saveLayout')) {
+      if (mountBlocked) {
         return false
       }
 
       // Pre-deployment guard: Prevent saves without user interaction
-      if (guardAgainstAutoSave('saveLayout', hasUserInteraction || layoutModifiedByUserRef.current)) {
+      if (autoBlocked) {
         return false
       }
 
       // CRITICAL: Never save layout unless user actually modified it
       // This prevents regressions from automatic saves on mount/hydration
-      if (!layoutModifiedByUserRef.current) {
+      if (noModBlocked) {
         if (process.env.NODE_ENV === 'development') {
           console.debug("[Layout] Save blocked: no user modification")
         }
@@ -386,6 +392,9 @@ export default function InterfaceBuilder({
       )
 
       if (layoutHash === lastSavedLayoutRef.current) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:saveLayout:noDiff',message:'Save skipped: layout unchanged',data:{pageId:page.id},timestamp:Date.now(),hypothesisId:'L2'})}).catch(()=>{});
+        // #endregion
         if (process.env.NODE_ENV === 'development') {
           console.debug("[Layout] Save skipped: no diff (layout unchanged)")
         }
@@ -424,6 +433,9 @@ export default function InterfaceBuilder({
           })
         }
 
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:saveLayout:apiCall',message:'PATCH /api/pages/.../blocks',data:{pageId:page.id,layoutCount:layout.length},timestamp:Date.now(),hypothesisId:'L2'})}).catch(()=>{});
+        // #endregion
         const response = await fetch(`/api/pages/${page.id}/blocks`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -455,14 +467,23 @@ export default function InterfaceBuilder({
             debugLog('🔥 saveLayout COMPLETE – not reloading (blocks already correct)')
           }
           
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:saveLayout:success',message:'Layout saved successfully',data:{pageId:page.id},timestamp:Date.now(),hypothesisId:'L2'})}).catch(()=>{});
+          // #endregion
           // Show success feedback briefly, then reset to idle
           setTimeout(() => setSaveStatus("idle"), 2000)
           return true
         } else {
           const error = await response.text()
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:saveLayout:apiError',message:'API returned non-OK',data:{pageId:page.id,status:response.status,error:error?.slice(0,200)},timestamp:Date.now(),hypothesisId:'L2'})}).catch(()=>{});
+          // #endregion
           throw new Error(error || "Failed to save layout")
         }
       } catch (error: any) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:saveLayout:catch',message:'saveLayout threw',data:{pageId:page.id,errorMsg:error?.message},timestamp:Date.now(),hypothesisId:'L2'})}).catch(()=>{});
+        // #endregion
         debugError("Failed to save layout:", error)
         setSaveStatus("error")
         toast({
@@ -494,6 +515,9 @@ export default function InterfaceBuilder({
    */
   const handleLayoutChange = useCallback(
     (layout: LayoutItem[]) => {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:handleLayoutChange:entry',message:'Layout change received',data:{pageId:page.id,layoutCount:layout.length,effectiveIsEditing},timestamp:Date.now(),hypothesisId:'L1'})}).catch(()=>{});
+      // #endregion
       // Only save in edit mode - view mode never mutates layout
       if (!effectiveIsEditing) return
       

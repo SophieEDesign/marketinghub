@@ -277,6 +277,34 @@ export default function RecordEditor({
     [localFieldLayout, onLayoutSave, visibilityContext, setLiveFieldLayout]
   )
 
+  const handleFieldSelect = useCallback(
+    (fieldId: string) => {
+      setSelectedContext({ type: "field", fieldId, tableId })
+    },
+    [setSelectedContext, tableId]
+  )
+
+  const handleFieldSpanToggle = useCallback(
+    (fieldName: string) => {
+      const updated = localFieldLayout.map((item) => {
+        if (item.field_name !== fieldName) return item
+        const newSpan = (item.modal_column_span === 2 ? 1 : 2) as 1 | 2
+        return {
+          ...item,
+          modal_column_span: newSpan,
+          // When shrinking to single column, assign to col-1 if currently full-width
+          ...(newSpan === 1 && item.modal_column_span === 2
+            ? { modal_column_id: item.modal_column_id || "col-1" }
+            : {}),
+        }
+      })
+      setLocalFieldLayout(updated)
+      setLiveFieldLayout(updated)
+      onLayoutSave?.(updated)
+    },
+    [localFieldLayout, onLayoutSave, setLiveFieldLayout]
+  )
+
   const prevInterfaceModeRef = useRef(interfaceMode)
   useEffect(() => {
     if (prevInterfaceModeRef.current === "edit" && interfaceMode !== "edit") {
@@ -415,6 +443,8 @@ export default function RecordEditor({
             onFieldLabelClick={handleFieldLabelClick}
             layoutMode={isEditingLayout}
             onFieldLayoutChange={isEditingLayout ? handleFieldLayoutChange : undefined}
+            onFieldSelect={isEditingLayout ? handleFieldSelect : undefined}
+            onFieldSpanToggle={isEditingLayout ? handleFieldSpanToggle : undefined}
             visibilityContext={visibilityContext}
             selectedFieldId={selectedContext?.type === "field" ? selectedContext.fieldId : null}
             forceStackedLayout={!useGridLayout}

@@ -336,6 +336,9 @@ export default function Canvas({
     // Increment layout version to prevent stale sync overwrites
     layoutVersionRef.current += 1
     
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:applyUserLayoutChange',message:'User drag/resize end - layout applied',data:{pageId,blockCount:newLayout.length},timestamp:Date.now(),hypothesisId:'L1'})}).catch(()=>{});
+    // #endregion
     devLog('[Canvas] User layout change persisted', {
       version: layoutVersionRef.current,
       blockCount: newLayout.length,
