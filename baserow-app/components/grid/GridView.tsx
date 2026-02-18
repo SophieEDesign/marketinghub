@@ -2438,8 +2438,20 @@ export default function GridView({
     }
 
     // Default: use RecordPanel context (for side panel)
-    // CRITICAL: Pass interfaceMode so RecordPanel inherits edit mode (Airtable-style)
-    openRecord(tableId, rowId, supabaseTableName, modalFields, modalLayout, cascadeContext, interfaceMode)
+    // CRITICAL: Pass interfaceMode, fieldLayout, onLayoutSave so Edit layout works
+    openRecord(
+      tableId,
+      rowId,
+      supabaseTableName,
+      modalFields,
+      modalLayout,
+      cascadeContext,
+      interfaceMode,
+      () => loadRows(),
+      fieldLayout,
+      onModalLayoutSave,
+      tableFields
+    )
   }
 
   function handleOpenRecordClick(e: React.MouseEvent, rowId: string) {
