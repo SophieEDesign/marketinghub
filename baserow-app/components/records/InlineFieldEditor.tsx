@@ -40,6 +40,8 @@ interface InlineFieldEditorProps {
   recordId?: string // For attachment uploads
   tableName?: string // For attachment uploads (supabase table name)
   displayMode?: 'compact' | 'inline' | 'expanded' | 'list' // Display mode for linked fields (default: 'compact'); 'list' shows as vertical list (same as expanded)
+  /** When true, display boxes do not call onEditStart on click; parent handles click for selection (layout mode) */
+  disableClickToEdit?: boolean
 }
 
 export default function InlineFieldEditor({
@@ -58,6 +60,7 @@ export default function InlineFieldEditor({
   recordId,
   tableName,
   displayMode = 'compact',
+  disableClickToEdit = false,
 }: InlineFieldEditorProps) {
   const { toast } = useToast()
   const [localValue, setLocalValue] = useState(value)
@@ -379,7 +382,7 @@ export default function InlineFieldEditor({
           </div>
         ) : (
           <div
-            onClick={onEditStart}
+            onClick={disableClickToEdit ? undefined : onEditStart}
             className={`${displayBoxClassName} ${!dateValueForDisplay ? "bg-white" : ""}`}
           >
             {dateValueForDisplay || <span className="text-gray-400 italic">Click to set date...</span>}
@@ -472,7 +475,7 @@ export default function InlineFieldEditor({
           </div>
         ) : (
           <div
-            onClick={onEditStart}
+            onClick={disableClickToEdit ? undefined : onEditStart}
             className={cn("overflow-visible min-h-[40px]", displayBoxClassName, !value && "bg-white")}
           >
             {value ? (
@@ -525,7 +528,7 @@ export default function InlineFieldEditor({
           </label>
         )}
         <div
-          onClick={(e) => {
+          onClick={disableClickToEdit ? undefined : (e) => {
             if (isReadOnly) return
             // Don't force edit mode when user is just previewing an attachment.
             if ((e.target as HTMLElement).closest('[data-attachment-preview]')) return
@@ -538,7 +541,7 @@ export default function InlineFieldEditor({
           }
           role={!isReadOnly ? "button" : undefined}
           tabIndex={!isReadOnly ? 0 : undefined}
-          onKeyDown={(e) => {
+          onKeyDown={disableClickToEdit ? undefined : (e) => {
             if (isReadOnly) return
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault()
@@ -637,7 +640,7 @@ export default function InlineFieldEditor({
           </div>
         ) : (
           <div
-            onClick={onEditStart}
+            onClick={disableClickToEdit ? undefined : onEditStart}
             className={`${displayBoxClassName} ${showLabel ? "min-h-[36px] flex items-center group" : "group"}`}
             title={value || undefined}
           >
@@ -714,7 +717,7 @@ export default function InlineFieldEditor({
           </div>
         ) : (
           <div
-            onClick={onEditStart}
+            onClick={disableClickToEdit ? undefined : onEditStart}
             className={`${displayBoxClassName} ${showLabel ? "min-h-[36px] flex items-center" : "flex items-center"} ${!value ? "bg-white" : ""}`}
             title={value || undefined}
           >
@@ -798,7 +801,7 @@ export default function InlineFieldEditor({
         </div>
       ) : (
         <div
-          onClick={onEditStart}
+          onClick={disableClickToEdit ? undefined : onEditStart}
           className={`${displayBoxClassName} ${showLabel ? "min-h-[36px] flex items-center" : ""} ${!value ? "bg-white" : ""}`}
         >
           {isUserFieldType && userDisplayName ? (

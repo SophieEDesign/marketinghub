@@ -25,6 +25,27 @@ export async function saveBlockLayout(
 ): Promise<void> {
   const supabase = await createClient()
 
+  // Schema probe: verify page_id column exists (migration may not have run on this project)
+  const projectRef = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/^https?:\/\//, '').split('.')[0] || 'unknown'
+  const { error: probeError } = await supabase
+    .from('view_blocks')
+    .select('page_id')
+    .limit(1)
+    .maybeSingle()
+
+  if (probeError && /column.*page_id.*does not exist/i.test(probeError.message)) {
+    const hint = projectRef !== 'unknown'
+      ? `App connects to project "${projectRef}". Run the migration in that project's SQL Editor.`
+      : 'Check NEXT_PUBLIC_SUPABASE_URL. Run the migration in that project\'s SQL Editor.'
+    throw new Error(
+      `view_blocks.page_id column does not exist. ${hint} ` +
+      `Migration: supabase/migrations/20250217000000_add_view_blocks_page_id_if_missing.sql`
+    )
+  }
+  if (probeError) {
+    throw new Error(`Schema check failed: ${probeError.message}`)
+  }
+
   // Check if this is an interface_pages.id or views.id
   const { data: page } = await supabase
     .from('interface_pages')
@@ -59,26 +80,47 @@ export async function saveBlockLayout(
         order_index: update.order_index,
       })
 
+      const updatePayload = {
+        position_x: update.position_x,
+        position_y: update.position_y,
+        width: update.width,
+        height: update.height,
+        order_index: update.order_index,
+        updated_at: new Date().toISOString(),
+      }
+
+      // Try page_id OR view_id first; fallback to view_id only if page_id column doesn't exist
       let query = supabase
         .from('view_blocks')
-        .update({
-          position_x: update.position_x,
-          position_y: update.position_y,
-          width: update.width,
-          height: update.height,
-          order_index: update.order_index,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updatePayload)
         .eq('id', update.id)
-        .select('id, position_x, position_y, width, height') // Select to verify update succeeded
+        .select('id, position_x, position_y, width, height')
 
-      // CRITICAL: Match blocks by page_id OR view_id (same as GET /blocks)
-      // Legacy blocks may have view_id; interface_pages blocks may have page_id
       query = query.or(`page_id.eq.${pageId},view_id.eq.${pageId}`)
 
-      // Execute the query and check for errors and verify update succeeded
-      const { data, error } = await query
+      let { data, error } = await query
+
+      // Fallback: if page_id column doesn't exist, retry with view_id only
+      if (error && /column.*page_id.*does not exist/i.test(error.message)) {
+        query = supabase
+          .from('view_blocks')
+          .update(updatePayload)
+          .eq('id', update.id)
+          .eq('view_id', pageId)
+          .select('id, position_x, position_y, width, height')
+        const fallback = await query
+        data = fallback.data
+        error = fallback.error
+      }
+
       if (error) {
+        const msg = error.message || ''
+        if (/column.*page_id.*does not exist/i.test(msg)) {
+          throw new Error(
+            `Failed to update block ${update.id}: column view_blocks.page_id does not exist. ` +
+            `Run the migration in Supabase SQL Editor: supabase/migrations/20250217000000_add_view_blocks_page_id_if_missing.sql`
+          )
+        }
         throw new Error(`Failed to update block ${update.id}: ${error.message}`)
       }
       // Verify the update actually happened (RLS might silently fail)

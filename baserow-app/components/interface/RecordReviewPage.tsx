@@ -45,6 +45,8 @@ interface RecordReviewPageProps {
   page: Page
   initialBlocks: PageBlock[]
   isViewer?: boolean
+  /** Resolved table ID from page (base_table, saved_view, etc). Takes precedence over page config. */
+  pageTableId?: string | null
   onSave?: () => void
   onEditModeChange?: (isEditing: boolean) => void
   onLayoutSave?: (fieldLayout: FieldLayoutItem[]) => Promise<void>
@@ -56,6 +58,7 @@ export default function RecordReviewPage({
   page,
   initialBlocks,
   isViewer = false,
+  pageTableId: pageTableIdProp,
   onSave,
   onEditModeChange,
   onLayoutSave,
@@ -81,11 +84,15 @@ export default function RecordReviewPage({
 
   // Load table fields for record_view right panel
   const pageConfig: PageConfig | any = (page as any).config || page.settings || {}
+  // CRITICAL: Use resolved pageTableId from parent (InterfacePageClient) when provided.
+  // Fallback: base_table is primary for interface_pages; config may not have tableId
   const pageTableId =
-    pageConfig.tableId ||
-    pageConfig.primary_table_id ||
-    page.settings?.tableId ||
-    page.settings?.primary_table_id ||
+    pageTableIdProp ??
+    pageConfig.tableId ??
+    pageConfig.primary_table_id ??
+    (page as any).base_table ??
+    page.settings?.tableId ??
+    page.settings?.primary_table_id ??
     null
 
   useEffect(() => {
@@ -281,7 +288,7 @@ export default function RecordReviewPage({
             fields={tableFields}
             fieldLayout={fieldLayout}
             pageEditable={pageEditable}
-            interfaceMode={isViewer ? "view" : recordInterfaceMode}
+            interfaceMode={isViewer ? "view" : (isRecordView && isBlockEditing ? "edit" : recordInterfaceMode)}
             onInterfaceModeChange={isViewer ? undefined : setRecordInterfaceMode}
             onLayoutSave={onLayoutSave}
             titleField={pageConfig.title_field || pageConfig.left_panel?.title_field}

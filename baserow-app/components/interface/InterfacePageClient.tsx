@@ -66,6 +66,7 @@ function InterfacePageContent({
         initialBlocks={memoizedBlocks}
         isViewer={isViewer}
         hideHeader={true}
+        pageTableId={pageTableId}
         onLayoutSave={onRecordViewLayoutSave}
         onPageConfigSave={onRecordViewPageConfigSave}
       />

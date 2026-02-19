@@ -571,7 +571,7 @@ export default function SettingsPanel({
             onClick={onClose}
             size="sm"
           >
-            Close
+            {embedded ? 'Page settings' : 'Close'}
           </Button>
           {!readOnly && (
             <Button

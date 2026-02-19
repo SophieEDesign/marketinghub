@@ -157,20 +157,11 @@ function ShellContent({
   setSidebarOpen: (v: boolean) => void
   primaryColor: string
 }) {
-  const { data } = useRightSettingsPanelData()
-  const { state: recordPanelState } = useRecordPanel()
   const isEditMode = useUIMode().isEdit()
 
-  // Right Settings Panel: only mount in Edit Mode. UIModeContext is single source of truth.
-  const hasInterfacePageContext = data?.page != null && data?.blocks != null
-  const isRecordPanelOpen = recordPanelState.isOpen && recordPanelState.recordId
-  const isRecordPanelEditMode = recordPanelState.interfaceMode === "edit"
-  const hasRecordContextBlock = data?.recordId != null && data?.recordTableId != null && !isRecordPanelOpen
-  const hasPanelContext =
-    hasInterfacePageContext ||
-    (isRecordPanelOpen && isRecordPanelEditMode) ||
-    hasRecordContextBlock
-  const isPanelVisible = hasPanelContext && isEditMode
+  // Right Settings Panel: always visible in Edit Mode - cannot be closed/crossed off.
+  // UIModeContext is single source of truth. Panel shows "Select an element" when no context.
+  const isPanelVisible = isEditMode
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 overflow-x-hidden">

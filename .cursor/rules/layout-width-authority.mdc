@@ -12,7 +12,7 @@ alwaysApply: true
 
 1. **Single source of truth:** `isEditMode = uiMode === "edit" || uiMode === "editPages" || uiMode === "recordLayoutEdit" || uiMode === "fieldSchemaEdit"`
 
-2. **Conditional render:** RightSettingsPanel must be conditionally rendered: `{isEditMode && hasPanelContext && <RightSettingsPanel />}`. Never use translate-x, w-0, pointer-events-none, or opacity to hide the panel while keeping it mounted.
+2. **Conditional render:** RightSettingsPanel must be conditionally rendered: `{isEditMode && <RightSettingsPanel />}`. Panel is always visible in edit mode (cannot be closed). Never use translate-x, w-0, pointer-events-none, or opacity to hide the panel while keeping it mounted.
 
 3. **Width rules:**
    - When isEditMode === false: InterfaceContainer width = 100%, RightSettingsPanel does NOT render.

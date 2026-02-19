@@ -771,6 +771,7 @@ export default function RecordFields({
               tableId={tableId}
               recordId={recordId}
               tableName={tableName}
+              disableClickToEdit={layoutMode}
             />
             {helperText && (
               <p className="text-xs text-gray-500">{helperText}</p>

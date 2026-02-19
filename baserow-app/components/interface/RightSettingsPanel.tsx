@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useSelectionContext } from "@/contexts/SelectionContext"
 import { useRightSettingsPanelData } from "@/contexts/RightSettingsPanelDataContext"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
-import { ChevronRight, ChevronLeft, X, MoreVertical } from "lucide-react"
+import { ChevronRight, ChevronLeft, Settings, MoreVertical } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import PageDisplaySettingsPanel from "./PageDisplaySettingsPanel"
 import SettingsPanel from "./SettingsPanel"
@@ -63,7 +63,7 @@ export default function RightSettingsPanel() {
 
   const hasInterfacePageContext = data?.page != null && data?.blocks != null
 
-  // Repurpose "close" to show Page Settings (panel cannot be closed in Edit Mode)
+  // Navigate to Page Settings (panel cannot be closed in Edit Mode - always visible)
   const handleShowPageSettings = () => setSelectedContext({ type: "page" })
 
   // Panel always on right; flex sibling of InterfaceContainer. Mounted only when in edit mode.
@@ -149,9 +149,9 @@ export default function RightSettingsPanel() {
                 size="sm"
                 onClick={handleShowPageSettings}
                 className="h-8 w-8 p-0 flex-shrink-0"
-                aria-label="Show page settings"
+                aria-label="Page settings"
               >
-                <X className="h-4 w-4" />
+                <Settings className="h-4 w-4" />
               </Button>
             </>
           )}
