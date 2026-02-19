@@ -36,6 +36,9 @@ export default function RecordPreviewSurface({
   onBlockUpdate,
 }: RecordPreviewSurfaceProps) {
   const useCanvasEditor = Boolean(blockId && onBlockUpdate)
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordPreviewSurface.tsx',message:'Record preview path',data:{useCanvasEditor,hasBlockId:!!blockId,hasOnBlockUpdate:!!onBlockUpdate,isEditing},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
+  // #endregion
 
   if (useCanvasEditor) {
     return (
