@@ -95,6 +95,8 @@ export interface CardConfig {
   groupBy?: string
   /** Timeline only: date field for event start */
   timelineDateField?: string
+  /** Timeline only: date field for event end (optional; if empty, start is used for both) */
+  timelineEndDateField?: string
 }
 
 interface CustomizeCardsDialogProps {
@@ -133,6 +135,7 @@ export default function CustomizeCardsDialog({
   const [localWrapText, setLocalWrapText] = useState(config.cardWrapText ?? true)
   const [localGroupBy, setLocalGroupBy] = useState<string>(config.groupBy || "")
   const [localDateField, setLocalDateField] = useState<string>(config.timelineDateField || "")
+  const [localEndDateField, setLocalEndDateField] = useState<string>(config.timelineEndDateField || "")
   const [orderedFieldNames, setOrderedFieldNames] = useState<string[]>([])
   const [search, setSearch] = useState("")
 
@@ -143,6 +146,7 @@ export default function CustomizeCardsDialog({
     setLocalWrapText(config.cardWrapText ?? true)
     setLocalGroupBy(config.groupBy || "")
     setLocalDateField(config.timelineDateField || "")
+    setLocalEndDateField(config.timelineEndDateField || "")
   }, [config, isOpen])
 
   useEffect(() => {
@@ -247,7 +251,10 @@ export default function CustomizeCardsDialog({
       cardColorField: localColorField || undefined,
       cardWrapText: localWrapText,
       groupBy: localGroupBy || undefined,
-      ...(isTimeline && { timelineDateField: localDateField || undefined }),
+      ...(isTimeline && {
+        timelineDateField: localDateField || undefined,
+        timelineEndDateField: localEndDateField || undefined,
+      }),
     }
 
     try {
@@ -272,6 +279,7 @@ export default function CustomizeCardsDialog({
       }
       if (isTimeline) {
         configUpdate.timeline_date_field = nextConfig.timelineDateField
+        configUpdate.timeline_end_date_field = nextConfig.timelineEndDateField
         configUpdate.timeline_group_by = nextConfig.groupBy
       }
       const { error: updateError } = await supabase
@@ -321,26 +329,47 @@ export default function CustomizeCardsDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2 overflow-y-auto flex-1 min-h-0">
-          {/* Date field (timeline only) */}
+          {/* Start and End date fields (timeline only) */}
           {isTimeline && dateFields.length > 0 && (
-            <div className="space-y-2">
-              <Label className="text-xs font-medium flex items-center gap-1.5">
-                <Calendar className="h-3.5 w-3.5" />
-                Date field
-              </Label>
-              <Select value={localDateField || "__none__"} onValueChange={(v) => setLocalDateField(v === "__none__" ? "" : v)}>
-                <SelectTrigger className="h-8">
-                  <SelectValue placeholder="Select date field" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Auto-detect</SelectItem>
-                  {dateFields.map((f) => (
-                    <SelectItem key={f.name} value={f.name}>
-                      {f.label || f.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label className="text-xs font-medium flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5" />
+                  Start date
+                </Label>
+                <Select value={localDateField || "__none__"} onValueChange={(v) => setLocalDateField(v === "__none__" ? "" : v)}>
+                  <SelectTrigger className="h-8">
+                    <SelectValue placeholder="Select start date field" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Auto-detect</SelectItem>
+                    {dateFields.map((f) => (
+                      <SelectItem key={f.name} value={f.name}>
+                        {f.label || f.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-medium flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5" />
+                  End date
+                </Label>
+                <Select value={localEndDateField || "__same__"} onValueChange={(v) => setLocalEndDateField(v === "__same__" ? "" : v)}>
+                  <SelectTrigger className="h-8">
+                    <SelectValue placeholder="Same as start (single date)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__same__">Same as start (single date)</SelectItem>
+                    {dateFields.map((f) => (
+                      <SelectItem key={f.name} value={f.name}>
+                        {f.label || f.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           )}
 

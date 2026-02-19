@@ -344,6 +344,12 @@ export default function TimelineView({
     }
   }
 
+  // Initial load and refetch when table/filters/reloadKey change
+  useEffect(() => {
+    if (!supabaseTableName) return
+    loadRows()
+  }, [supabaseTableName, filtersKey, reloadKey])
+
   // Filter rows by search query
   const filteredRows = useMemo(() => {
     if (!searchQuery || !tableFields.length) return rows

@@ -226,6 +226,7 @@ export default async function ViewPage({
             cardColorField={(view.config as { card_color_field?: string })?.card_color_field}
             cardWrapText={(view.config as { card_wrap_text?: boolean })?.card_wrap_text}
             timelineDateField={(view.config as { timeline_date_field?: string })?.timeline_date_field}
+            timelineEndDateField={(view.config as { timeline_end_date_field?: string })?.timeline_end_date_field}
           />
         )}
       </WorkspaceShellWrapper>

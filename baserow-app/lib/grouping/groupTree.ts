@@ -1,4 +1,5 @@
 import type { TableField } from '@/types/fields'
+import { getOptionValueToLabelMap } from '@/lib/fields/select-options'
 import type {
   FlattenedGroupItem,
   GroupContext,
@@ -139,19 +140,30 @@ function getGroupKeysForValue(ctx: GroupContext, rule: GroupRule, field: TableFi
       continue
     }
 
-    const resolvedFromMap = (() => {
-      if (!field) return null
-      const key = rawKey
+    const resolvedLabel = (() => {
+      if (!field) return rawKey
+      // 1. For single_select/multi_select: resolve from field options (id -> label, label -> label)
+      if (field.type === 'single_select' || field.type === 'multi_select') {
+        const optionMap = getOptionValueToLabelMap(field.type, field.options)
+        const resolved =
+          optionMap.get(rawKey) ??
+          (looksLikeUuid(rawKey) ? optionMap.get(rawKey.toLowerCase()) : undefined)
+        if (resolved) return resolved
+      }
+      // 2. External valueLabelMaps (e.g. link_to_table resolved names)
       const maps = ctx.options.valueLabelMaps
-      if (!maps) return null
-      const byName = maps[field.name]
-      const byId = maps[(field as any)?.id]
-      const lookup = (m: Record<string, string> | undefined) =>
-        m?.[key] ?? (looksLikeUuid(key) ? m?.[key.toLowerCase()] : undefined)
-      return (lookup(byName as Record<string, string>) ?? lookup(byId as Record<string, string>) ?? null) as string | null
+      if (maps) {
+        const byName = maps[field.name]
+        const byId = maps[(field as any)?.id]
+        const lookup = (m: Record<string, string> | undefined) =>
+          m?.[rawKey] ?? (looksLikeUuid(rawKey) ? m?.[rawKey.toLowerCase()] : undefined)
+        const fromMap = lookup(byName as Record<string, string>) ?? lookup(byId as Record<string, string>)
+        if (fromMap) return fromMap
+      }
+      return rawKey
     })()
 
-    const label = String(resolvedFromMap ?? rawKey).trim()
+    const label = String(resolvedLabel).trim()
     if (!label) {
       keys.push(emptyKey)
       continue

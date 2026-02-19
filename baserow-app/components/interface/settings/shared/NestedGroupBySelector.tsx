@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select"
 import type { TableField } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
+import { getFieldDisplayName } from "@/lib/fields/display"
 import type { GroupRule } from "@/lib/grouping/types"
 import { GripVertical, X, Plus, ArrowUp, ArrowDown } from "lucide-react"
 
@@ -151,7 +152,7 @@ export default function NestedGroupBySelector({
                     <SelectContent>
                       {groupableFields.map((field) => (
                         <SelectItem key={field.id} value={field.name}>
-                          {field.name} ({FIELD_TYPES.find(t => t.type === field.type)?.label})
+                          {getFieldDisplayName(field)} ({FIELD_TYPES.find(t => t.type === field.type)?.label})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -170,7 +171,7 @@ export default function NestedGroupBySelector({
                       <SelectContent>
                         {dateFields.map((field) => (
                           <SelectItem key={field.id} value={field.name}>
-                            {field.name}
+                            {getFieldDisplayName(field)}
                           </SelectItem>
                         ))}
                       </SelectContent>

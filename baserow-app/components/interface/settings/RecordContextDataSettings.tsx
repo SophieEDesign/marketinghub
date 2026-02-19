@@ -158,11 +158,12 @@ export default function RecordContextDataSettings({
         <div className="space-y-2 border-t pt-4">
           <ModalFieldsSelector
             value={(() => {
-              // Single source of truth: field_layout > modal_fields (right panel) > visible_fields (record list)
+              // Single source of truth: field_layout (right panel only) > modal_fields > visible_fields
+              // NOTE: visible_in_card is NOT used here - "Fields to show" only controls the right panel
               const fl = (config as any).field_layout
               if (Array.isArray(fl) && fl.length > 0) {
                 return fl
-                  .filter((i: any) => i.visible_in_canvas !== false && i.visible_in_card !== false)
+                  .filter((i: any) => i.visible_in_canvas !== false)
                   .sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0))
                   .map((i: any) => i.field_name)
               }
@@ -176,6 +177,8 @@ export default function RecordContextDataSettings({
               const visibleSet = new Set(fieldNames)
               const hidden = allFieldNames.filter((n) => n !== "id" && !visibleSet.has(n))
               const buildFieldLayout = () => {
+                // "Fields to show" controls ONLY the right panel (detail). Cards use Card/list fields.
+                // visible_in_canvas/visible_in_modal = selection; visible_in_card = true for ALL so cards aren't limited
                 const items: Array<{ field_id: string; field_name: string; order: number; visible_in_modal?: boolean; visible_in_card?: boolean; visible_in_canvas?: boolean; editable: boolean }> = []
                 let order = 0
                 fieldNames.forEach((name) => {
@@ -200,7 +203,7 @@ export default function RecordContextDataSettings({
                       field_name: f.name,
                       order: order++,
                       visible_in_modal: false,
-                      visible_in_card: false,
+                      visible_in_card: true,
                       visible_in_canvas: false,
                       editable: false,
                     })
@@ -216,7 +219,7 @@ export default function RecordContextDataSettings({
             }}
             fields={fields}
             label="Fields to show"
-            description="Visible and hidden fields for both the record list (left) and record detail panel (right). Same as Airtable: one list controls both. Leave empty to show all fields."
+            description="Visible and hidden fields for the record detail panel (right) only. Cards use Card/list fields below. Leave empty to show all fields."
           />
         </div>
       )}

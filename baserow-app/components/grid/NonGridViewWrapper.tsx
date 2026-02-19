@@ -53,6 +53,7 @@ interface NonGridViewWrapperProps {
   cardColorField?: string
   cardWrapText?: boolean
   timelineDateField?: string
+  timelineEndDateField?: string
 }
 
 export default function NonGridViewWrapper({
@@ -74,6 +75,7 @@ export default function NonGridViewWrapper({
   cardColorField: cardColorFieldProp,
   cardWrapText: cardWrapTextProp = true,
   timelineDateField: timelineDateFieldProp,
+  timelineEndDateField: timelineEndDateFieldProp,
 }: NonGridViewWrapperProps) {
   const viewUuid = normalizeUuid(viewId)
   const router = useRouter()
@@ -98,6 +100,7 @@ export default function NonGridViewWrapper({
   const [cardColorField, setCardColorField] = useState<string>(cardColorFieldProp || "")
   const [cardWrapText, setCardWrapText] = useState(cardWrapTextProp ?? true)
   const [timelineDateField, setTimelineDateField] = useState<string>(timelineDateFieldProp || "")
+  const [timelineEndDateField, setTimelineEndDateField] = useState<string>(timelineEndDateFieldProp || "")
   const [customizeCardsDialogOpen, setCustomizeCardsDialogOpen] = useState(false)
 
   const fieldIds = useMemo(() => {
@@ -177,7 +180,8 @@ export default function NonGridViewWrapper({
 
   useEffect(() => {
     setTimelineDateField(timelineDateFieldProp || "")
-  }, [timelineDateFieldProp])
+    setTimelineEndDateField(timelineEndDateFieldProp || "")
+  }, [timelineDateFieldProp, timelineEndDateFieldProp])
 
   useEffect(() => {
     setCardImageField(cardImageFieldProp || "")
@@ -311,6 +315,8 @@ export default function NonGridViewWrapper({
           <TimelineView
             tableId={tableId}
             viewId={viewId}
+            startDateFieldId={timelineDateField || dateFieldId || fieldIds[0] || undefined}
+            endDateFieldId={timelineEndDateField || undefined}
             dateFieldId={timelineDateField || dateFieldId || fieldIds[0] || ""}
             fieldIds={fieldIds}
             searchQuery={searchQuery}
@@ -413,15 +419,19 @@ export default function NonGridViewWrapper({
             cardColorField: cardColorField || undefined,
             cardWrapText: cardWrapText,
             groupBy: groupingFieldId || undefined,
-            ...(viewType === "timeline" && { timelineDateField: timelineDateField || undefined }),
+            ...(viewType === "timeline" && {
+              timelineDateField: timelineDateField || undefined,
+              timelineEndDateField: timelineEndDateField || undefined,
+            }),
           }}
           onConfigChange={(next) => {
             setCardFields(next.cardFields)
             setCardImageField(next.cardImageField || "")
             setCardColorField(next.cardColorField || "")
             setCardWrapText(next.cardWrapText ?? true)
-            if (viewType === "timeline" && next.timelineDateField !== undefined) {
-              setTimelineDateField(next.timelineDateField || "")
+            if (viewType === "timeline") {
+              if (next.timelineDateField !== undefined) setTimelineDateField(next.timelineDateField || "")
+              if (next.timelineEndDateField !== undefined) setTimelineEndDateField(next.timelineEndDateField || "")
             }
             router.refresh()
           }}
