@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useBranding } from "@/contexts/BrandingContext"
 import {
   DndContext,
@@ -82,6 +82,7 @@ export default function GroupedInterfaces({
   onRefresh,
 }: GroupedInterfacesProps) {
   const pathname = usePathname()
+  const router = useRouter()
   // Single source of truth: derive from pathname only (no params/searchParams mix)
   const currentPageId = pathname?.match(/\/pages\/([^/?]+)/)?.[1] ?? undefined
   const { primaryColor, sidebarTextColor } = useBranding()
@@ -867,9 +868,10 @@ export default function GroupedInterfaces({
   }
 
   // Navigation Page Component (view mode)
-  // Use plain Link - no onClick/router.push. Avoids double-handling that can freeze transitions.
+  // Fallback: if Next.js Link navigation doesn't complete (known issue), force full reload after 100ms
   function NavigationPage({ page, level = 0 }: { page: InterfacePage; level?: number }) {
     const targetPageId = page.id
+    const targetPath = `/pages/${targetPageId}`
     const isActive = currentPageId === targetPageId
 
     const className = cn(
@@ -882,10 +884,23 @@ export default function GroupedInterfaces({
 
     return (
       <Link
-        href={`/pages/${targetPageId}`}
+        href={targetPath}
         prefetch={false}
         className={className}
         style={style}
+        onClick={(e) => {
+          if (isActive) {
+            e.preventDefault()
+            router.refresh()
+            return
+          }
+          const startPath = pathname
+          setTimeout(() => {
+            if (window.location.pathname !== targetPath && window.location.pathname === startPath) {
+              window.location.href = targetPath
+            }
+          }, 100)
+        }}
       >
         <span className="truncate flex-1">{page.name}</span>
       </Link>
@@ -987,7 +1002,21 @@ export default function GroupedInterfaces({
                 if (editMode && isDraggingRef.current && activeId) {
                   e.preventDefault()
                   e.stopPropagation()
+                  return
                 }
+                if (isActive) {
+                  e.preventDefault()
+                  router.refresh()
+                  return
+                }
+                // Fallback: if Next.js Link navigation doesn't complete (known issue), force full reload
+                const startPath = pathname
+                const targetPath = `/pages/${targetPageId}`
+                setTimeout(() => {
+                  if (window.location.pathname !== targetPath && window.location.pathname === startPath) {
+                    window.location.href = targetPath
+                  }
+                }, 100)
               }}
             >
               <Layers className="h-4 w-4 flex-shrink-0" style={{ color: isActive ? primaryColor : sidebarTextColor }} />

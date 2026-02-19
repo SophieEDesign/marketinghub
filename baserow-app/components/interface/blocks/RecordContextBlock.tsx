@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState, useMemo, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { PageBlock, BlockFilter } from "@/lib/interface/types"
 import type { RecordContext } from "@/lib/interface/types"
@@ -10,12 +10,17 @@ import { filterRowsBySearch } from "@/lib/search/filterRows"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Search, Plus, Trash2 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import type { TableField } from "@/types/fields"
 import { renderPills } from "@/lib/ui/pills"
 import { formatDateUK } from "@/lib/utils"
 import { formatDateByField, formatNumericValue } from "@/lib/fields/format"
+import type { GroupRule } from "@/lib/grouping/types"
+import { buildGroupTree, flattenGroupTree } from "@/lib/grouping/groupTree"
+import { getFieldDisplayName } from "@/lib/fields/display"
+import { resolveChoiceColor, normalizeHexColor, getTextColorForBackground } from "@/lib/field-colors"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 function isUuidLike(value: string | null | undefined): value is string {
@@ -64,6 +69,15 @@ export default function RecordContextBlock({
   const listPillFields = config.list_pill_fields || []
   const listMetaFields = config.list_meta_fields || []
   const visibleFields = Array.isArray(config.visible_fields) ? config.visible_fields : []
+  const groupByRules = useMemo((): GroupRule[] => {
+    const rules = (config as any).group_by_rules
+    if (Array.isArray(rules) && rules.length > 0) return rules.filter(Boolean) as GroupRule[]
+    const legacy = (config as any).group_by_field || (config as any).group_by
+    if (legacy && typeof legacy === "string" && legacy !== "__none__") {
+      return [{ type: "field", field: legacy }]
+    }
+    return []
+  }, [(config as any).group_by_rules, (config as any).group_by_field, (config as any).group_by])
 
   useEffect(() => {
     if (!tableId) {
@@ -209,6 +223,29 @@ export default function RecordContextBlock({
       undefined
     ) as { id: string; [k: string]: unknown }[]
   }, [records, tableFields, searchQuery])
+
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  const toggleGroupCollapsed = useCallback((pathKey: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(pathKey)) next.delete(pathKey)
+      else next.add(pathKey)
+      return next
+    })
+  }, [])
+
+  const groupModel = useMemo(() => {
+    if (groupByRules.length === 0 || !tableFields.length) return null
+    return buildGroupTree(filteredRecords, tableFields, groupByRules, {
+      emptyLabel: "(Empty)",
+      emptyLast: true,
+    })
+  }, [groupByRules, filteredRecords, tableFields])
+
+  const flattenedGroups = useMemo(() => {
+    if (!groupModel || groupModel.rootGroups.length === 0) return null
+    return flattenGroupTree(groupModel.rootGroups, collapsedGroups)
+  }, [groupModel, collapsedGroups])
 
   const handleSelect = (record: { id: string }) => {
     if (!table || !onRecordContextChange) return
@@ -439,69 +476,192 @@ export default function RecordContextBlock({
           })
         ) : (
           <ul className="w-full space-y-1">
-            {filteredRecords.map((record) => {
-              const isActive = selectedInThisBlock === record.id
-              const subtitle = getSubtitle(record)
-              const imageUrl = getImageUrl(record)
-              const pillFieldObjs = listPillFields
-                .map((fn) => tableFields.find((f) => f.name === fn || f.id === fn))
-                .filter((f): f is TableField => !!f && (f.type === "single_select" || f.type === "multi_select"))
-              const metaFieldObjs = listMetaFields
-                .map((fn) => tableFields.find((f) => f.name === fn || f.id === fn))
-                .filter((f): f is TableField => !!f && ["date", "number", "percent", "currency"].includes(f.type))
-              return (
-                <li key={record.id}>
-                  <button
-                    type="button"
-                    onClick={() => handleSelect(record)}
-                    className={cn(
-                      "w-full rounded-md border px-3 py-2 text-left text-sm transition-colors hover:bg-accent flex gap-3 items-start",
-                      isActive && "ring-2 ring-primary bg-accent"
-                    )}
-                  >
-                    {imageUrl && (
-                      <div className="flex-shrink-0 w-10 h-10 rounded overflow-hidden bg-muted">
-                        <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+            {flattenedGroups ? (
+              flattenedGroups.map((entry) => {
+                if (entry.type === "group") {
+                  const node = entry.node
+                  const fieldName = node.rule?.field || ""
+                  const fieldDef = tableFields.find((f) => f.name === fieldName || f.id === fieldName)
+                  const isCollapsed = collapsedGroups.has(node.pathKey)
+                  const ruleLabel =
+                    node.rule?.type === "date"
+                      ? node.rule.granularity === "year"
+                        ? "Year"
+                        : "Month"
+                      : fieldDef
+                        ? getFieldDisplayName(fieldDef)
+                        : fieldName
+                  if (fieldDef?.type === "single_select" || fieldDef?.type === "multi_select") {
+                    const normalizedColor = normalizeHexColor(
+                      resolveChoiceColor(
+                        String(node.key),
+                        fieldDef.type,
+                        fieldDef.options,
+                        fieldDef.type === "single_select"
+                      )
+                    )
+                    const textColor = getTextColorForBackground(normalizedColor)
+                    return (
+                      <li key={node.pathKey}>
+                        <button
+                          type="button"
+                          onClick={() => toggleGroupCollapsed(node.pathKey)}
+                          className="w-full flex items-center justify-between px-3 py-2 hover:bg-accent/50 rounded text-left"
+                          style={{ paddingLeft: 12 + entry.level * 16 }}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Badge
+                              className={cn("text-xs font-medium border border-opacity-20", textColor)}
+                              style={{ backgroundColor: normalizedColor }}
+                            >
+                              {node.label}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">{node.size}</span>
+                          </div>
+                          <span className="text-xs text-muted-foreground">{isCollapsed ? "▸" : "▾"}</span>
+                        </button>
+                      </li>
+                    )
+                  }
+                  return (
+                    <li key={node.pathKey}>
+                      <button
+                        type="button"
+                        onClick={() => toggleGroupCollapsed(node.pathKey)}
+                        className="w-full flex items-center justify-between px-3 py-2 hover:bg-accent/50 rounded text-left"
+                        style={{ paddingLeft: 12 + entry.level * 16 }}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-xs font-semibold text-foreground truncate">
+                            {ruleLabel}: {node.label}
+                          </span>
+                          <span className="text-xs text-muted-foreground">{node.size}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">{isCollapsed ? "▸" : "▾"}</span>
+                      </button>
+                    </li>
+                  )
+                }
+                const record = entry.item
+                const isActive = selectedInThisBlock === record.id
+                const subtitle = getSubtitle(record)
+                const imageUrl = getImageUrl(record)
+                const pillFieldObjs = listPillFields
+                  .map((fn) => tableFields.find((f) => f.name === fn || f.id === fn))
+                  .filter((f): f is TableField => !!f && (f.type === "single_select" || f.type === "multi_select"))
+                const metaFieldObjs = listMetaFields
+                  .map((fn) => tableFields.find((f) => f.name === fn || f.id === fn))
+                  .filter((f): f is TableField => !!f && ["date", "number", "percent", "currency"].includes(f.type))
+                return (
+                  <li key={record.id}>
+                    <button
+                      type="button"
+                      onClick={() => handleSelect(record)}
+                      className={cn(
+                        "w-full rounded-md border px-3 py-2 text-left text-sm transition-colors hover:bg-accent flex gap-3 items-start",
+                        isActive && "ring-2 ring-primary bg-accent"
+                      )}
+                    >
+                      {imageUrl && (
+                        <div className="flex-shrink-0 w-10 h-10 rounded overflow-hidden bg-muted">
+                          <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <span className="block font-medium truncate">{getLabel(record)}</span>
+                        {subtitle && (
+                          <span className="block text-xs text-muted-foreground mt-0.5 truncate">{subtitle}</span>
+                        )}
+                        {pillFieldObjs.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mt-1.5 items-center">
+                            {pillFieldObjs.map((f) => {
+                              const raw = record[f.name]
+                              if (raw == null || raw === "" || (Array.isArray(raw) && raw.length === 0)) return null
+                              const values = Array.isArray(raw) ? raw.filter((v) => v != null && String(v).trim() !== "") : [raw]
+                              if (values.length === 0) return null
+                              return (
+                                <span key={f.id}>
+                                  {renderPills(f, values, { density: "compact", max: 3 })}
+                                </span>
+                              )
+                            })}
+                          </div>
+                        )}
+                        {metaFieldObjs.length > 0 && (
+                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs text-muted-foreground">
+                            {metaFieldObjs.map((f) => {
+                              const val = formatMetaValue(f, record[f.name])
+                              if (val === "—") return null
+                              return <span key={f.id}>{val}</span>
+                            })}
+                          </div>
+                        )}
                       </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <span className="block font-medium truncate">{getLabel(record)}</span>
-                      {subtitle && (
-                        <span className="block text-xs text-muted-foreground mt-0.5 truncate">{subtitle}</span>
+                    </button>
+                  </li>
+                )
+              })
+            ) : (
+              filteredRecords.map((record) => {
+                const isActive = selectedInThisBlock === record.id
+                const subtitle = getSubtitle(record)
+                const imageUrl = getImageUrl(record)
+                const pillFieldObjs = listPillFields
+                  .map((fn) => tableFields.find((f) => f.name === fn || f.id === fn))
+                  .filter((f): f is TableField => !!f && (f.type === "single_select" || f.type === "multi_select"))
+                const metaFieldObjs = listMetaFields
+                  .map((fn) => tableFields.find((f) => f.name === fn || f.id === fn))
+                  .filter((f): f is TableField => !!f && ["date", "number", "percent", "currency"].includes(f.type))
+                return (
+                  <li key={record.id}>
+                    <button
+                      type="button"
+                      onClick={() => handleSelect(record)}
+                      className={cn(
+                        "w-full rounded-md border px-3 py-2 text-left text-sm transition-colors hover:bg-accent flex gap-3 items-start",
+                        isActive && "ring-2 ring-primary bg-accent"
                       )}
-                      {pillFieldObjs.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mt-1.5 items-center">
-                          {pillFieldObjs.map((f) => {
-                            const raw = record[f.name]
-                            if (raw == null || raw === "" || (Array.isArray(raw) && raw.length === 0)) return null
-                            const values = Array.isArray(raw) ? raw.filter((v) => v != null && String(v).trim() !== "") : [raw]
-                            if (values.length === 0) return null
-                            return (
-                              <span key={f.id}>
-                                {renderPills(f, values, { density: "compact", max: 3 })}
-                              </span>
-                            )
-                          })}
+                    >
+                      {imageUrl && (
+                        <div className="flex-shrink-0 w-10 h-10 rounded overflow-hidden bg-muted">
+                          <img src={imageUrl} alt="" className="w-full h-full object-cover" />
                         </div>
                       )}
-                      {metaFieldObjs.length > 0 && (
-                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs text-muted-foreground">
-                          {metaFieldObjs.map((f) => {
-                            const val = formatMetaValue(f, record[f.name])
-                            if (val === "—") return null
-                            return (
-                              <span key={f.id}>
-                                {val}
-                              </span>
-                            )
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </button>
-                </li>
-              )
-            })}
+                      <div className="min-w-0 flex-1">
+                        <span className="block font-medium truncate">{getLabel(record)}</span>
+                        {subtitle && (
+                          <span className="block text-xs text-muted-foreground mt-0.5 truncate">{subtitle}</span>
+                        )}
+                        {pillFieldObjs.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mt-1.5 items-center">
+                            {pillFieldObjs.map((f) => {
+                              const raw = record[f.name]
+                              if (raw == null || raw === "" || (Array.isArray(raw) && raw.length === 0)) return null
+                              const values = Array.isArray(raw) ? raw.filter((v) => v != null && String(v).trim() !== "") : [raw]
+                              if (values.length === 0) return null
+                              return (
+                                <span key={f.id}>
+                                  {renderPills(f, values, { density: "compact", max: 3 })}
+                                </span>
+                              )
+                            })}
+                          </div>
+                        )}
+                        {metaFieldObjs.length > 0 && (
+                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs text-muted-foreground">
+                            {metaFieldObjs.map((f) => {
+                              const val = formatMetaValue(f, record[f.name])
+                              if (val === "—") return null
+                              return <span key={f.id}>{val}</span>
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  </li>
+                )
+              })
+            )}
           </ul>
         )}
       </div>

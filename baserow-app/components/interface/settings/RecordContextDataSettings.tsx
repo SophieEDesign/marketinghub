@@ -276,7 +276,7 @@ export default function RecordContextDataSettings({
         const textFields = fields.filter(f => f.type === 'text' || f.type === 'long_text')
         const allFields = fields
         const selectFields = fields.filter(f => f.type === 'single_select' || f.type === 'multi_select')
-        const attachmentFields = fields.filter(f => f.type === 'attachment')
+        const imageFields = fields.filter(f => f.type === 'attachment' || f.type === 'url')
         const dateFields = fields.filter(f => f.type === 'date')
         const numberFields = fields.filter(f => f.type === 'number' || f.type === 'percent' || f.type === 'currency')
 
@@ -306,12 +306,12 @@ export default function RecordContextDataSettings({
                   <SelectItem value="__none__">None</SelectItem>
                   {textFields.length
                     ? textFields.map((f) => (
-                        <SelectItem key={f.id} value={getFieldDisplayName(f)}>
+                        <SelectItem key={f.id} value={f.name}>
                           {getFieldDisplayName(f)}
                         </SelectItem>
                       ))
                     : allFields.map((f) => (
-                        <SelectItem key={f.id} value={getFieldDisplayName(f)}>
+                        <SelectItem key={f.id} value={f.name}>
                           {getFieldDisplayName(f)}
                         </SelectItem>
                       ))}
@@ -337,7 +337,7 @@ export default function RecordContextDataSettings({
                     <SelectContent>
                       <SelectItem value="__none__">None</SelectItem>
                       {getAvailableSubtitleFields().map((f) => (
-                        <SelectItem key={f.id} value={getFieldDisplayName(f)}>
+                        <SelectItem key={f.id} value={f.name}>
                           {getFieldDisplayName(f)}
                         </SelectItem>
                       ))}
@@ -371,7 +371,7 @@ export default function RecordContextDataSettings({
                   </SelectTrigger>
                   <SelectContent>
                     {getAvailableSubtitleFields().map((f) => (
-                      <SelectItem key={f.id} value={getFieldDisplayName(f)}>
+                      <SelectItem key={f.id} value={f.name}>
                         {getFieldDisplayName(f)}
                       </SelectItem>
                     ))}
@@ -396,8 +396,8 @@ export default function RecordContextDataSettings({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">None</SelectItem>
-                  {attachmentFields.map((f) => (
-                    <SelectItem key={f.id} value={getFieldDisplayName(f)}>
+                  {imageFields.map((f) => (
+                    <SelectItem key={f.id} value={f.name}>
                       {getFieldDisplayName(f)}
                     </SelectItem>
                   ))}
@@ -423,7 +423,7 @@ export default function RecordContextDataSettings({
                     <SelectContent>
                       <SelectItem value="__none__">None</SelectItem>
                       {selectFields.map((f) => (
-                        <SelectItem key={f.id} value={getFieldDisplayName(f)}>
+                        <SelectItem key={f.id} value={f.name}>
                           {getFieldDisplayName(f)}
                         </SelectItem>
                       ))}
@@ -456,7 +456,7 @@ export default function RecordContextDataSettings({
                 </SelectTrigger>
                 <SelectContent>
                   {getAvailablePillFields().map((f) => (
-                    <SelectItem key={f.id} value={getFieldDisplayName(f)}>
+                    <SelectItem key={f.id} value={f.name}>
                       {getFieldDisplayName(f)}
                     </SelectItem>
                   ))}
@@ -482,7 +482,7 @@ export default function RecordContextDataSettings({
                     <SelectContent>
                       <SelectItem value="__none__">None</SelectItem>
                       {[...dateFields, ...numberFields].map((f) => (
-                        <SelectItem key={f.id} value={getFieldDisplayName(f)}>
+                        <SelectItem key={f.id} value={f.name}>
                           {getFieldDisplayName(f)}
                         </SelectItem>
                       ))}
@@ -515,7 +515,7 @@ export default function RecordContextDataSettings({
                 </SelectTrigger>
                 <SelectContent>
                   {getAvailableMetaFields().map((f) => (
-                    <SelectItem key={f.id} value={getFieldDisplayName(f)}>
+                    <SelectItem key={f.id} value={f.name}>
                       {getFieldDisplayName(f)}
                     </SelectItem>
                   ))}
