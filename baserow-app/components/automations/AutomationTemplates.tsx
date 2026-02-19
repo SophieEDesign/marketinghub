@@ -14,7 +14,7 @@ export default function AutomationTemplates({ onSelectTemplate, onClose }: Autom
   const categories = getTemplatesByCategory()
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 md:left-64 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
       <div
         className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}

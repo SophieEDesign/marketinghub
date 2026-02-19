@@ -275,7 +275,7 @@ export default function DevRecordPanel() {
   return (
     <>
       {useOverlayLayout && !state.isPinned && state.isOpen && (
-        <div className="fixed inset-0 bg-black/20 z-40" onClick={closeRecord} />
+        <div className="fixed inset-0 md:left-64 bg-black/20 z-40" onClick={closeRecord} aria-hidden="true" />
       )}
       <div
         key={`dev-record-panel-${state.recordId}`}

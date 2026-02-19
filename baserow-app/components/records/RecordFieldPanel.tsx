@@ -17,6 +17,7 @@ import { useState, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/components/ui/use-toast"
 import InlineFieldEditor from "./InlineFieldEditor"
+import RecordActivity from "./RecordActivity"
 import type { TableField } from "@/types/fields"
 import { getFieldDisplayName } from "@/lib/fields/display"
 import { FIELD_LABEL_CLASS } from "@/lib/fields/field-label"
@@ -553,6 +554,10 @@ export default function RecordFieldPanel({
           })}
         </div>
       )}
+      {/* Activity (audit) section - created/modified metadata */}
+      <div className="mt-6 pt-4 border-t border-gray-200">
+        <RecordActivity record={recordData} tableId={tableId} />
+      </div>
     </div>
   )
 }

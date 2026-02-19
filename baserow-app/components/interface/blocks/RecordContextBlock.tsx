@@ -12,6 +12,10 @@ import { Input } from "@/components/ui/input"
 import { Search, Plus, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
+import type { TableField } from "@/types/fields"
+import { renderPills } from "@/lib/ui/pills"
+import { formatDateUK } from "@/lib/utils"
+import { formatDateByField, formatNumericValue } from "@/lib/fields/format"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 function isUuidLike(value: string | null | undefined): value is string {
@@ -45,7 +49,7 @@ export default function RecordContextBlock({
   const [records, setRecords] = useState<{ id: string; [k: string]: unknown }[]>([])
   const [loading, setLoading] = useState(true)
   const [titleField, setTitleField] = useState<string | null>(null)
-  const [tableFields, setTableFields] = useState<{ id: string; name: string; type: string }[]>([])
+  const [tableFields, setTableFields] = useState<TableField[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const { toast } = useToast()
@@ -114,11 +118,11 @@ export default function RecordContextBlock({
 
       const { data: fields } = await supabase
         .from("table_fields")
-        .select("id, name, type")
+        .select("*")
         .eq("table_id", resolved.id)
         .order("position", { ascending: true })
 
-      const fieldList = (fields || []) as { id: string; name: string; type: string }[]
+      const fieldList = (fields || []) as TableField[]
       setTableFields(fieldList)
       const firstText = fieldList.find((f) => f.type === "text" || f.type === "long_text" || f.type === "single_line_text")
       const titleKey = (listTitleField && fieldList.some((f) => f.name === listTitleField))
@@ -317,6 +321,33 @@ export default function RecordContextBlock({
     return parts.length ? parts.join(" · ") : null
   }
 
+  const getImageUrl = (record: { id: string; [k: string]: unknown }): string | null => {
+    if (!listImageField) return null
+    const raw = record[listImageField]
+    if (!raw) return null
+    if (typeof raw === "string" && /^https?:\/\//.test(raw)) return raw
+    if (Array.isArray(raw) && raw.length > 0) {
+      const first = raw[0]
+      if (typeof first === "object" && first !== null && "url" in first) return (first as { url: string }).url
+      if (typeof first === "string" && /^https?:\/\//.test(first)) return first
+    }
+    return null
+  }
+
+  const formatMetaValue = (field: TableField, value: unknown): string => {
+    if (value == null || value === "") return "—"
+    switch (field.type) {
+      case "date":
+        return formatDateByField(String(value), field)
+      case "number":
+      case "percent":
+      case "currency":
+        return formatNumericValue(Number(value), field)
+      default:
+        return String(value)
+    }
+  }
+
   return (
     <div className="h-full w-full flex flex-col gap-2 p-2 rounded-md border bg-card">
       {(showSearch || showAddRecord || selectedInThisBlock) && (
@@ -409,20 +440,62 @@ export default function RecordContextBlock({
             {filteredRecords.map((record) => {
               const isActive = selectedInThisBlock === record.id
               const subtitle = getSubtitle(record)
+              const imageUrl = getImageUrl(record)
+              const pillFieldObjs = listPillFields
+                .map((fn) => tableFields.find((f) => f.name === fn || f.id === fn))
+                .filter((f): f is TableField => !!f && (f.type === "single_select" || f.type === "multi_select"))
+              const metaFieldObjs = listMetaFields
+                .map((fn) => tableFields.find((f) => f.name === fn || f.id === fn))
+                .filter((f): f is TableField => !!f && ["date", "number", "percent", "currency"].includes(f.type))
               return (
                 <li key={record.id}>
                   <button
                     type="button"
                     onClick={() => handleSelect(record)}
                     className={cn(
-                      "w-full rounded-md border px-3 py-2 text-left text-sm transition-colors hover:bg-accent",
+                      "w-full rounded-md border px-3 py-2 text-left text-sm transition-colors hover:bg-accent flex gap-3 items-start",
                       isActive && "ring-2 ring-primary bg-accent"
                     )}
                   >
-                    <span className="block font-medium">{getLabel(record)}</span>
-                    {subtitle && (
-                      <span className="block text-xs text-muted-foreground mt-0.5">{subtitle}</span>
+                    {imageUrl && (
+                      <div className="flex-shrink-0 w-10 h-10 rounded overflow-hidden bg-muted">
+                        <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+                      </div>
                     )}
+                    <div className="min-w-0 flex-1">
+                      <span className="block font-medium truncate">{getLabel(record)}</span>
+                      {subtitle && (
+                        <span className="block text-xs text-muted-foreground mt-0.5 truncate">{subtitle}</span>
+                      )}
+                      {pillFieldObjs.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mt-1.5 items-center">
+                          {pillFieldObjs.map((f) => {
+                            const raw = record[f.name]
+                            if (raw == null || raw === "" || (Array.isArray(raw) && raw.length === 0)) return null
+                            const values = Array.isArray(raw) ? raw.filter((v) => v != null && String(v).trim() !== "") : [raw]
+                            if (values.length === 0) return null
+                            return (
+                              <span key={f.id}>
+                                {renderPills(f, values, { density: "compact", max: 3 })}
+                              </span>
+                            )
+                          })}
+                        </div>
+                      )}
+                      {metaFieldObjs.length > 0 && (
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs text-muted-foreground">
+                          {metaFieldObjs.map((f) => {
+                            const val = formatMetaValue(f, record[f.name])
+                            if (val === "—") return null
+                            return (
+                              <span key={f.id}>
+                                {val}
+                              </span>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </button>
                 </li>
               )

@@ -221,24 +221,26 @@ export default function RecordContextDataSettings({
         </div>
       )}
 
-      <div className="space-y-2">
-        <Label>Display mode</Label>
-        <Select
-          value={displayMode}
-          onValueChange={(value: DisplayMode) =>
-            onUpdate({ displayMode: value, display_mode: value })
-          }
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="List" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="list">List</SelectItem>
-            <SelectItem value="grid">Grid</SelectItem>
-            <SelectItem value="compact">Compact</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      {hasTableAndFields && (
+        <div className="space-y-2 border-t pt-4">
+          <Label>Display mode</Label>
+          <Select
+            value={displayMode}
+            onValueChange={(value: DisplayMode) =>
+              onUpdate({ displayMode: value, display_mode: value })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="List" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="list">List</SelectItem>
+              <SelectItem value="grid">Grid</SelectItem>
+              <SelectItem value="compact">Compact</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {(config as any).filter_mode === "specific" && hasTableAndFields && (
         <div className="space-y-2 border-t pt-4">

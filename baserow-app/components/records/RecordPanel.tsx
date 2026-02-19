@@ -22,7 +22,7 @@ export default function RecordPanel() {
     toggleFullscreen,
     goBack,
   } = useRecordPanel()
-  const { isEdit } = useUIMode()
+  const { isEdit, state: uiModeState } = useUIMode()
   const { toast } = useToast()
   const router = useRouter()
   const isMobile = useIsMobile()
@@ -33,7 +33,14 @@ export default function RecordPanel() {
 
   const active = Boolean(state.isOpen && state.tableId)
   // Layout editing when in edit mode and layout can be saved (Airtable-style)
-  const interfaceMode = isEdit() && state.onLayoutSave ? "edit" : "view"
+  const isEditResult = isEdit()
+  const hasOnLayoutSave = Boolean(state.onLayoutSave)
+  const interfaceMode = isEditResult && state.onLayoutSave ? "edit" : "view"
+  // #region agent log
+  if (state.isOpen && state.recordId) {
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordPanel.tsx:interfaceMode',message:'RecordPanel interfaceMode computation',data:{isEditResult,hasOnLayoutSave,stateInterfaceMode:state.interfaceMode,computedInterfaceMode:interfaceMode,recordId:state.recordId,uiMode:uiModeState?.uiMode,editingPageId:uiModeState?.editingPageId},timestamp:Date.now(),hypothesisId:'A,B,C'})}).catch(()=>{});
+  }
+  // #endregion
 
   const handleCopyLink = useCallback(() => {
     if (!state.recordId) return

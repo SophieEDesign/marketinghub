@@ -587,28 +587,29 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   }, [config.field_layout, config, tableFields])
 
   // Get fields to display in structured field list (page-level config)
-  // Uses config.visible_fields (new) or config.detail_fields (backward compatibility)
+  // Priority: field_layout (canvas) > visible_fields > detail_fields > all fields
   const visibleFields = useMemo(() => {
     if (!tableFields.length) return []
-    
-    // Prefer visible_fields (new Record View setting), fallback to detail_fields (legacy)
+
+    // When field_layout exists and has items, use it as the source of truth for the detail panel
+    if (fieldLayout && fieldLayout.length > 0) {
+      return getVisibleFieldsFromLayout(fieldLayout, tableFields, 'canvas')
+    }
+
+    // Fallback: visible_fields (new Record View setting) or detail_fields (legacy)
     const visibleFieldNames = config.visible_fields || config.detail_fields || []
     const hasVisibleFieldsConfig = visibleFieldNames && Array.isArray(visibleFieldNames) && visibleFieldNames.length > 0
-    
-    // If visible_fields is explicitly configured with field names, filter to only those fields
-    // (and filter out any that don't exist in the table anymore)
+
     if (hasVisibleFieldsConfig) {
       const filtered = tableFields.filter(field => visibleFieldNames.includes(field.name))
-      // Maintain order from config
       return visibleFieldNames
         .map((fieldName: string) => filtered.find(f => f.name === fieldName))
         .filter((f): f is TableField => f !== undefined)
     }
-    
-    // Otherwise (undefined, null, or empty array), show ALL fields from the table
-    // This ensures new fields added to the table automatically appear
+
+    // Otherwise show ALL fields from the table
     return tableFields
-  }, [tableFields, config.visible_fields, config.detail_fields])
+  }, [tableFields, fieldLayout, config.visible_fields, config.detail_fields])
   
   // Handle field layout changes
   const handleFieldLayoutChange = useCallback(async (newLayout: FieldLayoutItem[]) => {

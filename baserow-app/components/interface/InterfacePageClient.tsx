@@ -1326,7 +1326,7 @@ function InterfacePageClientInternal({
       {hasPage && isAdmin && (
         <PageActionsRegistrar pageId={pageId} isAdmin={isAdmin} isViewer={isViewer} />
       )}
-      {/* Header with Edit Button - Admin Only */}
+      {/* Header - Admin Only */}
       {!isViewer && hasPage && isAdmin && (
         <div className="flex-shrink-0 border-b bg-white px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3 flex-1 min-w-0">

@@ -484,7 +484,7 @@ function AttachmentModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999]"
+      className="fixed inset-0 md:left-64 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999]"
       onClick={onClose}
     >
       <div
