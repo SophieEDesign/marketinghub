@@ -127,6 +127,7 @@ export default function Shell({
           userRole={userRole}
           hideRecordPanel={hideRecordPanel}
           defaultPageId={defaultPageId}
+          coreDataSectionTitle={coreDataSectionTitle}
         >
           {children}
         </ShellContent>
@@ -150,6 +151,7 @@ function ShellContent({
   hideTopbar = false,
   hideRecordPanel = false,
   defaultPageId = null,
+  coreDataSectionTitle,
   isMobile,
   sidebarOpen,
   setSidebarOpen,
