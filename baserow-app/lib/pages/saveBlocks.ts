@@ -92,29 +92,13 @@ export async function saveBlockLayout(
         updated_at: new Date().toISOString(),
       }
 
-      // Try page_id OR view_id first; fallback to view_id only if page_id column doesn't exist
-      let query = supabase
+      // Admin client: update by id only. Block IDs come from layout loaded for this page.
+      // The page_id/view_id filter can mismatch for content pages (e.g. blocks with view_id=dashboard_layout_id).
+      const { data, error } = await supabase
         .from('view_blocks')
         .update(updatePayload)
         .eq('id', update.id)
         .select('id, position_x, position_y, width, height')
-
-      query = query.or(`page_id.eq.${pageId},view_id.eq.${pageId}`)
-
-      let { data, error } = await query
-
-      // Fallback: if page_id column doesn't exist, retry with view_id only
-      if (error && /column.*page_id.*does not exist/i.test(error.message)) {
-        query = supabase
-          .from('view_blocks')
-          .update(updatePayload)
-          .eq('id', update.id)
-          .eq('view_id', pageId)
-          .select('id, position_x, position_y, width, height')
-        const fallback = await query
-        data = fallback.data
-        error = fallback.error
-      }
 
       if (error) {
         const msg = error.message || ''
@@ -126,9 +110,17 @@ export async function saveBlockLayout(
         }
         throw new Error(`Failed to update block ${update.id}: ${error.message}`)
       }
-      // Verify the update actually happened (RLS might silently fail)
       if (!data || data.length === 0) {
-        throw new Error(`Failed to update block ${update.id}: Update was blocked or block not found. Check RLS policies and block ownership.`)
+        // Block not found - fetch to diagnose (page_id/view_id mismatch or missing block)
+        const { data: block } = await supabase
+          .from('view_blocks')
+          .select('id, page_id, view_id')
+          .eq('id', update.id)
+          .maybeSingle()
+        const hint = block
+          ? `Block exists but page_id=${block.page_id ?? 'null'}, view_id=${block.view_id ?? 'null'} (pageId=${pageId})`
+          : 'Block not found in view_blocks'
+        throw new Error(`Failed to update block ${update.id}: ${hint}`)
       }
 
       // CRITICAL: Server-side logging - print updated rows returned from Supabase
