@@ -51,8 +51,6 @@ interface UIModeProviderProps {
 export function UIModeProvider({ children }: UIModeProviderProps) {
   // #region agent log
   useEffect(() => {
-    console.log("[UIModeProvider] MOUNT")
-    return () => { console.log("[UIModeProvider] UNMOUNT") }
   }, [])
   // #endregion
   const [state, setState] = useState<UIModeState>({

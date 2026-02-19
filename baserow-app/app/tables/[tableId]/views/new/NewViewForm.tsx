@@ -17,7 +17,7 @@ interface NewViewFormProps {
 export default function NewViewForm({ tableId }: NewViewFormProps) {
   const router = useRouter()
   const [name, setName] = useState("")
-  const [type, setType] = useState<"grid" | "form" | "kanban" | "calendar" | "gallery" | "page" | "timeline" | "horizontal_grouped">("grid")
+  const [type, setType] = useState<"grid" | "form" | "kanban" | "calendar" | "gallery" | "timeline" | "horizontal_grouped">("grid")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -118,7 +118,6 @@ export default function NewViewForm({ tableId }: NewViewFormProps) {
                 <option value="gallery">Gallery</option>
                 <option value="timeline">Timeline</option>
                 <option value="horizontal_grouped">Horizontal Grouped</option>
-                <option value="page">Interface Page</option>
               </select>
             </div>
 

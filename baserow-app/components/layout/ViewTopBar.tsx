@@ -23,7 +23,6 @@ import {
   Edit,
   Trash2,
   Star,
-  ChevronRight,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -52,7 +51,6 @@ interface ViewTopBarProps {
   tableId?: string
   views?: ViewSummary[]
   tableFields?: TableField[]
-  /** Table name for breadcrumb (Airtable-style Kanban) */
   tableName?: string
   /** When true, show More menu (Duplicate, Rename, Delete, Set Default) and Add new view */
   canManageViews?: boolean
@@ -77,7 +75,7 @@ export default function ViewTopBar({
   tableId,
   views = [],
   tableFields = [],
-  tableName,
+  tableName: _tableName,
   canManageViews = true,
   onCustomizeCards,
   onFilter,
@@ -154,25 +152,12 @@ export default function ViewTopBar({
     }
   }
 
-  const showAirtableBreadcrumb = viewType === "kanban" && tableName && tableId
-  const showAirtableToolbar = viewType === "kanban"
-
   return (
     <div className="bg-white border-b border-gray-200 flex flex-col">
-      {/* Row 1: Breadcrumb (Airtable-style Kanban) or View tabs */}
+      {/* Row 1: View tabs */}
       <div className="flex items-center border-b border-gray-200 overflow-x-auto shrink-0 min-w-0">
         <div className="flex items-center gap-0 flex-nowrap px-4 py-0 min-w-max">
-          {showAirtableBreadcrumb ? (
-            <div className="flex items-center gap-1.5 py-2.5 text-sm text-gray-600">
-              <Link href={`/tables/${tableId}`} className="hover:text-gray-900 truncate max-w-[200px]">
-                {tableName}
-              </Link>
-              <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
-              <span className="font-medium text-gray-900 truncate max-w-[200px]" style={{ color: primaryColor }}>
-                {viewName}
-              </span>
-            </div>
-          ) : views.length > 0 && tableId ? (
+          {views.length > 0 && tableId ? (
             views.map((v) => {
               const isActive = v.id === viewId
               return (
@@ -199,7 +184,7 @@ export default function ViewTopBar({
               {viewName} <span className="text-gray-500 font-normal">({viewType})</span>
             </span>
           )}
-          {canManageViews && tableId && !showAirtableBreadcrumb && (
+          {canManageViews && tableId && (
             <Link
               href={`/tables/${tableId}/views/new`}
               className="flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-50 border-transparent border-b-2 -mb-px shrink-0 rounded-sm"
@@ -215,7 +200,7 @@ export default function ViewTopBar({
       {/* Row 2: Toolbar - Airtable-style (Filter, Sort, Search) or full toolbar */}
       <div className="h-10 flex items-center gap-3 px-4 shrink-0 min-w-0">
         <div className="flex items-center gap-3 overflow-x-auto min-w-0 flex-1">
-          {onDesign && !showAirtableToolbar && (
+          {onDesign && (
             <Button
               variant="outline"
               size="sm"
@@ -227,7 +212,7 @@ export default function ViewTopBar({
               Design
             </Button>
           )}
-          {onAddField && !showAirtableToolbar && (
+          {onAddField && (
             <Button
               variant="outline"
               size="sm"
@@ -284,7 +269,7 @@ export default function ViewTopBar({
               Sort
             </Button>
           )}
-          {onGroup && !showAirtableToolbar && (
+          {onGroup && (
             <Button
               variant="ghost"
               size="sm"
@@ -295,7 +280,7 @@ export default function ViewTopBar({
               Group
             </Button>
           )}
-          {onHideFields && !showAirtableToolbar && (
+          {onHideFields && (
             <Button
               variant="ghost"
               size="sm"
@@ -306,7 +291,7 @@ export default function ViewTopBar({
               Hide Fields
             </Button>
           )}
-          {onShare && !showAirtableToolbar && (
+          {onShare && (
             <Button
               variant="ghost"
               size="sm"
@@ -333,11 +318,11 @@ export default function ViewTopBar({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {(viewType === "kanban" || viewType === "gallery") && onCustomizeCards && (
+            {(viewType === "kanban" || viewType === "gallery" || viewType === "timeline") && onCustomizeCards && (
               <>
                 <DropdownMenuItem onClick={onCustomizeCards}>
                   <Layout className="h-4 w-4 mr-2" />
-                  Customize cards
+                  {viewType === "timeline" ? "Customize timeline" : "Customize cards"}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
               </>
@@ -381,7 +366,7 @@ export default function ViewTopBar({
           className="h-7 px-2.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white shrink-0"
         >
           <Plus className="h-3.5 w-3.5 mr-1.5" />
-          {showAirtableToolbar ? "Add record" : "New Record"}
+          New Record
         </Button>
       )}
         </div>

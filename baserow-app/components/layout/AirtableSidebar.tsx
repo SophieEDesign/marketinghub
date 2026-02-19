@@ -56,6 +56,8 @@ interface AirtableSidebarProps {
   isOpen?: boolean
   onClose?: () => void
   defaultPageId?: string | null // For "Back to home" - never link to abstract /
+  /** Section title for the Core Data (tables) area. Default: "Core Data" */
+  coreDataSectionTitle?: string
 }
 
 export default function AirtableSidebar({ 
@@ -67,6 +69,7 @@ export default function AirtableSidebar({
   isOpen: isOpenProp,
   onClose,
   defaultPageId = null,
+  coreDataSectionTitle = "Core Data",
 }: AirtableSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
@@ -302,7 +305,7 @@ export default function AirtableSidebar({
                 className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold uppercase tracking-wider hover:bg-black/10 rounded transition-colors"
                 style={{ color: sidebarTextColor }}
               >
-                <span>Core Data</span>
+                <span>{coreDataSectionTitle}</span>
                 {expandedSections.has("core-data") ? (
                   <ChevronDown className="h-3 w-3 flex-shrink-0" style={{ color: sidebarTextColor }} />
                 ) : (

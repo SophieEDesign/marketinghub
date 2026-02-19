@@ -25,8 +25,6 @@ const SidebarModeContext = createContext<SidebarModeContextType | undefined>(und
 export function SidebarModeProvider({ children }: { children: ReactNode }) {
   // #region agent log
   useEffect(() => {
-    console.log("[SidebarModeProvider] MOUNT")
-    return () => { console.log("[SidebarModeProvider] UNMOUNT") }
   }, [])
   // #endregion
   const { isEditing, toggleEditMode, enterEditMode, exitEditMode } = useEditMode()

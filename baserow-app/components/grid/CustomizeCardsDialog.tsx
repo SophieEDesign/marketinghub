@@ -18,7 +18,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { GripVertical, Search, ImageIcon, Layers } from "lucide-react"
+import { GripVertical, Search, ImageIcon, Layers, Calendar } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -93,6 +93,8 @@ export interface CardConfig {
   cardColorField?: string
   cardWrapText?: boolean
   groupBy?: string
+  /** Timeline only: date field for event start */
+  timelineDateField?: string
 }
 
 interface CustomizeCardsDialogProps {
@@ -105,6 +107,8 @@ interface CustomizeCardsDialogProps {
   viewFields: Array<{ field_name: string; visible: boolean; position: number }>
   config: CardConfig
   onConfigChange: (config: CardConfig) => void
+  /** When "timeline", show date field selector and persist timeline-specific config */
+  viewType?: "kanban" | "gallery" | "timeline"
 }
 
 const IMAGE_FIELD_TYPES = ["attachment", "url"]
@@ -118,14 +122,17 @@ export default function CustomizeCardsDialog({
   viewFields,
   config,
   onConfigChange,
+  viewType = "kanban",
 }: CustomizeCardsDialogProps) {
   const router = useRouter()
   const viewUuid = normalizeUuid(viewId)
+  const isTimeline = viewType === "timeline"
   const [localCardFields, setLocalCardFields] = useState<string[]>(config.cardFields)
   const [localImageField, setLocalImageField] = useState<string>(config.cardImageField || "")
   const [localColorField, setLocalColorField] = useState<string>(config.cardColorField || "")
   const [localWrapText, setLocalWrapText] = useState(config.cardWrapText ?? true)
   const [localGroupBy, setLocalGroupBy] = useState<string>(config.groupBy || "")
+  const [localDateField, setLocalDateField] = useState<string>(config.timelineDateField || "")
   const [orderedFieldNames, setOrderedFieldNames] = useState<string[]>([])
   const [search, setSearch] = useState("")
 
@@ -135,6 +142,7 @@ export default function CustomizeCardsDialog({
     setLocalColorField(config.cardColorField || "")
     setLocalWrapText(config.cardWrapText ?? true)
     setLocalGroupBy(config.groupBy || "")
+    setLocalDateField(config.timelineDateField || "")
   }, [config, isOpen])
 
   useEffect(() => {
@@ -229,6 +237,7 @@ export default function CustomizeCardsDialog({
       f.type === "text" ||
       f.type === "long_text"
   )
+  const dateFields = tableFields.filter((f) => f.type === "date")
 
   async function handleSave() {
     const nextCardFields = orderedFieldNames.filter((name) => localCardFields.includes(name))
@@ -238,6 +247,7 @@ export default function CustomizeCardsDialog({
       cardColorField: localColorField || undefined,
       cardWrapText: localWrapText,
       groupBy: localGroupBy || undefined,
+      ...(isTimeline && { timelineDateField: localDateField || undefined }),
     }
 
     try {
@@ -252,18 +262,21 @@ export default function CustomizeCardsDialog({
         .eq("id", viewUuid)
         .single()
       const currentConfig = (viewData?.config as Record<string, unknown>) || {}
+      const configUpdate: Record<string, unknown> = {
+        ...currentConfig,
+        card_fields: nextCardFields,
+        card_image_field: nextConfig.cardImageField,
+        card_color_field: nextConfig.cardColorField,
+        card_wrap_text: nextConfig.cardWrapText,
+        kanbanGroupField: nextConfig.groupBy,
+      }
+      if (isTimeline) {
+        configUpdate.timeline_date_field = nextConfig.timelineDateField
+        configUpdate.timeline_group_by = nextConfig.groupBy
+      }
       const { error: updateError } = await supabase
         .from("views")
-        .update({
-          config: {
-            ...currentConfig,
-            card_fields: nextCardFields,
-            card_image_field: nextConfig.cardImageField,
-            card_color_field: nextConfig.cardColorField,
-            card_wrap_text: nextConfig.cardWrapText,
-            kanbanGroupField: nextConfig.groupBy,
-          },
-        })
+        .update({ config: configUpdate })
         .eq("id", viewUuid)
 
       if (updateError) throw updateError
@@ -299,13 +312,38 @@ export default function CustomizeCardsDialog({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Customize cards</DialogTitle>
+          <DialogTitle>{isTimeline ? "Customize timeline" : "Customize cards"}</DialogTitle>
           <DialogDescription>
-            Choose which fields appear on each card and how they are displayed.
+            {isTimeline
+              ? "Choose the date field and how events are displayed on the timeline."
+              : "Choose which fields appear on each card and how they are displayed."}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2 overflow-y-auto flex-1 min-h-0">
+          {/* Date field (timeline only) */}
+          {isTimeline && dateFields.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-xs font-medium flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5" />
+                Date field
+              </Label>
+              <Select value={localDateField || "__none__"} onValueChange={(v) => setLocalDateField(v === "__none__" ? "" : v)}>
+                <SelectTrigger className="h-8">
+                  <SelectValue placeholder="Select date field" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Auto-detect</SelectItem>
+                  {dateFields.map((f) => (
+                    <SelectItem key={f.name} value={f.name}>
+                      {f.label || f.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* Stacked by (group field) */}
           {groupFields.length > 0 && (
             <div className="space-y-2">
@@ -420,7 +458,9 @@ export default function CustomizeCardsDialog({
           </div>
 
           <p className="text-xs text-gray-500">
-            Only non-empty values are displayed in kanban cards.
+            {isTimeline
+              ? "Only non-empty values are displayed on timeline events."
+              : "Only non-empty values are displayed in kanban cards."}
           </p>
 
           {/* Wrap long cell values */}

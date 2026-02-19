@@ -139,10 +139,14 @@ export default async function ViewPage({
     const groupBy = gridSettings?.group_by_field || (view.config as { groupBy?: string })?.groupBy
     const groupByRules = gridSettings?.group_by_rules || null
     
-    // For Kanban/Gallery views, get group field from settings or config
-    const kanbanOrGalleryGroupField = (view.type === "kanban" || view.type === "gallery")
-      ? (groupBy || (view.config as { kanbanGroupField?: string })?.kanbanGroupField || (view.config as { gallery_group_by?: string })?.gallery_group_by)
-      : undefined
+    // For Kanban/Gallery/Timeline views, get group field from settings or config
+    const kanbanGalleryTimelineGroupField =
+      view.type === "kanban" || view.type === "gallery" || view.type === "timeline"
+        ? (groupBy ||
+          (view.config as { kanbanGroupField?: string })?.kanbanGroupField ||
+          (view.config as { gallery_group_by?: string })?.gallery_group_by ||
+          (view.config as { timeline_group_by?: string })?.timeline_group_by)
+        : undefined
 
     // For horizontal_grouped views, get group field and rules from settings
     const horizontalGroupedGroupField = view.type === "horizontal_grouped" ? groupBy : undefined
@@ -152,6 +156,24 @@ export default async function ViewPage({
     const tableViews = await getViews(tableId).catch(() => []).then((v) =>
       (v || []).filter((x) => x.type !== "interface")
     )
+
+    // Fallback when view_fields is empty (e.g. initialize-fields failed for new views).
+    // Timeline/Calendar need dateFieldId and fieldIds to load; derive from table_fields.
+    const tableFieldsTyped = tableFields as { name?: string; type?: string }[]
+    const needsDateField = view.type === "calendar" || view.type === "timeline"
+    const firstDateField = tableFieldsTyped?.find((f) => f.type === "date")?.name
+    const allFieldNames = (tableFieldsTyped ?? []).map((f) => f.name).filter(Boolean) as string[]
+    const effectiveFieldIds =
+      viewFields.length > 0
+        ? viewFields.map((f) => f.field_name).filter(Boolean)
+        : allFieldNames
+    const viewConfig = view.config as Record<string, unknown> | null
+    const timelineDateFromConfig = viewConfig?.timeline_date_field as string | undefined
+    const effectiveDateFieldId =
+      needsDateField &&
+      (timelineDateFromConfig ||
+        (Array.isArray(viewFields) && viewFields[0]?.field_name) ||
+        firstDateField)
 
     return (
       <WorkspaceShellWrapper title={view.name}>
@@ -192,13 +214,9 @@ export default async function ViewPage({
             tableId={tableId}
             viewId={viewId}
             views={tableViews}
-            fieldIds={Array.isArray(viewFields) ? viewFields.map((f) => f.field_name).filter(Boolean) : []}
-            groupingFieldId={kanbanOrGalleryGroupField}
-            dateFieldId={
-              view.type === "calendar" || view.type === "timeline"
-                ? (Array.isArray(viewFields) && viewFields[0]?.field_name) || undefined
-                : undefined
-            }
+            fieldIds={effectiveFieldIds}
+            groupingFieldId={kanbanGalleryTimelineGroupField}
+            dateFieldId={effectiveDateFieldId || undefined}
             viewFilters={viewFilters}
             viewSorts={viewSorts}
             viewFields={viewFields}
@@ -207,6 +225,7 @@ export default async function ViewPage({
             cardImageField={(view.config as { card_image_field?: string })?.card_image_field}
             cardColorField={(view.config as { card_color_field?: string })?.card_color_field}
             cardWrapText={(view.config as { card_wrap_text?: boolean })?.card_wrap_text}
+            timelineDateField={(view.config as { timeline_date_field?: string })?.timeline_date_field}
           />
         )}
       </WorkspaceShellWrapper>

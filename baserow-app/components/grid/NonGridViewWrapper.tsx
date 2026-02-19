@@ -52,6 +52,7 @@ interface NonGridViewWrapperProps {
   cardImageField?: string
   cardColorField?: string
   cardWrapText?: boolean
+  timelineDateField?: string
 }
 
 export default function NonGridViewWrapper({
@@ -72,6 +73,7 @@ export default function NonGridViewWrapper({
   cardImageField: cardImageFieldProp,
   cardColorField: cardColorFieldProp,
   cardWrapText: cardWrapTextProp = true,
+  timelineDateField: timelineDateFieldProp,
 }: NonGridViewWrapperProps) {
   const viewUuid = normalizeUuid(viewId)
   const router = useRouter()
@@ -95,6 +97,7 @@ export default function NonGridViewWrapper({
   const [cardImageField, setCardImageField] = useState<string>(cardImageFieldProp || "")
   const [cardColorField, setCardColorField] = useState<string>(cardColorFieldProp || "")
   const [cardWrapText, setCardWrapText] = useState(cardWrapTextProp ?? true)
+  const [timelineDateField, setTimelineDateField] = useState<string>(timelineDateFieldProp || "")
   const [customizeCardsDialogOpen, setCustomizeCardsDialogOpen] = useState(false)
 
   const fieldIds = useMemo(() => {
@@ -171,6 +174,10 @@ export default function NonGridViewWrapper({
   useEffect(() => {
     setCardFields(cardFieldsProp)
   }, [cardFieldsProp])
+
+  useEffect(() => {
+    setTimelineDateField(timelineDateFieldProp || "")
+  }, [timelineDateFieldProp])
 
   useEffect(() => {
     setCardImageField(cardImageFieldProp || "")
@@ -304,11 +311,13 @@ export default function NonGridViewWrapper({
           <TimelineView
             tableId={tableId}
             viewId={viewId}
-            dateFieldId={dateFieldId || fieldIds[0] || ""}
+            dateFieldId={timelineDateField || dateFieldId || fieldIds[0] || ""}
             fieldIds={fieldIds}
             searchQuery={searchQuery}
             tableFields={tableFields}
             filters={filtersAsConfig}
+            colorField={cardColorField || undefined}
+            groupByField={groupingFieldId || undefined}
           />
         )}
         {viewType === "horizontal_grouped" && tableInfo && (
@@ -390,7 +399,7 @@ export default function NonGridViewWrapper({
           router.refresh()
         }}
       />
-      {(viewType === "kanban" || viewType === "gallery") && (
+      {(viewType === "kanban" || viewType === "gallery" || viewType === "timeline") && (
         <CustomizeCardsDialog
           isOpen={customizeCardsDialogOpen}
           onClose={() => setCustomizeCardsDialogOpen(false)}
@@ -404,14 +413,19 @@ export default function NonGridViewWrapper({
             cardColorField: cardColorField || undefined,
             cardWrapText: cardWrapText,
             groupBy: groupingFieldId || undefined,
+            ...(viewType === "timeline" && { timelineDateField: timelineDateField || undefined }),
           }}
           onConfigChange={(next) => {
             setCardFields(next.cardFields)
             setCardImageField(next.cardImageField || "")
             setCardColorField(next.cardColorField || "")
             setCardWrapText(next.cardWrapText ?? true)
+            if (viewType === "timeline" && next.timelineDateField !== undefined) {
+              setTimelineDateField(next.timelineDateField || "")
+            }
             router.refresh()
           }}
+          viewType={viewType === "timeline" ? "timeline" : viewType === "gallery" ? "gallery" : "kanban"}
         />
       )}
       <HideFieldsDialog

@@ -64,6 +64,8 @@ interface ShellProps {
   hideTopbar?: boolean // Option to hide topbar (for interface pages that have their own toolbar)
   hideRecordPanel?: boolean // Option to hide the global RecordPanel (for pages that have their own record detail panel)
   defaultPageId?: string | null // For "Back to home" link - never link to abstract /
+  /** Section title for Core Data (tables) in sidebar. Default: "Core Data" */
+  coreDataSectionTitle?: string
 }
 
 export default function Shell({
@@ -78,6 +80,7 @@ export default function Shell({
   hideTopbar = false,
   hideRecordPanel = false,
   defaultPageId = null,
+  coreDataSectionTitle,
 }: ShellProps) {
   const isMobile = useIsMobile()
   const { primaryColor } = useBranding()
@@ -193,6 +196,7 @@ function ShellContent({
         isOpen={isMobile ? sidebarOpen : undefined}
         onClose={isMobile ? () => setSidebarOpen(false) : undefined}
         defaultPageId={defaultPageId}
+        coreDataSectionTitle={coreDataSectionTitle}
       />
       {/* MainArea: InterfaceContainer + RecordPanel (inline) + RightSettingsPanel (edit mode only) */}
       <div className="flex flex-1 min-w-0 overflow-hidden">
