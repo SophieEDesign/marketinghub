@@ -124,7 +124,9 @@ export default function RecordContextBlock({
 
       const fieldList = (fields || []) as TableField[]
       setTableFields(fieldList)
-      const firstText = fieldList.find((f) => f.type === "text" || f.type === "long_text" || f.type === "single_line_text")
+      const firstText = fieldList.find((f) =>
+        ["text", "long_text", "single_line_text"].includes(f.type as string)
+      )
       const titleKey = (listTitleField && fieldList.some((f) => f.name === listTitleField))
         ? listTitleField
         : visibleFields.length > 0 && fieldList.some((f) => f.name === visibleFields[0])
