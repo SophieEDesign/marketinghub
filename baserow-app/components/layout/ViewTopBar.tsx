@@ -160,22 +160,48 @@ export default function ViewTopBar({
           {views.length > 0 && tableId ? (
             views.map((v) => {
               const isActive = v.id === viewId
-              return (
-                <Link
-                  key={v.id}
-                  href={`/tables/${tableId}/views/${v.id}`}
-                  className={cn(
-                    "flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 transition-colors shrink-0",
-                    isActive
-                      ? "border-blue-600 text-blue-600 bg-white"
-                      : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                  )}
-                >
+              const tabContent = (
+                <>
                   <span style={isActive ? { color: primaryColor } : undefined} className="shrink-0 [&>svg]:h-4 [&>svg]:w-4">
                     {getViewIcon(v.type)}
                   </span>
                   <span className="truncate max-w-[140px]">{v.name}</span>
                   <span className="text-gray-400 text-xs capitalize shrink-0">({v.type})</span>
+                </>
+              )
+              const tabClassName = cn(
+                "flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 transition-colors shrink-0",
+                isActive
+                  ? "border-blue-600 text-blue-600 bg-white"
+                  : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+              )
+              if (isActive && canManageViews) {
+                return (
+                  <div
+                    key={v.id}
+                    role="tab"
+                    aria-selected="true"
+                    title="Double-click to rename"
+                    className={tabClassName}
+                    onDoubleClick={(e) => {
+                      e.preventDefault()
+                      setViewManagementAction("rename")
+                      setViewManagementDialogOpen(true)
+                    }}
+                  >
+                    {tabContent}
+                  </div>
+                )
+              }
+              return (
+                <Link
+                  key={v.id}
+                  href={`/tables/${tableId}/views/${v.id}`}
+                  className={tabClassName}
+                  role="tab"
+                  aria-selected={isActive}
+                >
+                  {tabContent}
                 </Link>
               )
             })
