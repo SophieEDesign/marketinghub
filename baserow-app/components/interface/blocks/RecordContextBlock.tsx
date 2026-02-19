@@ -501,13 +501,19 @@ export default function RecordContextBlock({
                       )
                     )
                     const textColor = getTextColorForBackground(normalizedColor)
+                    const indent = 12 + entry.level * 20
                     return (
                       <li key={node.pathKey}>
                         <button
                           type="button"
                           onClick={() => toggleGroupCollapsed(node.pathKey)}
-                          className="w-full flex items-center justify-between px-3 py-2 hover:bg-accent/50 rounded text-left"
-                          style={{ paddingLeft: 12 + entry.level * 16 }}
+                          className="w-full flex items-center justify-between px-3 py-2.5 hover:opacity-90 rounded text-left border-l-2"
+                          style={{
+                            marginLeft: entry.level * 12,
+                            paddingLeft: indent,
+                            borderLeftColor: normalizedColor,
+                            backgroundColor: `${normalizedColor}18`,
+                          }}
                         >
                           <div className="flex items-center gap-2 min-w-0">
                             <Badge
@@ -523,13 +529,14 @@ export default function RecordContextBlock({
                       </li>
                     )
                   }
+                  const indent = 12 + entry.level * 20
                   return (
                     <li key={node.pathKey}>
                       <button
                         type="button"
                         onClick={() => toggleGroupCollapsed(node.pathKey)}
-                        className="w-full flex items-center justify-between px-3 py-2 hover:bg-accent/50 rounded text-left"
-                        style={{ paddingLeft: 12 + entry.level * 16 }}
+                        className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-accent/60 rounded text-left border-l-2 border-muted-foreground/30 bg-muted/40"
+                        style={{ marginLeft: entry.level * 12, paddingLeft: indent }}
                       >
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="text-xs font-semibold text-foreground truncate">
@@ -553,7 +560,7 @@ export default function RecordContextBlock({
                   .map((fn) => tableFields.find((f) => f.name === fn || f.id === fn))
                   .filter((f): f is TableField => !!f && ["date", "number", "percent", "currency"].includes(f.type))
                 return (
-                  <li key={record.id}>
+                  <li key={record.id} style={{ marginLeft: entry.level * 16 }}>
                     <button
                       type="button"
                       onClick={() => handleSelect(record)}

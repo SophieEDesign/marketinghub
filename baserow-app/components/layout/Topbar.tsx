@@ -30,7 +30,7 @@ export default function Topbar({ title, onSidebarToggle, isAdmin }: TopbarProps)
           </Button>
         )}
         {title && (
-          <span className="text-lg font-semibold text-gray-700 truncate hidden sm:inline">
+          <span className="text-lg font-semibold text-gray-700 truncate">
             {title}
           </span>
         )}

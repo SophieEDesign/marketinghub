@@ -61,6 +61,9 @@ export default function RecordDetailPanelInline({
     )
   }
 
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordDetailPanelInline.tsx:render',message:'RecordDetailPanelInline props',data:{interfaceMode,hasOnLayoutSave:Boolean(onLayoutSave),fieldLayoutLen:fieldLayout.length,pageEditable,canEditLayout:pageEditable&&Boolean(onLayoutSave)},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
   return (
     <div className="flex flex-col h-full min-h-0 overflow-y-auto">
       <RecordEditor

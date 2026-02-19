@@ -614,12 +614,18 @@ export default function RecordReviewLeftColumn({
         resolveChoiceColor(String(node.key), fieldDef.type, fieldDef.options, fieldDef.type === "single_select")
       )
       const textColor = getTextColorForBackground(normalizedColor)
+      const indent = 12 + level * 20
       return (
         <button
           type="button"
           onClick={() => toggleGroupCollapsed(node.pathKey)}
-          className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 rounded"
-          style={{ paddingLeft: 12 + level * 16 }}
+          className="w-full flex items-center justify-between px-4 py-2.5 hover:opacity-90 rounded border-l-2"
+          style={{
+            marginLeft: level * 12,
+            paddingLeft: indent,
+            borderLeftColor: normalizedColor,
+            backgroundColor: `${normalizedColor}18`,
+          }}
         >
           <div className="flex items-center gap-2 min-w-0">
             <Badge className={`text-xs font-medium ${textColor} border border-opacity-20`} style={{ backgroundColor: normalizedColor }}>
@@ -632,12 +638,13 @@ export default function RecordReviewLeftColumn({
       )
     }
 
+    const indent = 12 + level * 20
     return (
       <button
         type="button"
         onClick={() => toggleGroupCollapsed(node.pathKey)}
-        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 rounded"
-        style={{ paddingLeft: 12 + level * 16 }}
+        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-100 rounded border-l-2 border-gray-300/50 bg-gray-50/80"
+        style={{ marginLeft: level * 12, paddingLeft: indent }}
       >
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-xs font-semibold text-gray-700 truncate">
@@ -975,15 +982,21 @@ export default function RecordReviewLeftColumn({
               flattenedGroups.map((it: any, idx: number) => {
                 if (it.type === 'group') {
                   const node = it.node
+                  const groupLevel = it.level ?? 0
                   return (
                     <div key={node.pathKey} className="border-b border-gray-100">
-                      {renderGroupHeader(node, it.level || 0)}
+                      {renderGroupHeader(node, groupLevel)}
                     </div>
                   )
                 } else {
                   // Render record row with indentation based on level
+                  const itemLevel = it.level ?? 1
                   return (
-                    <div key={`record-${it.item?.id || idx}`} className="border-b border-gray-50">
+                    <div
+                      key={`record-${it.item?.id || idx}`}
+                      className="border-b border-gray-50"
+                      style={{ marginLeft: itemLevel * 16 }}
+                    >
                       {renderRecordRow(it.item)}
                     </div>
                   )

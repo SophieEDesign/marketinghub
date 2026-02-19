@@ -175,8 +175,10 @@ export default async function ViewPage({
         (Array.isArray(viewFields) && viewFields[0]?.field_name) ||
         firstDateField)
 
+    const pageTitle = table?.name ? `${table.name} – ${view.name}` : view.name
+
     return (
-      <WorkspaceShellWrapper title={view.name}>
+      <WorkspaceShellWrapper title={pageTitle}>
         {view.type === "grid" ? (
           <AirtableViewPage
             tableId={tableId}
