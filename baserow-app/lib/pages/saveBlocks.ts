@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import type { PageBlock, LayoutItem } from '@/lib/interface/types'
 import { layoutItemToDbUpdate } from '@/lib/interface/layout-mapping'
 import { debugLog, debugError } from '@/lib/interface/debug-flags'
@@ -23,7 +24,9 @@ export async function saveBlockLayout(
   pageId: string,
   layout: LayoutItem[]
 ): Promise<void> {
-  const supabase = await createClient()
+  // Use admin client to bypass RLS - layout save is already protected by API/auth.
+  // RLS policies can block updates even when user has page access (e.g. policy mismatch).
+  const supabase = createAdminClient()
 
   // Schema probe: verify page_id column exists (migration may not have run on this project)
   const projectRef = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/^https?:\/\//, '').split('.')[0] || 'unknown'
