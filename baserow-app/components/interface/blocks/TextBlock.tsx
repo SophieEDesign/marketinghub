@@ -584,26 +584,10 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     }
   }, [editor, readOnly, textColor, fontWeight, textAlign, block.id, isEditing, isViewer])
 
-  // Toolbar component
-  // CRITICAL: Only check for editor existence - visibility controlled by isEditing prop
-  const Toolbar = () => {
-    if (!editor) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[TextBlock Toolbar] Not rendering: editor not ready')
-      }
-      return null
-    }
-
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[TextBlock Toolbar] Rendering:', { 
-        blockId: block.id, 
-        isEditing, 
-        readOnly, 
-        hasEditor: !!editor 
-      })
-    }
-
-    return (
+  // CRITICAL: Render toolbar as inline JSX, NOT as a component defined in render.
+  // Defining a component inline creates a new function every render → React unmounts/remounts it →
+  // onMouseEnter fires when new element mounts under cursor → setIsBlockEditing → re-render → loop (React #185).
+  const toolbarContent = editor && (
       <div 
         ref={toolbarRef}
         data-toolbar="true"
@@ -611,12 +595,9 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           "absolute top-2 left-2 z-20 flex flex-wrap items-center gap-1 bg-white/95 backdrop-blur border border-gray-200 rounded-lg shadow-sm p-1"
         )}
         onMouseDown={(e) => {
-          // Don't let the click bubble to the canvas (would select/drag the block),
-          // and keep editor selection from being cleared.
           handleToolbarMouseDown(e)
         }}
         onMouseEnter={() => {
-          // Ensure editor stays focused when hovering toolbar
           if (editor && !editor.isFocused) {
             setIsBlockEditing(true)
             editor.commands.focus()
@@ -838,8 +819,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           <LinkIcon className="h-4 w-4" />
         </Button>
       </div>
-    )
-  }
+  )
 
   // Show loading state if config is still loading
   if (isConfigLoading) {
@@ -936,7 +916,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       }}
     >
       {/* Toolbar (owned by this block; no global floating UI) */}
-      {showToolbar && <Toolbar />}
+      {showToolbar && toolbarContent}
       
       {/* Save status indicator */}
       {isEditing && saveStatus !== "idle" && (
