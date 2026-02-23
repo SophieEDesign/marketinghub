@@ -121,7 +121,7 @@ export default function ListView({
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const prevGroupByRef = useRef<string | undefined>(undefined)
   const didInitChoiceGroupCollapseRef = useRef(false)
-  // Ref for measuring content height
+  // Ref for measuring content height (outer container; when push-down mode, scrollHeight = full content)
   const contentRef = useRef<HTMLDivElement>(null)
   const [tableName, setTableName] = useState<string | null>(null)
   const [groupDialogOpen, setGroupDialogOpen] = useState(false)
@@ -502,39 +502,31 @@ export default function ListView({
   }, [currentGroupBy, defaultChoiceGroupsCollapsed, effectiveGroupRules.length, groupModel?.rootGroups])
 
   // Measure content height when grouping changes (expand/collapse or enable/disable)
-  // Only trigger on group state changes, not on data refresh, inline editing, etc.
-  // Enhanced with better measurement accuracy and max height cap
+  // When onHeightChange is provided, inner div uses overflow-visible so content grows; contentRef (outer)
+  // scrollHeight then reflects full content height (toolbar + table).
   useEffect(() => {
     if (!onHeightChange || !contentRef.current) return
     
     const isGrouped = effectiveGroupRules.length > 0
     if (!isGrouped) return // No grouping, skip measurement
 
-    // Debounce measurement to avoid excessive updates
     const timeoutId = setTimeout(() => {
       if (!contentRef.current) return
       
-      // Get computed styles to account for padding and margins
       const computedStyle = window.getComputedStyle(contentRef.current)
       const paddingTop = parseFloat(computedStyle.paddingTop) || 0
       const paddingBottom = parseFloat(computedStyle.paddingBottom) || 0
       const marginTop = parseFloat(computedStyle.marginTop) || 0
       const marginBottom = parseFloat(computedStyle.marginBottom) || 0
       
-      // Measure the actual scroll height of the content
       const pixelHeight = contentRef.current.scrollHeight || contentRef.current.clientHeight || 0
-      
-      // Add padding and margins to total height
       const totalPixelHeight = pixelHeight + paddingTop + paddingBottom + marginTop + marginBottom
       
-      // Convert to grid units (round up to ensure content fits)
       const heightInGridUnits = Math.ceil(totalPixelHeight / rowHeight)
-      
-      // Apply min and max constraints (max: 50 grid units)
       const finalHeight = Math.max(2, Math.min(heightInGridUnits, 50))
       
       onHeightChange(finalHeight)
-    }, 100) // Small debounce to allow DOM to update
+    }, 100)
 
     return () => clearTimeout(timeoutId)
   }, [collapsedGroups, effectiveGroupRules.length, currentGroupBy, onHeightChange, rowHeight])
@@ -943,8 +935,14 @@ export default function ListView({
           )}
         </div>
 
-        {/* Grouped Content - table with group header rows */}
-        <div className="flex-1 overflow-y-auto">
+        {/* Grouped Content - when onHeightChange: overflow-visible so content grows and pushes blocks down; else overflow-y-auto for scroll */}
+        <div
+          className={
+            onHeightChange
+              ? "min-h-0 overflow-visible"
+              : "flex-1 min-h-0 overflow-y-auto"
+          }
+        >
           <div className="border border-gray-200 rounded-lg bg-white">
             <table className="w-full border-collapse">
               <thead>

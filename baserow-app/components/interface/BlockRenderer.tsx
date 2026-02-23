@@ -371,6 +371,8 @@ export default function BlockRenderer({
             recordId={recordId}
             recordTableId={recordTableId}
             onRecordContextChange={onRecordContextChange}
+            onEphemeralHeightDelta={onEphemeralHeightDelta}
+            rowHeight={rowHeight}
           />
         )
 

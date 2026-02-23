@@ -173,7 +173,7 @@ export default function GalleryView({
 
     loadRows()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabaseTableName, tableId, JSON.stringify(filters), reloadKey])
+  }, [supabaseTableName, tableId, JSON.stringify(filters), JSON.stringify(filterTree), reloadKey])
 
   const safeFieldIds = useMemo(() => (Array.isArray(fieldIds) ? fieldIds : []), [fieldIds])
 

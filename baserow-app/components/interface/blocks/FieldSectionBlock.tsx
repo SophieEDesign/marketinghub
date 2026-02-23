@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { ChevronDown, ChevronRight } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import type { PageBlock } from "@/lib/interface/types"
 import type { TableField } from "@/types/fields"
 import InlineFieldEditor from "@/components/records/InlineFieldEditor"
+import RecordModal from "@/components/calendar/RecordModal"
 import { sectionAndSortFields } from "@/lib/fields/sectioning"
 import { resolveSystemFieldAlias } from "@/lib/fields/systemFieldAliases"
 import { useToast } from "@/components/ui/use-toast"
@@ -54,6 +55,10 @@ export default function FieldSectionBlock({
   const [loading, setLoading] = useState(false)
   const [tableName, setTableName] = useState<string | null>(null)
   const [collapsed, setCollapsed] = useState(defaultCollapsed)
+  const [createRecordModalOpen, setCreateRecordModalOpen] = useState(false)
+  const [createRecordTableId, setCreateRecordTableId] = useState<string | null>(null)
+  const [createRecordTableFields, setCreateRecordTableFields] = useState<TableField[]>([])
+  const [createRecordResolve, setCreateRecordResolve] = useState<((id: string | null) => void) | null>(null)
   const { toast } = useToast()
 
   // Load table name and fields
@@ -152,6 +157,60 @@ export default function FieldSectionBlock({
       setLoading(false)
     }
   }
+
+  // Handle creating new linked records - opens RecordModal (same as FieldBlock)
+  const handleCreateLinkedRecord = useCallback(async (tableId: string): Promise<string | null> => {
+    if (!tableId) return null
+    return new Promise((resolve) => {
+      const supabase = createClient()
+      supabase
+        .from("table_fields")
+        .select("*")
+        .eq("table_id", tableId)
+        .order("position", { ascending: true })
+        .then(({ data: fields, error }) => {
+          if (error) {
+            console.error("[FieldSectionBlock] Error loading table fields:", error)
+            toast({
+              title: "Failed to load fields",
+              description: error.message || "Please try again",
+              variant: "destructive",
+            })
+            resolve(null)
+            return
+          }
+          setCreateRecordResolve(() => resolve)
+          setCreateRecordTableId(tableId)
+          setCreateRecordTableFields(fields || [])
+          setCreateRecordModalOpen(true)
+        })
+    })
+  }, [toast])
+
+  const handleModalSave = useCallback((createdRecordId?: string | null) => {
+    if (createRecordResolve) {
+      createRecordResolve(createdRecordId || null)
+      setCreateRecordResolve(null)
+    }
+    setCreateRecordModalOpen(false)
+    setCreateRecordTableId(null)
+    setCreateRecordTableFields([])
+  }, [createRecordResolve])
+
+  const handleModalClose = useCallback(() => {
+    if (createRecordResolve) {
+      createRecordResolve(null)
+      setCreateRecordResolve(null)
+    }
+    setCreateRecordModalOpen(false)
+    setCreateRecordTableId(null)
+    setCreateRecordTableFields([])
+  }, [createRecordResolve])
+
+  const handleAddLinkedRecord = useCallback((field: TableField) => {
+    const tableId = field.options?.linked_table_id || field.options?.lookup_table_id
+    if (tableId) handleCreateLinkedRecord(tableId)
+  }, [handleCreateLinkedRecord])
 
   async function handleCommit(fieldId: string, newValue: any) {
     if (!recordId || !tableName) {
@@ -334,12 +393,8 @@ export default function FieldSectionBlock({
                         const interfaceMode = recordPanelState.interfaceMode ?? 'view'
                         openRecordByTableId(linkedTableId, linkedRecordId, interfaceMode)
                       }}
-                      onAddLinkedRecord={() => {
-                        toast({
-                          title: "Not implemented",
-                          description: "Adding linked records is not available here yet.",
-                        })
-                      }}
+                      onAddLinkedRecord={handleAddLinkedRecord}
+                      onCreateRecord={handleCreateLinkedRecord}
                       isReadOnly={!isEditable}
                       showLabel={false}
                       tableId={pageTableId || undefined}
@@ -353,6 +408,17 @@ export default function FieldSectionBlock({
           </div>
         )}
       </div>
+
+      {createRecordTableId && (
+        <RecordModal
+          open={createRecordModalOpen}
+          onClose={handleModalClose}
+          tableId={createRecordTableId}
+          recordId={null}
+          tableFields={createRecordTableFields}
+          onSave={handleModalSave}
+        />
+      )}
     </div>
   )
 }

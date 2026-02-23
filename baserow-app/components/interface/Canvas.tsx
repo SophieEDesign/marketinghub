@@ -2325,7 +2325,10 @@ export default function Canvas({
                                            target.closest('.ql-toolbar') ||
                                            target.closest('[role="textbox"]') ||
                                            target.closest('.ql-container') ||
-                                           target.closest('.ql-snow')
+                                           target.closest('.ql-snow') ||
+                                           target.closest('.fc-event') ||
+                                           target.closest('.fc-daygrid-event') ||
+                                           target.closest('.fc-daygrid-day')
                     // Field blocks: allow selection when clicking anywhere on content (except typing areas)
                     const isSelectableBlockContent = target.closest('[data-block-selectable]')
                     const isTypingArea = target.closest('input') || target.closest('textarea') || target.closest('[contenteditable="true"]')

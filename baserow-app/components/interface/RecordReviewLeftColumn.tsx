@@ -919,7 +919,7 @@ export default function RecordReviewLeftColumn({
   }
 
   return (
-    <div className="w-80 border-r border-gray-200 bg-white flex flex-col h-full">
+    <div className="w-80 flex-shrink-0 border-r border-gray-200 bg-white flex flex-col h-full min-h-0">
       {/* Header */}
       <div className="p-5 border-b border-gray-200">
         <h3 className="text-sm font-semibold text-gray-900 mb-4">{tableName || "Records"}</h3>

@@ -243,7 +243,8 @@ export default function RecordContextDataSettings({
               const buildFieldLayout = () => {
                 // "Fields to show" controls ONLY the right panel (detail). Cards use Card/list fields.
                 // visible_in_canvas/visible_in_modal = selection; visible_in_card = true for ALL so cards aren't limited
-                const items: Array<{ field_id: string; field_name: string; order: number; visible_in_modal?: boolean; visible_in_card?: boolean; visible_in_canvas?: boolean; editable: boolean }> = []
+                // Default to single column (col-1) so new layouts show stacked fields
+                const items: Array<{ field_id: string; field_name: string; order: number; visible_in_modal?: boolean; visible_in_card?: boolean; visible_in_canvas?: boolean; editable: boolean; modal_column_id?: string }> = []
                 let order = 0
                 fieldNames.forEach((name) => {
                   const f = fields.find((x) => x.name === name || x.id === name)
@@ -256,6 +257,7 @@ export default function RecordContextDataSettings({
                       visible_in_card: true,
                       visible_in_canvas: true,
                       editable: true,
+                      modal_column_id: "col-1",
                     })
                   }
                 })
@@ -270,6 +272,7 @@ export default function RecordContextDataSettings({
                       visible_in_card: true,
                       visible_in_canvas: false,
                       editable: false,
+                      modal_column_id: "col-1",
                     })
                   }
                 })

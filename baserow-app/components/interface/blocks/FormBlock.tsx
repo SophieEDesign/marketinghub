@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { PageBlock } from "@/lib/interface/types"
 import type { TableField as FieldType } from "@/types/fields"
 import { useToast } from "@/components/ui/use-toast"
 import { canCreateRecords, canEditBlock } from "@/lib/interface/block-permissions"
 import FieldEditor from "@/components/fields/FieldEditor"
+import RecordModal from "@/components/calendar/RecordModal"
 
 interface FormBlockProps {
   block: PageBlock
@@ -27,6 +28,10 @@ export default function FormBlock({ block, isEditing = false, onSubmit, pageTabl
   const [loading, setLoading] = useState(false)
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState<string>('')
+  const [createRecordModalOpen, setCreateRecordModalOpen] = useState(false)
+  const [createRecordTableId, setCreateRecordTableId] = useState<string | null>(null)
+  const [createRecordTableFields, setCreateRecordTableFields] = useState<FieldType[]>([])
+  const [createRecordResolve, setCreateRecordResolve] = useState<((id: string | null) => void) | null>(null)
 
   // Check block permissions
   const canEdit = canEditBlock(config)
@@ -176,59 +181,58 @@ export default function FormBlock({ block, isEditing = false, onSubmit, pageTabl
     }
   }
 
+  // Handle create new record for linked fields - opens RecordModal
+  const handleCreateRecord = useCallback((tableId: string): Promise<string | null> => {
+    if (!tableId) return Promise.resolve(null)
+    return new Promise((resolve) => {
+      const supabase = createClient()
+      supabase
+        .from("table_fields")
+        .select("*")
+        .eq("table_id", tableId)
+        .order("position", { ascending: true })
+        .then(({ data: fields, error }) => {
+          if (error) {
+            console.error("[FormBlock] Error loading table fields:", error)
+            toast({
+              title: "Failed to load fields",
+              description: error.message || "Please try again",
+              variant: "destructive",
+            })
+            resolve(null)
+            return
+          }
+          setCreateRecordResolve(() => resolve)
+          setCreateRecordTableId(tableId)
+          setCreateRecordTableFields((fields || []) as FieldType[])
+          setCreateRecordModalOpen(true)
+        })
+    })
+  }, [toast])
+
+  const handleCreateModalSave = useCallback((createdRecordId?: string | null) => {
+    if (createRecordResolve) {
+      createRecordResolve(createdRecordId || null)
+      setCreateRecordResolve(null)
+    }
+    setCreateRecordModalOpen(false)
+    setCreateRecordTableId(null)
+    setCreateRecordTableFields([])
+  }, [createRecordResolve])
+
+  const handleCreateModalClose = useCallback(() => {
+    if (createRecordResolve) {
+      createRecordResolve(null)
+      setCreateRecordResolve(null)
+    }
+    setCreateRecordModalOpen(false)
+    setCreateRecordTableId(null)
+    setCreateRecordTableFields([])
+  }, [createRecordResolve])
+
   function renderField(field: FieldType & { formConfig: any }) {
     const value = formData[field.name] ?? ""
     const isRequired = field.formConfig?.required || false
-
-    // Handle create new record for linked fields
-    const handleCreateRecord = async (tableId: string): Promise<string | null> => {
-      try {
-        const supabase = createClient()
-        
-        const { data: table } = await supabase
-          .from("tables")
-          .select("supabase_table")
-          .eq("id", tableId)
-          .single()
-
-        if (!table) return null
-
-        const { data: fields } = await supabase
-          .from("table_fields")
-          .select("*")
-          .eq("table_id", tableId)
-          .order("position", { ascending: true })
-          .limit(5)
-
-        const newRecord: Record<string, any> = {}
-        fields?.forEach(f => {
-          if (f.default_value !== null && f.default_value !== undefined) {
-            newRecord[f.name] = f.default_value
-          }
-        })
-
-        const { data, error } = await supabase
-          .from(table.supabase_table)
-          .insert([newRecord])
-          .select()
-          .single()
-
-        if (error) {
-          console.error("Error creating record:", error)
-          toast({
-            title: "Failed to create record",
-            description: error.message || "Please try again",
-            variant: "destructive",
-          })
-          return null
-        }
-
-        return data?.id || null
-      } catch (error: any) {
-        console.error("Error in handleCreateRecord:", error)
-        return null
-      }
-    }
 
     return (
       <div key={field.id} className="mb-4">
@@ -318,6 +322,17 @@ export default function FormBlock({ block, isEditing = false, onSubmit, pageTabl
           </div>
         )}
       </form>
+
+      {createRecordTableId && (
+        <RecordModal
+          open={createRecordModalOpen}
+          onClose={handleCreateModalClose}
+          tableId={createRecordTableId}
+          recordId={null}
+          tableFields={createRecordTableFields}
+          onSave={handleCreateModalSave}
+        />
+      )}
     </div>
   )
 }

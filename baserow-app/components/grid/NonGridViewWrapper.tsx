@@ -110,13 +110,13 @@ export default function NonGridViewWrapper({
         .sort((a, b) => a.position - b.position)
         .filter((vf) => !hiddenFields.includes(vf.field_name))
         .map((vf) => vf.field_name)
-      if ((viewType === "kanban" || viewType === "gallery") && cardFields.length > 0) {
+      if ((viewType === "kanban" || viewType === "gallery" || viewType === "timeline") && cardFields.length > 0) {
         const ordered = cardFields.filter((n) => visible.includes(n) && tableFieldNames.has(n))
         return ordered.length > 0 ? ordered : visible
       }
       return visible
     }
-    if ((viewType === "kanban" || viewType === "gallery") && cardFields.length > 0) {
+    if ((viewType === "kanban" || viewType === "gallery" || viewType === "timeline") && cardFields.length > 0) {
       return cardFields.filter((n) => tableFieldNames.has(n))
     }
     return Array.isArray(fieldIdsProp) ? fieldIdsProp : []
@@ -323,6 +323,8 @@ export default function NonGridViewWrapper({
             tableFields={tableFields}
             filters={filtersAsConfig}
             colorField={cardColorField || undefined}
+            imageField={cardImageField || undefined}
+            wrapTitle={cardWrapText}
             groupByField={groupingFieldId || undefined}
           />
         )}

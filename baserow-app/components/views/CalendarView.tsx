@@ -22,7 +22,7 @@ import { filterRowsBySearch } from "@/lib/search/filterRows"
 import { applyFiltersToQuery, deriveDefaultValuesFromFilters, stripFilterBlockFilters, type FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import { flattenFilterTree } from "@/lib/filters/canonical-model"
-import { addDays, differenceInCalendarDays, format, startOfDay } from "date-fns"
+import { addDays, differenceInCalendarDays, format, startOfDay, startOfWeek } from "date-fns"
 import type { EventDropArg, EventInput, EventClickArg, EventContentArg } from "@fullcalendar/core"
 import type { TableRow } from "@/types/database"
 import type { LinkedField, TableField } from "@/types/fields"
@@ -218,7 +218,6 @@ export default function CalendarView({
   const prevDateToTimeRef = useRef<number | null>(null)
   const prevDateFromKeyRef = useRef<string>("")
   const prevDateToKeyRef = useRef<string>("")
-  const calendarRef = useRef<InstanceType<typeof FullCalendar> | null>(null)
 
   const areLinkedValueMapsEqual = useCallback(
     (a: Record<string, Record<string, string>>, b: Record<string, Record<string, string>>): boolean => {
@@ -512,6 +511,10 @@ export default function CalendarView({
     prevFiltersKeyRef.current = newKey
     return newKey
   }, [filters])
+
+  // CRITICAL: filterTree (from filter blocks) is applied separately from filters.
+  // loadRows must refetch when filterTree changes - it's not included in filtersKey.
+  const filterTreeKey = useMemo(() => (filterTree ? JSON.stringify(filterTree) : ""), [filterTree])
   
   // CRITICAL: Cache previous combinedFilters to prevent unnecessary recalculations
   const prevCombinedFiltersRef = useRef<string>("")
@@ -594,10 +597,11 @@ export default function CalendarView({
       return
     }
     
-    // Only reload if filters (including date range), searchQuery, or loadedTableFields actually changed
+    // Only reload if filters (including filter block filterTree), searchQuery, or loadedTableFields actually changed
     const currentFiltersKey = filtersKey
+    const currentFilterTreeKey = filterTreeKey
     const currentFieldsKey = loadedTableFieldsKey
-    const combinedKey = `${currentFiltersKey}|${searchQuery}|${currentFieldsKey}|${reloadKey ?? 0}`
+    const combinedKey = `${currentFiltersKey}|${currentFilterTreeKey}|${searchQuery}|${currentFieldsKey}|${reloadKey ?? 0}`
     
     // CRITICAL: Only reload if the combined key actually changed.
     // DO NOT check rows.length === 0 as it causes infinite loops (React error #185).
@@ -629,7 +633,7 @@ export default function CalendarView({
     loadRows()
     // Use loadedTableFieldsKey to track actual content changes, not just length
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolvedTableId, supabaseTableName, filtersKey, searchQuery, loadedTableFieldsKey, reloadKey])
+  }, [resolvedTableId, supabaseTableName, filtersKey, filterTreeKey, searchQuery, loadedTableFieldsKey, reloadKey])
 
   async function resolveTableId() {
     // CRITICAL: tableId prop MUST come from block config (not page fallback)
@@ -1545,15 +1549,27 @@ export default function CalendarView({
     return undefined
   }, [dateFrom?.getTime()])
 
-  // When date range changes (e.g. user clicks "Today"), navigate calendar to that date
-  useEffect(() => {
-    if (!mounted || !dateFrom || isNaN(dateFrom.getTime())) return
-    const el = calendarRef.current
-    const api = el?.getApi?.()
-    if (api?.gotoDate) {
-      api.gotoDate(dateFrom)
-    }
-  }, [mounted, dateFrom?.getTime()])
+  // Infer preset from date range: Today = same day, This Week = 7 days (Mon-Sun)
+  const isTodayPreset = useMemo(() => {
+    if (!dateFrom || !dateTo) return false
+    return startOfDay(dateFrom).getTime() === startOfDay(dateTo).getTime()
+  }, [dateFrom?.getTime(), dateTo?.getTime()])
+  const isThisWeekPreset = useMemo(() => {
+    if (!dateFrom || !dateTo) return false
+    const days = differenceInCalendarDays(dateTo, dateFrom)
+    return days === 6 && startOfWeek(dateFrom, { weekStartsOn: 1 }).getTime() === startOfDay(dateFrom).getTime()
+  }, [dateFrom?.getTime(), dateTo?.getTime()])
+
+  // For Today/This Week: week view so the row is at top. For Month presets: month view.
+  const calendarInitialView = isTodayPreset || isThisWeekPreset ? "dayGridWeek" : "dayGridMonth"
+
+  // Key forces remount when preset changes - ensures calendar shows correct view and date
+  // (ref/gotoDate can be unreliable with memoized FullCalendar)
+  const calendarRemountKey = useMemo(() => {
+    if (!dateFrom) return "default"
+    const preset = isTodayPreset ? "today" : isThisWeekPreset ? "week" : "month"
+    return `${preset}-${format(dateFrom, "yyyy-MM-dd")}`
+  }, [dateFrom?.getTime(), isTodayPreset, isThisWeekPreset])
 
   const calendarEventClassNames = useCallback(
     (arg: EventContentArg) => [
@@ -1636,7 +1652,7 @@ export default function CalendarView({
       const fullTooltip = [titleLine, ...cardLines].join("\n")
 
     return (
-      <div className="flex items-center gap-1.5 h-full min-h-[2.5rem] min-w-0 px-1.5 py-1" title={fullTooltip}>
+      <div className="flex items-center gap-1 h-full min-h-[1.5rem] min-w-0 px-1 py-0.5" title={fullTooltip}>
         {image && (
           <div
             className={`flex-shrink-0 w-4 h-4 rounded overflow-hidden bg-gray-100 ${
@@ -1653,7 +1669,7 @@ export default function CalendarView({
         )}
         <div className="min-w-0 flex-1 overflow-hidden">
           <div className="flex flex-col gap-0.5 min-w-0 leading-tight">
-            <div className="line-clamp-2 text-xs font-medium">
+            <div className="line-clamp-1 text-[11px] font-medium">
               {titleField ? (
                 <TimelineFieldValue
                   field={titleField}
@@ -1666,7 +1682,7 @@ export default function CalendarView({
               )}
             </div>
             {cardFields.length > 0 && (
-              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px] opacity-90 min-w-0">
+              <div className="flex flex-wrap items-center gap-x-1 gap-y-0 text-[10px] opacity-90 min-w-0">
                 {cardFields.slice(0, 2).map((f: { field: TableField; value: unknown }, idx: number) => {
                   try {
                     if (!f || typeof f !== 'object') {
@@ -1969,27 +1985,26 @@ export default function CalendarView({
 
       {renderFilters()}
       
-      <div className="p-6 bg-white">
+      <div className="p-4 bg-white">
         {/* CRITICAL: Only render FullCalendar after mount to prevent hydration mismatch (React error #185) */}
         {mounted ? (
           <MemoizedFullCalendar
-            ref={calendarRef}
+            key={calendarRemountKey}
             plugins={CALENDAR_PLUGINS}
             events={calendarEvents}
             editable={!isViewOnly}
             eventDrop={handleEventDrop}
             headerToolbar={calendarHeaderToolbar}
-            // Uncontrolled: changing `initialView` after mount can trigger repeated remount/update cycles.
-            initialView="dayGridMonth"
+            initialView={calendarInitialView}
             initialDate={calendarInitialDate}
             height="auto"
-            aspectRatio={1.2}
-            dayMaxEvents={3}
+            aspectRatio={1.4}
+            dayMaxEvents={2}
             moreLinkClick="popover"
             eventDisplay="block"
             eventClassNames={calendarEventClassNames}
-            dayCellClassNames="hover:bg-gray-50 transition-colors min-h-[10rem]"
-            dayHeaderClassNames="text-sm font-medium text-gray-700 py-2"
+            dayCellClassNames="hover:bg-gray-50 transition-colors min-h-[3.5rem]"
+            dayHeaderClassNames="text-xs font-medium text-gray-700 py-1"
             eventTextColor="#1f2937"
             eventBorderColor="transparent"
             eventBackgroundColor="#f3f4f6"

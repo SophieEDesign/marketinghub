@@ -365,9 +365,16 @@ export default function TimelineView({
     return rows.filter((row) => filteredIds.has(row.id))
   }, [rows, tableFields, searchQuery, fieldIds])
 
-  // Load view config for timeline settings (color field, etc.)
+  // Load view config for timeline settings (from Customize timeline dialog)
   const [viewConfig, setViewConfig] = useState<{
     timeline_color_field?: string | null
+    card_color_field?: string | null
+    card_fields?: string[]
+    card_image_field?: string | null
+    card_wrap_text?: boolean
+    timeline_date_field?: string | null
+    timeline_end_date_field?: string | null
+    timeline_group_by?: string | null
   } | null>(null)
 
   useEffect(() => {
@@ -400,7 +407,7 @@ export default function TimelineView({
 
   // Resolve color field from props (highest priority), block config, view config, or auto-detect
   const resolvedColorField = useMemo(() => {
-    // 1. Props (highest priority - from appearance settings)
+    // 1. Props (highest priority - from appearance settings / Customize dialog)
     if (colorField) {
       const field = tableFields.find(f => 
         (f.name === colorField || f.id === colorField) && 
@@ -419,10 +426,11 @@ export default function TimelineView({
       if (field) return field
     }
     
-    // 3. Check view config
-    if (viewConfig?.timeline_color_field) {
+    // 3. Check view config (Customize timeline saves to card_color_field)
+    const viewColorField = viewConfig?.card_color_field || viewConfig?.timeline_color_field
+    if (viewColorField) {
       const field = tableFields.find(f => 
-        (f.name === viewConfig.timeline_color_field || f.id === viewConfig.timeline_color_field) && 
+        (f.name === viewColorField || f.id === viewColorField) && 
         (f.type === 'single_select' || f.type === 'multi_select')
       )
       if (field) return field
@@ -432,17 +440,32 @@ export default function TimelineView({
     return tableFields.find(f => f.type === 'single_select' || f.type === 'multi_select') || null
   }, [colorField, blockConfig, viewConfig, tableFields])
 
-  // Resolve date_from and date_to fields from block config, props, or auto-detect
+  // Resolve image field from props, block config, or view config (Customize timeline)
+  const resolvedImageField = useMemo(() => {
+    if (imageField) return imageField
+    const blockImage = blockConfig?.image_field || blockConfig?.appearance?.image_field
+    if (blockImage) return blockImage
+    if (viewConfig?.card_image_field) return viewConfig.card_image_field
+    return undefined
+  }, [imageField, blockConfig, viewConfig])
+
+  // Resolve date_from and date_to fields from block config, props, view config, or auto-detect
   // This must be defined before resolvedCardFields since it's used there
   const resolvedDateFields = useMemo(() => {
-    // Resolve date_from field (default/primary): block config > props > auto-detect
+    // Resolve date_from field (default/primary): block config > props > view config > auto-detect
     const blockFromField = blockConfig?.date_from || blockConfig?.from_date_field || blockConfig?.start_date_field || blockConfig?.timeline_date_field
     let resolvedFromField = blockFromField
       ? tableFields.find(f => (f.name === blockFromField || f.id === blockFromField) && f.type === 'date')
       : null
     
+    if (!resolvedFromField && startDateFieldId) {
+      resolvedFromField = tableFields.find(f => (f.name === startDateFieldId || f.id === startDateFieldId) && f.type === 'date')
+    }
+    if (!resolvedFromField && viewConfig?.timeline_date_field) {
+      resolvedFromField = tableFields.find(f => (f.name === viewConfig.timeline_date_field || f.id === viewConfig.timeline_date_field) && f.type === 'date')
+    }
     // Auto-detect date_from field if not configured
-    if (!resolvedFromField && !startDateFieldId) {
+    if (!resolvedFromField) {
       resolvedFromField = tableFields.find(f => 
         f.type === 'date' && (
           f.name.toLowerCase() === 'date_from' || 
@@ -456,14 +479,20 @@ export default function TimelineView({
     
     const actualFromFieldName = resolvedFromField?.name || startDateFieldId || dateFieldId || null
     
-    // Resolve date_to field (secondary/range): block config > props > auto-detect
+    // Resolve date_to field (secondary/range): block config > props > view config > auto-detect
     const blockToField = blockConfig?.date_to || blockConfig?.to_date_field || blockConfig?.end_date_field
     let resolvedToField = blockToField
       ? tableFields.find(f => (f.name === blockToField || f.id === blockToField) && f.type === 'date')
       : null
     
+    if (!resolvedToField && endDateFieldId) {
+      resolvedToField = tableFields.find(f => (f.name === endDateFieldId || f.id === endDateFieldId) && f.type === 'date')
+    }
+    if (!resolvedToField && viewConfig?.timeline_end_date_field) {
+      resolvedToField = tableFields.find(f => (f.name === viewConfig.timeline_end_date_field || f.id === viewConfig.timeline_end_date_field) && f.type === 'date')
+    }
     // Auto-detect date_to field if not configured
-    if (!resolvedToField && !endDateFieldId) {
+    if (!resolvedToField) {
       resolvedToField = tableFields.find(f => 
         f.type === 'date' && (
           f.name.toLowerCase() === 'date_to' || 
@@ -481,7 +510,7 @@ export default function TimelineView({
       fromFieldName: actualFromFieldName,
       toFieldName: actualToFieldName,
     }
-  }, [blockConfig, startDateFieldId, endDateFieldId, dateFieldId, tableFields])
+  }, [blockConfig, startDateFieldId, endDateFieldId, dateFieldId, viewConfig, tableFields])
 
   // Resolve card field configuration
   const resolvedCardFields = useMemo(() => {
@@ -495,19 +524,26 @@ export default function TimelineView({
       dateFieldId,
     ].filter(Boolean))
 
-    // Priority: Use fieldIds (derived from "Fields to Show on Cards/Table") if available (new system)
+    // Priority: Use fieldIds (derived from "Fields to Show on Cards/Table" / Customize timeline) if available
+    // Fallback: viewConfig.card_fields when used standalone (e.g. before parent passes config)
     // Otherwise fall back to timeline_field_1/2/3 (old system for backward compatibility)
     let allVisibleFields: TableField[] = []
     let cardFields: TableField[] = []
     let resolvedTitleField: TableField | null = null
     
-    if (Array.isArray(fieldIds) && fieldIds.length > 0) {
+    const effectiveFieldIds = (Array.isArray(fieldIds) && fieldIds.length > 0)
+      ? fieldIds
+      : (Array.isArray(viewConfig?.card_fields) && viewConfig.card_fields.length > 0)
+        ? viewConfig.card_fields
+        : []
+    
+    if (effectiveFieldIds.length > 0) {
       // Use the visible field order passed into this view (new system), but de-dupe by field id.
       // It's possible for configs to contain both id + name references (or duplicates after renames),
       // which would otherwise render duplicated chips/values on cards.
       const seenVisible = new Set<string>()
       allVisibleFields = []
-      for (const fid of fieldIds) {
+      for (const fid of effectiveFieldIds) {
         const resolved =
           tableFields.find((f) => f.name === fid || f.id === fid) || undefined
         if (!resolved) continue
@@ -557,18 +593,14 @@ export default function TimelineView({
         resolvedTitleField = primaryField
       }
       
-      // Card fields are all visible fields except title and date fields
-      // Only include fields that render as pills (select, linked fields)
+      // Card fields: all visible fields except title and date fields (when from explicit card_fields config)
+      // Include all field types - Customize timeline allows any field; TimelineFieldValue renders them
       const titleFieldNameToExclude = resolvedTitleField?.name
       const titleFieldIdToExclude = resolvedTitleField?.id
-      const pillFieldTypes = ['single_select', 'multi_select', 'link_to_table']
       cardFields = allVisibleFields.filter(f => 
         f.name !== titleFieldNameToExclude && 
         (titleFieldIdToExclude ? f.id !== titleFieldIdToExclude : true) &&
         !dateFieldNames.has(f.name) &&
-        // Only include pill-rendering field types
-        pillFieldTypes.includes(f.type) &&
-        // Skip non-card-friendly types
         f.type !== 'attachment'
       )
     } else {
@@ -605,7 +637,7 @@ export default function TimelineView({
       titleField: resolvedTitleField,
       cardFields,
     }
-  }, [titleFieldProp, cardField1, cardField2, cardField3, blockConfig, tableFields, resolvedDateFields, startDateFieldId, endDateFieldId, dateFieldId, fieldIds])
+  }, [titleFieldProp, cardField1, cardField2, cardField3, blockConfig, viewConfig, tableFields, resolvedDateFields, startDateFieldId, endDateFieldId, dateFieldId, fieldIds])
 
   // Resolve group by field - fall back to primary field if not configured
   const resolvedGroupByField = useMemo(() => {
@@ -613,6 +645,7 @@ export default function TimelineView({
       blockConfig?.timeline_group_by || 
       blockConfig?.group_by_field || 
       blockConfig?.group_by ||
+      viewConfig?.timeline_group_by ||
       null
     
     if (groupFieldName) {
@@ -626,7 +659,7 @@ export default function TimelineView({
     // This ensures we always group by a meaningful field instead of showing record IDs
     const primaryField = getPrimaryField(tableFields)
     return primaryField
-  }, [groupByFieldProp, blockConfig, tableFields])
+  }, [groupByFieldProp, blockConfig, viewConfig, tableFields])
 
   // Resolve display labels for any link_to_table fields used in cards/grouping.
   // NOTE: This must be defined after resolvedCardFields/resolvedGroupByField so TS doesn't
@@ -676,16 +709,16 @@ export default function TimelineView({
     }
   }, [filteredRows, resolvedCardFields, resolvedGroupByField, tableFieldsKey, areLinkedValueMapsEqual])
 
-  // Resolve wrap title setting
+  // Resolve wrap title setting (from Customize timeline or block config)
   const wrapTitle = useMemo(() => {
-    return wrapTitleProp !== undefined 
-      ? wrapTitleProp 
-      : blockConfig?.timeline_wrap_title || 
-        blockConfig?.card_wrap_title || 
-        blockConfig?.appearance?.timeline_wrap_title ||
-        blockConfig?.appearance?.card_wrap_title ||
-        false
-  }, [wrapTitleProp, blockConfig])
+    if (wrapTitleProp !== undefined) return wrapTitleProp
+    if (viewConfig?.card_wrap_text !== undefined) return viewConfig.card_wrap_text
+    return blockConfig?.timeline_wrap_title || 
+      blockConfig?.card_wrap_title || 
+      blockConfig?.appearance?.timeline_wrap_title ||
+      blockConfig?.appearance?.card_wrap_title ||
+      true
+  }, [wrapTitleProp, blockConfig, viewConfig])
 
   // Helper to get pill color for select fields
   const getPillColor = useCallback((field: TableField, value: any): string | null => {
@@ -940,8 +973,8 @@ export default function TimelineView({
 
         // Get image from image field
         let image: string | undefined = undefined
-        if (imageField) {
-          const imageValue = row.data[imageField]
+        if (resolvedImageField) {
+          const imageValue = row.data[resolvedImageField]
           if (imageValue) {
             // Handle attachment field (array of URLs) or URL field (single URL)
             if (Array.isArray(imageValue) && imageValue.length > 0) {
@@ -965,7 +998,7 @@ export default function TimelineView({
         }
       })
       .sort((a, b) => a.start.getTime() - b.start.getTime())
-  }, [filteredRows, startDateFieldId, endDateFieldId, dateFieldId, fieldIds, tableFields, optimisticUpdates, resolvedColorField, resolvedDateFields, imageField, resolvedCardFields, resolvedGroupByField])
+  }, [filteredRows, startDateFieldId, endDateFieldId, dateFieldId, fieldIds, tableFields, optimisticUpdates, resolvedColorField, resolvedDateFields, resolvedImageField, resolvedCardFields, resolvedGroupByField])
 
   // Calculate timeline range based on zoom level
   const timelineRange = useMemo(() => {

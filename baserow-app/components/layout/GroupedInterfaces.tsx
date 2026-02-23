@@ -869,7 +869,7 @@ export default function GroupedInterfaces({
   }
 
   // Navigation Page Component (view mode)
-  // Fallback: if Next.js Link navigation doesn't complete (known issue), force full reload after 100ms
+  // Fallback: if Next.js Link navigation doesn't complete after 500ms, retry with router.push
   function NavigationPage({ page, level = 0 }: { page: InterfacePage; level?: number }) {
     const targetPageId = page.id
     const targetPath = `/pages/${targetPageId}`
@@ -900,7 +900,7 @@ export default function GroupedInterfaces({
             if (window.location.pathname !== targetPath && window.location.pathname === startPath) {
               router.push(targetPath)
             }
-          }, 100)
+          }, 500)
         }}
       >
         <span className="truncate flex-1">{page.name}</span>
@@ -1010,14 +1010,14 @@ export default function GroupedInterfaces({
                   router.refresh()
                   return
                 }
-                // Fallback: if Next.js Link navigation doesn't complete (known issue), force full reload
+                // Fallback: if Next.js Link navigation doesn't complete, retry with router.push
                 const startPath = pathname
                 const targetPath = `/pages/${targetPageId}`
                 setTimeout(() => {
                   if (window.location.pathname !== targetPath && window.location.pathname === startPath) {
                     router.push(targetPath)
                   }
-                }, 100)
+                }, 500)
               }}
             >
               <Layers className="h-4 w-4 flex-shrink-0" style={{ color: isActive ? primaryColor : sidebarTextColor }} />

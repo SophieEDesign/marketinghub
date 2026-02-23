@@ -33,6 +33,8 @@ interface InlineFieldEditorProps {
   onEditEnd: () => void
   onLinkedRecordClick: (tableId: string, recordId: string) => void
   onAddLinkedRecord: (field: TableField) => void
+  /** When provided, used for linked field "Create new record" instead of internal RecordModal */
+  onCreateRecord?: (tableId: string) => Promise<string | null>
   isReadOnly?: boolean // Override read-only state (for field-level permissions)
   showLabel?: boolean // Whether to render the field label (default: true)
   labelClassName?: string // Optional label classes
@@ -53,6 +55,7 @@ export default function InlineFieldEditor({
   onEditEnd,
   onLinkedRecordClick,
   onAddLinkedRecord,
+  onCreateRecord: onCreateRecordProp,
   isReadOnly: propIsReadOnly,
   showLabel: propShowLabel = true,
   labelClassName: propLabelClassName,
@@ -278,7 +281,7 @@ export default function InlineFieldEditor({
               disabled={isReadOnly}
               placeholder={`Add ${getFieldDisplayName(field)}...`}
               onRecordClick={onLinkedRecordClick}
-              onCreateRecord={lookupConfig.allowCreate ? handleCreateRecord : undefined}
+              onCreateRecord={lookupConfig.allowCreate ? (onCreateRecordProp || handleCreateRecord) : undefined}
               isLookupField={false}
               compact={displayMode === 'compact' || displayMode === 'inline'}
             />

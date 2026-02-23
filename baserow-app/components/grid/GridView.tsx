@@ -1325,6 +1325,13 @@ export default function GridView({
     return JSON.stringify(canonical)
   }, [safeFilters])
 
+  // CRITICAL: filterTree (from filter blocks) is applied separately from safeFilters.
+  // loadRows must refetch when filterTree changes - it's not included in filtersKey.
+  const filterTreeKey = useMemo(() => {
+    if (!filterTree) return ""
+    return JSON.stringify(filterTree)
+  }, [filterTree])
+
   const viewFiltersKey = useMemo(() => {
     const canonical = (safeViewFilters ?? [])
       .map((f: { field_name?: string; operator?: string; value?: unknown }) => {
@@ -1433,7 +1440,7 @@ export default function GridView({
     }
     loadRows()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabaseTableName, filtersKey, viewFiltersKey, viewSortsKey, tableFieldsKey, reloadKey])
+  }, [supabaseTableName, filtersKey, filterTreeKey, viewFiltersKey, viewSortsKey, tableFieldsKey, reloadKey])
 
   async function loadRows() {
     // De-dupe in-flight loads (prevents hundreds of parallel requests).
@@ -2841,7 +2848,8 @@ export default function GridView({
   const previousHeightRef = useRef<number | null>(null)
   
   // Measure content height and report ephemeral delta (not total height)
-  // CRITICAL: Report delta from base (collapsed) state for ephemeral expansion
+  // When onHeightChange provided and grouped: use overflow-visible so content grows; contentRef scrollHeight reflects full content
+  const usePushDown = Boolean(onHeightChange && effectiveGroupRules.length > 0)
   useEffect(() => {
     if (!onHeightChange || !contentRef.current) {
       baseHeightRef.current = null
@@ -2856,44 +2864,36 @@ export default function GridView({
       return // No grouping, no ephemeral expansion
     }
 
-    // Measure current height
-    const computedStyle = window.getComputedStyle(contentRef.current)
-    const paddingTop = parseFloat(computedStyle.paddingTop) || 0
-    const paddingBottom = parseFloat(computedStyle.paddingBottom) || 0
-    const marginTop = parseFloat(computedStyle.marginTop) || 0
-    const marginBottom = parseFloat(computedStyle.marginBottom) || 0
-    
-    const pixelHeight = contentRef.current.scrollHeight || contentRef.current.clientHeight || 0
-    const currentHeightPx = pixelHeight + paddingTop + paddingBottom + marginTop + marginBottom
-    
-    // Track minimum height as base (when most collapsed)
-    if (baseHeightRef.current === null) {
-      baseHeightRef.current = currentHeightPx
-      previousHeightRef.current = currentHeightPx
-      return // First measurement, no delta yet
-    }
-    
-    // Update base if current is lower (more collapsed)
-    baseHeightRef.current = Math.min(baseHeightRef.current, currentHeightPx)
-    
-    // Calculate delta from base (ephemeral expansion)
-    const deltaPx = currentHeightPx - baseHeightRef.current
-    
-    // Only report if height actually changed
-    if (previousHeightRef.current !== null && Math.abs(currentHeightPx - previousHeightRef.current) > 1) {
-      // Calculate delta change from previous
-      const previousDelta = (previousHeightRef.current || baseHeightRef.current) - baseHeightRef.current
-      const deltaChange = deltaPx - previousDelta
+    const timeoutId = setTimeout(() => {
+      if (!contentRef.current) return
+      const computedStyle = window.getComputedStyle(contentRef.current)
+      const paddingTop = parseFloat(computedStyle.paddingTop) || 0
+      const paddingBottom = parseFloat(computedStyle.paddingBottom) || 0
+      const marginTop = parseFloat(computedStyle.marginTop) || 0
+      const marginBottom = parseFloat(computedStyle.marginBottom) || 0
       
-      // Report delta change (positive = expanding, negative = collapsing)
-      // Note: onHeightChange signature will be updated to onEphemeralHeightDelta(blockId, deltaPx)
-      // For now, report as total height (will be converted in GridBlock)
-      if (deltaChange !== 0) {
-        onHeightChange(deltaPx) // Temporary: report total delta, GridBlock will convert
+      const pixelHeight = contentRef.current.scrollHeight || contentRef.current.clientHeight || 0
+      const currentHeightPx = pixelHeight + paddingTop + paddingBottom + marginTop + marginBottom
+      
+      if (baseHeightRef.current === null) {
+        baseHeightRef.current = currentHeightPx
+        previousHeightRef.current = currentHeightPx
+        return
       }
-    }
-    
-    previousHeightRef.current = currentHeightPx
+      baseHeightRef.current = Math.min(baseHeightRef.current, currentHeightPx)
+      const deltaPx = currentHeightPx - baseHeightRef.current
+      
+      if (previousHeightRef.current !== null && Math.abs(currentHeightPx - previousHeightRef.current) > 1) {
+        const previousDelta = (previousHeightRef.current || baseHeightRef.current) - baseHeightRef.current
+        const deltaChange = deltaPx - previousDelta
+        if (deltaChange !== 0) {
+          onHeightChange(deltaPx) // GridBlock converts to ephemeral delta
+        }
+      }
+      previousHeightRef.current = currentHeightPx
+    }, 100)
+
+    return () => clearTimeout(timeoutId)
   }, [collapsedGroups, effectiveGroupRules.length, groupBy, onHeightChange, rowHeightPixels])
 
   // CRITICAL: Defensive guards - ensure we have required data before rendering
@@ -3142,11 +3142,21 @@ export default function GridView({
         </div>
       )}
 
-      {/* Grid Table - Takes remaining space and scrolls */}
-      <div className="flex-1 min-h-0 border border-gray-200 rounded-lg overflow-hidden bg-white flex flex-col relative">
+      {/* Grid Table - when usePushDown: content grows and pushes blocks down; else scrolls */}
+      <div
+        className={
+          usePushDown
+            ? "min-h-0 border border-gray-200 rounded-lg overflow-hidden bg-white flex flex-col relative"
+            : "flex-1 min-h-0 border border-gray-200 rounded-lg overflow-hidden bg-white flex flex-col relative"
+        }
+      >
         <div
           ref={scrollContainerRef}
-          className="flex-1 overflow-auto relative"
+          className={
+            usePushDown
+              ? "min-h-0 overflow-visible relative"
+              : "flex-1 overflow-auto relative"
+          }
           style={{ paddingBottom: isEditing ? '20px' : '0' }}
           onMouseMove={handleRowResizeHover}
           onMouseLeave={handleRowResizeMouseLeave}

@@ -245,7 +245,7 @@ export default function RecordReviewPage({
   const { isEditing: isBlockEditing } = useBlockEditMode(page.id)
 
   return (
-    <div className="flex h-full w-full">
+    <div className="flex flex-1 h-full min-h-0 w-full">
       {/* Fixed Left Column - Always Present */}
       {/* CRITICAL: Left column reads from page.settings.leftPanel - not from blocks or props */}
       <RecordReviewLeftColumn
@@ -262,7 +262,7 @@ export default function RecordReviewPage({
       />
 
       {/* Right Panel - record_view: RecordDetailPanelInline | record_review: InterfaceBuilder */}
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0 w-full">
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden min-w-0 w-full">
         {/* Record actions (block-based record pages) */}
         {canDeleteSelectedRecord && (
           <div className="flex items-center justify-end gap-2 px-3 py-2 border-b border-gray-200 bg-white">
@@ -295,18 +295,20 @@ export default function RecordReviewPage({
             showComments={pageConfig.comments_enabled !== false}
           />
         ) : (
-          <InterfaceBuilder
-            key={page.id}
-            page={page}
-            initialBlocks={initialBlocks}
-            isViewer={isViewer}
-            onSave={onSave}
-            onEditModeChange={onEditModeChange}
-            hideHeader={hideHeader}
-            pageTableId={pageTableId}
-            recordId={selectedRecordId}
-            mode={isBlockEditing ? "edit" : "view"}
-          />
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            <InterfaceBuilder
+              key={page.id}
+              page={page}
+              initialBlocks={initialBlocks}
+              isViewer={isViewer}
+              onSave={onSave}
+              onEditModeChange={onEditModeChange}
+              hideHeader={hideHeader}
+              pageTableId={pageTableId}
+              recordId={selectedRecordId}
+              mode={isBlockEditing ? "edit" : "view"}
+            />
+          </div>
         )}
       </div>
     </div>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo, useCallback } from "react"
+import { useEffect, useState, useMemo, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { PageBlock, BlockFilter } from "@/lib/interface/types"
 import type { RecordContext } from "@/lib/interface/types"
@@ -21,6 +21,7 @@ import type { GroupRule } from "@/lib/grouping/types"
 import { buildGroupTree, flattenGroupTree } from "@/lib/grouping/groupTree"
 import { getFieldDisplayName } from "@/lib/fields/display"
 import { resolveChoiceColor, normalizeHexColor, getTextColorForBackground } from "@/lib/field-colors"
+import RecordModal from "@/components/calendar/RecordModal"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 function isUuidLike(value: string | null | undefined): value is string {
@@ -34,7 +35,12 @@ interface RecordContextBlockProps {
   recordId?: string | null
   recordTableId?: string | null
   onRecordContextChange?: (context: RecordContext) => void
+  /** Callback for ephemeral height changes (collapsible expansion) - enables push-down instead of scrollbar */
+  onEphemeralHeightDelta?: (blockId: string, deltaPx: number) => void
+  rowHeight?: number
 }
+
+const ROW_HEIGHT_DEFAULT = 30
 
 export default function RecordContextBlock({
   block,
@@ -43,6 +49,8 @@ export default function RecordContextBlock({
   recordId = null,
   recordTableId = null,
   onRecordContextChange,
+  onEphemeralHeightDelta,
+  rowHeight = ROW_HEIGHT_DEFAULT,
 }: RecordContextBlockProps) {
   const config = block.config || {}
   const tableId = config.table_id ?? (config as any).tableId ?? pageTableId ?? null
@@ -57,6 +65,7 @@ export default function RecordContextBlock({
   const [tableFields, setTableFields] = useState<TableField[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const [createRecordModalOpen, setCreateRecordModalOpen] = useState(false)
   const { toast } = useToast()
 
   const filterMode = (config as any).filter_mode || "all"
@@ -226,6 +235,10 @@ export default function RecordContextBlock({
   }, [records, tableFields, searchQuery])
 
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  const contentRef = useRef<HTMLDivElement>(null)
+  const baseHeightRef = useRef<number | null>(null)
+  const previousHeightRef = useRef<number | null>(null)
+
   const toggleGroupCollapsed = useCallback((pathKey: string) => {
     setCollapsedGroups((prev) => {
       const next = new Set(prev)
@@ -248,34 +261,57 @@ export default function RecordContextBlock({
     return flattenGroupTree(groupModel.rootGroups, collapsedGroups)
   }, [groupModel, collapsedGroups])
 
+  // Measure content height when grouping changes (expand/collapse) - enables push-down instead of scrollbar
+  const isGrouped = groupByRules.length > 0
+  useEffect(() => {
+    if (!onEphemeralHeightDelta || !contentRef.current || !isGrouped) return
+
+    const timeoutId = setTimeout(() => {
+      if (!contentRef.current) return
+      const pixelHeight = contentRef.current.scrollHeight || contentRef.current.clientHeight || 0
+      const totalHeightPx = pixelHeight
+
+      if (baseHeightRef.current === null) {
+        baseHeightRef.current = totalHeightPx
+        previousHeightRef.current = totalHeightPx
+        return
+      }
+      baseHeightRef.current = Math.min(baseHeightRef.current, totalHeightPx)
+      const deltaPx = totalHeightPx - baseHeightRef.current
+      const previousDelta = (previousHeightRef.current ?? baseHeightRef.current) - baseHeightRef.current
+      const deltaChange = deltaPx - previousDelta
+
+      if (Math.abs(deltaChange) > 1) {
+        onEphemeralHeightDelta(block.id, deltaChange)
+      }
+      previousHeightRef.current = totalHeightPx
+    }, 100)
+
+    return () => clearTimeout(timeoutId)
+  }, [collapsedGroups, groupByRules.length, onEphemeralHeightDelta, block.id, isGrouped])
+
   const handleSelect = (record: { id: string }) => {
     if (!table || !onRecordContextChange) return
     onRecordContextChange({ tableId: table.id, recordId: record.id })
   }
 
-  const handleAddNew = async () => {
+  const handleAddNew = () => {
     if (!table || !onRecordContextChange) return
-    const supabase = createClient()
-    try {
-      const { data: inserted, error } = await supabase
-        .from(table.supabase_table)
-        .insert({})
-        .select("id")
-        .single()
-      if (error) throw error
-      if (inserted?.id) {
-        setRefreshTrigger((c) => c + 1)
-        onRecordContextChange({ tableId: table.id, recordId: inserted.id })
-        toast({ title: "Record created", description: "New record added and selected." })
-      }
-    } catch (e: any) {
-      toast({
-        variant: "destructive",
-        title: "Could not add record",
-        description: e?.message ?? "The table may require fields to be set.",
-      })
-    }
+    setCreateRecordModalOpen(true)
   }
+
+  const handleCreateModalSave = useCallback((createdRecordId?: string | null) => {
+    setCreateRecordModalOpen(false)
+    if (createdRecordId && table && onRecordContextChange) {
+      setRefreshTrigger((c) => c + 1)
+      onRecordContextChange({ tableId: table.id, recordId: createdRecordId })
+      toast({ title: "Record created", description: "New record added and selected." })
+    }
+  }, [table, onRecordContextChange, toast])
+
+  const handleCreateModalClose = useCallback(() => {
+    setCreateRecordModalOpen(false)
+  }, [])
 
   const selectedInThisBlock = table && recordTableId === table.id && recordId
 
@@ -391,8 +427,10 @@ export default function RecordContextBlock({
     }
   }
 
+  const usePushDown = Boolean(onEphemeralHeightDelta && isGrouped)
+
   return (
-    <div className="h-full w-full flex flex-col gap-2 p-2 rounded-md border bg-card">
+    <div ref={contentRef} className="h-full w-full flex flex-col gap-2 p-2 rounded-md border bg-card">
       {(showSearch || showAddRecord || selectedInThisBlock) && (
         <div className="flex items-center gap-2 flex-shrink-0">
           {showSearch && (
@@ -435,7 +473,8 @@ export default function RecordContextBlock({
       )}
       <div
         className={cn(
-          "flex flex-1 min-h-0 overflow-auto",
+          "flex min-h-0",
+          usePushDown ? "overflow-visible" : "flex-1 overflow-auto",
           displayMode === "grid" && "flex flex-wrap content-start gap-2",
           displayMode === "compact" && "flex flex-wrap gap-1"
         )}
@@ -676,6 +715,17 @@ export default function RecordContextBlock({
           </ul>
         )}
       </div>
+
+      {createRecordModalOpen && table && (
+        <RecordModal
+          open={createRecordModalOpen}
+          onClose={handleCreateModalClose}
+          tableId={table.id}
+          recordId={null}
+          tableFields={tableFields}
+          onSave={handleCreateModalSave}
+        />
+      )}
     </div>
   )
 }

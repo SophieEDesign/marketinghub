@@ -169,7 +169,7 @@ function ShellContent({
   const isPanelVisible = isEditMode
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50 overflow-x-hidden">
+    <div className="flex flex-col h-screen min-h-[100dvh] bg-gray-50 overflow-x-hidden">
       {/* Edit mode banner - full app width at top, above sidebar and content */}
       <EditModeBanner />
       <EditModeGuard />

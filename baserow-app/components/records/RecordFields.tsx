@@ -233,8 +233,6 @@ export default function RecordFields({
     fields: TableField[]
   }
 
-  const GRID_COLUMN_COUNT = 3
-
   const modalColumns: ModalColumn[] = useMemo(() => {
     // If there is no layout at all, fall back to a single implicit column based on fields order.
     if (!fieldLayout.length) {
@@ -261,14 +259,13 @@ export default function RecordFields({
     })
 
     // Build column buckets from layout metadata.
-    // When no modal_column_id: distribute across 3 columns (col-1, col-2, col-3) for grid layout.
+    // When no modal_column_id: default to single column (col-1) so users can add columns in layout mode.
     const byColumn = new Map<
       string,
       { id: string; order: number; width: number; fieldOrder: Array<{ order: number; field: TableField }> }
     >()
     const seenFieldNames = new Set<string>()
     const hasAnyColumnId = fieldLayout.some((i) => i.modal_column_id || i.modal_column_span === 2)
-    let syntheticColIndex = 0
 
     const visKey = visibilityContext === 'canvas' ? 'visible_in_canvas' : 'visible_in_modal'
     const sortedForCols = [...fieldLayout]
@@ -278,7 +275,7 @@ export default function RecordFields({
     sortedForCols.forEach((item) => {
       const colId = item.modal_column_span === 2
         ? "col-full"
-        : item.modal_column_id || (hasAnyColumnId ? "col-1" : `col-${(syntheticColIndex++ % GRID_COLUMN_COUNT) + 1}`)
+        : item.modal_column_id || "col-1"
       const colOrder = item.modal_column_order ?? 0
       const colWidth = item.modal_column_span === 2 ? 2 : (item.modal_column_width ?? 1)
       const field = fieldMap.get(item.field_name) || fieldMap.get(item.field_id)
@@ -334,7 +331,7 @@ export default function RecordFields({
     return columns
   }, [fieldLayout, fields, visibilityContext])
 
-  // Bootstrap 3-column layout when entering layout mode with no column metadata
+  // Bootstrap single-column layout when entering layout mode with no column metadata
   useEffect(() => {
     if (
       !layoutMode ||
@@ -347,9 +344,9 @@ export default function RecordFields({
     if (hasAnyColumnId) return
     hasBootstrappedColumnsRef.current = true
     const sorted = [...fieldLayout].sort((a, b) => a.order - b.order)
-    const bootstrapped = sorted.map((item, idx) => ({
+    const bootstrapped = sorted.map((item) => ({
       ...item,
-      modal_column_id: `col-${(idx % GRID_COLUMN_COUNT) + 1}`,
+      modal_column_id: "col-1",
     }))
     onFieldLayoutChange(bootstrapped)
   }, [layoutMode, onFieldLayoutChange, fieldLayout])
@@ -625,8 +622,22 @@ export default function RecordFields({
       const updatedLayout = [...fieldLayout, newItem]
       onFieldLayoutChange?.(updatedLayout)
     },
-    [layoutMode, onFieldLayoutChange, fieldLayout, onFieldVisibilityToggle, pageEditable]
+    [layoutMode, onFieldLayoutChange, fieldLayout, onFieldVisibilityToggle, pageEditable, modalColumns]
   )
+
+  // Add a new column when in layout mode with only 1 column (moves first field to col-2)
+  const handleAddColumn = useCallback(() => {
+    if (!layoutMode || !onFieldLayoutChange || !fieldLayout.length) return
+    const col1 = modalColumns.find((c) => c.id === "col-1")
+    if (!col1 || col1.fields.length === 0) return
+    const firstField = col1.fields[0]
+    const updatedLayout = fieldLayout.map((item) =>
+      item.field_name === firstField.name || item.field_id === firstField.id
+        ? { ...item, modal_column_id: "col-2" as const }
+        : item
+    )
+    onFieldLayoutChange(updatedLayout)
+  }, [layoutMode, onFieldLayoutChange, fieldLayout, modalColumns])
 
   // Get available fields that aren't in the layout
   const availableFields = useMemo(() => {
@@ -881,12 +892,12 @@ export default function RecordFields({
     return map
   }, [fieldLayout, fields])
 
-  // Compute CSS grid template: 2 or 3 columns for grid layout.
+  // Compute CSS grid template: 1, 2, or 3 columns for grid layout.
   // When layoutMode and 2+ columns, inject 8px resize handles between columns.
   const gridTemplateColumns = useMemo(() => {
     if (!showModalColumns) return undefined
     const cols = dataColumns
-    if (cols.length <= 1) return "1fr 1fr"
+    if (cols.length <= 1) return "1fr"
     const total = cols.reduce((sum, col) => sum + (col.width || 1), 0)
     if (!total) return "1fr 1fr"
     const fractions = cols.map((col) => `${(col.width || 1) / total}fr`)
@@ -1073,27 +1084,41 @@ export default function RecordFields({
                 })}
               </div>
 
-              {/* Layout-mode-only UI: Add field + column resize (no hooks, safe to vary). */}
-              {layoutMode && showModalColumns && availableFields.length > 0 && (
+              {/* Layout-mode-only UI: Add column, Add field, column resize (no hooks, safe to vary). */}
+              {layoutMode && showModalColumns && (
                 <div className="pt-2 mt-2 border-t border-dashed border-gray-200 flex flex-wrap gap-2">
-                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide w-full">
-                    Add field
-                  </span>
-                  {availableFields.slice(0, 6).map((field) => (
+                  {dataColumns.length === 1 && (
                     <button
-                      key={field.id}
                       type="button"
-                      onClick={() => handleAddField(field, modalColumns[0]?.id)}
+                      onClick={handleAddColumn}
                       className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-gray-300 rounded-md bg-white hover:bg-gray-50 text-gray-700"
                     >
                       <Plus className="h-3 w-3" />
-                      {getFieldDisplayName(field)}
+                      Add column
                     </button>
-                  ))}
-                  {availableFields.length > 6 && (
-                    <span className="text-xs text-gray-500 self-center">
-                      +{availableFields.length - 6} more
-                    </span>
+                  )}
+                  {availableFields.length > 0 && (
+                    <>
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide w-full">
+                        Add field
+                      </span>
+                      {availableFields.slice(0, 6).map((field) => (
+                        <button
+                          key={field.id}
+                          type="button"
+                          onClick={() => handleAddField(field, modalColumns[0]?.id)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-gray-300 rounded-md bg-white hover:bg-gray-50 text-gray-700"
+                        >
+                          <Plus className="h-3 w-3" />
+                          {getFieldDisplayName(field)}
+                        </button>
+                      ))}
+                      {availableFields.length > 6 && (
+                        <span className="text-xs text-gray-500 self-center">
+                          +{availableFields.length - 6} more
+                        </span>
+                      )}
+                    </>
                   )}
                 </div>
               )}

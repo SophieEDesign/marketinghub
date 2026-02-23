@@ -1200,7 +1200,10 @@ function InterfacePageClientInternal({
     const isContentPage = !useRecordReviewLayout
     const isFullPage =
       isContentPage && blocks.length === 1 && blocks[0]?.config?.is_full_page === true
-    mainScroll.setSuppressMainScroll(!!isFullPage)
+    // Suppress main scroll for: (1) full-page content blocks, (2) record_view/record_review two-panel layout
+    // Both layouts fill viewport; panels scroll internally.
+    const shouldSuppress = !!isFullPage || !!useRecordReviewLayout
+    mainScroll.setSuppressMainScroll(shouldSuppress)
   }, [mainScroll, page?.page_type, blocks])
 
   // CRITICAL: Stable callback for record_view layout save - MUST be before early returns (React Hooks rule).
