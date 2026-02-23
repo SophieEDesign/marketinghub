@@ -1405,8 +1405,8 @@ function InterfacePageClientInternal({
         }`}
       >
         {/* CRITICAL: Do NOT use flex-1 here - content must grow to full height so scroll works and bottom isn't cut off */}
-        {/* In edit mode: extra padding-bottom so user can scroll to reach bottom resize handles */}
-        <div className={`w-full min-w-0 flex flex-col overflow-x-hidden relative ${isEditMode ? 'pb-32' : ''}`}>
+        {/* In edit mode: extra padding-bottom so user can scroll to reach bottom resize handles and canvas isn't cut off */}
+        <div className={`w-full min-w-0 flex flex-col overflow-x-hidden relative ${isEditMode ? 'pb-48' : ''}`}>
           <InterfacePageContent
             useRecordReviewLayout={useRecordReviewLayout}
             hasPage={hasPage}

@@ -490,12 +490,15 @@ export default function BlockRenderer({
             <KanbanBlock
               block={safeBlock}
               isEditing={canEdit}
+              interfaceMode={interfaceMode}
               pageTableId={pageTableId}
               pageId={pageId}
               filters={filters}
               filterTree={filterTree}
               onRecordClick={onRecordClick}
               pageShowAddRecord={pageShowAddRecord}
+              onModalLayoutSave={onUpdate ? (fieldLayout) => onUpdate(block.id, { field_layout: fieldLayout }) : undefined}
+              canEditLayout={canEdit}
             />
           </LazyBlockWrapper>
         )
@@ -507,12 +510,15 @@ export default function BlockRenderer({
             <TimelineBlock
               block={safeBlock}
               isEditing={canEdit}
+              interfaceMode={interfaceMode}
               pageTableId={pageTableId}
               pageId={pageId}
               filters={filters}
               filterTree={filterTree}
               onRecordClick={onRecordClick}
               pageShowAddRecord={pageShowAddRecord}
+              onModalLayoutSave={onUpdate ? (fieldLayout) => onUpdate(block.id, { field_layout: fieldLayout }) : undefined}
+              canEditLayout={canEdit}
             />
           </LazyBlockWrapper>
         )
@@ -540,12 +546,15 @@ export default function BlockRenderer({
             <GalleryBlock
               block={safeBlock}
               isEditing={canEdit}
+              interfaceMode={interfaceMode}
               pageTableId={pageTableId}
               pageId={pageId}
               filters={filters}
               filterTree={filterTree}
               onRecordClick={onRecordClick}
               pageShowAddRecord={pageShowAddRecord}
+              onModalLayoutSave={onUpdate ? (fieldLayout) => onUpdate(block.id, { field_layout: fieldLayout }) : undefined}
+              canEditLayout={canEdit}
             />
           </LazyBlockWrapper>
         )

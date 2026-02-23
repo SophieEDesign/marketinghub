@@ -924,6 +924,7 @@ export default function GridBlock({
             reloadKey={refreshKey}
             interfaceMode={interfaceMode}
             onRecordDeleted={() => setRefreshKey((k) => k + 1)}
+            onModalLayoutSave={onModalLayoutSave ?? undefined}
           />
         )
       }
@@ -979,6 +980,7 @@ export default function GridBlock({
             compactMode={config.timeline_compact_mode ?? (appearance.row_height === 'compact')}
             highlightRules={config.highlight_rules}
             interfaceMode={interfaceMode}
+            onModalLayoutSave={onModalLayoutSave ?? undefined}
           />
         )
       }
@@ -1022,6 +1024,7 @@ export default function GridBlock({
             highlightRules={config.highlight_rules}
             interfaceMode={interfaceMode}
             onRecordDeleted={() => setRefreshKey((k) => k + 1)}
+            onModalLayoutSave={onModalLayoutSave ?? undefined}
           />
         )
       }
@@ -1119,12 +1122,14 @@ export default function GridBlock({
             pillFields={pillFields}
             metaFields={metaFields}
             modalFields={modalFieldsForRecord}
+            blockConfig={config}
             reloadKey={refreshKey}
             onHeightChange={isGrouped ? handleHeightChange : undefined}
             rowHeight={rowHeight}
             cascadeContext={cascadeContext}
             interfaceMode={interfaceMode}
             onRecordDeleted={() => setRefreshKey((k) => k + 1)}
+            onModalLayoutSave={onModalLayoutSave ?? undefined}
           />
         )
       }

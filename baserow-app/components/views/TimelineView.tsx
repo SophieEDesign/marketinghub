@@ -57,6 +57,8 @@ interface TimelineViewProps {
   interfaceMode?: 'view' | 'edit'
   /** Called when a record is deleted from RecordPanel; use to refresh core data. */
   onRecordDeleted?: () => void
+  /** Callback to save field layout when user edits modal layout in right panel. */
+  onModalLayoutSave?: (fieldLayout: import("@/lib/interface/field-layout-utils").FieldLayoutItem[]) => void
 }
 
 type ZoomLevel = "day" | "week" | "month" | "quarter" | "year"
@@ -94,6 +96,7 @@ export default function TimelineView({
   highlightRules = [],
   interfaceMode = 'view',
   onRecordDeleted,
+  onModalLayoutSave,
 }: TimelineViewProps) {
   const supabase = useMemo(() => createClient(), [])
   const viewUuid = useMemo(() => normalizeUuid(viewId), [viewId])
@@ -1145,8 +1148,8 @@ export default function TimelineView({
       onRecordClick(rowId)
       return
     }
-    openRecord(tableId, rowId, supabaseTableName, (blockConfig as any)?.modal_fields, (blockConfig as any)?.modal_layout, blockConfig ? { blockConfig } : undefined, interfaceMode, onRecordDeleted, (blockConfig as any)?.field_layout)
-  }, [blockConfig, onRecordClick, openRecord, supabaseTableName, tableId, interfaceMode, onRecordDeleted])
+    openRecord(tableId, rowId, supabaseTableName, (blockConfig as any)?.modal_fields, (blockConfig as any)?.modal_layout, blockConfig ? { blockConfig } : undefined, interfaceMode, onRecordDeleted, (blockConfig as any)?.field_layout, onModalLayoutSave ?? undefined, tableFields)
+  }, [blockConfig, onRecordClick, openRecord, supabaseTableName, tableId, interfaceMode, onRecordDeleted, onModalLayoutSave, tableFields])
 
   const handleEventSelect = useCallback((event: TimelineEvent, e: React.MouseEvent) => {
     // Don't open/select if we're resizing/dragging.

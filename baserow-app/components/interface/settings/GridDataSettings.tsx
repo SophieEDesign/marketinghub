@@ -295,9 +295,11 @@ export default function GridDataSettings({
                     const existing = layoutByField.get(fieldName)
                     const field = fields.find((f) => f.name === fieldName)
                     if (existing) {
-                      return { ...existing, order: i, visible_in_card: true, visible_in_modal: true }
+                      // Card/event only: only update visible_in_card. Preserve modal layout (edited in right panel).
+                      return { ...existing, order: i, visible_in_card: true }
                     }
                     if (field) {
+                      // New field: visible_in_card for card; default visible_in_modal/visible_in_canvas true until user hides in right panel.
                       return {
                         field_id: field.id,
                         field_name: field.name,
@@ -320,10 +322,10 @@ export default function GridDataSettings({
               label="Fields"
               description={
                 currentViewType === 'timeline'
-                  ? "Fields for record modal and side panel. Timeline cards use Title and Tag fields in the Timeline card section below."
+                  ? "Fields for card display. Timeline cards use Title and Tag fields in the Timeline card section below. Modal layout is edited in the right panel when you open a record."
                   : currentViewType === 'kanban'
-                    ? "Visible fields in order. Single source of truth for list rows, grid columns, gallery cards, and calendar previews. Kanban uses the separate 'Fields on Kanban cards' below. If none selected, the title field is used."
-                    : "Visible fields in order. Single source of truth for list rows, grid columns, gallery cards, and calendar previews. If none selected, the title field is used."
+                    ? "Fields for list rows, grid columns, gallery cards, and calendar previews. Kanban uses the separate 'Fields on Kanban cards' below. Modal layout is edited in the right panel when you open a record."
+                    : "Fields for list rows, grid columns, gallery cards, and calendar previews. Modal layout is edited in the right panel when you open a record."
               }
               required={false}
             />

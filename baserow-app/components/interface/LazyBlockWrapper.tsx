@@ -49,10 +49,9 @@ export default function LazyBlockWrapper({
   const observerRef = useRef<IntersectionObserver | null>(null)
 
   useEffect(() => {
-    // If lazy loading is disabled, render immediately
+    // If lazy loading is disabled, skip effect entirely - state already initialized via useState(!enabled)
+    // CRITICAL: Do NOT call setState here when disabled - redundant setState can contribute to React #185
     if (!enabled) {
-      setIsVisible(true)
-      setHasBeenVisible(true)
       return
     }
 

@@ -127,7 +127,7 @@ export default function RightSettingsPanel() {
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <span className="font-semibold text-gray-900 truncate">
-                  Modal layout
+                  {data?.onLayoutSave ? "Record" : "Modal layout"}
                 </span>
               </div>
               <Button
@@ -233,6 +233,7 @@ export default function RightSettingsPanel() {
             )
           }
           if (fromPageData) {
+            // record_view page: Record layout (not modal)
             return (
               <RecordLayoutSettings
                 tableId={data.recordTableId ?? ""}

@@ -9,6 +9,9 @@ import {
   Search,
   MessageSquare,
   MoreHorizontal,
+  Settings2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -183,6 +186,7 @@ export default function RecordLayoutSettings({
     ...resolvedLayout,
   ])
   const [searchQuery, setSearchQuery] = useState("")
+  const [fieldsExpanded, setFieldsExpanded] = useState(true)
 
   const layoutSignature = `${resolvedLayout.length}-${resolvedLayout.map((i) => i.field_id).sort().join(",")}`
   useEffect(() => {
@@ -352,6 +356,9 @@ export default function RecordLayoutSettings({
           </div>
           <div className="space-y-2">
             <Label className="text-sm font-medium text-gray-700">Permissions</Label>
+            <p className="text-xs text-gray-500">
+              Editable allows inline editing and layout mode (add fields, resize columns) in the record detail.
+            </p>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -419,24 +426,49 @@ export default function RecordLayoutSettings({
         </div>
       )}
 
-      {/* Fields to show in record modal - single source for modal layout */}
+      {/* Fields - Airtable-style: N visible + gear to expand/collapse */}
       <div className="p-4 border-b border-gray-200">
-        <p className="text-sm font-medium text-gray-700 mb-1">Fields to show in record modal</p>
-        <p className="text-xs text-gray-500 mb-3">
-          Choose which fields appear when opening a record. Drag to reorder. Use the eye icon to show or hide each field.
-        </p>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder="Search fields"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 h-9 bg-gray-50 border-gray-200"
-          />
+        <div className="flex items-center justify-between gap-2">
+          <Label className="text-sm font-medium text-gray-700">
+            {hasPageConfig ? "Fields" : "Fields to show in record modal"}
+          </Label>
+          <button
+            type="button"
+            onClick={() => setFieldsExpanded((e) => !e)}
+            className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-gray-100 text-sm text-gray-600"
+            title={fieldsExpanded ? "Collapse field list" : "Expand field list"}
+          >
+            <span>{visibleItems.length} visible</span>
+            <Settings2 className="h-4 w-4 text-gray-500" />
+            {fieldsExpanded ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
+          </button>
         </div>
+        {fieldsExpanded && (
+          <>
+            <p className="text-xs text-gray-500 mt-1 mb-3">
+              {hasPageConfig
+                ? "Visible and hidden fields for the record detail panel. Drag to reorder. Use the eye icon to show or hide."
+                : "Choose which fields appear when opening a record. Drag to reorder. Use the eye icon to show or hide each field."}
+            </p>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Find a field..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-9 bg-gray-50 border-gray-200"
+              />
+            </div>
+          </>
+        )}
       </div>
 
-      {/* Visible & Hidden sections */}
+      {/* Visible & Hidden sections - only when fields expanded */}
+      {fieldsExpanded && (
       <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4">
         <DndContext
           sensors={sensors}
@@ -531,6 +563,7 @@ export default function RecordLayoutSettings({
           </SortableContext>
         </DndContext>
       </div>
+      )}
     </div>
   )
 }

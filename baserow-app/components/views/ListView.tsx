@@ -78,6 +78,10 @@ interface ListViewProps {
   interfaceMode?: 'view' | 'edit'
   /** Called when a record is deleted from RecordPanel; use to refresh core data. */
   onRecordDeleted?: () => void
+  /** Block config for modal_fields, modal_layout, field_layout. */
+  blockConfig?: Record<string, any>
+  /** Callback to save field layout when user edits modal layout in right panel. */
+  onModalLayoutSave?: (fieldLayout: import("@/lib/interface/field-layout-utils").FieldLayoutItem[]) => void
 }
 
 export default function ListView({
@@ -111,6 +115,8 @@ export default function ListView({
   cascadeContext,
   interfaceMode = 'view',
   onRecordDeleted,
+  blockConfig,
+  onModalLayoutSave,
 }: ListViewProps) {
   const router = useRouter()
   const { openRecord } = useRecordPanel()
@@ -168,9 +174,21 @@ export default function ListView({
     }
     const effectiveTableName = tableName || supabaseTableName
     if (tableId && effectiveTableName) {
-      openRecord(tableId, recordId, effectiveTableName, undefined, undefined, cascadeContext ?? undefined, interfaceMode, onRecordDeleted)
+      openRecord(
+        tableId,
+        recordId,
+        effectiveTableName,
+        (blockConfig as any)?.modal_fields ?? modalFields,
+        (blockConfig as any)?.modal_layout,
+        cascadeContext ?? (blockConfig ? { blockConfig } : undefined),
+        interfaceMode,
+        onRecordDeleted,
+        (blockConfig as any)?.field_layout,
+        onModalLayoutSave ?? undefined,
+        tableFields
+      )
     }
-  }, [onRecordClick, openRecord, supabaseTableName, tableId, tableName, cascadeContext, interfaceMode, onRecordDeleted])
+  }, [blockConfig, modalFields, onRecordClick, openRecord, supabaseTableName, tableId, tableName, cascadeContext, interfaceMode, onRecordDeleted, onModalLayoutSave, tableFields])
 
   // Update currentGroupBy when groupBy prop changes
   useEffect(() => {

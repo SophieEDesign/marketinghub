@@ -47,6 +47,8 @@ interface KanbanViewProps {
   interfaceMode?: 'view' | 'edit'
   /** Called when a record is deleted from RecordPanel; use to refresh core data. */
   onRecordDeleted?: () => void
+  /** Callback to save field layout when user edits modal layout in right panel. */
+  onModalLayoutSave?: (fieldLayout: import("@/lib/interface/field-layout-utils").FieldLayoutItem[]) => void
 }
 
 export default function KanbanView({ 
@@ -69,6 +71,7 @@ export default function KanbanView({
   highlightRules = [],
   interfaceMode = 'view',
   onRecordDeleted,
+  onModalLayoutSave,
 }: KanbanViewProps) {
   // All hooks must be at the top level, before any conditional returns
   const router = useRouter()
@@ -329,9 +332,11 @@ export default function KanbanView({
       cascadeContext ?? (blockConfig ? { blockConfig } : undefined),
       interfaceMode,
       onRecordDeleted,
-      (blockConfig as any)?.field_layout
+      (blockConfig as any)?.field_layout,
+      onModalLayoutSave ?? undefined,
+      tableFields
     )
-  }, [blockConfig, cascadeContext, onRecordClick, openRecord, supabaseTableName, tableId, interfaceMode, onRecordDeleted])
+  }, [blockConfig, cascadeContext, onRecordClick, openRecord, supabaseTableName, tableId, interfaceMode, onRecordDeleted, onModalLayoutSave, tableFields])
 
   const handleCellSave = useCallback(async (rowId: string, fieldName: string, value: any) => {
     if (!supabaseTableName) return

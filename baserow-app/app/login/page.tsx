@@ -12,7 +12,6 @@ import {
   getAuthErrorMessage, // Deprecated, but kept for backward compatibility
   getRedirectUrl, 
   validateEmail, 
-  validatePassword,
   performPostAuthRedirect
 } from "@/lib/auth-utils"
 
@@ -130,56 +129,6 @@ function LoginForm() {
     }
   }
 
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
-    setEmailError(null)
-    setPasswordError(null)
-
-    // Validate inputs
-    const emailValidation = validateEmail(email)
-    if (!emailValidation.valid) {
-      setEmailError(emailValidation.error || 'Invalid email')
-      setLoading(false)
-      return
-    }
-
-    const passwordValidation = validatePassword(password)
-    if (!passwordValidation.valid) {
-      setPasswordError(passwordValidation.error || 'Invalid password')
-      setLoading(false)
-      return
-    }
-
-    const { error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-    })
-
-    if (error) {
-      setError(authErrorToMessage(error, 'signUp'))
-      setLoading(false)
-    } else {
-      // For sign up, user may need to confirm email first
-      // Wait for session using auth state listener with shorter timeout
-      await performPostAuthRedirect(supabase, searchParams, {
-        checkPasswordSetup: true,
-        onError: (errorMsg) => {
-          // If session not established, likely email confirmation required
-          if (errorMsg.includes('timed out') || errorMsg.includes('not established')) {
-            setError('Please check your email to confirm your account before signing in.')
-          } else {
-            setError(errorMsg)
-          }
-          setLoading(false)
-        }
-      })
-      // Note: If redirect succeeds, component will unmount
-      // If there's an error, onError callback handles it
-    }
-  }
-
   // Show loading state during initial auth check
   if (checkingAuth) {
     return (
@@ -270,12 +219,12 @@ function LoginForm() {
                 {error}
               </div>
             )}
-            <div className="flex gap-2">
+            <div>
               <Button
                 type="submit"
                 onClick={handleSignIn}
                 disabled={loading}
-                className="flex-1 text-white"
+                className="w-full text-white"
                 style={{ 
                   backgroundColor: primaryColor,
                   borderColor: primaryColor,
@@ -297,15 +246,6 @@ function LoginForm() {
                 }}
               >
                 Sign In
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleSignUp}
-                disabled={loading}
-                className="flex-1"
-              >
-                Sign Up
               </Button>
             </div>
           </form>

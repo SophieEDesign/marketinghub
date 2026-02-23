@@ -51,6 +51,8 @@ interface GalleryViewProps {
   interfaceMode?: 'view' | 'edit'
   /** Called when a record is deleted from RecordPanel; use to refresh core data. */
   onRecordDeleted?: () => void
+  /** Callback to save field layout when user edits modal layout in right panel. */
+  onModalLayoutSave?: (fieldLayout: import("@/lib/interface/field-layout-utils").FieldLayoutItem[]) => void
 }
 
 export default function GalleryView({
@@ -74,6 +76,7 @@ export default function GalleryView({
   highlightRules = [],
   interfaceMode = 'view',
   onRecordDeleted,
+  onModalLayoutSave,
 }: GalleryViewProps) {
   const { openRecord } = useRecordPanel()
   const [rows, setRows] = useState<TableRow[]>([])
@@ -450,8 +453,20 @@ export default function GalleryView({
       return
     }
     if (!supabaseTableName) return
-    openRecord(tableId, recordId, supabaseTableName, undefined, undefined, undefined, interfaceMode, onRecordDeleted)
-  }, [onRecordClick, openRecord, supabaseTableName, tableId, interfaceMode, onRecordDeleted])
+    openRecord(
+      tableId,
+      recordId,
+      supabaseTableName,
+      (blockConfig as any)?.modal_fields,
+      (blockConfig as any)?.modal_layout,
+      blockConfig ? { blockConfig } : undefined,
+      interfaceMode,
+      onRecordDeleted,
+      (blockConfig as any)?.field_layout,
+      onModalLayoutSave ?? undefined,
+      tableFields
+    )
+  }, [blockConfig, onRecordClick, openRecord, supabaseTableName, tableId, interfaceMode, onRecordDeleted, onModalLayoutSave, tableFields])
 
   const handleCellSave = useCallback(async (rowId: string, fieldName: string, value: any) => {
     if (!supabaseTableName) return

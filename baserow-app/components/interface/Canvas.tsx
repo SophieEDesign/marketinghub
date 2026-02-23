@@ -1919,7 +1919,7 @@ export default function Canvas({
       <div
         ref={containerRef}
         className={`flex-1 flex flex-col w-full min-w-0 relative ${isFullPageMode ? "overflow-hidden min-h-[100vh]" : "min-h-0"}`}
-        style={isFullPageMode ? undefined : { paddingBottom: isEditing ? "100px" : "80px" }}
+        style={isFullPageMode ? undefined : { paddingBottom: isEditing ? "140px" : "80px" }}
         onClick={(e) => {
           // Context-driven: clicking empty canvas selects page (opens page settings)
           // Blocks use stopPropagation, so only empty-area clicks reach here
