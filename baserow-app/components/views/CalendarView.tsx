@@ -1207,11 +1207,9 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
                     colorFieldObj.type,
                     colorFieldObj.options,
                     colorFieldObj.type === 'single_select'
-    )
-  )
-})
-
-export default memo(CalendarViewInner)
+                  )
+                )
+              }
             }
           }
 
