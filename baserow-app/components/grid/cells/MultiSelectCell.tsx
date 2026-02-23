@@ -20,6 +20,7 @@ interface MultiSelectCellProps {
   tableId?: string // Table ID for updating options
   onFieldOptionsUpdate?: () => void // Callback when field options are updated
   isSelected?: boolean // Whether the cell is currently selected
+  pillTruncate?: boolean // When true, truncate long pill labels (e.g. Kanban cards)
 }
 
 export default function MultiSelectCell({
@@ -36,6 +37,7 @@ export default function MultiSelectCell({
   tableId,
   onFieldOptionsUpdate,
   isSelected = false,
+  pillTruncate = false,
 }: MultiSelectCellProps) {
   const containerStyle: React.CSSProperties = rowHeight ? { height: `${rowHeight}px` } : {}
   // If we don't have fieldId/tableId, fall back to basic display (for backwards compatibility)
@@ -50,6 +52,7 @@ export default function MultiSelectCell({
             fieldType="multi_select"
             fieldOptions={fieldOptions}
             className="gap-1.5"
+            truncate={pillTruncate}
           />
         ) : (
           <span className="text-gray-400 italic text-sm">{placeholder}</span>
@@ -62,6 +65,7 @@ export default function MultiSelectCell({
     <div className="w-full px-3 py-1.5 flex items-start gap-1.5" style={containerStyle}>
       <InlineSelectDropdown
         value={value}
+        pillTruncate={pillTruncate}
         // Ensure the picker dropdown uses canonical manual order by default.
         // Alphabetise (if enabled) is a per-picker visual transform only.
         choices={sortLabelsByManualOrder(choices, "multi_select", fieldOptions)}

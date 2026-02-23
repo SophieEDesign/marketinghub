@@ -29,6 +29,8 @@ interface CellFactoryProps {
   isCellSelected?: boolean // Whether the cell is currently selected
   onDelete?: (rowId: string) => void
   canDelete?: boolean
+  /** When true, truncate long pill labels (e.g. for Kanban cards). */
+  pillTruncate?: boolean
 }
 
 export function CellFactory({
@@ -44,6 +46,7 @@ export function CellFactory({
   isCellSelected = false,
   onDelete,
   canDelete = false,
+  pillTruncate = false,
 }: CellFactoryProps): ReactNode {
   const commonProps = {
     value,
@@ -89,6 +92,7 @@ export function CellFactory({
           tableId={field.table_id}
           onFieldOptionsUpdate={onFieldOptionsUpdate}
           isSelected={isCellSelected}
+          pillTruncate={pillTruncate}
         />
       )
 
@@ -103,6 +107,7 @@ export function CellFactory({
           tableId={field.table_id}
           onFieldOptionsUpdate={onFieldOptionsUpdate}
           isSelected={isCellSelected}
+          pillTruncate={pillTruncate}
         />
       )
 

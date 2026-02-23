@@ -25,6 +25,11 @@ export interface ChoicePillProps extends React.HTMLAttributes<HTMLSpanElement> {
    * needs a tighter layout (e.g. very compact cards).
    */
   density?: "default" | "compact"
+  /**
+   * When true, truncate long labels with ellipsis (e.g. for Kanban cards).
+   * Uses max-w-[120px]. Title attribute shows full text on hover.
+   */
+  truncate?: boolean
 }
 
 export function ChoicePill({
@@ -33,6 +38,7 @@ export function ChoicePill({
   fieldOptions,
   useSemanticColors,
   density = "default",
+  truncate = false,
   className,
   style,
   ...props
@@ -48,14 +54,15 @@ export function ChoicePill({
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-md text-xs font-medium shrink-0",
+        "inline-flex items-center rounded-md text-xs font-medium",
+        truncate ? "truncate max-w-[120px] min-w-0" : "shrink-0",
         density === "compact" ? "px-2 py-0.5" : "px-2 py-0.5",
         textColorClass,
         className
       )}
       style={{
         backgroundColor: bgColor,
-        whiteSpace: "nowrap",
+        whiteSpace: truncate ? undefined : "nowrap",
         ...style,
       }}
       title={normalized}
@@ -73,6 +80,8 @@ export interface ChoicePillListProps extends React.HTMLAttributes<HTMLDivElement
   /** Max pills to render before collapsing into a +N pill. */
   max?: number
   density?: "default" | "compact"
+  /** When true, truncate long pill labels (e.g. for Kanban cards). */
+  truncate?: boolean
 }
 
 export function ChoicePillList({
@@ -81,6 +90,7 @@ export function ChoicePillList({
   fieldOptions,
   max,
   density = "default",
+  truncate = false,
   className,
   ...props
 }: ChoicePillListProps) {
@@ -97,6 +107,7 @@ export function ChoicePillList({
           fieldType={fieldType}
           fieldOptions={fieldOptions}
           density={density}
+          truncate={truncate}
         />
       ))}
       {remaining > 0 && (

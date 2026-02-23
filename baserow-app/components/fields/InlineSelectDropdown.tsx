@@ -28,6 +28,7 @@ interface InlineSelectDropdownProps {
   placeholder?: string
   isCellSelected?: boolean // Whether the cell is currently selected (for two-click behavior)
   allowOptionEditing?: boolean // Whether to show edit/delete/create option controls (default: true, false for cells)
+  pillTruncate?: boolean // When true, truncate long pill labels (e.g. Kanban cards)
 }
 
 export default function InlineSelectDropdown({
@@ -45,6 +46,7 @@ export default function InlineSelectDropdown({
   placeholder = 'Select...',
   isCellSelected = false,
   allowOptionEditing = true, // Default to true for backwards compatibility (header/settings)
+  pillTruncate = false,
 }: InlineSelectDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -374,7 +376,7 @@ export default function InlineSelectDropdown({
         {selectedValues.length > 0 ? (
           selectedValues.map((val: string) => {
             return (
-              <ChoicePill key={val} label={val} fieldType={fieldType} fieldOptions={mergedOptions} />
+              <ChoicePill key={val} label={val} fieldType={fieldType} fieldOptions={mergedOptions} truncate={pillTruncate} />
             )
           })
         ) : (
@@ -412,7 +414,7 @@ export default function InlineSelectDropdown({
           <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 text-left">
             {selectedValues.length > 0 ? (
               selectedValues.map((val: string) => (
-                <ChoicePill key={val} label={val} fieldType={fieldType} fieldOptions={mergedOptions} />
+                <ChoicePill key={val} label={val} fieldType={fieldType} fieldOptions={mergedOptions} truncate={pillTruncate} />
               ))
             ) : (
               <span className="text-muted-foreground italic">{placeholder}</span>

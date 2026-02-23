@@ -86,6 +86,7 @@ export default function TimelineEventCard({
   return (
     <div
       className="absolute group"
+      data-timeline-event="true"
       style={{
         left: `${left}px`,
         width: `${width}px`,

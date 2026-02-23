@@ -561,7 +561,7 @@ export default function AirtableKanbanView({
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="h-full min-w-0 bg-white overflow-auto">
+        <div className="h-full min-w-0 bg-white overflow-auto [scrollbar-gutter:stable] pr-2">
           <div className="flex gap-4 p-6 min-w-max h-full">
             {columns.map((column) => {
               const columnRows = groupedRows[column.id] || []
@@ -705,7 +705,7 @@ function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
-      className="flex-shrink-0 w-80 bg-gray-50 rounded-lg flex flex-col h-full max-h-full border border-gray-200"
+      className="flex-shrink-0 w-96 bg-gray-50 rounded-lg flex flex-col h-full max-h-full border border-gray-200"
       data-column-id={column.id}
     >
       {/* Column Header */}
@@ -896,6 +896,7 @@ function KanbanCard({ row, displayFields, tableFields, selected, onSelect, onOpe
                         wrapText={true}
                         rowHeight={22}
                         onSave={(v) => onCellSave(String(row.id), full.name, v)}
+                        pillTruncate={true}
                       />
                     </div>
                   )

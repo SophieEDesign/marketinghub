@@ -2392,7 +2392,8 @@ export default function Canvas({
                                            target.closest('.ql-snow') ||
                                            target.closest('.fc-event') ||
                                            target.closest('.fc-daygrid-event') ||
-                                           target.closest('.fc-daygrid-day')
+                                           target.closest('.fc-daygrid-day') ||
+                                           target.closest('[data-timeline-event]')
                     // Field blocks: allow selection when clicking anywhere on content (except typing areas)
                     const isSelectableBlockContent = target.closest('[data-block-selectable]')
                     const isTypingArea = target.closest('input') || target.closest('textarea') || target.closest('[contenteditable="true"]')
@@ -2580,7 +2581,11 @@ export default function Canvas({
                           recordId={recordId!}
                           pageId={pageId}
                           isEditing={isEditing}
-                          pageEditable={pageEditable}
+                          pageEditable={
+                            fullPageBlock.type === "record_context"
+                              ? fullPageBlock.config?.allow_editing !== false
+                              : pageEditable
+                          }
                           blockConfig={fullPageBlock.config}
                           blockId={fullPageBlock.id}
                           onBlockUpdate={onBlockUpdate}

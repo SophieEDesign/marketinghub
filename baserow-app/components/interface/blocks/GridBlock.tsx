@@ -26,7 +26,8 @@ import { getFieldDisplayName } from "@/lib/fields/display"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import QuickFilterBar from "@/components/filters/QuickFilterBar"
-import CalendarDateRangeControls from "@/components/views/calendar/CalendarDateRangeControls"
+import CalendarAnchorControls from "@/components/views/calendar/CalendarAnchorControls"
+import type { CalendarViewScrollHandle } from "@/components/views/CalendarView"
 import { VIEWS_ENABLED } from "@/lib/featureFlags"
 import { normalizeUuid } from "@/lib/utils/ids"
 import { isAbortError } from "@/lib/api/error-handling"
@@ -289,10 +290,11 @@ export default function GridBlock({
   }, [blockBaseFilters])
 
   const [userQuickFilters, setUserQuickFilters] = useState<FilterConfig[]>([])
-  // Calendar-only: date range filter state (lifted here so we can render controls in a unified header panel)
+  // Calendar-only: initial scroll target (anchor-based, no filtering)
   const [calendarDateFrom, setCalendarDateFrom] = useState<Date | undefined>(undefined)
   const [calendarDateTo, setCalendarDateTo] = useState<Date | undefined>(undefined)
-  
+  const calendarScrollRef = useRef<CalendarViewScrollHandle | null>(null)
+
   // Track if date range has been initialized to prevent re-initialization when user clears it
   const dateRangeInitializedRef = useRef(false)
   
@@ -842,6 +844,7 @@ export default function GridBlock({
             }
           >
           <CalendarView
+            ref={calendarScrollRef}
             key={block.id}
             tableId={tableId ?? ''}
             viewId={viewUuid || ''}
@@ -1313,19 +1316,10 @@ export default function GridBlock({
               )}
 
               {hasAnyDateField && (
-                <CalendarDateRangeControls
-                  dateFrom={calendarDateFrom}
-                  dateTo={calendarDateTo}
-                  onDateFromChange={setCalendarDateFrom}
-                  onDateToChange={setCalendarDateTo}
+                <CalendarAnchorControls
+                  onScrollToDate={(date) => calendarScrollRef.current?.scrollToDate(date)}
                   disabled={false}
-                  defaultPreset={
-                    config?.default_date_range_preset && config.default_date_range_preset !== "none"
-                      ? (config.default_date_range_preset as "today" | "thisWeek" | "thisMonth" | "nextWeek" | "nextMonth" | "custom")
-                      : null
-                  }
                   compact={compactBar}
-                  fromSettingsPresetOnly={isFullPage}
                 />
               )}
 

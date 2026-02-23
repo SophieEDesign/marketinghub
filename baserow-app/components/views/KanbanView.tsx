@@ -471,7 +471,7 @@ export default function KanbanView({
   }
 
   return (
-    <div className="w-full h-full min-w-0 overflow-auto bg-gray-50">
+    <div className="w-full h-full min-w-0 overflow-auto bg-gray-50 [scrollbar-gutter:stable] pr-2">
       <div className="flex gap-4 min-w-max p-6">
         {groups.map((groupName) => {
           const displayName =
@@ -480,7 +480,7 @@ export default function KanbanView({
             groupName
           const headerColor = getColumnHeaderColor(groupName)
           return (
-          <div key={groupName} className="flex-shrink-0 w-80">
+          <div key={groupName} className="flex-shrink-0 w-96">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 mb-3">
               <div className="flex items-center gap-2 flex-wrap">
                 {headerColor ? (
@@ -604,8 +604,9 @@ export default function KanbanView({
                               <div key={fieldObj.id ?? fieldObj.name} className="min-w-0 max-w-full">
                                 {isSelect && pillColor && pillLabel ? (
                                   <span
-                                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white truncate max-w-full"
+                                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white break-words max-w-full"
                                     style={{ backgroundColor: pillColor }}
+                                    title={pillLabel}
                                   >
                                     {pillLabel}
                                   </span>

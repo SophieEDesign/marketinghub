@@ -21,7 +21,6 @@ import ViewSelector from "./shared/ViewSelector"
 import BlockFilterEditor from "./BlockFilterEditor"
 import SortSelector from "./shared/SortSelector"
 import NestedGroupBySelector from "./shared/NestedGroupBySelector"
-import ModalFieldsSelector from "./shared/ModalFieldsSelector"
 import PermissionsSettings from "./PermissionsSettings"
 import { useViewMeta } from "@/hooks/useViewMeta"
 import { useToast } from "@/components/ui/use-toast"
@@ -65,58 +64,6 @@ export default function RecordContextDataSettings({
   const isListMode = displayMode === "list"
   const { metadata: viewMetaData } = useViewMeta(config.view_id, config.table_id)
   const { toast } = useToast()
-  const [layoutVersions, setLayoutVersions] = useState<Array<{ id: string; created_at: string }>>([])
-  const [restoringLayout, setRestoringLayout] = useState(false)
-  const [layoutOverwriteConfirmed, setLayoutOverwriteConfirmed] = useState(false)
-
-  const loadLayoutVersions = useCallback(async () => {
-    if (!blockId) return
-    try {
-      const res = await fetch(`/api/blocks/${blockId}/field-layout-versions`)
-      if (res.ok) {
-        const { versions } = await res.json()
-        setLayoutVersions(versions ?? [])
-      }
-    } catch {
-      setLayoutVersions([])
-    }
-  }, [blockId])
-
-  useEffect(() => {
-    if (blockId && hasTableAndFields && Array.isArray((config as any).field_layout) && (config as any).field_layout.length > 0) {
-      loadLayoutVersions()
-    } else {
-      setLayoutVersions([])
-    }
-  }, [blockId, hasTableAndFields, (config as any).field_layout, loadLayoutVersions])
-
-  useEffect(() => {
-    setLayoutOverwriteConfirmed(false)
-  }, [blockId])
-
-  const handleRestoreLayout = useCallback(async (versionId: string) => {
-    if (!blockId || restoringLayout) return
-    setRestoringLayout(true)
-    try {
-      const res = await fetch(`/api/blocks/${blockId}/restore-field-layout`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ versionId }),
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || "Failed to restore")
-      }
-      const { field_layout } = await res.json()
-      onUpdate({ field_layout } as any)
-      toast({ title: "Layout restored", description: "Previous field layout has been restored." })
-      loadLayoutVersions()
-    } catch (e: any) {
-      toast({ variant: "destructive", title: "Restore failed", description: e?.message || "Please try again." })
-    } finally {
-      setRestoringLayout(false)
-    }
-  }, [blockId, onUpdate, toast, loadLayoutVersions, restoringLayout])
 
   const handleCopySettingsFromView = () => {
     if (!viewMetaData) return
@@ -210,112 +157,7 @@ export default function RecordContextDataSettings({
         </div>
       )}
 
-      {hasTableAndFields && (
-        <div className="space-y-2 border-t pt-4">
-          <ModalFieldsSelector
-            value={(() => {
-              // Single source of truth: field_layout (right panel only) > modal_fields > visible_fields
-              // NOTE: visible_in_card is NOT used here - "Fields to show" only controls the right panel
-              const fl = (config as any).field_layout
-              if (Array.isArray(fl) && fl.length > 0) {
-                return fl
-                  .filter((i: any) => i.visible_in_canvas !== false)
-                  .sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0))
-                  .map((i: any) => i.field_name)
-              }
-              const mf = Array.isArray((config as any).modal_fields) ? (config as any).modal_fields : []
-              const vf = Array.isArray(config.visible_fields) ? config.visible_fields : []
-              return mf.length > 0 ? mf : vf
-            })()}
-            onChange={(fieldNames) => {
-              const fl = (config as any).field_layout
-              const hasExistingLayout = Array.isArray(fl) && fl.length > 0
-              if (hasExistingLayout && !layoutOverwriteConfirmed) {
-                const ok = window.confirm(
-                  "This will replace the current field layout. Continue?"
-                )
-                if (!ok) return
-                setLayoutOverwriteConfirmed(true)
-              }
-              const allFieldNames = fields.map((f) => f.name)
-              const visibleSet = new Set(fieldNames)
-              const hidden = allFieldNames.filter((n) => n !== "id" && !visibleSet.has(n))
-              const buildFieldLayout = () => {
-                // "Fields to show" controls ONLY the right panel (detail). Cards use Card/list fields.
-                // visible_in_canvas/visible_in_modal = selection; visible_in_card = true for ALL so cards aren't limited
-                // Default to single column (col-1) so new layouts show stacked fields
-                const items: Array<{ field_id: string; field_name: string; order: number; visible_in_modal?: boolean; visible_in_card?: boolean; visible_in_canvas?: boolean; editable: boolean; modal_column_id?: string }> = []
-                let order = 0
-                fieldNames.forEach((name) => {
-                  const f = fields.find((x) => x.name === name || x.id === name)
-                  if (f) {
-                    items.push({
-                      field_id: f.id,
-                      field_name: f.name,
-                      order: order++,
-                      visible_in_modal: true,
-                      visible_in_card: true,
-                      visible_in_canvas: true,
-                      editable: true,
-                      modal_column_id: "col-1",
-                    })
-                  }
-                })
-                hidden.forEach((name) => {
-                  const f = fields.find((x) => x.name === name)
-                  if (f) {
-                    items.push({
-                      field_id: f.id,
-                      field_name: f.name,
-                      order: order++,
-                      visible_in_modal: false,
-                      visible_in_card: true,
-                      visible_in_canvas: false,
-                      editable: false,
-                      modal_column_id: "col-1",
-                    })
-                  }
-                })
-                return items
-              }
-              onUpdate({
-                visible_fields: fieldNames,
-                modal_fields: fieldNames,
-                field_layout: buildFieldLayout(),
-              } as any)
-            }}
-            fields={fields}
-            label="Fields to show"
-            description="Visible and hidden fields for the record detail panel (right) only. Cards use Card/list fields below. Leave empty to show all fields."
-          />
-          {blockId && layoutVersions.length > 0 && (
-            <div className="space-y-2 pt-2">
-              <Label>Restore previous layout</Label>
-              <Select
-                value=""
-                onValueChange={(versionId) => {
-                  if (versionId) void handleRestoreLayout(versionId)
-                }}
-                disabled={restoringLayout}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={restoringLayout ? "Restoring…" : "Select a version to restore"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {layoutVersions.map((v) => (
-                    <SelectItem key={v.id} value={v.id}>
-                      {new Date(v.created_at).toLocaleString()}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-gray-500">
-                Restore a previously saved field layout. Current layout will be replaced.
-              </p>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Fields to show: moved to right panel. Click on record detail to configure. */}
 
       {hasTableAndFields && (
         <div className="space-y-2 border-t pt-4">

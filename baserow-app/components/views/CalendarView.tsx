@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useRef, useCallback, memo } from "react"
+import { useState, useEffect, useMemo, useRef, useCallback, memo, useImperativeHandle, forwardRef } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent } from "@/components/ui/card"
@@ -23,6 +23,7 @@ import { applyFiltersToQuery, deriveDefaultValuesFromFilters, stripFilterBlockFi
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import { flattenFilterTree } from "@/lib/filters/canonical-model"
 import { addDays, differenceInCalendarDays, format, startOfDay } from "date-fns"
+import { scrollToDate as scrollToDateUtil } from "@/lib/calendar-anchor-utils"
 import type { EventDropArg, EventInput, EventClickArg, EventContentArg } from "@fullcalendar/core"
 import type { TableRow } from "@/types/database"
 import type { LinkedField, TableField } from "@/types/fields"
@@ -31,7 +32,7 @@ import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { isDebugEnabled, debugLog, debugWarn, debugError } from '@/lib/interface/debug-flags'
 import { resolveCalendarDateFieldNames as resolveDateFields } from '@/lib/interface/calendar-date-fields'
 import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
-import CalendarDateRangeControls from "@/components/views/calendar/CalendarDateRangeControls"
+import CalendarAnchorControls, { getTargetDateForPreset } from "@/components/views/calendar/CalendarAnchorControls"
 import TimelineFieldValue, { type FieldValue } from "@/components/views/TimelineFieldValue"
 import { isAbortError } from "@/lib/api/error-handling"
 import { getLinkedFieldValueFromRow, linkedValueToIds, resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
@@ -71,6 +72,10 @@ interface CalendarViewProps {
   interfaceMode?: 'view' | 'edit'
   /** Optional block id for record modal remount key. */
   blockId?: string | null
+}
+
+export interface CalendarViewScrollHandle {
+  scrollToDate: (date: Date) => void
 }
 
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -121,7 +126,7 @@ function CalendarEventCardField({
   return <span className="truncate">{value != null && value !== "" ? String(value) : "—"}</span>
 }
 
-export default function CalendarView({
+const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps>(function CalendarViewInner({
   tableId,
   viewId,
   dateFieldId,
@@ -146,7 +151,7 @@ export default function CalendarView({
   canEditLayout = false,
   interfaceMode = 'view',
   blockId = null,
-}: CalendarViewProps) {
+}, ref) {
   console.log("[CalendarView] MOUNT", blockId)
 
   // -------------------------------------------------------------------------
@@ -218,6 +223,8 @@ export default function CalendarView({
   const prevDateToTimeRef = useRef<number | null>(null)
   const prevDateFromKeyRef = useRef<string>("")
   const prevDateToKeyRef = useRef<string>("")
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const hasScrolledToInitialRef = useRef(false)
 
   const areLinkedValueMapsEqual = useCallback(
     (a: Record<string, Record<string, string>>, b: Record<string, Record<string, string>>): boolean => {
@@ -1200,9 +1207,11 @@ export default function CalendarView({
                     colorFieldObj.type,
                     colorFieldObj.options,
                     colorFieldObj.type === 'single_select'
-                  )
-                )
-              }
+    )
+  )
+})
+
+export default memo(CalendarViewInner)
             }
           }
 
@@ -1529,35 +1538,60 @@ export default function CalendarView({
     }
   }, [computedCalendarEvents])
 
+  // Visible week span: 4, 6 (default), or 8 weeks - controls how many week rows render
+  const visibleWeekSpan = useMemo(() => {
+    const v = (blockConfig as any)?.visible_week_span
+    if (v === 4 || v === 8) return v
+    return 6
+  }, [(blockConfig as any)?.visible_week_span])
+
+  // Custom views for 4, 6, or 8 weeks (Airtable-style)
+  const calendarViews = useMemo(
+    () => ({
+      dayGridWeek4: {
+        type: "dayGrid" as const,
+        duration: { weeks: 4 },
+        buttonText: "4 weeks",
+      },
+      dayGridWeek6: {
+        type: "dayGrid" as const,
+        duration: { weeks: 6 },
+        buttonText: "6 weeks",
+      },
+      dayGridWeek8: {
+        type: "dayGrid" as const,
+        duration: { weeks: 8 },
+        buttonText: "8 weeks",
+      },
+    }),
+    []
+  )
+
+  const calendarInitialView = useMemo(() => {
+    if (visibleWeekSpan === 4) return "dayGridWeek4"
+    if (visibleWeekSpan === 8) return "dayGridWeek8"
+    return "dayGridWeek6"
+  }, [visibleWeekSpan])
+
   // FullCalendar: use stable plugins array (defined at module level to prevent React #185)
   const calendarHeaderToolbar = useMemo(
     () => ({
       left: "prev,next today",
       center: "title",
-      right: "dayGridMonth,dayGridWeek",
+      right: "dayGridWeek4,dayGridWeek6,dayGridWeek8",
     }),
     []
   )
   const calendarDayHeaderFormat = useMemo(() => ({ weekday: "short" as const }), [])
 
-  // Presets (Today, This Week, This Month) are for NAVIGATION only - they bring the target date to the top
-  // but do NOT restrict/hide the rest of the calendar. No validRange is used.
-
-  // initialDate: when date range is set, navigate to that date; otherwise default to today
+  // initialDate: default to today for initial render
   const calendarInitialDate = useMemo(() => {
     if (dateFrom && !isNaN(dateFrom.getTime())) return format(dateFrom, "yyyy-MM-dd")
-    return undefined
+    return format(new Date(), "yyyy-MM-dd")
   }, [dateFrom?.getTime()])
 
-  // Always use month view - presets only NAVIGATE to the target date, they don't change view.
-  // Full calendar (month) stays visible; Today/This Week/This Month just move to that date.
-  const calendarInitialView = "dayGridMonth"
-
-  // Key forces remount when preset changes - ensures calendar shows correct date
-  const calendarRemountKey = useMemo(() => {
-    if (!dateFrom) return "default"
-    return `nav-${format(dateFrom, "yyyy-MM-dd")}`
-  }, [dateFrom?.getTime()])
+  // CRITICAL: Stable key - never remount on preset/scroll. Anchor scrolling only.
+  const calendarStableKey = "calendar-anchor"
 
   const calendarEventClassNames = useCallback(
     (arg: EventContentArg) => [
@@ -1837,6 +1871,34 @@ export default function CalendarView({
     handleDateClickRef.current(info)
   }, [])
 
+  // Anchor-based scroll: scroll to date without filtering or remounting
+  const handleScrollToDate = useCallback((date: Date) => {
+    scrollToDateUtil(date, scrollContainerRef.current, {
+      block: "start",
+      behavior: "smooth",
+    })
+  }, [])
+
+  useImperativeHandle(ref, () => ({ scrollToDate: handleScrollToDate }), [handleScrollToDate])
+
+  // Initial scroll to default date after calendar renders (once)
+  useEffect(() => {
+    if (!mounted || hasScrolledToInitialRef.current) return
+    const preset = (blockConfig as any)?.default_date_range_preset as string | undefined
+    const validPresets = ["today", "thisWeek", "thisMonth", "nextWeek", "nextMonth"]
+    const targetPreset = preset && validPresets.includes(preset) ? preset : "thisWeek"
+    const targetDate = getTargetDateForPreset(targetPreset as "today" | "thisWeek" | "nextWeek" | "thisMonth" | "nextMonth")
+    // Defer scroll until FullCalendar has rendered
+    const t = setTimeout(() => {
+      hasScrolledToInitialRef.current = true
+      scrollToDateUtil(targetDate, scrollContainerRef.current, {
+        block: "start",
+        behavior: "smooth",
+      })
+    }, 100)
+    return () => clearTimeout(t)
+  }, [mounted, blockConfig])
+
   // ---------- END OF HOOKS: No hook may be declared below this line ----------
   // From here on only conditional returns and the main render.
 
@@ -1949,35 +2011,32 @@ export default function CalendarView({
     )
   }
 
-  // Render date range filters above calendar (other filters are shown via QuickFilterBar in blocks)
-  const renderFilters = () => {
+  // Anchor controls: Today, This Week, Next Week, This Month, Next Month (scroll only, no filtering)
+  const renderAnchorControls = () => {
     if (!resolvedDateFieldId || !showDateRangeControls) return null
     return (
       <div className="mb-4">
-        <CalendarDateRangeControls
-          dateFrom={dateFrom}
-          dateTo={dateTo}
-          onDateFromChange={setDateFrom}
-          onDateToChange={setDateTo}
-          defaultPreset={(blockConfig as any)?.default_date_range_preset && (blockConfig as any).default_date_range_preset !== 'none'
-            ? ((blockConfig as any).default_date_range_preset as 'today' | 'thisWeek' | 'thisMonth' | 'nextWeek' | 'nextMonth' | 'custom')
-            : null}
+        <CalendarAnchorControls
+          onScrollToDate={handleScrollToDate}
+          disabled={loading}
+          compact={!!(blockConfig as any)?.appearance}
         />
       </div>
     )
   }
 
   return (
-    <div className="w-full h-full bg-white">
-      {/* Airtable-style Header - FullCalendar handles this with headerToolbar */}
-
-      {renderFilters()}
-      
-      <div className="p-4 bg-white">
+    <div className="w-full h-full flex flex-col bg-white">
+      {renderAnchorControls()}
+      {/* Scroll container: stable ref for anchor scrolling, single scrollbar */}
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 min-h-0 overflow-y-auto p-4 bg-white"
+      >
         {/* CRITICAL: Only render FullCalendar after mount to prevent hydration mismatch (React error #185) */}
         {mounted ? (
           <MemoizedFullCalendar
-            key={calendarRemountKey}
+            key={calendarStableKey}
             plugins={CALENDAR_PLUGINS}
             events={calendarEvents}
             editable={!isViewOnly}
@@ -1985,6 +2044,7 @@ export default function CalendarView({
             headerToolbar={calendarHeaderToolbar}
             initialView={calendarInitialView}
             initialDate={calendarInitialDate}
+            views={calendarViews}
             height="auto"
             aspectRatio={1.4}
             dayMaxEvents={2}
@@ -2010,4 +2070,6 @@ export default function CalendarView({
       </div>
     </div>
   )
-}
+})
+
+export default memo(CalendarViewInner)

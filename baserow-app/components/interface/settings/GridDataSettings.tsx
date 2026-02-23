@@ -528,9 +528,9 @@ export default function GridDataSettings({
               fields={fields}
             />
 
-            {/* Default Date Range Preset */}
+            {/* Default scroll target (anchor-based, no filtering) */}
             <div className="space-y-2">
-              <Label className="text-sm">Default Date Range</Label>
+              <Label className="text-sm">Default Scroll Target</Label>
               <Select
                 value={config.default_date_range_preset || 'thisWeek'}
                 onValueChange={(value) =>
@@ -538,7 +538,7 @@ export default function GridDataSettings({
                 }
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select default date range" />
+                  <SelectValue placeholder="Select default scroll target" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="today">Today</SelectItem>
@@ -550,7 +550,30 @@ export default function GridDataSettings({
                 </SelectContent>
               </Select>
               <p className="text-xs text-gray-500">
-                The calendar will automatically show this date range when first loaded. Default: This Week
+                Where to scroll when the calendar first loads. Does not filter data.
+              </p>
+            </div>
+
+            {/* Visible week span */}
+            <div className="space-y-2">
+              <Label className="text-sm">Visible Week Span</Label>
+              <Select
+                value={String(config.visible_week_span ?? 6)}
+                onValueChange={(value) =>
+                  onUpdate({ visible_week_span: parseInt(value, 10) })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Weeks to show" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="4">4 weeks</SelectItem>
+                  <SelectItem value="6">6 weeks (default)</SelectItem>
+                  <SelectItem value="8">8 weeks</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500">
+                Number of week rows visible at once. Default: 6 weeks
               </p>
             </div>
 

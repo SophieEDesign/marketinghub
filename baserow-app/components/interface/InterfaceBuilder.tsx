@@ -1339,7 +1339,85 @@ export default function InterfaceBuilder({
       ? eligibleFullPageBlocks[0].id
       : null
   }, [blocks])
-  
+
+  const fullPageBlock = fullPageBlockId ? blocks.find((b) => b.id === fullPageBlockId) : null
+
+  // Sync record context to right panel when record is selected (record_context full page)
+  // Like calendar modal: Record settings (Fields, View-only/Editable) show in right panel
+  const [recordContextTableFields, setRecordContextTableFields] = useState<any[]>([])
+  useEffect(() => {
+    if (!recordTableId || !fullPageBlock || fullPageBlock.type !== "record_context") {
+      setRecordContextTableFields([])
+      return
+    }
+    let cancelled = false
+    createClient()
+      .from("table_fields")
+      .select("*")
+      .eq("table_id", recordTableId)
+      .order("position", { ascending: true })
+      .then(({ data }) => {
+        if (!cancelled) setRecordContextTableFields((data as any[]) || [])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [recordTableId, fullPageBlock?.id, fullPageBlock?.type])
+
+  const lastRecordContextSyncRef = useRef<{ recordId: string; blockId: string } | null>(null)
+  useEffect(() => {
+    if (
+      !effectiveIsEditing ||
+      !recordId ||
+      !recordTableId ||
+      !fullPageBlock ||
+      fullPageBlock.type !== "record_context"
+    ) {
+      lastRecordContextSyncRef.current = null
+      return
+    }
+    const prev = lastRecordContextSyncRef.current
+    if (prev?.recordId === recordId && prev?.blockId === fullPageBlock.id) return
+    lastRecordContextSyncRef.current = { recordId, blockId: fullPageBlock.id }
+    const fieldLayout = (fullPageBlock.config?.field_layout as any[]) || []
+    const onLayoutSave = async (layout: any[]) => {
+      await handleBlockUpdate(fullPageBlock.id, { field_layout: layout })
+      setBlocks((prevBlocks) =>
+        prevBlocks.map((b) =>
+          b.id === fullPageBlock.id ? { ...b, config: { ...b.config, field_layout: layout } } : b
+        )
+      )
+    }
+    const pageConfig = { allow_editing: fullPageBlock.config?.allow_editing }
+    const onPageConfigSave = async (updates: Record<string, unknown>) => {
+      await handleBlockUpdate(fullPageBlock.id, { ...fullPageBlock.config, ...updates })
+      setBlocks((prevBlocks) =>
+        prevBlocks.map((b) =>
+          b.id === fullPageBlock.id ? { ...b, config: { ...b.config, ...updates } } : b
+        )
+      )
+    }
+    setSelectedContext({ type: "record", recordId, tableId: recordTableId })
+    setRightPanelData({
+      recordId,
+      recordTableId,
+      fieldLayout,
+      onLayoutSave,
+      tableFields: recordContextTableFields,
+      pageConfig,
+      onPageConfigSave,
+    })
+  }, [
+    effectiveIsEditing,
+    recordId,
+    recordTableId,
+    fullPageBlock,
+    recordContextTableFields,
+    setSelectedContext,
+    setRightPanelData,
+    handleBlockUpdate,
+  ])
+
   // Keyboard shortcuts
   useEffect(() => {
     if (!effectiveIsEditing) return
