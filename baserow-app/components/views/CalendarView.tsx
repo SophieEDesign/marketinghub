@@ -218,7 +218,7 @@ export default function CalendarView({
   const prevDateToTimeRef = useRef<number | null>(null)
   const prevDateFromKeyRef = useRef<string>("")
   const prevDateToKeyRef = useRef<string>("")
-  const calendarRef = useRef<{ getApi?: () => { gotoDate: (d: Date) => void } } | null>(null)
+  const calendarRef = useRef<InstanceType<typeof FullCalendar> | null>(null)
 
   const areLinkedValueMapsEqual = useCallback(
     (a: Record<string, Record<string, string>>, b: Record<string, Record<string, string>>): boolean => {
