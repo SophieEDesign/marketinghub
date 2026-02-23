@@ -274,7 +274,7 @@ export default function GridDataSettings({
         </p>
       </div>
 
-      {/* F. Fields - single source of truth (list rows, grid columns, gallery cards, calendar previews, kanban cards) */}
+      {/* F. Fields - single source of truth (list rows, grid columns, gallery cards, calendar previews). Kanban has its own selector below. */}
       {config.table_id && fields.length > 0 && (() => {
         const fieldLayout = (config as any).field_layout || []
         const visibleFields =
@@ -322,8 +322,39 @@ export default function GridDataSettings({
               description={
                 currentViewType === 'timeline'
                   ? "Fields for record modal and side panel. Timeline cards use Title and Tag fields in the Timeline card section below."
-                  : "Visible fields in order. Single source of truth for list rows, grid columns, gallery cards, calendar previews, and kanban cards. If none selected, the title field is used."
+                  : currentViewType === 'kanban'
+                    ? "Visible fields in order. Single source of truth for list rows, grid columns, gallery cards, and calendar previews. Kanban uses the separate 'Fields on Kanban cards' below. If none selected, the title field is used."
+                    : "Visible fields in order. Single source of truth for list rows, grid columns, gallery cards, and calendar previews. If none selected, the title field is used."
               }
+              required={false}
+            />
+          </div>
+        )
+      })()}
+
+      {/* F1b. Fields on Kanban cards - Kanban-only, overrides main Fields when set */}
+      {config.table_id && fields.length > 0 && currentViewType === 'kanban' && (() => {
+        const kanbanFields = Array.isArray((config as any).kanban_card_fields)
+          ? (config as any).kanban_card_fields
+          : []
+        const fieldLayout = (config as any).field_layout || []
+        const defaultFields =
+          fieldLayout.length > 0
+            ? fieldLayout.filter((item: any) => item.visible_in_card !== false).map((item: any) => item.field_name)
+            : Array.isArray(config.visible_fields)
+              ? config.visible_fields
+              : []
+        const displayValue = kanbanFields.length > 0 ? kanbanFields : defaultFields
+        return (
+          <div className="border-t border-gray-200 pt-4">
+            <CardFieldsSelector
+              value={displayValue}
+              onChange={(fieldNames) => {
+                onUpdate({ kanban_card_fields: fieldNames.length > 0 ? fieldNames : undefined } as any)
+              }}
+              fields={fields}
+              label="Fields on Kanban cards"
+              description="Fields to show on Kanban cards. When empty, uses the visible fields above. Configure different fields here for a Kanban-specific layout."
               required={false}
             />
           </div>

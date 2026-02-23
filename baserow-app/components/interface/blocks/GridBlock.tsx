@@ -540,6 +540,15 @@ export default function GridBlock({
     [visibleFields.map(f => f.field_name).join(',')]
   )
 
+  // Kanban uses kanban_card_fields when set; otherwise falls back to fieldIds
+  const kanbanFieldIds = useMemo(() => {
+    const kanbanFields = (config as any)?.kanban_card_fields
+    if (Array.isArray(kanbanFields) && kanbanFields.length > 0) {
+      return kanbanFields
+    }
+    return fieldIds
+  }, [configContentKey, fieldIds])
+
   if (!tableId) {
     return (
       <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
@@ -903,7 +912,7 @@ export default function GridBlock({
             tableId={tableId}
             viewId={viewUuid || ''}
             groupingFieldId={groupByFieldId}
-            fieldIds={fieldIds}
+            fieldIds={kanbanFieldIds}
             searchQuery=""
             tableFields={tableFields}
             colorField={appearance.color_field}

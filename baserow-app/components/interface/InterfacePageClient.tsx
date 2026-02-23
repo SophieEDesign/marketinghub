@@ -1403,7 +1403,8 @@ function InterfacePageClientInternal({
           suppressMainScroll ? "overflow-y-hidden" : "overflow-y-auto"
         }`}
       >
-        <div className="flex-1 w-full min-w-0 min-h-0 flex flex-col overflow-x-hidden relative">
+        {/* CRITICAL: Do NOT use flex-1 here - content must grow to full height so scroll works and bottom isn't cut off */}
+        <div className="w-full min-w-0 flex flex-col overflow-x-hidden relative">
           <InterfacePageContent
             useRecordReviewLayout={useRecordReviewLayout}
             hasPage={hasPage}

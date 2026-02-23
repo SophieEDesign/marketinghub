@@ -91,6 +91,8 @@ export interface BlockConfig {
   fields?: string[]
   /** Canonical visible field names (single source of truth for data-view blocks). */
   visible_fields?: string[]
+  /** Kanban-only: field names to show on cards. When set, overrides visible_fields for Kanban view. */
+  kanban_card_fields?: string[]
   filters?: BlockFilter[]
   sorts?: BlockSort[]
   group_by?: string

@@ -1772,6 +1772,71 @@ export default function Canvas({
   // Log container width for debugging
   // CRITICAL: Must be declared before any early returns (Rules of Hooks)
   const containerRef = useRef<HTMLDivElement>(null)
+  
+  // Auto-scroll during resize/drag when cursor near viewport edge (react-grid-layout's built-in is unreliable with nested scroll)
+  const scrollListenerActiveRef = useRef(false)
+  const scrollRafRef = useRef<number | null>(null)
+  const EDGE_THRESHOLD = 80
+  const SCROLL_STEP = 20
+  const handleDragResizeScroll = useCallback((e: MouseEvent) => {
+    const container = containerRef.current
+    if (!container) return
+    let el: HTMLElement | null = container
+    while (el) {
+      const style = getComputedStyle(el)
+      const oy = style.overflowY
+      if (oy === 'auto' || oy === 'scroll' || oy === 'overlay') {
+        const rect = el.getBoundingClientRect()
+        const mouseY = e.clientY
+        const canScrollDown = el.scrollTop + el.clientHeight < el.scrollHeight - 2
+        const canScrollUp = el.scrollTop > 2
+        if (mouseY >= rect.bottom - EDGE_THRESHOLD && canScrollDown) {
+          if (scrollRafRef.current != null) cancelAnimationFrame(scrollRafRef.current)
+          scrollRafRef.current = requestAnimationFrame(() => {
+            el!.scrollTop = Math.min(el!.scrollTop + SCROLL_STEP, el!.scrollHeight - el!.clientHeight)
+            scrollRafRef.current = null
+          })
+        } else if (mouseY <= rect.top + EDGE_THRESHOLD && canScrollUp) {
+          if (scrollRafRef.current != null) cancelAnimationFrame(scrollRafRef.current)
+          scrollRafRef.current = requestAnimationFrame(() => {
+            el!.scrollTop = Math.max(0, el!.scrollTop - SCROLL_STEP)
+            scrollRafRef.current = null
+          })
+        }
+        break
+      }
+      el = el.parentElement
+    }
+  }, [])
+  const removeScrollListenerImpl = useCallback(() => {
+    if (!scrollListenerActiveRef.current) return
+    scrollListenerActiveRef.current = false
+    document.removeEventListener('mousemove', handleDragResizeScroll)
+    if (scrollRafRef.current != null) {
+      cancelAnimationFrame(scrollRafRef.current)
+      scrollRafRef.current = null
+    }
+  }, [handleDragResizeScroll])
+  const addScrollListener = useCallback(() => {
+    if (scrollListenerActiveRef.current) return
+    scrollListenerActiveRef.current = true
+    document.addEventListener('mousemove', handleDragResizeScroll, { passive: true })
+    const cleanupOnMouseUp = () => {
+      removeScrollListenerImpl()
+      document.removeEventListener('mouseup', cleanupOnMouseUp, true)
+    }
+    document.addEventListener('mouseup', cleanupOnMouseUp, { once: true, capture: true })
+  }, [handleDragResizeScroll, removeScrollListenerImpl])
+  const removeScrollListener = useCallback(() => {
+    if (!currentlyResizingBlockIdRef.current && !currentlyDraggingBlockIdRef.current) {
+      removeScrollListenerImpl()
+    }
+  }, [removeScrollListenerImpl])
+  
+  useEffect(() => {
+    return () => removeScrollListenerImpl()
+  }, [removeScrollListenerImpl])
+  
   useEffect(() => {
     if (containerRef.current) {
       const width = containerRef.current.offsetWidth
@@ -1853,7 +1918,7 @@ export default function Canvas({
       {/* flex-1 flex flex-col min-h-0: fill parent flex; min-h-0 prevents flex collapse; flex flex-col for block list. */}
       <div
         ref={containerRef}
-        className={`flex-1 flex flex-col w-full min-h-0 min-w-0 relative ${isFullPageMode ? "overflow-hidden" : ""}`}
+        className={`flex-1 flex flex-col w-full min-w-0 relative ${isFullPageMode ? "overflow-hidden min-h-[100vh]" : "min-h-0"}`}
         style={isFullPageMode ? undefined : { paddingBottom: isEditing ? "80px" : "80px" }}
         onClick={(e) => {
           // Context-driven: clicking empty canvas selects page (opens page settings)
@@ -1915,6 +1980,7 @@ export default function Canvas({
           onResizeStart={(layout, oldItem, newItem, placeholder, e, element) => {
             const blockId = oldItem.i
             currentlyResizingBlockIdRef.current = blockId
+            addScrollListener()
             debugLog('LAYOUT', `[Canvas] Resize started for block ${blockId}`, {
               initialHeight: oldItem.h || 4,
             })
@@ -2010,9 +2076,11 @@ export default function Canvas({
               
               // Clear resize tracking
               currentlyResizingBlockIdRef.current = null
+              removeScrollListener()
             } catch (error) {
               devError('[Canvas] Error in onResizeStop:', error)
               currentlyResizingBlockIdRef.current = null
+              removeScrollListener()
             }
           }}
           onDragStart={(layout, oldItem, newItem, placeholder, e, element) => {
@@ -2028,6 +2096,7 @@ export default function Canvas({
               y: oldItem.y || 0,
             })
             
+            addScrollListener()
             // Show drag ghost
             setDragGhost({
               blockId,
@@ -2271,6 +2340,7 @@ export default function Canvas({
             dragStartPositionRef.current.delete(blockId)
             dragLastPositionRef.current.delete(blockId)
             currentlyDraggingBlockIdRef.current = null
+            removeScrollListener()
           }}
           draggableHandle=".drag-handle"
           resizeHandles={['se', 'sw', 'ne', 'nw', 'e', 'w', 's', 'n']}
