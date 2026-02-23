@@ -11,7 +11,6 @@ import type { AggregateRequest } from './useAggregateData'
 import type { PageBlock } from '@/lib/interface/types'
 import type { FilterConfig } from '@/lib/interface/filters'
 import { mergeFilters } from '@/lib/interface/filters'
-import { debugLog } from '@/lib/debug'
 
 export interface AggregateDataMap {
   [blockId: string]: {
@@ -100,15 +99,7 @@ export function usePageAggregates(
 ): AggregateDataMap {
   // Extract all aggregate requests from KPI blocks
   const requests = useMemo(() => {
-    // #region agent log
-    const start = performance.now()
-    // #endregion
-    const result = extractAggregateRequests(blocks, pageFilters)
-    // #region agent log
-    const duration = performance.now() - start
-    if (duration > 5) debugLog("usePageAggregates extractRequests duration:", duration.toFixed(1), "ms", { requestCount: result.size })
-    // #endregion
-    return result
+    return extractAggregateRequests(blocks, pageFilters)
   }, [blocks, pageFilters])
   
   // Group requests by their parameters to deduplicate
@@ -154,9 +145,6 @@ export function usePageAggregates(
   
   // Build aggregate map from batch results - memoized to prevent React #185 (re-render cascades)
   const aggregateMap = useMemo(() => {
-    // #region agent log
-    const start = performance.now()
-    // #endregion
     const map: AggregateDataMap = {}
     if (batchResults) {
       requestGroups.forEach(({ blockIds, index }) => {
@@ -182,10 +170,6 @@ export function usePageAggregates(
         })
       })
     }
-    // #region agent log
-    const duration = performance.now() - start
-    if (duration > 5) debugLog("usePageAggregates aggregateMap duration:", duration.toFixed(1), "ms")
-    // #endregion
     return map
   }, [batchResults, requestGroups, error, isLoading])
 

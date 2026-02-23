@@ -293,9 +293,6 @@ export default function Canvas({
   const dragLastPositionRef = useRef<Map<string, { x: number; y: number }>>(new Map())
   const currentlyDraggingBlockIdRef = useRef<string | null>(null)
   const currentlyResizingBlockIdRef = useRef<string | null>(null)
-  // #region agent log
-  const blocksMapIterationRef = useRef(0)
-  // #endregion
 
   // Dev assertion: verify edit mode toggle does NOT cause Canvas remount
   useEffect(() => {
@@ -585,11 +582,6 @@ export default function Canvas({
    * Ephemeral expansion doesn't affect persistent layout, so no sync needed
    */
   useEffect(() => {
-    // #region agent log
-    if (process.env.NODE_ENV === 'development') {
-      devLog('[Canvas] Layout sync effect RUN', { blocksLen: blocks.length, layoutLen: layout.length, pageId })
-    }
-    // #endregion
     // Don't sync if no blocks
     if (blocks.length === 0) {
       if (previousBlockIdsRef.current !== "") {
@@ -1448,11 +1440,6 @@ export default function Canvas({
    */
   const handleLayoutChange = useCallback(
     (newLayout: Layout[]) => {
-      // #region agent log
-      if (process.env.NODE_ENV === 'development') {
-        devLog('[Canvas] handleLayoutChange called', { layoutLen: newLayout?.length, isEditing })
-      }
-      // #endregion
       // Ignore when not in edit mode
       if (!isEditing) {
         if (isFirstLayoutChangeRef.current) {
@@ -1536,11 +1523,6 @@ export default function Canvas({
   // Trigger compaction when blocks are deleted (block count decreases)
   const previousBlockCountRef = useRef<number>(blocks.length)
   useEffect(() => {
-    // #region agent log
-    if (process.env.NODE_ENV === 'development') {
-      devLog('[Canvas] Block-deleted effect RUN', { blocksLen: blocks.length, layoutLen: layout.length, prevCount: previousBlockCountRef.current, isEditing })
-    }
-    // #endregion
     const blockCountDecreased = blocks.length < previousBlockCountRef.current
     
     if (blockCountDecreased && isEditing && layout.length > 0) {

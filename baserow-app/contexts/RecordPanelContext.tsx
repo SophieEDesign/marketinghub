@@ -84,9 +84,6 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
       console.warn("[RecordPanel] Opened without cascadeContext; block-level permissions will not be enforced.")
     }
     setSelectedContext({ type: "record", recordId, tableId })
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordPanelContext.tsx:openRecord',message:'openRecord called',data:{recordId,callerInterfaceMode:interfaceMode,hasOnLayoutSave:Boolean(onLayoutSave),hasFieldLayout:Boolean(fieldLayout)},timestamp:Date.now(),hypothesisId:'C,D,E'})}).catch(()=>{});
-    // #endregion
     setState((prev) => ({
       ...prev,
       isOpen: true,

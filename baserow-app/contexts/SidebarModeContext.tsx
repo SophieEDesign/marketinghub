@@ -23,10 +23,6 @@ interface SidebarModeContextType {
 const SidebarModeContext = createContext<SidebarModeContextType | undefined>(undefined)
 
 export function SidebarModeProvider({ children }: { children: ReactNode }) {
-  // #region agent log
-  useEffect(() => {
-  }, [])
-  // #endregion
   const { isEditing, toggleEditMode, enterEditMode, exitEditMode } = useEditMode()
 
   const isSidebarEditing = isEditing("sidebar")

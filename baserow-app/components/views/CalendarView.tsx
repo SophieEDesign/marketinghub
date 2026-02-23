@@ -1083,9 +1083,6 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
   }, [supabaseTableName, resolvedDateFieldNames])
 
   function getEvents(): EventInput[] {
-    // #region agent log
-    const start = performance.now()
-    // #endregion
     try {
     if (!resolvedDateFieldId || !isValidDateField) {
       debugWarn('CALENDAR', 'Calendar: Cannot generate events - missing or invalid date field', {
@@ -1356,10 +1353,6 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
         })
       }
 
-      // #region agent log
-      const duration = performance.now() - start
-      if (duration > 10) console.log("CalendarView getEvents duration:", duration.toFixed(1), "ms", { eventsCount: events.length })
-      // #endregion
       return events
     } catch (error: unknown) {
       debugError('CALENDAR', 'Calendar: Error generating events:', error)
@@ -1720,7 +1713,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
         }
         return items.filter((x) => x.label).map(({ label, rawVal }) => ({
           label,
-          bgColor: isSelect && rawVal ? normalizeHexColor(resolveChoiceColor(rawVal, f.field.type, f.field.options)) : undefined,
+          bgColor: isSelect && rawVal ? normalizeHexColor(resolveChoiceColor(rawVal, f.field.type as 'single_select' | 'multi_select', f.field.options)) : undefined,
         }))
       })
 
@@ -2064,7 +2057,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
         {/* CRITICAL: Only render FullCalendar after mount to prevent hydration mismatch (React error #185) */}
         {mounted ? (
           <MemoizedFullCalendar
-            ref={fullCalendarRef}
+            ref={fullCalendarRef as React.LegacyRef<React.ComponentRef<typeof FullCalendar>>}
             key={calendarStableKey}
             plugins={CALENDAR_PLUGINS}
             events={calendarEvents}

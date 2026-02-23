@@ -178,12 +178,6 @@ export default function BlockRenderer({
     blockDriftChecksRun = true
     runBlockDriftChecks()
   }, [])
-  // #region agent log – mount stability (if this logs repeatedly, parent is recreated)
-  useEffect(() => {
-    debugLog("BlockRenderer mount", block.id)
-    return () => { debugLog("BlockRenderer unmount", block.id) }
-  }, [])
-  // #endregion
   // #region HOOK CHECK - After useEffect blockDriftChecks
   if (process.env.NODE_ENV === 'development') {
     debugLog('[HOOK CHECK]', 'BlockRenderer after useEffect blockDriftChecks')

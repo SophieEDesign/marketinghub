@@ -273,23 +273,14 @@ export default function NavigationDiagnostics() {
       }
       
       // Defer heavy operations to avoid blocking UI thread
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'NavigationDiagnostics.tsx:225',message:'Deferring heavy DOM queries',data:{hasIdleCallback:typeof requestIdleCallback !== 'undefined'},timestamp:Date.now(),runId:'pre-fix',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion agent log
       if (typeof requestIdleCallback !== 'undefined') {
         requestIdleCallback(() => {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'NavigationDiagnostics.tsx:229',message:'Executing deferred DOM queries',data:{timestamp:Date.now()},timestamp:Date.now(),runId:'pre-fix',hypothesisId:'A'})}).catch(()=>{});
-          // #endregion agent log
           checkPointerEvents()
           checkZIndex()
         }, { timeout: 2000 })
       } else {
         // Fallback for browsers without requestIdleCallback
         setTimeout(() => {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'NavigationDiagnostics.tsx:237',message:'Executing deferred DOM queries (setTimeout fallback)',data:{timestamp:Date.now()},timestamp:Date.now(),runId:'pre-fix',hypothesisId:'A'})}).catch(()=>{});
-          // #endregion agent log
           checkPointerEvents()
           checkZIndex()
         }, 0)
@@ -369,9 +360,6 @@ export default function NavigationDiagnostics() {
       }
       
       // Defer heavy diagnostics to avoid blocking UI thread
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'NavigationDiagnostics.tsx:355',message:'Deferring runDiagnostics heavy operations',data:{checkKind,hasIdleCallback:typeof requestIdleCallback !== 'undefined'},timestamp:Date.now(),runId:'pre-fix',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion agent log
       if (typeof requestIdleCallback !== 'undefined') {
         requestIdleCallback(runHeavyDiagnostics, { timeout: 1000 })
       } else {
@@ -453,14 +441,8 @@ export default function NavigationDiagnostics() {
         if (sidebarLink) {
           // CRITICAL: Defer heavy getComputedStyle calls to avoid blocking UI thread
           // These operations force layout recalculation and can block navigation
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'NavigationDiagnostics.tsx:375',message:'Deferring click handler heavy operations',data:{hasIdleCallback:typeof requestIdleCallback !== 'undefined'},timestamp:Date.now(),runId:'pre-fix',hypothesisId:'B'})}).catch(()=>{});
-          // #endregion agent log
           if (typeof requestIdleCallback !== 'undefined') {
             requestIdleCallback(() => {
-              // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'NavigationDiagnostics.tsx:378',message:'Executing deferred click handler operations',data:{timestamp:Date.now()},timestamp:Date.now(),runId:'pre-fix',hypothesisId:'B'})}).catch(()=>{});
-              // #endregion agent log
               const linkStyle = window.getComputedStyle(sidebarLink)
               console.log("🔗 Click is on a link:", {
                 href: sidebarLink.getAttribute("href"),

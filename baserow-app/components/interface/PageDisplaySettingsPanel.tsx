@@ -297,11 +297,7 @@ export default function PageDisplaySettingsPanel({
   // Pages now use blocks, so we save to page config and update/create blocks
   const saveSettings = useCallback(async () => {
     if (!page) return
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PageDisplaySettingsPanel.tsx:saveSettings:entry',message:'Page settings save started',data:{pageId:page?.id,pageType:page?.page_type,selectedTableId},timestamp:Date.now(),hypothesisId:'E'})}).catch(()=>{});
-    // #endregion
-    
+
     // TypeScript guard: page is non-null after the check above
     const currentPage = page
 
@@ -371,9 +367,6 @@ export default function PageDisplaySettingsPanel({
         .eq('type', 'grid')
 
       if (existingBlocks && existingBlocks.length > 0) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PageDisplaySettingsPanel.tsx:saveSettings:updateGrid',message:'Updating existing grid block',data:{pageId:currentPage.id,gridBlockId:existingBlocks[0]?.id},timestamp:Date.now(),hypothesisId:'E'})}).catch(()=>{});
-        // #endregion
         // Update existing grid block
         const gridBlock = existingBlocks[0]
         await supabase
@@ -392,9 +385,6 @@ export default function PageDisplaySettingsPanel({
           })
           .eq('id', gridBlock.id)
       } else if (selectedTableId) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PageDisplaySettingsPanel.tsx:saveSettings:createGrid',message:'Creating NEW grid block - may change layout',data:{pageId:currentPage.id,selectedTableId},timestamp:Date.now(),hypothesisId:'E'})}).catch(()=>{});
-        // #endregion
         // Create a new grid block for this page
         await supabase
           .from('view_blocks')
@@ -418,9 +408,6 @@ export default function PageDisplaySettingsPanel({
           })
       }
 
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PageDisplaySettingsPanel.tsx:saveSettings:onUpdate',message:'Calling onUpdate - triggers loadBlocks',data:{pageId:currentPage.id},timestamp:Date.now(),hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
       onUpdate()
       // Refresh data without full page reload
       // The onUpdate callback will trigger a data refresh in the parent component

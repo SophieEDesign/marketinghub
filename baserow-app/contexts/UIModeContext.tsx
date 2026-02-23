@@ -49,10 +49,6 @@ interface UIModeProviderProps {
 }
 
 export function UIModeProvider({ children }: UIModeProviderProps) {
-  // #region agent log
-  useEffect(() => {
-  }, [])
-  // #endregion
   const [state, setState] = useState<UIModeState>({
     uiMode: "view",
     editingPageId: null,

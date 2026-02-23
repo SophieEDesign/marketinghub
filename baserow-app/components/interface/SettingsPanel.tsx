@@ -258,11 +258,7 @@ export default function SettingsPanel({
   }
 
   const handleSave = useCallback(async (configToSave: BlockConfig) => {
-    if (!block || readOnly) return
-
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SettingsPanel.tsx:handleSave:entry',message:'Block settings save started',data:{blockId:block?.id,blockType:block?.type,configKeys:Object.keys(configToSave||{}),hasAppearance:!!(configToSave as any)?.appearance},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
+      if (!block || readOnly) return
 
     // Mark user interaction (save button click is a user action)
     markUserInteraction()
@@ -276,9 +272,6 @@ export default function SettingsPanel({
     )
     
     if (overwriteCheck.blocked) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SettingsPanel.tsx:handleSave:blocked',message:'Save blocked by overwrite guard',data:{blockId:block?.id,reason:overwriteCheck.reason},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
       setValidationErrors([overwriteCheck.reason || 'Invalid save operation'])
       return
     }
@@ -337,9 +330,6 @@ export default function SettingsPanel({
     const validation = validateBlockConfig(block.type, safeConfig)
     
     if (!validation.valid) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SettingsPanel.tsx:handleSave:validationFailed',message:'Save blocked by validation',data:{blockId:block?.id,errors:validation.errors},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
       setValidationErrors(validation.errors)
       toast({
         variant: "destructive",
@@ -355,23 +345,13 @@ export default function SettingsPanel({
     // Prevent saving if config hasn't actually changed
     const configToSaveJson = JSON.stringify(safeConfig)
     if (configToSaveJson === previousConfigRef.current) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SettingsPanel.tsx:handleSave:noChange',message:'Save skipped - config unchanged',data:{blockId:block?.id},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       return
     }
     
     setSaving(true)
     setSaved(false)
     try {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SettingsPanel.tsx:handleSave:callingOnSave',message:'Calling onSave with config',data:{blockId:block.id,safeConfigKeys:Object.keys(safeConfig||{})},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
-      // Save the validated, safely merged config object
       await onSave(block.id, safeConfig)
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SettingsPanel.tsx:handleSave:onSaveComplete',message:'onSave completed successfully',data:{blockId:block.id},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       setSaved(true)
       // Update previous config ref to prevent re-saving
       previousConfigRef.current = configToSaveJson

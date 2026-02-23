@@ -232,11 +232,6 @@ export default function RecordEditor({
     !isViewOnly &&
     Boolean(onLayoutSave) &&
     !!recordId
-  // #region agent log
-  if (mode === "review" && recordId) {
-    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordEditor.tsx:isEditingLayout',message:'Layout mode check',data:{interfaceMode,canEditLayout,isViewOnly,hasOnLayoutSave:Boolean(onLayoutSave),resolvedFieldLayoutLen:resolvedFieldLayout.length,hasRecordId:!!recordId,isEditingLayout},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-  }
-  // #endregion
   const layoutFieldsSource = localFieldLayout.length > 0 ? localFieldLayout : resolvedFieldLayout
   const layoutModeFields = useMemo(() => {
     if (!isEditingLayout || layoutFieldsSource.length === 0) return visibleFields

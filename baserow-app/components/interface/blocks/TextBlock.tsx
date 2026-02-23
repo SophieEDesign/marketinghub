@@ -59,16 +59,7 @@ interface TextBlockProps {
  */
 export default function TextBlock({ block, isEditing = false, onUpdate }: TextBlockProps) {
   const { config } = block
-  // Track render count for debugging React #185
-  const renderCountRef = useRef<number>(0)
-  renderCountRef.current += 1
-  // #region agent log
-  if (process.env.NODE_ENV === 'development') {
-    console.log(`[TextBlock] RENDER #${renderCountRef.current}: blockId=${block.id}, isEditing=${isEditing}`)
-  }
-  // Removed fetch instrumentation - using console.log instead
-  // #endregion
-  
+
   // Prevent toolbar interactions from stealing focus/selection from TipTap.
   // Without this, clicks can clear the selection before commands run, making the toolbar feel "broken".
   const handleToolbarMouseDown = useCallback((e: React.MouseEvent) => {
@@ -312,30 +303,11 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         }, 150)
       },
       onUpdate: ({ editor: ed }: { editor: { getJSON: () => any } }) => {
-        // #region agent log
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`[TextBlock] onUpdate FIRED: blockId=${blockIdRef.current}, editorInitialized=${editorInitializedRef.current}, readOnly=${readOnlyRef.current}, hasOnUpdate=${!!onUpdateRef.current}`)
-        }
-        // Removed fetch instrumentation - using console.log instead
-        // #endregion
         // CRITICAL: Prevent onUpdate from firing during initialization to avoid React #185 loop
         // When setContent is called during initialization, TipTap may fire onUpdate even with emitUpdate=false
         if (!onUpdateRef.current || readOnlyRef.current || !editorInitializedRef.current) {
-          // #region agent log
-          if (process.env.NODE_ENV === 'development') {
-            const reason = !onUpdateRef.current ? 'noOnUpdate' : readOnlyRef.current ? 'readOnly' : 'notInitialized'
-            console.log(`[TextBlock] onUpdate BLOCKED: reason=${reason}, editorInitialized=${editorInitializedRef.current}`)
-          }
-          // Removed fetch instrumentation - using console.log instead
-          // #endregion
           return
         }
-        // #region agent log
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`[TextBlock] onUpdate PROCEEDING: blockId=${blockIdRef.current}`)
-        }
-        // Removed fetch instrumentation - using console.log instead
-        // #endregion
         // CRITICAL: Use requestAnimationFrame to defer setState and prevent React #185
         // This ensures setState doesn't happen synchronously during the update callback
         requestAnimationFrame(() => {
@@ -348,13 +320,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     []
   )
 
-  // #region agent log
-  // Removed fetch instrumentation - using console.log instead
-  // #endregion
   const editor = useEditor(editorConfig)
-  // #region agent log
-  // Removed fetch instrumentation - using console.log instead
-  // #endregion
 
   // Keep editorRef current so editorProps.handleKeyDown (memoized) can access it
   useEffect(() => {
@@ -470,19 +436,13 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       previousBlockIdRef.current = block.id
       hasInitialised.current = false
       editorInitializedRef.current = false
-      // #region agent log
-      // Removed fetch instrumentation - using console.log instead
-      // #endregion
-      
+
       const newContent = getInitialContent()
       editor.commands.setContent(newContent, false) // false = don't emit update event
       lastSavedContentRef.current = cachedConfigContentStrRef.current || JSON.stringify(newContent)
       hasInitialised.current = true
       editorInitializedRef.current = true
-      // #region agent log
-      // Removed fetch instrumentation - using console.log instead
-      // #endregion
-      
+
       if (process.env.NODE_ENV === 'development') {
         console.log(`[TextBlock] Block ID changed - rehydrated: blockId=${block.id}`)
       }
@@ -491,10 +451,6 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     
     // Only initialize content on first mount (when hasInitialised is false)
     if (!hasInitialised.current) {
-      // #region agent log
-      // Removed fetch instrumentation - using console.log instead
-      // #endregion
-      
       if (contentJson) {
         const initialContent = getInitialContent()
         editor.commands.setContent(initialContent, false) // false = don't emit update event
@@ -506,10 +462,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       }
       hasInitialised.current = true
       editorInitializedRef.current = true
-      // #region agent log
-      // Removed fetch instrumentation - using console.log instead
-      // #endregion
-      
+
       if (process.env.NODE_ENV === 'development') {
         console.log(`[TextBlock] Initialized content on first mount: blockId=${block.id}`)
       }

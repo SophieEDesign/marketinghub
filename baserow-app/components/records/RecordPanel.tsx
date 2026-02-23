@@ -36,11 +36,6 @@ export default function RecordPanel() {
   const callerWantsEdit = state.interfaceMode === "edit"
   const pageEditWithLayout = isEdit() && state.onLayoutSave
   const interfaceMode = callerWantsEdit || pageEditWithLayout ? "edit" : "view"
-  // #region agent log
-  if (state.isOpen && state.recordId) {
-    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordPanel.tsx:interfaceMode',message:'RecordPanel interfaceMode computation',data:{callerWantsEdit,pageEditWithLayout,stateInterfaceMode:state.interfaceMode,computedInterfaceMode:interfaceMode,recordId:state.recordId,uiMode:uiModeState?.uiMode},timestamp:Date.now(),hypothesisId:'post-fix'})}).catch(()=>{});
-  }
-  // #endregion
 
   const handleCopyLink = useCallback(() => {
     if (!state.recordId) return
