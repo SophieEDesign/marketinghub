@@ -659,6 +659,7 @@ export default function RecordReviewLeftColumn({
 
   // Get ordered fields for card display
   // Priority: field_layout.visible_in_card > legacy title_field/field_1/field_2
+  // When field_layout is empty (Fields to show = all), default to all fields in left panel
   const orderedFields = useMemo(() => {
     if (isRecordView) {
       // If field_layout exists and has visible_in_card, use it as single source of truth
@@ -667,6 +668,10 @@ export default function RecordReviewLeftColumn({
         if (cardFields.length > 0) {
           return cardFields
         }
+      }
+      // When field_layout is empty: "Fields to show" means all - show all fields in left panel (match right panel)
+      if (!fieldLayout || fieldLayout.length === 0) {
+        return fields.filter((f) => !f.options?.system)
       }
       // Fallback: legacy title_field, field_1, field_2
       const titleField = titleFieldId ? fields.find(f => f.id === titleFieldId) : null

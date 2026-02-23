@@ -466,7 +466,7 @@ export default function KanbanView({
   }
 
   return (
-    <div className="w-full h-full overflow-x-auto bg-gray-50">
+    <div className="w-full h-full min-w-0 overflow-auto bg-gray-50">
       <div className="flex gap-4 min-w-max p-6">
         {groups.map((groupName) => {
           const displayName =

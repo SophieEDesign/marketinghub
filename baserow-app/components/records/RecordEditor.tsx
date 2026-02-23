@@ -231,7 +231,6 @@ export default function RecordEditor({
     canEditLayout &&
     !isViewOnly &&
     Boolean(onLayoutSave) &&
-    resolvedFieldLayout.length > 0 &&
     !!recordId
   // #region agent log
   if (mode === "review" && recordId) {
@@ -443,11 +442,15 @@ export default function RecordEditor({
           </div>
         )
       }
-      // Allow grid layout when field_layout has column metadata (modal_column_id, etc.) so users can drag/resize
+      // Record view (canvas): stacked layout only - fields resizable by drag/reorder, no fixed columns.
+      // Modal: allow grid layout when field_layout has column metadata for drag/resize between columns.
       const hasColumnMetadata = resolvedFieldLayout.some(
         (i) => i.modal_column_id != null || i.modal_column_span != null || i.modal_row_order != null
       )
-      const useGridLayout = resolvedFieldLayout.length > 0 && (hasColumnMetadata || isEditingLayout)
+      const useGridLayout =
+        visibilityContext !== "canvas" &&
+        resolvedFieldLayout.length > 0 &&
+        (hasColumnMetadata || isEditingLayout)
       return (
         <div className="space-y-4 py-4">
           <RecordFields

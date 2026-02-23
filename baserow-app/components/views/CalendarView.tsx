@@ -22,7 +22,7 @@ import { filterRowsBySearch } from "@/lib/search/filterRows"
 import { applyFiltersToQuery, deriveDefaultValuesFromFilters, stripFilterBlockFilters, type FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import { flattenFilterTree } from "@/lib/filters/canonical-model"
-import { addDays, differenceInCalendarDays, format, startOfDay, startOfWeek } from "date-fns"
+import { addDays, differenceInCalendarDays, format, startOfDay } from "date-fns"
 import type { EventDropArg, EventInput, EventClickArg, EventContentArg } from "@fullcalendar/core"
 import type { TableRow } from "@/types/database"
 import type { LinkedField, TableField } from "@/types/fields"
@@ -1549,27 +1549,15 @@ export default function CalendarView({
     return undefined
   }, [dateFrom?.getTime()])
 
-  // Infer preset from date range: Today = same day, This Week = 7 days (Mon-Sun)
-  const isTodayPreset = useMemo(() => {
-    if (!dateFrom || !dateTo) return false
-    return startOfDay(dateFrom).getTime() === startOfDay(dateTo).getTime()
-  }, [dateFrom?.getTime(), dateTo?.getTime()])
-  const isThisWeekPreset = useMemo(() => {
-    if (!dateFrom || !dateTo) return false
-    const days = differenceInCalendarDays(dateTo, dateFrom)
-    return days === 6 && startOfWeek(dateFrom, { weekStartsOn: 1 }).getTime() === startOfDay(dateFrom).getTime()
-  }, [dateFrom?.getTime(), dateTo?.getTime()])
+  // Always use month view - presets only NAVIGATE to the target date, they don't change view.
+  // Full calendar (month) stays visible; Today/This Week/This Month just move to that date.
+  const calendarInitialView = "dayGridMonth"
 
-  // For Today/This Week: week view so the row is at top. For Month presets: month view.
-  const calendarInitialView = isTodayPreset || isThisWeekPreset ? "dayGridWeek" : "dayGridMonth"
-
-  // Key forces remount when preset changes - ensures calendar shows correct view and date
-  // (ref/gotoDate can be unreliable with memoized FullCalendar)
+  // Key forces remount when preset changes - ensures calendar shows correct date
   const calendarRemountKey = useMemo(() => {
     if (!dateFrom) return "default"
-    const preset = isTodayPreset ? "today" : isThisWeekPreset ? "week" : "month"
-    return `${preset}-${format(dateFrom, "yyyy-MM-dd")}`
-  }, [dateFrom?.getTime(), isTodayPreset, isThisWeekPreset])
+    return `nav-${format(dateFrom, "yyyy-MM-dd")}`
+  }, [dateFrom?.getTime()])
 
   const calendarEventClassNames = useCallback(
     (arg: EventContentArg) => [

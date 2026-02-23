@@ -561,7 +561,7 @@ export default function AirtableKanbanView({
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="h-full bg-white overflow-x-auto">
+        <div className="h-full min-w-0 bg-white overflow-auto">
           <div className="flex gap-4 p-6 min-w-max h-full">
             {columns.map((column) => {
               const columnRows = groupedRows[column.id] || []

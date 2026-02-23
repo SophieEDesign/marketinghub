@@ -261,7 +261,7 @@ export default function NonGridViewWrapper({
         onAddField={() => setDesignSidebarOpen(true)}
         onNewRecord={handleNewRecord}
       />
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
         {viewType === "form" && (
           <FormView
             tableId={tableId}
