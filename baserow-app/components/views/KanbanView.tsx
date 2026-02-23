@@ -519,133 +519,103 @@ function KanbanView({
                   const cardFieldIds = (Array.isArray(fieldIds) ? fieldIds : [])
                     .filter((fid) => fid !== groupingFieldId)
                     .slice(0, 6)
-                  const cardFields = cardFieldIds
+                  let cardFields = cardFieldIds
                     .map((fieldId) => (Array.isArray(tableFields) ? tableFields : []).find(
                       (f: any) => f?.name === fieldId || f?.id === fieldId
                     ) as TableField | undefined)
                     .filter((f): f is TableField => !!f)
-                  const titleField = cardFields[0]
-                  const otherFields = cardFields.slice(1)
-                  const pillMetaFields = otherFields.length >= 2 ? otherFields.slice(0, -1) : otherFields
-                  const contentField = otherFields.length >= 2 ? otherFields[otherFields.length - 1] : null
+                  // If image field is configured and has data but not in cardFields, insert after first field
+                  if (cardImage && imageFieldName && !cardFields.some((f) => f.name === imageFieldName || f.id === imageFieldName)) {
+                    const imgField = (Array.isArray(tableFields) ? tableFields : []).find(
+                      (f: any) => f && (f.name === imageFieldName || f.id === imageFieldName)
+                    ) as TableField | undefined
+                    if (imgField) {
+                      cardFields = [cardFields[0], imgField, ...cardFields.slice(1)].filter(Boolean)
+                    }
+                  }
                   const data = row.data || {}
+                  const FIELD_ROW_HEIGHT = 32
+                  const LONG_TEXT_ROW_HEIGHT = 48
+                  const IMAGE_ROW_HEIGHT = 112
 
                   return (
                 <Card 
                   key={row.id} 
-                  className={`h-[120px] overflow-hidden hover:shadow-md transition-shadow bg-white border-gray-200 rounded-lg cursor-default min-w-0 ${
+                  className={`hover:shadow-md transition-shadow bg-white border-gray-200 rounded-lg cursor-default min-w-0 ${
                     selectedCardId === String(row.id) ? "ring-1 ring-blue-400/40 bg-blue-50/30" : ""
                   }`}
                   style={{ ...borderColor, ...rowFormattingStyle }}
                   onClick={() => setSelectedCardId(String(row.id))}
                   onDoubleClick={() => row.id != null && handleOpenRecord(String(row.id))}
                 >
-                  <CardContent className="p-3 min-w-0 h-full flex flex-col justify-between min-h-0">
-                    <div className="space-y-2 min-w-0 flex-1 flex flex-col justify-between min-h-0 overflow-hidden">
-                      {/* Title row: primary value + open button (Airtable-style) */}
-                      <div className="flex items-start gap-1.5 min-w-0">
-                        {titleField && (
+                  <CardContent className="p-3 min-w-0">
+                    <div className="flex flex-col gap-1 min-w-0">
+                      {cardFields.map((fieldObj, idx) => {
+                        const isFirst = idx === 0
+                        const isVirtual = fieldObj.type === "formula" || fieldObj.type === "lookup"
+                        const isImageField = imageField && (fieldObj.name === imageField || fieldObj.id === imageField)
+                        const isLongText = fieldObj.type === "long_text"
+                        const imgSrc = isImageField ? cardImage : null
+                        const rowH = imgSrc ? (fitImageSize ? undefined : IMAGE_ROW_HEIGHT) : (isLongText ? LONG_TEXT_ROW_HEIGHT : FIELD_ROW_HEIGHT)
+
+                        if (isImageField && imgSrc) {
+                          return (
+                            <div
+                              key={fieldObj.id ?? fieldObj.name}
+                              className={`w-full min-w-0 rounded overflow-hidden bg-gray-100 ${!fitImageSize ? "flex-shrink-0" : ""}`}
+                              style={!fitImageSize ? { height: IMAGE_ROW_HEIGHT } : undefined}
+                              onClick={(e) => e.stopPropagation()}
+                              onDoubleClick={(e) => e.stopPropagation()}
+                            >
+                              <img
+                                src={imgSrc}
+                                alt=""
+                                className={`w-full ${fitImageSize ? "h-auto object-contain" : "h-28 object-cover"}`}
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = "none"
+                                }}
+                              />
+                            </div>
+                          )
+                        }
+
+                        return (
                           <div
-                            className="flex-1 min-w-0 truncate whitespace-nowrap overflow-hidden font-semibold text-sm text-gray-900 leading-tight"
+                            key={fieldObj.id ?? fieldObj.name}
+                            className={`flex items-center gap-1.5 min-w-0 ${isFirst ? "font-semibold text-sm text-gray-900" : "text-xs text-gray-600"}`}
+                            style={{ minHeight: rowH }}
                             onClick={(e) => e.stopPropagation()}
                             onDoubleClick={(e) => e.stopPropagation()}
                           >
-                            <CellFactory
-                              field={titleField}
-                              value={data[titleField.name]}
-                              rowId={String(row.id)}
-                              tableName={supabaseTableName || ""}
-                              editable={!titleField.options?.read_only && titleField.type !== "formula" && titleField.type !== "lookup" && !!supabaseTableName}
-                              wrapText={wrapText}
-                              rowHeight={undefined}
-                              onSave={(value) => handleCellSave(String(row.id), titleField.name, value)}
-                            />
+                            <div className={`flex-1 min-w-0 overflow-hidden ${isLongText ? "line-clamp-2" : "truncate"}`}>
+                              <CellFactory
+                                field={fieldObj}
+                                value={data[fieldObj.name]}
+                                rowId={String(row.id)}
+                                tableName={supabaseTableName || ""}
+                                editable={!fieldObj.options?.read_only && !isVirtual && !!supabaseTableName}
+                                wrapText={wrapText}
+                                rowHeight={rowH}
+                                onSave={(value) => handleCellSave(String(row.id), fieldObj.name, value)}
+                              />
+                            </div>
+                            {isFirst && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  if (row.id != null) handleOpenRecord(String(row.id))
+                                }}
+                                className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
+                                title="Open record"
+                                aria-label="Open record"
+                              >
+                                <ChevronRight className="h-4 w-4" />
+                              </button>
+                            )}
                           </div>
-                        )}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            if (row.id != null) handleOpenRecord(String(row.id))
-                          }}
-                          className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
-                          title="Open record"
-                          aria-label="Open record"
-                        >
-                          <ChevronRight className="h-4 w-4" />
-                        </button>
-                      </div>
-
-                      {/* Image if configured */}
-                      {cardImage && (
-                        <div className={`w-full min-w-0 ${fitImageSize ? 'h-auto' : 'h-28'} rounded overflow-hidden bg-gray-100`}>
-                          <img
-                            src={cardImage}
-                            alt=""
-                            className={`w-full ${fitImageSize ? 'h-auto object-contain' : 'h-28 object-cover'}`}
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = 'none'
-                            }}
-                          />
-                        </div>
-                      )}
-
-                      {/* Category/Date pills - single row, no wrap */}
-                      {pillMetaFields.length > 0 && (
-                        <div className="flex flex-nowrap gap-1.5 overflow-hidden min-w-0" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
-                          {pillMetaFields.map((fieldObj) => {
-                            const isVirtual = fieldObj.type === "formula" || fieldObj.type === "lookup"
-                            const isSelect = fieldObj.type === "single_select" || fieldObj.type === "multi_select"
-                            const rawVal = data[fieldObj.name]
-                            const pillLabel = isSelect && rawVal
-                              ? (getOptionValueToLabelMap(fieldObj.type as "single_select" | "multi_select", fieldObj.options).get(String(rawVal).trim()) ?? String(rawVal))
-                              : null
-                            const pillColor = isSelect && rawVal
-                              ? normalizeHexColor(resolveChoiceColor(String(rawVal).trim(), fieldObj.type as "single_select" | "multi_select", fieldObj.options, true))
-                              : null
-                            return (
-                              <div key={fieldObj.id ?? fieldObj.name} className="min-w-0 shrink-0 max-w-[80px]">
-                                {isSelect && pillColor && pillLabel ? (
-                                  <span
-                                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white truncate max-w-full shrink-0"
-                                    style={{ backgroundColor: pillColor }}
-                                    title={pillLabel}
-                                  >
-                                    {pillLabel}
-                                  </span>
-                                ) : (
-                                  <CellFactory
-                                    field={fieldObj}
-                                    value={data[fieldObj.name]}
-                                    rowId={String(row.id)}
-                                    tableName={supabaseTableName || ""}
-                                    editable={!fieldObj.options?.read_only && !isVirtual && !!supabaseTableName}
-                                    wrapText={wrapText}
-                                    rowHeight={22}
-                                    onSave={(value) => handleCellSave(String(row.id), fieldObj.name, value)}
-                                  />
-                                )}
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )}
-
-                      {/* Content preview (larger, 2-3 lines) - leave blank when empty */}
-                      {contentField && data[contentField.name] != null && String(data[contentField.name]).trim() !== "" ? (
-                        <div className="text-sm text-gray-600 truncate whitespace-nowrap min-w-0" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
-                          <CellFactory
-                            field={contentField}
-                            value={data[contentField.name]}
-                            rowId={String(row.id)}
-                            tableName={supabaseTableName || ""}
-                            editable={!contentField.options?.read_only && contentField.type !== "formula" && contentField.type !== "lookup" && !!supabaseTableName}
-                            wrapText={wrapText}
-                            rowHeight={undefined}
-                            onSave={(value) => handleCellSave(String(row.id), contentField.name, value)}
-                          />
-                        </div>
-                      ) : null}
+                        )
+                      })}
                     </div>
                   </CardContent>
                 </Card>

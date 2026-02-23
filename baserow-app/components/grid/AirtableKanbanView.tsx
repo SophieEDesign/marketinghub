@@ -802,24 +802,21 @@ function KanbanCard({ row, displayFields, tableFields, selected, onSelect, onOpe
   }
 
   const list = Array.isArray(displayFields) ? displayFields : []
-  const primaryField = list[0]
-  const primaryValue = primaryField ? row[primaryField.name] : null
-  const primaryId = primaryField ? (primaryField.id ?? primaryField.name) : ""
-  const otherFields = list.slice(1).filter((f) => f && (f.id ?? f.name) !== primaryId)
-  const pillMetaFields = otherFields.length >= 2 ? otherFields.slice(0, -1) : otherFields
-  const footerField = otherFields.length >= 2 ? otherFields[otherFields.length - 1] : null
-
   const getFullField = (field: TableField): TableField => {
     if (!field || !tableFields) return field
     const fullField = tableFields.find((f) => f.id === field.id || f.name === field.name)
     return fullField || field
   }
 
+  // Airtable-style: each field on its own row with set height, no fixed card size
+  const FIELD_ROW_HEIGHT = 32
+  const LONG_TEXT_ROW_HEIGHT = 48
+
   return (
     <Card
       ref={setNodeRef}
       style={style}
-      className={`h-[120px] overflow-hidden group hover:shadow-md transition-all duration-200 bg-white border border-gray-200 rounded-lg shadow-sm cursor-default ${
+      className={`group hover:shadow-md transition-all duration-200 bg-white border border-gray-200 rounded-lg shadow-sm cursor-default ${
         selected ? "ring-2 ring-blue-400/50 bg-blue-50/40" : ""
       }`}
       onClick={() => onSelect()}
@@ -831,8 +828,8 @@ function KanbanCard({ row, displayFields, tableFields, selected, onSelect, onOpe
         onOpen()
       }}
     >
-      <CardContent className="p-3 min-w-0 h-full flex flex-col justify-between min-h-0">
-        <div className="flex items-start gap-2 min-w-0 flex-1 flex flex-col justify-between min-h-0 overflow-hidden">
+      <CardContent className="p-3 min-w-0">
+        <div className="flex items-start gap-2 min-w-0">
           {canEdit && (
             <div
               {...attributes}
@@ -843,81 +840,54 @@ function KanbanCard({ row, displayFields, tableFields, selected, onSelect, onOpe
               <GripVertical className="h-4 w-4 text-gray-400" />
             </div>
           )}
-          <div className="flex-1 min-w-0 space-y-2">
-            {/* Title row: primary value only (bold, 2–3 lines ellipsis) + open button */}
-            <div className="flex items-start gap-1.5 min-w-0">
-              {primaryField && (
+          <div className="flex-1 min-w-0 flex flex-col gap-1">
+            {list.map((field, idx) => {
+              if (!field?.name) return null
+              const full = getFullField(field)
+              const value = row[full.name]
+              const isFirst = idx === 0
+              const isLongText = full.type === "long_text"
+              const rowH = isLongText ? LONG_TEXT_ROW_HEIGHT : FIELD_ROW_HEIGHT
+              return (
                 <div
-                  className="flex-1 min-w-0 truncate whitespace-nowrap overflow-hidden font-semibold text-sm text-gray-900 leading-tight"
+                  key={full.id ?? full.name}
+                  className={`flex items-center gap-1.5 min-w-0 ${isFirst ? "font-semibold text-sm text-gray-900" : "text-xs text-gray-600"}`}
+                  style={{ minHeight: rowH }}
                   data-kanban-field="true"
                   onClick={(e) => e.stopPropagation()}
+                  onDoubleClick={(e) => e.stopPropagation()}
                 >
-                  <CellFactory
-                    field={getFullField(primaryField)}
-                    value={primaryValue}
-                    rowId={String(row.id)}
-                    tableName={tableName}
-                    editable={canEdit && !getFullField(primaryField).options?.read_only}
-                    wrapText={true}
-                    rowHeight={undefined}
-                    onSave={(value) => onCellSave(String(row.id), getFullField(primaryField).name, value)}
-                  />
+                  <div className={`flex-1 min-w-0 overflow-hidden ${isLongText ? "line-clamp-2" : "truncate"}`}>
+                    <CellFactory
+                      field={full}
+                      value={value}
+                      rowId={String(row.id)}
+                      tableName={tableName}
+                      editable={canEdit && !full.options?.read_only && full.type !== "lookup" && full.type !== "formula"}
+                      wrapText={true}
+                      rowHeight={rowH}
+                      onSave={(v) => onCellSave(String(row.id), full.name, v)}
+                      pillTruncate={true}
+                    />
+                  </div>
+                  {isFirst && (
+                    <button
+                      type="button"
+                      data-kanban-open="true"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onOpen()
+                      }}
+                      className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
+                      title="Open record"
+                      aria-label="Open record"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
-              )}
-              <button
-                type="button"
-                data-kanban-open="true"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onOpen()
-                }}
-                className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
-                title="Open record"
-                aria-label="Open record"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-            {/* Pills / meta: single row, no wrap */}
-            {pillMetaFields.length > 0 && (
-              <div className="flex flex-nowrap gap-1.5 overflow-hidden pt-0.5 min-w-0" data-kanban-field="true" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
-                {pillMetaFields.map((field) => {
-                  if (!field?.name) return null
-                  const full = getFullField(field)
-                  const value = row[full.name]
-                  return (
-                    <div key={full.id ?? full.name} className="min-w-0 shrink-0 max-w-[80px]">
-                      <CellFactory
-                        field={full}
-                        value={value}
-                        rowId={String(row.id)}
-                        tableName={tableName}
-                        editable={canEdit && !full.options?.read_only && full.type !== "lookup" && full.type !== "formula"}
-                        wrapText={true}
-                        rowHeight={22}
-                        onSave={(v) => onCellSave(String(row.id), full.name, v)}
-                        pillTruncate={true}
-                      />
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-            {/* Footer: optional last field as subtle meta */}
-            {footerField && (
-              <div className="border-t border-gray-100 pt-1.5 mt-0.5 text-xs text-gray-500 min-w-0" data-kanban-field="true" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
-                <CellFactory
-                  field={getFullField(footerField)}
-                  value={row[getFullField(footerField).name]}
-                  rowId={String(row.id)}
-                  tableName={tableName}
-                  editable={canEdit && !getFullField(footerField).options?.read_only && getFullField(footerField).type !== "lookup" && getFullField(footerField).type !== "formula"}
-                  wrapText={true}
-                  rowHeight={20}
-                  onSave={(v) => onCellSave(String(row.id), getFullField(footerField).name, v)}
-                />
-              </div>
-            )}
+              )
+            })}
           </div>
         </div>
       </CardContent>

@@ -14,7 +14,15 @@ import FieldSchemaSettings from "./settings/FieldSchemaSettings"
 import { getFieldDisplayName } from "@/lib/fields/display"
 import type { SelectedContext } from "@/contexts/SelectionContext"
 
-function Breadcrumb({ context, onNavigate }: { context: SelectedContext; onNavigate: (ctx: SelectedContext) => void }) {
+function Breadcrumb({
+  context,
+  onNavigate,
+  selectedBlock,
+}: {
+  context: SelectedContext
+  onNavigate: (ctx: SelectedContext) => void
+  selectedBlock?: { type: string } | null
+}) {
   if (!context) return null
 
   const items: { label: string; ctx: SelectedContext }[] = []
@@ -22,7 +30,10 @@ function Breadcrumb({ context, onNavigate }: { context: SelectedContext; onNavig
 
   if (context.type === "block" || context.type === "recordList" || context.type === "record" || context.type === "field") {
     if (context.type === "block") {
-      items.push({ label: "Block", ctx: context })
+      items.push({
+        label: selectedBlock?.type === "record_context" ? "Left panel" : "Block",
+        ctx: context,
+      })
     } else if (context.type === "recordList") {
       items.push({ label: "Record list", ctx: context })
     } else if (context.type === "record" || context.type === "field") {
@@ -127,7 +138,7 @@ export default function RightSettingsPanel() {
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <span className="font-semibold text-gray-900 truncate">
-                  {data?.onLayoutSave ? "Record" : "Modal layout"}
+                  {data?.onLayoutSave ? "Right panel – Record" : "Modal layout"}
                 </span>
               </div>
               <Button
@@ -142,7 +153,11 @@ export default function RightSettingsPanel() {
           ) : (
             <>
               <div className="min-w-0 flex-1">
-                <Breadcrumb context={selectedContext} onNavigate={setSelectedContext} />
+                <Breadcrumb
+                  context={selectedContext}
+                  onNavigate={setSelectedContext}
+                  selectedBlock={data?.selectedBlock ?? undefined}
+                />
               </div>
               <Button
                 variant="ghost"
@@ -161,8 +176,13 @@ export default function RightSettingsPanel() {
       {/* Content */}
       <div className="flex-1 overflow-y-auto min-h-0">
         {!selectedContext && !(recordPanelState.isOpen && recordPanelState.recordId) && (
-          <div className="p-4 text-sm text-muted-foreground">
-            {hasInterfacePageContext ? "Select an element to configure." : "No selection"}
+          <div className="p-4 text-sm text-muted-foreground space-y-2">
+            <p>{hasInterfacePageContext ? "Select an element to configure." : "No selection"}</p>
+            {hasInterfacePageContext && (
+              <p className="text-xs">
+                <strong>Left panel</strong> (record list): click &quot;Left panel&quot; in the left column. <strong>Right panel</strong> (record detail): select a record, then click the Customize (gear) button.
+              </p>
+            )}
           </div>
         )}
 

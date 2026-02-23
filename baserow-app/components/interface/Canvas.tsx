@@ -47,6 +47,7 @@ import { CANVAS_LAYOUT_DEFAULTS } from "@/lib/interface/canvas-layout-defaults"
 import { debugLog, debugWarn, isDebugEnabled } from "@/lib/interface/debug-flags"
 import { debugLog as devLog, debugWarn as devWarn, debugError as devError } from "@/lib/debug"
 import { usePageAggregates } from "@/lib/dashboard/usePageAggregates"
+import { Settings2 } from "lucide-react"
 
 const ResponsiveGridLayout = WidthProvider(Responsive)
 
@@ -98,6 +99,8 @@ interface CanvasProps {
   onFieldBlockSelect?: (blockId: string, fieldId: string, tableId: string) => void
   /** When set, highlights the selected field block in record detail canvas. */
   selectedFieldBlockId?: string | null
+  /** When provided with record_context full page, shows a "Configure left panel" button. */
+  onConfigureLeftPanel?: () => void
 }
 
 export default function Canvas({
@@ -138,6 +141,7 @@ export default function Canvas({
   onShowRecordSettings,
   onFieldBlockSelect,
   selectedFieldBlockId = null,
+  onConfigureLeftPanel,
 }: CanvasProps) {
   const router = useRouter()
   // Get filters from filter blocks for this block
@@ -2547,9 +2551,23 @@ export default function Canvas({
                 /* Full-page: rail layout (left block + right preview) or fill layout */
                 isRail ? (
                   <div className="flex h-full w-full overflow-hidden">
-                    <div className="h-full overflow-hidden border-r flex flex-col" style={{ width: fullPageDef?.fullPageMaxWidth ?? 360 }}>
+                    <div className="h-full overflow-hidden border-r flex flex-col relative" style={{ width: fullPageDef?.fullPageMaxWidth ?? 360 }}>
+                      {isEditing && onConfigureLeftPanel && fullPageBlock.type === "record_context" && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onConfigureLeftPanel()
+                          }}
+                          className="absolute top-2 left-2 z-10 p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900 transition-colors shadow-sm flex items-center gap-1.5 text-xs"
+                          title="Configure left panel (record list, card fields)"
+                        >
+                          <Settings2 className="h-4 w-4" />
+                          <span>Left panel</span>
+                        </button>
+                      )}
                       <BlockAppearanceWrapper block={fullPageBlock} isFullPage isRail className={isEditing ? "pointer-events-auto" : ""}>
-                        <div className="h-full w-full overflow-hidden">
+                        <div className={`h-full w-full overflow-hidden ${isEditing && onConfigureLeftPanel && fullPageBlock.type === "record_context" ? "pt-10" : ""}`}>
                           <BlockRenderer
                             block={fullPageBlock}
                             isEditing={isEditing && !fullPageBlock.config?.locked}

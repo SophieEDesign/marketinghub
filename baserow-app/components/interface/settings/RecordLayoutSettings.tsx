@@ -6,6 +6,8 @@ import {
   GripVertical,
   Eye,
   EyeOff,
+  Edit2,
+  Lock,
   Search,
   MessageSquare,
   MoreHorizontal,
@@ -65,16 +67,20 @@ function SortableFieldRow({
   item,
   field,
   onVisibilityToggle,
+  onEditableToggle,
   visible,
   searchQuery,
   isHiddenSection,
+  showEditableToggle,
 }: {
   item: FieldLayoutItem
   field: TableField
   onVisibilityToggle: (fieldName: string, visible: boolean) => void
+  onEditableToggle?: (fieldName: string, editable: boolean) => void
   visible: boolean
   searchQuery: string
   isHiddenSection: boolean
+  showEditableToggle?: boolean
 }) {
   const {
     attributes,
@@ -125,6 +131,25 @@ function SortableFieldRow({
       >
         {displayName}
       </span>
+      {showEditableToggle && onEditableToggle && (
+        <button
+          type="button"
+          onClick={() => onEditableToggle(field.name, !(item.editable !== false))}
+          className={cn(
+            "p-1.5 rounded",
+            item.editable !== false
+              ? "text-blue-600 hover:bg-blue-50"
+              : "text-gray-400 hover:bg-gray-50"
+          )}
+          title={item.editable !== false ? "Editable" : "View-only"}
+        >
+          {item.editable !== false ? (
+            <Edit2 className="h-4 w-4" />
+          ) : (
+            <Lock className="h-4 w-4" />
+          )}
+        </button>
+      )}
       <button
         type="button"
         onClick={() => onVisibilityToggle(field.name, !visible)}
@@ -249,10 +274,27 @@ export default function RecordLayoutSettings({
           next = [...prev, newItem]
         }
         setLiveLayout(next)
+        void onLayoutSave?.(next)
         return next
       })
     },
-    [fieldMap, setLiveLayout]
+    [fieldMap, setLiveLayout, onLayoutSave]
+  )
+
+  const handleEditableToggle = useCallback(
+    (fieldName: string, editable: boolean) => {
+      setDraftLayout((prev) => {
+        const next = prev.map((i) =>
+          i.field_name === fieldName || i.field_id === fieldName
+            ? { ...i, editable }
+            : i
+        )
+        setLiveLayout(next)
+        void onLayoutSave?.(next)
+        return next
+      })
+    },
+    [setLiveLayout, onLayoutSave]
   )
 
   const handleHideAll = useCallback(() => {
@@ -263,9 +305,10 @@ export default function RecordLayoutSettings({
         visible_in_modal: false,
       }))
       setLiveLayout(next)
+      void onLayoutSave?.(next)
       return next
     })
-  }, [setLiveLayout])
+  }, [setLiveLayout, onLayoutSave])
 
   const handleShowAll = useCallback(() => {
     setDraftLayout((prev) => {
@@ -275,9 +318,10 @@ export default function RecordLayoutSettings({
         visible_in_modal: true,
       }))
       setLiveLayout(next)
+      void onLayoutSave?.(next)
       return next
     })
-  }, [setLiveLayout])
+  }, [setLiveLayout, onLayoutSave])
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
@@ -299,10 +343,11 @@ export default function RecordLayoutSettings({
           order: index,
         }))
         setLiveLayout(next)
+        void onLayoutSave?.(next)
         return next
       })
     },
-    [setLiveLayout]
+    [setLiveLayout, onLayoutSave]
   )
 
   const sensors = useSensors(
@@ -430,7 +475,7 @@ export default function RecordLayoutSettings({
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center justify-between gap-2">
           <Label className="text-sm font-medium text-gray-700">
-            {hasPageConfig ? "Fields" : "Fields to show in record modal"}
+            {hasPageConfig ? "Fields to show in right panel" : "Fields to show in record modal"}
           </Label>
           <button
             type="button"
@@ -451,7 +496,7 @@ export default function RecordLayoutSettings({
           <>
             <p className="text-xs text-gray-500 mt-1 mb-3">
               {hasPageConfig
-                ? "Visible and hidden fields for the record detail panel. Drag to reorder. Use the eye icon to show or hide."
+                ? "Visible and hidden fields for the record detail panel. Drag to reorder. Use the eye icon to show or hide. When Editable is selected, use the pencil icon to toggle inline editing per field."
                 : "Choose which fields appear when opening a record. Drag to reorder. Use the eye icon to show or hide each field."}
             </p>
             <div className="relative">
@@ -517,9 +562,11 @@ export default function RecordLayoutSettings({
                       item={item}
                       field={field}
                       onVisibilityToggle={handleVisibilityToggle}
+                      onEditableToggle={handleEditableToggle}
                       visible={true}
                       searchQuery={searchQuery}
                       isHiddenSection={false}
+                      showEditableToggle={hasPageConfig && allowEditing}
                     />
                   )
                 })}
@@ -551,9 +598,11 @@ export default function RecordLayoutSettings({
                         item={item}
                         field={field}
                         onVisibilityToggle={handleVisibilityToggle}
+                        onEditableToggle={handleEditableToggle}
                         visible={false}
                         searchQuery={searchQuery}
                         isHiddenSection={true}
+                        showEditableToggle={hasPageConfig && allowEditing}
                       />
                     )
                   })}

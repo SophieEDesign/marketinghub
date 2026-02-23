@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
-import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useBranding } from "@/contexts/BrandingContext"
 import {
@@ -869,7 +868,7 @@ export default function GroupedInterfaces({
   }
 
   // Navigation Page Component (view mode)
-  // Use router.push directly - Link's client-side navigation can fail in this app
+  // Use full page navigation - Next.js client-side routing (Link/router.push) fails in this app
   function NavigationPage({ page, level = 0 }: { page: InterfacePage; level?: number }) {
     const targetPageId = page.id
     const targetPath = `/pages/${targetPageId}`
@@ -884,29 +883,20 @@ export default function GroupedInterfaces({
     const style = { color: sidebarTextColor }
 
     return (
-      <Link
+      <a
         href={targetPath}
-        prefetch={false}
         className={className}
         style={style}
         onClick={(e) => {
-          e.preventDefault()
           if (isActive) {
+            e.preventDefault()
             router.refresh()
-            return
           }
-          router.push(targetPath)
-          // Fallback: if router.push doesn't navigate (known Next.js issue), force full reload
-          const startPath = pathname
-          setTimeout(() => {
-            if (window.location.pathname !== targetPath && window.location.pathname === startPath) {
-              window.location.href = targetPath
-            }
-          }, 800)
+          // Let default <a> navigation run for non-active - full page load, always works
         }}
       >
         <span className="truncate flex-1">{page.name}</span>
-      </Link>
+      </a>
     )
   }
 
@@ -992,9 +982,8 @@ export default function GroupedInterfaces({
               onDragStart={(e) => e.preventDefault()}
             />
           ) : (
-            <Link
+            <a
               href={`/pages/${targetPageId}`}
-              prefetch={false}
               className="flex-1 flex items-center gap-2 px-2 py-1.5 rounded transition-colors hover:bg-black/10"
               style={isActive ? { 
                 backgroundColor: primaryColor + '15', 
@@ -1006,23 +995,16 @@ export default function GroupedInterfaces({
                   e.stopPropagation()
                   return
                 }
-                e.preventDefault()
                 if (isActive) {
+                  e.preventDefault()
                   router.refresh()
-                  return
                 }
-                const targetPath = `/pages/${targetPageId}`
-                router.push(targetPath)
-                setTimeout(() => {
-                  if (window.location.pathname !== targetPath && window.location.pathname === pathname) {
-                    window.location.href = targetPath
-                  }
-                }, 800)
+                // Let default <a> navigation run for non-active - full page load
               }}
             >
               <Layers className="h-4 w-4 flex-shrink-0" style={{ color: isActive ? primaryColor : sidebarTextColor }} />
               <span className="text-sm truncate">{page.name}</span>
-            </Link>
+            </a>
           )}
             <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>

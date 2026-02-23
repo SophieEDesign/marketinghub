@@ -1375,50 +1375,110 @@ export default function InterfaceBuilder({
       return
     const blocks = (fullPageBlock.config?.record_field_layout as any[]) || []
     const useCanvasLayout = blocks.length > 0
+    const blockFieldNames = new Set(
+      blocks
+        .filter((b: any) => b.config?.field_id || b.config?.field_name)
+        .map((b: any) => b.config?.field_name || recordContextTableFields.find((f: any) => f.id === b.config?.field_id)?.name)
+        .filter(Boolean)
+    )
     const fieldLayout = useCanvasLayout
-      ? blocks
-          .filter((b: any) => b.config?.field_id || b.config?.field_name)
-          .map((b: any, i: number) => {
-            const fieldName = b.config?.field_name || ""
-            const fieldId =
-              b.config?.field_id ||
-              recordContextTableFields.find((f: any) => f.name === fieldName)?.id ||
-              ""
-            return {
-              field_id: fieldId,
-              field_name: fieldName,
-              order: i,
-              editable: b.config?.allow_inline_edit !== false,
-              label_override: b.config?.label_override,
-              helper_text: b.config?.helper_text,
-              field_size: b.config?.field_size,
-            }
-          })
+      ? (() => {
+          const fromBlocks = blocks
+            .filter((b: any) => b.config?.field_id || b.config?.field_name)
+            .map((b: any, i: number) => {
+              const fieldName = b.config?.field_name || ""
+              const fieldId =
+                b.config?.field_id ||
+                recordContextTableFields.find((f: any) => f.name === fieldName)?.id ||
+                ""
+              return {
+                field_id: fieldId,
+                field_name: fieldName,
+                order: i,
+                editable: b.config?.allow_inline_edit !== false,
+                visible_in_canvas: true,
+                visible_in_modal: true,
+                label_override: b.config?.label_override,
+                helper_text: b.config?.helper_text,
+                field_size: b.config?.field_size,
+              }
+            })
+          const visibleNames = new Set(fromBlocks.map((x: any) => x.field_name))
+          const hidden = recordContextTableFields
+            .filter((f: any) => !f.options?.system && !visibleNames.has(f.name))
+            .map((f: any, i: number) => ({
+              field_id: f.id,
+              field_name: f.name,
+              order: fromBlocks.length + i,
+              editable: true,
+              visible_in_canvas: false,
+              visible_in_modal: false,
+            }))
+          return [...fromBlocks, ...hidden]
+        })()
       : (fullPageBlock.config?.field_layout as any[]) || []
     const onLayoutSave = async (layout: any[]) => {
       if (useCanvasLayout) {
-        const updated = blocks.map((block: any) => {
-          const item = layout.find(
-            (l: any) => l.field_id === block.config?.field_id || l.field_name === block.config?.field_name
+        const visibleLayout = layout.filter(
+          (l: any) => (l.visible_in_canvas ?? l.visible_in_modal) !== false
+        )
+        const updated: any[] = []
+        for (const item of visibleLayout) {
+          const block = blocks.find(
+            (b: any) =>
+              b.config?.field_id === item.field_id || b.config?.field_name === item.field_name
           )
-          if (item) {
-            return {
+          const field = recordContextTableFields.find((f: any) => f.id === item.field_id || f.name === item.field_name)
+          if (!field) continue
+          if (block) {
+            updated.push({
               ...block,
               config: {
                 ...block.config,
-                allow_inline_edit: item.editable,
+                allow_inline_edit: item.editable !== false,
                 label_override: item.label_override,
                 helper_text: item.helper_text,
                 field_size: item.field_size,
               },
-            }
+            })
+          } else {
+            const maxY = updated.length > 0 ? Math.max(...updated.map((b: any) => (b.y ?? 0) + (b.h ?? 2))) : -1
+            updated.push({
+              id: `field-${field.name}`,
+              page_id: fullPageBlock.id,
+              type: "field",
+              x: 0,
+              y: maxY + 1,
+              w: 6,
+              h: field.type === "link_to_table" || field.type === "lookup" ? 3 : 2,
+              config: {
+                field_id: field.id,
+                field_name: field.name,
+                table_id: recordTableId,
+                allow_inline_edit: item.editable !== false,
+                label_override: item.label_override,
+                helper_text: item.helper_text,
+                field_size: item.field_size,
+              },
+              order_index: updated.length,
+              created_at: new Date().toISOString(),
+            })
           }
-          return block
+        }
+        const flForFieldLayout = layout.map((l: any) => ({
+          ...l,
+          visible_in_canvas: (l.visible_in_canvas ?? l.visible_in_modal) !== false,
+          visible_in_modal: (l.visible_in_canvas ?? l.visible_in_modal) !== false,
+        }))
+        await handleBlockUpdate(fullPageBlock.id, {
+          record_field_layout: updated,
+          field_layout: flForFieldLayout,
         })
-        await handleBlockUpdate(fullPageBlock.id, { record_field_layout: updated })
         setBlocks((prevBlocks) =>
           prevBlocks.map((b) =>
-            b.id === fullPageBlock.id ? { ...b, config: { ...b.config, record_field_layout: updated } } : b
+            b.id === fullPageBlock.id
+              ? { ...b, config: { ...b.config, record_field_layout: updated, field_layout: flForFieldLayout } }
+              : b
           )
         )
       } else {
@@ -1763,6 +1823,14 @@ export default function InterfaceBuilder({
                 selectedContext.blockId
                   ? selectedContext.blockId
                   : null
+              }
+              onConfigureLeftPanel={
+                fullPageBlock?.type === "record_context" && fullPageBlock
+                  ? () => {
+                      setSelectedBlockId(fullPageBlock.id)
+                      setSelectedContext({ type: "block", blockId: fullPageBlock.id })
+                    }
+                  : undefined
               }
             />
           </FilterStateProvider>
