@@ -280,6 +280,7 @@ export default function RightSettingsPanel() {
                   type: "field",
                   fieldId: newFieldId,
                   tableId: selectedContext.tableId ?? recordPanelState.tableId ?? data?.recordTableId ?? "",
+                  blockId: selectedContext.blockId,
                 })
               }
             />

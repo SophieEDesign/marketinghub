@@ -22,6 +22,10 @@ interface RecordDetailCanvasProps {
   isEditing?: boolean
   pageEditable?: boolean
   onBlockUpdate?: (blockId: string, config: Partial<Record<string, unknown>>) => void
+  /** When a field block is clicked in edit mode, opens its settings in the right panel. */
+  onFieldBlockSelect?: (blockId: string, fieldId: string, tableId: string) => void
+  /** When set, highlights the selected field block in the canvas. */
+  selectedFieldBlockId?: string | null
 }
 
 function defaultBlockH(field: TableField): number {
@@ -57,6 +61,8 @@ export default function RecordDetailCanvas({
   isEditing = false,
   pageEditable = true,
   onBlockUpdate,
+  onFieldBlockSelect,
+  selectedFieldBlockId = null,
 }: RecordDetailCanvasProps) {
   const [tableFields, setTableFields] = useState<TableField[]>([])
   const [loading, setLoading] = useState(true)
@@ -333,6 +339,22 @@ export default function RecordDetailCanvas({
     [blockId, onBlockUpdate]
   )
 
+  const handleBlockSelect = useCallback(
+    (clickedBlockId: string) => {
+      if (!onFieldBlockSelect || !isEditing || pageEditable === false) return
+      const block = currentBlocks.find((b) => b.id === clickedBlockId)
+      if (block?.type !== "field") return
+      const fieldName = block.config?.field_name as string | undefined
+      const fieldId =
+        (block.config?.field_id as string) ||
+        (fieldName ? tableFields.find((f) => f.name === fieldName)?.id : undefined)
+      if (fieldId) {
+        onFieldBlockSelect(clickedBlockId, fieldId, tableId)
+      }
+    },
+    [onFieldBlockSelect, isEditing, pageEditable, currentBlocks, tableFields, tableId]
+  )
+
   const fieldsInLayout = new Set(
     currentBlocks.map((b) => b.config?.field_name as string).filter(Boolean)
   )
@@ -380,6 +402,8 @@ export default function RecordDetailCanvas({
             onLayoutChange={canEdit ? handleLayoutChange : undefined}
             onBlockUpdate={canEdit ? handleBlockConfigUpdate : undefined}
             onBlockDelete={canEdit ? handleBlockDelete : undefined}
+            onBlockSelect={onFieldBlockSelect ? handleBlockSelect : undefined}
+            selectedBlockId={selectedFieldBlockId}
             pageTableId={tableId}
             pageId={blockId}
             recordId={recordId}

@@ -34,6 +34,8 @@ interface KanbanViewProps {
   fitImageSize?: boolean // Whether to fit image to container size
   wrapText?: boolean // Whether to wrap long text in card cells (default true)
   blockConfig?: Record<string, any> // Block config for modal_fields
+  /** Modal field list (from field_layout when available); same as Calendar/List for consistent modal editor */
+  modalFields?: string[]
   onRecordClick?: (recordId: string) => void
   /** Optional: pass to RecordPanel for permission cascade */
   cascadeContext?: { pageConfig?: any; blockConfig?: any } | null
@@ -64,6 +66,7 @@ export default function KanbanView({
   fitImageSize = false,
   wrapText = true,
   blockConfig = {},
+  modalFields,
   onRecordClick,
   cascadeContext = null,
   reloadKey,
@@ -327,7 +330,7 @@ export default function KanbanView({
       tableId,
       id,
       supabaseTableName,
-      (blockConfig as any)?.modal_fields,
+      (blockConfig as any)?.modal_fields ?? modalFields,
       (blockConfig as any)?.modal_layout,
       cascadeContext ?? (blockConfig ? { blockConfig } : undefined),
       interfaceMode,
@@ -336,7 +339,7 @@ export default function KanbanView({
       onModalLayoutSave ?? undefined,
       tableFields
     )
-  }, [blockConfig, cascadeContext, onRecordClick, openRecord, supabaseTableName, tableId, interfaceMode, onRecordDeleted, onModalLayoutSave, tableFields])
+  }, [blockConfig, cascadeContext, modalFields, onRecordClick, openRecord, supabaseTableName, tableId, interfaceMode, onRecordDeleted, onModalLayoutSave, tableFields])
 
   const handleCellSave = useCallback(async (rowId: string, fieldName: string, value: any) => {
     if (!supabaseTableName) return
@@ -480,7 +483,7 @@ export default function KanbanView({
             groupName
           const headerColor = getColumnHeaderColor(groupName)
           return (
-          <div key={groupName} className="flex-shrink-0 w-96">
+          <div key={groupName} className="flex-shrink-0 w-80">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 mb-3">
               <div className="flex items-center gap-2 flex-wrap">
                 {headerColor ? (
@@ -587,9 +590,9 @@ export default function KanbanView({
                         </div>
                       )}
 
-                      {/* Category/Date pills (Airtable-style colored tags) */}
+                      {/* Category/Date pills - stacked vertically for neat layout */}
                       {pillMetaFields.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 min-w-0" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+                        <div className="flex flex-col gap-1 min-w-0" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
                           {pillMetaFields.map((fieldObj) => {
                             const isVirtual = fieldObj.type === "formula" || fieldObj.type === "lookup"
                             const isSelect = fieldObj.type === "single_select" || fieldObj.type === "multi_select"

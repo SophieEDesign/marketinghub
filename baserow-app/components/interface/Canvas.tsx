@@ -92,6 +92,12 @@ interface CanvasProps {
   fullPageBlockId?: string | null
   /** When set, opens the specified record in edit mode for the specified block */
   openRecordInEditModeForBlock?: { blockId: string; recordId: string; tableId: string } | null
+  /** When provided, RecordPreviewSurface shows a Customize button to open Record settings. */
+  onShowRecordSettings?: () => void
+  /** When a field block is clicked in record detail canvas, opens its settings in the right panel. */
+  onFieldBlockSelect?: (blockId: string, fieldId: string, tableId: string) => void
+  /** When set, highlights the selected field block in record detail canvas. */
+  selectedFieldBlockId?: string | null
 }
 
 export default function Canvas({
@@ -129,6 +135,9 @@ export default function Canvas({
   editingBlockCanvasId = null,
   fullPageBlockId = null,
   openRecordInEditModeForBlock = null,
+  onShowRecordSettings,
+  onFieldBlockSelect,
+  selectedFieldBlockId = null,
 }: CanvasProps) {
   const router = useRouter()
   // Get filters from filter blocks for this block
@@ -2589,6 +2598,9 @@ export default function Canvas({
                           blockConfig={fullPageBlock.config}
                           blockId={fullPageBlock.id}
                           onBlockUpdate={onBlockUpdate}
+                          onShowRecordSettings={onShowRecordSettings}
+                          onFieldBlockSelect={onFieldBlockSelect}
+                          selectedFieldBlockId={selectedFieldBlockId}
                         />
                       ) : (
                         <div className="flex-1 h-full bg-background" />

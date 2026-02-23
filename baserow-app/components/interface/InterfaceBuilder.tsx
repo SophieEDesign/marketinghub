@@ -1364,29 +1364,71 @@ export default function InterfaceBuilder({
     }
   }, [recordTableId, fullPageBlock?.id, fullPageBlock?.type])
 
-  const lastRecordContextSyncRef = useRef<{ recordId: string; blockId: string } | null>(null)
-  useEffect(() => {
+  const syncRecordContextToRightPanel = useCallback(() => {
     if (
       !effectiveIsEditing ||
       !recordId ||
       !recordTableId ||
       !fullPageBlock ||
       fullPageBlock.type !== "record_context"
-    ) {
-      lastRecordContextSyncRef.current = null
+    )
       return
-    }
-    const prev = lastRecordContextSyncRef.current
-    if (prev?.recordId === recordId && prev?.blockId === fullPageBlock.id) return
-    lastRecordContextSyncRef.current = { recordId, blockId: fullPageBlock.id }
-    const fieldLayout = (fullPageBlock.config?.field_layout as any[]) || []
+    const blocks = (fullPageBlock.config?.record_field_layout as any[]) || []
+    const useCanvasLayout = blocks.length > 0
+    const fieldLayout = useCanvasLayout
+      ? blocks
+          .filter((b: any) => b.config?.field_id || b.config?.field_name)
+          .map((b: any, i: number) => {
+            const fieldName = b.config?.field_name || ""
+            const fieldId =
+              b.config?.field_id ||
+              recordContextTableFields.find((f: any) => f.name === fieldName)?.id ||
+              ""
+            return {
+              field_id: fieldId,
+              field_name: fieldName,
+              order: i,
+              editable: b.config?.allow_inline_edit !== false,
+              label_override: b.config?.label_override,
+              helper_text: b.config?.helper_text,
+              field_size: b.config?.field_size,
+            }
+          })
+      : (fullPageBlock.config?.field_layout as any[]) || []
     const onLayoutSave = async (layout: any[]) => {
-      await handleBlockUpdate(fullPageBlock.id, { field_layout: layout })
-      setBlocks((prevBlocks) =>
-        prevBlocks.map((b) =>
-          b.id === fullPageBlock.id ? { ...b, config: { ...b.config, field_layout: layout } } : b
+      if (useCanvasLayout) {
+        const updated = blocks.map((block: any) => {
+          const item = layout.find(
+            (l: any) => l.field_id === block.config?.field_id || l.field_name === block.config?.field_name
+          )
+          if (item) {
+            return {
+              ...block,
+              config: {
+                ...block.config,
+                allow_inline_edit: item.editable,
+                label_override: item.label_override,
+                helper_text: item.helper_text,
+                field_size: item.field_size,
+              },
+            }
+          }
+          return block
+        })
+        await handleBlockUpdate(fullPageBlock.id, { record_field_layout: updated })
+        setBlocks((prevBlocks) =>
+          prevBlocks.map((b) =>
+            b.id === fullPageBlock.id ? { ...b, config: { ...b.config, record_field_layout: updated } } : b
+          )
         )
-      )
+      } else {
+        await handleBlockUpdate(fullPageBlock.id, { field_layout: layout })
+        setBlocks((prevBlocks) =>
+          prevBlocks.map((b) =>
+            b.id === fullPageBlock.id ? { ...b, config: { ...b.config, field_layout: layout } } : b
+          )
+        )
+      }
     }
     const pageConfig = { allow_editing: fullPageBlock.config?.allow_editing }
     const onPageConfigSave = async (updates: Record<string, unknown>) => {
@@ -1416,6 +1458,30 @@ export default function InterfaceBuilder({
     setSelectedContext,
     setRightPanelData,
     handleBlockUpdate,
+  ])
+
+  const lastRecordContextSyncRef = useRef<{ recordId: string; blockId: string } | null>(null)
+  useEffect(() => {
+    if (
+      !effectiveIsEditing ||
+      !recordId ||
+      !recordTableId ||
+      !fullPageBlock ||
+      fullPageBlock.type !== "record_context"
+    ) {
+      lastRecordContextSyncRef.current = null
+      return
+    }
+    const prev = lastRecordContextSyncRef.current
+    if (prev?.recordId === recordId && prev?.blockId === fullPageBlock.id) return
+    lastRecordContextSyncRef.current = { recordId, blockId: fullPageBlock.id }
+    syncRecordContextToRightPanel()
+  }, [
+    effectiveIsEditing,
+    recordId,
+    recordTableId,
+    fullPageBlock,
+    syncRecordContextToRightPanel,
   ])
 
   // Keyboard shortcuts
@@ -1674,6 +1740,30 @@ export default function InterfaceBuilder({
               pageShowFieldNames={(page as any).config?.show_field_names !== false}
               editingBlockCanvasId={editingBlockCanvasId}
               fullPageBlockId={fullPageBlockId}
+              onShowRecordSettings={
+                fullPageBlock?.type === "record_context" && recordId && recordTableId
+                  ? syncRecordContextToRightPanel
+                  : undefined
+              }
+              onFieldBlockSelect={
+                fullPageBlock?.type === "record_context" && recordId && recordTableId
+                  ? (blockId, fieldId) => {
+                      setSelectedContext({
+                        type: "field",
+                        fieldId,
+                        tableId: recordTableId,
+                        blockId,
+                      })
+                    }
+                  : undefined
+              }
+              selectedFieldBlockId={
+                fullPageBlock?.type === "record_context" &&
+                selectedContext?.type === "field" &&
+                selectedContext.blockId
+                  ? selectedContext.blockId
+                  : null
+              }
             />
           </FilterStateProvider>
           {/* Footer spacer to ensure bottom content is visible and resize handles reachable in editor */}

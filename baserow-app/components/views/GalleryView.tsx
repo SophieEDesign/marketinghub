@@ -37,6 +37,8 @@ interface GalleryViewProps {
   fitImageSize?: boolean
   // Block config (optional, for future card settings)
   blockConfig?: Record<string, any>
+  /** Modal field list (from field_layout when available); same as Calendar/List for consistent modal editor */
+  modalFields?: string[]
   /** When grouping, should groups start collapsed? Default: true (closed). */
   defaultGroupsCollapsed?: boolean
   /** Callback to open block settings (for configuration) */
@@ -69,6 +71,7 @@ export default function GalleryView({
   imageField,
   fitImageSize = false,
   blockConfig = {},
+  modalFields,
   defaultGroupsCollapsed = true,
   onOpenSettings,
   onHeightChange,
@@ -457,7 +460,7 @@ export default function GalleryView({
       tableId,
       recordId,
       supabaseTableName,
-      (blockConfig as any)?.modal_fields,
+      (blockConfig as any)?.modal_fields ?? modalFields,
       (blockConfig as any)?.modal_layout,
       blockConfig ? { blockConfig } : undefined,
       interfaceMode,
@@ -466,7 +469,7 @@ export default function GalleryView({
       onModalLayoutSave ?? undefined,
       tableFields
     )
-  }, [blockConfig, onRecordClick, openRecord, supabaseTableName, tableId, interfaceMode, onRecordDeleted, onModalLayoutSave, tableFields])
+  }, [blockConfig, modalFields, onRecordClick, openRecord, supabaseTableName, tableId, interfaceMode, onRecordDeleted, onModalLayoutSave, tableFields])
 
   const handleCellSave = useCallback(async (rowId: string, fieldName: string, value: any) => {
     if (!supabaseTableName) return

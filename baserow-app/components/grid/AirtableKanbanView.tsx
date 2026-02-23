@@ -705,7 +705,7 @@ function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
-      className="flex-shrink-0 w-96 bg-gray-50 rounded-lg flex flex-col h-full max-h-full border border-gray-200"
+      className="flex-shrink-0 w-80 bg-gray-50 rounded-lg flex flex-col h-full max-h-full border border-gray-200"
       data-column-id={column.id}
     >
       {/* Column Header */}
@@ -878,9 +878,9 @@ function KanbanCard({ row, displayFields, tableFields, selected, onSelect, onOpe
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>
-            {/* Pills / meta: values only, no labels */}
+            {/* Pills / meta: stacked vertically for neat layout */}
             {pillMetaFields.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 pt-0.5 min-w-0" data-kanban-field="true" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+              <div className="flex flex-col gap-1 pt-0.5 min-w-0" data-kanban-field="true" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
                 {pillMetaFields.map((field) => {
                   if (!field?.name) return null
                   const full = getFullField(field)

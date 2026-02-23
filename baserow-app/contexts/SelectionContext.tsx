@@ -7,7 +7,7 @@ export type SelectedContext =
   | { type: "block"; blockId: string }
   | { type: "recordList"; blockId: string }
   | { type: "record"; recordId: string; tableId?: string }
-  | { type: "field"; fieldId: string; tableId?: string }
+  | { type: "field"; fieldId: string; tableId?: string; blockId?: string }
   | null
 
 interface SelectionContextType {

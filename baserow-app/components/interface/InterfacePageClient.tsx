@@ -198,6 +198,15 @@ function InterfacePageClientInternal({
     prevIsEditingRef.current = isEditing
   }, [isEditing, setSelectedContext])
 
+  // Auto-show Modal layout when record panel opens in edit mode (no navigation needed)
+  useEffect(() => {
+    if (!isEditing) return
+    if (!recordPanelState.isOpen || !recordPanelState.recordId || !recordPanelState.tableId || !recordPanelState.onLayoutSave) return
+    const isViewingRecordOrField = selectedContext?.type === "record" || selectedContext?.type === "field"
+    if (isViewingRecordOrField) return
+    setSelectedContext({ type: "record", recordId: recordPanelState.recordId, tableId: recordPanelState.tableId })
+  }, [isEditing, recordPanelState.isOpen, recordPanelState.recordId, recordPanelState.tableId, recordPanelState.onLayoutSave, selectedContext?.type, setSelectedContext])
+
   // CRITICAL: Extract pageTableId from page - only update when page changes
   useEffect(() => {
     if (!page) {

@@ -39,6 +39,8 @@ interface TimelineViewProps {
   tableFields?: TableField[]
   filters?: FilterConfig[] // Dynamic filters from config
   blockConfig?: Record<string, any> // Block/page config for reading date_from/date_to from page settings
+  /** Modal field list (from field_layout when available); same as Calendar/List for consistent modal editor */
+  modalFields?: string[]
   colorField?: string // Field name to use for event colors (single-select field)
   onRecordClick?: (recordId: string) => void
   // Card field configuration (compact contract)
@@ -85,6 +87,7 @@ export default function TimelineView({
   tableFields = [],
   filters = [],
   blockConfig = {},
+  modalFields,
   colorField,
   onRecordClick,
   titleField: titleFieldProp,
@@ -1148,8 +1151,8 @@ export default function TimelineView({
       onRecordClick(rowId)
       return
     }
-    openRecord(tableId, rowId, supabaseTableName, (blockConfig as any)?.modal_fields, (blockConfig as any)?.modal_layout, blockConfig ? { blockConfig } : undefined, interfaceMode, onRecordDeleted, (blockConfig as any)?.field_layout, onModalLayoutSave ?? undefined, tableFields)
-  }, [blockConfig, onRecordClick, openRecord, supabaseTableName, tableId, interfaceMode, onRecordDeleted, onModalLayoutSave, tableFields])
+    openRecord(tableId, rowId, supabaseTableName, (blockConfig as any)?.modal_fields ?? modalFields, (blockConfig as any)?.modal_layout, blockConfig ? { blockConfig } : undefined, interfaceMode, onRecordDeleted, (blockConfig as any)?.field_layout, onModalLayoutSave ?? undefined, tableFields)
+  }, [blockConfig, modalFields, onRecordClick, openRecord, supabaseTableName, tableId, interfaceMode, onRecordDeleted, onModalLayoutSave, tableFields])
 
   const handleEventSelect = useCallback((event: TimelineEvent, e: React.MouseEvent) => {
     // Don't open/select if we're resizing/dragging.

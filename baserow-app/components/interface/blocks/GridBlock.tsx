@@ -854,6 +854,7 @@ export default function GridBlock({
             filters={allFilters}
             filterTree={filterTree}
             blockConfig={stableBlockConfig}
+            modalFields={modalFieldsForRecord}
             onRecordClick={onRecordClick}
             colorField={appearance.color_field}
             imageField={appearance.image_field}
@@ -922,6 +923,7 @@ export default function GridBlock({
             imageField={appearance.image_field}
             fitImageSize={appearance.fit_image_size}
             blockConfig={config}
+            modalFields={modalFieldsForRecord}
             onRecordClick={onRecordClick}
             cascadeContext={cascadeContext}
             reloadKey={refreshKey}
@@ -969,6 +971,7 @@ export default function GridBlock({
             tableFields={tableFields}
             filters={allFilters} // Pass merged filters
             blockConfig={config} // Pass block config so TimelineView can read date_from/date_to from page settings
+            modalFields={modalFieldsForRecord}
             colorField={appearance.color_field}
             onRecordClick={onRecordClick}
             reloadKey={refreshKey}
@@ -1019,6 +1022,7 @@ export default function GridBlock({
             filterTree={filterTree}
             onRecordClick={onRecordClick}
             blockConfig={config}
+            modalFields={modalFieldsForRecord}
             defaultGroupsCollapsed={galleryDefaultGroupsCollapsed}
             colorField={appearance.color_field}
             imageField={appearance.image_field}
@@ -1304,8 +1308,8 @@ export default function GridBlock({
         const compactBar = true
 
         return (
-          <div className="flex items-center gap-3 flex-shrink-0 py-2 px-2 border-b border-gray-200/80 bg-white/95 min-h-0">
-            <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="flex items-center gap-3 flex-shrink-0 py-2 px-2 border-b border-gray-200/80 bg-white/95 min-h-0 overflow-x-auto min-w-0">
+            <div className="flex items-center gap-2 flex-1 min-w-0 flex-wrap">
               {showQuickFilters && (
                 <QuickFilterBar
                   storageKey={`mh:quickFilters:${pageId || "page"}:${block.id}`}
@@ -1369,8 +1373,8 @@ export default function GridBlock({
         />
       )}
 
-      {/* Single scroll container: GridView/CalendarView owns scroll; flex so child can flex-1. Kanban needs overflow-x-auto for horizontal column scroll. */}
-      <div className={`flex-1 min-h-0 min-w-0 flex flex-col ${viewType === 'calendar' ? 'min-h-[100vh]' : ''} ${viewType === 'kanban' ? 'overflow-x-auto' : ''}`}>
+      {/* Single scroll container: GridView/CalendarView owns scroll; flex so child can flex-1. Calendar needs overflow-hidden so child controls scroll. */}
+      <div className={`flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden ${viewType === 'calendar' ? 'min-h-[100vh]' : ''} ${viewType === 'kanban' ? 'overflow-x-auto' : ''}`}>
         {renderView()}
       </div>
     </div>

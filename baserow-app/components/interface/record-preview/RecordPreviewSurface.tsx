@@ -1,5 +1,6 @@
 "use client"
 
+import { Settings2 } from "lucide-react"
 import type { PageBlock, BlockConfig } from "@/lib/interface/types"
 import RecordBlock from "@/components/interface/blocks/RecordBlock"
 import RecordDetailCanvas from "./RecordDetailCanvas"
@@ -17,6 +18,12 @@ interface RecordPreviewSurfaceProps {
   blockId?: string | null
   /** Callback to persist record_field_layout to block config. */
   onBlockUpdate?: (blockId: string, config: Partial<Record<string, unknown>>) => void
+  /** When provided, shows a Customize button to open Record settings in the right panel. */
+  onShowRecordSettings?: () => void
+  /** When a field block is clicked in edit mode, opens its settings in the right panel. */
+  onFieldBlockSelect?: (blockId: string, fieldId: string, tableId: string) => void
+  /** When set, highlights the selected field block in the canvas. */
+  selectedFieldBlockId?: string | null
 }
 
 /**
@@ -34,15 +41,28 @@ export default function RecordPreviewSurface({
   blockConfig,
   blockId,
   onBlockUpdate,
+  onShowRecordSettings,
+  onFieldBlockSelect,
+  selectedFieldBlockId = null,
 }: RecordPreviewSurfaceProps) {
   const useCanvasEditor = Boolean(blockId && onBlockUpdate)
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RecordPreviewSurface.tsx',message:'Record preview path',data:{useCanvasEditor,hasBlockId:!!blockId,hasOnBlockUpdate:!!onBlockUpdate,isEditing},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
-  // #endregion
 
   if (useCanvasEditor) {
     return (
-      <div className="h-full w-full min-w-0 overflow-hidden">
+      <div className="h-full w-full min-w-0 overflow-hidden relative">
+        {isEditing && onShowRecordSettings && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onShowRecordSettings()
+            }}
+            className="absolute top-2 right-2 z-10 p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900 transition-colors shadow-sm"
+            title="Customize record layout"
+          >
+            <Settings2 className="h-4 w-4" />
+          </button>
+        )}
         <RecordDetailCanvas
           tableId={tableId}
           recordId={recordId}
@@ -51,6 +71,8 @@ export default function RecordPreviewSurface({
           isEditing={isEditing}
           pageEditable={pageEditable}
           onBlockUpdate={onBlockUpdate}
+          onFieldBlockSelect={onFieldBlockSelect}
+          selectedFieldBlockId={selectedFieldBlockId}
         />
       </div>
     )
@@ -76,7 +98,20 @@ export default function RecordPreviewSurface({
   }
 
   return (
-    <div className="h-full w-full min-w-0 overflow-auto">
+    <div className="h-full w-full min-w-0 overflow-auto relative">
+      {isEditing && onShowRecordSettings && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onShowRecordSettings()
+          }}
+          className="absolute top-2 right-2 z-10 p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900 transition-colors shadow-sm"
+          title="Customize record layout"
+        >
+          <Settings2 className="h-4 w-4" />
+        </button>
+      )}
       <RecordBlock
         block={syntheticBlock}
         isEditing={isEditing}

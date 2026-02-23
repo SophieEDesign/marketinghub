@@ -50,6 +50,8 @@ interface CalendarViewProps {
   filterTree?: FilterTree // Canonical filter tree from filter blocks (supports groups/OR)
   onRecordClick?: (recordId: string) => void // Emit recordId on click
   blockConfig?: Record<string, any> // Block/page config for reading date_field from page settings
+  /** Modal field list (from field_layout when available); same as List/Timeline for consistent modal editor */
+  modalFields?: string[]
   colorField?: string // Field name to use for event colors (single-select field)
   imageField?: string // Field name to use for event images
   fitImageSize?: boolean // Whether to fit image to container size
@@ -137,6 +139,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
   filterTree = null,
   onRecordClick,
   blockConfig = {},
+  modalFields,
   colorField,
   imageField,
   fitImageSize = false,
@@ -1806,11 +1809,12 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
       // Use right-side RecordPanel (Airtable-style) instead of center modal
       queueMicrotask(() => {
         const bc = blockConfigRef.current
+        const modalFieldsParam = Array.isArray(bc?.modal_fields) ? bc.modal_fields : (modalFields ?? undefined)
         openRecordPanel(
           resolvedTableId,
           recordIdString,
           supabaseTableName ?? "",
-          Array.isArray(bc?.modal_fields) ? bc.modal_fields : undefined,
+          modalFieldsParam,
           bc?.modal_layout,
           cascadeContext ?? undefined,
           interfaceMode,
@@ -1821,7 +1825,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
         )
       })
     },
-    [allowOpenRecord, onRecordClick, resolvedDateFieldNames, openRecordPanel, resolvedTableId, loadedTableFields, supabaseTableName, interfaceMode, onModalLayoutSave, cascadeContext]
+    [allowOpenRecord, modalFields, onRecordClick, openRecordPanel, resolvedTableId, loadedTableFields, supabaseTableName, interfaceMode, onModalLayoutSave, cascadeContext]
   )
   const handleEventClickRef = useRef(handleEventClickImpl)
   handleEventClickRef.current = handleEventClickImpl
@@ -2024,12 +2028,12 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
   }
 
   return (
-    <div className="w-full h-full flex flex-col bg-white">
+    <div className="w-full h-full min-w-0 flex flex-col bg-white overflow-hidden">
       {renderAnchorControls()}
-      {/* Scroll container: stable ref for anchor scrolling, single scrollbar */}
+      {/* Scroll container: stable ref for anchor scrolling; overflow-auto so wide calendar can scroll horizontally */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 min-h-0 overflow-y-auto p-4 bg-white"
+        className="flex-1 min-h-0 min-w-0 overflow-auto p-4 bg-white"
       >
         {/* CRITICAL: Only render FullCalendar after mount to prevent hydration mismatch (React error #185) */}
         {mounted ? (
