@@ -76,6 +76,7 @@ interface AirtableKanbanViewProps {
   }>
   kanbanGroupField?: string
   cardFields?: string[]
+  showFieldLabels?: boolean
   userRole?: "admin" | "editor" | "viewer" | null
 }
 
@@ -96,6 +97,7 @@ export default function AirtableKanbanView({
   viewSorts = [],
   kanbanGroupField,
   cardFields = [],
+  showFieldLabels = false,
   userRole = "editor",
 }: AirtableKanbanViewProps) {
   const router = useRouter()
@@ -576,6 +578,7 @@ export default function AirtableKanbanView({
                   onToggle={() => toggleColumn(column.id)}
                   onAddCard={() => handleAddCard(column.id)}
                   displayFields={displayCardFields}
+                  showFieldLabels={showFieldLabels}
                   groupField={groupField}
                   canEdit={canEdit}
                   onCardSelect={(row) => setSelectedRowId(String(row.id))}
@@ -651,6 +654,7 @@ interface KanbanColumnProps {
   onToggle: () => void
   onAddCard: () => void
   displayFields: TableField[]
+  showFieldLabels?: boolean
   groupField: TableField
   canEdit: boolean
   onCardSelect: (row: Record<string, any>) => void
@@ -668,6 +672,7 @@ function KanbanColumn({
   onToggle,
   onAddCard,
   displayFields,
+  showFieldLabels = false,
   groupField,
   canEdit,
   onCardSelect,
@@ -744,6 +749,7 @@ function KanbanColumn({
                     key={row.id}
                     row={row}
                     displayFields={displayFields}
+                    showFieldLabels={showFieldLabels}
                     tableFields={tableFields}
                     selected={selectedRowId === String(row.id)}
                     onSelect={() => onCardSelect(row)}
@@ -780,6 +786,7 @@ function KanbanColumn({
 interface KanbanCardProps {
   row: Record<string, any>
   displayFields: TableField[]
+  showFieldLabels?: boolean
   tableFields: TableField[]
   selected: boolean
   onSelect: () => void
@@ -789,7 +796,7 @@ interface KanbanCardProps {
   onCellSave: (rowId: string, fieldName: string, value: any) => Promise<void>
 }
 
-function KanbanCard({ row, displayFields, tableFields, selected, onSelect, onOpen, canEdit, tableName, onCellSave }: KanbanCardProps) {
+function KanbanCard({ row, displayFields, showFieldLabels = false, tableFields, selected, onSelect, onOpen, canEdit, tableName, onCellSave }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: row.id,
     disabled: !canEdit,
@@ -851,12 +858,18 @@ function KanbanCard({ row, displayFields, tableFields, selected, onSelect, onOpe
               return (
                 <div
                   key={full.id ?? full.name}
-                  className={`flex items-center gap-1.5 min-w-0 ${isFirst ? "font-semibold text-sm text-gray-900" : "text-xs text-gray-600"}`}
+                  className={`flex flex-col gap-0.5 min-w-0 ${isFirst ? "font-semibold text-sm text-gray-900" : "text-xs text-gray-600"}`}
                   style={{ minHeight: rowH }}
                   data-kanban-field="true"
                   onClick={(e) => e.stopPropagation()}
                   onDoubleClick={(e) => e.stopPropagation()}
                 >
+                  {showFieldLabels && (
+                    <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wide shrink-0">
+                      {getFieldDisplayName(full)}
+                    </div>
+                  )}
+                  <div className={`flex items-center gap-1.5 min-w-0 flex-1`}>
                   <div className={`flex-1 min-w-0 overflow-hidden ${isLongText ? "line-clamp-2" : "truncate"}`}>
                     <CellFactory
                       field={full}
@@ -885,6 +898,7 @@ function KanbanCard({ row, displayFields, tableFields, selected, onSelect, onOpe
                       <ChevronRight className="h-4 w-4" />
                     </button>
                   )}
+                  </div>
                 </div>
               )
             })}

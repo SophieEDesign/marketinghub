@@ -312,6 +312,8 @@ export default function ViewTopBar({
                   className={tabClassName}
                   role="tab"
                   aria-selected={isActive}
+                  onDoubleClick={canManageViews ? (e) => { e.preventDefault(); startInlineEdit() } : undefined}
+                  title={canManageViews ? "Double-click to rename, right-click for menu" : undefined}
                 >
                   <span style={isActive ? { color: primaryColor } : undefined} className="shrink-0 [&>svg]:h-4 [&>svg]:w-4">
                     {getViewIcon(v.type)}

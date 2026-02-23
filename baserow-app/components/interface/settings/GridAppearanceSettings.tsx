@@ -269,6 +269,15 @@ value={String(appearance.gallery_rows_per_page || "12")}
               }
             />
           </div>
+          <div className="flex items-center justify-between">
+            <Label>Show field labels</Label>
+            <Switch
+              checked={(appearance as any).kanban_show_field_labels === true}
+              onCheckedChange={(c) =>
+                onUpdate({ kanban_show_field_labels: c } as any)
+              }
+            />
+          </div>
         </>
       )}
 

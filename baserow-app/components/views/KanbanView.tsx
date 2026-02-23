@@ -20,6 +20,7 @@ import type { HighlightRule } from "@/lib/interface/types"
 import { evaluateHighlightRules, getFormattingStyle } from "@/lib/conditional-formatting/evaluator"
 import { getLinkedFieldValueFromRow, linkedValueToIds, resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
 import type { LinkedField } from "@/types/fields"
+import { getFieldDisplayName } from "@/lib/fields/display"
 
 interface KanbanViewProps {
   tableId: string
@@ -32,6 +33,7 @@ interface KanbanViewProps {
   colorField?: string // Field name to use for card colors (single-select field)
   imageField?: string // Field name to use for card images
   fitImageSize?: boolean // Whether to fit image to container size
+  showFieldLabels?: boolean // Whether to show field names above values on cards
   wrapText?: boolean // Whether to wrap long text in card cells (default true)
   blockConfig?: Record<string, any> // Block config for modal_fields
   /** Modal field list (from field_layout when available); same as Calendar/List for consistent modal editor */
@@ -64,6 +66,7 @@ function KanbanView({
   colorField,
   imageField,
   fitImageSize = false,
+  showFieldLabels = false,
   wrapText = true,
   blockConfig = {},
   modalFields,
@@ -562,19 +565,28 @@ function KanbanView({
                           return (
                             <div
                               key={fieldObj.id ?? fieldObj.name}
-                              className={`w-full min-w-0 rounded overflow-hidden bg-gray-100 ${!fitImageSize ? "flex-shrink-0" : ""}`}
-                              style={!fitImageSize ? { height: IMAGE_ROW_HEIGHT } : undefined}
+                              className="w-full min-w-0"
                               onClick={(e) => e.stopPropagation()}
                               onDoubleClick={(e) => e.stopPropagation()}
                             >
-                              <img
-                                src={imgSrc}
-                                alt=""
-                                className={`w-full ${fitImageSize ? "h-auto object-contain" : "h-28 object-cover"}`}
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).style.display = "none"
-                                }}
-                              />
+                              {showFieldLabels && (
+                                <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-0.5">
+                                  {getFieldDisplayName(fieldObj)}
+                                </div>
+                              )}
+                              <div
+                                className={`w-full min-w-0 rounded overflow-hidden bg-gray-100 ${!fitImageSize ? "flex-shrink-0" : ""}`}
+                                style={!fitImageSize ? { height: IMAGE_ROW_HEIGHT } : undefined}
+                              >
+                                <img
+                                  src={imgSrc}
+                                  alt=""
+                                  className={`w-full ${fitImageSize ? "h-auto object-contain" : "h-28 object-cover"}`}
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = "none"
+                                  }}
+                                />
+                              </div>
                             </div>
                           )
                         }
@@ -582,11 +594,17 @@ function KanbanView({
                         return (
                           <div
                             key={fieldObj.id ?? fieldObj.name}
-                            className={`flex items-center gap-1.5 min-w-0 ${isFirst ? "font-semibold text-sm text-gray-900" : "text-xs text-gray-600"}`}
+                            className={`flex flex-col gap-0.5 min-w-0 ${isFirst ? "font-semibold text-sm text-gray-900" : "text-xs text-gray-600"}`}
                             style={{ minHeight: rowH }}
                             onClick={(e) => e.stopPropagation()}
                             onDoubleClick={(e) => e.stopPropagation()}
                           >
+                            {showFieldLabels && (
+                              <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wide shrink-0">
+                                {getFieldDisplayName(fieldObj)}
+                              </div>
+                            )}
+                            <div className={`flex items-center gap-1.5 min-w-0 flex-1`}>
                             <div className={`flex-1 min-w-0 overflow-hidden ${isLongText ? "line-clamp-2" : "truncate"}`}>
                               <CellFactory
                                 field={fieldObj}
@@ -613,6 +631,7 @@ function KanbanView({
                                 <ChevronRight className="h-4 w-4" />
                               </button>
                             )}
+                            </div>
                           </div>
                         )
                       })}

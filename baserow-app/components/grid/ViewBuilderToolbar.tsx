@@ -1,9 +1,11 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
+import { supabase } from "@/lib/supabase/client"
+import { normalizeUuid } from "@/lib/utils/ids"
 import {
   Filter,
   ArrowUpDown,
@@ -35,6 +37,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/context-menu/ContextMenu"
 import UnifiedFilterDialog from "@/components/filters/UnifiedFilterDialog"
 import SortDialog from "./SortDialog"
 import GroupDialog from "./GroupDialog"
@@ -127,11 +135,41 @@ export default function ViewBuilderToolbar({
   const [hideFieldsDialogOpen, setHideFieldsDialogOpen] = useState(false)
   const [viewManagementDialogOpen, setViewManagementDialogOpen] = useState(false)
   const [viewManagementAction, setViewManagementAction] = useState<"rename" | "duplicate" | "delete" | null>(null)
+  const [editingViewId, setEditingViewId] = useState<string | null>(null)
+  const [inlineEditName, setInlineEditName] = useState("")
+  const inlineInputRef = useRef<HTMLInputElement>(null)
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "")
   const [debouncedQuery, setDebouncedQuery] = useState(searchQuery)
 
   const canEdit = userRole === "admin" || userRole === "editor"
   const canManageViews = userRole === "admin"
+
+  // Focus inline input when entering edit mode
+  useEffect(() => {
+    if (editingViewId && inlineInputRef.current) {
+      inlineInputRef.current.focus()
+      inlineInputRef.current.select()
+    }
+  }, [editingViewId])
+
+  async function saveInlineRename(viewIdToSave: string, newName: string) {
+    const trimmed = newName.trim()
+    if (!trimmed) {
+      setEditingViewId(null)
+      return
+    }
+    const viewUuid = normalizeUuid(viewIdToSave)
+    if (!viewUuid) return
+    try {
+      await supabase.from("views").update({ name: trimmed }).eq("id", viewUuid)
+      onViewAction?.("rename")
+      router.refresh()
+    } catch (error) {
+      console.error("Error renaming view:", error)
+      alert("Failed to rename view")
+    }
+    setEditingViewId(null)
+  }
 
   // Debounce search query (300ms)
   useEffect(() => {
@@ -198,16 +236,122 @@ export default function ViewBuilderToolbar({
             {views.length > 0 ? (
               views.map((v) => {
                 const isActive = v.id === viewId
-                return (
-                  <Link
-                    key={v.id}
-                    href={`/tables/${tableId}/views/${v.id}`}
-                    className={cn(
-                      "flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors -mb-[1px] shrink-0",
-                      isActive
-                        ? "border-blue-600 text-blue-600 bg-white"
-                        : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                const isEditing = editingViewId === v.id
+                const tabClassName = cn(
+                  "flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors -mb-[1px] shrink-0",
+                  isActive
+                    ? "border-blue-600 text-blue-600 bg-white"
+                    : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                )
+                const startInlineEdit = () => {
+                  setEditingViewId(v.id)
+                  setInlineEditName(v.name)
+                }
+                const tabContent = (
+                  <>
+                    <span className={cn("shrink-0", isActive && "text-blue-600")}>
+                      {getViewIcon(v.type as ViewType)}
+                    </span>
+                    {isEditing ? (
+                      <Input
+                        ref={inlineInputRef}
+                        value={inlineEditName}
+                        onChange={(e) => setInlineEditName(e.target.value)}
+                        onBlur={() => saveInlineRename(v.id, inlineEditName)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault()
+                            saveInlineRename(v.id, inlineEditName)
+                          } else if (e.key === "Escape") {
+                            setEditingViewId(null)
+                            setInlineEditName(v.name)
+                            inlineInputRef.current?.blur()
+                          }
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        onDoubleClick={(e) => e.stopPropagation()}
+                        className="h-6 min-w-[60px] max-w-[120px] text-sm px-1.5 py-0 border-blue-300 focus-visible:ring-1"
+                      />
+                    ) : (
+                      <span className="truncate max-w-[140px]">{v.name}</span>
                     )}
+                    {!isEditing && <span className="text-gray-400 text-xs capitalize shrink-0">({v.type})</span>}
+                  </>
+                )
+                if (isActive && canManageViews) {
+                  return (
+                    <ContextMenu key={v.id}>
+                      <ContextMenuTrigger asChild>
+                        <div
+                          role="tab"
+                          aria-selected="true"
+                          title="Double-click to rename, right-click for menu"
+                          className={tabClassName}
+                          onDoubleClick={(e) => {
+                            e.preventDefault()
+                            if (!isEditing) startInlineEdit()
+                          }}
+                        >
+                          {tabContent}
+                        </div>
+                      </ContextMenuTrigger>
+                      <ContextMenuContent>
+                        <ContextMenuItem onClick={startInlineEdit}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Rename
+                        </ContextMenuItem>
+                        <ContextMenuItem onClick={() => { setViewManagementAction("duplicate"); setViewManagementDialogOpen(true) }}>
+                          <Copy className="h-4 w-4 mr-2" />
+                          Duplicate View
+                        </ContextMenuItem>
+                        <ContextMenuItem onClick={() => onViewAction?.("setDefault")}>
+                          <Star className="h-4 w-4 mr-2" />
+                          Set as Default
+                        </ContextMenuItem>
+                        <ContextMenuItem
+                          onClick={() => { setViewManagementAction("delete"); setViewManagementDialogOpen(true) }}
+                          className="text-red-600 focus:text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete View
+                        </ContextMenuItem>
+                      </ContextMenuContent>
+                    </ContextMenu>
+                  )
+                }
+                const inactiveTabContent = isEditing ? (
+                  <div className={tabClassName} role="tab">
+                    <span className="shrink-0 text-blue-600">
+                      {getViewIcon(v.type as ViewType)}
+                    </span>
+                    <Input
+                      ref={inlineInputRef}
+                      value={inlineEditName}
+                      onChange={(e) => setInlineEditName(e.target.value)}
+                      onBlur={() => saveInlineRename(v.id, inlineEditName)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault()
+                          saveInlineRename(v.id, inlineEditName)
+                        } else if (e.key === "Escape") {
+                          setEditingViewId(null)
+                          setInlineEditName(v.name)
+                          inlineInputRef.current?.blur()
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      onDoubleClick={(e) => e.stopPropagation()}
+                      className="h-6 min-w-[60px] max-w-[120px] text-sm px-1.5 py-0 border-blue-300 focus-visible:ring-1"
+                    />
+                  </div>
+                ) : (
+                  <Link
+                    href={`/tables/${tableId}/views/${v.id}`}
+                    className={tabClassName}
+                    role="tab"
+                    aria-selected={isActive}
+                    onDoubleClick={canManageViews ? (e) => { e.preventDefault(); startInlineEdit() } : undefined}
+                    title={canManageViews ? "Double-click to rename, right-click for menu" : undefined}
                   >
                     <span className={cn("shrink-0", isActive && "text-blue-600")}>
                       {getViewIcon(v.type as ViewType)}
@@ -215,6 +359,36 @@ export default function ViewBuilderToolbar({
                     <span className="truncate max-w-[140px]">{v.name}</span>
                     <span className="text-gray-400 text-xs capitalize shrink-0">({v.type})</span>
                   </Link>
+                )
+                return (
+                  <ContextMenu key={v.id}>
+                    <ContextMenuTrigger asChild>
+                      {inactiveTabContent}
+                    </ContextMenuTrigger>
+                    {canManageViews && (
+                      <ContextMenuContent>
+                        <ContextMenuItem onClick={startInlineEdit}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Rename
+                        </ContextMenuItem>
+                        <ContextMenuItem onClick={() => { setViewManagementAction("duplicate"); setViewManagementDialogOpen(true) }}>
+                          <Copy className="h-4 w-4 mr-2" />
+                          Duplicate View
+                        </ContextMenuItem>
+                        <ContextMenuItem onClick={() => onViewAction?.("setDefault")}>
+                          <Star className="h-4 w-4 mr-2" />
+                          Set as Default
+                        </ContextMenuItem>
+                        <ContextMenuItem
+                          onClick={() => { setViewManagementAction("delete"); setViewManagementDialogOpen(true) }}
+                          className="text-red-600 focus:text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete View
+                        </ContextMenuItem>
+                      </ContextMenuContent>
+                    )}
+                  </ContextMenu>
                 )
               })
             ) : (

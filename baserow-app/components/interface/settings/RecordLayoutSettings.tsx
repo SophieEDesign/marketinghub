@@ -48,6 +48,7 @@ import { getFieldDisplayName } from "@/lib/fields/display"
 import { getFieldIcon } from "@/lib/icons"
 import { getPrimaryFieldName } from "@/lib/fields/primary"
 import { cn } from "@/lib/utils"
+import ModalFieldsSelector from "./shared/ModalFieldsSelector"
 
 interface RecordLayoutSettingsProps {
   tableId: string
@@ -471,147 +472,172 @@ export default function RecordLayoutSettings({
         </div>
       )}
 
-      {/* Fields - Airtable-style: N visible + gear to expand/collapse */}
-      <div className="p-4 border-b border-gray-200">
-        <div className="flex items-center justify-between gap-2">
-          <Label className="text-sm font-medium text-gray-700">
-            {hasPageConfig ? "Fields to show in right panel" : "Fields to show in record modal"}
-          </Label>
-          <button
-            type="button"
-            onClick={() => setFieldsExpanded((e) => !e)}
-            className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-gray-100 text-sm text-gray-600"
-            title={fieldsExpanded ? "Collapse field list" : "Expand field list"}
-          >
-            <span>{visibleItems.length} visible</span>
-            <Settings2 className="h-4 w-4 text-gray-500" />
-            {fieldsExpanded ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
-          </button>
-        </div>
-        {fieldsExpanded && (
-          <>
-            <p className="text-xs text-gray-500 mt-1 mb-3">
-              {hasPageConfig
-                ? "Visible and hidden fields for the record detail panel. Drag to reorder. Use the eye icon to show or hide. When Editable is selected, use the pencil icon to toggle inline editing per field."
-                : "Choose which fields appear when opening a record. Drag to reorder. Use the eye icon to show or hide each field."}
-            </p>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Find a field..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-9 bg-gray-50 border-gray-200"
-              />
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Visible & Hidden sections - only when fields expanded */}
-      {fieldsExpanded && (
-      <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4">
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext
-            items={draftLayout.map((i) => i.field_id)}
-            strategy={verticalListSortingStrategy}
-          >
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-gray-700">Visible</p>
-                {visibleItems.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleHideAll}
-                    className="text-xs text-blue-600 hover:underline"
-                  >
-                    Hide all
-                  </button>
-                )}
-              </div>
-
-              {/* Record comments - special row */}
-              {(!searchQuery ||
-                "record comments".includes(searchQuery.toLowerCase())) && (
-                <div className="flex items-center gap-2 py-2 px-3 rounded-md border border-gray-200 bg-white mb-2">
-                  <div className="w-4 flex-shrink-0" />
-                  <MessageSquare className="h-3.5 w-3.5 text-gray-500 flex-shrink-0" />
-                  <span className="flex-1 text-sm font-medium text-gray-900">
-                    Record comments
-                  </span>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                {visibleItems.map((item) => {
-                  const field =
-                    fieldMap.get(item.field_name) ||
-                    fields.find((f) => f.id === item.field_id)
-                  if (!field) return null
-                  return (
-                    <SortableFieldRow
-                      key={item.field_id}
-                      item={item}
-                      field={field}
-                      onVisibilityToggle={handleVisibilityToggle}
-                      onEditableToggle={handleEditableToggle}
-                      visible={true}
-                      searchQuery={searchQuery}
-                      isHiddenSection={false}
-                      showEditableToggle={hasPageConfig && allowEditing}
-                    />
+      {/* Fields - for record_context (right panel): ModalFieldsSelector style. For modal: Airtable-style visible/hidden. */}
+      {hasPageConfig ? (
+        <div className="flex-1 overflow-y-auto min-h-0 p-4">
+          <ModalFieldsSelector
+            value={
+              visibleItems.length === 0 || visibleItems.length >= fields.filter((f) => !f.options?.system).length
+                ? []
+                : visibleItems
+                    .sort((a, b) => a.order - b.order)
+                    .map((i) => i.field_name)
+            }
+            onChange={(fieldNames) => {
+              const layoutByField = new Map(draftLayout.map((i) => [i.field_name, i]))
+              const visibleSet = new Set(fieldNames)
+              const newLayout: FieldLayoutItem[] = []
+              fieldNames.forEach((name, i) => {
+                const existing = layoutByField.get(name)
+                const field = fieldMap.get(name) || fields.find((f) => f.name === name)
+                if (field) {
+                  newLayout.push(
+                    existing
+                      ? { ...existing, order: i, visible_in_canvas: true, visible_in_modal: true }
+                      : {
+                          field_id: field.id,
+                          field_name: field.name,
+                          order: i,
+                          editable: true,
+                          visible_in_canvas: true,
+                          visible_in_modal: true,
+                        }
                   )
-                })}
-              </div>
+                }
+              })
+              fields
+                .filter((f) => !f.options?.system && !visibleSet.has(f.name))
+                .forEach((f, i) => {
+                  const existing = layoutByField.get(f.name)
+                  newLayout.push(
+                    existing
+                      ? { ...existing, order: newLayout.length + i, visible_in_canvas: false, visible_in_modal: false }
+                      : {
+                          field_id: f.id,
+                          field_name: f.name,
+                          order: newLayout.length + i,
+                          editable: true,
+                          visible_in_canvas: false,
+                          visible_in_modal: false,
+                        }
+                  )
+                })
+              setDraftLayout(newLayout)
+              setLiveLayout(newLayout)
+              void onLayoutSave?.(newLayout)
+            }}
+            fields={fields}
+            label="Fields to show in right panel"
+            description="Choose which fields appear in the record detail panel. Add fields from the dropdown, drag to reorder. Leave empty to show all fields."
+          />
+        </div>
+      ) : (
+        <>
+          <div className="p-4 border-b border-gray-200">
+            <div className="flex items-center justify-between gap-2">
+              <Label className="text-sm font-medium text-gray-700">Fields to show in record modal</Label>
+              <button
+                type="button"
+                onClick={() => setFieldsExpanded((e) => !e)}
+                className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-gray-100 text-sm text-gray-600"
+                title={fieldsExpanded ? "Collapse field list" : "Expand field list"}
+              >
+                <span>{visibleItems.length} visible</span>
+                <Settings2 className="h-4 w-4 text-gray-500" />
+                {fieldsExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </button>
             </div>
-
-            {/* Hidden section */}
-            {hiddenItems.length > 0 && (
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-medium text-gray-700">Hidden</p>
-                  <button
-                    type="button"
-                    onClick={handleShowAll}
-                    className="text-xs text-blue-600 hover:underline"
-                  >
-                    Show all
-                  </button>
+            {fieldsExpanded && (
+              <>
+                <p className="text-xs text-gray-500 mt-1 mb-3">
+                  Choose which fields appear when opening a record. Drag to reorder. Use the eye icon to show or hide each field.
+                </p>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Find a field..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 h-9 bg-gray-50 border-gray-200"
+                  />
                 </div>
-                <div className="space-y-2">
-                  {hiddenItems.map((item) => {
-                    const field =
-                      fieldMap.get(item.field_name) ||
-                      fields.find((f) => f.id === item.field_id)
-                    if (!field) return null
-                    return (
-                      <SortableFieldRow
-                        key={item.field_id}
-                        item={item}
-                        field={field}
-                        onVisibilityToggle={handleVisibilityToggle}
-                        onEditableToggle={handleEditableToggle}
-                        visible={false}
-                        searchQuery={searchQuery}
-                        isHiddenSection={true}
-                        showEditableToggle={hasPageConfig && allowEditing}
-                      />
-                    )
-                  })}
-                </div>
-              </div>
+              </>
             )}
-          </SortableContext>
-        </DndContext>
-      </div>
+          </div>
+          {fieldsExpanded && (
+            <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4">
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={draftLayout.map((i) => i.field_id)} strategy={verticalListSortingStrategy}>
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-medium text-gray-700">Visible</p>
+                      {visibleItems.length > 0 && (
+                        <button type="button" onClick={handleHideAll} className="text-xs text-blue-600 hover:underline">
+                          Hide all
+                        </button>
+                      )}
+                    </div>
+                    {(!searchQuery || "record comments".includes(searchQuery.toLowerCase())) && (
+                      <div className="flex items-center gap-2 py-2 px-3 rounded-md border border-gray-200 bg-white mb-2">
+                        <div className="w-4 flex-shrink-0" />
+                        <MessageSquare className="h-3.5 w-3.5 text-gray-500 flex-shrink-0" />
+                        <span className="flex-1 text-sm font-medium text-gray-900">Record comments</span>
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      {visibleItems.map((item) => {
+                        const field = fieldMap.get(item.field_name) || fields.find((f) => f.id === item.field_id)
+                        if (!field) return null
+                        return (
+                          <SortableFieldRow
+                            key={item.field_id}
+                            item={item}
+                            field={field}
+                            onVisibilityToggle={handleVisibilityToggle}
+                            onEditableToggle={handleEditableToggle}
+                            visible={true}
+                            searchQuery={searchQuery}
+                            isHiddenSection={false}
+                            showEditableToggle={false}
+                          />
+                        )
+                      })}
+                    </div>
+                  </div>
+                  {hiddenItems.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-sm font-medium text-gray-700">Hidden</p>
+                        <button type="button" onClick={handleShowAll} className="text-xs text-blue-600 hover:underline">
+                          Show all
+                        </button>
+                      </div>
+                      <div className="space-y-2">
+                        {hiddenItems.map((item) => {
+                          const field = fieldMap.get(item.field_name) || fields.find((f) => f.id === item.field_id)
+                          if (!field) return null
+                          return (
+                            <SortableFieldRow
+                              key={item.field_id}
+                              item={item}
+                              field={field}
+                              onVisibilityToggle={handleVisibilityToggle}
+                              onEditableToggle={handleEditableToggle}
+                              visible={false}
+                              searchQuery={searchQuery}
+                              isHiddenSection={true}
+                              showEditableToggle={false}
+                            />
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </SortableContext>
+              </DndContext>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

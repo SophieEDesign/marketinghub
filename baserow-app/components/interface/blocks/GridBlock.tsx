@@ -922,6 +922,7 @@ export default function GridBlock({
             colorField={appearance.color_field}
             imageField={appearance.image_field}
             fitImageSize={appearance.fit_image_size}
+            showFieldLabels={(appearance as any)?.kanban_show_field_labels === true}
             blockConfig={config}
             modalFields={modalFieldsForRecord}
             onRecordClick={onRecordClick}

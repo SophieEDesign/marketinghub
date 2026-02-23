@@ -2534,22 +2534,40 @@ export default function Canvas({
                 isRail ? (
                   <div className="flex h-full w-full overflow-hidden">
                     <div className="h-full overflow-hidden border-r flex flex-col relative" style={{ width: fullPageDef?.fullPageMaxWidth ?? 360 }}>
-                      {isEditing && onConfigureLeftPanel && fullPageBlock.type === "record_context" && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            onConfigureLeftPanel()
-                          }}
-                          className="absolute top-2 left-2 z-10 p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900 transition-colors shadow-sm flex items-center gap-1.5 text-xs"
-                          title="Configure left panel (record list, card fields)"
-                        >
-                          <Settings2 className="h-4 w-4" />
-                          <span>Left panel</span>
-                        </button>
+                      {isEditing && fullPageBlock.type === "record_context" && (
+                        <div className="absolute top-2 left-2 z-10 flex items-center gap-1">
+                          {onConfigureLeftPanel && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onConfigureLeftPanel()
+                              }}
+                              className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900 transition-colors shadow-sm flex items-center gap-1.5 text-xs"
+                              title="Configure left panel (record list, card fields)"
+                            >
+                              <Settings2 className="h-4 w-4" />
+                              <span>Left panel</span>
+                            </button>
+                          )}
+                          {onShowRecordSettings && recordId && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onShowRecordSettings()
+                              }}
+                              className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900 transition-colors shadow-sm flex items-center gap-1.5 text-xs"
+                              title="Configure right panel (fields to show in record detail)"
+                            >
+                              <Settings2 className="h-4 w-4" />
+                              <span>Right panel</span>
+                            </button>
+                          )}
+                        </div>
                       )}
                       <BlockAppearanceWrapper block={fullPageBlock} isFullPage isRail className={isEditing ? "pointer-events-auto" : ""}>
-                        <div className={`h-full w-full overflow-hidden ${isEditing && onConfigureLeftPanel && fullPageBlock.type === "record_context" ? "pt-10" : ""}`}>
+                        <div className={`h-full w-full overflow-hidden ${isEditing && fullPageBlock.type === "record_context" ? "pt-10" : ""}`}>
                           <BlockRenderer
                             block={fullPageBlock}
                             isEditing={isEditing && !fullPageBlock.config?.locked}

@@ -451,6 +451,7 @@ export default function AirtableViewPage({
             viewSorts={sorts}
             kanbanGroupField={kanbanGroupField}
             cardFields={cardFields}
+            showFieldLabels={(view.config as { kanban_show_field_labels?: boolean })?.kanban_show_field_labels === true}
             userRole={userRole}
           />
         ) : null}
