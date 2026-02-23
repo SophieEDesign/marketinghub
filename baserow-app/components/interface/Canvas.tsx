@@ -2535,12 +2535,10 @@ export default function Canvas({
             </div>
             
             {/* Block Content - ALWAYS visible; never conditional on isEditing. No transition/willChange - immediate paint. */}
-            {/* overflow-hidden in both modes for most blocks: prevents layout shift; filter/text get special handling */}
+            {/* overflow-hidden for all blocks: single scroll per surface (Canvas/InterfaceContainer) */}
             <div
-              className={`block-content h-full w-full min-h-0 rounded-lg ${block.config?.locked ? 'pointer-events-none opacity-75' : ''} ${
+              className={`block-content h-full w-full min-h-0 min-w-0 rounded-lg ${block.config?.locked ? 'pointer-events-none opacity-75' : ''} ${
                 block.type === 'field' ? 'overflow-visible' :
-                block.type === 'filter' ? 'overflow-hidden' :
-                block.type === 'text' ? 'overflow-auto' :
                 'overflow-hidden'
               }`}
               data-block-id={block.id}

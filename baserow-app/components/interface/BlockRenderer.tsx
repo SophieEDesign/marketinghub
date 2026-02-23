@@ -640,7 +640,7 @@ export default function BlockRenderer({
 
   return (
     <ErrorBoundary>
-      <div className="relative h-full w-full">
+      <div className="relative h-full w-full min-w-0 min-h-0">
         {/* Filter indicator - always mount, visibility toggled by isEditing for mount stability */}
         {filterBlockSources.length > 0 && (
           <div

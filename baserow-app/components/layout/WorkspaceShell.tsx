@@ -202,8 +202,8 @@ function ShellContent({
       />
       {/* MainArea: InterfaceContainer + RecordPanel (inline) + RightSettingsPanel (edit mode only) */}
       <div className="flex flex-1 min-w-0 overflow-hidden">
-        {/* InterfaceContainer - flex-1 fills remaining space; w-full when panels unmounted */}
-        <div className="flex flex-1 flex flex-col min-w-0 overflow-hidden w-full">
+        {/* InterfaceContainer - flex-1 fills remaining space; w-full when panels unmounted; contain for layout stability */}
+        <div className="flex flex-1 flex flex-col min-w-0 overflow-hidden w-full" style={{ contain: 'layout style paint' }}>
           {!hideTopbar && (
             <Topbar
               title={title}

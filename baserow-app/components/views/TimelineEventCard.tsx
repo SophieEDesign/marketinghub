@@ -123,7 +123,7 @@ export default function TimelineEventCard({
             />
           )}
 
-          <div className="flex-1 min-w-0 text-xs font-medium truncate">
+          <div className="flex-1 min-w-0 text-xs font-medium truncate whitespace-nowrap">
             {title || "—"}
           </div>
 

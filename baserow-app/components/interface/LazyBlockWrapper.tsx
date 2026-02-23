@@ -115,7 +115,7 @@ export default function LazyBlockWrapper({
   return (
     <div
       ref={containerRef}
-      className="h-full w-full"
+      className="h-full w-full min-w-0 min-h-0"
       // Removed minHeight - height must be derived from content, not fixed
       aria-hidden="true"
     />

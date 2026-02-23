@@ -57,17 +57,14 @@ export default function CalendarAnchorControls({
   ]
 
   return (
-    <div className={compact ? "flex items-center gap-1.5 flex-wrap" : "flex items-center gap-2 flex-wrap"}>
-      {compact && (
-        <span className="text-xs text-gray-500 mr-0.5">Go to:</span>
-      )}
+    <div className={compact ? "flex items-center gap-1 flex-wrap" : "flex items-center gap-2 flex-wrap"}>
       {presets.map((preset) => (
         <Button
           key={preset}
-          variant="outline"
+          variant="ghost"
           size="sm"
           disabled={disabled}
-          className={compact ? "text-xs h-7 px-2" : "text-xs h-7"}
+          className={compact ? "text-xs h-7 px-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100" : "text-xs h-7"}
           onClick={() => onScrollToDate(getTargetDateForPreset(preset))}
         >
           {PRESET_LABELS[preset]}

@@ -1308,17 +1308,20 @@ export default function GridBlock({
         const compactBar = true
 
         return (
-          <div className="flex items-center gap-3 flex-shrink-0 py-2 px-2 border-b border-gray-200/80 bg-white/95 min-h-0 overflow-x-auto min-w-0">
-            <div className="flex items-center gap-2 flex-1 min-w-0 flex-wrap">
+          <div className="flex items-center gap-3 flex-shrink-0 py-2.5 px-4 border-b border-gray-200/80 bg-white min-h-0 overflow-x-auto min-w-0">
+            <div className="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
               {showQuickFilters && (
                 <QuickFilterBar
                   storageKey={`mh:quickFilters:${pageId || "page"}:${block.id}`}
                   tableFields={safeTableFields}
                   viewDefaultFilters={viewDefaultFilters}
                   onChange={setUserQuickFilters}
+                  compact
                 />
               )}
-
+              {showQuickFilters && hasAnyDateField && (
+                <div className="h-5 w-px bg-gray-200 flex-shrink-0" aria-hidden />
+              )}
               {hasAnyDateField && (
                 <CalendarAnchorControls
                   onScrollToDate={(date) => calendarScrollRef.current?.scrollToDate(date)}
@@ -1326,22 +1329,21 @@ export default function GridBlock({
                   compact={compactBar}
                 />
               )}
-
-              {showAddRecord && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={handleAddRecord}
-                  disabled={isAddRecordDisabled}
-                  title={!canCreateRecord ? "Adding records is disabled for this block" : "Add a new record"}
-                  className="h-8 text-xs flex-shrink-0"
-                >
-                  <Plus className="h-3.5 w-3 mr-1.5" />
-                  Add record
-                </Button>
-              )}
             </div>
+            {showAddRecord && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={handleAddRecord}
+                disabled={isAddRecordDisabled}
+                title={!canCreateRecord ? "Adding records is disabled for this block" : "Add a new record"}
+                className="h-8 text-xs flex-shrink-0"
+              >
+                <Plus className="h-3.5 w-3 mr-1.5" />
+                Add record
+              </Button>
+            )}
           </div>
         )
       })()}

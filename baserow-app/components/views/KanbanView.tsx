@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useState, useEffect, useMemo, useCallback, memo } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
@@ -53,7 +53,7 @@ interface KanbanViewProps {
   onModalLayoutSave?: (fieldLayout: import("@/lib/interface/field-layout-utils").FieldLayoutItem[]) => void
 }
 
-export default function KanbanView({ 
+function KanbanView({ 
   tableId, 
   viewId, 
   groupingFieldId, 
@@ -483,7 +483,7 @@ export default function KanbanView({
             groupName
           const headerColor = getColumnHeaderColor(groupName)
           return (
-          <div key={groupName} className="flex-shrink-0 w-80">
+          <div key={groupName} className="flex-shrink-0 w-[320px] min-w-[280px] max-w-[340px]">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 mb-3">
               <div className="flex items-center gap-2 flex-wrap">
                 {headerColor ? (
@@ -533,20 +533,20 @@ export default function KanbanView({
                   return (
                 <Card 
                   key={row.id} 
-                  className={`hover:shadow-md transition-shadow bg-white border-gray-200 rounded-lg cursor-default min-w-0 ${
+                  className={`h-[120px] overflow-hidden hover:shadow-md transition-shadow bg-white border-gray-200 rounded-lg cursor-default min-w-0 ${
                     selectedCardId === String(row.id) ? "ring-1 ring-blue-400/40 bg-blue-50/30" : ""
                   }`}
                   style={{ ...borderColor, ...rowFormattingStyle }}
                   onClick={() => setSelectedCardId(String(row.id))}
                   onDoubleClick={() => row.id != null && handleOpenRecord(String(row.id))}
                 >
-                  <CardContent className="p-3 min-w-0">
-                    <div className="space-y-2 min-w-0">
+                  <CardContent className="p-3 min-w-0 h-full flex flex-col justify-between min-h-0">
+                    <div className="space-y-2 min-w-0 flex-1 flex flex-col justify-between min-h-0 overflow-hidden">
                       {/* Title row: primary value + open button (Airtable-style) */}
                       <div className="flex items-start gap-1.5 min-w-0">
                         {titleField && (
                           <div
-                            className="flex-1 min-w-0 line-clamp-2 overflow-hidden font-semibold text-sm text-gray-900 leading-tight"
+                            className="flex-1 min-w-0 truncate whitespace-nowrap overflow-hidden font-semibold text-sm text-gray-900 leading-tight"
                             onClick={(e) => e.stopPropagation()}
                             onDoubleClick={(e) => e.stopPropagation()}
                           >
@@ -590,9 +590,9 @@ export default function KanbanView({
                         </div>
                       )}
 
-                      {/* Category/Date pills - stacked vertically for neat layout */}
+                      {/* Category/Date pills - single row, no wrap */}
                       {pillMetaFields.length > 0 && (
-                        <div className="flex flex-col gap-1 min-w-0" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+                        <div className="flex flex-nowrap gap-1.5 overflow-hidden min-w-0" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
                           {pillMetaFields.map((fieldObj) => {
                             const isVirtual = fieldObj.type === "formula" || fieldObj.type === "lookup"
                             const isSelect = fieldObj.type === "single_select" || fieldObj.type === "multi_select"
@@ -604,10 +604,10 @@ export default function KanbanView({
                               ? normalizeHexColor(resolveChoiceColor(String(rawVal).trim(), fieldObj.type as "single_select" | "multi_select", fieldObj.options, true))
                               : null
                             return (
-                              <div key={fieldObj.id ?? fieldObj.name} className="min-w-0 max-w-full">
+                              <div key={fieldObj.id ?? fieldObj.name} className="min-w-0 shrink-0 max-w-[80px]">
                                 {isSelect && pillColor && pillLabel ? (
                                   <span
-                                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white break-words max-w-full"
+                                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white truncate max-w-full shrink-0"
                                     style={{ backgroundColor: pillColor }}
                                     title={pillLabel}
                                   >
@@ -633,7 +633,7 @@ export default function KanbanView({
 
                       {/* Content preview (larger, 2-3 lines) - leave blank when empty */}
                       {contentField && data[contentField.name] != null && String(data[contentField.name]).trim() !== "" ? (
-                        <div className="text-sm text-gray-600 line-clamp-3 min-w-0" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+                        <div className="text-sm text-gray-600 truncate whitespace-nowrap min-w-0" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
                           <CellFactory
                             field={contentField}
                             value={data[contentField.name]}
@@ -678,3 +678,4 @@ export default function KanbanView({
   )
 }
 
+export default memo(KanbanView)

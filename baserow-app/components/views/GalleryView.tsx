@@ -535,7 +535,7 @@ export default function GalleryView({
           <CardContent className="p-4 space-y-2">
             <div className="flex items-start justify-between gap-2">
               <div
-                className="min-w-0 flex-1 text-sm font-semibold text-gray-900 line-clamp-2"
+                className="min-w-0 flex-1 text-sm font-semibold text-gray-900 truncate whitespace-nowrap"
                 onDoubleClick={(e) => e.stopPropagation()}
               >
                 {titleFieldObj ? (

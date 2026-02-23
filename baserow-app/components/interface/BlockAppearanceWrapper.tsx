@@ -70,7 +70,7 @@ export default function BlockAppearanceWrapper({
   }
 
   return (
-    <div className={cn(containerClasses, accentBorder, className, "w-full flex flex-col min-h-0")}>
+    <div className={cn(containerClasses, accentBorder, className, "w-full flex flex-col min-h-0 min-w-0")}>
       {/* Header with title */}
       {showTitle && (
         <>

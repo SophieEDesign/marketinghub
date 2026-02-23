@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useRef, useCallback } from "react"
+import { useState, useEffect, useMemo, useRef, useCallback, memo } from "react"
 import { format } from "date-fns"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
@@ -76,7 +76,7 @@ interface TimelineEvent {
   groupValue?: string | null
 }
 
-export default function TimelineView({
+function TimelineView({
   tableId,
   viewId,
   startDateFieldId,
@@ -1464,7 +1464,7 @@ export default function TimelineView({
   }
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full min-h-0 bg-white">
       {/* Toolbar */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
         <div className="flex items-center gap-2">
@@ -1493,7 +1493,7 @@ export default function TimelineView({
       </div>
 
       {/* Timeline */}
-      <div className="flex-1 overflow-auto relative" ref={timelineRef}>
+      <div className="flex-1 min-h-0 overflow-auto relative" ref={timelineRef}>
         <div className="relative" style={{ minHeight: "100%", padding: "20px" }}>
           {/* Time labels */}
           <div className="sticky top-0 bg-white z-10 border-b border-gray-200 pb-2 mb-4">
@@ -1603,7 +1603,7 @@ export default function TimelineView({
                       }
 
                 return (
-                  <div key={groupKey} className={rowSizeSpacing.laneSpacing}>
+                  <div key={groupKey} className={`${rowSizeSpacing.laneSpacing} ${compactMode ? 'min-h-[28px]' : 'min-h-[40px]'}`}>
                     {/* Group header */}
                     <div 
                       className="sticky top-12 z-5 border-b pb-1 mb-2 px-2 py-1 rounded"
@@ -1770,6 +1770,8 @@ export default function TimelineView({
     </div>
   )
 }
+
+export default memo(TimelineView)
 
 // Helper functions (getColorForValue removed - using centralized color system)
 

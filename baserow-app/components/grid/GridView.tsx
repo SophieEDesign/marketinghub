@@ -3100,7 +3100,7 @@ export default function GridView({
   return (
     <div 
       ref={contentRef}
-      className="w-full h-full flex flex-col relative" 
+      className="w-full h-full flex flex-col relative min-h-0 min-w-0" 
       style={{ paddingBottom: isEditing ? '60px' : '0' }}
     >
       {/* Toolbar - Only show builder controls in edit mode */}

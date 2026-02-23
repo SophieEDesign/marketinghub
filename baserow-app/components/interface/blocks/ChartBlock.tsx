@@ -520,7 +520,7 @@ export default function ChartBlock({
     const totalCount = categoricalData.reduce((sum, item) => sum + item.count, 0)
 
     return (
-      <div className="h-full w-full p-4 overflow-auto">
+      <div className="h-full w-full p-4 overflow-hidden">
         <div className="space-y-3">
           {categoricalData.map((item) => {
             const bgColor = normalizeHexColor(item.color)
@@ -796,7 +796,7 @@ export default function ChartBlock({
 
   return (
     <div 
-      className={`h-full w-full overflow-auto flex flex-col ${clickThrough && !isEditing ? 'cursor-pointer' : ''}`}
+      className={`h-full w-full overflow-hidden flex flex-col ${clickThrough && !isEditing ? 'cursor-pointer' : ''}`}
       style={blockStyle}
     >
       {showTitle && (

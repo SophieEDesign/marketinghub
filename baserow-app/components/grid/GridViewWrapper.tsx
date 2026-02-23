@@ -846,7 +846,7 @@ export default function GridViewWrapper({
   const showSort = showToolbar && appearance.show_sort !== false
 
   return (
-    <div className="w-full h-full flex flex-col">
+    <div className="w-full h-full flex flex-col min-w-0">
       {/* Show toolbar based on appearance settings */}
       {showToolbar && (
         <div className="flex-shrink-0">
@@ -871,7 +871,7 @@ export default function GridViewWrapper({
           />
         </div>
       )}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 min-w-0">
         <GridView
         tableId={tableId}
         viewId={viewId}

@@ -101,6 +101,8 @@ export interface QuickFilterBarProps {
   viewDefaultFilters: FilterConfig[]
   /** Emit active user quick filters (as FilterConfig[]) */
   onChange: (userQuickFilters: FilterConfig[]) => void
+  /** When true, use compact padding (e.g. in calendar header) */
+  compact?: boolean
 }
 
 export default function QuickFilterBar({
@@ -108,6 +110,7 @@ export default function QuickFilterBar({
   tableFields,
   viewDefaultFilters,
   onChange,
+  compact = false,
 }: QuickFilterBarProps) {
   const quickableFields = useMemo(() => getQuickableFields(tableFields), [tableFields])
 
@@ -209,7 +212,7 @@ export default function QuickFilterBar({
   }
 
   return (
-    <div className="flex items-center gap-2 flex-wrap py-2">
+    <div className={`flex items-center gap-2 flex-wrap ${compact ? "py-0.5" : "py-2"}`}>
       {items.map((item) => {
         const field = fieldsByName.get(item.field)
         if (!field) return null

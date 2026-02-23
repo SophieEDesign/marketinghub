@@ -637,8 +637,8 @@ export default function HorizontalGroupedView({
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <Tabs value={activeTab ?? ""} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+    <div className="flex flex-col h-full min-h-0">
+      <Tabs value={activeTab ?? ""} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
         <div className="border-b bg-background px-4">
           <TabsList className="w-full justify-start h-auto p-0 bg-transparent">
             {groups.map((group) => {
@@ -700,7 +700,7 @@ export default function HorizontalGroupedView({
           </TabsList>
         </div>
 
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 min-h-0 overflow-auto">
           {groups.map((group) => (
             <TabsContent
               key={group.key}

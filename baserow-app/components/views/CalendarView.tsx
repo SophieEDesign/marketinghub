@@ -1548,24 +1548,28 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
 
   // Custom views for 4, 6, or 8 weeks (Airtable-style)
   // dateAlignment: 'week' ensures each view starts on a week boundary (Monday with firstDay: 1)
+  // aspectRatio per view: smaller = taller. 4 weeks fits screen; 8 weeks needs more height.
   const calendarViews = useMemo(
     () => ({
       dayGridWeek4: {
         type: "dayGrid" as const,
         duration: { weeks: 4 },
         dateAlignment: "week" as const,
+        aspectRatio: 1.5,
         buttonText: "4 weeks",
       },
       dayGridWeek6: {
         type: "dayGrid" as const,
         duration: { weeks: 6 },
         dateAlignment: "week" as const,
+        aspectRatio: 1.0,
         buttonText: "6 weeks",
       },
       dayGridWeek8: {
         type: "dayGrid" as const,
         duration: { weeks: 8 },
         dateAlignment: "week" as const,
+        aspectRatio: 0.65,
         buttonText: "8 weeks",
       },
     }),
@@ -1577,6 +1581,9 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
     if (visibleWeekSpan === 8) return "dayGridWeek8"
     return "dayGridWeek6"
   }, [visibleWeekSpan])
+
+  // Default aspect ratio (overridden per-view in calendarViews)
+  const calendarAspectRatio = 1.2
 
   // FullCalendar: use stable plugins array (defined at module level to prevent React #185)
   const calendarHeaderToolbar = useMemo(
@@ -1696,7 +1703,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
         )}
         <div className="min-w-0 flex-1 overflow-hidden">
           <div className="flex flex-col gap-0.5 min-w-0 leading-tight">
-            <div className="line-clamp-1 text-[11px] font-medium">
+            <div className="truncate whitespace-nowrap text-[11px] font-medium">
               {titleField ? (
                 <TimelineFieldValue
                   field={titleField}
@@ -1708,41 +1715,6 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
                 String(eventInfo.event.title || "Untitled")
               )}
             </div>
-            {cardFields.length > 0 && (
-              <div className="flex flex-wrap items-center gap-x-1 gap-y-0 text-[10px] opacity-90 min-w-0">
-                {cardFields.slice(0, 2).map((f: { field: TableField; value: unknown }, idx: number) => {
-                  try {
-                    if (!f || typeof f !== 'object') {
-                      if (process.env.NODE_ENV === 'development') {
-                        console.warn(`[CalendarView] Invalid card field in JSX at index ${idx}:`, f)
-                      }
-                      return null
-                    }
-                    const field = f?.field ? (f.field as TableField) : null
-                    const value = f?.value
-                    const valueLabelMap = field
-                      ? (stableLinkedValueLabelMaps[field.name] || stableLinkedValueLabelMaps[field.id])
-                      : undefined
-                    return (
-                      <span key={`${eventInfo.event.id}-cf-${field?.id ?? field?.name ?? idx}`} className="truncate inline-flex items-center shrink-0 max-w-full">
-                        {idx > 0 && <span className="text-gray-500 mr-1">·</span>}
-                        <CalendarEventCardField
-                          field={field}
-                          value={value}
-                          valueLabelMap={valueLabelMap}
-                          compact={true}
-                        />
-                      </span>
-                    )
-                  } catch (err) {
-                    if (process.env.NODE_ENV === 'development') {
-                      console.error(`[CalendarView] Error rendering card field at index ${idx}:`, err, f)
-                    }
-                    return null
-                  }
-                })}
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -2037,7 +2009,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
       {/* Scroll container: stable ref for anchor scrolling; overflow-auto so wide calendar can scroll horizontally */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 min-h-0 min-w-0 overflow-auto p-4 bg-white"
+        className="flex-1 min-h-0 min-w-0 overflow-auto px-4 py-3 bg-white"
       >
         {/* CRITICAL: Only render FullCalendar after mount to prevent hydration mismatch (React error #185) */}
         {mounted ? (
@@ -2052,7 +2024,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
             initialDate={calendarInitialDate}
             views={calendarViews}
             height="auto"
-            aspectRatio={1.4}
+            aspectRatio={calendarAspectRatio}
             expandRows={true}
             dayMaxEvents={2}
             moreLinkClick="popover"

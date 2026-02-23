@@ -705,7 +705,7 @@ function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
-      className="flex-shrink-0 w-80 bg-gray-50 rounded-lg flex flex-col h-full max-h-full border border-gray-200"
+      className="flex-shrink-0 w-[320px] min-w-[280px] max-w-[340px] bg-gray-50 rounded-lg flex flex-col h-full max-h-full border border-gray-200"
       data-column-id={column.id}
     >
       {/* Column Header */}
@@ -731,7 +731,7 @@ function KanbanColumn({
 
       {/* Cards */}
       {!isCollapsed && (
-        <div className="flex-1 px-3 py-3 overflow-y-auto min-h-0">
+        <div className="flex-1 px-3 py-3 overflow-hidden min-h-0">
           <SortableContext items={rows.map((r) => r.id)} strategy={verticalListSortingStrategy}>
             <div className="space-y-3">
               {rows.length === 0 ? (
@@ -819,7 +819,7 @@ function KanbanCard({ row, displayFields, tableFields, selected, onSelect, onOpe
     <Card
       ref={setNodeRef}
       style={style}
-      className={`group hover:shadow-md transition-all duration-200 bg-white border border-gray-200 rounded-lg shadow-sm cursor-default ${
+      className={`h-[120px] overflow-hidden group hover:shadow-md transition-all duration-200 bg-white border border-gray-200 rounded-lg shadow-sm cursor-default ${
         selected ? "ring-2 ring-blue-400/50 bg-blue-50/40" : ""
       }`}
       onClick={() => onSelect()}
@@ -831,8 +831,8 @@ function KanbanCard({ row, displayFields, tableFields, selected, onSelect, onOpe
         onOpen()
       }}
     >
-      <CardContent className="p-3 min-w-0">
-        <div className="flex items-start gap-2 min-w-0">
+      <CardContent className="p-3 min-w-0 h-full flex flex-col justify-between min-h-0">
+        <div className="flex items-start gap-2 min-w-0 flex-1 flex flex-col justify-between min-h-0 overflow-hidden">
           {canEdit && (
             <div
               {...attributes}
@@ -848,7 +848,7 @@ function KanbanCard({ row, displayFields, tableFields, selected, onSelect, onOpe
             <div className="flex items-start gap-1.5 min-w-0">
               {primaryField && (
                 <div
-                  className="flex-1 min-w-0 line-clamp-3 overflow-hidden font-semibold text-sm text-gray-900 leading-tight"
+                  className="flex-1 min-w-0 truncate whitespace-nowrap overflow-hidden font-semibold text-sm text-gray-900 leading-tight"
                   data-kanban-field="true"
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -878,15 +878,15 @@ function KanbanCard({ row, displayFields, tableFields, selected, onSelect, onOpe
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>
-            {/* Pills / meta: stacked vertically for neat layout */}
+            {/* Pills / meta: single row, no wrap */}
             {pillMetaFields.length > 0 && (
-              <div className="flex flex-col gap-1 pt-0.5 min-w-0" data-kanban-field="true" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+              <div className="flex flex-nowrap gap-1.5 overflow-hidden pt-0.5 min-w-0" data-kanban-field="true" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
                 {pillMetaFields.map((field) => {
                   if (!field?.name) return null
                   const full = getFullField(field)
                   const value = row[full.name]
                   return (
-                    <div key={full.id ?? full.name} className="min-w-0 max-w-full">
+                    <div key={full.id ?? full.name} className="min-w-0 shrink-0 max-w-[80px]">
                       <CellFactory
                         field={full}
                         value={value}

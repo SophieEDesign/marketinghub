@@ -134,7 +134,7 @@ export default function RecordBlock({ block, isEditing = false, pageId = null, p
     if (isEditing && tableFields.length > 0) {
       // Show field preview in edit mode
       return (
-        <div className="h-full overflow-auto p-4">
+        <div className="h-full overflow-hidden p-4">
           <div className="space-y-4">
             <div className="text-sm font-medium text-gray-700 mb-2">Record Fields Preview</div>
             {tableFields.map((field) => (
@@ -213,7 +213,7 @@ export default function RecordBlock({ block, isEditing = false, pageId = null, p
   }))
 
   return (
-    <div className="h-full overflow-auto">
+    <div className="h-full overflow-hidden">
       <RecordFieldPanel
         tableId={tableId}
         recordId={String(recordId)}

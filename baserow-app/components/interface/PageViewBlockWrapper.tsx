@@ -60,7 +60,7 @@ export default function PageViewBlockWrapper({
   }, [page.id, page.saved_view_id, page.base_table, page.created_at, pageTableId, viewType, config])
 
   return (
-    <div className="h-full w-full">
+    <div className="h-full w-full min-w-0 min-h-0">
       <GridBlock
         block={block}
         isEditing={false}

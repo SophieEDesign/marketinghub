@@ -105,7 +105,7 @@ export default function ActionBlock({ block, isEditing = false }: ActionBlockPro
 
   return (
     <>
-      <div className="h-full w-full overflow-auto flex flex-col items-center justify-center" style={blockStyle}>
+      <div className="h-full w-full overflow-hidden flex flex-col items-center justify-center" style={blockStyle}>
         {showTitle && (
           <div
             className="mb-4 pb-2 border-b w-full text-center"
