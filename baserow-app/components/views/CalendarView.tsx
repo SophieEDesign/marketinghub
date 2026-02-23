@@ -1871,7 +1871,7 @@ export default function CalendarView({
             const params = new URLSearchParams(window.location.search)
             params.delete("q")
             window.history.replaceState({}, "", `?${params.toString()}`)
-            window.location.reload()
+            router.refresh()
           }}
           className="text-xs text-blue-600 hover:text-blue-700 underline"
         >

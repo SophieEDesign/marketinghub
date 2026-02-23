@@ -367,11 +367,11 @@ export default function AirtableSidebar({
                               router.refresh()
                               return
                             }
-                            // Fallback: if Next.js Link navigation doesn't complete (known issue), force full reload
+                            // Fallback: if Next.js Link navigation doesn't complete (known issue), use router (Phase 4: avoid full-page reload)
                             const startPath = pathname
                             setTimeout(() => {
                               if (window.location.pathname !== targetPath && window.location.pathname === startPath) {
-                                window.location.href = targetPath
+                                router.push(targetPath)
                               }
                             }, 100)
                           }}
@@ -400,7 +400,7 @@ export default function AirtableSidebar({
                                   const startPath = pathname
                                   setTimeout(() => {
                                     if (window.location.pathname !== viewPath && window.location.pathname === startPath) {
-                                      window.location.href = viewPath
+                                      router.push(viewPath)
                                     }
                                   }, 100)
                                 }}
@@ -435,7 +435,7 @@ export default function AirtableSidebar({
               const startPath = pathname
               setTimeout(() => {
                 if (window.location.pathname !== "/settings" && window.location.pathname === startPath) {
-                  window.location.href = "/settings"
+                  router.push("/settings")
                 }
               }, 100)
             }}

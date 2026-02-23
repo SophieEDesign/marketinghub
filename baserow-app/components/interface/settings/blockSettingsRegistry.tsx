@@ -43,6 +43,7 @@ export type DataSettingsCtx = {
   onTableChange: (tableId: string) => Promise<void>
   pageTableId?: string | null
   allBlocks?: PageBlock[]
+  blockId?: string | null // For field layout version restore
   onEditCanvas?: () => void // For Tabs blocks
   isEditingCanvas?: boolean // For Tabs blocks
   onExitBlockCanvas?: () => void // For Tabs blocks

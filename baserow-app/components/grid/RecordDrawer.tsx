@@ -50,6 +50,7 @@ export default function RecordDrawer({
     modalFields: fieldNames,
     active: isOpen,
     cascadeContext,
+    saveOnFieldChange: true,
     onSave: () => {
       onSave?.()
       onClose()
@@ -71,6 +72,7 @@ export default function RecordDrawer({
     handleFieldChange,
     canEditRecords,
     canDeleteRecords,
+    saveOnFieldChange,
   } = core
 
   // Load collapsed sections state from localStorage
@@ -275,18 +277,20 @@ export default function RecordDrawer({
               onClick={onClose}
               className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
             >
-              Cancel
+              {saveOnFieldChange && rowId ? "Close" : "Cancel"}
             </button>
-            <button
-              onClick={handleSave}
-              disabled={saving || !rowId || !canEditRecords}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              title={!canEditRecords ? "You don't have permission to edit this record" : undefined}
-              aria-disabled={saving || !rowId || !canEditRecords}
-            >
-              <Save className="h-4 w-4" />
-              {saving ? "Saving..." : "Save"}
-            </button>
+            {(!saveOnFieldChange || !rowId) && (
+              <button
+                onClick={handleSave}
+                disabled={saving || !rowId || !canEditRecords}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                title={!canEditRecords ? "You don't have permission to edit this record" : undefined}
+                aria-disabled={saving || !rowId || !canEditRecords}
+              >
+                <Save className="h-4 w-4" />
+                {saving ? "Saving..." : "Save"}
+              </button>
+            )}
           </div>
         </div>
       </div>

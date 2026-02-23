@@ -228,7 +228,10 @@ export async function DELETE(
 
     const { error } = await supabase
       .from('views')
-      .delete()
+      .update({
+        is_archived: true,
+        archived_at: new Date().toISOString(),
+      })
       .eq('id', params.pageId)
       .eq('type', 'interface')
 

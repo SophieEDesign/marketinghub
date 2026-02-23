@@ -11,9 +11,11 @@
  * - When cascadeContext is not provided, core-data behaviour remains unchanged (no gating).
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { isAbortError } from '@/lib/api/error-handling'
+import { useToast } from '@/components/ui/use-toast'
+import { syncLinkedFieldBidirectional } from '@/lib/dataView/linkedFields'
 import type { TableField } from '@/types/fields'
 import type { PageConfig } from '@/lib/interface/page-config'
 import type { BlockConfig } from '@/lib/interface/types'
@@ -60,6 +62,8 @@ export interface RecordEditorCoreOptions {
   onDeleted?: () => void | Promise<void>
   /** Optional: permission cascade context; when provided, core enforces canEdit/canCreate/canDelete in save() and deleteRecord(). */
   cascadeContext?: RecordEditorCascadeContext | null
+  /** When true (default), persist each field change immediately (Airtable-style). Only applies when recordId exists (edit mode). */
+  saveOnFieldChange?: boolean
 }
 
 export interface RecordEditorCoreResult {
@@ -84,6 +88,16 @@ export interface RecordEditorCoreResult {
   canEditRecords: boolean
   canDeleteRecords: boolean
   canCreateRecords: boolean
+  /** When true, field changes are persisted immediately (edit mode); Save button can be hidden. */
+  saveOnFieldChange: boolean
+  /** True when formData differs from last loaded/saved state */
+  isDirty: boolean
+  /** True when a localStorage draft exists that is newer than DB (edit) or exists (create) */
+  hasDraftToRestore: boolean
+  /** Restore draft from localStorage into formData */
+  restoreDraft: () => void
+  /** Clear draft from localStorage (call after save or discard) */
+  clearDraft: () => void
 }
 
 function normalizeLinkValue(
@@ -135,9 +149,11 @@ export function useRecordEditorCore(
     onSave,
     onDeleted,
     cascadeContext,
+    saveOnFieldChange = true,
   } = options
 
   const { role: userRole } = useUserRole()
+  const { toast } = useToast()
 
   const cascadeContextForHelpers = useMemo(
     () => (cascadeContext?.blockConfig != null ? { blockConfig: cascadeContext.blockConfig } : undefined),
@@ -165,8 +181,53 @@ export function useRecordEditorCore(
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [hasDraftToRestore, setHasDraftToRestore] = useState(false)
+  const [baselineFormData, setBaselineFormData] = useState<Record<string, any>>({})
+
+  const debounceTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const formDataRef = useRef<Record<string, any>>({})
+  const baselineFormDataRef = useRef<Record<string, any>>({})
+  const draftSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const isCreateMode = recordId == null
+
+  useEffect(() => {
+    formDataRef.current = formData
+  }, [formData])
+
+  useEffect(() => {
+    return () => {
+      debounceTimersRef.current.forEach((t) => clearTimeout(t))
+      debounceTimersRef.current.clear()
+      if (draftSaveTimeoutRef.current) {
+        clearTimeout(draftSaveTimeoutRef.current)
+        draftSaveTimeoutRef.current = null
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || loading) return
+    if (Object.keys(formData).length === 0 && !recordId) return
+    draftSaveTimeoutRef.current = setTimeout(() => {
+      draftSaveTimeoutRef.current = null
+      try {
+        const key = getDraftKey()
+        localStorage.setItem(key, JSON.stringify({
+          formData: { ...formData },
+          savedAt: Date.now(),
+        }))
+      } catch (e) {
+        if (process.env.NODE_ENV === 'development') console.warn('Failed to save draft:', e)
+      }
+    }, 500)
+    return () => {
+      if (draftSaveTimeoutRef.current) {
+        clearTimeout(draftSaveTimeoutRef.current)
+        draftSaveTimeoutRef.current = null
+      }
+    }
+  }, [formData, loading, recordId, getDraftKey])
 
   const loadTableInfo = useCallback(async () => {
     if (!tableId || supabaseTableNameProp != null) return
@@ -199,6 +260,21 @@ export function useRecordEditorCore(
     }
   }, [tableId, tableFieldsProp])
 
+  const getDraftKey = useCallback(() => {
+    if (recordId) return `record-draft-${recordId}`
+    return `record-draft-new-${tableId}`
+  }, [recordId, tableId])
+
+  const clearDraft = useCallback(() => {
+    if (typeof window === 'undefined') return
+    try {
+      localStorage.removeItem(getDraftKey())
+      setHasDraftToRestore(false)
+    } catch (e) {
+      if (process.env.NODE_ENV === 'development') console.warn('Failed to clear draft:', e)
+    }
+  }, [getDraftKey])
+
   const loadRecord = useCallback(async () => {
     const tableToUse = supabaseTableNameProp ?? effectiveTableName
     if (recordId == null || !tableToUse) return
@@ -209,16 +285,38 @@ export function useRecordEditorCore(
         .from(tableToUse)
         .select('*')
         .eq('id', recordId)
+        .is('deleted_at', null)
         .single()
       if (!error && data) {
         setFormData(data)
+        const baseline = { ...data }
+        baselineFormDataRef.current = baseline
+        setBaselineFormData(baseline)
+        if (typeof window !== 'undefined') {
+          try {
+            const draftRaw = localStorage.getItem(getDraftKey())
+            if (draftRaw) {
+              const draft = JSON.parse(draftRaw) as { formData: Record<string, any>; savedAt: number }
+              const recordUpdatedAt = data.updated_at ? new Date(data.updated_at).getTime() : 0
+              if (draft.savedAt > recordUpdatedAt) {
+                setHasDraftToRestore(true)
+              } else {
+                localStorage.removeItem(getDraftKey())
+              }
+            } else {
+              setHasDraftToRestore(false)
+            }
+          } catch {
+            setHasDraftToRestore(false)
+          }
+        }
       }
     } catch (e) {
       if (!isAbortError(e)) console.error('Error loading record:', e)
     } finally {
       setLoading(false)
     }
-  }, [recordId, effectiveTableName, supabaseTableNameProp])
+  }, [recordId, effectiveTableName, supabaseTableNameProp, getDraftKey])
 
   useEffect(() => {
     if (supabaseTableNameProp != null) {
@@ -257,10 +355,24 @@ export function useRecordEditorCore(
       }
     } else if (initialData) {
       setFormData(initialData)
+      const baseline = { ...initialData }
+      baselineFormDataRef.current = baseline
+      setBaselineFormData(baseline)
+      if (typeof window !== 'undefined') {
+        try {
+          const draftRaw = localStorage.getItem(getDraftKey())
+          setHasDraftToRestore(!!draftRaw)
+        } catch {
+          setHasDraftToRestore(false)
+        }
+      }
     } else {
       setFormData({})
+      baselineFormDataRef.current = {}
+      setBaselineFormData({})
+      setHasDraftToRestore(false)
     }
-  }, [active, recordId, effectiveTableName, supabaseTableNameProp, initialData, loadRecord])
+  }, [active, recordId, effectiveTableName, supabaseTableNameProp, initialData, loadRecord, getDraftKey])
 
   const effectiveFieldLayout = useMemo(() => {
     if (fieldLayoutProp && fieldLayoutProp.length > 0) return fieldLayoutProp
@@ -304,9 +416,106 @@ export function useRecordEditorCore(
     [fields]
   )
 
-  const handleFieldChange = useCallback((fieldName: string, value: any) => {
-    setFormData((prev) => ({ ...prev, [fieldName]: value }))
-  }, [])
+  const persistFieldChange = useCallback(
+    async (fieldName: string, value: any, oldValue: any) => {
+      const tableToUse = supabaseTableNameProp ?? effectiveTableName
+      if (!recordId || !tableToUse || !saveOnFieldChange) return
+      if (cascadeContext != null && !canEditRecords) return
+
+      const normalizedValue = normalizeUpdateValue(fieldName, value)
+      const supabase = createClient()
+
+      const doUpdate = async (val: any) =>
+        supabase.from(tableToUse).update({ [fieldName]: val }).eq('id', recordId)
+
+      let finalSavedValue: any = normalizedValue
+      let { error } = await doUpdate(finalSavedValue)
+
+      if (
+        error?.code === '42804' &&
+        !Array.isArray(finalSavedValue) &&
+        String(error?.message || '').toLowerCase().includes('uuid[]')
+      ) {
+        const wrappedValue = finalSavedValue != null ? [finalSavedValue] : null
+        const retry = await doUpdate(wrappedValue)
+        error = retry.error
+        if (!retry.error) finalSavedValue = wrappedValue
+      }
+
+      if (error) {
+        toast({
+          variant: 'destructive',
+          title: 'Failed to update field',
+          description: error.message || 'Please try again',
+        })
+        setFormData((prev) => ({ ...prev, [fieldName]: oldValue }))
+        return
+      }
+
+      const field = fields.find((f) => f?.name === fieldName)
+      if (field && field.type === 'link_to_table') {
+        try {
+          await syncLinkedFieldBidirectional(
+            tableId,
+            tableToUse,
+            fieldName,
+            recordId,
+            finalSavedValue as string | string[] | null,
+            oldValue as string | string[] | null,
+            false
+          )
+        } catch (syncError) {
+          console.error('[record-editor-core] Bidirectional sync failed:', syncError)
+        }
+      }
+
+      const newBaseline = { ...formDataRef.current, [fieldName]: finalSavedValue }
+      baselineFormDataRef.current = newBaseline
+      setBaselineFormData(newBaseline)
+
+      triggerRecordAutomations(tableId, 'row_updated', {
+        ...formDataRef.current,
+        [fieldName]: finalSavedValue,
+        id: recordId,
+      })
+    },
+    [
+      recordId,
+      effectiveTableName,
+      supabaseTableNameProp,
+      saveOnFieldChange,
+      cascadeContext,
+      canEditRecords,
+      normalizeUpdateValue,
+      tableId,
+      fields,
+      toast,
+    ]
+  )
+
+  const handleFieldChange = useCallback(
+    (fieldName: string, value: any) => {
+      const oldValue = formDataRef.current[fieldName]
+      setFormData((prev) => ({ ...prev, [fieldName]: value }))
+
+      if (!saveOnFieldChange || !recordId) return
+      if (cascadeContext != null && !canEditRecords) return
+
+      const existing = debounceTimersRef.current.get(fieldName)
+      if (existing) {
+        clearTimeout(existing)
+        debounceTimersRef.current.delete(fieldName)
+      }
+
+      const timer = setTimeout(() => {
+        debounceTimersRef.current.delete(fieldName)
+        persistFieldChange(fieldName, value, oldValue)
+      }, 400)
+
+      debounceTimersRef.current.set(fieldName, timer)
+    },
+    [saveOnFieldChange, recordId, cascadeContext, canEditRecords, persistFieldChange]
+  )
 
   const save = useCallback(async () => {
     if (!effectiveTableName) return
@@ -341,6 +550,10 @@ export function useRecordEditorCore(
           .update(payload)
           .eq('id', recordId)
         if (error) throw error
+        const newBaseline = { ...payload, id: recordId }
+        baselineFormDataRef.current = newBaseline
+        setBaselineFormData(newBaseline)
+        clearDraft()
         triggerRecordAutomations(tableId, 'row_updated', { ...payload, id: recordId })
         onSave?.()
       } else {
@@ -351,6 +564,7 @@ export function useRecordEditorCore(
           .single()
         if (error) throw error
         const createdId = data?.id ?? null
+        clearDraft()
         triggerRecordAutomations(tableId, 'row_created', data as Record<string, any>)
         onSave?.(createdId)
       }
@@ -370,6 +584,7 @@ export function useRecordEditorCore(
     cascadeContext,
     canEditRecords,
     canCreateRecords,
+    clearDraft,
   ])
 
   const deleteRecord = useCallback(
@@ -389,7 +604,10 @@ export function useRecordEditorCore(
       setDeleting(true)
       try {
         const supabase = createClient()
-        const { error } = await supabase.from(effectiveTableName).delete().eq('id', recordId)
+        const { error } = await supabase
+          .from(effectiveTableName)
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('id', recordId)
         if (error) throw error
         triggerRecordAutomations(tableId, 'row_deleted', { ...formData, id: recordId })
         await onDeleted?.()
@@ -401,6 +619,29 @@ export function useRecordEditorCore(
     },
     [recordId, effectiveTableName, formData, tableId, onDeleted, cascadeContext, canDeleteRecords]
   )
+
+  const restoreDraft = useCallback(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const draftRaw = localStorage.getItem(getDraftKey())
+      if (!draftRaw) return
+      const draft = JSON.parse(draftRaw) as { formData: Record<string, any> }
+      setFormData(draft.formData)
+      baselineFormDataRef.current = { ...draft.formData }
+      setBaselineFormData({ ...draft.formData })
+      clearDraft()
+    } catch (e) {
+      if (process.env.NODE_ENV === 'development') console.warn('Failed to restore draft:', e)
+    }
+  }, [getDraftKey, clearDraft])
+
+  const isDirty = useMemo(() => {
+    try {
+      return JSON.stringify(formData) !== JSON.stringify(baselineFormData)
+    } catch {
+      return false
+    }
+  }, [formData, baselineFormData])
 
   return {
     loading,
@@ -420,5 +661,10 @@ export function useRecordEditorCore(
     canEditRecords,
     canDeleteRecords,
     canCreateRecords,
+    saveOnFieldChange,
+    isDirty,
+    hasDraftToRestore,
+    restoreDraft,
+    clearDraft,
   }
 }

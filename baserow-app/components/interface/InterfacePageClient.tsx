@@ -14,7 +14,7 @@ import PageRenderer from "./PageRenderer"
 import PageSetupState from "./PageSetupState"
 import { useRightSettingsPanelData } from "@/contexts/RightSettingsPanelDataContext"
 import { getRequiredAnchorType } from "@/lib/interface/page-types"
-import { usePageEditMode, useBlockEditMode } from "@/contexts/EditModeContext"
+import { usePageEditMode, useBlockEditMode, useEditMode } from "@/contexts/EditModeContext"
 import { useUIMode } from "@/contexts/UIModeContext"
 import { useMainScroll } from "@/contexts/MainScrollContext"
 import { useSelectionContext } from "@/contexts/SelectionContext"
@@ -122,6 +122,7 @@ function InterfacePageClientInternal({
   // Use unified editing context (block scope kept in sync with UIMode editPages)
   const { isEditing: isPageEditing, enter: enterPageEdit, exit: exitPageEdit } = usePageEditMode(pageId)
   const { isEditing: isBlockEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(pageId)
+  const { blocksDirty } = useEditMode()
   const { enterEditPages, exitEditPages } = useUIMode()
   const { selectedContext, setSelectedContext } = useSelectionContext()
   const { setData: setRightPanelData } = useRightSettingsPanelData()
@@ -621,10 +622,11 @@ function InterfacePageClientInternal({
         return
       }
 
-      // Load data directly from the actual table
+      // Load data directly from the actual table (exclude soft-deleted)
       const { data: tableData, error: tableDataError } = await supabase
         .from(supabaseTableName)
         .select('*')
+        .is('deleted_at', null)
         .order('created_at', { ascending: false })
         .limit(1000)
 
@@ -731,10 +733,11 @@ function InterfacePageClientInternal({
       const filters = filtersRes.data || []
       const sorts = sortsRes.data || []
 
-      // Build query - use 'any' type to avoid deep type inference issues
+      // Build query - use 'any' type to avoid deep type inference issues (exclude soft-deleted)
       let query: any = supabase
         .from(table.supabase_table)
         .select('*')
+        .is('deleted_at', null)
         .limit(1000)
 
       // Apply filters
@@ -969,9 +972,18 @@ function InterfacePageClientInternal({
         willUpdate: blocksChanged || forceReload,
       })
       
-      // Only update if blocks actually changed or forceReload is true (and not aborted)
+      // Phase 4: Guard - do not overwrite blocks when user has unsaved changes (same page, forceReload)
       if (!signal?.aborted) {
-        if (blocksChanged || forceReload) {
+        if (blocksDirty && forceReload) {
+          if (process.env.NODE_ENV === 'development') {
+            debugLog('[loadBlocks] Skipping setBlocks - blocks dirty, save before reloading')
+          }
+          toast({
+            variant: "default",
+            title: "Unsaved changes",
+            description: "You have unsaved changes. Save before reloading.",
+          })
+        } else if (blocksChanged || forceReload) {
           // #region agent log
           fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfacePageClient.tsx:loadBlocks:setBlocks',message:'loadBlocks updating blocks state',data:{pageId,blocksCount:pageBlocks.length,blockIds:pageBlocks.map((b:any)=>b.id),blockLayouts:pageBlocks.map((b:any)=>({id:b.id,x:b.x,y:b.y,w:b.w,h:b.h})),forceReload,blocksChanged},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
           // #endregion

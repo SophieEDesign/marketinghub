@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import {
   Sheet,
   SheetContent,
@@ -55,6 +56,7 @@ export default function InterfacePageSettingsDrawer({
   onClose,
   onUpdate,
 }: InterfacePageSettingsDrawerProps) {
+  const router = useRouter()
   const [page, setPage] = useState<InterfacePage | null>(null)
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
@@ -400,8 +402,8 @@ export default function InterfacePageSettingsDrawer({
         throw new Error(error.error || 'Failed to delete page')
       }
 
-      // Redirect to home or first available page
-      window.location.href = '/'
+      // Redirect to home or first available page (Phase 4: avoid full-page reload)
+      router.push('/')
     } catch (error: any) {
       console.error('Error deleting page:', error)
       alert(error.message || 'Failed to delete page')

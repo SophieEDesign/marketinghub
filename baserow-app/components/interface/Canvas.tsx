@@ -29,6 +29,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "react"
+import { useRouter } from "next/navigation"
 import { Responsive, WidthProvider, Layout } from "react-grid-layout"
 import "react-grid-layout/css/styles.css"
 import "react-resizable/css/styles.css"
@@ -129,6 +130,7 @@ export default function Canvas({
   fullPageBlockId = null,
   openRecordInEditModeForBlock = null,
 }: CanvasProps) {
+  const router = useRouter()
   // Get filters from filter blocks for this block
   const { getFiltersForBlock, getFilterTreeForBlock } = useFilterState()
   
@@ -470,8 +472,8 @@ export default function Canvas({
           devLog('[Canvas] Heights reset complete:', result)
           devLog('[Canvas] Refreshing page to see changes...')
           
-          // Reload page to see the reset take effect
-          window.location.reload()
+          // Reload page to see the reset take effect (Phase 4: avoid full-page reload)
+          router.refresh()
         } catch (error) {
           devError('[Canvas] Error resetting heights:', error)
           devLog('[Canvas] Falling back to manual reset via layout update...')

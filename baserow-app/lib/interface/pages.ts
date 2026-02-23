@@ -39,6 +39,7 @@ export async function getInterfacePage(pageId: string): Promise<InterfacePage | 
     .from('interface_pages')
     .select('*')
     .eq('id', pageId)
+    .eq('is_archived', false)
     .maybeSingle()
 
   if (error) {
@@ -64,6 +65,7 @@ export async function getInterfacePagesByGroup(groupId: string | null): Promise<
     .from('interface_pages')
     .select('*')
     .eq('group_id', groupId)
+    .eq('is_archived', false)
     .order('order_index', { ascending: true })
     .order('created_at', { ascending: true }) // Secondary sort for consistency
 
@@ -87,6 +89,7 @@ export async function getAllInterfacePages(): Promise<InterfacePage[]> {
   const { data, error } = await supabase
     .from('interface_pages')
     .select('*')
+    .eq('is_archived', false)
     .order('order_index', { ascending: true })
     .order('created_at', { ascending: true }) // Secondary sort for consistency
 
@@ -365,7 +368,10 @@ export async function deleteInterfacePage(pageId: string): Promise<void> {
   
   const { error, data } = await supabase
     .from('interface_pages')
-    .delete()
+    .update({
+      is_archived: true,
+      archived_at: new Date().toISOString(),
+    })
     .eq('id', pageId)
     .select()
 
@@ -381,7 +387,7 @@ export async function deleteInterfacePage(pageId: string): Promise<void> {
     throw new Error(error.message || 'Failed to delete page')
   }
 
-  // Check if page was actually deleted
+  // Check if page was actually soft-deleted
   if (!data || data.length === 0) {
     throw new Error('Page not found or already deleted')
   }

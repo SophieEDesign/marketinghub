@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useRef } from "react"
+import { useRouter } from "next/navigation"
 import React from "react"
 import { supabase } from "@/lib/supabase/client"
 import GridView from "./GridView"
@@ -147,6 +148,7 @@ export default function GridViewWrapper({
   interfaceMode = 'view',
   blockId = null,
 }: GridViewWrapperProps) {
+  const router = useRouter()
   // CRITICAL: Normalize all inputs at wrapper entry point
   const safeInitialFilters = asArray<Filter>(initialFilters)
   const safeInitialSorts = asArray<Sort>(initialSorts)
@@ -740,8 +742,8 @@ export default function GridViewWrapper({
 
   async function handleFieldSave() {
     await loadFields()
-    // Reload the page to get updated viewFields
-    window.location.reload()
+    // Reload the page to get updated viewFields (Phase 4: avoid full-page reload)
+    router.refresh()
   }
 
   // Track deleted block-level filters (by field name) to prevent re-application

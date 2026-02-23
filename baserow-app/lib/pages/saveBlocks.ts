@@ -308,7 +308,10 @@ export async function deleteBlock(blockId: string): Promise<void> {
 
   const { error } = await supabase
     .from('view_blocks')
-    .delete()
+    .update({
+      is_archived: true,
+      archived_at: new Date().toISOString(),
+    })
     .eq('id', blockId)
 
   if (error) {

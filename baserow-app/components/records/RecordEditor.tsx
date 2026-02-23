@@ -121,6 +121,7 @@ export default function RecordEditor({
     cascadeContext,
     onSave,
     onDeleted,
+    saveOnFieldChange: true,
   })
 
   const {
@@ -137,6 +138,11 @@ export default function RecordEditor({
     canEditRecords,
     canCreateRecords,
     canDeleteRecords,
+    saveOnFieldChange,
+    isDirty,
+    hasDraftToRestore,
+    restoreDraft,
+    clearDraft,
   } = core
 
   const canSave = recordId ? canEditRecords : canCreateRecords
@@ -147,6 +153,17 @@ export default function RecordEditor({
       : canSave
   const [contentReady, setContentReady] = useState(false)
   const contentReadyRef = useRef(false)
+
+  useEffect(() => {
+    if (!isDirty) return
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = "You have unsaved changes. Leave anyway?"
+      return "You have unsaved changes. Leave anyway?"
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload)
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload)
+  }, [isDirty])
 
   useEffect(() => {
     const ready =
@@ -397,7 +414,7 @@ export default function RecordEditor({
         </div>
       )
     }
-    if (recordId && (!formData || Object.keys(formData).length === 0)) {
+    if (recordId && (!formData || Object.keys(formData).length === 0) && !hasDraftToRestore) {
       return (
         <div className="flex items-center justify-center py-8">
           <div className="text-gray-500">Record not found</div>
@@ -573,13 +590,15 @@ export default function RecordEditor({
             )}
             {onClose && (
               <Button variant="outline" onClick={onClose} disabled={deleting || saving}>
-                Cancel
+                {saveOnFieldChange && recordId ? "Close" : "Cancel"}
               </Button>
             )}
-            <Button onClick={handleSave} disabled={saving || loading || !canSave}>
-              <Save className="mr-2 h-4 w-4" />
-              {saving ? "Saving..." : "Save"}
-            </Button>
+            {(!saveOnFieldChange || !recordId) && (
+              <Button onClick={handleSave} disabled={saving || loading || !canSave}>
+                <Save className="mr-2 h-4 w-4" />
+                {saving ? "Saving..." : "Save"}
+              </Button>
+            )}
             {onClose && (
               <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0" aria-label="Close">
                 <X className="h-4 w-4" />
@@ -595,7 +614,7 @@ export default function RecordEditor({
             {recordTitle || "Record Details"}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            {interfaceMode === "edit" && canSave && (
+            {interfaceMode === "edit" && canSave && (!saveOnFieldChange || !recordId) && (
               <Button
                 variant="default"
                 size="sm"
@@ -631,6 +650,19 @@ export default function RecordEditor({
 
       {/* Content stacks naturally so section headers + fields push comments down; parent scrolls */}
       <div className="flex-shrink-0 flex flex-col overflow-visible px-6">
+        {hasDraftToRestore && (
+          <div className="mb-4 flex items-center justify-between gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            <span>You have an unsaved draft. Restore it?</span>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={restoreDraft}>
+                Restore draft
+              </Button>
+              <Button variant="ghost" size="sm" onClick={clearDraft}>
+                Discard
+              </Button>
+            </div>
+          </div>
+        )}
         {renderFieldsContent()}
       </div>
 

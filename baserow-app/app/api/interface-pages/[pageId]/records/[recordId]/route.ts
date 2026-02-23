@@ -68,7 +68,10 @@ export async function DELETE(
       .eq('id', recordId)
       .single()
 
-    const { error } = await supabase.from(table.supabase_table).delete().eq('id', recordId)
+    const { error } = await supabase
+      .from(table.supabase_table)
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', recordId)
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }

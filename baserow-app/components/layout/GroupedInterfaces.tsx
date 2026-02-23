@@ -437,10 +437,11 @@ export default function GroupedInterfaces({
 
       // Remove from local state
       setPages((prev) => prev.filter((p) => p.id !== pageId))
+      toast({ title: "Moved to trash", description: "Page has been moved to trash." })
       
-      // If we're on the deleted page, redirect to home
+      // If we're on the deleted page, redirect to home (Phase 4: avoid full-page reload)
       if (currentPageId === pageId) {
-        window.location.href = '/'
+        router.push('/')
       } else {
         onRefresh?.()
       }
@@ -897,7 +898,7 @@ export default function GroupedInterfaces({
           const startPath = pathname
           setTimeout(() => {
             if (window.location.pathname !== targetPath && window.location.pathname === startPath) {
-              window.location.href = targetPath
+              router.push(targetPath)
             }
           }, 100)
         }}
@@ -1014,7 +1015,7 @@ export default function GroupedInterfaces({
                 const targetPath = `/pages/${targetPageId}`
                 setTimeout(() => {
                   if (window.location.pathname !== targetPath && window.location.pathname === startPath) {
-                    window.location.href = targetPath
+                    router.push(targetPath)
                   }
                 }, 100)
               }}

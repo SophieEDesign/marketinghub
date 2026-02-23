@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import {
@@ -24,6 +24,7 @@ import NestedGroupBySelector from "./shared/NestedGroupBySelector"
 import ModalFieldsSelector from "./shared/ModalFieldsSelector"
 import PermissionsSettings from "./PermissionsSettings"
 import { useViewMeta } from "@/hooks/useViewMeta"
+import { useToast } from "@/components/ui/use-toast"
 
 interface RecordContextDataSettingsProps {
   config: BlockConfig
@@ -32,6 +33,7 @@ interface RecordContextDataSettingsProps {
   fields: TableField[]
   onUpdate: (updates: Partial<BlockConfig>) => void
   onTableChange: (tableId: string) => Promise<void>
+  blockId?: string | null
 }
 
 type DisplayMode = "list" | "grid" | "compact"
@@ -43,6 +45,7 @@ export default function RecordContextDataSettings({
   fields,
   onUpdate,
   onTableChange,
+  blockId,
 }: RecordContextDataSettingsProps) {
   const [selectedTableId, setSelectedTableId] = useState<string>(config.table_id || "")
 
@@ -61,6 +64,59 @@ export default function RecordContextDataSettings({
   const hasTableAndFields = config.table_id && fields.length > 0
   const isListMode = displayMode === "list"
   const { metadata: viewMetaData } = useViewMeta(config.view_id, config.table_id)
+  const { toast } = useToast()
+  const [layoutVersions, setLayoutVersions] = useState<Array<{ id: string; created_at: string }>>([])
+  const [restoringLayout, setRestoringLayout] = useState(false)
+  const [layoutOverwriteConfirmed, setLayoutOverwriteConfirmed] = useState(false)
+
+  const loadLayoutVersions = useCallback(async () => {
+    if (!blockId) return
+    try {
+      const res = await fetch(`/api/blocks/${blockId}/field-layout-versions`)
+      if (res.ok) {
+        const { versions } = await res.json()
+        setLayoutVersions(versions ?? [])
+      }
+    } catch {
+      setLayoutVersions([])
+    }
+  }, [blockId])
+
+  useEffect(() => {
+    if (blockId && hasTableAndFields && Array.isArray((config as any).field_layout) && (config as any).field_layout.length > 0) {
+      loadLayoutVersions()
+    } else {
+      setLayoutVersions([])
+    }
+  }, [blockId, hasTableAndFields, (config as any).field_layout, loadLayoutVersions])
+
+  useEffect(() => {
+    setLayoutOverwriteConfirmed(false)
+  }, [blockId])
+
+  const handleRestoreLayout = useCallback(async (versionId: string) => {
+    if (!blockId || restoringLayout) return
+    setRestoringLayout(true)
+    try {
+      const res = await fetch(`/api/blocks/${blockId}/restore-field-layout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ versionId }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || "Failed to restore")
+      }
+      const { field_layout } = await res.json()
+      onUpdate({ field_layout } as any)
+      toast({ title: "Layout restored", description: "Previous field layout has been restored." })
+      loadLayoutVersions()
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Restore failed", description: e?.message || "Please try again." })
+    } finally {
+      setRestoringLayout(false)
+    }
+  }, [blockId, onUpdate, toast, loadLayoutVersions, restoringLayout])
 
   const handleCopySettingsFromView = () => {
     if (!viewMetaData) return
@@ -173,6 +229,14 @@ export default function RecordContextDataSettings({
             })()}
             onChange={(fieldNames) => {
               const fl = (config as any).field_layout
+              const hasExistingLayout = Array.isArray(fl) && fl.length > 0
+              if (hasExistingLayout && !layoutOverwriteConfirmed) {
+                const ok = window.confirm(
+                  "This will replace the current field layout. Continue?"
+                )
+                if (!ok) return
+                setLayoutOverwriteConfirmed(true)
+              }
               const allFieldNames = fields.map((f) => f.name)
               const visibleSet = new Set(fieldNames)
               const hidden = allFieldNames.filter((n) => n !== "id" && !visibleSet.has(n))
@@ -221,6 +285,32 @@ export default function RecordContextDataSettings({
             label="Fields to show"
             description="Visible and hidden fields for the record detail panel (right) only. Cards use Card/list fields below. Leave empty to show all fields."
           />
+          {blockId && layoutVersions.length > 0 && (
+            <div className="space-y-2 pt-2">
+              <Label>Restore previous layout</Label>
+              <Select
+                value=""
+                onValueChange={(versionId) => {
+                  if (versionId) void handleRestoreLayout(versionId)
+                }}
+                disabled={restoringLayout}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={restoringLayout ? "Restoring…" : "Select a version to restore"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {layoutVersions.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {new Date(v.created_at).toLocaleString()}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500">
+                Restore a previously saved field layout. Current layout will be replaced.
+              </p>
+            </div>
+          )}
         </div>
       )}
 

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -70,6 +71,7 @@ export default function KanbanView({
   onRecordDeleted,
 }: KanbanViewProps) {
   // All hooks must be at the top level, before any conditional returns
+  const router = useRouter()
   const { openRecord } = useRecordPanel()
   const [rows, setRows] = useState<TableRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -445,7 +447,7 @@ export default function KanbanView({
             const params = new URLSearchParams(window.location.search)
             params.delete("q")
             window.history.replaceState({}, "", `?${params.toString()}`)
-            window.location.reload()
+            router.refresh()
           },
         }}
       />

@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Save } from "lucide-react"
-import type { TableRow } from "@/types/database"
 import type { TableField } from "@/types/fields"
 import FieldEditor from "@/components/fields/FieldEditor"
+import { useToast } from "@/components/ui/use-toast"
 
 interface FormViewProps {
   tableId: string
@@ -16,12 +16,28 @@ interface FormViewProps {
   rowId?: string
 }
 
+const DEBOUNCE_MS = 400
+
 export default function FormView({ tableId, viewId, fieldIds, rowId }: FormViewProps) {
+  const { toast } = useToast()
   const [formData, setFormData] = useState<Record<string, any>>({})
   const [tableFields, setTableFields] = useState<TableField[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [supabaseTableName, setSupabaseTableName] = useState<string>("")
+  const debounceTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const formDataRef = useRef<Record<string, any>>({})
+
+  useEffect(() => {
+    formDataRef.current = formData
+  }, [formData])
+
+  useEffect(() => {
+    return () => {
+      debounceTimersRef.current.forEach((t) => clearTimeout(t))
+      debounceTimersRef.current.clear()
+    }
+  }, [])
 
   useEffect(() => {
     loadTableData()
@@ -114,9 +130,13 @@ export default function FormView({ tableId, viewId, fieldIds, rowId }: FormViewP
 
         if (error) {
           console.error("Error updating row:", error)
-          alert("Failed to update record. Please try again.")
+          toast({
+            variant: "destructive",
+            title: "Failed to update record",
+            description: error.message || "Please try again.",
+          })
         } else {
-          alert("Record updated successfully!")
+          toast({ title: "Record updated", description: "Changes saved successfully." })
         }
       } else {
         const { error } = await supabase
@@ -125,23 +145,71 @@ export default function FormView({ tableId, viewId, fieldIds, rowId }: FormViewP
 
         if (error) {
           console.error("Error creating row:", error)
-          alert("Failed to create record. Please try again.")
+          toast({
+            variant: "destructive",
+            title: "Failed to create record",
+            description: error.message || "Please try again.",
+          })
         } else {
-          alert("Record created successfully!")
+          toast({ title: "Record created", description: "New record saved successfully." })
           setFormData({})
         }
       }
     } catch (error) {
       console.error("Error saving:", error)
-      alert("Failed to save record. Please try again.")
+      toast({
+        variant: "destructive",
+        title: "Failed to save",
+        description: error instanceof Error ? error.message : "Please try again.",
+      })
     } finally {
       setSaving(false)
     }
   }
 
-  function handleFieldChange(fieldName: string, value: any) {
-    setFormData((prev) => ({ ...prev, [fieldName]: value }))
-  }
+  const handleFieldChange = useCallback(
+    (fieldName: string, value: any) => {
+      const oldValue = formDataRef.current[fieldName]
+      setFormData((prev) => ({ ...prev, [fieldName]: value }))
+
+      if (!rowId || !supabaseTableName) return
+
+      const existing = debounceTimersRef.current.get(fieldName)
+      if (existing) {
+        clearTimeout(existing)
+        debounceTimersRef.current.delete(fieldName)
+      }
+
+      const timer = setTimeout(async () => {
+        debounceTimersRef.current.delete(fieldName)
+        try {
+          const { error } = await supabase
+            .from(supabaseTableName)
+            .update({ [fieldName]: value })
+            .eq("id", rowId)
+
+          if (error) {
+            toast({
+              variant: "destructive",
+              title: "Failed to update field",
+              description: error.message || "Please try again.",
+            })
+            setFormData((prev) => ({ ...prev, [fieldName]: oldValue }))
+          }
+        } catch (err) {
+          toast({
+            variant: "destructive",
+            title: "Failed to update field",
+            description: err instanceof Error ? err.message : "Please try again.",
+          })
+          setFormData((prev) => ({ ...prev, [fieldName]: oldValue }))
+        }
+      }, DEBOUNCE_MS)
+
+      debounceTimersRef.current.set(fieldName, timer)
+    },
+    [rowId, supabaseTableName, toast]
+  )
 
   // Get visible fields - use fieldIds if provided, otherwise show all fields
   const visibleFields = fieldIds.length > 0
@@ -197,16 +265,18 @@ export default function FormView({ tableId, viewId, fieldIds, rowId }: FormViewP
               )
             })
           )}
-          <div className="flex justify-end pt-4 border-t border-gray-200">
-            <Button 
-              onClick={handleSave} 
-              disabled={saving || visibleFields.length === 0}
-              className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
-            >
-              <Save className="mr-2 h-4 w-4" />
-              {saving ? "Saving..." : "Save"}
-            </Button>
-          </div>
+          {!rowId && (
+            <div className="flex justify-end pt-4 border-t border-gray-200">
+              <Button
+                onClick={handleSave}
+                disabled={saving || visibleFields.length === 0}
+                className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+              >
+                <Save className="mr-2 h-4 w-4" />
+                {saving ? "Saving..." : "Create"}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

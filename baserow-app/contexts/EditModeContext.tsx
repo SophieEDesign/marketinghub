@@ -71,6 +71,10 @@ interface EditModeContextType {
   
   // Clear specific editing context
   clearEditingContext: (scope: EditScope) => void
+  
+  // Blocks dirty (unsaved layout/config) - when true, isAnyEditing is true for navigation guard
+  blocksDirty: boolean
+  setBlocksDirty: (dirty: boolean) => void
 }
 
 const EditModeContext = createContext<EditModeContextType | undefined>(undefined)
@@ -82,6 +86,7 @@ interface EditModeProviderProps {
 }
 
 export function EditModeProvider({ children, isViewer = false }: EditModeProviderProps) {
+  const [blocksDirty, setBlocksDirty] = useState(false)
   const [state, setState] = useState<EditModeState>({
     activeScopes: new Set(),
     editingPageId: null,
@@ -145,8 +150,8 @@ export function EditModeProvider({ children, isViewer = false }: EditModeProvide
 
   const isAnyEditing = useCallback((): boolean => {
     if (isViewer) return false
-    return state.activeScopes.size > 0
-  }, [state.activeScopes, isViewer])
+    return state.activeScopes.size > 0 || blocksDirty
+  }, [state.activeScopes, blocksDirty, isViewer])
 
   const enterEditMode = useCallback((
     scope: EditScope,
@@ -234,6 +239,7 @@ export function EditModeProvider({ children, isViewer = false }: EditModeProvide
       editingTableId: null,
       editingViewId: null,
     })
+    setBlocksDirty(false)
   }, [])
 
   const clearEditingContext = useCallback((scope: EditScope) => {
@@ -249,6 +255,8 @@ export function EditModeProvider({ children, isViewer = false }: EditModeProvide
     toggleEditMode,
     exitAllEditModes,
     clearEditingContext,
+    blocksDirty,
+    setBlocksDirty,
   }), [
     state,
     isEditing,
@@ -258,6 +266,7 @@ export function EditModeProvider({ children, isViewer = false }: EditModeProvide
     toggleEditMode,
     exitAllEditModes,
     clearEditingContext,
+    blocksDirty,
   ])
 
   return (
@@ -283,12 +292,15 @@ export function useEditMode() {
  */
 export function useSidebarEditMode() {
   const { isEditing, toggleEditMode, enterEditMode, exitEditMode } = useEditMode()
-  return {
+  const toggle = useCallback(() => toggleEditMode("sidebar"), [toggleEditMode])
+  const enter = useCallback(() => enterEditMode("sidebar"), [enterEditMode])
+  const exit = useCallback(() => exitEditMode("sidebar"), [exitEditMode])
+  return useMemo(() => ({
     isEditing: isEditing("sidebar"),
-    toggle: () => toggleEditMode("sidebar"),
-    enter: () => enterEditMode("sidebar"),
-    exit: () => exitEditMode("sidebar"),
-  }
+    toggle,
+    enter,
+    exit,
+  }), [isEditing("sidebar"), toggle, enter, exit])
 }
 
 export function usePageEditMode(pageId?: string) {
@@ -320,26 +332,32 @@ export function useBlockEditMode(pageId?: string) {
 
 export function useRecordEditMode(recordId?: string) {
   const { isEditing, toggleEditMode, enterEditMode, exitEditMode, state } = useEditMode()
-  return {
+  const toggle = useCallback(() => toggleEditMode("record", recordId ? { recordId } : undefined), [toggleEditMode, recordId])
+  const enter = useCallback(() => enterEditMode("record", recordId ? { recordId } : undefined), [enterEditMode, recordId])
+  const exit = useCallback(() => exitEditMode("record"), [exitEditMode])
+  return useMemo(() => ({
     isEditing: isEditing("record") && (!recordId || state.editingRecordId === recordId),
-    toggle: () => toggleEditMode("record", recordId ? { recordId } : undefined),
-    enter: () => enterEditMode("record", recordId ? { recordId } : undefined),
-    exit: () => exitEditMode("record"),
+    toggle,
+    enter,
+    exit,
     editingRecordId: state.editingRecordId,
-  }
+  }), [isEditing("record"), recordId, state.editingRecordId, toggle, enter, exit])
 }
 
 export function useGridEditMode(tableId?: string, viewId?: string) {
   const { isEditing, toggleEditMode, enterEditMode, exitEditMode, state } = useEditMode()
-  return {
-    isEditing: isEditing("grid") && 
+  const toggle = useCallback(() => toggleEditMode("grid", { tableId, viewId }), [toggleEditMode, tableId, viewId])
+  const enter = useCallback(() => enterEditMode("grid", { tableId, viewId }), [enterEditMode, tableId, viewId])
+  const exit = useCallback(() => exitEditMode("grid"), [exitEditMode])
+  return useMemo(() => ({
+    isEditing: isEditing("grid") &&
       (!tableId || state.editingTableId === tableId) &&
       (!viewId || state.editingViewId === viewId),
-    toggle: () => toggleEditMode("grid", { tableId, viewId }),
-    enter: () => enterEditMode("grid", { tableId, viewId }),
-    exit: () => exitEditMode("grid"),
+    toggle,
+    enter,
+    exit,
     editingTableId: state.editingTableId,
     editingViewId: state.editingViewId,
-  }
+  }), [isEditing("grid"), tableId, viewId, state.editingTableId, state.editingViewId, toggle, enter, exit])
 }
 

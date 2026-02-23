@@ -645,6 +645,7 @@ export default function SettingsPanel({
       onTableChange,
       pageTableId,
       allBlocks,
+      blockId: block?.id ?? null,
       onOpenRecordForLayoutEdit: onOpenRecordForLayoutEdit,
       ...additionalProps,
     } as any)

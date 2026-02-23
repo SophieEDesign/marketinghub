@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
@@ -111,6 +112,7 @@ export default function ListView({
   interfaceMode = 'view',
   onRecordDeleted,
 }: ListViewProps) {
+  const router = useRouter()
   const { openRecord } = useRecordPanel()
   const viewUuid = useMemo(() => normalizeUuid(viewId), [viewId])
   const [rows, setRows] = useState<Record<string, any>[]>([])
@@ -1137,7 +1139,7 @@ export default function ListView({
                 const params = new URLSearchParams(window.location.search)
                 params.delete("q")
                 window.history.replaceState({}, "", `?${params.toString()}`)
-                window.location.reload()
+                router.refresh()
               },
             } : undefined}
           />

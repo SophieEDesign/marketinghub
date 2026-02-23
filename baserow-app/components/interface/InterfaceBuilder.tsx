@@ -5,7 +5,7 @@ import { useInterfaceBuilderSelection } from "./useInterfaceBuilderSelection"
 import { useUndoRedo } from "@/hooks/useUndoRedo"
 import { Save, Eye, Edit2, Plus, Trash2, Settings, MoreVertical, Undo2, Redo2 } from "lucide-react"
 import { useBranding } from "@/contexts/BrandingContext"
-import { useBlockEditMode } from "@/contexts/EditModeContext"
+import { useBlockEditMode, useEditMode } from "@/contexts/EditModeContext"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { useSelectionContext } from "@/contexts/SelectionContext"
 import { FilterStateProvider } from "@/lib/interface/filter-state"
@@ -87,6 +87,7 @@ export default function InterfaceBuilder({
   
   // Context-driven editing: Edit/View toggle from sidebar menu controls block editing
   const { isEditing: isBlockEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(page.id)
+  const { setBlocksDirty } = useEditMode()
   const { selectedContext, setSelectedContext } = useSelectionContext()
   const { setData: setRightPanelData } = useRightSettingsPanelData()
   
@@ -456,6 +457,9 @@ export default function InterfaceBuilder({
 
           setSaveStatus("saved")
           
+          // Phase 4: Clear blocks dirty when layout save succeeds
+          setBlocksDirty(false)
+          
           // Update last saved layout hash to prevent duplicate saves
           lastSavedLayoutRef.current = layoutHash
           
@@ -495,7 +499,7 @@ export default function InterfaceBuilder({
         return false
       }
     },
-    [page.id, effectiveIsEditing, toast]
+    [page.id, effectiveIsEditing, toast, setBlocksDirty]
   )
 
   // Track if layout has been modified by user (not just initialized)
@@ -530,6 +534,9 @@ export default function InterfaceBuilder({
       // Mark that layout has been modified by user
       layoutModifiedByUserRef.current = true
 
+      // Phase 4: Track blocks dirty for EditModeGuard navigation protection
+      setBlocksDirty(true)
+
       // CRITICAL: Store latest grid layout in ref (source of truth)
       // The grid library has the authoritative layout - blocks state may lag
       latestLayoutRef.current = layout
@@ -563,7 +570,7 @@ export default function InterfaceBuilder({
         saveLayout(layout, true) // Pass hasUserInteraction=true since this is triggered by user drag/resize
       }, 500)
     },
-    [effectiveIsEditing, saveLayout]
+    [effectiveIsEditing, saveLayout, setBlocksDirty]
   )
 
   // Reset layout modified flag when entering edit mode (not exiting)
@@ -723,6 +730,8 @@ export default function InterfaceBuilder({
 
   const handleBlockUpdate = useCallback(
     async (blockId: string, configPatch: Partial<PageBlock["config"]>) => {
+      // Phase 4: Track blocks dirty for EditModeGuard navigation protection
+      setBlocksDirty(true)
       // #region agent log
       fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:handleBlockUpdate:entry',message:'Block update started',data:{blockId,configKeys:Object.keys(configPatch||{})},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
       // #endregion
@@ -763,6 +772,7 @@ export default function InterfaceBuilder({
 
       // 3) Only recover/reload on error
       if (!res.ok) {
+        setBlocksDirty(false) // Revert dirty on failure (we reload from server)
         // #region agent log
         fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:handleBlockUpdate:apiFailed',message:'Block update API failed',data:{blockId,status:res.status},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
         // #endregion
@@ -810,6 +820,8 @@ export default function InterfaceBuilder({
         })
       }
 
+      // Phase 4: Clear blocks dirty when block update succeeds
+      setBlocksDirty(false)
       // #region agent log
       fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:handleBlockUpdate:success',message:'Block update API success',data:{blockId},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
       // #endregion
@@ -820,7 +832,7 @@ export default function InterfaceBuilder({
         })
       }
     },
-    [page.id, toast]
+    [page.id, toast, setBlocksDirty]
   )
 
   // Helper function to find next available position without overlapping.
@@ -901,6 +913,8 @@ export default function InterfaceBuilder({
 
   const handleAddBlock = useCallback(
     async (type: BlockType) => {
+      // Phase 4: Track blocks dirty when adding block
+      setBlocksDirty(true)
       const def = BLOCK_REGISTRY[type]
 
       // If page already has an eligible full-page block, prevent adding a second block
@@ -961,6 +975,8 @@ export default function InterfaceBuilder({
         setBlocks((prev) => [...prev, block])
         setSelectedBlockId(block.id)
         setSelectedContext({ type: "block", blockId: block.id })
+        // Phase 4: Clear blocks dirty when add block succeeds
+        setBlocksDirty(false)
 
         // When adding the first block and type supports full-page, prompt to use as full-page view only if block is eligible (e.g. record_context needs table_id)
         if (wasEmpty && def.supportsFullPage && isBlockEligibleForFullPage(block)) {
@@ -975,6 +991,7 @@ export default function InterfaceBuilder({
         }
       } catch (error: any) {
         console.error("Failed to create block:", error)
+        setBlocksDirty(false) // Revert dirty on failure
         toast({
           variant: "destructive",
           title: "Failed to create block",
@@ -982,7 +999,7 @@ export default function InterfaceBuilder({
         })
       }
     },
-    [page.id, page.settings, blocks, toast, findNextAvailablePosition, handleBlockUpdate]
+    [page.id, page.settings, blocks, toast, findNextAvailablePosition, handleBlockUpdate, setBlocksDirty]
   )
 
   const handleDeleteBlock = useCallback(
@@ -1009,13 +1026,16 @@ export default function InterfaceBuilder({
           clearSelectionState()
           setSelectedContext(null)
         }
+        // Phase 4: Clear blocks dirty when delete block succeeds
+        setBlocksDirty(false)
         toast({
           variant: "success",
-          title: "Block deleted",
-          description: "The block has been removed",
+          title: "Moved to trash",
+          description: "The block has been moved to trash",
         })
       } catch (error: any) {
         console.error("Failed to delete block:", error)
+        setBlocksDirty(false) // Revert dirty on failure
         toast({
           variant: "destructive",
           title: "Failed to delete block",
@@ -1023,7 +1043,7 @@ export default function InterfaceBuilder({
         })
       }
     },
-    [page.id, selectedBlockId, toast, clearSelectionState, setSelectedContext]
+    [page.id, selectedBlockId, toast, clearSelectionState, setSelectedContext, setBlocksDirty]
   )
 
   const handleDuplicateBlock = useCallback(

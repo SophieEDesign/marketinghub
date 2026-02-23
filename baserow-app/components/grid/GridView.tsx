@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
+import { useRouter } from "next/navigation"
 import React from "react"
 import { supabase } from "@/lib/supabase/client"
 import { Plus, ChevronDown, ChevronRight, Edit, Copy, ArrowLeft, ArrowRight, Link, Info, Lock, Filter, Group, Eye, EyeOff, Trash2, ArrowUpDown, GripVertical } from "lucide-react"
@@ -591,6 +592,7 @@ export default function GridView({
   interfaceMode = 'view',
   blockId = null,
 }: GridViewProps) {
+  const router = useRouter()
   const { openRecord } = useRecordPanel()
   const isMobile = useIsMobile()
   const [rows, setRows] = useState<Record<string, any>[]>([])
@@ -2563,9 +2565,9 @@ export default function GridView({
       }
 
       debugLog('LAYOUT', 'Field duplicated successfully:', { fieldName, duplicateName })
-      // Refresh table fields and reload page
+      // Refresh table fields and reload page (Phase 4: avoid full-page reload)
       onTableFieldsRefresh?.()
-      window.location.reload()
+      router.refresh()
     } catch (error) {
       debugError('LAYOUT', 'Error duplicating field:', error)
       alert('Failed to duplicate field')
@@ -2627,9 +2629,9 @@ export default function GridView({
       }
 
       debugLog('LAYOUT', 'Field deleted successfully:', fieldToDelete)
-      // Refresh table fields and reload page
+      // Refresh table fields and reload page (Phase 4: avoid full-page reload)
       onTableFieldsRefresh?.()
-      window.location.reload()
+      router.refresh()
     } catch (error) {
       debugError('LAYOUT', 'Error deleting field:', error)
       alert('Failed to delete field')
@@ -3004,8 +3006,8 @@ export default function GridView({
       
       // Only reload if fields were actually added
       if (data.added > 0) {
-        // Reload the page to refresh viewFields
-        window.location.reload()
+        // Reload the page to refresh viewFields (Phase 4: avoid full-page reload)
+        router.refresh()
       } else if (data.message) {
         // Just log if no fields were added (already configured)
         debugLog('LAYOUT', 'Fields initialization:', data.message)

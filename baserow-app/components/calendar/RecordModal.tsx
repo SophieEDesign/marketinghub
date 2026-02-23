@@ -82,7 +82,7 @@ export default function RecordModal({
             onClose()
           }}
           onDeleted={async () => {
-            toast({ title: "Record deleted", description: "The record has been deleted." })
+            toast({ title: "Moved to trash", description: "The record has been moved to trash." })
             await onDeleted?.()
             onClose()
           }}

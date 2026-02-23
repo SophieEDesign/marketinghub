@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     const deletePromises = batches.map((batch) =>
       supabase
         .from(table)
-        .delete()
+        .update({ deleted_at: new Date().toISOString() })
         .in('id', batch)
     )
 

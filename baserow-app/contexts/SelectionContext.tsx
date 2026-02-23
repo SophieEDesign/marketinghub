@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react"
+import { createContext, useContext, useState, useCallback, useEffect, useMemo, ReactNode } from "react"
 
 export type SelectedContext =
   | { type: "page" }
@@ -35,8 +35,13 @@ export function SelectionContextProvider({ children }: { children: ReactNode }) 
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [selectedContext])
 
+  const contextValue = useMemo(() => ({
+    selectedContext,
+    setSelectedContext,
+  }), [selectedContext, setSelectedContext])
+
   return (
-    <SelectionContext.Provider value={{ selectedContext, setSelectedContext }}>
+    <SelectionContext.Provider value={contextValue}>
       {children}
     </SelectionContext.Provider>
   )

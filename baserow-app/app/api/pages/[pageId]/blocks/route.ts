@@ -239,7 +239,9 @@ export async function PATCH(
     const updatedBlocks: PageBlock[] = []
     if (blockUpdates && Array.isArray(blockUpdates)) {
       const supabase = await createClient()
-      
+      const { data: { user } } = await supabase.auth.getUser()
+      const createdBy = user?.id ?? null
+
       await Promise.all(
         blockUpdates.map(async (update: { id: string; config?: any }) => {
           // Get current block to determine type
@@ -251,6 +253,22 @@ export async function PATCH(
 
           if (!currentBlock) {
             throw new Error(`Block ${update.id} not found`)
+          }
+
+          // Version field_layout before overwrite (data protection)
+          if (update.config?.field_layout != null) {
+            const currentLayout = (currentBlock.config as any)?.field_layout
+            const incomingLayout = update.config.field_layout
+            const currentStr = JSON.stringify(currentLayout ?? [])
+            const incomingStr = JSON.stringify(incomingLayout ?? [])
+            if (currentStr !== incomingStr && (Array.isArray(currentLayout) ? currentLayout.length > 0 : currentLayout != null)) {
+              await supabase.from('field_layout_versions').insert({
+                entity_type: 'block',
+                entity_id: update.id,
+                layout_json: currentLayout ?? [],
+                created_by: createdBy,
+              })
+            }
           }
 
           // DEBUG_TEXT: Log received content_json (server-side, always logs in dev)

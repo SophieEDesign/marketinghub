@@ -1668,7 +1668,7 @@ export default function AirtableGridView({
             const params = new URLSearchParams(window.location.search)
             params.delete("q")
             window.history.replaceState({}, "", `?${params.toString()}`)
-            window.location.reload()
+            router.refresh()
           }}
           className="text-xs text-blue-600 hover:text-blue-700 underline"
         >
@@ -2233,8 +2233,8 @@ export default function AirtableGridView({
             throw new Error(data.error || 'Failed to update records')
           }
           
-          // Refresh data
-          window.location.reload()
+          // Refresh data (Phase 4: avoid full-page reload)
+          router.refresh()
         }}
         onBulkDelete={async () => {
           setSelectedCount(selectedRowIds.size)
@@ -2320,7 +2320,7 @@ export default function AirtableGridView({
             }
             
             handleClearSelection()
-            window.location.reload()
+            router.refresh()
           } catch (error: any) {
             handleError(error, "Failed to delete records", error.message || "An error occurred while deleting records")
           }

@@ -12,6 +12,7 @@
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { Search, ChevronUp, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -46,6 +47,7 @@ interface RecordReviewViewProps {
 }
 
 export default function RecordReviewView({ page, data, config, blocks = [], pageTableId, isLoading = false }: RecordReviewViewProps) {
+  const router = useRouter()
   // CRITICAL: Use useState to prevent hydration mismatch - localStorage access must happen after mount
   const [recordDebugEnabled, setRecordDebugEnabled] = useState(false)
   
@@ -629,8 +631,8 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
         .update({ config: newConfig })
         .eq('id', page.id)
       
-      // Trigger page refresh
-      window.location.reload()
+      // Trigger page refresh (Phase 4: avoid full-page reload)
+      router.refresh()
     } catch (error) {
       console.error('Error updating field layout:', error)
       toast({
@@ -639,7 +641,7 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
         variant: "destructive",
       })
     }
-  }, [config, page.id, toast])
+  }, [config, page.id, toast, router])
 
   // CRITICAL: Memoize InterfaceBuilder page props to prevent remounts
   // Creating new objects on every render causes component remounts and canvas resets

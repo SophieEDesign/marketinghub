@@ -419,7 +419,10 @@ export function useGridData({
 
         const selectClause = buildSelectClause(existingPhysicalFieldNames, { includeId: true, fallback: '*' })
 
-        let query = supabase.from(tableName).select(selectClause)
+        let query = supabase
+          .from(tableName)
+          .select(selectClause)
+          .is('deleted_at', null)
 
       // Apply filters: support both flat FilterConfig[] and FilterTree (from view_filter_groups)
         const isFilterTree = currentFilters && typeof currentFilters === 'object' && !Array.isArray(currentFilters) && 'operator' in (currentFilters as object)
@@ -932,7 +935,7 @@ export function useGridData({
       try {
         const { error: deleteError } = await supabase
           .from(tableName)
-          .delete()
+          .update({ deleted_at: new Date().toISOString() })
           .eq('id', rowId)
 
         if (deleteError) {

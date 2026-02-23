@@ -43,6 +43,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase/client'
 import { formatDateTimeUK } from '@/lib/utils'
+import { useToast } from '@/components/ui/use-toast'
 import InterfacePageSettingsDrawer from '@/components/interface/InterfacePageSettingsDrawer'
 import PageCreationWizard from '@/components/interface/PageCreationWizard'
 import type { InterfacePage } from '@/lib/interface/page-types-only'
@@ -64,6 +65,7 @@ interface Page {
 
 export default function SettingsPagesTab() {
   const router = useRouter()
+  const { toast } = useToast()
   const [pages, setPages] = useState<Page[]>([])
   const [loading, setLoading] = useState(true)
   const [newPageOpen, setNewPageOpen] = useState(false)
@@ -325,11 +327,14 @@ export default function SettingsPagesTab() {
           throw new Error(error.error || 'Failed to delete page')
         }
       } else {
-        // Delete from views table (for backward compatibility with old system)
+        // Soft delete from views table (for backward compatibility with old system)
         const supabase = createClient()
         const { error } = await supabase
           .from('views')
-          .delete()
+          .update({
+            is_archived: true,
+            archived_at: new Date().toISOString(),
+          })
           .eq('id', pageToDelete.id)
 
         if (error) {
@@ -343,6 +348,7 @@ export default function SettingsPagesTab() {
       await loadPages()
       router.refresh()
       window.dispatchEvent(new CustomEvent('pages-updated'))
+      toast({ title: "Moved to trash", description: "Page has been moved to trash." })
     } catch (error: any) {
       console.error('Error deleting page:', error)
       alert(error.message || 'Failed to delete page. Make sure you have permission to delete pages.')

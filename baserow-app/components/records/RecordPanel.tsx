@@ -214,7 +214,7 @@ export default function RecordPanel() {
             cascadeContext={state.cascadeContext}
             active={active}
             onDeleted={() => {
-              toast({ title: "Record deleted", description: "The record has been removed." })
+              toast({ title: "Moved to trash", description: "The record has been moved to trash." })
               state.onRecordDeleted?.()
               closeRecord()
             }}

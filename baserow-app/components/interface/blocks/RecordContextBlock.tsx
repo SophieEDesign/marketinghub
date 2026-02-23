@@ -165,6 +165,7 @@ export default function RecordContextBlock({
       let query = supabase
         .from(resolved.supabase_table)
         .select(selectCols.join(", "))
+        .is("deleted_at", null)
         .limit(200)
 
       // Respect filter_mode: "all" = no filters, "specific" = use config filters, "viewer" = user-scoped (TODO)
@@ -290,16 +291,19 @@ export default function RecordContextBlock({
     if (!table || !recordId || recordTableId !== table.id || !onRecordContextChange) return
     const supabase = createClient()
     try {
-      const { error } = await supabase.from(table.supabase_table).delete().eq("id", recordId)
+      const { error } = await supabase
+        .from(table.supabase_table)
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", recordId)
       if (error) throw error
       setRefreshTrigger((c) => c + 1)
       const remaining = filteredRecords.filter((r) => r.id !== recordId)
       if (remaining.length > 0) {
         onRecordContextChange({ tableId: table.id, recordId: remaining[0].id })
-        toast({ title: "Record deleted", description: "Selecting next record." })
+        toast({ title: "Moved to trash", description: "Selecting next record." })
       } else {
         onRecordContextChange(null)
-        toast({ title: "Record deleted", description: "No more records." })
+        toast({ title: "Moved to trash", description: "No more records." })
       }
     } catch (e: any) {
       toast({

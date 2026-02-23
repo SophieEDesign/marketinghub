@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { X, Save } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -33,6 +34,7 @@ export default function FieldBuilderModal({
   onSave,
   tableFields = [],
 }: FieldBuilderModalProps) {
+  const router = useRouter()
   const [name, setName] = useState("")
   const [type, setType] = useState<FieldType>("text")
   const [required, setRequired] = useState(false)
@@ -274,9 +276,9 @@ export default function FieldBuilderModal({
       onSave()
       onClose()
       
-      // Refresh the page after adding a new field (not when editing)
+      // Refresh the page after adding a new field (not when editing) (Phase 4: avoid full-page reload)
       if (!isEdit) {
-        window.location.reload()
+        router.refresh()
       }
     } catch (err: any) {
       setError(err.message || "Failed to save field")

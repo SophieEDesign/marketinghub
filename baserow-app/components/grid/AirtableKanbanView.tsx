@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback } from "react"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import {
   DndContext,
   DragOverlay,
@@ -98,6 +98,7 @@ export default function AirtableKanbanView({
   cardFields = [],
   userRole = "editor",
 }: AirtableKanbanViewProps) {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const searchQuery = searchParams.get("q") || ""
   const [rows, setRows] = useState<Record<string, any>[]>([])
@@ -487,7 +488,7 @@ export default function AirtableKanbanView({
             const params = new URLSearchParams(window.location.search)
             params.delete("q")
             window.history.replaceState({}, "", `?${params.toString()}`)
-            window.location.reload()
+            router.refresh()
           }}
           className="text-xs text-blue-600 hover:text-blue-700 underline"
         >

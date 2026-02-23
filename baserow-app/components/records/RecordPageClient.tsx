@@ -120,14 +120,14 @@ export default function RecordPageClient({
       const supabase = createClient()
       const { error } = await supabase
         .from(supabaseTableName)
-        .delete()
+        .update({ deleted_at: new Date().toISOString() })
         .eq("id", recordId)
 
       if (error) throw error
 
       toast({
-        title: "Deleted",
-        description: "Record deleted successfully",
+        title: "Moved to trash",
+        description: "Record moved to trash successfully",
       })
 
       router.push(`/tables/${tableId}`)

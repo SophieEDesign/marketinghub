@@ -77,7 +77,7 @@ export default function DevRecordPanel() {
     active,
     cascadeContext,
     onDeleted: () => {
-      toast({ title: "Record deleted", description: "The record has been removed." })
+      toast({ title: "Moved to trash", description: "The record has been moved to trash." })
       onRecordDeleted?.()
       closeRecord()
       setUIMode("view")
