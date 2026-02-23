@@ -131,38 +131,47 @@ export default function UnifiedFilterDialog({
         return
       }
 
-      // Delete existing filter groups and filters
-      await supabase.from("view_filters").delete().eq("view_id", viewUuid)
-      await supabase.from("view_filter_groups").delete().eq("view_id", viewUuid)
+      // Delete existing filters first (view_filters before view_filter_groups due to FK)
+      const { error: deleteFiltersError } = await supabase.from("view_filters").delete().eq("view_id", viewUuid)
+      if (deleteFiltersError) throw deleteFiltersError
+
+      // Delete filter groups (may fail with 500 if table missing or RLS blocks - e.g. Kanban Core Data)
+      const { error: deleteGroupsError } = await supabase.from("view_filter_groups").delete().eq("view_id", viewUuid)
+      if (deleteGroupsError) {
+        console.warn("view_filter_groups delete failed (RLS/table issue), continuing with filters only:", deleteGroupsError)
+      }
 
       // Convert filter tree to database format
       const { groups, filters: dbFilters } = filterTreeToDbFormat(filterTree, viewUuid)
 
-      // Insert filter groups first
-      let insertedGroupIds: string[] = []
-      if (groups.length > 0) {
+      let filtersToInsert = dbFilters
+
+      // Try to insert filter groups first (only if we have groups and no prior delete error)
+      if (groups.length > 0 && !deleteGroupsError) {
         const { data: insertedGroups, error: groupsError } = await supabase
           .from("view_filter_groups")
           .insert(groups)
           .select("id")
 
-        if (groupsError) throw groupsError
-        insertedGroupIds = insertedGroups?.map((g) => g.id) || []
-      }
-
-      // Map filters to groups using temp indices
-      const filtersToInsert = dbFilters.map((filter) => {
-        // If filter has a temp group ID (temp-0, temp-1, etc.), map it to actual group ID
-        if (filter.filter_group_id && typeof filter.filter_group_id === 'string' && filter.filter_group_id.startsWith('temp-')) {
-          const tempIndex = parseInt(filter.filter_group_id.replace('temp-', ''), 10)
-          const actualGroupId = insertedGroupIds[tempIndex] || null
-          return {
-            ...filter,
-            filter_group_id: actualGroupId,
-          }
+        if (groupsError) {
+          // Fallback: save filters as ungrouped when view_filter_groups fails (500, RLS, etc.)
+          console.warn("view_filter_groups insert failed, saving filters without groups:", groupsError)
+          filtersToInsert = dbFilters.map((f) => ({ ...f, filter_group_id: null }))
+        } else {
+          const insertedGroupIds = insertedGroups?.map((g) => g.id) || []
+          filtersToInsert = dbFilters.map((filter) => {
+            if (filter.filter_group_id && typeof filter.filter_group_id === 'string' && filter.filter_group_id.startsWith('temp-')) {
+              const tempIndex = parseInt(filter.filter_group_id.replace('temp-', ''), 10)
+              const actualGroupId = insertedGroupIds[tempIndex] || null
+              return { ...filter, filter_group_id: actualGroupId }
+            }
+            return filter
+          })
         }
-        return filter
-      })
+      } else if (groups.length > 0 && deleteGroupsError) {
+        // Groups exist in tree but we couldn't delete - save as ungrouped
+        filtersToInsert = dbFilters.map((f) => ({ ...f, filter_group_id: null }))
+      }
 
       // Insert all filters
       if (filtersToInsert.length > 0) {
@@ -174,8 +183,6 @@ export default function UnifiedFilterDialog({
       }
 
       // Notify parent component (flattened for backward compatibility)
-      // Note: filtersToInsert doesn't have id yet (it's Omit<ViewFilter, "id">)
-      // We need to reload filters to get the actual IDs
       const { data: insertedFilters } = await supabase
         .from("view_filters")
         .select("id, field_name, operator, value")

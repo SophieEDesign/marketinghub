@@ -93,6 +93,8 @@ export interface CardConfig {
   cardColorField?: string
   cardWrapText?: boolean
   groupBy?: string
+  /** Kanban only: show field names above values on cards */
+  kanbanShowFieldLabels?: boolean
   /** Timeline only: date field for event start */
   timelineDateField?: string
   /** Timeline only: date field for event end (optional; if empty, start is used for both) */
@@ -129,11 +131,13 @@ export default function CustomizeCardsDialog({
   const router = useRouter()
   const viewUuid = normalizeUuid(viewId)
   const isTimeline = viewType === "timeline"
+  const isKanban = viewType === "kanban"
   const [localCardFields, setLocalCardFields] = useState<string[]>(config.cardFields)
   const [localImageField, setLocalImageField] = useState<string>(config.cardImageField || "")
   const [localColorField, setLocalColorField] = useState<string>(config.cardColorField || "")
   const [localWrapText, setLocalWrapText] = useState(config.cardWrapText ?? true)
   const [localGroupBy, setLocalGroupBy] = useState<string>(config.groupBy || "")
+  const [localShowFieldLabels, setLocalShowFieldLabels] = useState(config.kanbanShowFieldLabels ?? false)
   const [localDateField, setLocalDateField] = useState<string>(config.timelineDateField || "")
   const [localEndDateField, setLocalEndDateField] = useState<string>(config.timelineEndDateField || "")
   const [orderedFieldNames, setOrderedFieldNames] = useState<string[]>([])
@@ -145,6 +149,7 @@ export default function CustomizeCardsDialog({
     setLocalColorField(config.cardColorField || "")
     setLocalWrapText(config.cardWrapText ?? true)
     setLocalGroupBy(config.groupBy || "")
+    setLocalShowFieldLabels(config.kanbanShowFieldLabels ?? false)
     setLocalDateField(config.timelineDateField || "")
     setLocalEndDateField(config.timelineEndDateField || "")
   }, [config, isOpen])
@@ -251,6 +256,7 @@ export default function CustomizeCardsDialog({
       cardColorField: localColorField || undefined,
       cardWrapText: localWrapText,
       groupBy: localGroupBy || undefined,
+      ...(isKanban && { kanbanShowFieldLabels: localShowFieldLabels }),
       ...(isTimeline && {
         timelineDateField: localDateField || undefined,
         timelineEndDateField: localEndDateField || undefined,
@@ -276,6 +282,7 @@ export default function CustomizeCardsDialog({
         card_color_field: nextConfig.cardColorField,
         card_wrap_text: nextConfig.cardWrapText,
         kanbanGroupField: nextConfig.groupBy,
+        ...(isKanban && { kanban_show_field_labels: nextConfig.kanbanShowFieldLabels }),
       }
       if (isTimeline) {
         configUpdate.timeline_date_field = nextConfig.timelineDateField
@@ -503,6 +510,20 @@ export default function CustomizeCardsDialog({
               onCheckedChange={setLocalWrapText}
             />
           </div>
+
+          {/* Show field labels (Kanban only) */}
+          {isKanban && (
+            <div className="flex items-center justify-between">
+              <Label htmlFor="show-field-labels" className="text-sm">
+                Show field labels
+              </Label>
+              <Switch
+                id="show-field-labels"
+                checked={localShowFieldLabels}
+                onCheckedChange={setLocalShowFieldLabels}
+              />
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end gap-2 pt-4 border-t">

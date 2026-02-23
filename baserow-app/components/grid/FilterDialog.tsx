@@ -255,11 +255,16 @@ export default function FilterDialog({
         alert("This view is not linked to a valid view ID, so filters can't be saved.")
         return
       }
-      // Delete existing filter groups and filters
-      await supabase.from("view_filters").delete().eq("view_id", viewUuid)
-      await supabase.from("view_filter_groups").delete().eq("view_id", viewUuid)
+      // Delete existing filters first, then filter groups
+      const { error: deleteFiltersError } = await supabase.from("view_filters").delete().eq("view_id", viewUuid)
+      if (deleteFiltersError) throw deleteFiltersError
 
-      // Insert filter groups first
+      const { error: deleteGroupsError } = await supabase.from("view_filter_groups").delete().eq("view_id", viewUuid)
+      if (deleteGroupsError) {
+        console.warn("view_filter_groups delete failed (RLS/table), continuing with filters only:", deleteGroupsError)
+      }
+
+      // Insert filter groups first (fallback to ungrouped when view_filter_groups fails)
       const groupsToInsert = filterGroups
         .filter((group) => group.filters.length > 0)
         .map((group, index) => ({
@@ -269,22 +274,27 @@ export default function FilterDialog({
         }))
 
       let insertedGroupIds: string[] = []
-      if (groupsToInsert.length > 0) {
+      const useGroups = groupsToInsert.length > 0 && !deleteGroupsError
+      if (useGroups) {
         const { data: insertedGroups, error: groupsError } = await supabase
           .from("view_filter_groups")
           .insert(groupsToInsert)
           .select("id")
 
-        if (groupsError) throw groupsError
-        insertedGroupIds = insertedGroups?.map((g) => g.id) || []
+        if (groupsError) {
+          console.warn("view_filter_groups insert failed, saving filters without groups:", groupsError)
+        } else {
+          insertedGroupIds = insertedGroups?.map((g) => g.id) || []
+        }
       }
 
       // Collect all filters to insert
       const filtersToInsert: any[] = []
 
-      // Add filters from groups
+      // Add filters from groups (or as ungrouped if groups failed)
       filterGroups.forEach((group, groupIndex) => {
-        if (group.filters.length > 0 && insertedGroupIds[groupIndex]) {
+        if (group.filters.length > 0) {
+          const groupId = insertedGroupIds[groupIndex] || null
           group.filters.forEach((filter, filterIndex) => {
             if (filter.field_name && filter.operator) {
               filtersToInsert.push({
@@ -292,7 +302,7 @@ export default function FilterDialog({
                 field_name: filter.field_name,
                 operator: filter.operator,
                 value: filter.value || null,
-                filter_group_id: insertedGroupIds[groupIndex],
+                filter_group_id: groupId,
                 order_index: filterIndex,
               })
             }

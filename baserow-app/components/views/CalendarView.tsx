@@ -155,8 +155,6 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
   interfaceMode = 'view',
   blockId = null,
 }, ref) {
-  console.log("[CalendarView] MOUNT", blockId)
-
   // -------------------------------------------------------------------------
   // HOOKS: All useState, useMemo, useEffect, useRef, useCallback (and useRouter)
   // must be declared here, in the same order every render. No hook inside

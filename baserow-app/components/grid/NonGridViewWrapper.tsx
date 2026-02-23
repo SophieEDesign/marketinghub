@@ -54,6 +54,8 @@ interface NonGridViewWrapperProps {
   cardWrapText?: boolean
   timelineDateField?: string
   timelineEndDateField?: string
+  /** Server-provided view config (ensures TimelineView gets fresh config after CustomizeCardsDialog save) */
+  viewConfig?: Record<string, unknown>
 }
 
 export default function NonGridViewWrapper({
@@ -76,6 +78,7 @@ export default function NonGridViewWrapper({
   cardWrapText: cardWrapTextProp = true,
   timelineDateField: timelineDateFieldProp,
   timelineEndDateField: timelineEndDateFieldProp,
+  viewConfig: viewConfigProp = undefined,
 }: NonGridViewWrapperProps) {
   const viewUuid = normalizeUuid(viewId)
   const router = useRouter()
@@ -281,6 +284,7 @@ export default function NonGridViewWrapper({
             imageField={cardImageField || undefined}
             colorField={cardColorField || undefined}
             wrapText={cardWrapText}
+            showFieldLabels={(viewConfigProp as { kanban_show_field_labels?: boolean })?.kanban_show_field_labels === true}
           />
         )}
         {viewType === "gallery" && (
@@ -325,6 +329,7 @@ export default function NonGridViewWrapper({
             colorField={cardColorField || undefined}
             tagField={cardFields?.[0]}
             groupByField={groupingFieldId || undefined}
+            viewConfig={viewConfigProp}
           />
         )}
         {viewType === "horizontal_grouped" && tableInfo && (
@@ -420,6 +425,9 @@ export default function NonGridViewWrapper({
             cardColorField: cardColorField || undefined,
             cardWrapText: cardWrapText,
             groupBy: groupingFieldId || undefined,
+            ...(viewType === "kanban" && {
+              kanbanShowFieldLabels: (viewConfigProp as { kanban_show_field_labels?: boolean })?.kanban_show_field_labels === true,
+            }),
             ...(viewType === "timeline" && {
               timelineDateField: timelineDateField || undefined,
               timelineEndDateField: timelineEndDateField || undefined,

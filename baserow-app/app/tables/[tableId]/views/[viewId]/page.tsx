@@ -1,6 +1,9 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from "@/lib/supabase/server"
+
+// Ensure fresh data on router.refresh() (e.g. after CustomizeCardsDialog saves)
+export const dynamic = 'force-dynamic'
 import { isAdmin } from "@/lib/roles"
 import AirtableViewPage from "@/components/grid/AirtableViewPage"
 import NonGridViewWrapper from "@/components/grid/NonGridViewWrapper"
@@ -229,6 +232,7 @@ export default async function ViewPage({
             cardWrapText={(view.config as { card_wrap_text?: boolean })?.card_wrap_text}
             timelineDateField={(view.config as { timeline_date_field?: string })?.timeline_date_field}
             timelineEndDateField={(view.config as { timeline_end_date_field?: string })?.timeline_end_date_field}
+            viewConfig={view.config as Record<string, unknown> | undefined}
           />
         )}
       </WorkspaceShellWrapper>

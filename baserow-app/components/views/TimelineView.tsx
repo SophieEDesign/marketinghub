@@ -61,6 +61,8 @@ interface TimelineViewProps {
   onRecordDeleted?: () => void
   /** Callback to save field layout when user edits modal layout in right panel. */
   onModalLayoutSave?: (fieldLayout: import("@/lib/interface/field-layout-utils").FieldLayoutItem[]) => void
+  /** Server-provided view config (Core Data: ensures fresh config after CustomizeCardsDialog save) */
+  viewConfig?: Record<string, unknown> | null
 }
 
 type ZoomLevel = "day" | "week" | "month" | "quarter" | "year"
@@ -100,6 +102,7 @@ function TimelineView({
   interfaceMode = 'view',
   onRecordDeleted,
   onModalLayoutSave,
+  viewConfig: viewConfigProp,
 }: TimelineViewProps) {
   const supabase = useMemo(() => createClient(), [])
   const viewUuid = useMemo(() => normalizeUuid(viewId), [viewId])
@@ -363,8 +366,8 @@ function TimelineView({
     return rows.filter((row) => filteredIds.has(row.id))
   }, [rows, tableFields, searchQuery, fieldIds])
 
-  // Load view config for timeline settings (from Customize timeline dialog)
-  const [viewConfig, setViewConfig] = useState<{
+  // View config: use prop when provided (Core Data - fresh after CustomizeCardsDialog save), else fetch
+  const [fetchedViewConfig, setFetchedViewConfig] = useState<{
     timeline_color_field?: string | null
     card_color_field?: string | null
     card_fields?: string[]
@@ -375,8 +378,10 @@ function TimelineView({
     timeline_group_by?: string | null
   } | null>(null)
 
+  const viewConfig = viewConfigProp ?? fetchedViewConfig
+
   useEffect(() => {
-    if (!viewUuid) return
+    if (!viewUuid || viewConfigProp) return
     let cancelled = false
 
     async function loadViewConfig() {
@@ -388,7 +393,7 @@ function TimelineView({
           .single()
 
         if (!cancelled && view?.config) {
-          setViewConfig(view.config as any)
+          setFetchedViewConfig(view.config as any)
         }
       } catch (error) {
         if (!cancelled) {
@@ -401,7 +406,7 @@ function TimelineView({
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewUuid])
+  }, [viewUuid, viewConfigProp])
 
   // Resolve color field from props (highest priority), block config, view config, or auto-detect
   const resolvedColorField = useMemo(() => {
