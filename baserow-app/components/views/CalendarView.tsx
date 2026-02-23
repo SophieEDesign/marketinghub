@@ -1536,17 +1536,10 @@ export default function CalendarView({
   )
   const calendarDayHeaderFormat = useMemo(() => ({ weekday: "short" as const }), [])
 
-  // CRITICAL: Use string keys only - never raw Date objects in deps or return (prevents React #185)
-  // FullCalendar validRange end is EXCLUSIVE - add 1 day so the full range is visible (e.g. Feb 28 needs end: Mar 1)
-  const calendarValidRange = useMemo(() => {
-    if (!dateFrom || !dateTo || isNaN(dateFrom.getTime()) || isNaN(dateTo.getTime())) return undefined
-    return {
-      start: format(dateFrom, "yyyy-MM-dd"),
-      end: format(addDays(dateTo, 1), "yyyy-MM-dd"),
-    }
-  }, [dateFrom?.getTime(), dateTo?.getTime()])
+  // Presets (Today, This Week, This Month) are for NAVIGATION only - they bring the target date to the top
+  // but do NOT restrict/hide the rest of the calendar. No validRange is used.
 
-  // initialDate: when date range is set, show that range; otherwise default to today
+  // initialDate: when date range is set, navigate to that date; otherwise default to today
   const calendarInitialDate = useMemo(() => {
     if (dateFrom && !isNaN(dateFrom.getTime())) return format(dateFrom, "yyyy-MM-dd")
     return undefined
@@ -2005,7 +1998,6 @@ export default function CalendarView({
             eventContent={calendarEventContent}
             eventClick={handleEventClick}
             dateClick={handleDateClick}
-            validRange={calendarValidRange}
           />
         ) : (
           <div className="flex items-center justify-center h-64 text-gray-500">

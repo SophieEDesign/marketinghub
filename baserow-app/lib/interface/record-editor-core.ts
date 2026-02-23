@@ -189,6 +189,11 @@ export function useRecordEditorCore(
   const baselineFormDataRef = useRef<Record<string, any>>({})
   const draftSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const getDraftKey = useCallback(() => {
+    if (recordId) return `record-draft-${recordId}`
+    return `record-draft-new-${tableId}`
+  }, [recordId, tableId])
+
   const isCreateMode = recordId == null
 
   useEffect(() => {
@@ -259,11 +264,6 @@ export function useRecordEditorCore(
       if (!isAbortError(e)) console.error('Error loading fields:', e)
     }
   }, [tableId, tableFieldsProp])
-
-  const getDraftKey = useCallback(() => {
-    if (recordId) return `record-draft-${recordId}`
-    return `record-draft-new-${tableId}`
-  }, [recordId, tableId])
 
   const clearDraft = useCallback(() => {
     if (typeof window === 'undefined') return
