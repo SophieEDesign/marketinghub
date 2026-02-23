@@ -45,7 +45,7 @@ export default function PerformanceMonitor() {
       if (frameTime > 50) {
         slowFrameCount++
         // Only warn if we've accumulated enough slow frames AND enough time has passed since last warning
-        if (slowFrameCount > 5 && (now - lastWarningTime) > WARNING_COOLDOWN) {
+        if (slowFrameCount > 10 && (now - lastWarningTime) > WARNING_COOLDOWN) {
           lastWarningTime = now
           setBlocked(true)
           console.warn("⚠️ UI BLOCKED - Multiple slow frames detected!", {

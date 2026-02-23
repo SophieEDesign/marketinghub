@@ -325,7 +325,9 @@ export function useGridData({
     
     // Prevent concurrent loads
     if (isLoadingRef.current) {
-      console.warn('[useGridData] Load already in progress, skipping duplicate request')
+      if (typeof window !== 'undefined' && (process.env.NODE_ENV === 'development' || localStorage.getItem('DEBUG_GRID_DATA') === '1')) {
+        console.debug('[useGridData] Load already in progress, skipping duplicate request')
+      }
       return
     }
 
