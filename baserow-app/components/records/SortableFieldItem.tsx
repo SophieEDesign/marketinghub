@@ -57,11 +57,13 @@ export default function SortableFieldItem({
       )}
     >
       {layoutMode && (
-        <div className="absolute left-0 top-0 bottom-0 flex items-center z-10">
+        <div className="absolute left-0 top-0 bottom-0 flex items-center z-10 -ml-0.5">
           <div
             {...attributes}
             {...listeners}
-            className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 p-1"
+            className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded p-2 transition-colors touch-none"
+            title="Drag to reorder"
+            aria-label="Drag to reorder"
           >
             <GripVertical className="h-4 w-4" />
           </div>

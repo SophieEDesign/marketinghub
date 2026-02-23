@@ -24,6 +24,7 @@ import { sanitizeFieldName } from "@/lib/fields/validation"
 import { resolveSystemFieldAlias } from "@/lib/fields/systemFieldAliases"
 import { normalizeSelectOptionsForUi } from "@/lib/fields/select-options"
 import { getPrimaryField } from "@/lib/fields/primary"
+import { getFieldDisplayName } from "@/lib/fields/display"
 import type { HighlightRule } from "@/lib/interface/types"
 import { evaluateHighlightRules, getFormattingStyle } from "@/lib/conditional-formatting/evaluator"
 
@@ -39,19 +40,15 @@ interface TimelineViewProps {
   filters?: FilterConfig[] // Dynamic filters from config
   blockConfig?: Record<string, any> // Block/page config for reading date_from/date_to from page settings
   colorField?: string // Field name to use for event colors (single-select field)
-  imageField?: string // Field name to use for event images
-  fitImageSize?: boolean // Whether to fit image to container size
   onRecordClick?: (recordId: string) => void
-  // Card field configuration
+  // Card field configuration (compact contract)
   titleField?: string // Field to use as card title
-  cardField1?: string // Secondary field 1
-  cardField2?: string // Secondary field 2
-  cardField3?: string // Secondary field 3
+  tagField?: string // Optional single tag field (max 1 pill)
   // Grouping
   groupByField?: string // Field to group by (select field)
   // Appearance settings
-  wrapTitle?: boolean // Whether to wrap title text
   rowSize?: 'compact' | 'medium' | 'comfortable' // Row size setting
+  compactMode?: boolean // When true: 28px cards; when false: 40px
   /** Bump to force a refetch (e.g. after external record creation). */
   reloadKey?: number
   /** Conditional formatting rules */
@@ -72,7 +69,6 @@ interface TimelineEvent {
   end: Date
   rowData: Record<string, any>
   color?: string
-  image?: string
   groupValue?: string | null
 }
 
@@ -88,16 +84,12 @@ export default function TimelineView({
   filters = [],
   blockConfig = {},
   colorField,
-  imageField,
-  fitImageSize = false,
   onRecordClick,
   titleField: titleFieldProp,
-  cardField1,
-  cardField2,
-  cardField3,
+  tagField: tagFieldProp,
   groupByField: groupByFieldProp,
-  wrapTitle: wrapTitleProp,
   rowSize = 'medium',
+  compactMode: compactModeProp,
   reloadKey,
   highlightRules = [],
   interfaceMode = 'view',
@@ -440,15 +432,6 @@ export default function TimelineView({
     return tableFields.find(f => f.type === 'single_select' || f.type === 'multi_select') || null
   }, [colorField, blockConfig, viewConfig, tableFields])
 
-  // Resolve image field from props, block config, or view config (Customize timeline)
-  const resolvedImageField = useMemo(() => {
-    if (imageField) return imageField
-    const blockImage = blockConfig?.image_field || blockConfig?.appearance?.image_field
-    if (blockImage) return blockImage
-    if (viewConfig?.card_image_field) return viewConfig.card_image_field
-    return undefined
-  }, [imageField, blockConfig, viewConfig])
-
   // Resolve date_from and date_to fields from block config, props, view config, or auto-detect
   // This must be defined before resolvedCardFields since it's used there
   const resolvedDateFields = useMemo(() => {
@@ -512,9 +495,8 @@ export default function TimelineView({
     }
   }, [blockConfig, startDateFieldId, endDateFieldId, dateFieldId, viewConfig, tableFields])
 
-  // Resolve card field configuration
+  // Resolve compact card config: titleField + tagField (max 1)
   const resolvedCardFields = useMemo(() => {
-    // Get date field names to exclude from card fields
     const { fromFieldName, toFieldName } = resolvedDateFields
     const dateFieldNames = new Set([
       fromFieldName,
@@ -524,120 +506,64 @@ export default function TimelineView({
       dateFieldId,
     ].filter(Boolean))
 
-    // Priority: Use fieldIds (derived from "Fields to Show on Cards/Table" / Customize timeline) if available
-    // Fallback: viewConfig.card_fields when used standalone (e.g. before parent passes config)
-    // Otherwise fall back to timeline_field_1/2/3 (old system for backward compatibility)
-    let allVisibleFields: TableField[] = []
-    let cardFields: TableField[] = []
-    let resolvedTitleField: TableField | null = null
-    
     const effectiveFieldIds = (Array.isArray(fieldIds) && fieldIds.length > 0)
       ? fieldIds
       : (Array.isArray(viewConfig?.card_fields) && viewConfig.card_fields.length > 0)
         ? viewConfig.card_fields
         : []
-    
+
+    let allVisibleFields: TableField[] = []
     if (effectiveFieldIds.length > 0) {
-      // Use the visible field order passed into this view (new system), but de-dupe by field id.
-      // It's possible for configs to contain both id + name references (or duplicates after renames),
-      // which would otherwise render duplicated chips/values on cards.
       const seenVisible = new Set<string>()
-      allVisibleFields = []
       for (const fid of effectiveFieldIds) {
-        const resolved =
-          tableFields.find((f) => f.name === fid || f.id === fid) || undefined
+        const resolved = tableFields.find((f) => f.name === fid || f.id === fid)
         if (!resolved) continue
         if (resolved.id && seenVisible.has(String(resolved.id))) continue
         if (resolved.id) seenVisible.add(String(resolved.id))
         allVisibleFields.push(resolved)
       }
-      
-      // Resolve title field: explicit config > first non-date field from visible fields
-      const titleFieldName = titleFieldProp || 
-        blockConfig?.timeline_title_field || 
-        blockConfig?.card_title_field ||
-        null
-      
-      if (titleFieldName) {
-        // IMPORTANT: title field may not be included in visible_fields.
-        // Prefer resolving against the full tableFields list so user-selected title always works.
-        resolvedTitleField =
-          tableFields.find(f => f.name === titleFieldName || f.id === titleFieldName) || null
+    }
 
-        // Don't allow a date field as the title (would be confusing, and is usually the timeline axis)
-        if (resolvedTitleField && dateFieldNames.has(resolvedTitleField.name)) {
-          resolvedTitleField = null
-        }
-      }
-      
-      // If no explicit title field, use first non-date field from visible_fields
-      if (!resolvedTitleField) {
-        // Prefer a text/long_text field for the title (e.g. "Content Name") so cards are readable.
-        // If none exist in visible_fields, fall back to first non-date field.
-        resolvedTitleField =
-          allVisibleFields.find(
-            (f) =>
-              !dateFieldNames.has(f.name) &&
-              (f.type === "text" || f.type === "long_text")
-          ) ||
-          allVisibleFields.find((f) => !dateFieldNames.has(f.name)) ||
-          null
-      }
-      
-      // Fallback to auto-detect if still no title field
-      if (!resolvedTitleField) {
-        const primaryField = tableFields.find(f => 
-          (f.type === 'text' || f.type === 'long_text') && 
-          (f.name.toLowerCase() === 'name' || f.name.toLowerCase() === 'title')
-        ) || tableFields.find(f => f.type === 'text' || f.type === 'long_text') || null
-        resolvedTitleField = primaryField
-      }
-      
-      // Card fields: all visible fields except title and date fields (when from explicit card_fields config)
-      // Include all field types - Customize timeline allows any field; TimelineFieldValue renders them
-      const titleFieldNameToExclude = resolvedTitleField?.name
-      const titleFieldIdToExclude = resolvedTitleField?.id
-      cardFields = allVisibleFields.filter(f => 
-        f.name !== titleFieldNameToExclude && 
-        (titleFieldIdToExclude ? f.id !== titleFieldIdToExclude : true) &&
-        !dateFieldNames.has(f.name) &&
-        f.type !== 'attachment'
-      )
-    } else {
-      // Fall back to old system (backward compatibility)
-      const titleFieldName = titleFieldProp || 
-        blockConfig?.timeline_title_field || 
-        blockConfig?.card_title_field ||
+    // Title field: explicit config > first non-date from visible > primary
+    const titleFieldName = titleFieldProp ||
+      blockConfig?.timeline_title_field ||
+      blockConfig?.card_title_field ||
+      null
+
+    let resolvedTitleField: TableField | null = null
+    if (titleFieldName) {
+      resolvedTitleField = tableFields.find(f => f.name === titleFieldName || f.id === titleFieldName) || null
+      if (resolvedTitleField && dateFieldNames.has(resolvedTitleField.name)) resolvedTitleField = null
+    }
+    if (!resolvedTitleField) {
+      resolvedTitleField =
+        allVisibleFields.find(f => !dateFieldNames.has(f.name) && (f.type === "text" || f.type === "long_text")) ||
+        allVisibleFields.find(f => !dateFieldNames.has(f.name)) ||
         null
-      
-      // Find primary field (name/title field) as default
-      const primaryField = tableFields.find(f => 
-        (f.type === 'text' || f.type === 'long_text') && 
+    }
+    if (!resolvedTitleField) {
+      resolvedTitleField = tableFields.find(f =>
+        (f.type === 'text' || f.type === 'long_text') &&
         (f.name.toLowerCase() === 'name' || f.name.toLowerCase() === 'title')
       ) || tableFields.find(f => f.type === 'text' || f.type === 'long_text') || null
-      
-      resolvedTitleField = titleFieldName
-        ? tableFields.find(f => f.name === titleFieldName || f.id === titleFieldName) || primaryField
-        : primaryField
-      
-      // Only include fields that render as pills (select, linked fields)
-      const pillFieldTypes = ['single_select', 'multi_select', 'link_to_table']
-      cardFields = [
-        cardField1 || blockConfig?.timeline_field_1 || blockConfig?.card_field_1,
-        cardField2 || blockConfig?.timeline_field_2 || blockConfig?.card_field_2,
-        cardField3 || blockConfig?.timeline_field_3 || blockConfig?.card_field_3,
-      ].filter(Boolean).map(fieldName => 
-        tableFields.find(f => f.name === fieldName || f.id === fieldName)
-      ).filter((f): f is TableField => 
-        f !== undefined && pillFieldTypes.includes(f.type)
-      )
     }
 
-    return {
-      titleField: resolvedTitleField,
-      cardFields,
-    }
-  }, [titleFieldProp, cardField1, cardField2, cardField3, blockConfig, viewConfig, tableFields, resolvedDateFields, startDateFieldId, endDateFieldId, dateFieldId, fieldIds])
+    // Tag field: explicit config > card_field_1/timeline_field_1 (backward compat). Max 1. Pill types only.
+    const pillFieldTypes = ['single_select', 'multi_select', 'link_to_table']
+    const tagFieldName = tagFieldProp ||
+      blockConfig?.timeline_tag_field ||
+      blockConfig?.timeline_field_1 ||
+      blockConfig?.card_field_1 ||
+      null
+    const resolvedTagField = tagFieldName
+      ? (() => {
+          const f = tableFields.find(f => f.name === tagFieldName || f.id === tagFieldName)
+          return f && pillFieldTypes.includes(f.type) ? f : null
+        })()
+      : null
+
+    return { titleField: resolvedTitleField, tagField: resolvedTagField }
+  }, [titleFieldProp, tagFieldProp, blockConfig, viewConfig, tableFields, resolvedDateFields, startDateFieldId, endDateFieldId, dateFieldId, fieldIds])
 
   // Resolve group by field - fall back to primary field if not configured
   const resolvedGroupByField = useMemo(() => {
@@ -676,7 +602,7 @@ export default function TimelineView({
       }
 
       addIfLinked(resolvedCardFields?.titleField || null)
-      for (const f of resolvedCardFields?.cardFields || []) addIfLinked(f)
+      addIfLinked(resolvedCardFields?.tagField || null)
       addIfLinked(resolvedGroupByField as any)
 
       if (wanted.size === 0) {
@@ -709,16 +635,6 @@ export default function TimelineView({
     }
   }, [filteredRows, resolvedCardFields, resolvedGroupByField, tableFieldsKey, areLinkedValueMapsEqual])
 
-  // Resolve wrap title setting (from Customize timeline or block config)
-  const wrapTitle = useMemo(() => {
-    if (wrapTitleProp !== undefined) return wrapTitleProp
-    if (viewConfig?.card_wrap_text !== undefined) return viewConfig.card_wrap_text
-    return blockConfig?.timeline_wrap_title || 
-      blockConfig?.card_wrap_title || 
-      blockConfig?.appearance?.timeline_wrap_title ||
-      blockConfig?.appearance?.card_wrap_title ||
-      true
-  }, [wrapTitleProp, blockConfig, viewConfig])
 
   // Helper to get pill color for select fields
   const getPillColor = useCallback((field: TableField, value: any): string | null => {
@@ -971,20 +887,6 @@ export default function TimelineView({
           groupValue = 'Unassigned'
         }
 
-        // Get image from image field
-        let image: string | undefined = undefined
-        if (resolvedImageField) {
-          const imageValue = row.data[resolvedImageField]
-          if (imageValue) {
-            // Handle attachment field (array of URLs) or URL field (single URL)
-            if (Array.isArray(imageValue) && imageValue.length > 0) {
-              image = imageValue[0]
-            } else if (typeof imageValue === 'string' && (imageValue.startsWith('http') || imageValue.startsWith('/'))) {
-              image = imageValue
-            }
-          }
-        }
-
         return {
           id: row.id,
           rowId: row.id,
@@ -993,12 +895,11 @@ export default function TimelineView({
           end,
           rowData: row.data,
           color,
-          image,
           groupValue,
         }
       })
       .sort((a, b) => a.start.getTime() - b.start.getTime())
-  }, [filteredRows, startDateFieldId, endDateFieldId, dateFieldId, fieldIds, tableFields, optimisticUpdates, resolvedColorField, resolvedDateFields, resolvedImageField, resolvedCardFields, resolvedGroupByField])
+  }, [filteredRows, startDateFieldId, endDateFieldId, dateFieldId, fieldIds, tableFields, optimisticUpdates, resolvedColorField, resolvedDateFields, resolvedCardFields, resolvedGroupByField])
 
   // Calculate timeline range based on zoom level
   const timelineRange = useMemo(() => {
@@ -1113,28 +1014,90 @@ export default function TimelineView({
     return sortedGroups
   }, [visibleEvents, resolvedGroupByField])
 
-  // Calculate row size spacing
+  // Compact mode: 28px cards when true, 40px when false. Fixed heights regardless of content.
+  const compactMode = compactModeProp ?? blockConfig?.timeline_compact_mode ?? (blockConfig?.appearance?.row_height === 'compact' || rowSize === 'compact') ?? false
+
+  // Lane row spacing (for grouped layout)
   const rowSizeSpacing = useMemo(() => {
-    const rowSizeValue = blockConfig?.appearance?.row_height || rowSize || 'medium'
-    switch (rowSizeValue) {
-      case 'compact':
-        return { cardPadding: 'p-1.5', laneSpacing: 'mb-2', cardHeight: 'h-8' }
-      case 'comfortable':
-        return { cardPadding: 'p-3', laneSpacing: 'mb-6', cardHeight: 'h-16' }
-      default: // medium
-        return { cardPadding: 'p-2', laneSpacing: 'mb-4', cardHeight: 'h-10' }
-    }
-  }, [blockConfig, rowSize])
+    return compactMode ? { laneSpacing: 'mb-2' } : { laneSpacing: 'mb-4' }
+  }, [compactMode])
 
   // Absolute-positioned cards do NOT contribute to parent height.
   // Compute consistent pixel metrics so lanes reserve enough space and don't overlap.
   const laneLayout = useMemo(() => {
-    const cardHeightPx =
-      rowSizeSpacing.cardHeight === 'h-8' ? 32 : rowSizeSpacing.cardHeight === 'h-16' ? 64 : 40
-    const stackGapPx =
-      rowSizeSpacing.cardHeight === 'h-8' ? 50 : rowSizeSpacing.cardHeight === 'h-16' ? 90 : 70
+    const cardHeightPx = compactMode ? 28 : 40
+    const stackGapPx = compactMode ? 40 : 52
     return { cardHeightPx, stackGapPx }
-  }, [rowSizeSpacing.cardHeight])
+  }, [compactMode])
+
+  const dateFieldNames = useMemo(() => {
+    const { fromFieldName, toFieldName } = resolvedDateFields
+    return new Set([
+      fromFieldName,
+      toFieldName,
+      startDateFieldId,
+      endDateFieldId,
+      dateFieldId,
+    ].filter(Boolean))
+  }, [resolvedDateFields, startDateFieldId, endDateFieldId, dateFieldId])
+
+  // Build tag string and tooltip content for compact card display
+  const getCompactDisplay = useCallback((event: TimelineEvent) => {
+    const { titleField, tagField } = resolvedCardFields
+    const titleFieldName = titleField?.name
+    const tagFieldName = tagField?.name
+
+    let tag: string | undefined
+    if (tagField) {
+      const val = event.rowData[tagField.name] ?? event.rowData[tagField.id]
+      if (val != null && val !== '') {
+        if (tagField.type === 'link_to_table') {
+          const arr = Array.isArray(val) ? val : [val]
+          const first = arr[0]
+          const id = first && typeof first === 'object' && 'id' in first ? String((first as any).id) : String(first)
+          const map = linkedValueLabelMaps[tagField.name] || linkedValueLabelMaps[tagField.id] || {}
+          tag = (id && map[id.trim()]) || id || String(val)
+        } else if (tagField.type === 'multi_select' && Array.isArray(val)) {
+          tag = val.length > 0 ? String(val[0]).trim() : undefined
+        } else {
+          tag = String(val).trim()
+        }
+      }
+    }
+
+    const tooltipLines: string[] = []
+    for (const f of tableFields) {
+      if (f.name === 'id') continue
+      if (dateFieldNames.has(f.name)) continue
+      if (f.name === titleFieldName || f.id === titleFieldName) continue
+      if (f.name === tagFieldName || f.id === tagFieldName) continue
+      if (f.type === 'attachment') continue
+
+      const val = event.rowData[f.name] ?? event.rowData[f.id]
+      if (val == null || val === '') continue
+
+      let displayVal: string
+      if (f.type === 'link_to_table') {
+        const arr = Array.isArray(val) ? val : [val]
+        const labels = arr.map((v: any) => {
+          const id = v && typeof v === 'object' && 'id' in v ? String((v as any).id) : String(v)
+          const map = linkedValueLabelMaps[f.name] || linkedValueLabelMaps[f.id] || {}
+          return (id && map[id.trim()]) || id
+        })
+        displayVal = labels.join(', ')
+      } else if (Array.isArray(val)) {
+        displayVal = val.map(v => String(v)).join(', ')
+      } else if (val instanceof Date) {
+        displayVal = isNaN(val.getTime()) ? '—' : val.toLocaleDateString()
+      } else {
+        displayVal = String(val)
+      }
+      tooltipLines.push(`${getFieldDisplayName(f)}: ${displayVal}`)
+    }
+    const tooltipContent = tooltipLines.length > 0 ? tooltipLines.join('\n') : undefined
+
+    return { tag, tooltipContent }
+  }, [resolvedCardFields, tableFields, dateFieldNames, linkedValueLabelMaps])
 
   // Calculate pixel positions for events
   const getEventPosition = useCallback(
@@ -1670,6 +1633,7 @@ export default function TimelineView({
                     >
                       {groupEvents.map((event, eventIndex) => {
                         const { left, width } = getEventPosition(event)
+                        const { tag, tooltipContent } = getCompactDisplay(event)
                         return (
                           <TimelineEventCard
                             key={event.id}
@@ -1677,13 +1641,13 @@ export default function TimelineView({
                             left={left}
                             width={width}
                             top={eventIndex * laneLayout.stackGapPx}
-                            rowSizeSpacing={rowSizeSpacing}
-                            wrapTitle={wrapTitle}
-                            resolvedCardFields={resolvedCardFields}
-                            linkedValueLabelMaps={linkedValueLabelMaps}
+                            title={event.title}
+                            color={event.color}
+                            tag={tag}
+                            tooltipContent={tooltipContent}
+                            compactMode={compactMode}
                             tableFields={tableFields}
                             highlightRules={highlightRules}
-                            fitImageSize={fitImageSize}
                             selectedEventId={selectedEventId}
                             isDragging={draggingEvent === event.id}
                             isResizing={resizingEvent?.id === event.id}
@@ -1702,6 +1666,7 @@ export default function TimelineView({
               // Render ungrouped events
               visibleEvents.map((event, index) => {
                 const { left, width } = getEventPosition(event)
+                const { tag, tooltipContent } = getCompactDisplay(event)
                 return (
                   <TimelineEventCard
                     key={event.id}
@@ -1709,13 +1674,13 @@ export default function TimelineView({
                     left={left}
                     width={width}
                     top={index * laneLayout.stackGapPx}
-                    rowSizeSpacing={rowSizeSpacing}
-                    wrapTitle={wrapTitle}
-                    resolvedCardFields={resolvedCardFields}
-                    linkedValueLabelMaps={linkedValueLabelMaps}
+                    title={event.title}
+                    color={event.color}
+                    tag={tag}
+                    tooltipContent={tooltipContent}
+                    compactMode={compactMode}
                     tableFields={tableFields}
                     highlightRules={highlightRules}
-                    fitImageSize={fitImageSize}
                     selectedEventId={selectedEventId}
                     isDragging={draggingEvent === event.id}
                     isResizing={resizingEvent?.id === event.id}

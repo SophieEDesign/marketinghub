@@ -957,21 +957,17 @@ export default function GridBlock({
             filters={allFilters} // Pass merged filters
             blockConfig={config} // Pass block config so TimelineView can read date_from/date_to from page settings
             colorField={appearance.color_field}
-            imageField={appearance.image_field}
-            fitImageSize={appearance.fit_image_size}
             onRecordClick={onRecordClick}
             reloadKey={refreshKey}
             onRecordDeleted={() => setRefreshKey((k) => k + 1)}
-            // Card field configuration
+            // Compact card configuration
             titleField={config.timeline_title_field || config.card_title_field}
-            cardField1={config.timeline_field_1 || config.card_field_1}
-            cardField2={config.timeline_field_2 || config.card_field_2}
-            cardField3={config.timeline_field_3 || config.card_field_3}
+            tagField={config.timeline_tag_field || config.timeline_field_1 || config.card_field_1}
             // Grouping
             groupByField={config.timeline_group_by || config.group_by_field || config.group_by}
-            // Appearance settings
-            wrapTitle={appearance.timeline_wrap_title || appearance.card_wrap_title}
+            // Appearance
             rowSize={appearance.row_height as 'compact' | 'medium' | 'comfortable' || 'medium'}
+            compactMode={config.timeline_compact_mode ?? (appearance.row_height === 'compact')}
             highlightRules={config.highlight_rules}
             interfaceMode={interfaceMode}
           />

@@ -1,7 +1,6 @@
 "use client"
 
 import { Card, CardContent } from "@/components/ui/card"
-import TimelineFieldValue from "./TimelineFieldValue"
 import type { TableField } from "@/types/fields"
 import type { HighlightRule } from "@/lib/interface/types"
 import { evaluateHighlightRules, getFormattingStyle } from "@/lib/conditional-formatting/evaluator"
@@ -15,22 +14,23 @@ export interface TimelineEventCardEvent {
   image?: string
 }
 
-interface ResolvedCardFields {
-  cardFields: TableField[]
-}
-
 interface TimelineEventCardProps {
   event: TimelineEventCardEvent
   left: number
   width: number
   top: number
-  rowSizeSpacing: { cardHeight: string; cardPadding: string }
-  wrapTitle: boolean
-  resolvedCardFields: ResolvedCardFields
-  linkedValueLabelMaps: Record<string, Record<string, string>>
+  /** Display title (single line, truncated in UI) */
+  title: string
+  /** Color for status indicator / left border */
+  color?: string
+  /** Optional single tag pill (max 1) */
+  tag?: string
+  /** Tooltip content - additional fields for hover */
+  tooltipContent?: string
+  /** Compact mode: 28px height when true, 40px when false */
+  compactMode: boolean
   tableFields: TableField[]
   highlightRules?: HighlightRule[] | null
-  fitImageSize: boolean
   selectedEventId: string | null
   isDragging: boolean
   isResizing: boolean
@@ -45,13 +45,13 @@ export default function TimelineEventCard({
   left,
   width,
   top,
-  rowSizeSpacing,
-  wrapTitle,
-  resolvedCardFields,
-  linkedValueLabelMaps,
+  title,
+  color,
+  tag,
+  tooltipContent,
+  compactMode,
   tableFields,
   highlightRules,
-  fitImageSize,
   selectedEventId,
   isDragging,
   isResizing,
@@ -69,13 +69,19 @@ export default function TimelineEventCard({
       ? getFormattingStyle(matchingRule)
       : {}
 
+  const effectiveColor = color ?? event.color
   const baseCardStyle = {
-    borderLeftColor: event.color,
-    backgroundColor: event.color ? `${event.color}15` : "white",
+    borderLeftColor: effectiveColor,
+    backgroundColor: effectiveColor ? `${effectiveColor}15` : "white",
     outline: selectedEventId === event.rowId ? "2px solid rgba(96, 165, 250, 0.4)" : "none",
     outlineOffset: selectedEventId === event.rowId ? "2px" : "0",
     ...rowFormattingStyle,
   }
+
+  const tooltip = tooltipContent ? `${title}\n\n${tooltipContent}` : title
+
+  const cardHeightClass = compactMode ? "h-7" : "h-10"
+  const cardPaddingClass = compactMode ? "px-2 py-1" : "px-2 py-1.5"
 
   return (
     <div
@@ -87,35 +93,19 @@ export default function TimelineEventCard({
       }}
     >
       <Card
-        className={`${rowSizeSpacing.cardHeight} shadow-sm transition-all hover:shadow-md ${
-          event.color ? "border-l-4" : ""
+        className={`${cardHeightClass} shadow-sm transition-all hover:shadow-md ${
+          effectiveColor ? "border-l-4" : ""
         } ${isDragging || isResizing ? "opacity-75" : ""} ${
           draggingOrResizingAny ? "cursor-grabbing" : "cursor-pointer"
         }`}
         style={baseCardStyle}
         onMouseDown={onDragStart}
         onClick={onSelect}
+        title={tooltip}
       >
         <CardContent
-          className={`${rowSizeSpacing.cardPadding} h-full flex flex-col relative gap-1 min-w-0`}
+          className={`${cardPaddingClass} h-full flex items-center gap-2 min-w-0 overflow-hidden`}
         >
-          {event.image && (
-            <div
-              className={`flex-shrink-0 w-6 h-6 rounded overflow-hidden bg-gray-100 ${
-                fitImageSize ? "object-contain" : "object-cover"
-              }`}
-            >
-              <img
-                src={event.image}
-                alt=""
-                className={`w-full h-full ${fitImageSize ? "object-contain" : "object-cover"}`}
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = "none"
-                }}
-              />
-            </div>
-          )}
-
           <div
             className="absolute left-0 top-0 bottom-0 w-4 cursor-ew-resize hover:bg-blue-300/50 opacity-0 group-hover:opacity-100 transition-opacity z-10 rounded-l"
             onMouseDown={(e) => onResizeStart("start", e)}
@@ -124,32 +114,22 @@ export default function TimelineEventCard({
             data-timeline-resize="true"
           />
 
-          <div
-            className={`text-xs font-medium leading-tight ${wrapTitle ? "break-words" : "truncate"}`}
-            title={event.title}
-          >
-            {event.title}
+          {effectiveColor && (
+            <div
+              className="flex-shrink-0 w-1.5 h-1.5 rounded-full"
+              style={{ backgroundColor: effectiveColor }}
+              aria-hidden
+            />
+          )}
+
+          <div className="flex-1 min-w-0 text-xs font-medium truncate">
+            {title || "—"}
           </div>
 
-          {resolvedCardFields.cardFields.length > 0 && (
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 min-w-0">
-              {resolvedCardFields.cardFields.slice(0, 3).map((field, idx) => {
-                const value = event.rowData[field.name]
-                return (
-                  <span key={field.id} className="inline-flex items-center shrink-0">
-                    {idx > 0 && <span className="text-gray-400 mr-0.5 text-[10px]">·</span>}
-                    <TimelineFieldValue
-                      field={field}
-                      value={value}
-                      valueLabelMap={
-                        linkedValueLabelMaps[field.name] || linkedValueLabelMaps[field.id]
-                      }
-                      compact={true}
-                    />
-                  </span>
-                )
-              })}
-            </div>
+          {tag && (
+            <span className="flex-shrink-0 px-2 py-0.5 rounded-md text-[10px] font-medium bg-gray-100 text-gray-700 truncate max-w-[80px]">
+              {tag}
+            </span>
           )}
 
           <div

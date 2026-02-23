@@ -252,9 +252,6 @@ function InterfacePageClientInternal({
       : undefined
   // handlePageUpdate changes when page loads (page?.id, page?.source_view) - must not be in sync effect deps
   const handlePageUpdate = useCallback(async () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfacePageClient.tsx:handlePageUpdate:entry',message:'Page update triggered - will reload page and blocks',data:{pageId},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
     pageLoadedRef.current = false
     if (pageId) {
       blocksLoadedRef.current = { pageId, loaded: false }
@@ -983,10 +980,7 @@ function InterfacePageClientInternal({
             title: "Unsaved changes",
             description: "You have unsaved changes. Save before reloading.",
           })
-        } else if (blocksChanged || forceReload) {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfacePageClient.tsx:loadBlocks:setBlocks',message:'loadBlocks updating blocks state',data:{pageId,blocksCount:pageBlocks.length,blockIds:pageBlocks.map((b:any)=>b.id),blockLayouts:pageBlocks.map((b:any)=>({id:b.id,x:b.x,y:b.y,w:b.w,h:b.h})),forceReload,blocksChanged},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
-          // #endregion
+        } else         if (blocksChanged || forceReload) {
           setBlocks(pageBlocks)
         } else if (process.env.NODE_ENV === 'development') {
           debugLog(`[loadBlocks] Blocks unchanged - skipping setBlocks to prevent re-render`)

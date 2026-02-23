@@ -2,6 +2,13 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react"
 import { ChevronDown, ChevronRight, Plus } from "lucide-react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { useToast } from "@/components/ui/use-toast"
@@ -625,15 +632,18 @@ export default function RecordFields({
     [layoutMode, onFieldLayoutChange, fieldLayout, onFieldVisibilityToggle, pageEditable, modalColumns]
   )
 
-  // Add a new column when in layout mode with only 1 column (moves first field to col-2)
+  // Add a new column when in layout mode (moves first field from col-1 to the new column)
   const handleAddColumn = useCallback(() => {
     if (!layoutMode || !onFieldLayoutChange || !fieldLayout.length) return
+    const dataCols = modalColumns.filter((c) => c.id !== "col-full")
+    if (dataCols.length >= 3) return
+    const nextColId = dataCols.length === 1 ? "col-2" : "col-3"
     const col1 = modalColumns.find((c) => c.id === "col-1")
     if (!col1 || col1.fields.length === 0) return
     const firstField = col1.fields[0]
     const updatedLayout = fieldLayout.map((item) =>
       item.field_name === firstField.name || item.field_id === firstField.id
-        ? { ...item, modal_column_id: "col-2" as const }
+        ? { ...item, modal_column_id: nextColId as "col-2" | "col-3" }
         : item
     )
     onFieldLayoutChange(updatedLayout)
@@ -893,7 +903,7 @@ export default function RecordFields({
   }, [fieldLayout, fields])
 
   // Compute CSS grid template: 1, 2, or 3 columns for grid layout.
-  // When layoutMode and 2+ columns, inject 8px resize handles between columns.
+  // When layoutMode and 2+ columns, inject 10px resize handles between columns (Airtable-style).
   const gridTemplateColumns = useMemo(() => {
     if (!showModalColumns) return undefined
     const cols = dataColumns
@@ -902,7 +912,7 @@ export default function RecordFields({
     if (!total) return "1fr 1fr"
     const fractions = cols.map((col) => `${(col.width || 1) / total}fr`)
     if (layoutMode && cols.length >= 2) {
-      return fractions.join(" 8px ")
+      return fractions.join(" 10px ")
     }
     return fractions.join(" ")
   }, [showModalColumns, modalColumns, dataColumns, layoutMode])
@@ -988,7 +998,7 @@ export default function RecordFields({
             <>
               <div
                 ref={columnsContainerRef}
-                className={showModalColumns ? "grid gap-4" : "space-y-3"}
+                className={showModalColumns ? "grid gap-3" : "space-y-3"}
                 style={
                   showModalColumns && gridTemplateColumns
                     ? { gridTemplateColumns, gridAutoFlow: "row" }
@@ -1003,19 +1013,23 @@ export default function RecordFields({
                       key={`resize-${idx}`}
                       role="separator"
                       aria-orientation="vertical"
+                      aria-label="Resize column"
                       onMouseDown={(e) => {
                         e.preventDefault()
                         startResize(idx)
                       }}
-                      className="cursor-col-resize hover:bg-blue-200/60 rounded transition-colors bg-gray-200 self-stretch"
+                      className="cursor-col-resize hover:bg-blue-200/60 rounded transition-colors bg-gray-200 self-stretch flex items-center justify-center group"
                       style={{
                         gridColumn: 2 + idx * 2,
                         gridRow: "1 / -1",
                         minHeight: 40,
-                        width: 8,
-                        minWidth: 8,
+                        width: 10,
+                        minWidth: 10,
                       }}
-                    />
+                      title="Drag to resize column width"
+                    >
+                      <span className="w-0.5 h-8 bg-gray-400 group-hover:bg-blue-500 rounded-full opacity-60 group-hover:opacity-100 transition-opacity" />
+                    </div>
                   ))}
                 {canonicalFieldItems.map((item, index) => {
                   const prevGroupName =
@@ -1036,7 +1050,7 @@ export default function RecordFields({
                     <div
                       key={item.field.id}
                       className={cn(
-                        showModalColumns && "min-w-0 p-4 rounded-lg border border-dashed border-gray-200",
+                        showModalColumns && "min-w-0 p-4 rounded-lg border border-dashed border-gray-200 transition-all duration-200 ease-out",
                         !showModalColumns && isFirstInGroup && index > 0 && "pt-4 mt-4 border-t border-dashed border-gray-200"
                       )}
                       style={gridColStyle}
@@ -1087,7 +1101,7 @@ export default function RecordFields({
               {/* Layout-mode-only UI: Add column, Add field, column resize (no hooks, safe to vary). */}
               {layoutMode && showModalColumns && (
                 <div className="pt-2 mt-2 border-t border-dashed border-gray-200 flex flex-wrap gap-2">
-                  {dataColumns.length === 1 && (
+                  {dataColumns.length < 3 && (
                     <button
                       type="button"
                       onClick={handleAddColumn}
@@ -1097,28 +1111,38 @@ export default function RecordFields({
                       Add column
                     </button>
                   )}
+                  {dataColumns.length === 1 && (
+                    <span className="text-xs text-gray-500 self-center">
+                      Drag handle to reorder · Add column for grid layout
+                    </span>
+                  )}
+                  {dataColumns.length >= 2 && (
+                    <span className="text-xs text-gray-500 self-center">
+                      Drag between columns to arrange · Resize column width with handles between columns
+                    </span>
+                  )}
                   {availableFields.length > 0 && (
-                    <>
-                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide w-full">
-                        Add field
-                      </span>
-                      {availableFields.slice(0, 6).map((field) => (
-                        <button
-                          key={field.id}
-                          type="button"
-                          onClick={() => handleAddField(field, modalColumns[0]?.id)}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-gray-300 rounded-md bg-white hover:bg-gray-50 text-gray-700"
-                        >
-                          <Plus className="h-3 w-3" />
-                          {getFieldDisplayName(field)}
-                        </button>
-                      ))}
-                      {availableFields.length > 6 && (
-                        <span className="text-xs text-gray-500 self-center">
-                          +{availableFields.length - 6} more
-                        </span>
-                      )}
-                    </>
+                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide w-full flex items-center gap-2 flex-wrap">
+                      <span>Add field</span>
+                      <Select
+                        value=""
+                        onValueChange={(fieldName) => {
+                          const field = availableFields.find((f) => f.name === fieldName || f.id === fieldName)
+                          if (field) handleAddField(field, modalColumns[0]?.id)
+                        }}
+                      >
+                        <SelectTrigger className="w-[200px] h-8 text-xs">
+                          <SelectValue placeholder="Choose a field..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableFields.map((field) => (
+                            <SelectItem key={field.id} value={field.name}>
+                              {getFieldDisplayName(field)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </span>
                   )}
                 </div>
               )}

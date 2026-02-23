@@ -182,9 +182,7 @@ export default function InterfaceBuilder({
       (blocks.length === 0 && initialBlocks.length > 0)
 
     if (!shouldInit && initialBlocks?.length > 0 && blocks.length > 0) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:oneWayGate:skipped',message:'One-way gate SKIPPED update - keeping internal blocks',data:{pageId:page.id,initialBlocksCount:initialBlocks?.length,blocksCount:blocks.length,initialBlockIds:initialBlocks?.map((b:any)=>b.id),blockIds:blocks.map(b=>b.id)},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
+      // One-way gate: keep internal blocks, skip update
     }
 
     if (shouldInit) {
@@ -324,7 +322,6 @@ export default function InterfaceBuilder({
       debugLog(`[Lifecycle] InterfaceBuilder UNMOUNT: pageId=${page.id}`)
     }
   }, [])
-  // #region agent log – page-level remount (if "InterfaceBuilder mount" logs repeatedly, page-level remount)
   useEffect(() => {
     debugLog("InterfaceBuilder mount")
     return () => { debugLog("InterfaceBuilder unmount") }
@@ -358,12 +355,9 @@ export default function InterfaceBuilder({
 
   const saveLayout = useCallback(
     async (layout: LayoutItem[], hasUserInteraction = false) => {
-      // #region agent log
       const mountBlocked = guardAgainstMountSave(componentIdRef.current, 'saveLayout');
       const autoBlocked = guardAgainstAutoSave('saveLayout', hasUserInteraction || layoutModifiedByUserRef.current);
       const noModBlocked = !layoutModifiedByUserRef.current;
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:saveLayout:entry',message:'saveLayout called',data:{pageId:page.id,layoutCount:layout.length,hasUserInteraction,mountBlocked,autoBlocked,noModBlocked,layoutModifiedByUser:layoutModifiedByUserRef.current},timestamp:Date.now(),hypothesisId:'L2'})}).catch(()=>{});
-      // #endregion
       // Only save in edit mode - view mode must never mutate layout
       if (!effectiveIsEditing) return false
 
@@ -393,9 +387,6 @@ export default function InterfaceBuilder({
       )
 
       if (layoutHash === lastSavedLayoutRef.current) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:saveLayout:noDiff',message:'Save skipped: layout unchanged',data:{pageId:page.id},timestamp:Date.now(),hypothesisId:'L2'})}).catch(()=>{});
-        // #endregion
         if (process.env.NODE_ENV === 'development') {
           console.debug("[Layout] Save skipped: no diff (layout unchanged)")
         }
@@ -434,9 +425,6 @@ export default function InterfaceBuilder({
           })
         }
 
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:saveLayout:apiCall',message:'PATCH /api/pages/.../blocks',data:{pageId:page.id,layoutCount:layout.length},timestamp:Date.now(),hypothesisId:'L2'})}).catch(()=>{});
-        // #endregion
         const response = await fetch(`/api/pages/${page.id}/blocks`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -471,23 +459,14 @@ export default function InterfaceBuilder({
             debugLog('🔥 saveLayout COMPLETE – not reloading (blocks already correct)')
           }
           
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:saveLayout:success',message:'Layout saved successfully',data:{pageId:page.id},timestamp:Date.now(),hypothesisId:'L2'})}).catch(()=>{});
-          // #endregion
           // Show success feedback briefly, then reset to idle
           setTimeout(() => setSaveStatus("idle"), 2000)
           return true
         } else {
           const error = await response.text()
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:saveLayout:apiError',message:'API returned non-OK',data:{pageId:page.id,status:response.status,error:error?.slice(0,200)},timestamp:Date.now(),hypothesisId:'L2'})}).catch(()=>{});
-          // #endregion
           throw new Error(error || "Failed to save layout")
         }
       } catch (error: any) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:saveLayout:catch',message:'saveLayout threw',data:{pageId:page.id,errorMsg:error?.message},timestamp:Date.now(),hypothesisId:'L2'})}).catch(()=>{});
-        // #endregion
         debugError("Failed to save layout:", error)
         setSaveStatus("error")
         toast({
@@ -519,9 +498,6 @@ export default function InterfaceBuilder({
    */
   const handleLayoutChange = useCallback(
     (layout: LayoutItem[]) => {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:handleLayoutChange:entry',message:'Layout change received',data:{pageId:page.id,layoutCount:layout.length,effectiveIsEditing},timestamp:Date.now(),hypothesisId:'L1'})}).catch(()=>{});
-      // #endregion
       // Only save in edit mode - view mode never mutates layout
       if (!effectiveIsEditing) return
       
@@ -732,9 +708,6 @@ export default function InterfaceBuilder({
     async (blockId: string, configPatch: Partial<PageBlock["config"]>) => {
       // Phase 4: Track blocks dirty for EditModeGuard navigation protection
       setBlocksDirty(true)
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:handleBlockUpdate:entry',message:'Block update started',data:{blockId,configKeys:Object.keys(configPatch||{})},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       // 1) Optimistic in-place update (does not remount TipTap)
       // This preserves the same array length, same objects for other blocks,
       // and the same TextBlock instance - TipTap keeps focus + cursor
@@ -773,9 +746,6 @@ export default function InterfaceBuilder({
       // 3) Only recover/reload on error
       if (!res.ok) {
         setBlocksDirty(false) // Revert dirty on failure (we reload from server)
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:handleBlockUpdate:apiFailed',message:'Block update API failed',data:{blockId,status:res.status},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
-        // #endregion
         // Re-sync from server if save failed
         debugError(`[InterfaceBuilder] Block update failed, reloading from server: blockId=${blockId}`)
         const blocksResponse = await fetch(`/api/pages/${page.id}/blocks`, {
@@ -822,9 +792,6 @@ export default function InterfaceBuilder({
 
       // Phase 4: Clear blocks dirty when block update succeeds
       setBlocksDirty(false)
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InterfaceBuilder.tsx:handleBlockUpdate:success',message:'Block update API success',data:{blockId},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       if (process.env.NODE_ENV === 'development') {
         debugLog(`[InterfaceBuilder] Block updated successfully (optimistic): blockId=${blockId}`, {
           pageId: page.id,

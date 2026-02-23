@@ -869,7 +869,7 @@ export default function GroupedInterfaces({
   }
 
   // Navigation Page Component (view mode)
-  // Fallback: if Next.js Link navigation doesn't complete after 500ms, retry with router.push
+  // Use router.push directly - Link's client-side navigation can fail in this app
   function NavigationPage({ page, level = 0 }: { page: InterfacePage; level?: number }) {
     const targetPageId = page.id
     const targetPath = `/pages/${targetPageId}`
@@ -890,17 +890,19 @@ export default function GroupedInterfaces({
         className={className}
         style={style}
         onClick={(e) => {
+          e.preventDefault()
           if (isActive) {
-            e.preventDefault()
             router.refresh()
             return
           }
+          router.push(targetPath)
+          // Fallback: if router.push doesn't navigate (known Next.js issue), force full reload
           const startPath = pathname
           setTimeout(() => {
             if (window.location.pathname !== targetPath && window.location.pathname === startPath) {
-              router.push(targetPath)
+              window.location.href = targetPath
             }
-          }, 500)
+          }, 800)
         }}
       >
         <span className="truncate flex-1">{page.name}</span>
@@ -999,25 +1001,23 @@ export default function GroupedInterfaces({
                 color: primaryColor 
               } : { color: sidebarTextColor }}
               onClick={(e) => {
-                // Only prevent navigation when dragging in edit mode - never block otherwise
                 if (editMode && isDraggingRef.current && activeId) {
                   e.preventDefault()
                   e.stopPropagation()
                   return
                 }
+                e.preventDefault()
                 if (isActive) {
-                  e.preventDefault()
                   router.refresh()
                   return
                 }
-                // Fallback: if Next.js Link navigation doesn't complete, retry with router.push
-                const startPath = pathname
                 const targetPath = `/pages/${targetPageId}`
+                router.push(targetPath)
                 setTimeout(() => {
-                  if (window.location.pathname !== targetPath && window.location.pathname === startPath) {
-                    router.push(targetPath)
+                  if (window.location.pathname !== targetPath && window.location.pathname === pathname) {
+                    window.location.href = targetPath
                   }
-                }, 500)
+                }, 800)
               }}
             >
               <Layers className="h-4 w-4 flex-shrink-0" style={{ color: isActive ? primaryColor : sidebarTextColor }} />

@@ -282,6 +282,10 @@ export interface BlockConfig {
     // Linked field display settings (for field blocks)
     linked_field_display_mode?: 'compact' | 'inline' | 'expanded' | 'list' // Display mode for linked record fields
   }
+  // Timeline view specific (compact card contract)
+  timeline_title_field?: string // Field for card title
+  timeline_tag_field?: string // Optional single tag field (max 1 pill)
+  timeline_compact_mode?: boolean // When true: 28px cards; when false: 40px
   // List block specific config (at root level for backward compatibility)
   list_title_field?: string
   list_subtitle_fields?: string[]

@@ -621,6 +621,7 @@ export default function GridView({
   const { openRecordModal } = useRecordModal()
 
   // Open record in edit mode when openRecordInEditMode is set (e.g. from block settings)
+  // CRITICAL: Use loadRowsRef instead of loadRows in deps - loadRows is recreated each render and would cause React #185 infinite loop
   useEffect(() => {
     if (openRecordInEditMode && recordOpenStyle === 'modal') {
       openRecordModal({
@@ -636,12 +637,12 @@ export default function GridView({
         onLayoutSave: onModalLayoutSave,
         initialEditMode: true,
         interfaceMode,
-        onSave: () => loadRows(),
-        onDeleted: () => loadRows(),
+        onSave: () => loadRowsRef.current(),
+        onDeleted: () => loadRowsRef.current(),
         keySuffix: blockId ?? undefined,
       })
     }
-  }, [openRecordInEditMode, recordOpenStyle, openRecordModal, tableId, tableFields, modalFields, modalLayout, fieldLayout, supabaseTableName, cascadeContext, canEditLayout, onModalLayoutSave, interfaceMode, blockId, loadRows])
+  }, [openRecordInEditMode, recordOpenStyle, openRecordModal, tableId, tableFields, modalFields, modalLayout, fieldLayout, supabaseTableName, cascadeContext, canEditLayout, onModalLayoutSave, interfaceMode, blockId])
 
   // Track previous groupBy to detect changes
   const prevGroupByRef = useRef<string | undefined>(groupBy)
@@ -649,6 +650,8 @@ export default function GridView({
   const didInitGroupCollapseRef = useRef(false)
   // Ref for measuring content height
   const contentRef = useRef<HTMLDivElement>(null)
+  // Ref for loadRows - avoids including it in effect deps (loadRows is recreated each render, causing React #185 infinite loop)
+  const loadRowsRef = useRef<() => void>(() => {})
 
   // Prevent runaway "create table" loops on repeated errors.
   // (E.g. when the error is actually a missing column, not a missing table.)
@@ -2085,6 +2088,9 @@ export default function GridView({
       }
     }
   }
+
+  // Keep ref updated so openRecordInEditMode effect can call loadRows without it in deps (prevents React #185)
+  loadRowsRef.current = loadRows
 
   // Track if component is mounted to prevent state updates after unmount
   const isMountedRef = useRef(true)

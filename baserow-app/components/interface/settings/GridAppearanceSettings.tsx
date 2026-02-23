@@ -313,62 +313,25 @@ value={String(appearance.gallery_rows_per_page || "12")}
         </>
       )}
 
-      {/* TIMELINE: image field, layout, record height/width, stack labels vertically, wrap labels, color, show label */}
+      {/* TIMELINE: layout only (compact cards use fixed height; colour in Color section below) */}
       {viewType === "timeline" && (
-        <>
-          <div className="space-y-2">
-            <Label>Image field</Label>
-            <Select
-              value={appearance.image_field || "__none__"}
-              onValueChange={(v) => onUpdate({ image_field: v === "__none__" ? undefined : v })}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">None</SelectItem>
-                {imageFields.map((f) => (
-                  <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Layout</Label>
-            <Select
-              value={(appearance as any).timeline_layout || "stacked"}
-              onValueChange={(v) =>
-                onUpdate({ timeline_layout: v as "stacked" | "lanes" } as any)
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="stacked">Stacked</SelectItem>
-                <SelectItem value="lanes">Lanes</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center justify-between">
-            <Label>Stack labels vertically</Label>
-            <Switch
-              checked={(appearance as any).timeline_stack_labels_vertical || false}
-              onCheckedChange={(c) =>
-                onUpdate({ timeline_stack_labels_vertical: c } as any)
-              }
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <Label>Wrap labels</Label>
-            <Switch
-              checked={appearance.timeline_wrap_title || appearance.card_wrap_title || false}
-              onCheckedChange={(c) =>
-                onUpdate({ timeline_wrap_title: c, card_wrap_title: c })
-              }
-            />
-          </div>
-        </>
+        <div className="space-y-2">
+          <Label>Layout</Label>
+          <Select
+            value={(appearance as any).timeline_layout || "stacked"}
+            onValueChange={(v) =>
+              onUpdate({ timeline_layout: v as "stacked" | "lanes" } as any)
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="stacked">Stacked</SelectItem>
+              <SelectItem value="lanes">Lanes</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       )}
 
       {/* Grid-only: wrap cell text (legacy) */}

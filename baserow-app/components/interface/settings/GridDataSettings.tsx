@@ -23,11 +23,13 @@ import { getFieldDisplayName } from "@/lib/fields/display"
 import TableSelector from "./shared/TableSelector"
 import ViewSelector from "./shared/ViewSelector"
 import CardFieldsSelector from "./shared/CardFieldsSelector"
+import ModalFieldsSelector from "./shared/ModalFieldsSelector"
 import DateFieldSelector from "./shared/DateFieldSelector"
 import GroupBySelector from "./shared/GroupBySelector"
 import NestedGroupBySelector from "./shared/NestedGroupBySelector"
 import type { GroupRule } from "@/lib/grouping/types"
 import SortSelector from "./shared/SortSelector"
+import { Switch } from "@/components/ui/switch"
 
 interface GridDataSettingsProps {
   config: BlockConfig
@@ -209,7 +211,7 @@ export default function GridDataSettings({
             <div className="text-xs text-gray-500 p-3 bg-gray-50 rounded-md border border-gray-200">
               <p className="font-medium mb-1">Edit layout in the record modal</p>
               <p>
-                Open a record and use &quot;Edit layout&quot; in the modal header to customize the layout. Drag and drop fields to reorder them, toggle visibility, and set editability. Changes save when you click Done.
+                With the page in edit mode, open a record to customize the layout. Use &quot;Add column&quot; to create a multi-column grid, drag fields between columns to arrange them, and drag the resize handles between columns to adjust widths. Changes save when you click Done.
               </p>
             </div>
             {((config as any).field_layout && (config as any).field_layout.length > 0) ||
@@ -317,8 +319,90 @@ export default function GridDataSettings({
               }}
               fields={fields}
               label="Fields"
-              description="Visible fields in order. Single source of truth for list rows, grid columns, gallery cards, calendar previews, and kanban cards. If none selected, the title field is used. Modal layout uses this set."
+              description={
+                currentViewType === 'timeline'
+                  ? "Fields for record modal and side panel. Timeline cards use Title and Tag fields in the Timeline card section below."
+                  : "Visible fields in order. Single source of truth for list rows, grid columns, gallery cards, calendar previews, and kanban cards. If none selected, the title field is used."
+              }
               required={false}
+            />
+          </div>
+        )
+      })()}
+
+      {/* F2. Fields to show in record modal - hide/show fields when opening a record */}
+      {config.table_id && fields.length > 0 && (() => {
+        const fieldLayout = (config as any).field_layout || []
+        const modalFieldNames =
+          fieldLayout.length > 0
+            ? fieldLayout
+                .filter((item: any) => item.visible_in_modal !== false)
+                .sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0))
+                .map((item: any) => item.field_name)
+            : Array.isArray(config.visible_fields)
+              ? config.visible_fields
+              : []
+        return (
+          <div className="space-y-2 border-t border-gray-200 pt-4">
+            <ModalFieldsSelector
+              value={modalFieldNames}
+              onChange={async (fieldNames) => {
+                const fl = (config as any).field_layout || []
+                const visibleFields =
+                  fl.length > 0
+                    ? fl.filter((item: any) => item.visible_in_card !== false).map((item: any) => item.field_name)
+                    : Array.isArray(config.visible_fields) ? config.visible_fields : []
+                const showAllInModal = fieldNames.length === 0
+                if (fl.length > 0) {
+                  const layoutByField = new Map(fl.map((item: any) => [item.field_name, item]))
+                  const allFieldNames = [...new Set([...visibleFields, ...fieldNames])]
+                  const updatedLayout = allFieldNames.map((fieldName: string, i: number) => {
+                    const existing = layoutByField.get(fieldName)
+                    const field = fields.find((f) => f.name === fieldName)
+                    const visibleInModal = showAllInModal || fieldNames.includes(fieldName)
+                    if (existing) {
+                      return { ...existing, order: i, visible_in_modal: visibleInModal }
+                    }
+                    if (field) {
+                      return {
+                        field_id: field.id,
+                        field_name: field.name,
+                        order: i,
+                        visible_in_card: visibleFields.includes(fieldName),
+                        visible_in_modal: visibleInModal,
+                        visible_in_canvas: visibleInModal,
+                        editable: true,
+                        group_name: field.group_name,
+                        modal_column_id: "col-1",
+                      }
+                    }
+                    return null
+                  }).filter(Boolean) as any[]
+                  await onUpdate({ field_layout: updatedLayout } as any)
+                } else {
+                  const fieldMap = new Map(fields.map((f) => [f.name, f]))
+                  const namesToUse = showAllInModal ? visibleFields : fieldNames
+                  const newLayout = namesToUse.map((name: string, i: number) => {
+                    const field = fieldMap.get(name)
+                    if (!field) return null
+                    return {
+                      field_id: field.id,
+                      field_name: field.name,
+                      order: i,
+                      visible_in_card: true,
+                      visible_in_modal: true,
+                      visible_in_canvas: true,
+                      editable: true,
+                      group_name: field.group_name,
+                      modal_column_id: "col-1",
+                    }
+                  }).filter(Boolean) as any[]
+                  await onUpdate({ field_layout: newLayout, modal_fields: namesToUse } as any)
+                }
+              }}
+              fields={fields}
+              label="Fields to show in record modal"
+              description="Choose which fields appear when opening a record. Drag to reorder. Leave empty to show all fields from the list above."
             />
           </div>
         )
@@ -657,13 +741,92 @@ export default function GridDataSettings({
             />
           </div>
 
-          {/* Card fields explanation - uses Fields to Show on Cards/Table above */}
+          {/* Compact card configuration: Title, Tag, Compact mode */}
           <div className="space-y-3 pt-2 border-t border-gray-200">
-            <Label className="text-sm font-semibold">Card fields</Label>
+            <Label className="text-sm font-semibold">Timeline card</Label>
             <p className="text-xs text-gray-500">
-              Timeline cards use the ordered <span className="font-medium">Fields to Show on Cards/Table</span> selection above.
-              Only the first <span className="font-medium">3</span> non-date fields are shown on each card to keep lanes compact.
+              Cards show title, optional tag, and colour. Set colour in <span className="font-medium">Appearance</span> tab.
             </p>
+
+            <div className="space-y-2">
+              <Label>Title field</Label>
+              <Select
+                value={
+                  config.timeline_title_field ||
+                  config.card_title_field ||
+                  (() => {
+                    const primary = fields.find(f =>
+                      (f.type === 'text' || f.type === 'long_text') &&
+                      (f.name.toLowerCase() === 'name' || f.name.toLowerCase() === 'title')
+                    )
+                    return primary?.name || (fields.find(f => f.type === 'text' || f.type === 'long_text')?.name) || "__first__"
+                  })()
+                }
+                onValueChange={(value) =>
+                  onUpdate({
+                    timeline_title_field: value === "__first__" ? undefined : (value as any),
+                    card_title_field: value === "__first__" ? undefined : (value as any),
+                  })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select title field" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__first__">First text field</SelectItem>
+                  {fields
+                    .filter((f) => f.name !== "id" && f.type !== "date")
+                    .map((field) => (
+                      <SelectItem key={field.id} value={field.name}>
+                        {getFieldDisplayName(field)}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Tag field (optional)</Label>
+              <Select
+                value={config.timeline_tag_field || config.timeline_field_1 || config.card_field_1 || "__none__"}
+                onValueChange={(value) =>
+                  onUpdate({
+                    timeline_tag_field: value === "__none__" ? undefined : (value as any),
+                    timeline_field_1: value === "__none__" ? undefined : (value as any),
+                    card_field_1: value === "__none__" ? undefined : (value as any),
+                  })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="None" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None</SelectItem>
+                  {fields
+                    .filter((f) =>
+                      f.name !== "id" &&
+                      (f.type === "single_select" || f.type === "multi_select" || f.type === "link_to_table")
+                    )
+                    .map((field) => (
+                      <SelectItem key={field.id} value={field.name}>
+                        {getFieldDisplayName(field)}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500">Max 1 pill per card. Select, multi-select, or linked fields only.</p>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Compact mode</Label>
+                <p className="text-xs text-gray-500">28px cards when ON, 40px when OFF</p>
+              </div>
+              <Switch
+                checked={config.timeline_compact_mode ?? false}
+                onCheckedChange={(c) => onUpdate({ timeline_compact_mode: c } as any)}
+              />
+            </div>
           </div>
         </>
       )}
