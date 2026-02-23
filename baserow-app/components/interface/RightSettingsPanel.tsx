@@ -127,7 +127,7 @@ export default function RightSettingsPanel() {
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <span className="font-semibold text-gray-900 truncate">
-                  Record layout
+                  Modal layout
                 </span>
               </div>
               <Button

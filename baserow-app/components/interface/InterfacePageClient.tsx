@@ -123,7 +123,8 @@ function InterfacePageClientInternal({
   const { isEditing: isPageEditing, enter: enterPageEdit, exit: exitPageEdit } = usePageEditMode(pageId)
   const { isEditing: isBlockEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(pageId)
   const { blocksDirty } = useEditMode()
-  const { enterEditPages, exitEditPages } = useUIMode()
+  const { enterEditPages, exitEditPages, isEdit } = useUIMode()
+  const isEditMode = isEdit()
   const { selectedContext, setSelectedContext } = useSelectionContext()
   const { setData: setRightPanelData } = useRightSettingsPanelData()
   const { state: recordPanelState } = useRecordPanel()
@@ -1404,7 +1405,8 @@ function InterfacePageClientInternal({
         }`}
       >
         {/* CRITICAL: Do NOT use flex-1 here - content must grow to full height so scroll works and bottom isn't cut off */}
-        <div className="w-full min-w-0 flex flex-col overflow-x-hidden relative">
+        {/* In edit mode: extra padding-bottom so user can scroll to reach bottom resize handles */}
+        <div className={`w-full min-w-0 flex flex-col overflow-x-hidden relative ${isEditMode ? 'pb-32' : ''}`}>
           <InterfacePageContent
             useRecordReviewLayout={useRecordReviewLayout}
             hasPage={hasPage}

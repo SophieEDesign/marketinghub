@@ -440,16 +440,18 @@ export default function SettingsPanel({
 
   const panelContent = (
       <div className={embedded ? "w-full flex flex-col" : "fixed inset-y-0 right-0 w-96 bg-white border-l border-gray-200 shadow-xl z-50 flex flex-col"}>
-      {/* Header - Airtable-style: table name + block type (e.g. Sponsorships Record list) */}
+      {/* Header - Airtable-style: table name + block type (e.g. Sponsorships Record list). No close when embedded - panel cannot be closed. */}
       <div className="border-b border-gray-200 px-4 py-3">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold truncate">{displayLabel}</h2>
-          <button
-            onClick={onClose}
-            className="p-1 rounded-md hover:bg-gray-100 text-gray-500"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          {!embedded && (
+            <button
+              onClick={onClose}
+              className="p-1 rounded-md hover:bg-gray-100 text-gray-500"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -566,13 +568,15 @@ export default function SettingsPanel({
           )}
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={onClose}
-            size="sm"
-          >
-            {embedded ? 'Page settings' : 'Close'}
-          </Button>
+          {!embedded && (
+            <Button
+              variant="outline"
+              onClick={onClose}
+              size="sm"
+            >
+              Close
+            </Button>
+          )}
           {!readOnly && (
             <Button
               onClick={() => handleSave(config)}

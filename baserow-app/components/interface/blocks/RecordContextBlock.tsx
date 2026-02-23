@@ -77,7 +77,6 @@ export default function RecordContextBlock({
   const listImageField = config.list_image_field ?? (config as any).image_field
   const listPillFields = config.list_pill_fields || []
   const listMetaFields = config.list_meta_fields || []
-  const visibleFields = Array.isArray(config.visible_fields) ? config.visible_fields : []
   const groupByRules = useMemo((): GroupRule[] => {
     const rules = (config as any).group_by_rules
     if (Array.isArray(rules) && rules.length > 0) return rules.filter(Boolean) as GroupRule[]
@@ -152,11 +151,13 @@ export default function RecordContextBlock({
       )
       const titleKey = (listTitleField && fieldList.some((f) => f.name === listTitleField))
         ? listTitleField
-        : visibleFields.length > 0 && fieldList.some((f) => f.name === visibleFields[0])
-          ? visibleFields[0]
-          : (firstText?.name ?? "id")
+        : (firstText?.name ?? "id")
       setTitleField(titleKey)
 
+      // Left panel cards use Card/list fields only. "Fields to show" controls the right panel only.
+      const groupFields = groupByRules
+        .filter((r): r is { type: "field"; field: string } => r.type === "field" && !!r.field)
+        .map((r) => r.field)
       const cardCols = [
         "id",
         titleKey,
@@ -164,12 +165,9 @@ export default function RecordContextBlock({
         ...(listImageField ? [listImageField] : []),
         ...listPillFields,
         ...listMetaFields,
+        ...groupFields,
       ]
-      const visibleCols = visibleFields.length > 0
-        ? visibleFields.filter((c) => fieldList.some((f) => f.name === c))
-        : cardCols.slice(1)
-      const allCols = ["id", ...new Set([...visibleCols, ...cardCols.slice(1)])]
-      const selectCols = allCols.filter((c) => c === "id" || fieldList.some((f) => f.name === c))
+      const selectCols = [...new Set(cardCols)].filter((c) => c === "id" || fieldList.some((f) => f.name === c))
 
       let query = supabase
         .from(resolved.supabase_table)
@@ -220,7 +218,7 @@ export default function RecordContextBlock({
     listImageField,
     JSON.stringify(listPillFields),
     JSON.stringify(listMetaFields),
-    JSON.stringify(visibleFields),
+    JSON.stringify(groupByRules),
     refreshTrigger,
   ])
 

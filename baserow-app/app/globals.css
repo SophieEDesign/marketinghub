@@ -230,7 +230,7 @@
 /* Ensure resize handles are always visible and accessible */
 .react-grid-layout {
   position: relative;
-  padding-bottom: 20px; /* Add padding at bottom so resize handles aren't cut off */
+  padding-bottom: 64px; /* Extra space so bottom resize handles are reachable when scrolling in editor */
 }
 
 .react-resizable-handle {

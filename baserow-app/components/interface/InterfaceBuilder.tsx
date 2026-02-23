@@ -1598,8 +1598,8 @@ export default function InterfaceBuilder({
               fullPageBlockId={fullPageBlockId}
             />
           </FilterStateProvider>
-          {/* Footer spacer to ensure bottom content is visible (accounts for taskbar) */}
-          <div className="h-48 w-full" />
+          {/* Footer spacer to ensure bottom content is visible and resize handles reachable in editor */}
+          <div className={`w-full ${effectiveIsEditing ? 'h-64' : 'h-48'}`} />
         </div>
       </div>
 

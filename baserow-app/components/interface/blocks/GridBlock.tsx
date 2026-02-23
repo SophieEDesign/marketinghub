@@ -1169,7 +1169,7 @@ export default function GridBlock({
                   modalFieldsForRecord,
                   (config as any).modal_layout,
                   { blockConfig: config },
-                  undefined,
+                  interfaceMode,
                   () => setRefreshKey((k) => k + 1),
                   (config as any).field_layout,
                   onModalLayoutSave ?? undefined,

@@ -419,12 +419,16 @@ export default function RecordLayoutSettings({
         </div>
       )}
 
-      {/* Search */}
+      {/* Fields to show in record modal - single source for modal layout */}
       <div className="p-4 border-b border-gray-200">
+        <p className="text-sm font-medium text-gray-700 mb-1">Fields to show in record modal</p>
+        <p className="text-xs text-gray-500 mb-3">
+          Choose which fields appear when opening a record. Drag to reorder. Use the eye icon to show or hide each field.
+        </p>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
-            placeholder="Search"
+            placeholder="Search fields"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9 h-9 bg-gray-50 border-gray-200"

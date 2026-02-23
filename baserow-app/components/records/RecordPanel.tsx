@@ -55,24 +55,29 @@ export default function RecordPanel() {
   const handleBack = useCallback(() => {
     if (state.isFullscreen) {
       router.back()
-    } else {
+    } else if (state.history.length > 1) {
       goBack()
+    } else {
+      // In edit mode, Back closes the record when it's the only one (no close button shown)
+      closeRecord()
     }
-  }, [state.isFullscreen, router, goBack])
+  }, [state.isFullscreen, state.history.length, router, goBack, closeRecord])
 
   // Desktop: inline (pushes content left, Airtable-style). Mobile: overlay (full-screen).
   const useOverlayLayout = isMobile
   const panelWidth = state.isFullscreen ? "100%" : `${state.width}px`
-  const canGoBack = state.isFullscreen || state.history.length > 1
+  // In edit mode, always show Back so user can close (X is hidden). Otherwise show when we can go to previous record.
+  const canGoBack = state.isFullscreen || state.history.length > 1 || isEdit()
 
   useEffect(() => {
     if (!state.isOpen) return
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !state.isPinned) closeRecord()
+      // In edit mode, panel cannot be closed via Escape (use Back instead)
+      if (e.key === "Escape" && !state.isPinned && !isEdit()) closeRecord()
     }
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [state.isOpen, state.isPinned, closeRecord])
+  }, [state.isOpen, state.isPinned, isEdit, closeRecord])
 
   useEffect(() => {
     return () => {
@@ -150,7 +155,7 @@ export default function RecordPanel() {
               <button
                 onClick={handleBack}
                 className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-                title="Go back"
+                title={state.history.length <= 1 && isEdit() ? "Close" : "Go back"}
               >
                 <ChevronLeft className="h-4 w-4 text-gray-600" />
               </button>
@@ -190,7 +195,7 @@ export default function RecordPanel() {
                 <Maximize2 className="h-4 w-4 text-gray-600" />
               )}
             </button>
-            {!state.isPinned && (
+            {!state.isPinned && !isEdit() && (
               <button
                 onClick={closeRecord}
                 className="p-1.5 hover:bg-gray-100 rounded transition-colors"

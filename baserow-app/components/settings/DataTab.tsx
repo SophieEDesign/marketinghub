@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Plus, Table2, Trash2, Edit2, Check, X, Upload, Download } from 'lucide-react'
+import { Plus, Table2, Trash2, Edit2, Check, X, Upload, Download, Database } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import Link from 'next/link'
 import CSVImportModal from '@/components/layout/CSVImportModal'
@@ -39,6 +39,7 @@ export default function SettingsDataTab() {
   const [tableToImport, setTableToImport] = useState<Table | null>(null)
   const [selectTableDialogOpen, setSelectTableDialogOpen] = useState(false)
   const [exportingTableId, setExportingTableId] = useState<string | null>(null)
+  const [exportingFullDatabase, setExportingFullDatabase] = useState(false)
 
   useEffect(() => {
     loadTables()
@@ -261,6 +262,30 @@ export default function SettingsDataTab() {
     setImportModalOpen(true)
   }
 
+  async function handleExportFullDatabase() {
+    try {
+      setExportingFullDatabase(true)
+      const res = await fetch('/api/export/full-database')
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to export database')
+      }
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `database-export-${new Date().toISOString().slice(0, 10)}.json`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (error: any) {
+      console.error('Error exporting full database:', error)
+      alert(error.message || 'Failed to export full database')
+    } finally {
+      setExportingFullDatabase(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -281,6 +306,14 @@ export default function SettingsDataTab() {
             <CardDescription>Raw data management</CardDescription>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={handleExportFullDatabase}
+              disabled={exportingFullDatabase || tables.length === 0}
+            >
+              <Database className="h-4 w-4 mr-2" />
+              {exportingFullDatabase ? 'Exporting…' : 'Export Full Database'}
+            </Button>
             <Button variant="outline" onClick={handleImportCSVClick} disabled={tables.length === 0}>
               <Upload className="h-4 w-4 mr-2" />
               Import CSV
