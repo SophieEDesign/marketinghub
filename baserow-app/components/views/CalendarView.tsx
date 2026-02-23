@@ -218,6 +218,7 @@ export default function CalendarView({
   const prevDateToTimeRef = useRef<number | null>(null)
   const prevDateFromKeyRef = useRef<string>("")
   const prevDateToKeyRef = useRef<string>("")
+  const calendarRef = useRef<{ getApi?: () => { gotoDate: (d: Date) => void } } | null>(null)
 
   const areLinkedValueMapsEqual = useCallback(
     (a: Record<string, Record<string, string>>, b: Record<string, Record<string, string>>): boolean => {
@@ -1536,13 +1537,30 @@ export default function CalendarView({
   const calendarDayHeaderFormat = useMemo(() => ({ weekday: "short" as const }), [])
 
   // CRITICAL: Use string keys only - never raw Date objects in deps or return (prevents React #185)
+  // FullCalendar validRange end is EXCLUSIVE - add 1 day so the full range is visible (e.g. Feb 28 needs end: Mar 1)
   const calendarValidRange = useMemo(() => {
-    if (!dateFromKey && !dateToKey) return undefined
+    if (!dateFrom || !dateTo || isNaN(dateFrom.getTime()) || isNaN(dateTo.getTime())) return undefined
     return {
-      start: dateFromKey || undefined,
-      end: dateToKey || undefined,
+      start: format(dateFrom, "yyyy-MM-dd"),
+      end: format(addDays(dateTo, 1), "yyyy-MM-dd"),
     }
-  }, [dateFromKey, dateToKey])
+  }, [dateFrom?.getTime(), dateTo?.getTime()])
+
+  // initialDate: when date range is set, show that range; otherwise default to today
+  const calendarInitialDate = useMemo(() => {
+    if (dateFrom && !isNaN(dateFrom.getTime())) return format(dateFrom, "yyyy-MM-dd")
+    return undefined
+  }, [dateFrom?.getTime()])
+
+  // When date range changes (e.g. user clicks "Today"), navigate calendar to that date
+  useEffect(() => {
+    if (!mounted || !dateFrom || isNaN(dateFrom.getTime())) return
+    const el = calendarRef.current
+    const api = el?.getApi?.()
+    if (api?.gotoDate) {
+      api.gotoDate(dateFrom)
+    }
+  }, [mounted, dateFrom?.getTime()])
 
   const calendarEventClassNames = useCallback(
     (arg: EventContentArg) => [
@@ -1962,6 +1980,7 @@ export default function CalendarView({
         {/* CRITICAL: Only render FullCalendar after mount to prevent hydration mismatch (React error #185) */}
         {mounted ? (
           <MemoizedFullCalendar
+            ref={calendarRef}
             plugins={CALENDAR_PLUGINS}
             events={calendarEvents}
             editable={!isViewOnly}
@@ -1969,8 +1988,9 @@ export default function CalendarView({
             headerToolbar={calendarHeaderToolbar}
             // Uncontrolled: changing `initialView` after mount can trigger repeated remount/update cycles.
             initialView="dayGridMonth"
+            initialDate={calendarInitialDate}
             height="auto"
-            aspectRatio={1.35}
+            aspectRatio={1.2}
             dayMaxEvents={3}
             moreLinkClick="popover"
             eventDisplay="block"
