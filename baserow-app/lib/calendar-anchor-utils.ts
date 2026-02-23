@@ -12,10 +12,12 @@ import {
   startOfDay,
 } from "date-fns"
 
-const WEEK_STARTS_ON = 1 // Monday
+const WEEK_STARTS_ON = 1 as const // Monday (0=Sun, 1=Mon, ... 6=Sat)
+
+type Day = 0 | 1 | 2 | 3 | 4 | 5 | 6
 
 /** Start of week (Monday) for a given date */
-export function getStartOfWeek(date: Date, weekStartsOn = WEEK_STARTS_ON): Date {
+export function getStartOfWeek(date: Date, weekStartsOn: Day = WEEK_STARTS_ON): Date {
   return startOfWeek(startOfDay(date), { weekStartsOn })
 }
 
@@ -30,7 +32,7 @@ export function getStartOfNextMonth(date: Date): Date {
 }
 
 /** Start of next week */
-export function getStartOfNextWeek(date: Date, weekStartsOn = WEEK_STARTS_ON): Date {
+export function getStartOfNextWeek(date: Date, weekStartsOn: Day = WEEK_STARTS_ON): Date {
   return addWeeks(getStartOfWeek(date, weekStartsOn), 1)
 }
 
