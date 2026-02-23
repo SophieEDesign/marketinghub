@@ -1547,21 +1547,25 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
   }, [(blockConfig as any)?.visible_week_span])
 
   // Custom views for 4, 6, or 8 weeks (Airtable-style)
+  // dateAlignment: 'week' ensures each view starts on a week boundary (Monday with firstDay: 1)
   const calendarViews = useMemo(
     () => ({
       dayGridWeek4: {
         type: "dayGrid" as const,
         duration: { weeks: 4 },
+        dateAlignment: "week" as const,
         buttonText: "4 weeks",
       },
       dayGridWeek6: {
         type: "dayGrid" as const,
         duration: { weeks: 6 },
+        dateAlignment: "week" as const,
         buttonText: "6 weeks",
       },
       dayGridWeek8: {
         type: "dayGrid" as const,
         duration: { weeks: 8 },
+        dateAlignment: "week" as const,
         buttonText: "8 weeks",
       },
     }),
@@ -2028,7 +2032,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
   }
 
   return (
-    <div className="w-full h-full min-w-0 flex flex-col bg-white overflow-hidden">
+    <div className="w-full h-full min-w-0 min-h-0 flex flex-col bg-white overflow-hidden">
       {renderAnchorControls()}
       {/* Scroll container: stable ref for anchor scrolling; overflow-auto so wide calendar can scroll horizontally */}
       <div
@@ -2049,6 +2053,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
             views={calendarViews}
             height="auto"
             aspectRatio={1.4}
+            expandRows={true}
             dayMaxEvents={2}
             moreLinkClick="popover"
             eventDisplay="block"
