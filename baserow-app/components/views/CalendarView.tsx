@@ -1752,7 +1752,15 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
                 <span
                   key={i}
                   className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium truncate max-w-[6rem]"
-                  style={p.bgColor ? { backgroundColor: `${p.bgColor}30`, color: p.bgColor } : { backgroundColor: "rgb(243 244 246)", color: "rgb(75 85 99)" }}
+                  style={p.bgColor ? (() => {
+                  const hex = p.bgColor
+                  if (!hex?.startsWith('#')) return { backgroundColor: hex, color: '#1f2937' }
+                  const r = parseInt(hex.slice(1, 3), 16)
+                  const g = parseInt(hex.slice(3, 5), 16)
+                  const b = parseInt(hex.slice(5, 7), 16)
+                  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+                  return { backgroundColor: hex, color: luminance > 0.5 ? '#000000' : '#ffffff' }
+                })() : { backgroundColor: "rgb(243 244 246)", color: "rgb(75 85 99)" }}
                 >
                   {p.label}
                 </span>
