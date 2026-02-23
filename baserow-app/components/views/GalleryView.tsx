@@ -677,7 +677,7 @@ export default function GalleryView({
   }
 
   return (
-    <div ref={contentRef} className="w-full h-full overflow-auto bg-gray-50">
+    <div ref={contentRef} className="w-full h-full overflow-y-auto overflow-x-hidden bg-gray-50">
       {Array.isArray(groupedRows) && groupedRows.length > 0 ? (
         <div className="p-6 space-y-6">
           {groupedRows.map((group) => {

@@ -68,6 +68,10 @@ interface ViewTopBarProps {
   onSort?: () => void
   onGroup?: () => void
   onHideFields?: () => void
+  filterCount?: number
+  sortCount?: number
+  hasGroupBy?: boolean
+  hiddenFieldsCount?: number
   onShare?: () => void
   onAddField?: () => void
   onNewRecord?: () => void
@@ -90,6 +94,10 @@ export default function ViewTopBar({
   onSort,
   onGroup,
   onHideFields,
+  filterCount = 0,
+  sortCount = 0,
+  hasGroupBy = false,
+  hiddenFieldsCount = 0,
   onShare,
   onAddField,
   onNewRecord,
@@ -426,10 +434,15 @@ export default function ViewTopBar({
               variant="ghost"
               size="sm"
               onClick={onFilter}
-              className="h-7 px-2.5 text-xs font-normal text-gray-600 hover:bg-gray-50 shrink-0"
+              className={cn(
+                "h-7 px-2.5 text-xs font-normal shrink-0",
+                filterCount > 0
+                  ? "bg-blue-50 text-blue-700 hover:bg-blue-100"
+                  : "text-gray-600 hover:bg-gray-50"
+              )}
             >
               <Filter className="h-3.5 w-3.5 mr-1.5" />
-              Filter
+              Filter {filterCount > 0 && `(${filterCount})`}
             </Button>
           )}
           {onSort && (
@@ -437,10 +450,15 @@ export default function ViewTopBar({
               variant="ghost"
               size="sm"
               onClick={onSort}
-              className="h-7 px-2.5 text-xs font-normal text-gray-600 hover:bg-gray-50 shrink-0"
+              className={cn(
+                "h-7 px-2.5 text-xs font-normal shrink-0",
+                sortCount > 0
+                  ? "bg-blue-50 text-blue-700 hover:bg-blue-100"
+                  : "text-gray-600 hover:bg-gray-50"
+              )}
             >
               <ArrowUpDown className="h-3.5 w-3.5 mr-1.5" />
-              Sort
+              Sort {sortCount > 0 && `(${sortCount})`}
             </Button>
           )}
           {onGroup && (
@@ -448,10 +466,13 @@ export default function ViewTopBar({
               variant="ghost"
               size="sm"
               onClick={onGroup}
-              className="h-7 px-2.5 text-xs font-normal text-gray-600 hover:bg-gray-50 shrink-0"
+              className={cn(
+                "h-7 px-2.5 text-xs font-normal shrink-0",
+                hasGroupBy ? "bg-blue-50 text-blue-700 hover:bg-blue-100" : "text-gray-600 hover:bg-gray-50"
+              )}
             >
               <Group className="h-3.5 w-3.5 mr-1.5" />
-              Group
+              Group {hasGroupBy && "•"}
             </Button>
           )}
           {onHideFields && (
@@ -459,10 +480,15 @@ export default function ViewTopBar({
               variant="ghost"
               size="sm"
               onClick={onHideFields}
-              className="h-7 px-2.5 text-xs font-normal text-gray-600 hover:bg-gray-50 shrink-0"
+              className={cn(
+                "h-7 px-2.5 text-xs font-normal shrink-0",
+                hiddenFieldsCount > 0
+                  ? "bg-blue-50 text-blue-700 hover:bg-blue-100"
+                  : "text-gray-600 hover:bg-gray-50"
+              )}
             >
               <Eye className="h-3.5 w-3.5 mr-1.5" />
-              Hide Fields
+              Hide Fields {hiddenFieldsCount > 0 && `(${hiddenFieldsCount})`}
             </Button>
           )}
           {onShare && (

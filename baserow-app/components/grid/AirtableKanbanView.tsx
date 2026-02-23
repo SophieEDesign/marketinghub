@@ -563,8 +563,8 @@ export default function AirtableKanbanView({
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="h-full min-w-0 bg-white overflow-auto [scrollbar-gutter:stable] pr-2">
-          <div className="flex gap-4 p-6 min-w-max h-full">
+        <div className="h-full min-w-0 bg-white overflow-y-auto overflow-x-auto [scrollbar-gutter:stable] pr-2">
+          <div className="flex flex-nowrap gap-4 p-6 h-full min-w-max">
             {columns.map((column) => {
               const columnRows = groupedRows[column.id] || []
               const isCollapsed = collapsedColumns.has(column.id)

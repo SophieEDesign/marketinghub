@@ -259,10 +259,15 @@ export default function NonGridViewWrapper({
         onSearch={() => {}} // Handled via URL params
         onFilter={() => setFilterDialogOpen(true)}
         onSort={() => setSortDialogOpen(true)}
+        onGroup={["kanban", "gallery", "timeline"].includes(viewType) ? () => setCustomizeCardsDialogOpen(true) : undefined}
         onHideFields={() => setHideFieldsDialogOpen(true)}
         onDesign={() => setDesignSidebarOpen(true)}
         onAddField={() => setDesignSidebarOpen(true)}
         onNewRecord={handleNewRecord}
+        filterCount={filters.length}
+        sortCount={sorts.length}
+        hasGroupBy={!!groupingFieldId}
+        hiddenFieldsCount={hiddenFields.length}
       />
       <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
         {viewType === "form" && (

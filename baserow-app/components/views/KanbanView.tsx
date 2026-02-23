@@ -477,8 +477,8 @@ function KanbanView({
   }
 
   return (
-    <div className="w-full h-full min-w-0 overflow-auto bg-gray-50 [scrollbar-gutter:stable] pr-2">
-      <div className="flex gap-4 min-w-max p-6">
+    <div className="w-full h-full min-w-0 overflow-y-auto overflow-x-auto bg-gray-50 [scrollbar-gutter:stable] pr-2">
+      <div className="flex flex-nowrap gap-4 p-6 min-w-max">
         {groups.map((groupName) => {
           const displayName =
             groupValueToLabel.get(groupName) ??
