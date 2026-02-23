@@ -323,8 +323,7 @@ export default function NonGridViewWrapper({
             tableFields={tableFields}
             filters={filtersAsConfig}
             colorField={cardColorField || undefined}
-            imageField={cardImageField || undefined}
-            wrapTitle={cardWrapText}
+            tagField={cardFields?.[0]}
             groupByField={groupingFieldId || undefined}
           />
         )}
