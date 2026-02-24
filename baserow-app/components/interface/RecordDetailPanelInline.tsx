@@ -26,6 +26,8 @@ interface RecordDetailPanelInlineProps {
   onLayoutSave?: (fieldLayout: FieldLayoutItem[]) => Promise<void>
   titleField?: string
   showComments?: boolean
+  /** Called after a field is successfully persisted; use to refresh parent UI (e.g. record list). */
+  onRecordUpdate?: () => void
 }
 
 export default function RecordDetailPanelInline({
@@ -40,6 +42,7 @@ export default function RecordDetailPanelInline({
   onInterfaceModeChange,
   onLayoutSave,
   showComments = true,
+  onRecordUpdate,
 }: RecordDetailPanelInlineProps) {
   const { openRecordModal } = useRecordModal()
   const cascadeContext = useMemo(() => ({ pageConfig: {} }), [])
@@ -90,6 +93,7 @@ export default function RecordDetailPanelInline({
         showComments={showComments}
         interfaceMode={interfaceMode}
         renderHeaderActions={false}
+        onRecordUpdate={onRecordUpdate ? () => onRecordUpdate() : undefined}
       />
     </div>
   )

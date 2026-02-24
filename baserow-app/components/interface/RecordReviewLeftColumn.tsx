@@ -71,6 +71,8 @@ interface RecordReviewLeftColumnProps {
     pageType?: 'record_view' | 'record_review' // To determine which settings format to use
     /** Unified field_layout - when present, card fields use visible_in_card */
     fieldLayout?: FieldLayoutItem[]
+  /** When this value changes, records are refetched (e.g. after field update in right panel). */
+  refreshTrigger?: number
 }
 
 export default function RecordReviewLeftColumn({
@@ -84,6 +86,7 @@ export default function RecordReviewLeftColumn({
   leftPanelSettings,
   pageType = 'record_review', // Default to record_review for backward compatibility
   fieldLayout = [],
+  refreshTrigger,
 }: RecordReviewLeftColumnProps) {
   const { toast } = useToast()
   const { role: userRole } = useUserRole()
@@ -275,6 +278,13 @@ export default function RecordReviewLeftColumn({
       setLoading(false)
     }
   }, [])
+
+  // Refresh records when parent signals (e.g. after field update in right panel)
+  useEffect(() => {
+    if (typeof refreshTrigger !== 'number' || refreshTrigger <= 0) return
+    if (!supabaseTableName) return
+    loadRecords(supabaseTableName)
+  }, [refreshTrigger, supabaseTableName, loadRecords])
 
   // Load table name and fields
   useEffect(() => {

@@ -73,6 +73,8 @@ export interface RecordEditorProps {
   allowEdit?: boolean
   /** Optional content to render below comments in review mode (e.g. InterfaceBuilder blocks). */
   renderExtraContent?: React.ReactNode
+  /** Called after a field is successfully persisted; use to refresh parent UI (e.g. record list). */
+  onRecordUpdate?: (recordId: string, fieldName: string, value: any) => void
 }
 
 export default function RecordEditor({
@@ -102,6 +104,7 @@ export default function RecordEditor({
   visibilityContext = "modal",
   allowEdit = true,
   renderExtraContent,
+  onRecordUpdate,
 }: RecordEditorProps) {
   const { selectedContext, setSelectedContext } = useSelectionContext()
   const { toast } = useToast()
@@ -122,6 +125,7 @@ export default function RecordEditor({
     onSave,
     onDeleted,
     saveOnFieldChange: true,
+    onRecordUpdate,
   })
 
   const {
