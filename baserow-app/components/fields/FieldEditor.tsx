@@ -213,7 +213,10 @@ function AttachmentFieldEditor({
         ref={fileInputRef}
         multiple
         className="hidden"
-        onChange={(e) => e.target.files && handleFiles(e.target.files)}
+        onChange={(e) => {
+          if (e.target.files?.length) handleFiles(e.target.files)
+          e.target.value = ""
+        }}
       />
 
       <div
@@ -247,6 +250,8 @@ function AttachmentFieldEditor({
             maxVisible={10}
             size={field.options?.attachment_preview_size || "medium"}
             displayStyle={field.options?.attachment_display_style || "thumbnails"}
+            onDelete={!isReadOnly ? handleDelete : undefined}
+            editable={!isReadOnly}
           />
           <div className="flex flex-wrap gap-2">
             {attachments.map((attachment, index) => (

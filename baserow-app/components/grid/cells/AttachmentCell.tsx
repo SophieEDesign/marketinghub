@@ -169,7 +169,10 @@ export default function AttachmentCell({
         ref={fileInputRef}
         multiple
         className="hidden"
-        onChange={(e) => e.target.files && handleFiles(e.target.files)}
+        onChange={(e) => {
+          if (e.target.files?.length) handleFiles(e.target.files)
+          e.target.value = ""
+        }}
       />
 
       <div

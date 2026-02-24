@@ -11,6 +11,7 @@ import {
   FileSpreadsheet,
   FileCode,
   Download,
+  Trash2,
   X
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -28,6 +29,8 @@ interface AttachmentPreviewProps {
   size?: 'small' | 'medium' | 'large' // Preview size
   displayStyle?: 'thumbnails' | 'list' | 'hero' | 'cover' | 'gallery' // Display style
   onPreviewClick?: (index: number) => void // Optional: custom click handler
+  onDelete?: (index: number) => void | Promise<void> // Optional: delete handler (shows Delete in modal when editable)
+  editable?: boolean // When true and onDelete provided, modal shows Delete button
   className?: string
   compact?: boolean // For grid cells - show minimal previews
 }
@@ -48,6 +51,8 @@ export default function AttachmentPreview({
   size = 'medium',
   displayStyle = 'thumbnails',
   onPreviewClick,
+  onDelete,
+  editable = false,
   className,
   compact = false,
 }: AttachmentPreviewProps) {
@@ -232,6 +237,8 @@ export default function AttachmentPreview({
             index={previewIndex}
             onClose={() => setPreviewIndex(null)}
             onNavigate={(newIndex) => setPreviewIndex(newIndex)}
+            onDelete={onDelete}
+            editable={editable}
           />
         )}
       </>
@@ -282,6 +289,8 @@ export default function AttachmentPreview({
             index={previewIndex}
             onClose={() => setPreviewIndex(null)}
             onNavigate={(newIndex) => setPreviewIndex(newIndex)}
+            onDelete={onDelete}
+            editable={editable}
           />
         )}
       </>
@@ -337,6 +346,8 @@ export default function AttachmentPreview({
             index={previewIndex}
             onClose={() => setPreviewIndex(null)}
             onNavigate={(newIndex) => setPreviewIndex(newIndex)}
+            onDelete={onDelete}
+            editable={editable}
           />
         )}
       </>
@@ -394,6 +405,8 @@ export default function AttachmentPreview({
             index={previewIndex}
             onClose={() => setPreviewIndex(null)}
             onNavigate={(newIndex) => setPreviewIndex(newIndex)}
+            onDelete={onDelete}
+            editable={editable}
           />
         )}
       </>
@@ -456,6 +469,8 @@ export default function AttachmentPreview({
           index={previewIndex}
           onClose={() => setPreviewIndex(null)}
           onNavigate={(newIndex) => setPreviewIndex(newIndex)}
+          onDelete={onDelete}
+          editable={editable}
         />
       )}
     </>
@@ -464,23 +479,40 @@ export default function AttachmentPreview({
 
 /**
  * Attachment Modal/Lightbox
- * Shows full-size preview with navigation
+ * Shows full-size preview with navigation and optional delete
  */
 function AttachmentModal({
   attachments,
   index,
   onClose,
   onNavigate,
+  onDelete,
+  editable = false,
 }: {
   attachments: Attachment[]
   index: number
   onClose: () => void
   onNavigate: (index: number) => void
+  onDelete?: (index: number) => void | Promise<void>
+  editable?: boolean
 }) {
+  const [deleting, setDeleting] = useState(false)
   const attachment = attachments[index]
   if (!attachment) return null
 
   const isImage = (attachment.type || '').startsWith('image/')
+  const canDelete = editable && onDelete
+
+  const handleDelete = async () => {
+    if (!canDelete) return
+    setDeleting(true)
+    try {
+      await onDelete(index)
+      onClose()
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   return (
     <div
@@ -504,6 +536,20 @@ function AttachmentModal({
             >
               <Download className="h-4 w-4 text-gray-600" />
             </a>
+          )}
+          {canDelete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                handleDelete()
+              }}
+              disabled={deleting}
+              className="p-1.5 rounded-full hover:bg-red-100 text-red-600 hover:text-red-700 transition-colors disabled:opacity-50"
+              aria-label="Delete"
+              title="Delete"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
           )}
           <button
             onClick={onClose}
@@ -543,22 +589,35 @@ function AttachmentModal({
           </div>
         )}
 
-        <div className="flex justify-between items-center mt-4">
+        <div className="flex justify-between items-center mt-4 gap-2">
           <button
             onClick={() => index > 0 && onNavigate(index - 1)}
-            disabled={index === 0}
+            disabled={index === 0 || deleting}
             className="px-3 py-1.5 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300 transition-colors"
           >
             ← Prev
           </button>
 
-          <span className="text-sm text-gray-600">
+          <span className="text-sm text-gray-600 flex-1 text-center">
             {index + 1} of {attachments.length}
           </span>
 
+          {canDelete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                handleDelete()
+              }}
+              disabled={deleting}
+              className="px-3 py-1.5 bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50 transition-colors"
+            >
+              {deleting ? 'Deleting...' : 'Delete'}
+            </button>
+          )}
+
           <button
             onClick={() => index < attachments.length - 1 && onNavigate(index + 1)}
-            disabled={index === attachments.length - 1}
+            disabled={index === attachments.length - 1 || deleting}
             className="px-3 py-1.5 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300 transition-colors"
           >
             Next →

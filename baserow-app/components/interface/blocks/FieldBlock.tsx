@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import type { PageBlock } from "@/lib/interface/types"
@@ -488,6 +488,87 @@ export default function FieldBlock({
     ? (Array.isArray(fieldValue) ? fieldValue : [fieldValue])
     : []
 
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  function generateUUID(): string {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) {
+      return crypto.randomUUID()
+    }
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0
+      const v = c === "x" ? r : (r & 0x3) | 0x8
+      return v.toString(16)
+    })
+  }
+
+  async function handleUploadAttachments(files: FileList) {
+    if (!recordId || !tableName || !field) return
+    const supabase = createClient()
+    const uploaded: Attachment[] = []
+    try {
+      for (const file of Array.from(files)) {
+        const ext = (file?.name || "").split(".").pop() || "bin"
+        const filePath = `attachments/${tableName}/${recordId}/${field.name}/${generateUUID()}.${ext}`
+        const { error: uploadError } = await supabase.storage
+          .from("attachments")
+          .upload(filePath, file, { upsert: false })
+        if (uploadError) {
+          console.error("Upload error:", uploadError)
+          toast({
+            variant: "destructive",
+            title: "Upload failed",
+            description: `Failed to upload ${file.name}`,
+          })
+          continue
+        }
+        const { data: urlData } = supabase.storage.from("attachments").getPublicUrl(filePath)
+        uploaded.push({
+          url: urlData.publicUrl,
+          name: file.name,
+          size: file.size,
+          type: file.type,
+        })
+      }
+      if (uploaded.length > 0) {
+        await handleCommit([...attachments, ...uploaded])
+        toast({
+          title: "Uploaded",
+          description: `${uploaded.length} file${uploaded.length !== 1 ? "s" : ""} uploaded successfully`,
+        })
+      }
+    } catch (error: any) {
+      console.error("Error uploading:", error)
+      toast({
+        variant: "destructive",
+        title: "Upload error",
+        description: error.message || "Failed to upload files",
+      })
+    }
+  }
+
+  async function handleDeleteAttachment(index: number) {
+    if (!recordId || !tableName || !field || !attachments[index]) return
+    const file = attachments[index]
+    try {
+      const supabase = createClient()
+      const urlParts = file.url.split("/storage/v1/object/public/attachments/")
+      const storagePath = urlParts[1]
+      if (storagePath) {
+        await supabase.storage.from("attachments").remove([storagePath])
+      }
+      const updated = attachments.filter((_, i) => i !== index)
+      await handleCommit(updated)
+      toast({ title: "Deleted", description: "Image deleted successfully" })
+    } catch (error: any) {
+      console.error("Error deleting attachment:", error)
+      toast({
+        variant: "destructive",
+        title: "Delete error",
+        description: error.message || "Failed to delete image",
+      })
+    }
+  }
+
   async function handleCommit(newValue: any) {
     if (!recordId || !tableName || !field) {
       setIsEditingValue(false)
@@ -561,8 +642,42 @@ export default function FieldBlock({
         displayMode={linkedFieldDisplayMode}
       />
     ) : (
-      <div className="flex-1">
+      <div
+        className={cn(
+          "flex-1 min-h-[80px] rounded-md",
+          canEditInline && "border-2 border-dashed border-gray-200 hover:border-gray-300 hover:bg-gray-50/50 transition-colors cursor-pointer"
+        )}
+        onClick={
+          canEditInline
+            ? (e) => {
+                if ((e.target as HTMLElement).closest("[data-attachment-preview]")) return
+                fileInputRef.current?.click()
+              }
+            : undefined
+        }
+        onDragOver={canEditInline ? (e) => e.preventDefault() : undefined}
+        onDragLeave={canEditInline ? (e) => e.preventDefault() : undefined}
+        onDrop={
+          canEditInline
+            ? (e) => {
+                e.preventDefault()
+                if (e.dataTransfer.files.length > 0) handleUploadAttachments(e.dataTransfer.files)
+              }
+            : undefined
+        }
+      >
+        <input
+          type="file"
+          ref={fileInputRef}
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            if (e.target.files?.length) handleUploadAttachments(e.target.files)
+            e.target.value = ""
+          }}
+        />
         {attachments.length > 0 ? (
+          <div data-attachment-preview className="w-full" onClick={(e) => e.stopPropagation()}>
           <AttachmentPreview
             attachments={attachments}
             maxVisible={
@@ -580,11 +695,18 @@ export default function FieldBlock({
               field.options?.attachment_display_style ||
               "thumbnails"
             }
+            onDelete={canEditInline ? handleDeleteAttachment : undefined}
+            editable={!!canEditInline}
           />
+          </div>
         ) : (
-          <div className="px-3 py-2 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-400 italic flex items-center gap-2">
-            <Paperclip className="h-4 w-4" />
-            No attachments
+          <div className="px-3 py-2 text-sm text-gray-400 italic flex items-center gap-2 h-full min-h-[80px] items-center justify-center">
+            <Paperclip className="h-4 w-4 flex-shrink-0" />
+            {canEditInline ? (
+              <span>Drop files or click to upload (multiple supported)</span>
+            ) : (
+              <span>No attachments</span>
+            )}
           </div>
         )}
       </div>
