@@ -1156,7 +1156,7 @@ function TimelineView({
       onRecordClick(rowId)
       return
     }
-    openRecord(tableId, rowId, supabaseTableName, (blockConfig as any)?.modal_fields ?? modalFields, (blockConfig as any)?.modal_layout, blockConfig ? { blockConfig } : undefined, interfaceMode, onRecordDeleted, (blockConfig as any)?.field_layout, onModalLayoutSave ?? undefined, tableFields)
+    openRecord(tableId, rowId, supabaseTableName, (blockConfig as any)?.modal_fields ?? modalFields, (blockConfig as any)?.modal_layout, blockConfig ? { blockConfig } : undefined, interfaceMode, onRecordDeleted, () => loadRows(), (blockConfig as any)?.field_layout, onModalLayoutSave ?? undefined, tableFields)
   }, [blockConfig, modalFields, onRecordClick, openRecord, supabaseTableName, tableId, interfaceMode, onRecordDeleted, onModalLayoutSave, tableFields])
 
   const handleEventSelect = useCallback((event: TimelineEvent, e: React.MouseEvent) => {

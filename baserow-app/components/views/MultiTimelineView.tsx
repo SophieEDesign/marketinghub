@@ -841,7 +841,7 @@ export default function MultiTimelineView({
                             onRecordClick(ev.rowId, ev.tableId)
                             return
                           }
-                          openRecord(ev.tableId, ev.rowId, ev.supabaseTableName, (blockConfig as any)?.modal_fields, (blockConfig as any)?.modal_layout, blockConfig ? { blockConfig } : undefined, interfaceMode, undefined, (blockConfig as any)?.field_layout)
+                          openRecord(ev.tableId, ev.rowId, ev.supabaseTableName, (blockConfig as any)?.modal_fields, (blockConfig as any)?.modal_layout, blockConfig ? { blockConfig } : undefined, interfaceMode, undefined, () => loadAll(), (blockConfig as any)?.field_layout)
                         }}
                         onMouseDown={(e) => {
                           if (!canDrag) return

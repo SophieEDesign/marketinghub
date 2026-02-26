@@ -313,6 +313,7 @@ export default function BlockRenderer({
               openRecordInEditModeForBlock={openRecordInEditModeForBlock}
               onModalLayoutSave={onUpdate ? (fieldLayout) => onUpdate(block.id, { field_layout: fieldLayout }) : undefined}
               canEditLayout={canEdit}
+              onUpdate={onUpdate ? (updates) => onUpdate(block.id, updates) : undefined}
             />
           </LazyBlockWrapper>
         )
@@ -493,6 +494,7 @@ export default function BlockRenderer({
               pageShowAddRecord={pageShowAddRecord}
               onModalLayoutSave={onUpdate ? (fieldLayout) => onUpdate(block.id, { field_layout: fieldLayout }) : undefined}
               canEditLayout={canEdit}
+              onUpdate={onUpdate ? (updates) => onUpdate(block.id, updates) : undefined}
             />
           </LazyBlockWrapper>
         )

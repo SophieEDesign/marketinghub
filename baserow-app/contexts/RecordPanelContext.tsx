@@ -28,11 +28,13 @@ interface RecordPanelState {
   interfaceMode?: 'view' | 'edit'
   /** Called when the record is deleted; blocks use this to refresh core data (grid/calendar). */
   onRecordDeleted?: () => void
+  /** Called when a field is updated; views use this to refresh row data (e.g. card color from status). */
+  onRecordUpdated?: () => void
 }
 
 interface RecordPanelContextType {
   state: RecordPanelState
-  openRecord: (tableId: string, recordId: string, tableName: string, modalFields?: string[], modalLayout?: BlockConfig["modal_layout"], cascadeContext?: RecordEditorCascadeContext | null, interfaceMode?: "view" | "edit", onRecordDeleted?: () => void, fieldLayout?: FieldLayoutItem[], onLayoutSave?: (layout: FieldLayoutItem[]) => void | Promise<void>, tableFields?: TableField[]) => void
+  openRecord: (tableId: string, recordId: string, tableName: string, modalFields?: string[], modalLayout?: BlockConfig["modal_layout"], cascadeContext?: RecordEditorCascadeContext | null, interfaceMode?: "view" | "edit", onRecordDeleted?: () => void, onRecordUpdated?: () => void, fieldLayout?: FieldLayoutItem[], onLayoutSave?: (layout: FieldLayoutItem[]) => void | Promise<void>, tableFields?: TableField[]) => void
   /** Fetches table supabase_table by id and opens the record in the panel. Use when only tableId + recordId are available (e.g. linked record click). */
   openRecordByTableId: (tableId: string, recordId: string, interfaceMode?: 'view' | 'edit') => Promise<void>
   closeRecord: () => void
@@ -76,6 +78,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
     cascadeContext?: RecordEditorCascadeContext | null,
     interfaceMode?: "view" | "edit",
     onRecordDeleted?: () => void,
+    onRecordUpdated?: () => void,
     fieldLayout?: FieldLayoutItem[],
     onLayoutSave?: (layout: FieldLayoutItem[]) => void | Promise<void>,
     tableFields?: TableField[]
@@ -98,6 +101,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
       cascadeContext,
       interfaceMode: interfaceMode ?? prev.interfaceMode ?? "view",
       onRecordDeleted,
+      onRecordUpdated,
       history:
         prev.isOpen && prev.tableId === tableId && prev.recordId === recordId
           ? prev.history

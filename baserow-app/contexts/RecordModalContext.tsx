@@ -62,6 +62,7 @@ export function RecordModalProvider({ children }: { children: ReactNode }) {
           openState.cascadeContext,
           openState.interfaceMode,
           openState.onDeleted,
+          openState.onSave ? () => openState.onSave?.() : undefined,
           openState.fieldLayout,
           openState.onLayoutSave ?? undefined,
           openState.tableFields

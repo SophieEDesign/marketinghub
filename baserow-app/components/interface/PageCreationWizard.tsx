@@ -668,8 +668,10 @@ export default function PageCreationWizard({
       setCreating(false)
       onOpenChange(false)
 
-      // Redirect to new page
+      // Redirect to new page and refresh sidebar so new page appears immediately
       router.push(`/pages/${page.id}`)
+      router.refresh()
+      window.dispatchEvent(new CustomEvent('pages-updated'))
     } catch (error: any) {
       console.error('Error creating page:', error)
       alert(error.message || 'Failed to create page')

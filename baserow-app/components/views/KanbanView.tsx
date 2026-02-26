@@ -5,7 +5,14 @@ import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { ChevronRight, Plus, Settings, Columns } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { ChevronRight, ChevronDown, Plus, Settings, Columns, MoreVertical } from "lucide-react"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
 import type { TableRow } from "@/types/database"
 import type { TableField } from "@/types/fields"
@@ -14,7 +21,7 @@ import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { CellFactory } from "@/components/grid/CellFactory"
 import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
 import { isAbortError } from "@/lib/api/error-handling"
-import { getOptionValueToLabelMap } from "@/lib/fields/select-options"
+import { getOptionValueToLabelMap, normalizeSelectOptionsForUi } from "@/lib/fields/select-options"
 import EmptyState from "@/components/empty-states/EmptyState"
 import type { HighlightRule } from "@/lib/interface/types"
 import { evaluateHighlightRules, getFormattingStyle } from "@/lib/conditional-formatting/evaluator"
@@ -53,6 +60,14 @@ interface KanbanViewProps {
   onRecordDeleted?: () => void
   /** Callback to save field layout when user edits modal layout in right panel. */
   onModalLayoutSave?: (fieldLayout: import("@/lib/interface/field-layout-utils").FieldLayoutItem[]) => void
+  /** Initial collapsed stack IDs (group names). */
+  collapsedStacks?: string[]
+  /** Called when user collapses/expands stacks; use to persist state. */
+  onCollapsedStacksChange?: (collapsed: string[]) => void
+  /** Called when user renames a stack (select option). Updates the field's option label. */
+  onRenameOption?: (optionIdOrLabel: string, newLabel: string) => Promise<void>
+  /** When true, show rename and collapse controls. */
+  canEditTable?: boolean
 }
 
 function KanbanView({ 
@@ -78,6 +93,10 @@ function KanbanView({
   interfaceMode = 'view',
   onRecordDeleted,
   onModalLayoutSave,
+  collapsedStacks: initialCollapsedStacks = [],
+  onCollapsedStacksChange,
+  onRenameOption,
+  canEditTable = false,
 }: KanbanViewProps) {
   // All hooks must be at the top level, before any conditional returns
   const router = useRouter()
@@ -87,6 +106,52 @@ function KanbanView({
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
   const [groupValueLabelMaps, setGroupValueLabelMaps] = useState<Record<string, Record<string, string>>>({})
+  const [collapsedStacks, setCollapsedStacks] = useState<Set<string>>(
+    () => new Set(Array.isArray(initialCollapsedStacks) ? initialCollapsedStacks : [])
+  )
+  const initialCollapsedKey = useMemo(
+    () => (Array.isArray(initialCollapsedStacks) ? [...initialCollapsedStacks].sort().join(",") : ""),
+    [initialCollapsedStacks]
+  )
+  useEffect(() => {
+    const arr = Array.isArray(initialCollapsedStacks) ? initialCollapsedStacks : []
+    setCollapsedStacks(new Set(arr))
+  }, [initialCollapsedKey])
+  const [editingGroupName, setEditingGroupName] = useState<string | null>(null)
+  const [editingLabelValue, setEditingLabelValue] = useState("")
+
+  const toggleStack = useCallback((groupName: string) => {
+    setCollapsedStacks((prev) => {
+      const next = new Set(prev)
+      if (next.has(groupName)) {
+        next.delete(groupName)
+      } else {
+        next.add(groupName)
+      }
+      onCollapsedStacksChange?.(Array.from(next))
+      return next
+    })
+  }, [onCollapsedStacksChange])
+
+  const startRename = useCallback((groupName: string, currentLabel: string) => {
+    setEditingGroupName(groupName)
+    setEditingLabelValue(currentLabel)
+  }, [])
+
+  const saveRename = useCallback(async () => {
+    if (!editingGroupName || !onRenameOption) return
+    const trimmed = editingLabelValue.trim()
+    if (!trimmed) {
+      setEditingGroupName(null)
+      return
+    }
+    try {
+      await onRenameOption(editingGroupName, trimmed)
+      setEditingGroupName(null)
+    } catch (err) {
+      console.error("Failed to rename stack:", err)
+    }
+  }, [editingGroupName, editingLabelValue, onRenameOption])
 
   // IMPORTANT: config may provide field IDs or display names; row data keys are field NAMES (supabase columns).
   const groupingFieldName = useMemo(() => {
@@ -251,7 +316,7 @@ function KanbanView({
   useEffect(() => {
     loadRows()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableId, reloadKey])
+  }, [tableId, reloadKey, filters, tableFields])
 
   async function loadRows() {
     if (!tableId) {
@@ -338,6 +403,7 @@ function KanbanView({
       cascadeContext ?? (blockConfig ? { blockConfig } : undefined),
       interfaceMode,
       onRecordDeleted,
+      () => loadRows(),
       (blockConfig as any)?.field_layout,
       onModalLayoutSave ?? undefined,
       tableFields
@@ -443,7 +509,28 @@ function KanbanView({
   }
 
   const groupedRows = groupRowsByField()
-  const groups = Object.keys(groupedRows)
+  const groups = useMemo(() => {
+    const keys = Object.keys(groupedRows)
+    if (!groupingField || (groupingField.type !== "single_select" && groupingField.type !== "multi_select")) {
+      return keys
+    }
+    const { selectOptions } = normalizeSelectOptionsForUi(groupingField.type, groupingField.options)
+    const ordered = [...selectOptions].sort((a, b) => a.sort_index - b.sort_index)
+    const sortIndexByKey = new Map<string, number>()
+    for (const o of ordered) {
+      sortIndexByKey.set(o.id, o.sort_index)
+      if (o.id !== o.label) sortIndexByKey.set(o.label, o.sort_index)
+    }
+    const uncategorizedSort = 99999
+    sortIndexByKey.set("Uncategorized", uncategorizedSort)
+    sortIndexByKey.set("—", uncategorizedSort + 1)
+    return [...keys].sort((a, b) => {
+      const ai = sortIndexByKey.get(a) ?? uncategorizedSort + 2
+      const bi = sortIndexByKey.get(b) ?? uncategorizedSort + 2
+      if (ai !== bi) return ai - bi
+      return String(a).localeCompare(String(b))
+    })
+  }, [groupedRows, groupingField])
 
   // Empty state for search
   if (searchQuery && filteredRows.length === 0) {
@@ -485,21 +572,128 @@ function KanbanView({
             groupValueLabelMaps[groupingFieldName]?.[groupName] ??
             groupName
           const headerColor = getColumnHeaderColor(groupName)
-          return (
-          <div key={groupName} className="flex-shrink-0 w-[320px] min-w-[280px] max-w-[340px]">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 mb-3">
-              <div className="flex items-center gap-2 flex-wrap">
-                {headerColor ? (
+          const isCollapsed = collapsedStacks.has(groupName)
+          const isEditingThis = editingGroupName === groupName
+          const canEdit = canEditTable && (onRenameOption || onCollapsedStacksChange)
+
+          if (isCollapsed) {
+            return (
+              <div
+                key={groupName}
+                className="flex-shrink-0 w-12 min-h-[120px] flex flex-col items-center"
+                title="Click to expand"
+              >
+                <button
+                  type="button"
+                  className="w-full flex-1 min-h-[80px] rounded-lg flex flex-col items-center justify-center gap-1 px-1 py-2 transition-colors hover:opacity-90 cursor-pointer"
+                  style={headerColor ? { backgroundColor: headerColor } : { backgroundColor: "#9CA3AF" }}
+                  onClick={() => toggleStack(groupName)}
+                >
+                  <ChevronRight className="h-4 w-4 text-white/90 shrink-0" />
                   <span
-                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white shrink-0"
-                    style={{ backgroundColor: headerColor }}
+                    className="text-[10px] font-medium text-white/95 line-clamp-3 text-center [writing-mode:vertical] [text-orientation:mixed]"
+                    style={{ writingMode: "vertical-rl" as const }}
                   >
                     {displayName}
                   </span>
-                ) : (
-                  <h3 className="text-sm font-semibold text-gray-900">{displayName}</h3>
+                  <span className="text-[10px] text-white/80">{groupedRows[groupName].length}</span>
+                </button>
+                {canEdit && showAddRecord && canCreateRecord && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-1 h-7 w-7 p-0 shrink-0"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleCreateInGroup(groupName)
+                    }}
+                    title="Add content"
+                    aria-label="Add content"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
                 )}
-                <span className="text-xs text-gray-500">{groupedRows[groupName].length} items</span>
+              </div>
+            )
+          }
+
+          return (
+          <div key={groupName} className="flex-shrink-0 min-w-[260px]">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 mb-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  {canEdit && (
+                    <button
+                      type="button"
+                      onClick={() => toggleStack(groupName)}
+                      className="shrink-0 p-0.5 rounded hover:bg-gray-100 text-gray-500"
+                      title="Collapse stack"
+                      aria-label="Collapse stack"
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </button>
+                  )}
+                  {isEditingThis ? (
+                    <Input
+                      value={editingLabelValue}
+                      onChange={(e) => setEditingLabelValue(e.target.value)}
+                      onBlur={saveRename}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveRename()
+                        if (e.key === "Escape") setEditingGroupName(null)
+                      }}
+                      className="h-7 text-sm flex-1 min-w-0"
+                      autoFocus
+                    />
+                  ) : (
+                    <>
+                      {headerColor ? (
+                        <span
+                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white shrink-0"
+                          style={{ backgroundColor: headerColor }}
+                        >
+                          {displayName}
+                        </span>
+                      ) : (
+                        <h3 className="text-sm font-semibold text-gray-900 truncate">{displayName}</h3>
+                      )}
+                      <span className="text-xs text-gray-500 shrink-0">{groupedRows[groupName].length} items</span>
+                    </>
+                  )}
+                </div>
+                {canEdit && onRenameOption && !isEditingThis && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        className="shrink-0 p-1 rounded hover:bg-gray-100 text-gray-500"
+                        aria-label="Stack options"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      <DropdownMenuItem onClick={() => startRename(groupName, displayName)}>
+                        Rename stack
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => toggleStack(groupName)}>
+                        Collapse stack
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+                {canEdit && showAddRecord && canCreateRecord && !isEditingThis && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="shrink-0 h-7 w-7 p-0"
+                    onClick={() => handleCreateInGroup(groupName)}
+                    title="Add content"
+                    aria-label="Add content"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </div>
             <div className="space-y-2">
@@ -552,7 +746,7 @@ function KanbanView({
                   onDoubleClick={() => row.id != null && handleOpenRecord(String(row.id))}
                 >
                   <CardContent className="p-3 min-w-0">
-                    <div className="flex flex-col gap-1 min-w-0">
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-1 min-w-0">
                       {cardFields.map((fieldObj, idx) => {
                         const isFirst = idx === 0
                         const isVirtual = fieldObj.type === "formula" || fieldObj.type === "lookup"
@@ -565,7 +759,7 @@ function KanbanView({
                           return (
                             <div
                               key={fieldObj.id ?? fieldObj.name}
-                              className="w-full min-w-0"
+                              className={`w-full min-w-0 ${isFirst ? "col-span-full" : ""}`}
                               onClick={(e) => e.stopPropagation()}
                               onDoubleClick={(e) => e.stopPropagation()}
                             >
@@ -594,8 +788,7 @@ function KanbanView({
                         return (
                           <div
                             key={fieldObj.id ?? fieldObj.name}
-                            className={`flex flex-col gap-0.5 min-w-0 ${isFirst ? "font-semibold text-sm text-gray-900" : "text-xs text-gray-600"}`}
-                            style={{ minHeight: rowH }}
+                            className={`flex flex-col gap-0.5 min-w-0 ${isFirst ? "col-span-full font-semibold text-sm text-gray-900" : "text-xs text-gray-600"}`}
                             onClick={(e) => e.stopPropagation()}
                             onDoubleClick={(e) => e.stopPropagation()}
                           >

@@ -59,6 +59,8 @@ interface GridBlockProps {
   isFullPage?: boolean
   /** When set and matches this block, opens the record in edit mode */
   openRecordInEditModeForBlock?: { blockId: string; recordId: string; tableId: string } | null
+  /** Called when block config should be updated (e.g. kanban collapsed stacks) */
+  onUpdate?: (updates: Partial<import("@/lib/interface/types").PageBlock["config"]>) => void
 }
 
 export default function GridBlock({
@@ -78,6 +80,7 @@ export default function GridBlock({
   canEditLayout = false,
   isFullPage = false,
   openRecordInEditModeForBlock,
+  onUpdate,
 }: GridBlockProps) {
   // #region HOOK CHECK - GridBlock render start
   if (process.env.NODE_ENV === 'development') {
@@ -910,6 +913,30 @@ export default function GridBlock({
           )
         }
         
+        const groupingField = safeTableFields.find(
+          (f: any) => f && (f.name === groupByFieldId || f.id === groupByFieldId)
+        )
+        const handleRenameOption = async (optionIdOrLabel: string, newLabel: string) => {
+          if (!tableId || !groupingField?.id) return
+          const opts = (groupingField.options as any) || {}
+          const selectOptions = Array.isArray(opts.selectOptions) ? opts.selectOptions : []
+          const updated = selectOptions.map((o: any) =>
+            (o.id === optionIdOrLabel || o.label === optionIdOrLabel)
+              ? { ...o, label: newLabel.trim() }
+              : o
+          )
+          const res = await fetch(`/api/tables/${tableId}/fields`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              fieldId: groupingField.id,
+              options: { ...opts, selectOptions: updated },
+            }),
+          })
+          if (!res.ok) throw new Error(await res.text())
+          setRefreshKey((k) => k + 1)
+        }
+
         return (
           <KanbanView
             highlightRules={config.highlight_rules}
@@ -919,6 +946,7 @@ export default function GridBlock({
             fieldIds={kanbanFieldIds}
             searchQuery=""
             tableFields={tableFields}
+            filters={allFilters}
             colorField={appearance.color_field}
             imageField={appearance.image_field}
             fitImageSize={appearance.fit_image_size}
@@ -931,6 +959,10 @@ export default function GridBlock({
             interfaceMode={interfaceMode}
             onRecordDeleted={() => setRefreshKey((k) => k + 1)}
             onModalLayoutSave={onModalLayoutSave ?? undefined}
+            collapsedStacks={(config as any)?.kanban_collapsed_stacks ?? []}
+            onCollapsedStacksChange={(collapsed) => onUpdate?.({ kanban_collapsed_stacks: collapsed })}
+            onRenameOption={onUpdate && groupingField ? handleRenameOption : undefined}
+            canEditTable={isEditing}
           />
         )
       }
@@ -1376,8 +1408,8 @@ export default function GridBlock({
         />
       )}
 
-      {/* Single scroll container: GridView/CalendarView owns scroll; flex so child can flex-1. Calendar needs overflow-hidden so child controls scroll. */}
-      <div className={`flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden ${viewType === 'calendar' ? 'min-h-[100vh]' : ''} ${viewType === 'kanban' ? 'overflow-x-auto' : ''}`}>
+      {/* Single scroll container: GridView/CalendarView owns scroll; flex so child can flex-1. No min-h for calendar (was causing overflow/push-off). */}
+      <div className={`flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden ${viewType === 'kanban' ? 'overflow-x-auto' : ''}`}>
         {renderView()}
       </div>
     </div>

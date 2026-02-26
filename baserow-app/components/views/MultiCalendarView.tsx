@@ -681,7 +681,7 @@ export default function MultiCalendarView({
         onRecordClick(recordId, tableId)
         return
       }
-      openRecord(tableId, recordId, tableName, (blockConfig as any)?.modal_fields, (blockConfig as any)?.modal_layout, cascadeContext, interfaceMode, undefined, (blockConfig as any)?.field_layout)
+      openRecord(tableId, recordId, tableName, (blockConfig as any)?.modal_fields, (blockConfig as any)?.modal_layout, cascadeContext, interfaceMode, undefined, () => loadAll(), (blockConfig as any)?.field_layout)
     },
     [blockConfig, cascadeContext, onRecordClick, openRecord, interfaceMode]
   )

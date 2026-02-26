@@ -18,6 +18,7 @@ interface KanbanBlockProps {
   pageShowAddRecord?: boolean
   onModalLayoutSave?: (fieldLayout: FieldLayoutItem[]) => void
   canEditLayout?: boolean
+  onUpdate?: (updates: Partial<PageBlock["config"]>) => void
 }
 
 /**
@@ -36,6 +37,7 @@ export default function KanbanBlock({
   pageShowAddRecord = false,
   onModalLayoutSave,
   canEditLayout = false,
+  onUpdate,
 }: KanbanBlockProps) {
   // Create a modified block config with view_type='kanban'
   const kanbanBlock: PageBlock = {
@@ -59,6 +61,7 @@ export default function KanbanBlock({
       pageShowAddRecord={pageShowAddRecord}
       onModalLayoutSave={onModalLayoutSave}
       canEditLayout={canEditLayout}
+      onUpdate={onUpdate}
     />
   )
 }

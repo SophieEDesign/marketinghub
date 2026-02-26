@@ -218,6 +218,7 @@ export default function RecordPanel() {
               state.onRecordDeleted?.()
               closeRecord()
             }}
+            onRecordUpdate={() => state.onRecordUpdated?.()}
             interfaceMode={interfaceMode}
             renderHeaderActions={false}
             modalLayout={state.modalLayout}

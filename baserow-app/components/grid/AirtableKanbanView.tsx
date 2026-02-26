@@ -52,6 +52,7 @@ import { buildSelectClause, toPostgrestColumn } from "@/lib/supabase/postgrest"
 import { normalizeSelectOptionsForUi } from "@/lib/fields/select-options"
 import { getFieldDisplayName } from "@/lib/fields/display"
 import { isAbortError } from "@/lib/api/error-handling"
+import { deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
 
 // PostgREST expects unquoted identifiers in select/order clauses; see `lib/supabase/postgrest`.
 
@@ -387,9 +388,19 @@ export default function AirtableKanbanView({
 
     try {
       const newValue = groupField.type === "multi_select" ? [columnId] : columnId
-      const { data, error } = await supabase
+      const filtersAsConfig: FilterConfig[] = viewFilters.map((f) => ({
+        field: f.field_name,
+        operator: f.operator as FilterConfig["operator"],
+        value: f.value,
+      }))
+      const filterDefaults = deriveDefaultValuesFromFilters(filtersAsConfig, tableFields)
+      const insertData = {
+        [groupField.name]: newValue,
+        ...filterDefaults,
+      }
+      const { error } = await supabase
         .from(supabaseTableName)
-        .insert([{ [groupField.name]: newValue }])
+        .insert([insertData])
         .select()
         .single()
 
@@ -710,7 +721,7 @@ function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
-      className="flex-shrink-0 w-[320px] min-w-[280px] max-w-[340px] bg-gray-50 rounded-lg flex flex-col h-full max-h-full border border-gray-200"
+      className="flex-shrink-0 min-w-[260px] bg-gray-50 rounded-lg flex flex-col h-full max-h-full border border-gray-200"
       data-column-id={column.id}
     >
       {/* Column Header */}
@@ -847,7 +858,7 @@ function KanbanCard({ row, displayFields, showFieldLabels = false, tableFields, 
               <GripVertical className="h-4 w-4 text-gray-400" />
             </div>
           )}
-          <div className="flex-1 min-w-0 flex flex-col gap-1">
+          <div className="flex-1 min-w-0 grid grid-cols-2 gap-x-3 gap-y-1">
             {list.map((field, idx) => {
               if (!field?.name) return null
               const full = getFullField(field)
@@ -858,8 +869,7 @@ function KanbanCard({ row, displayFields, showFieldLabels = false, tableFields, 
               return (
                 <div
                   key={full.id ?? full.name}
-                  className={`flex flex-col gap-0.5 min-w-0 ${isFirst ? "font-semibold text-sm text-gray-900" : "text-xs text-gray-600"}`}
-                  style={{ minHeight: rowH }}
+                  className={`flex flex-col gap-0.5 min-w-0 ${isFirst ? "col-span-full font-semibold text-sm text-gray-900" : "text-xs text-gray-600"}`}
                   data-kanban-field="true"
                   onClick={(e) => e.stopPropagation()}
                   onDoubleClick={(e) => e.stopPropagation()}

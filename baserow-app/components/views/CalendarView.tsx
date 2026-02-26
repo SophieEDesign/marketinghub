@@ -1589,9 +1589,6 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
     return "dayGridWeek6"
   }, [visibleWeekSpan])
 
-  // Default aspect ratio (overridden per-view in calendarViews)
-  const calendarAspectRatio = 1.2
-
   // FullCalendar: use stable plugins array (defined at module level to prevent React #185)
   const calendarHeaderToolbar = useMemo(
     () => ({
@@ -1844,6 +1841,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
           cascadeContext ?? undefined,
           interfaceMode,
           () => { if (resolvedTableId && supabaseTableName && loadRowsRef.current) loadRowsRef.current() },
+          () => { if (resolvedTableId && supabaseTableName && loadRowsRef.current) loadRowsRef.current() },
           (bc as any)?.field_layout,
           onModalLayoutSave ?? undefined,
           Array.isArray(loadedTableFields) ? loadedTableFields : undefined
@@ -2055,32 +2053,32 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
   return (
     <div className="w-full h-full min-w-0 min-h-0 flex flex-col bg-white overflow-hidden">
       {renderAnchorControls()}
-      {/* Scroll container: stable ref for anchor scrolling; overflow-auto so wide calendar can scroll horizontally */}
+      {/* Scroll container: fills available space; overflow-auto for horizontal scroll when wide */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 min-h-0 min-w-0 overflow-auto px-4 py-3 bg-white"
+        className="flex-1 min-h-0 min-w-0 overflow-auto px-4 py-3 bg-white flex flex-col"
       >
-        {/* CRITICAL: Only render FullCalendar after mount to prevent hydration mismatch (React error #185) */}
+        {/* Wrapper with h-full so FullCalendar fills container and fits viewport */}
         {mounted ? (
-          <MemoizedFullCalendar
-            ref={fullCalendarRef as React.LegacyRef<React.ComponentRef<typeof FullCalendar>>}
-            key={calendarStableKey}
-            plugins={CALENDAR_PLUGINS}
-            events={calendarEvents}
-            editable={!isViewOnly}
-            eventDrop={handleEventDrop}
-            headerToolbar={calendarHeaderToolbar}
-            initialView={calendarInitialView}
-            initialDate={calendarInitialDate}
-            views={calendarViews}
-            height="auto"
-            aspectRatio={calendarAspectRatio}
+          <div className="flex-1 min-h-0 min-w-0 w-full">
+            <MemoizedFullCalendar
+              ref={fullCalendarRef as React.LegacyRef<React.ComponentRef<typeof FullCalendar>>}
+              key={calendarStableKey}
+              plugins={CALENDAR_PLUGINS}
+              events={calendarEvents}
+              editable={!isViewOnly}
+              eventDrop={handleEventDrop}
+              headerToolbar={calendarHeaderToolbar}
+              initialView={calendarInitialView}
+              initialDate={calendarInitialDate}
+              views={calendarViews}
+              height="100%"
             expandRows={true}
             dayMaxEvents={2}
             moreLinkClick="popover"
             eventDisplay="block"
             eventClassNames={calendarEventClassNames}
-            dayCellClassNames="hover:bg-gray-50 transition-colors min-h-[4rem]"
+            dayCellClassNames="hover:bg-gray-50 transition-colors min-h-[3rem]"
             dayHeaderClassNames="text-xs font-medium text-gray-700 py-1"
             eventTextColor="#1f2937"
             eventBorderColor="transparent"
@@ -2091,6 +2089,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
             eventClick={handleEventClick}
             dateClick={handleDateClick}
           />
+          </div>
         ) : (
           <div className="flex items-center justify-center h-64 text-gray-500">
             Loading calendar...

@@ -183,6 +183,7 @@ export default function ListView({
         cascadeContext ?? (blockConfig ? { blockConfig } : undefined),
         interfaceMode,
         onRecordDeleted,
+        () => loadRows(),
         (blockConfig as any)?.field_layout,
         onModalLayoutSave ?? undefined,
         tableFields

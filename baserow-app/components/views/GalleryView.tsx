@@ -90,6 +90,7 @@ export default function GalleryView({
   const [groupValueLabelMaps, setGroupValueLabelMaps] = useState<Record<string, Record<string, string>>>({})
   // Ref for measuring content height
   const contentRef = useRef<HTMLDivElement>(null)
+  const loadRowsRef = useRef<() => Promise<void>>(() => Promise.resolve())
 
   // Resolve supabase table name
   useEffect(() => {
@@ -122,7 +123,7 @@ export default function GalleryView({
 
   // Load rows
   useEffect(() => {
-    async function loadRows() {
+    const loadRows = async () => {
       // Guardrail: during page transitions/unmounts, tableId can temporarily be undefined
       // while supabaseTableName is still set from a previous render. Never call split on it.
       if (!supabaseTableName || !tableId) {
@@ -176,7 +177,7 @@ export default function GalleryView({
         setLoading(false)
       }
     }
-
+    loadRowsRef.current = loadRows
     loadRows()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabaseTableName, tableId, JSON.stringify(filters), JSON.stringify(filterTree), reloadKey])
@@ -465,6 +466,7 @@ export default function GalleryView({
       blockConfig ? { blockConfig } : undefined,
       interfaceMode,
       onRecordDeleted,
+      () => loadRowsRef.current?.(),
       (blockConfig as any)?.field_layout,
       onModalLayoutSave ?? undefined,
       tableFields

@@ -124,6 +124,33 @@ function resolveEffectiveLabelFields(args: {
   return { primary, secondary }
 }
 
+/** Text-like field types that support ilike search. */
+const SEARCHABLE_FIELD_TYPES = ['text', 'long_text', 'email', 'url']
+
+/**
+ * Find the best field to use for search.
+ * Prefers the primary label field if it's text-like; otherwise uses the first text field.
+ * Returns null if no searchable field exists (e.g. table only has id/number/link columns).
+ */
+function resolveSearchField(
+  effectivePrimaryLabelField: string,
+  lookupFields: LookupFieldMeta[],
+  physicalCols: Set<string> | null
+): string | null {
+  const hasPhysical = !!physicalCols && physicalCols.size > 0
+  const isPhysical = (name: string) => !hasPhysical || physicalCols!.has(name)
+
+  const primaryField = lookupFields.find((f) => f.name === effectivePrimaryLabelField)
+  if (primaryField && SEARCHABLE_FIELD_TYPES.includes(primaryField.type) && isPhysical(effectivePrimaryLabelField)) {
+    return effectivePrimaryLabelField
+  }
+
+  const firstTextField = lookupFields.find(
+    (f) => SEARCHABLE_FIELD_TYPES.includes(f.type) && isPhysical(f.name)
+  )
+  return firstTextField?.name ?? null
+}
+
 export interface LookupFieldConfig {
   // Optional: field to use as primary label (defaults to the table's primary field)
   primaryLabelField?: string
@@ -330,19 +357,22 @@ export default function LookupFieldPicker({
             requestedSecondaryLabelFields,
           })
 
-        const fieldsToSelect = ["id", effectivePrimaryLabelField, ...effectiveSecondaryLabelFields].filter(Boolean)
+        const searchField = resolveSearchField(effectivePrimaryLabelField, lookupFields, physicalCols)
+        const fieldsToSelect = [
+          "id",
+          effectivePrimaryLabelField,
+          ...effectiveSecondaryLabelFields,
+          ...(searchField && searchField !== effectivePrimaryLabelField ? [searchField] : []),
+        ].filter(Boolean)
 
         const supabase = createClient()
         let queryBuilder = supabase
           .from(table.supabase_table)
-          .select(fieldsToSelect.join(", "))
+          .select([...new Set(fieldsToSelect)].join(", "))
           .limit(50)
 
-        if (query.trim()) {
-          const primaryField = lookupFields.find((f: any) => f.name === effectivePrimaryLabelField)
-          if (primaryField) {
-            queryBuilder = queryBuilder.ilike(effectivePrimaryLabelField, `%${query}%`)
-          }
+        if (query.trim() && searchField) {
+          queryBuilder = queryBuilder.ilike(searchField, `%${query}%`)
         }
 
         const { data: records, error } = await queryBuilder

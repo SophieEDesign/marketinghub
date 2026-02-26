@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import AirtableSidebar from "./AirtableSidebar"
 import Topbar from "./Topbar"
 import EditModeBanner from "./EditModeBanner"
@@ -82,7 +83,15 @@ export default function Shell({
   defaultPageId = null,
   coreDataSectionTitle,
 }: ShellProps) {
+  const router = useRouter()
   const isMobile = useIsMobile()
+
+  // When any component dispatches pages-updated (new page, rename, reorder, etc.), refresh to re-fetch sidebar data
+  useEffect(() => {
+    const handler = () => router.refresh()
+    window.addEventListener('pages-updated', handler)
+    return () => window.removeEventListener('pages-updated', handler)
+  }, [router])
   const { primaryColor } = useBranding()
   // On mobile: sidebar closed by default
   // On tablet/desktop: sidebar visible by default (handled internally)

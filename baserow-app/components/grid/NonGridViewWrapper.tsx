@@ -277,21 +277,65 @@ export default function NonGridViewWrapper({
             fieldIds={fieldIds}
           />
         )}
-        {viewType === "kanban" && (
-          <KanbanView
-            tableId={tableId}
-            viewId={viewId}
-            groupingFieldId={groupingFieldId || fieldIds[0] || ""}
-            fieldIds={fieldIds}
-            searchQuery={searchQuery}
-            tableFields={tableFields}
-            filters={filtersAsConfig}
-            imageField={cardImageField || undefined}
-            colorField={cardColorField || undefined}
-            wrapText={cardWrapText}
-            showFieldLabels={(viewConfigProp as { kanban_show_field_labels?: boolean })?.kanban_show_field_labels === true}
-          />
-        )}
+        {viewType === "kanban" && (() => {
+          const vc = viewConfigProp as { kanban_collapsed_stacks?: string[]; kanban_show_field_labels?: boolean } | undefined
+          const groupingField = tableFields.find(
+            (f) => f && (f.name === (groupingFieldId || fieldIds[0]) || f.id === (groupingFieldId || fieldIds[0]))
+          )
+          const handleRenameOption = async (optionIdOrLabel: string, newLabel: string) => {
+            if (!tableId || !groupingField?.id) return
+            const opts = (groupingField.options as Record<string, unknown>) || {}
+            const selectOptions = Array.isArray(opts.selectOptions) ? opts.selectOptions : []
+            const updated = selectOptions.map((o: { id?: string; label?: string }) =>
+              (o.id === optionIdOrLabel || o.label === optionIdOrLabel)
+                ? { ...o, label: newLabel.trim() }
+                : o
+            )
+            const res = await fetch(`/api/tables/${tableId}/fields`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                fieldId: groupingField.id,
+                options: { ...opts, selectOptions: updated },
+              }),
+            })
+            if (!res.ok) throw new Error(await res.text())
+            router.refresh()
+          }
+          const handleCollapsedStacksChange = async (collapsed: string[]) => {
+            if (!viewUuid) return
+            try {
+              const { data } = await supabase.from("views").select("config").eq("id", viewUuid).single()
+              const current = (data?.config as Record<string, unknown>) || {}
+              await supabase
+                .from("views")
+                .update({ config: { ...current, kanban_collapsed_stacks: collapsed } })
+                .eq("id", viewUuid)
+              router.refresh()
+            } catch (e) {
+              console.error("Error saving collapsed stacks:", e)
+            }
+          }
+          return (
+            <KanbanView
+              tableId={tableId}
+              viewId={viewId}
+              groupingFieldId={groupingFieldId || fieldIds[0] || ""}
+              fieldIds={fieldIds}
+              searchQuery={searchQuery}
+              tableFields={tableFields}
+              filters={filtersAsConfig}
+              imageField={cardImageField || undefined}
+              colorField={cardColorField || undefined}
+              wrapText={cardWrapText}
+              showFieldLabels={vc?.kanban_show_field_labels === true}
+              collapsedStacks={vc?.kanban_collapsed_stacks ?? []}
+              onCollapsedStacksChange={handleCollapsedStacksChange}
+              onRenameOption={handleRenameOption}
+              canEditTable={true}
+            />
+          )
+        })()}
         {viewType === "gallery" && (
           <GalleryView
             tableId={tableId}

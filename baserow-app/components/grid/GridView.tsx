@@ -2463,6 +2463,7 @@ export default function GridView({
       cascadeContext,
       interfaceMode,
       () => loadRows(),
+      () => loadRows(),
       fieldLayout,
       onModalLayoutSave,
       tableFields
