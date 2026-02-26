@@ -1216,6 +1216,7 @@ export default function GridBlock({
                   { blockConfig: config },
                   interfaceMode,
                   () => setRefreshKey((k) => k + 1),
+                  () => setRefreshKey((k) => k + 1),
                   (config as any).field_layout,
                   onModalLayoutSave ?? undefined,
                   tableFields
