@@ -46,6 +46,7 @@ Or for Vercel deployments, this is automatically set via `VERCEL_URL`.
 2. Add these redirect URLs:
    - `https://your-domain.com/auth/callback`
    - `https://your-domain.com/auth/setup-password`
+   - `https://your-domain.com/auth/update-password` (for password reset flow)
    - `https://your-domain.com/login`
 
 This ensures that invited users can properly complete the password setup flow.

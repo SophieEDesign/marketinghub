@@ -23,6 +23,7 @@ CORS errors are blocking requests from `https://marketing.petersandmay.com` to S
 3. **Add Redirect URLs** (click "Add URL" for each):
    - `https://marketing.petersandmay.com/auth/callback`
    - `https://marketing.petersandmay.com/auth/setup-password`
+   - `https://marketing.petersandmay.com/auth/update-password`
    - `https://marketing.petersandmay.com/login`
 4. **Click "Save"**
 
