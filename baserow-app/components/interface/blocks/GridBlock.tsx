@@ -30,7 +30,7 @@ import CalendarAnchorControls from "@/components/views/calendar/CalendarAnchorCo
 import type { CalendarViewScrollHandle } from "@/components/views/CalendarView"
 import { VIEWS_ENABLED } from "@/lib/featureFlags"
 import { normalizeUuid } from "@/lib/utils/ids"
-import { isAbortError } from "@/lib/api/error-handling"
+import { isAbortError, formatErrorForLog } from "@/lib/api/error-handling"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { startOfWeek, endOfWeek, startOfDay, addWeeks, startOfMonth, endOfMonth, addMonths } from "date-fns"
 import type { GroupRule } from "@/lib/grouping/types"
@@ -497,7 +497,7 @@ export default function GridBlock({
           }
         }
       } catch (error) {
-        console.error("Error loading table data:", error)
+        console.error("Error loading table data:", formatErrorForLog(error))
         // CRITICAL: Do NOT retry automatically on network failure
         // Keep existing data if available
       } finally {

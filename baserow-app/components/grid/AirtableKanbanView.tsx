@@ -44,6 +44,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import ColumnManagementDialog from "./ColumnManagementDialog"
 import RecordDrawer from "./RecordDrawer"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
+import { formatErrorForLog } from "@/lib/api/error-handling"
 import type { TableField } from "@/types/fields"
 import { sortRowsByFieldType, shouldUseClientSideSorting } from "@/lib/sorting/fieldTypeAwareSort"
 import { resolveChoiceColor, normalizeHexColor, getTextColorForBackground } from "@/lib/field-colors"
@@ -51,7 +52,7 @@ import { CellFactory } from "./CellFactory"
 import { buildSelectClause, toPostgrestColumn } from "@/lib/supabase/postgrest"
 import { normalizeSelectOptionsForUi } from "@/lib/fields/select-options"
 import { getFieldDisplayName } from "@/lib/fields/display"
-import { isAbortError } from "@/lib/api/error-handling"
+import { isAbortError, formatErrorForLog } from "@/lib/api/error-handling"
 import { deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
 
 // PostgREST expects unquoted identifiers in select/order clauses; see `lib/supabase/postgrest`.
@@ -192,7 +193,7 @@ export default function AirtableKanbanView({
 
       if (error) {
         if (isAbortError(error)) return
-        console.error("Error loading rows:", error)
+        console.error("Error loading rows:", formatErrorForLog(error))
         setRows([])
       } else {
         let rowsData = data || []

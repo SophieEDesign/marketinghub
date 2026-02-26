@@ -99,3 +99,19 @@ export function createErrorResponse(
  *   return NextResponse.json(createErrorResponse(error, 'Failed to load', 500), { status: 500 })
  */
 
+/**
+ * Serialize an error for console logging. Supabase/PostgrestError and other objects
+ * often log as "Object" in production. This extracts message, code, details for visibility.
+ */
+export function formatErrorForLog(error: unknown): string {
+  if (error == null) return "unknown"
+  if (typeof error === "string") return error
+  const e = error as { message?: string; code?: string; details?: string; hint?: string }
+  const parts: string[] = []
+  if (e.message) parts.push(e.message)
+  if (e.code) parts.push(`code=${e.code}`)
+  if (e.details) parts.push(`details=${e.details}`)
+  if (e.hint) parts.push(`hint=${e.hint}`)
+  return parts.length > 0 ? parts.join(" | ") : String(error)
+}
+

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Plus, ChevronLeft, ChevronRight } from "lucide-react"
 import type { TableRow, ViewFilter, ViewSort } from "@/types/database"
 import { useViewMeta } from "@/hooks/useViewMeta"
-import { isAbortError } from "@/lib/api/error-handling"
+import { isAbortError, formatErrorForLog } from "@/lib/api/error-handling"
 
 interface GridViewProps {
   tableId: string
@@ -157,7 +157,7 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
       }
     } catch (error) {
       if (isAbortError(error)) return
-      console.error("Error loading rows:", error)
+      console.error("Error loading rows:", formatErrorForLog(error))
       // CRITICAL: Do NOT retry automatically on network failure
       // Keep existing rows if available
       if (rows.length === 0) {

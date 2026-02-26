@@ -22,7 +22,7 @@ import FilterDialog from "@/components/grid/FilterDialog"
 import { toPostgrestColumn } from "@/lib/supabase/postgrest"
 import { buildGroupTree, flattenGroupTree } from "@/lib/grouping/groupTree"
 import type { GroupRule } from "@/lib/grouping/types"
-import { isAbortError } from "@/lib/api/error-handling"
+import { isAbortError, formatErrorForLog } from "@/lib/api/error-handling"
 import type { LinkedField } from "@/types/fields"
 import { getLinkedFieldValueFromRow, linkedValueToIds, resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
 import { normalizeUuid } from "@/lib/utils/ids"
@@ -328,7 +328,7 @@ export default function ListView({
           loadingRowsRef.current = false
           return
         }
-        console.error("Error loading rows:", error)
+        console.error("Error loading rows:", formatErrorForLog(error))
         consecutiveFailuresRef.current += 1
         
         // Only clear rows if we haven't loaded any yet (preserve existing data on error)

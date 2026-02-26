@@ -20,7 +20,7 @@ import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { CellFactory } from "@/components/grid/CellFactory"
 import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
-import { isAbortError } from "@/lib/api/error-handling"
+import { isAbortError, formatErrorForLog } from "@/lib/api/error-handling"
 import { getOptionValueToLabelMap, normalizeSelectOptionsForUi } from "@/lib/fields/select-options"
 import EmptyState from "@/components/empty-states/EmptyState"
 import type { HighlightRule } from "@/lib/interface/types"
@@ -339,7 +339,7 @@ function KanbanView({
         .single()
 
       if (tableError || !table) {
-        console.error("Error loading table:", tableError)
+        console.error("Error loading table:", formatErrorForLog(tableError))
         setRows([])
         setLoading(false)
         return
@@ -358,7 +358,7 @@ function KanbanView({
 
       if (error) {
         if (!isAbortError(error)) {
-          console.error("Error loading rows:", error)
+          console.error("Error loading rows:", formatErrorForLog(error))
           setRows([])
         }
       } else {
@@ -374,7 +374,7 @@ function KanbanView({
       }
     } catch (error) {
       if (!isAbortError(error)) {
-        console.error("Error loading kanban rows:", error)
+        console.error("Error loading kanban rows:", formatErrorForLog(error))
         setRows([])
       }
     }

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
 import type { TableField } from "@/types/fields"
 import { applyFiltersToQuery, stripFilterBlockFilters, type FilterConfig } from "@/lib/interface/filters"
+import { formatErrorForLog } from "@/lib/api/error-handling"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { buildGroupTree } from "@/lib/grouping/groupTree"
 import type { GroupRule } from "@/lib/grouping/types"
@@ -155,7 +156,7 @@ export default function HorizontalGroupedView({
 
         setRows(rowsWithId)
       } catch (error) {
-        console.error("Error loading rows:", error)
+        console.error("Error loading rows:", formatErrorForLog(error))
         if (!cancelled) {
           setRows([])
         }

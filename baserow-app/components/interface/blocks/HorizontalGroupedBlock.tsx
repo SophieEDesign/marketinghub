@@ -6,6 +6,7 @@ import type { FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import { useState, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { formatErrorForLog } from "@/lib/api/error-handling"
 import type { TableField } from "@/types/fields"
 import type { GroupRule } from "@/lib/grouping/types"
 
@@ -83,7 +84,7 @@ export default function HorizontalGroupedBlock({
 
         if (tableError) {
           if (tableError.name !== 'AbortError') {
-            console.error("Error loading table:", tableError)
+            console.error("Error loading table:", formatErrorForLog(tableError))
           }
           return
         }
@@ -120,7 +121,7 @@ export default function HorizontalGroupedBlock({
         if (error?.name === 'AbortError') {
           return
         }
-        console.error("Error loading table info:", error)
+        console.error("Error loading table info:", formatErrorForLog(error))
       } finally {
         if (!abortController.signal.aborted) {
           setLoading(false)

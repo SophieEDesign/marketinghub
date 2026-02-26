@@ -11,7 +11,7 @@ import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig 
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { TableRow } from "@/types/database"
 import type { LinkedField, TableField } from "@/types/fields"
-import { isAbortError } from "@/lib/api/error-handling"
+import { isAbortError, formatErrorForLog } from "@/lib/api/error-handling"
 import {
   resolveChoiceColor,
   normalizeHexColor,
@@ -298,7 +298,7 @@ function TimelineView({
 
       if (error) {
         if (!isAbortError(error)) {
-          console.error("Error loading rows:", error)
+          console.error("Error loading rows:", formatErrorForLog(error))
           setRows([])
         }
       } else {
@@ -331,7 +331,7 @@ function TimelineView({
       }
     } catch (error) {
       if (!isAbortError(error)) {
-        console.error("Error loading rows:", error)
+        console.error("Error loading rows:", formatErrorForLog(error))
         // If a newer load has started, ignore this error.
         if (seq === loadSeqRef.current) {
           setRows([])

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client"
 import type { PageBlock } from "@/lib/interface/types"
 import type { TableField } from "@/types/database"
 import { canOpenRecords } from "@/lib/interface/block-permissions"
+import { formatErrorForLog } from "@/lib/api/error-handling"
 import RecordFieldPanel from "@/components/records/RecordFieldPanel"
 
 interface RecordBlockProps {
@@ -104,7 +105,7 @@ export default function RecordBlock({ block, isEditing = false, pageId = null, p
         setTableFields(fields as TableField[])
       }
     } catch (error) {
-      console.error("Error loading table:", error)
+      console.error("Error loading table:", formatErrorForLog(error))
       // CRITICAL: Do NOT retry automatically on network failure
       // Keep existing data if available
     } finally {
