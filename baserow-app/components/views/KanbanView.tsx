@@ -466,7 +466,9 @@ function KanbanView({
     }
   }, [showAddRecord, canCreateRecord, supabaseTableName, tableId, groupingFieldName, handleOpenRecord])
 
-  function groupRowsByField() {
+  // CRITICAL: All hooks must run before any early return (Rules of Hooks).
+  // groupRowsByField + groups useMemo were previously after early returns, causing React #310.
+  const groupedRows = useMemo(() => {
     const groups: Record<string, TableRow[]> = {}
     const isLinkField = groupingField?.type === "link_to_table"
     filteredRows.forEach((row) => {
@@ -487,28 +489,8 @@ function KanbanView({
       groups[groupValue].push(row)
     })
     return groups
-  }
+  }, [filteredRows, groupingField, groupingFieldName])
 
-  if (loading) {
-    return <div className="p-4">Loading...</div>
-  }
-
-  // Empty state: no grouping field configured
-  if (!groupingFieldName) {
-    return (
-      <EmptyState
-        icon={<Columns className="h-12 w-12" />}
-        title="Grouping field required"
-        description="Kanban view needs a grouping field to organize cards into columns. Configure the grouping field in block settings."
-        action={onOpenSettings ? {
-          label: "Configure Grouping",
-          onClick: onOpenSettings,
-        } : undefined}
-      />
-    )
-  }
-
-  const groupedRows = groupRowsByField()
   const groups = useMemo(() => {
     const keys = Object.keys(groupedRows)
     if (!groupingField || (groupingField.type !== "single_select" && groupingField.type !== "multi_select")) {
@@ -531,6 +513,25 @@ function KanbanView({
       return String(a).localeCompare(String(b))
     })
   }, [groupedRows, groupingField])
+
+  if (loading) {
+    return <div className="p-4">Loading...</div>
+  }
+
+  // Empty state: no grouping field configured
+  if (!groupingFieldName) {
+    return (
+      <EmptyState
+        icon={<Columns className="h-12 w-12" />}
+        title="Grouping field required"
+        description="Kanban view needs a grouping field to organize cards into columns. Configure the grouping field in block settings."
+        action={onOpenSettings ? {
+          label: "Configure Grouping",
+          onClick: onOpenSettings,
+        } : undefined}
+      />
+    )
+  }
 
   // Empty state for search
   if (searchQuery && filteredRows.length === 0) {

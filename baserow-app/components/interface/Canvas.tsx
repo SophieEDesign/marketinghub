@@ -28,7 +28,7 @@
  *    - Snapping never alters heights, only x/y alignment
  */
 
-import { useState, useCallback, useEffect, useRef, useMemo } from "react"
+import { useState, useCallback, useEffect, useRef, useMemo, useLayoutEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Responsive, WidthProvider, Layout } from "react-grid-layout"
 import "react-grid-layout/css/styles.css"
@@ -1689,6 +1689,18 @@ export default function Canvas({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isEditing, selectedBlockId, layout, layoutSettings?.cols, applySmartSnap, notifyLayoutChange])
 
+  // Full-page: use viewport-based rowHeight so block fits screen (50 rows = viewport height)
+  const [viewportHeight, setViewportHeight] = useState(() =>
+    typeof window !== "undefined" ? window.innerHeight : 800
+  )
+  useLayoutEffect(() => {
+    if (!isFullPageMode) return
+    const update = () => setViewportHeight(window.innerHeight)
+    update()
+    window.addEventListener("resize", update)
+    return () => window.removeEventListener("resize", update)
+  }, [isFullPageMode])
+
   // CRITICAL: Grid configuration must be IDENTICAL for edit and public view
   // isEditing ONLY controls interactivity (isDraggable, isResizable)
   // All layout-affecting props (cols, rowHeight, margin, compactType, etc.) must be identical
@@ -1699,7 +1711,11 @@ export default function Canvas({
     // Use layoutSettings if provided, otherwise use shared defaults
     // CRITICAL: These defaults must be the same in edit and public view
     const cols = layoutSettings?.cols ?? CANVAS_LAYOUT_DEFAULTS.cols
-    const rowHeight = layoutSettings?.rowHeight ?? CANVAS_LAYOUT_DEFAULTS.rowHeight
+    const baseRowHeight = layoutSettings?.rowHeight ?? CANVAS_LAYOUT_DEFAULTS.rowHeight
+    // Full-page: rowHeight = (viewport - header) / 50 so block fits screen; min 12px for usability
+    const rowHeight = isFullPageMode
+      ? Math.max(12, Math.floor((viewportHeight - 100) / 50))
+      : baseRowHeight
     const margin = layoutSettings?.margin ?? CANVAS_LAYOUT_DEFAULTS.margin
     
     return {
@@ -1718,7 +1734,7 @@ export default function Canvas({
       containerPadding: [0, 0] as [number, number],
       useCSSTransforms: true,
     }
-  }, [layoutSettings?.cols, layoutSettings?.rowHeight, layoutSettings?.margin])
+  }, [layoutSettings?.cols, layoutSettings?.rowHeight, layoutSettings?.margin, isFullPageMode, viewportHeight])
   
   // Add CSS for smooth block animations
   // CRITICAL: Height transitions are disabled - they delay reflow on collapse

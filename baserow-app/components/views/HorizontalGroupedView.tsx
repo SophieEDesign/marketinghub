@@ -607,6 +607,10 @@ export default function HorizontalGroupedView({
     }
   }, [isEditing, groups, activeTab, layoutTemplate, currentBlocks.length, supabaseTableName, createFieldBlocks])
 
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'41b24e'},body:JSON.stringify({sessionId:'41b24e',location:'HorizontalGroupedView.tsx:preReturn',message:'HorizontalGroupedView before early returns',data:{loading,effectiveGroupRulesLen:effectiveGroupRules.length,groupsLen:groups.length},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
