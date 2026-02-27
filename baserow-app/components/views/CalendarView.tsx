@@ -1568,8 +1568,10 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
 
   // Track current view for density-aware event rendering (Comfortable/Compact/Ultra)
   const currentViewRef = useRef<string>("dayGridWeek6")
-  const handleViewDidMount = useCallback((view: { type: string }) => {
-    currentViewRef.current = view.type
+  const handleViewDidMount = useCallback((arg: unknown) => {
+    // FullCalendar ViewMountArg: view is nested; use unknown to satisfy DidMountHandler<ViewMountArg>
+    const a = arg as { view?: { type?: string }; type?: string }
+    currentViewRef.current = a.view?.type ?? a.type ?? "dayGridWeek6"
   }, [])
 
   // Custom views for 4, 6, or 8 weeks - adaptive density
