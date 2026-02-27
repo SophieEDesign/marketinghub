@@ -229,6 +229,9 @@ function InterfacePageClientInternal({
   // Only change edit state when user explicitly calls enter/exit via UI.
   useEffect(() => {
     if (previousRoutePageIdRef.current !== null && previousRoutePageIdRef.current !== pageId) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'41b24e'},body:JSON.stringify({sessionId:'41b24e',location:'InterfacePageClient.tsx:navReset',message:'NAV RESET',data:{from:previousRoutePageIdRef.current,to:pageId,hypothesisId:'H5'},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       if (process.env.NODE_ENV === "development") {
         debugLog("[Nav] Route pageId changed:", { from: previousRoutePageIdRef.current, to: pageId })
       }
@@ -484,7 +487,9 @@ function InterfacePageClientInternal({
   // Both fetches are independent (only need pageId) - parallelizing reduces initial load time
   useEffect(() => {
     if (!pageId) return
-
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'41b24e'},body:JSON.stringify({sessionId:'41b24e',location:'InterfacePageClient.tsx:loadEffect',message:'loadEffect RUN',data:{pageId,previousRoutePageId:previousRoutePageIdRef.current,hypothesisId:'H5'},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     const abortController = new AbortController()
     const signal = abortController.signal
 
@@ -1001,6 +1006,9 @@ function InterfacePageClientInternal({
             description: "You have unsaved changes. Save before reloading.",
           })
         } else         if (blocksChanged || forceReload) {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'41b24e'},body:JSON.stringify({sessionId:'41b24e',location:'InterfacePageClient.tsx:loadBlocks:setBlocks',message:'setBlocks CALLED',data:{pageId,blocksCount:pageBlocks.length,blockIds:pageBlocks.map((b:any)=>b.id),hypothesisId:'H5'},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
           setBlocks(pageBlocks)
         } else if (process.env.NODE_ENV === 'development') {
           debugLog(`[loadBlocks] Blocks unchanged - skipping setBlocks to prevent re-render`)
@@ -1119,10 +1127,17 @@ function InterfacePageClientInternal({
     const signature = result.length === 0
       ? ""
       : result.map((b: any) => `${b.id}:${b.x ?? ""}:${b.y ?? ""}:${b.w ?? ""}:${b.h ?? ""}`).join("|")
-    if (prevBlocksRef.current.signature === signature && prevBlocksRef.current.blocks.length === result.length) {
+    const returnedCached = prevBlocksRef.current.signature === signature && prevBlocksRef.current.blocks.length === result.length
+    if (returnedCached) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'41b24e'},body:JSON.stringify({sessionId:'41b24e',location:'InterfacePageClient.tsx:memoizedBlocks',message:'memoizedBlocks CACHED',data:{blocksLen:result.length,pageId:page?.id,hypothesisId:'H2'},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       return prevBlocksRef.current.blocks
     }
     prevBlocksRef.current = { blocks: result, signature }
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'41b24e'},body:JSON.stringify({sessionId:'41b24e',location:'InterfacePageClient.tsx:memoizedBlocks',message:'memoizedBlocks NEW',data:{blocksLen:result.length,pageId:page?.id,hypothesisId:'H2'},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     return result
   }, [blocks, page?.id]) // ONLY page.id - NOT page_type, NOT mode, NOT isViewer
   

@@ -634,6 +634,9 @@ export default function Canvas({
     }
     
     if (shouldSync) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'41b24e'},body:JSON.stringify({sessionId:'41b24e',location:'Canvas.tsx:layoutSync',message:'Canvas setLayout',data:{pageId,blocksLen:blocks.length,layoutLen:blocks.length,blockIdsChanged,layoutIsEmpty,hypothesisId:'H4'},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       if (process.env.NODE_ENV === 'development') {
         devLog('[Canvas] Layout sync calling setLayout', { blocksLen: blocks.length, pageId })
       }

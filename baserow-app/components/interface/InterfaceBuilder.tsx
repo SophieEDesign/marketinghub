@@ -183,9 +183,15 @@ export default function InterfaceBuilder({
 
     if (!shouldInit && initialBlocks?.length > 0 && blocks.length > 0) {
       // One-way gate: keep internal blocks, skip update
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'41b24e'},body:JSON.stringify({sessionId:'41b24e',location:'InterfaceBuilder.tsx:oneWayGate',message:'oneWayGate SKIP',data:{pageId:page.id,initialBlocksLen:initialBlocks.length,blocksLen:blocks.length,hasInitialized:hasInitializedRef.current,hypothesisId:'H1'},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
     }
 
     if (shouldInit) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'41b24e'},body:JSON.stringify({sessionId:'41b24e',location:'InterfaceBuilder.tsx:oneWayGate',message:'oneWayGate ACCEPT',data:{pageId:page.id,initialBlocksLen:initialBlocks.length,blocksLen:blocks.length,hasInitialized:hasInitializedRef.current,hypothesisId:'H1'},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       debugLog(`[InterfaceBuilder] First-time initialization (one-way gate): pageId=${page.id}`, {
         initialBlocksCount: initialBlocks.length,
         initialBlockIds: initialBlocks.map(b => b.id),

@@ -2,6 +2,10 @@
 
 The following tables are deprecated in favor of newer versions with standardized audit fields and schema.
 
+## content_calendar_all
+
+Stub/placeholder table with only `id`, `created_at`, `updated_at`. Reserved for future content calendar unified view or migration. No application usage. See `20250219000000_schema_audit_plan_implementation.sql` for table comment.
+
 ## Deprecated Tables (migrate away from)
 
 | Legacy Table | Preferred Table | Notes |
