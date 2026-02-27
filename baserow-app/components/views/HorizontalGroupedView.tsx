@@ -182,13 +182,14 @@ export default function HorizontalGroupedView({
   }, [rows, tableFields, searchQuery])
 
   // Resolve grouping labels for linked record fields
+  // CRITICAL: Use functional updates to avoid setState when value unchanged (prevents React #185).
   useEffect(() => {
     let cancelled = false
 
     async function load() {
       const rules = Array.isArray(effectiveGroupRules) ? effectiveGroupRules : []
       if (rules.length === 0) {
-        setGroupValueLabelMaps({})
+        setGroupValueLabelMaps(prev => (Object.keys(prev).length === 0 ? prev : {}))
         return
       }
 
@@ -208,7 +209,7 @@ export default function HorizontalGroupedView({
       }
 
       if (groupedLinkFields.length === 0) {
-        setGroupValueLabelMaps({})
+        setGroupValueLabelMaps(prev => (Object.keys(prev).length === 0 ? prev : {}))
         return
       }
 

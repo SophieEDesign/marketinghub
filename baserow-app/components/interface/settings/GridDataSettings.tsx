@@ -694,12 +694,13 @@ export default function GridDataSettings({
 
             {/* Group by Select Field */}
             <GroupBySelector
-              value={config.timeline_group_by || config.group_by_field || config.group_by}
+              value={config.timeline_group_by ?? config.group_by_field ?? config.group_by ?? undefined}
               onChange={(value) =>
                 onUpdate({
-                  timeline_group_by: value,
-                  group_by_field: value,
-                  group_by: value,
+                  // Use null (not undefined) when clearing so the key is persisted on save
+                  timeline_group_by: value ?? null,
+                  group_by_field: value ?? null,
+                  group_by: value ?? null,
                 })
               }
               fields={fields}

@@ -576,26 +576,23 @@ function TimelineView({
     return { titleField: resolvedTitleField, tagField: resolvedTagField }
   }, [titleFieldProp, tagFieldProp, blockConfig, viewConfig, tableFields, resolvedDateFields, startDateFieldId, endDateFieldId, dateFieldId, fieldIds])
 
-  // Resolve group by field - fall back to primary field if not configured
+  // Resolve group by field - respect explicit "None" (null/undefined/__none__), no fallback
   const resolvedGroupByField = useMemo(() => {
-    const groupFieldName = groupByFieldProp || 
-      blockConfig?.timeline_group_by || 
-      blockConfig?.group_by_field || 
-      blockConfig?.group_by ||
-      viewConfig?.timeline_group_by ||
+    const groupFieldName = groupByFieldProp ?? 
+      blockConfig?.timeline_group_by ?? 
+      blockConfig?.group_by_field ?? 
+      blockConfig?.group_by ??
+      viewConfig?.timeline_group_by ??
       null
     
-    if (groupFieldName) {
-      // Timeline grouping is supported for many field types (not just select fields).
-      // For select fields, we preserve choice-order sorting when choices are available.
-      const field = tableFields.find(f => (f.name === groupFieldName || f.id === groupFieldName))
-      if (field) return field
+    // Explicit "no grouping": null, undefined, empty string, or "__none__"
+    if (!groupFieldName || groupFieldName === '__none__') {
+      return null
     }
     
-    // Fall back to primary field if no group field is configured
-    // This ensures we always group by a meaningful field instead of showing record IDs
-    const primaryField = getPrimaryField(tableFields)
-    return primaryField
+    // Timeline grouping is supported for many field types (not just select fields).
+    const field = tableFields.find(f => (f.name === groupFieldName || f.id === groupFieldName))
+    return field ?? null
   }, [groupByFieldProp, blockConfig, viewConfig, tableFields])
 
   // Resolve display labels for any link_to_table fields used in cards/grouping.

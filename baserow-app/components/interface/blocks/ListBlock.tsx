@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import QuickFilterBar from "@/components/filters/QuickFilterBar"
 import { useRecordModal } from "@/contexts/RecordModalContext"
+import { isAbortError } from "@/lib/api/error-handling"
 import { useToast } from "@/components/ui/use-toast"
 import { VIEWS_ENABLED } from "@/lib/featureFlags"
 import type { GroupRule } from "@/lib/grouping/types"
@@ -244,10 +245,12 @@ export default function ListBlock({
         setTableFields(normalizedFields)
       } catch (error) {
         // #region agent log
-        const isAbort = (error as any)?.name === 'AbortError' || String((error as any)?.message || '').includes('abort') || String((error as any)?.details || '').includes('abort');
+        const isAbort = isAbortError(error);
         fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'41b24e'},body:JSON.stringify({sessionId:'41b24e',location:'ListBlock.tsx:catch',message:'ListBlock table load error',data:{isAbort,errorMsg:String((error as any)?.message||''),errorName:(error as any)?.name},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
         // #endregion
-        console.error("Error loading table data:", error)
+        if (!isAbortError(error)) {
+          console.error("Error loading table data:", error)
+        }
       } finally {
         setLoading(false)
         loadingRef.current = false

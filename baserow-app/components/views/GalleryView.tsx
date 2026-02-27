@@ -324,12 +324,13 @@ export default function GalleryView({
   }, [rows, tableFields, searchQuery, safeFieldIds])
 
   // Resolve grouping labels for linked record fields (link_to_table).
+  // CRITICAL: Use functional updates to avoid setState when value unchanged (prevents React #185).
   useEffect(() => {
     let cancelled = false
 
     async function load() {
       if (!effectiveGroupByField) {
-        setGroupValueLabelMaps({})
+        setGroupValueLabelMaps(prev => (Object.keys(prev).length === 0 ? prev : {}))
         return
       }
 
@@ -339,7 +340,7 @@ export default function GalleryView({
         | undefined
 
       if (!fieldObj || fieldObj.type !== "link_to_table") {
-        setGroupValueLabelMaps({})
+        setGroupValueLabelMaps(prev => (Object.keys(prev).length === 0 ? prev : {}))
         return
       }
 
@@ -351,7 +352,7 @@ export default function GalleryView({
       }
 
       if (ids.size === 0) {
-        setGroupValueLabelMaps({})
+        setGroupValueLabelMaps(prev => (Object.keys(prev).length === 0 ? prev : {}))
         return
       }
 

@@ -574,7 +574,7 @@ export default function AirtableKanbanView({
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="h-full min-w-0 bg-white overflow-y-auto overflow-x-auto [scrollbar-gutter:stable] pr-2">
+        <div className="h-full min-w-0 bg-white overflow-y-auto overflow-x-auto [scrollbar-gutter:stable] pr-2 grid-scroll-container">
           <div className="flex flex-nowrap gap-4 p-6 h-full min-w-max">
             {columns.map((column) => {
               const columnRows = groupedRows[column.id] || []
@@ -826,10 +826,6 @@ function KanbanCard({ row, displayFields, showFieldLabels = false, tableFields, 
     return fullField || field
   }
 
-  // Airtable-style: each field on its own row with set height, no fixed card size
-  const FIELD_ROW_HEIGHT = 32
-  const LONG_TEXT_ROW_HEIGHT = 48
-
   return (
     <Card
       ref={setNodeRef}
@@ -858,18 +854,17 @@ function KanbanCard({ row, displayFields, showFieldLabels = false, tableFields, 
               <GripVertical className="h-4 w-4 text-gray-400" />
             </div>
           )}
-          <div className="flex-1 min-w-0 grid grid-cols-2 gap-x-3 gap-y-1">
+          <div className="flex-1 min-w-0 flex flex-col gap-2">
             {list.map((field, idx) => {
               if (!field?.name) return null
               const full = getFullField(field)
               const value = row[full.name]
               const isFirst = idx === 0
               const isLongText = full.type === "long_text"
-              const rowH = isLongText ? LONG_TEXT_ROW_HEIGHT : FIELD_ROW_HEIGHT
               return (
                 <div
                   key={full.id ?? full.name}
-                  className={`flex flex-col gap-0.5 min-w-0 ${isFirst ? "col-span-full font-semibold text-sm text-gray-900" : "text-xs text-gray-600"}`}
+                  className={`flex flex-col gap-0.5 min-w-0 ${isFirst ? "font-semibold text-sm text-gray-900" : "text-xs text-gray-600"}`}
                   data-kanban-field="true"
                   onClick={(e) => e.stopPropagation()}
                   onDoubleClick={(e) => e.stopPropagation()}
@@ -879,8 +874,8 @@ function KanbanCard({ row, displayFields, showFieldLabels = false, tableFields, 
                       {getFieldDisplayName(full)}
                     </div>
                   )}
-                  <div className={`flex items-center gap-1.5 min-w-0 flex-1`}>
-                  <div className={`flex-1 min-w-0 overflow-hidden ${isLongText ? "line-clamp-2" : "truncate"}`}>
+                  <div className={`flex items-center gap-1.5 min-w-0 ${isLongText ? "" : "min-h-0"}`}>
+                  <div className={`flex-1 min-w-0 overflow-hidden ${isLongText ? "line-clamp-3" : "truncate"}`}>
                     <CellFactory
                       field={full}
                       value={value}
@@ -888,7 +883,6 @@ function KanbanCard({ row, displayFields, showFieldLabels = false, tableFields, 
                       tableName={tableName}
                       editable={canEdit && !full.options?.read_only && full.type !== "lookup" && full.type !== "formula"}
                       wrapText={true}
-                      rowHeight={rowH}
                       onSave={(v) => onCellSave(String(row.id), full.name, v)}
                       pillTruncate={true}
                     />

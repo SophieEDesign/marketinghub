@@ -242,11 +242,12 @@ function KanbanView({
   }, [rows, tableFields, searchQuery, fieldIds])
 
   // Resolve linked record (link_to_table) grouping IDs to display labels for column headers.
+  // CRITICAL: Use functional updates to avoid setState when value unchanged (prevents React #185).
   useEffect(() => {
     let cancelled = false
     async function load() {
       if (!groupingField || groupingField.type !== "link_to_table") {
-        setGroupValueLabelMaps({})
+        setGroupValueLabelMaps(prev => (Object.keys(prev).length === 0 ? prev : {}))
         return
       }
       const linkField = groupingField as LinkedField
@@ -256,7 +257,7 @@ function KanbanView({
         for (const id of linkedValueToIds(fieldValue)) ids.add(id)
       }
       if (ids.size === 0) {
-        setGroupValueLabelMaps({})
+        setGroupValueLabelMaps(prev => (Object.keys(prev).length === 0 ? prev : {}))
         return
       }
       const map = await resolveLinkedFieldDisplayMap(linkField, Array.from(ids))
@@ -565,7 +566,7 @@ function KanbanView({
   }
 
   return (
-    <div className="w-full h-full min-w-0 overflow-y-auto overflow-x-auto bg-gray-50 [scrollbar-gutter:stable] pr-2">
+    <div className="w-full h-full min-w-0 overflow-y-auto overflow-x-auto bg-gray-50 [scrollbar-gutter:stable] pr-2 grid-scroll-container">
       <div className="flex flex-nowrap gap-4 p-6 min-w-max">
         {groups.map((groupName) => {
           const displayName =
@@ -732,8 +733,6 @@ function KanbanView({
                     }
                   }
                   const data = row.data || {}
-                  const FIELD_ROW_HEIGHT = 32
-                  const LONG_TEXT_ROW_HEIGHT = 48
                   const IMAGE_ROW_HEIGHT = 112
 
                   return (
@@ -747,20 +746,19 @@ function KanbanView({
                   onDoubleClick={() => row.id != null && handleOpenRecord(String(row.id))}
                 >
                   <CardContent className="p-3 min-w-0">
-                    <div className="grid grid-cols-2 gap-x-3 gap-y-1 min-w-0">
+                    <div className="flex flex-col gap-2 min-w-0">
                       {cardFields.map((fieldObj, idx) => {
                         const isFirst = idx === 0
                         const isVirtual = fieldObj.type === "formula" || fieldObj.type === "lookup"
                         const isImageField = imageField && (fieldObj.name === imageField || fieldObj.id === imageField)
                         const isLongText = fieldObj.type === "long_text"
                         const imgSrc = isImageField ? cardImage : null
-                        const rowH = imgSrc ? (fitImageSize ? undefined : IMAGE_ROW_HEIGHT) : (isLongText ? LONG_TEXT_ROW_HEIGHT : FIELD_ROW_HEIGHT)
 
                         if (isImageField && imgSrc) {
                           return (
                             <div
                               key={fieldObj.id ?? fieldObj.name}
-                              className={`w-full min-w-0 ${isFirst ? "col-span-full" : ""}`}
+                              className="w-full min-w-0"
                               onClick={(e) => e.stopPropagation()}
                               onDoubleClick={(e) => e.stopPropagation()}
                             >
@@ -789,7 +787,7 @@ function KanbanView({
                         return (
                           <div
                             key={fieldObj.id ?? fieldObj.name}
-                            className={`flex flex-col gap-0.5 min-w-0 ${isFirst ? "col-span-full font-semibold text-sm text-gray-900" : "text-xs text-gray-600"}`}
+                            className={`flex flex-col gap-0.5 min-w-0 ${isFirst ? "font-semibold text-sm text-gray-900" : "text-xs text-gray-600"}`}
                             onClick={(e) => e.stopPropagation()}
                             onDoubleClick={(e) => e.stopPropagation()}
                           >
@@ -798,8 +796,8 @@ function KanbanView({
                                 {getFieldDisplayName(fieldObj)}
                               </div>
                             )}
-                            <div className={`flex items-center gap-1.5 min-w-0 flex-1`}>
-                            <div className={`flex-1 min-w-0 overflow-hidden ${isLongText ? "line-clamp-2" : "truncate"}`}>
+                            <div className={`flex items-center gap-1.5 min-w-0 ${isLongText ? "" : "min-h-0"}`}>
+                            <div className={`flex-1 min-w-0 overflow-hidden ${isLongText ? "line-clamp-3" : "truncate"}`}>
                               <CellFactory
                                 field={fieldObj}
                                 value={data[fieldObj.name]}
@@ -807,7 +805,6 @@ function KanbanView({
                                 tableName={supabaseTableName || ""}
                                 editable={!fieldObj.options?.read_only && !isVirtual && !!supabaseTableName}
                                 wrapText={wrapText}
-                                rowHeight={rowH}
                                 onSave={(value) => handleCellSave(String(row.id), fieldObj.name, value)}
                               />
                             </div>

@@ -105,6 +105,9 @@ export default function NonGridViewWrapper({
   const [timelineDateField, setTimelineDateField] = useState<string>(timelineDateFieldProp || "")
   const [timelineEndDateField, setTimelineEndDateField] = useState<string>(timelineEndDateFieldProp || "")
   const [customizeCardsDialogOpen, setCustomizeCardsDialogOpen] = useState(false)
+  const [kanbanShowFieldLabels, setKanbanShowFieldLabels] = useState(
+    (viewConfigProp as { kanban_show_field_labels?: boolean })?.kanban_show_field_labels === true
+  )
 
   const fieldIds = useMemo(() => {
     const tableFieldNames = new Set(tableFields.map((f) => f.name))
@@ -124,6 +127,10 @@ export default function NonGridViewWrapper({
     }
     return Array.isArray(fieldIdsProp) ? fieldIdsProp : []
   }, [viewFields, hiddenFields, fieldIdsProp, viewType, cardFields, tableFields])
+
+  useEffect(() => {
+    setKanbanShowFieldLabels((viewConfigProp as { kanban_show_field_labels?: boolean })?.kanban_show_field_labels === true)
+  }, [viewConfigProp])
 
   useEffect(() => {
     async function loadTableInfo() {
@@ -328,7 +335,7 @@ export default function NonGridViewWrapper({
               imageField={cardImageField || undefined}
               colorField={cardColorField || undefined}
               wrapText={cardWrapText}
-              showFieldLabels={vc?.kanban_show_field_labels === true}
+              showFieldLabels={kanbanShowFieldLabels}
               collapsedStacks={vc?.kanban_collapsed_stacks ?? []}
               onCollapsedStacksChange={handleCollapsedStacksChange}
               onRenameOption={handleRenameOption}
@@ -475,7 +482,7 @@ export default function NonGridViewWrapper({
             cardWrapText: cardWrapText,
             groupBy: groupingFieldId || undefined,
             ...(viewType === "kanban" && {
-              kanbanShowFieldLabels: (viewConfigProp as { kanban_show_field_labels?: boolean })?.kanban_show_field_labels === true,
+              kanbanShowFieldLabels,
             }),
             ...(viewType === "timeline" && {
               timelineDateField: timelineDateField || undefined,
@@ -487,6 +494,9 @@ export default function NonGridViewWrapper({
             setCardImageField(next.cardImageField || "")
             setCardColorField(next.cardColorField || "")
             setCardWrapText(next.cardWrapText ?? true)
+            if (viewType === "kanban" && next.kanbanShowFieldLabels !== undefined) {
+              setKanbanShowFieldLabels(next.kanbanShowFieldLabels)
+            }
             if (viewType === "timeline") {
               if (next.timelineDateField !== undefined) setTimelineDateField(next.timelineDateField || "")
               if (next.timelineEndDateField !== undefined) setTimelineEndDateField(next.timelineEndDateField || "")

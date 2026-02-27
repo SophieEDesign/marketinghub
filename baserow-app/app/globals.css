@@ -350,6 +350,8 @@
 /* Grid scrollbar spacing - ensure horizontal scrollbar doesn't overlap content */
 .grid-scroll-container {
   padding-bottom: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
 }
 
 .grid-scroll-container::-webkit-scrollbar {

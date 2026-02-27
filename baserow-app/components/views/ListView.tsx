@@ -419,13 +419,14 @@ export default function ListView({
   }, [effectiveGroupRules, filteredRows, tableFields, groupValueLabelMaps])
 
   // Resolve grouping labels for linked record fields (link_to_table).
+  // CRITICAL: Use functional updates and avoid setState when value unchanged to prevent React #185 (max update depth).
   useEffect(() => {
     let cancelled = false
 
     async function load() {
       const rules = Array.isArray(effectiveGroupRules) ? effectiveGroupRules : []
       if (rules.length === 0) {
-        setGroupValueLabelMaps({})
+        setGroupValueLabelMaps(prev => (Object.keys(prev).length === 0 ? prev : {}))
         return
       }
 
@@ -445,7 +446,7 @@ export default function ListView({
       }
 
       if (groupedLinkFields.length === 0) {
-        setGroupValueLabelMaps({})
+        setGroupValueLabelMaps(prev => (Object.keys(prev).length === 0 ? prev : {}))
         return
       }
 

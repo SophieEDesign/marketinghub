@@ -2741,13 +2741,14 @@ export default function GridView({
   }, [effectiveGroupRules, filteredRows, safeTableFields, groupValueLabelMaps])
 
   // Resolve grouping labels for linked record fields (link_to_table).
+  // CRITICAL: Use functional updates and avoid setState when value unchanged to prevent React #185 (max update depth).
   useEffect(() => {
     let cancelled = false
 
     async function load() {
       const rules = Array.isArray(effectiveGroupRules) ? effectiveGroupRules : []
       if (rules.length === 0) {
-        setGroupValueLabelMaps({})
+        setGroupValueLabelMaps(prev => (Object.keys(prev).length === 0 ? prev : {}))
         return
       }
 
@@ -2767,7 +2768,7 @@ export default function GridView({
       }
 
       if (groupedLinkFields.length === 0) {
-        setGroupValueLabelMaps({})
+        setGroupValueLabelMaps(prev => (Object.keys(prev).length === 0 ? prev : {}))
         return
       }
 
