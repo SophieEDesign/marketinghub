@@ -95,7 +95,7 @@ export interface BlockConfig {
   kanban_card_fields?: string[]
   filters?: BlockFilter[]
   sorts?: BlockSort[]
-  group_by?: string | null
+  group_by?: string
   chart_type?: ChartType
   chart_x_axis?: string
   chart_y_axis?: string
@@ -139,7 +139,7 @@ export interface BlockConfig {
     view_id?: string
   }
   // Chart
-  group_by_field?: string | null
+  group_by_field?: string
   metric_field?: string
   source_type?: 'table' | 'sql_view'
   source_view?: string
@@ -285,7 +285,6 @@ export interface BlockConfig {
     linked_field_display_mode?: 'compact' | 'inline' | 'expanded' | 'list' // Display mode for linked record fields
   }
   // Timeline view specific (compact card contract)
-  timeline_group_by?: string | null // Field to group timeline lanes by
   timeline_title_field?: string // Field for card title
   timeline_tag_field?: string // Optional single tag field (max 1 pill)
   timeline_compact_mode?: boolean // When true: 28px cards; when false: 40px

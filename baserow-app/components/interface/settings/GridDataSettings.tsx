@@ -698,9 +698,9 @@ export default function GridDataSettings({
               onChange={(value) =>
                 onUpdate({
                   // Use null (not undefined) when clearing so the key is persisted on save
-                  timeline_group_by: value ?? null,
-                  group_by_field: value ?? null,
-                  group_by: value ?? null,
+                  timeline_group_by: (value ?? null) as string | undefined,
+                  group_by_field: (value ?? null) as string | undefined,
+                  group_by: (value ?? null) as string | undefined,
                 })
               }
               fields={fields}
