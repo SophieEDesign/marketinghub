@@ -497,6 +497,10 @@ export default function GridBlock({
           }
         }
       } catch (error) {
+        // #region agent log
+        const isAbort = isAbortError(error);
+        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'41b24e'},body:JSON.stringify({sessionId:'41b24e',location:'GridBlock.tsx:catch',message:'GridBlock table load error',data:{isAbort,errorMsg:formatErrorForLog(error)},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+        // #endregion
         console.error("Error loading table data:", formatErrorForLog(error))
         // CRITICAL: Do NOT retry automatically on network failure
         // Keep existing data if available

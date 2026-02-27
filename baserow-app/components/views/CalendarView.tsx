@@ -37,6 +37,7 @@ import TimelineFieldValue, { type FieldValue } from "@/components/views/Timeline
 import { isAbortError } from "@/lib/api/error-handling"
 import { getLinkedFieldValueFromRow, linkedValueToIds, resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
 import { normalizeUuid } from "@/lib/utils/ids"
+import { stripHtml } from "@/lib/utils"
 import type { HighlightRule } from "@/lib/interface/types"
 import { evaluateHighlightRules, getFormattingStyle } from "@/lib/conditional-formatting/evaluator"
 interface CalendarViewProps {
@@ -207,6 +208,18 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
     setMounted(true)
     return () => {
       debugLog('CALENDAR', `CalendarView UNMOUNT: tableId=${tableId}, viewId=${viewId}`)
+    }
+  }, [])
+
+  // Prevent nested scroll in day cells: FullCalendar may add overflow-y-auto to .fc-daygrid-day-events
+  useEffect(() => {
+    const style = document.createElement('style')
+    style.id = 'calendar-no-nested-scroll'
+    style.textContent = '.fc-daygrid-day-events { overflow: hidden !important; }'
+    document.head.appendChild(style)
+    return () => {
+      const el = document.getElementById('calendar-no-nested-scroll')
+      if (el) el.remove()
     }
   }, [])
 
@@ -1553,9 +1566,14 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
     return 6
   }, [(blockConfig as any)?.visible_week_span])
 
-  // Custom views for 4, 6, or 8 weeks (Airtable-style)
-  // dateAlignment: 'week' ensures each view starts on a week boundary (Monday with firstDay: 1)
-  // aspectRatio: smaller = taller rows; larger = shorter rows. 4 weeks fills page; 8 weeks uses compact rows.
+  // Track current view for density-aware event rendering (Comfortable/Compact/Ultra)
+  const currentViewRef = useRef<string>("dayGridWeek6")
+  const handleViewDidMount = useCallback((view: { type: string }) => {
+    currentViewRef.current = view.type
+  }, [])
+
+  // Custom views for 4, 6, or 8 weeks - adaptive density
+  // dayMaxEvents: Comfortable 4, Compact 2, Ultra 1. No vertical scroll in day cells.
   const calendarViews = useMemo(
     () => ({
       dayGridWeek4: {
@@ -1564,6 +1582,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
         dateAlignment: "week" as const,
         aspectRatio: 0.85,
         buttonText: "4 weeks",
+        dayMaxEvents: 4,
       },
       dayGridWeek6: {
         type: "dayGrid" as const,
@@ -1571,6 +1590,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
         dateAlignment: "week" as const,
         aspectRatio: 1.0,
         buttonText: "6 weeks",
+        dayMaxEvents: 2,
       },
       dayGridWeek8: {
         type: "dayGrid" as const,
@@ -1578,6 +1598,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
         dateAlignment: "week" as const,
         aspectRatio: 1.4,
         buttonText: "8 weeks",
+        dayMaxEvents: 1,
       },
     }),
     []
@@ -1588,6 +1609,11 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
     if (visibleWeekSpan === 8) return "dayGridWeek8"
     return "dayGridWeek6"
   }, [visibleWeekSpan])
+
+  // Keep currentViewRef in sync with visibleWeekSpan so density is correct before viewDidMount
+  useEffect(() => {
+    currentViewRef.current = calendarInitialView
+  }, [calendarInitialView])
 
   // FullCalendar: use stable plugins array (defined at module level to prevent React #185)
   const calendarHeaderToolbar = useMemo(
@@ -1640,6 +1666,12 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
         return <div className="p-1 text-xs text-gray-500">Invalid event</div>
       }
 
+      const viewType = currentViewRef.current
+      const density: 'comfortable' | 'compact' | 'ultra' =
+        viewType === 'dayGridWeek4' ? 'comfortable'
+        : viewType === 'dayGridWeek8' ? 'ultra'
+        : 'compact'
+
       const image = eventInfo.event.extendedProps?.image
       const fitImageSize = eventInfo.event.extendedProps?.fitImageSize || false
       const cardFieldsRaw = eventInfo.event.extendedProps?.cardFields
@@ -1676,7 +1708,8 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
                 }
               }).filter(Boolean).join(", ") || String(f.value)
             } else {
-              valStr = Array.isArray(f.value) ? (f.value as unknown[]).map(String).join(", ") : String(f.value)
+              const raw = Array.isArray(f.value) ? (f.value as unknown[]).map(String).join(", ") : String(f.value)
+              valStr = (f?.field?.type === "long_text" || f?.field?.type === "text") ? stripHtml(raw) : raw
             }
           }
           return `${label}: ${valStr}`
@@ -1690,7 +1723,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
       const fullTooltip = [titleLine, ...cardLines].join("\n")
 
       // Build pills from cardFields (select values as inline pills)
-      const pills = cardFields.slice(0, 3).flatMap((f: { field: TableField; value: unknown }) => {
+      const allPills = cardFields.flatMap((f: { field: TableField; value: unknown }) => {
         if (!f?.field || f?.value === null || f?.value === undefined) return []
         const valueMap = f.field ? (stableLinkedValueLabelMaps[f.field.name] || stableLinkedValueLabelMaps[f.field.id]) : undefined
         const isSelect = f.field.type === "single_select" || f.field.type === "multi_select"
@@ -1703,7 +1736,8 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
         } else if (f.field.type === "link_to_table" && Array.isArray(f.value)) {
           items = (f.value as string[]).map((id) => ({ label: valueMap?.[id] ?? id, rawVal: id })).filter((x) => x.label)
         } else {
-          const label = Array.isArray(f.value) ? (f.value as unknown[]).map(String).join(", ") : String(f.value)
+          const raw = Array.isArray(f.value) ? (f.value as unknown[]).map(String).join(", ") : String(f.value)
+          const label = (f.field.type === "long_text" || f.field.type === "text") ? stripHtml(raw) : raw
           items = [{ label, rawVal: "" }]
         }
         return items.filter((x) => x.label).map(({ label, rawVal }) => ({
@@ -1711,60 +1745,87 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
           bgColor: isSelect && rawVal ? normalizeHexColor(resolveChoiceColor(rawVal, f.field.type as 'single_select' | 'multi_select', f.field.options)) : undefined,
         }))
       })
+      const maxPills = density === 'comfortable' ? 2 : density === 'compact' ? 1 : 0
+      const pills = allPills.slice(0, maxPills)
 
-    return (
-      <div className="flex items-start gap-1 h-full min-h-[2.5rem] min-w-0 px-1 py-0.5" title={fullTooltip}>
-        {image && (
-          <div
-            className={`flex-shrink-0 w-4 h-4 rounded overflow-hidden bg-gray-100 mt-0.5 ${
-              fitImageSize ? "object-contain" : "object-cover"
-            }`}
-          >
-            <img
-              src={image}
-              alt=""
-              className={`w-full h-full ${fitImageSize ? "object-contain" : "object-cover"}`}
-              onError={hideImageOnError}
-            />
+      const pillStyle = (p: { label: string; bgColor?: string }) =>
+        p.bgColor ? (() => {
+          const hex = p.bgColor
+          if (!hex?.startsWith('#')) return { backgroundColor: hex, color: '#1f2937' }
+          const r = parseInt(hex.slice(1, 3), 16)
+          const g = parseInt(hex.slice(3, 5), 16)
+          const b = parseInt(hex.slice(5, 7), 16)
+          const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+          return { backgroundColor: hex, color: luminance > 0.5 ? '#000000' : '#ffffff' }
+        })() : { backgroundColor: "rgb(243 244 246)", color: "rgb(75 85 99)" }
+
+      // Ultra: inline chip only, single line
+      if (density === 'ultra') {
+        return (
+          <div className="flex items-center h-full min-h-0 min-w-0 px-1 py-0.5" title={fullTooltip}>
+            <span className="truncate text-[10px] font-medium leading-tight w-full">
+              {titleField ? (
+                <TimelineFieldValue
+                  field={titleField}
+                  value={titleValue ?? eventInfo.event.title}
+                  valueLabelMap={stableLinkedValueLabelMaps[titleField.name] || stableLinkedValueLabelMaps[titleField.id]}
+                  compact={true}
+                />
+              ) : (
+                String(eventInfo.event.title || "Untitled")
+              )}
+            </span>
           </div>
-        )}
-        <div className="min-w-0 flex-1 overflow-hidden flex flex-col gap-0.5">
-          <div className="truncate whitespace-nowrap text-[11px] font-medium leading-tight">
-            {titleField ? (
-              <TimelineFieldValue
-                field={titleField}
-                value={titleValue ?? eventInfo.event.title}
-                valueLabelMap={stableLinkedValueLabelMaps[titleField.name] || stableLinkedValueLabelMaps[titleField.id]}
-                compact={true}
+        )
+      }
+
+      // Compact: p-1.5, 1 pill, no status
+      const padding = density === 'comfortable' ? 'p-2' : 'p-1.5'
+      return (
+        <div className={`flex items-start gap-1 h-full min-h-0 min-w-0 ${padding}`} title={fullTooltip}>
+          {image && density === 'comfortable' && (
+            <div
+              className={`flex-shrink-0 w-4 h-4 rounded overflow-hidden bg-gray-100 mt-0.5 ${
+                fitImageSize ? "object-contain" : "object-cover"
+              }`}
+            >
+              <img
+                src={image}
+                alt=""
+                className={`w-full h-full ${fitImageSize ? "object-contain" : "object-cover"}`}
+                onError={hideImageOnError}
               />
-            ) : (
-              String(eventInfo.event.title || "Untitled")
-            )}
-          </div>
-          {pills.length > 0 && (
-            <div className="flex flex-wrap gap-1 items-center min-h-[1rem]">
-              {pills.map((p, i) => (
-                <span
-                  key={i}
-                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium truncate max-w-[6rem]"
-                  style={p.bgColor ? (() => {
-                  const hex = p.bgColor
-                  if (!hex?.startsWith('#')) return { backgroundColor: hex, color: '#1f2937' }
-                  const r = parseInt(hex.slice(1, 3), 16)
-                  const g = parseInt(hex.slice(3, 5), 16)
-                  const b = parseInt(hex.slice(5, 7), 16)
-                  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-                  return { backgroundColor: hex, color: luminance > 0.5 ? '#000000' : '#ffffff' }
-                })() : { backgroundColor: "rgb(243 244 246)", color: "rgb(75 85 99)" }}
-                >
-                  {p.label}
-                </span>
-              ))}
             </div>
           )}
+          <div className="min-w-0 flex-1 overflow-hidden flex flex-col gap-0.5">
+            <div className="truncate whitespace-nowrap text-[11px] font-medium leading-tight">
+              {titleField ? (
+                <TimelineFieldValue
+                  field={titleField}
+                  value={titleValue ?? eventInfo.event.title}
+                  valueLabelMap={stableLinkedValueLabelMaps[titleField.name] || stableLinkedValueLabelMaps[titleField.id]}
+                  compact={true}
+                />
+              ) : (
+                String(eventInfo.event.title || "Untitled")
+              )}
+            </div>
+            {pills.length > 0 && (
+              <div className="flex flex-wrap gap-1 items-center min-h-0">
+                {pills.map((p, i) => (
+                  <span
+                    key={i}
+                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium truncate max-w-[6rem]"
+                    style={pillStyle(p)}
+                  >
+                    {p.label}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-    )
+      )
     } catch (err) {
       // CRITICAL: If event content rendering fails, return a safe fallback to prevent infinite loop
       if (process.env.NODE_ENV === 'development') {
@@ -2053,14 +2114,14 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
   return (
     <div className="w-full h-full min-w-0 min-h-0 flex flex-col bg-white overflow-hidden">
       {renderAnchorControls()}
-      {/* Scroll container: fills available space; overflow-auto for horizontal scroll when wide */}
+      {/* Scroll container: constrained by sidebar; overflow-auto so horizontal scrollbar appears when calendar is wider */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 min-h-0 min-w-0 overflow-auto px-4 py-3 bg-white flex flex-col"
+        className="flex-1 min-h-0 min-w-0 overflow-x-auto overflow-y-hidden px-4 py-3 bg-white flex flex-col"
       >
-        {/* Wrapper with h-full so FullCalendar fills container and fits viewport */}
+        {/* Wrapper: min-w-[700px] ensures 7-day grid has room; horizontal scrollbar when sidebar narrows view */}
         {mounted ? (
-          <div className="flex-1 min-h-0 min-w-0 w-full">
+          <div className="flex-1 min-h-0 min-w-[700px] w-full">
             <MemoizedFullCalendar
               ref={fullCalendarRef as React.LegacyRef<React.ComponentRef<typeof FullCalendar>>}
               key={calendarStableKey}
@@ -2074,11 +2135,12 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
               views={calendarViews}
               height="100%"
             expandRows={true}
-            dayMaxEvents={2}
+            viewDidMount={handleViewDidMount}
             moreLinkClick="popover"
+            moreLinkContent={(args) => `+${args.num} more`}
             eventDisplay="block"
             eventClassNames={calendarEventClassNames}
-            dayCellClassNames="hover:bg-gray-50 transition-colors min-h-[3rem]"
+            dayCellClassNames="hover:bg-gray-50 transition-colors min-h-[3rem] overflow-hidden"
             dayHeaderClassNames="text-xs font-medium text-gray-700 py-1"
             eventTextColor="#1f2937"
             eventBorderColor="transparent"

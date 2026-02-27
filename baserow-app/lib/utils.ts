@@ -7,6 +7,15 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Strips HTML tags from a string for safe plain-text display.
+ * Use when displaying long_text/rich_text in cards, pills, or compact views.
+ */
+export function stripHtml(html: string | null | undefined): string {
+  if (html == null || typeof html !== "string") return ""
+  return html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim()
+}
+
+/**
  * UK Date Formatting Utilities
  * 
  * Storage format: ISO (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ssZ)

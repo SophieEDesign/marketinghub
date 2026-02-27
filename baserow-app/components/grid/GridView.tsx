@@ -2728,6 +2728,9 @@ export default function GridView({
 
   const [groupValueLabelMaps, setGroupValueLabelMaps] = useState<Record<string, Record<string, string>>>({})
 
+  // #region agent log
+  if (effectiveGroupRules.length > 0) { fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'41b24e'},body:JSON.stringify({sessionId:'41b24e',location:'GridView.tsx:beforeGroupModel',message:'GridView before groupModel useMemo',data:{effectiveGroupRulesLen:effectiveGroupRules.length,filteredRowsLen:filteredRows.length},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{}); }
+  // #endregion
   const groupModel = useMemo(() => {
     if (effectiveGroupRules.length === 0) return null
     return buildGroupTree(asArray<Record<string, any>>(filteredRows), safeTableFields, effectiveGroupRules, {

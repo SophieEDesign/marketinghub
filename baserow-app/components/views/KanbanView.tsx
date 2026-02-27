@@ -619,7 +619,7 @@ function KanbanView({
           }
 
           return (
-          <div key={groupName} className="flex-shrink-0 min-w-[260px]">
+          <div key={groupName} className="flex-shrink-0 w-[280px]">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 mb-3">
               <div className="flex items-center gap-2 flex-wrap">
                 <div className="flex items-center gap-2 flex-1 min-w-0">

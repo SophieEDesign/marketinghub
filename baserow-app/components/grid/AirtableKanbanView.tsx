@@ -721,7 +721,7 @@ function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
-      className="flex-shrink-0 min-w-[260px] bg-gray-50 rounded-lg flex flex-col h-full max-h-full border border-gray-200"
+      className="flex-shrink-0 w-[280px] bg-gray-50 rounded-lg flex flex-col h-full max-h-full border border-gray-200"
       data-column-id={column.id}
     >
       {/* Column Header */}

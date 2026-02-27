@@ -592,6 +592,9 @@ export function useGridData({
     } catch (err: unknown) {
       clearTimeout(timeoutId)
       if (isAbortError(err)) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'41b24e'},body:JSON.stringify({sessionId:'41b24e',location:'useGridData.ts:abort',message:'useGridData received AbortError',data:{tableName},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
+        // #endregion
         isLoadingRef.current = false
         // Retry once so initial load recovers from spurious aborts (e.g. React Strict Mode, navigation)
         if (!abortRetryScheduledRef.current) {

@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
 import { resolveChoiceColor, normalizeHexColor, getTextColorForBackground, SEMANTIC_COLORS } from '@/lib/field-colors'
-import { formatDateUK } from "@/lib/utils"
+import { formatDateUK, stripHtml } from "@/lib/utils"
 import type { TableField } from "@/types/fields"
 import { renderPill, renderPills } from "@/lib/ui/pills"
 import { sortLabelsByManualOrder } from "@/lib/fields/select-options"
@@ -406,6 +406,9 @@ export default function ListView({
     return []
   }, [currentGroupBy, groupByRules])
 
+  // #region agent log
+  if (effectiveGroupRules.length > 0) { fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'41b24e'},body:JSON.stringify({sessionId:'41b24e',location:'ListView.tsx:beforeGroupModel',message:'ListView before groupModel useMemo',data:{effectiveGroupRulesLen:effectiveGroupRules.length,filteredRowsLen:filteredRows.length},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{}); }
+  // #endregion
   const groupModel = useMemo(() => {
     if (effectiveGroupRules.length === 0) return null
     return buildGroupTree(filteredRows, tableFields, effectiveGroupRules, {
@@ -640,6 +643,9 @@ export default function ListView({
           return `${value.length} file${value.length !== 1 ? 's' : ''}`
         }
         return '—'
+      case 'long_text':
+      case 'text':
+        return stripHtml(String(value)) || '—'
       default:
         return String(value)
     }

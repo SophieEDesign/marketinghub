@@ -2,6 +2,7 @@
 
 import type { TableField } from "@/types/fields"
 import { ChoicePill, ChoicePillList } from "@/components/fields/ChoicePill"
+import { stripHtml } from "@/lib/utils"
 
 /** Linked record reference: stored ID or UI shape with id/label. */
 type LinkedRecordRef = string | { id: string; label?: string; value?: string; name?: string }
@@ -163,8 +164,9 @@ export default function TimelineFieldValue({
     }
   }
 
-  // Text, long_text, and other types - render as plain text
-  const textValue = String(value)
+  // Text, long_text, and other types - render as plain text (strip HTML for long_text)
+  const rawValue = String(value)
+  const textValue = (field.type === "long_text" || field.type === "text") ? stripHtml(rawValue) : rawValue
   const isLongText = field.type === "long_text"
 
   return (

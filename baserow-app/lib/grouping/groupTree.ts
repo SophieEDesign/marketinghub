@@ -287,6 +287,9 @@ function buildNodesAtLevel<TItem extends Record<string, any>>(
     // Debug: Log if field is missing in data (only for nested levels to avoid spam)
     if (ruleIndex > 0 && raw === undefined && items.length > 0 && items.indexOf(item) === 0) {
       console.log(`[GroupTree] Field "${fieldNameForData}" (from rule field "${rule.field}") not found in item data at level ${ruleIndex + 1}. Available keys:`, Object.keys(item || {}))
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'41b24e'},body:JSON.stringify({sessionId:'41b24e',location:'groupTree.ts:fieldNotFound',message:'Field not found in item data',data:{fieldNameForData:fieldNameForData,ruleField:rule.field,ruleIndex,availableKeys:Object.keys(item||{})},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
+      // #endregion
     }
     
     const groupKeys = getGroupKeysForValue(ctx, rule, field, raw)
@@ -357,6 +360,9 @@ export function buildGroupTree<TItem extends Record<string, any>>(
 
   const normalizedRules = safeRules.map((r) => normalizeGroupRuleFieldName(ctx, r))
   
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'41b24e'},body:JSON.stringify({sessionId:'41b24e',location:'groupTree.ts:buildGroupTree',message:'buildGroupTree called',data:{ruleCount:normalizedRules.length,itemCount:items.length,availableFields:Array.from(ctx.fieldByName.keys())},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
+  // #endregion
   // Debug logging for nested groups
   if (normalizedRules.length > 1) {
     console.log('[GroupTree] Building nested groups:', {
