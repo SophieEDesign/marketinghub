@@ -670,7 +670,10 @@ export default function MultiCalendarView({
   // FullCalendar: keep option prop references stable to avoid internal update loops.
   const calendarPlugins = useMemo(() => [dayGridPlugin, interactionPlugin], [])
 
-  const onCalendarEventClick = useCallback(
+  // CRITICAL: FullCalendar's rx.set/rx.handle calls setState when eventClick/dateClick props change.
+  // Unstable handler identity → FullCalendar reinit → setState during commit → React #185.
+  // Use ref-backed stable callbacks so FullCalendar ALWAYS receives the same function reference.
+  const onCalendarEventClickImpl = useCallback(
     (info: any) => {
       const ext = info.event.extendedProps as any
       const recordId = String(ext?.rowId || "")
@@ -685,17 +688,26 @@ export default function MultiCalendarView({
     },
     [blockConfig, cascadeContext, onRecordClick, openRecord, interfaceMode]
   )
+  const onCalendarEventClickRef = useRef(onCalendarEventClickImpl)
+  onCalendarEventClickRef.current = onCalendarEventClickImpl
+  const onCalendarEventClick = useCallback((info: any) => {
+    onCalendarEventClickRef.current(info)
+  }, [])
 
-  const onCalendarDateClick = useCallback(
+  const onCalendarDateClickImpl = useCallback(
     (arg: any) => {
       if (!canCreateRecord) return
-      // Force explicit table selection (no implicit default).
       setCreateSourceId("")
       setCreateDate(arg.date || new Date())
       setCreateOpen(true)
     },
     [canCreateRecord]
   )
+  const onCalendarDateClickRef = useRef(onCalendarDateClickImpl)
+  onCalendarDateClickRef.current = onCalendarDateClickImpl
+  const onCalendarDateClick = useCallback((arg: any) => {
+    onCalendarDateClickRef.current(arg)
+  }, [])
 
   async function handleCreate() {
     const sid = createSourceId
