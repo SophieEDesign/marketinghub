@@ -289,14 +289,24 @@ function InterfacePageClientInternal({
   // CRITICAL: When a block is selected, InterfaceBuilder owns blocks/selectedBlock/onBlockSave (it syncs from its state).
   // Do NOT overwrite blocks/selectedBlock with InterfacePageClient's blocks - they become stale after settings save
   // because InterfaceBuilder updates its blocks optimistically but InterfacePageClient's blocks only change on loadBlocks.
+  const pageClientSyncCountRef = useRef(0)
   useEffect(() => {
+    pageClientSyncCountRef.current += 1
     if (!page) {
       setRightPanelData(null)
       return
     }
     const prev = lastRightPanelSyncRef.current
-    if (prev?.pageRef === page && prev?.blocksRef === blocks && prev?.selectedBlockId === selectedBlockIdForPanel && prev?.isEditing === isEditing) return
+    if (prev?.pageRef === page && prev?.blocksRef === blocks && prev?.selectedBlockId === selectedBlockIdForPanel && prev?.isEditing === isEditing) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'41b24e'},body:JSON.stringify({sessionId:'41b24e',location:'InterfacePageClient.tsx:RightPanelSync',message:'SKIP',data:{count:pageClientSyncCountRef.current,hypothesisId:'D'},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+      return
+    }
     lastRightPanelSyncRef.current = { pageRef: page, blocksRef: blocks, selectedBlockId: selectedBlockIdForPanel, isEditing }
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'41b24e'},body:JSON.stringify({sessionId:'41b24e',location:'InterfacePageClient.tsx:RightPanelSync',message:'CALL setRightPanelData',data:{count:pageClientSyncCountRef.current,pageId:page?.id,hypothesisId:'D'},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     const updates: Parameters<typeof setRightPanelData>[0] = {
       page,
       onPageUpdate: stableHandlePageUpdate,

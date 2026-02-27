@@ -80,8 +80,22 @@ export function RightSettingsPanelDataProvider({ children }: { children: ReactNo
           prev.fieldLayout === next.fieldLayout && prev.onLayoutSave === next.onLayoutSave &&
           prev.tableFields === next.tableFields && prev.isEditing === next.isEditing &&
           prev.pageConfig === next.pageConfig && prev.onPageConfigSave === next.onPageConfigSave) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'41b24e'},body:JSON.stringify({sessionId:'41b24e',location:'RightSettingsPanelDataContext.tsx:setData',message:'SKIP (guard)',data:{hypothesisId:'A'},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         return prev
       }
+      // #region agent log
+      const changed: string[] = []
+      if (prev?.blocks !== next.blocks) changed.push('blocks')
+      if (prev?.selectedBlock !== next.selectedBlock) changed.push('selectedBlock')
+      if (prev?.onBlockSave !== next.onBlockSave) changed.push('onBlockSave')
+      if (prev?.onBlockMoveToTop !== next.onBlockMoveToTop) changed.push('onBlockMoveToTop')
+      if (prev?.onBlockMoveToBottom !== next.onBlockMoveToBottom) changed.push('onBlockMoveToBottom')
+      if (prev?.onBlockLock !== next.onBlockLock) changed.push('onBlockLock')
+      if (prev?.onLayoutSave !== next.onLayoutSave) changed.push('onLayoutSave')
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'41b24e'},body:JSON.stringify({sessionId:'41b24e',location:'RightSettingsPanelDataContext.tsx:setData',message:'UPDATE',data:{changed,hypothesisId:'A'},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       return next
     })
   }, [])

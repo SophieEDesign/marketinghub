@@ -142,6 +142,15 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     })
     return map
   }, [tableFields])
+
+  // Convert old config format to field_layout (with backward compatibility)
+  // CRITICAL: Must be defined BEFORE previewFields which uses it (prevents React #310)
+  const fieldLayout = useMemo(() => {
+    if (config.field_layout && Array.isArray(config.field_layout) && config.field_layout.length > 0) {
+      return config.field_layout as FieldLayoutItem[]
+    }
+    return convertToFieldLayout(config, tableFields)
+  }, [config.field_layout, config, tableFields])
   
   // Helper function to get display name for a field
   const getFieldDisplayName = (fieldIdOrName: string): string => {
@@ -220,7 +229,7 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     )
     
     return statusField ? [nameField, statusField] : [nameField]
-  }, [config.left_panel?.title_field, config.left_panel?.field_1, config.left_panel?.field_2, config.title_field, config.preview_fields, columns])
+  }, [fieldLayout, config.left_panel?.title_field, config.left_panel?.field_1, config.left_panel?.field_2, config.title_field, config.preview_fields, columns])
   
   // Get group field for grouping - use left_panel.group_by or config.group_by_field
   const groupField = useMemo(() => {
@@ -579,14 +588,6 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   const editableFieldNames = useMemo(() => {
     return config.editable_fields || []
   }, [config.editable_fields])
-
-  // Convert old config format to field_layout (with backward compatibility)
-  const fieldLayout = useMemo(() => {
-    if (config.field_layout && Array.isArray(config.field_layout) && config.field_layout.length > 0) {
-      return config.field_layout as FieldLayoutItem[]
-    }
-    return convertToFieldLayout(config, tableFields)
-  }, [config.field_layout, config, tableFields])
 
   // Get fields to display in structured field list (page-level config)
   // Priority: field_layout (canvas) > visible_fields > detail_fields > all fields

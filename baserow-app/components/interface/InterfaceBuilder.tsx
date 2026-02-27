@@ -1233,11 +1233,21 @@ export default function InterfaceBuilder({
   // Sync block data to RightSettingsPanel when block is selected (must be after selectedBlock and handlers)
   // CRITICAL: Skip redundant updates when block and blocks ref unchanged to prevent render loops
   const lastRightPanelSyncRef = useRef<{ blockId: string; blocksRef: PageBlock[] } | null>(null)
+  const rightPanelSyncCountRef = useRef(0)
   useEffect(() => {
+    rightPanelSyncCountRef.current += 1
     if (effectiveIsEditing && selectedContext?.type === 'block' && selectedBlock) {
       const prev = lastRightPanelSyncRef.current
-      if (prev?.blockId === selectedBlock.id && prev?.blocksRef === blocks) return
+      if (prev?.blockId === selectedBlock.id && prev?.blocksRef === blocks) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'41b24e'},body:JSON.stringify({sessionId:'41b24e',location:'InterfaceBuilder.tsx:RightPanelSync',message:'SKIP (ref guard)',data:{count:rightPanelSyncCountRef.current,hypothesisId:'B'},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+        return
+      }
       lastRightPanelSyncRef.current = { blockId: selectedBlock.id, blocksRef: blocks }
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'41b24e'},body:JSON.stringify({sessionId:'41b24e',location:'InterfaceBuilder.tsx:RightPanelSync',message:'CALL setRightPanelData',data:{count:rightPanelSyncCountRef.current,blockId:selectedBlock.id,hypothesisId:'B'},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       setRightPanelData({
         blocks,
         selectedBlock,
@@ -1292,16 +1302,22 @@ export default function InterfaceBuilder({
   }, [undoRedoLayoutState, saveLayout])
 
   // Corrective pass: clear is_full_page on invalid record_context (no table_id) so page never locks on invalid config.
+  const correctivePassCountRef = useRef(0)
   useEffect(() => {
-    blocks.forEach((block) => {
-      if (
-        block.type === 'record_context' &&
-        block.config?.is_full_page === true &&
-        !block.config?.table_id
-      ) {
+    correctivePassCountRef.current += 1
+    const toFix = blocks.filter((b) =>
+      b.type === 'record_context' &&
+      b.config?.is_full_page === true &&
+      !b.config?.table_id
+    )
+    if (toFix.length > 0) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'41b24e'},body:JSON.stringify({sessionId:'41b24e',location:'InterfaceBuilder.tsx:CorrectivePass',message:'handleBlockUpdate',data:{count:correctivePassCountRef.current,blockIds:toFix.map(b=>b.id),hypothesisId:'C'},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+      toFix.forEach((block) => {
         handleBlockUpdate(block.id, { ...block.config, is_full_page: false })
-      }
-    })
+      })
+    }
   }, [blocks, handleBlockUpdate])
 
   // Full-page invariant: at most one block may have config.is_full_page === true (among eligible blocks).

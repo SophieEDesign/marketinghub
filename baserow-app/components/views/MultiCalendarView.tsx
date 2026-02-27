@@ -709,6 +709,26 @@ export default function MultiCalendarView({
     onCalendarDateClickRef.current(arg)
   }, [])
 
+  // CRITICAL: eventDidMount must be stable - inline arrow causes FullCalendar rx.set → setState → React #185
+  const handleEventDidMount = useCallback((arg: any) => {
+    const el = arg?.el as HTMLElement | undefined
+    if (!el) return
+    el.style.setProperty("background-color", "#ffffff", "important")
+    el.style.setProperty("border-color", "#e5e7eb", "important")
+    el.style.setProperty("color", "#111827", "important")
+    el.style.setProperty("border-width", "1px", "important")
+    el.style.setProperty("border-style", "solid", "important")
+    el.style.setProperty("box-shadow", "0 1px 2px rgba(0,0,0,0.05)", "important")
+    el.style.setProperty("border-radius", "6px", "important")
+    try {
+      el.querySelectorAll("a").forEach((a) => {
+        ;(a as HTMLElement).style.setProperty("color", "#111827", "important")
+      })
+    } catch {
+      // ignore
+    }
+  }, [])
+
   async function handleCreate() {
     const sid = createSourceId
     const mapping = sources.find((s) => s.id === sid)
@@ -933,27 +953,7 @@ export default function MultiCalendarView({
           eventDrop={handleEventDrop}
           eventClick={onCalendarEventClick}
           dateClick={onCalendarDateClick}
-          // Enforce unified styling even if FullCalendar/theme CSS overrides event colors.
-          eventDidMount={(arg: any) => {
-            const el = arg?.el as HTMLElement | undefined
-            if (!el) return
-            el.style.setProperty("background-color", "#ffffff", "important")
-            el.style.setProperty("border-color", "#e5e7eb", "important")
-            el.style.setProperty("color", "#111827", "important")
-            el.style.setProperty("border-width", "1px", "important")
-            el.style.setProperty("border-style", "solid", "important")
-            el.style.setProperty("box-shadow", "0 1px 2px rgba(0,0,0,0.05)", "important")
-            el.style.setProperty("border-radius", "6px", "important")
-
-            // FullCalendar often renders the title inside an <a>; force link text color too.
-            try {
-              el.querySelectorAll("a").forEach((a) => {
-                ;(a as HTMLElement).style.setProperty("color", "#111827", "important")
-              })
-            } catch {
-              // ignore
-            }
-          }}
+          eventDidMount={handleEventDidMount}
         />
       </div>
 

@@ -144,7 +144,12 @@ export default function RecordReviewPage({
     (page.settings as any)?.showAddRecord === true
 
   // Sync selected record to SelectionContext and RightSettingsPanel (for Record Layout Settings)
+  const recordReviewSyncCountRef = useRef(0)
   useEffect(() => {
+    recordReviewSyncCountRef.current += 1
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'41b24e'},body:JSON.stringify({sessionId:'41b24e',location:'RecordReviewPage.tsx:RightPanelSync',message:'EFFECT_RUN',data:{count:recordReviewSyncCountRef.current,selectedRecordId,pageTableId,hypothesisId:'E'},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     if (selectedRecordId && pageTableId) {
       setSelectedContext({ type: "record", recordId: selectedRecordId, tableId: pageTableId })
       setRightPanelData({
