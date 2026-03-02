@@ -62,6 +62,7 @@ function InterfacePageContent({
   if (useRecordReviewLayout && hasPage) {
     return (
       <RecordReviewPage
+        key={page?.id ?? 'record-review'}
         page={page as any}
         initialBlocks={memoizedBlocks}
         isViewer={isViewer}
@@ -75,6 +76,7 @@ function InterfacePageContent({
   return (
     <div className="min-h-screen w-full min-w-0 flex flex-col">
       <InterfaceBuilder
+        key={(interfaceBuilderPage ?? fallbackPage).id}
         page={(interfaceBuilderPage ?? fallbackPage) as any}
         initialBlocks={memoizedBlocks}
         isViewer={isViewer}
@@ -1127,17 +1129,10 @@ function InterfacePageClientInternal({
     const signature = result.length === 0
       ? ""
       : result.map((b: any) => `${b.id}:${b.x ?? ""}:${b.y ?? ""}:${b.w ?? ""}:${b.h ?? ""}`).join("|")
-    const returnedCached = prevBlocksRef.current.signature === signature && prevBlocksRef.current.blocks.length === result.length
-    if (returnedCached) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'41b24e'},body:JSON.stringify({sessionId:'41b24e',location:'InterfacePageClient.tsx:memoizedBlocks',message:'memoizedBlocks CACHED',data:{blocksLen:result.length,pageId:page?.id,hypothesisId:'H2'},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
+    if (prevBlocksRef.current.signature === signature && prevBlocksRef.current.blocks.length === result.length) {
       return prevBlocksRef.current.blocks
     }
     prevBlocksRef.current = { blocks: result, signature }
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'41b24e'},body:JSON.stringify({sessionId:'41b24e',location:'InterfacePageClient.tsx:memoizedBlocks',message:'memoizedBlocks NEW',data:{blocksLen:result.length,pageId:page?.id,hypothesisId:'H2'},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     return result
   }, [blocks, page?.id]) // ONLY page.id - NOT page_type, NOT mode, NOT isViewer
   
