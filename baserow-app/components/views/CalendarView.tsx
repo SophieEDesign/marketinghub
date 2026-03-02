@@ -2116,12 +2116,12 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
   return (
     <div className="w-full h-full min-w-0 min-h-0 flex flex-col bg-white overflow-hidden">
       {renderAnchorControls()}
-      {/* Scroll container: constrained by sidebar; overflow-auto so horizontal scrollbar appears when calendar is wider */}
+      {/* Scroll container: overflow-auto for single scroll when content overflows; min-h-0 required for flex height propagation */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 min-h-0 min-w-0 overflow-x-auto overflow-y-hidden px-4 py-3 bg-white flex flex-col"
+        className="flex-1 min-h-0 min-w-0 overflow-auto px-4 py-3 bg-white flex flex-col"
       >
-        {/* Wrapper: min-w-[700px] ensures 7-day grid has room; horizontal scrollbar when sidebar narrows view */}
+        {/* Wrapper: min-w-[700px] ensures 7-day grid has room; min-h-0 for flex child to receive constrained height */}
         {mounted ? (
           <div className="flex-1 min-h-0 min-w-[700px] w-full">
             <MemoizedFullCalendar

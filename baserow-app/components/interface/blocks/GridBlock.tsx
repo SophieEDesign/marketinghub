@@ -1305,7 +1305,7 @@ export default function GridBlock({
   }
 
   return (
-    <div className="h-full w-full flex flex-col overflow-hidden" style={blockStyle}>
+    <div className="h-full w-full min-h-0 flex flex-col overflow-hidden" style={blockStyle}>
       {/* Legacy header (title + optional add record) - only when appearance wrapper is not active */}
       {!wrapperHasAppearanceSettings &&
         (((appearance.showTitle ?? (appearance as any).show_title) !== false && blockTitle) ||
