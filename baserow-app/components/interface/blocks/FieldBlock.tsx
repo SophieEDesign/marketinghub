@@ -61,6 +61,7 @@ export default function FieldBlock({
   const [createRecordTableFields, setCreateRecordTableFields] = useState<any[]>([])
   const [createRecordResolve, setCreateRecordResolve] = useState<((id: string | null) => void) | null>(null)
   const { toast } = useToast()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const allowInlineEdit = config?.allow_inline_edit || false
   const editPermission = config?.inline_edit_permission || 'both'
@@ -487,8 +488,6 @@ export default function FieldBlock({
   const attachments: Attachment[] = isAttachmentField && fieldValue 
     ? (Array.isArray(fieldValue) ? fieldValue : [fieldValue])
     : []
-
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   function generateUUID(): string {
     if (typeof crypto !== "undefined" && crypto.randomUUID) {
