@@ -1142,7 +1142,7 @@ function TimelineView({
     return { tag, tooltipContent }
   }, [resolvedCardFields, tableFields, dateFieldNames, linkedValueLabelMaps])
 
-  // Calculate pixel positions for events
+  // Calculate pixel positions for events - cards constrained 160-240px
   const getEventPosition = useCallback(
     (event: TimelineEvent) => {
       const timelineWidth = timelineRef.current?.clientWidth || 1000
@@ -1151,7 +1151,8 @@ function TimelineView({
       const durationMs = event.end.getTime() - event.start.getTime()
 
       const left = (startMs / rangeMs) * timelineWidth
-      const width = Math.max((durationMs / rangeMs) * timelineWidth, 100) // Min width 100px
+      const rawWidth = (durationMs / rangeMs) * timelineWidth
+      const width = Math.min(240, Math.max(160, rawWidth))
 
       return { left, width }
     },
@@ -1501,8 +1502,8 @@ function TimelineView({
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0 overflow-hidden bg-white">
-      {/* Toolbar */}
+    <div className="timeline-root flex flex-col h-full min-h-0 min-w-0 bg-white">
+      {/* Toolbar - shrink-0 so it doesn't collapse */}
       <div className="shrink-0 flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={handlePrevious}>
@@ -1529,11 +1530,11 @@ function TimelineView({
         </div>
       </div>
 
-      {/* Timeline */}
-      <div className="flex-1 min-h-0 overflow-auto relative" ref={timelineRef}>
-        <div className="relative p-4" style={{ minHeight: "100%" }}>
-          {/* Time labels */}
-          <div className="sticky top-0 bg-white z-10 border-b border-gray-200 pb-2 mb-4">
+      {/* Timeline body - single scroll container */}
+      <div className="timeline-body flex-1 min-h-0 overflow-auto" ref={timelineRef}>
+        <div className="timeline-grid w-full min-w-max p-4">
+          {/* Date scale header - sticky */}
+          <div className="timeline-header sticky top-0 z-10 bg-white border-b border-gray-200 pb-2 mb-2 -mx-4 px-4">
             <div className="relative h-8">
               {timeLabels.map((label, index) => (
                 <div
@@ -1547,18 +1548,8 @@ function TimelineView({
             </div>
           </div>
 
-          {/* Events - Grouped or Ungrouped */}
-          <div
-            className="relative"
-            style={{
-              height: `${Math.max(
-                400,
-                visibleEvents.length > 0
-                  ? (visibleEvents.length - 1) * laneLayout.stackGapPx + laneLayout.cardHeightPx + 20
-                  : 400
-              )}px`,
-            }}
-          >
+          {/* Lanes - fixed row height, cards absolutely positioned */}
+          <div className="relative">
             {resolvedGroupByField ? (
               // Render grouped lanes
               Object.entries(groupedEvents).map(([groupKey, groupEvents], groupIndex) => {
@@ -1640,10 +1631,10 @@ function TimelineView({
                       }
 
                 return (
-                  <div key={groupKey} className={`${rowSizeSpacing.laneSpacing} ${compactMode ? 'min-h-[28px]' : 'min-h-[40px]'}`}>
+                  <div key={groupKey} className="relative border-b min-h-[84px] py-2">
                     {/* Group header */}
                     <div 
-                      className="sticky top-12 z-5 border-b pb-1 mb-2 px-2 py-1 rounded"
+                      className="px-2 py-1 rounded mb-2"
                       style={bgColorStyle}
                     >
                       <div className="flex items-center gap-2">
@@ -1662,16 +1653,13 @@ function TimelineView({
                       </div>
                     </div>
 
-                    {/* Group events */}
+                    {/* Group events - cards absolutely positioned, do not affect row height */}
                     <div
-                      className="relative"
+                      className="relative min-h-[52px]"
                       style={{
-                        height: `${Math.max(
-                          60,
-                          groupEvents.length > 0
-                            ? (groupEvents.length - 1) * laneLayout.stackGapPx + laneLayout.cardHeightPx + 12
-                            : 60
-                        )}px`,
+                        height: groupEvents.length > 0
+                          ? (groupEvents.length - 1) * laneLayout.stackGapPx + laneLayout.cardHeightPx + 8
+                          : 52,
                       }}
                     >
                       {groupEvents.map((event, eventIndex) => {
@@ -1706,34 +1694,45 @@ function TimelineView({
                 )
               })
             ) : (
-              // Render ungrouped events
-              visibleEvents.map((event, index) => {
-                const { left, width } = getEventPosition(event)
-                const { tag, tooltipContent } = getCompactDisplay(event)
-                return (
-                  <TimelineEventCard
-                    key={event.id}
-                    event={event}
-                    left={left}
-                    width={width}
-                    top={index * laneLayout.stackGapPx}
-                    title={event.title}
-                    color={event.color}
-                    tag={tag}
-                    tooltipContent={tooltipContent}
-                    compactMode={compactMode}
-                    tableFields={tableFields}
-                    highlightRules={highlightRules}
-                    selectedEventId={selectedEventId}
-                    isDragging={draggingEvent === event.id}
-                    isResizing={resizingEvent?.id === event.id}
-                    draggingOrResizingAny={!!(draggingEvent || resizingEvent)}
-                    onDragStart={(e) => handleDragStart(event, e)}
-                    onSelect={(e) => handleEventSelect(event, e)}
-                    onResizeStart={(edge, e) => handleResizeStart(event, edge, e)}
-                  />
-                )
-              })
+              // Render ungrouped events - single lane with min-h-[84px]
+              <div className="relative border-b min-h-[84px] py-2">
+                <div
+                  className="relative min-h-[52px]"
+                  style={{
+                    height: visibleEvents.length > 0
+                      ? (visibleEvents.length - 1) * laneLayout.stackGapPx + laneLayout.cardHeightPx + 8
+                      : 52,
+                  }}
+                >
+                  {visibleEvents.map((event, index) => {
+                    const { left, width } = getEventPosition(event)
+                    const { tag, tooltipContent } = getCompactDisplay(event)
+                    return (
+                      <TimelineEventCard
+                        key={event.id}
+                        event={event}
+                        left={left}
+                        width={width}
+                        top={index * laneLayout.stackGapPx}
+                        title={event.title}
+                        color={event.color}
+                        tag={tag}
+                        tooltipContent={tooltipContent}
+                        compactMode={compactMode}
+                        tableFields={tableFields}
+                        highlightRules={highlightRules}
+                        selectedEventId={selectedEventId}
+                        isDragging={draggingEvent === event.id}
+                        isResizing={resizingEvent?.id === event.id}
+                        draggingOrResizingAny={!!(draggingEvent || resizingEvent)}
+                        onDragStart={(e) => handleDragStart(event, e)}
+                        onSelect={(e) => handleEventSelect(event, e)}
+                        onResizeStart={(edge, e) => handleResizeStart(event, edge, e)}
+                      />
+                    )
+                  })}
+                </div>
+              </div>
             )}
           </div>
 

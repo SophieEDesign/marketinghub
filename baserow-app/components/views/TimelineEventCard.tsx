@@ -85,7 +85,7 @@ export default function TimelineEventCard({
 
   return (
     <div
-      className="absolute group"
+      className="absolute group min-w-[160px] max-w-[240px] overflow-hidden"
       data-timeline-event="true"
       style={{
         left: `${left}px`,
@@ -95,7 +95,7 @@ export default function TimelineEventCard({
     >
       <CardContainer
         density="compact"
-        className={`max-w-none ${cardHeightClass} ${
+        className={`w-full min-w-0 overflow-hidden ${cardHeightClass} ${
           effectiveColor ? "border-l-4" : ""
         } ${isDragging || isResizing ? "opacity-75" : ""} ${
           draggingOrResizingAny ? "cursor-grabbing" : "cursor-pointer"
@@ -124,12 +124,14 @@ export default function TimelineEventCard({
             />
           )}
 
-          <div className="card-title flex-1 min-w-0 truncate font-medium text-xs">
+          {/* Title always first - primary field */}
+          <div className="card-title flex-1 min-w-0 truncate text-xs font-medium">
             {title || "—"}
           </div>
 
+          {/* Status pill last - secondary metadata */}
           {tag && (
-            <span className="card-status flex-shrink-0 text-[11px] px-2 py-0.5 rounded-md bg-gray-100 truncate max-w-[80px]">
+            <span className="card-status flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-md text-[11px] bg-gray-100 text-gray-700 max-w-full truncate">
               {tag}
             </span>
           )}

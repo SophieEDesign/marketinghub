@@ -961,34 +961,33 @@ export default function GridBlock({
         }
         
         return (
-          <TimelineView
-            tableId={tableId!}
-            viewId={viewUuid || ''}
-            dateFieldId={dateFieldId}
-            startDateFieldId={dateFromFieldFromConfig}
-            endDateFieldId={dateToFieldFromConfig}
-            fieldIds={fieldIds}
-            searchQuery=""
-            tableFields={tableFields}
-            filters={allFilters} // Pass merged filters
-            blockConfig={config} // Pass block config so TimelineView can read date_from/date_to from page settings
-            modalFields={modalFieldsForRecord}
-            colorField={appearance.color_field}
-            onRecordClick={onRecordClick}
-            reloadKey={refreshKey}
-            onRecordDeleted={() => setRefreshKey((k) => k + 1)}
-            // Compact card configuration
-            titleField={config.timeline_title_field || config.card_title_field}
-            tagField={config.timeline_tag_field || config.timeline_field_1 || config.card_field_1}
-            // Grouping
-            groupByField={config.timeline_group_by || config.group_by_field || config.group_by}
-            // Appearance
-            rowSize={appearance.row_height as 'compact' | 'medium' | 'comfortable' || 'medium'}
-            compactMode={config.timeline_compact_mode ?? (appearance.row_height === 'compact')}
-            highlightRules={config.highlight_rules}
-            interfaceMode={interfaceMode}
-            onModalLayoutSave={onModalLayoutSave ?? undefined}
-          />
+          <div className="flex flex-col h-full min-h-0">
+            <TimelineView
+              tableId={tableId!}
+              viewId={viewUuid || ''}
+              dateFieldId={dateFieldId}
+              startDateFieldId={dateFromFieldFromConfig}
+              endDateFieldId={dateToFieldFromConfig}
+              fieldIds={fieldIds}
+              searchQuery=""
+              tableFields={tableFields}
+              filters={allFilters}
+              blockConfig={config}
+              modalFields={modalFieldsForRecord}
+              colorField={appearance.color_field}
+              onRecordClick={onRecordClick}
+              reloadKey={refreshKey}
+              onRecordDeleted={() => setRefreshKey((k) => k + 1)}
+              titleField={config.timeline_title_field || config.card_title_field}
+              tagField={config.timeline_tag_field || config.timeline_field_1 || config.card_field_1}
+              groupByField={config.timeline_group_by || config.group_by_field || config.group_by}
+              rowSize={appearance.row_height as 'compact' | 'medium' | 'comfortable' || 'medium'}
+              compactMode={config.timeline_compact_mode ?? (appearance.row_height === 'compact')}
+              highlightRules={config.highlight_rules}
+              interfaceMode={interfaceMode}
+              onModalLayoutSave={onModalLayoutSave ?? undefined}
+            />
+          </div>
         )
       }
       
