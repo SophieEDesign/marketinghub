@@ -2057,7 +2057,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
       {/* Scroll container: overflow-auto for single scroll; flex flex-col + min-h-0 for height propagation to FullCalendar */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 min-h-0 min-w-0 overflow-auto p-4 bg-white flex flex-col"
+        className="flex-1 min-h-0 min-w-0 overflow-auto p-2 bg-white flex flex-col"
       >
         {/* Wrapper: min-h-0 allows flex child to receive constrained height; FullCalendar height="100%" fills it */}
         {mounted ? (

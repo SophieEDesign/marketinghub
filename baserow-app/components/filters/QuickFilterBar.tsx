@@ -103,6 +103,8 @@ export interface QuickFilterBarProps {
   onChange: (userQuickFilters: FilterConfig[]) => void
   /** When true, use compact padding (e.g. in calendar header) */
   compact?: boolean
+  /** When true (full-page calendar), use extra-small pills */
+  extraCompact?: boolean
 }
 
 export default function QuickFilterBar({
@@ -111,6 +113,7 @@ export default function QuickFilterBar({
   viewDefaultFilters,
   onChange,
   compact = false,
+  extraCompact = false,
 }: QuickFilterBarProps) {
   const quickableFields = useMemo(() => getQuickableFields(tableFields), [tableFields])
 
@@ -211,8 +214,12 @@ export default function QuickFilterBar({
     return null
   }
 
+  const pillClass = extraCompact
+    ? "inline-flex items-center gap-1.5 rounded-full border bg-white px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50"
+    : "inline-flex items-center gap-2 rounded-full border bg-white px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+
   return (
-    <div className={`flex items-center gap-2 flex-wrap ${compact ? "py-0.5" : "py-2"}`}>
+    <div className={`flex items-center flex-wrap ${extraCompact ? "gap-1 py-0" : compact ? "gap-2 py-0.5" : "gap-2 py-2"}`}>
       {items.map((item) => {
         const field = fieldsByName.get(item.field)
         if (!field) return null
@@ -228,7 +235,7 @@ export default function QuickFilterBar({
             <PopoverTrigger asChild>
               <button
                 type="button"
-                className="inline-flex items-center gap-2 rounded-full border bg-white px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+                className={pillClass}
                 aria-label={`Filter by ${getFieldDisplayName(field)}`}
               >
                 <span className="font-medium">{getFieldDisplayName(field)}</span>
@@ -323,10 +330,10 @@ export default function QuickFilterBar({
           <PopoverTrigger asChild>
             <button
               type="button"
-              className="inline-flex items-center gap-1 rounded-full border border-dashed bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50"
+              className={extraCompact ? "inline-flex items-center gap-1 rounded-full border border-dashed bg-white px-2 py-1 text-[11px] text-gray-600 hover:bg-gray-50" : "inline-flex items-center gap-1 rounded-full border border-dashed bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50"}
               aria-label="Add Filter"
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className={extraCompact ? "h-3 w-3" : "h-3.5 w-3.5"} />
               Add Filter
             </button>
           </PopoverTrigger>

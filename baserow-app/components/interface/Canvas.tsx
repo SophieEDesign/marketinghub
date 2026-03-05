@@ -1736,12 +1736,15 @@ export default function Canvas({
 
   // Compute min height from layout so content can grow and main scroll works (react-grid-layout doesn't auto-grow)
   const gridMinHeightPx = useMemo(() => {
-    if (!gridLayout.length) return 0
     const rowHeight = GRID_CONFIG.rowHeight
     const marginY = GRID_CONFIG.margin[1]
+    if (!gridLayout.length) {
+      // Fallback when layout not yet synced - ensure content grows so scroll works
+      return blocks.length > 0 ? 400 : 0
+    }
     const maxRow = Math.max(0, ...gridLayout.map((item) => (item.y ?? 0) + (item.h ?? 4)))
     return (maxRow + 1) * rowHeight + maxRow * marginY
-  }, [gridLayout, GRID_CONFIG.rowHeight, GRID_CONFIG.margin])
+  }, [gridLayout, GRID_CONFIG.rowHeight, GRID_CONFIG.margin, blocks.length])
   
   // Add CSS for smooth block animations
   // CRITICAL: Height transitions are disabled - they delay reflow on collapse

@@ -1351,9 +1351,9 @@ function InterfacePageClientInternal({
       {hasPage && isAdmin && (
         <PageActionsRegistrar pageId={pageId} isAdmin={isAdmin} isViewer={isViewer} />
       )}
-      {/* Header - Admin Only */}
+      {/* Header - Admin Only. Compact when single calendar (suppressMainScroll) for Airtable-style */}
       {!isViewer && hasPage && isAdmin && (
-        <div className="flex-shrink-0 border-b bg-white px-4 py-3 flex items-center justify-between">
+        <div className={`flex-shrink-0 border-b bg-white px-4 flex items-center justify-between ${suppressMainScroll ? "py-2" : "py-3"}`}>
           <div className="flex items-center gap-3 flex-1 min-w-0">
             {isEditingTitle ? (
               <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -1364,7 +1364,7 @@ function InterfacePageClientInternal({
                   onChange={(e) => handleTitleChange(e.target.value)}
                   onBlur={handleTitleBlur}
                   onKeyDown={handleTitleKeyDown}
-                  className={`flex-1 text-lg font-semibold border-none outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 ${
+                  className={`flex-1 font-semibold border-none outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 ${suppressMainScroll ? "text-base" : "text-lg"} ${
                     titleError ? 'bg-red-50 ring-2 ring-red-500' : ''
                   }`}
                   disabled={isSavingTitle}
@@ -1376,7 +1376,7 @@ function InterfacePageClientInternal({
             ) : (
               <>
                 <h1 
-                  className="text-lg font-semibold cursor-text hover:text-blue-600 transition-colors flex-1 min-w-0 truncate"
+                  className={`font-semibold cursor-text hover:text-blue-600 transition-colors flex-1 min-w-0 truncate ${suppressMainScroll ? "text-base" : "text-lg"}`}
                   onClick={handleStartEditTitle}
                   title="Click to edit page title"
                 >
@@ -1395,9 +1395,9 @@ function InterfacePageClientInternal({
       
       {/* Header without Edit Button - Non-admin with View Only badge */}
       {!isViewer && hasPage && !isAdmin && (
-        <div className="flex-shrink-0 border-b bg-white px-4 py-3 flex items-center justify-between">
+        <div className={`flex-shrink-0 border-b bg-white px-4 flex items-center justify-between ${suppressMainScroll ? "py-2" : "py-3"}`}>
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <h1 className="text-lg font-semibold flex-1 min-w-0 truncate">{page?.name}</h1>
+            <h1 className={`font-semibold flex-1 min-w-0 truncate ${suppressMainScroll ? "text-base" : "text-lg"}`}>{page?.name}</h1>
             <span 
               className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded flex-shrink-0"
               title="Ask an admin to edit this page"

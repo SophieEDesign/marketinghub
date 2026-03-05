@@ -465,3 +465,20 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #9ca3af;
 }
+
+/* FullCalendar compact toolbar (Airtable-style) - smaller header, more space for grid */
+.fc .fc-toolbar {
+  padding: 0.25rem 0;
+  gap: 0.5rem;
+}
+.fc .fc-toolbar-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+.fc .fc-button {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
+.fc .fc-button .fc-icon {
+  font-size: 0.75rem;
+}

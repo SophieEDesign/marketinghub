@@ -41,12 +41,15 @@ export interface CalendarAnchorControlsProps {
   onScrollToDate: (date: Date) => void
   disabled?: boolean
   compact?: boolean
+  /** When true (full-page calendar), use extra-small buttons for Airtable-style compact bar */
+  extraCompact?: boolean
 }
 
 export default function CalendarAnchorControls({
   onScrollToDate,
   disabled = false,
   compact = false,
+  extraCompact = false,
 }: CalendarAnchorControlsProps) {
   const presets: AnchorPreset[] = [
     "today",
@@ -56,15 +59,21 @@ export default function CalendarAnchorControls({
     "nextMonth",
   ]
 
+  const btnClass = extraCompact
+    ? "text-[11px] h-6 px-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+    : compact
+      ? "text-xs h-7 px-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+      : "text-xs h-7"
+
   return (
-    <div className={compact ? "flex items-center gap-1 flex-wrap" : "flex items-center gap-2 flex-wrap"}>
+    <div className={extraCompact ? "flex items-center gap-0.5 flex-wrap" : compact ? "flex items-center gap-1 flex-wrap" : "flex items-center gap-2 flex-wrap"}>
       {presets.map((preset) => (
         <Button
           key={preset}
           variant="ghost"
           size="sm"
           disabled={disabled}
-          className={compact ? "text-xs h-7 px-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100" : "text-xs h-7"}
+          className={btnClass}
           onClick={() => onScrollToDate(getTargetDateForPreset(preset))}
         >
           {PRESET_LABELS[preset]}

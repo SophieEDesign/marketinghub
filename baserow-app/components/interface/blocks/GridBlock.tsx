@@ -1308,9 +1308,10 @@ export default function GridBlock({
         // Compact toolbar for all calendar blocks (full-page and normal)
         const compactBar = true
 
+        const headerCompact = isFullPage
         return (
-          <div className="flex items-center gap-3 flex-shrink-0 py-2.5 px-4 border-b border-gray-200/80 bg-white min-h-0 overflow-x-auto min-w-0">
-            <div className="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
+          <div className={`flex items-center gap-2 flex-shrink-0 border-b border-gray-200/80 bg-white min-h-0 overflow-x-auto min-w-0 ${headerCompact ? "py-1.5 px-3" : "py-2.5 px-4"}`}>
+            <div className={`flex items-center gap-2 flex-1 min-w-0 flex-wrap ${headerCompact ? "gap-2" : "gap-3"}`}>
               {showQuickFilters && (
                 <QuickFilterBar
                   storageKey={`mh:quickFilters:${pageId || "page"}:${block.id}`}
@@ -1318,16 +1319,18 @@ export default function GridBlock({
                   viewDefaultFilters={viewDefaultFilters}
                   onChange={setUserQuickFilters}
                   compact
+                  extraCompact={headerCompact}
                 />
               )}
               {showQuickFilters && hasAnyDateField && (
-                <div className="h-5 w-px bg-gray-200 flex-shrink-0" aria-hidden />
+                <div className={`bg-gray-200 flex-shrink-0 ${headerCompact ? "h-4 w-px" : "h-5 w-px"}`} aria-hidden />
               )}
               {hasAnyDateField && (
                 <CalendarAnchorControls
                   onScrollToDate={(date) => calendarScrollRef.current?.scrollToDate(date)}
                   disabled={false}
                   compact={compactBar}
+                  extraCompact={headerCompact}
                 />
               )}
             </div>
@@ -1339,9 +1342,9 @@ export default function GridBlock({
                 onClick={handleAddRecord}
                 disabled={isAddRecordDisabled}
                 title={!canCreateRecord ? "Adding records is disabled for this block" : "Add a new record"}
-                className="h-8 text-xs flex-shrink-0"
+                className={`text-xs flex-shrink-0 ${headerCompact ? "h-7 px-2" : "h-8"}`}
               >
-                <Plus className="h-3.5 w-3 mr-1.5" />
+                <Plus className={`mr-1.5 ${headerCompact ? "h-3 w-3" : "h-3.5 w-3"}`} />
                 Add record
               </Button>
             )}
