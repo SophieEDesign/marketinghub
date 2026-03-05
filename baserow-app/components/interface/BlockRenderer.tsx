@@ -633,7 +633,7 @@ export default function BlockRenderer({
   }, [filters])
 
   return (
-    <ErrorBoundary>
+    <ErrorBoundary resetKeys={[block.id]}>
       <div className="relative h-full w-full min-w-0 min-h-0">
         {/* Filter indicator - always mount, visibility toggled by isEditing for mount stability */}
         {filterBlockSources.length > 0 && (

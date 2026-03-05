@@ -1,9 +1,10 @@
 /**
- * Optional debug telemetry. Only runs when NEXT_PUBLIC_DEBUG_TELEMETRY=1 or true.
- * Never enable in production. Safe to import from client or server.
+ * Optional debug telemetry. Only runs in development when NEXT_PUBLIC_DEBUG_TELEMETRY=1 or true.
+ * Never enable in production - ingest URL fails and adds noise.
  */
 const DEBUG_TELEMETRY_ENABLED =
   typeof process !== 'undefined' &&
+  process.env?.NODE_ENV === 'development' &&
   (process.env?.NEXT_PUBLIC_DEBUG_TELEMETRY === '1' || process.env?.NEXT_PUBLIC_DEBUG_TELEMETRY === 'true')
 
 const TELEMETRY_URL = 'http://127.0.0.1:7242/ingest/7e9b68cb-9457-4ad2-a6ab-af4806759e7a'

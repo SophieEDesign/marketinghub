@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster"
 import CommandPaletteProvider from "@/components/command-palette/CommandPaletteProvider"
 import DynamicTitle from "@/components/layout/DynamicTitle"
 import ConsoleErrorFilter from "@/components/layout/ConsoleErrorFilter"
+import RootErrorBoundary from "@/components/layout/RootErrorBoundary"
 import DiagnosticsInitializer from "@/components/layout/DiagnosticsInitializer"
 import InteractionFailsafe from "@/components/layout/InteractionFailsafe"
 // NavigationDiagnostics temporarily disabled for performance isolation
@@ -87,7 +88,9 @@ export default function RootLayout({
           {/* STEP 1: Temporarily disabled to verify not causing heavy message listeners or loops */}
           {/* <NavigationDiagnostics /> */}
           <DynamicTitle />
-          {children}
+          <RootErrorBoundary>
+            {children}
+          </RootErrorBoundary>
           <Toaster />
           <CommandPaletteProvider />
           <div id="modal-root" />

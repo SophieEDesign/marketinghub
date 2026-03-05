@@ -11,6 +11,8 @@ interface ErrorBoundaryProps {
   children: React.ReactNode
   fallback?: React.ReactNode
   onError?: (error: Error, errorInfo: React.ErrorInfo) => void
+  /** When these keys change, the boundary resets and tries to render children again */
+  resetKeys?: unknown[]
 }
 
 export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
@@ -21,6 +23,19 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error }
+  }
+
+  componentDidUpdate(prevProps: ErrorBoundaryProps) {
+    if (this.state.hasError && this.props.resetKeys) {
+      const prevKeys = prevProps.resetKeys ?? []
+      const currKeys = this.props.resetKeys ?? []
+      if (
+        prevKeys.length !== currKeys.length ||
+        prevKeys.some((k, i) => k !== currKeys[i])
+      ) {
+        this.setState({ hasError: false, error: null })
+      }
+    }
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
@@ -45,6 +60,13 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
             <p className="text-xs text-red-600">
               This block encountered an error. Please refresh the page or contact support.
             </p>
+            <button
+              type="button"
+              onClick={() => this.setState({ hasError: false, error: null })}
+              className="mt-2 px-3 py-1.5 text-xs font-medium text-red-800 bg-red-100 rounded hover:bg-red-200"
+            >
+              Try again
+            </button>
             {process.env.NODE_ENV === "development" && this.state.error && (
               <details className="mt-2 text-left">
                 <summary className="text-xs text-red-500 cursor-pointer">
