@@ -7,7 +7,7 @@
   "crons": [
     {
       "path": "/api/automations/run-scheduled",
-      "schedule": "* * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
