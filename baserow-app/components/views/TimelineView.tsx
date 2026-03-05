@@ -24,6 +24,7 @@ import { sanitizeFieldName } from "@/lib/fields/validation"
 import { resolveSystemFieldAlias } from "@/lib/fields/systemFieldAliases"
 import { normalizeSelectOptionsForUi } from "@/lib/fields/select-options"
 import { getFieldDisplayName } from "@/lib/fields/display"
+import { getPrimaryField } from "@/lib/fields/primary"
 import type { HighlightRule } from "@/lib/interface/types"
 import { evaluateHighlightRules, getFormattingStyle } from "@/lib/conditional-formatting/evaluator"
 
@@ -536,7 +537,8 @@ function TimelineView({
       }
     }
 
-    // Title field: explicit config > first non-date from visible > primary
+    // Title field: always use primary field (record name) so status never appears as main label.
+    // Only use config if it points to a text field; never use single_select/multi_select (status) as title.
     const titleFieldName = titleFieldProp ||
       blockConfig?.timeline_title_field ||
       blockConfig?.card_title_field ||
@@ -544,8 +546,14 @@ function TimelineView({
 
     let resolvedTitleField: TableField | null = null
     if (titleFieldName) {
-      resolvedTitleField = tableFields.find(f => f.name === titleFieldName || f.id === titleFieldName) || null
-      if (resolvedTitleField && dateFieldNames.has(resolvedTitleField.name)) resolvedTitleField = null
+      const configField = tableFields.find(f => f.name === titleFieldName || f.id === titleFieldName)
+      // Only use config field if it's a text field (not status/select)
+      if (configField && (configField.type === "text" || configField.type === "long_text") && !dateFieldNames.has(configField.name)) {
+        resolvedTitleField = configField
+      }
+    }
+    if (!resolvedTitleField) {
+      resolvedTitleField = getPrimaryField(tableFields)
     }
     if (!resolvedTitleField) {
       resolvedTitleField =

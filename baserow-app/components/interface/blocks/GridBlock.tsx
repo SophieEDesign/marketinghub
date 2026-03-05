@@ -1377,7 +1377,8 @@ export default function GridBlock({
       )}
 
       {/* Single scroll container: GridView/CalendarView owns scroll; flex so child can flex-1. Calendar needs overflow-hidden so child controls scroll. */}
-      <div className={`flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden ${viewType === 'calendar' ? 'min-h-[100vh]' : ''} ${viewType === 'kanban' ? 'overflow-x-auto' : ''}`}>
+      {/* When isFullPage, parent provides height (no min-h). Otherwise calendar uses min-h-[100vh] for scroll. */}
+      <div className={`flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden ${viewType === 'calendar' && !isFullPage ? 'min-h-[100vh]' : ''} ${viewType === 'kanban' ? 'overflow-x-auto' : ''}`}>
         {renderView()}
       </div>
     </div>

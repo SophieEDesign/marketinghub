@@ -73,7 +73,7 @@ function InterfacePageContent({
     )
   }
   return (
-    <div className="h-full min-h-0 w-full min-w-0 flex flex-col overflow-hidden">
+    <div className="min-h-0 w-full min-w-0 flex flex-col">
       <InterfaceBuilder
         page={(interfaceBuilderPage ?? fallbackPage) as any}
         initialBlocks={memoizedBlocks}
@@ -1202,8 +1202,14 @@ function InterfacePageClientInternal({
     const isRecordReview = page?.page_type === 'record_review'
     const useRecordReviewLayout = isRecordReview || isRecordView
     const isContentPage = !useRecordReviewLayout
+    const isSingleCalendar =
+      isContentPage &&
+      blocks.length === 1 &&
+      blocks[0]?.type === "grid" &&
+      blocks[0]?.config?.view_type === "calendar"
     const isFullPage =
-      isContentPage && blocks.length === 1 && blocks[0]?.config?.is_full_page === true
+      (isContentPage && blocks.length === 1 && blocks[0]?.config?.is_full_page === true) ||
+      isSingleCalendar
     // Suppress main scroll for: (1) full-page content blocks, (2) record_view/record_review two-panel layout
     // Both layouts fill viewport; panels scroll internally.
     const shouldSuppress = !!isFullPage || !!useRecordReviewLayout
@@ -1413,9 +1419,9 @@ function InterfacePageClientInternal({
           suppressMainScroll ? "overflow-y-hidden" : "overflow-y-auto"
         }`}
       >
-        {/* CRITICAL: Do NOT use flex-1 here - content must grow to full height so scroll works and bottom isn't cut off */}
+        {/* When suppressMainScroll: use flex-1 min-h-0 so content fills viewport (full-page/calendar). Otherwise content grows for scroll. */}
         {/* In edit mode: extra padding-bottom so user can scroll to reach bottom resize handles and canvas isn't cut off */}
-        <div className={`w-full min-w-0 flex flex-col overflow-x-hidden relative ${isEditMode ? 'pb-48' : ''}`}>
+        <div className={`w-full min-w-0 flex flex-col overflow-x-hidden relative ${suppressMainScroll ? "flex-1 min-h-0" : ""} ${isEditMode ? "pb-48" : ""}`}>
           <InterfacePageContent
             useRecordReviewLayout={useRecordReviewLayout}
             hasPage={hasPage}

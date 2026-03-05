@@ -1343,14 +1343,18 @@ export default function InterfaceBuilder({
     })()
   }, [blocks, page.id, handleBlockUpdate])
 
-  // Derive full-page block for canvas: only when exactly one block and it has is_full_page and is eligible.
+  // Derive full-page block for canvas: when exactly one block and (1) it has is_full_page and is eligible,
+  // or (2) it's a grid block with calendar view (Airtable-style: calendar fills viewport).
   const fullPageBlockId = useMemo(() => {
+    if (blocks.length !== 1) return null
+    const block = blocks[0]
+    const isCalendarBlock =
+      block?.type === "grid" && block?.config?.view_type === "calendar"
+    if (isCalendarBlock) return block.id
     const eligibleFullPageBlocks = blocks.filter(
       (b) => b.config?.is_full_page === true && isBlockEligibleForFullPage(b)
     )
-    return eligibleFullPageBlocks.length === 1 && blocks.length === 1
-      ? eligibleFullPageBlocks[0].id
-      : null
+    return eligibleFullPageBlocks.length === 1 ? eligibleFullPageBlocks[0].id : null
   }, [blocks])
 
   const fullPageBlock = fullPageBlockId ? blocks.find((b) => b.id === fullPageBlockId) : null
@@ -1615,7 +1619,7 @@ export default function InterfaceBuilder({
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0 w-full bg-gray-50 min-w-0 overflow-hidden">
+    <div className="flex flex-col min-h-0 w-full bg-gray-50 min-w-0 flex-1">
       {/* Main Canvas - flex-1 fills available space; no h-full/overflow-hidden on root */}
       <div className="flex-1 flex flex-col min-w-0 w-full min-h-0">
         {/* Toolbar / Interface Header */}
@@ -1750,11 +1754,11 @@ export default function InterfaceBuilder({
         </div>
         )}
 
-        {/* Canvas - flex flex-col so Canvas (flex-1) fills space */}
+        {/* Canvas - no flex-1 so content can grow; main scroll in InterfacePageClient handles overflow */}
         {/* Full-page: no scroll, no padding. Normal: overflow-visible so content flows to main (single scroll surface, no nested scrollbars). Parent has overflow-x-hidden. */}
         <div
           ref={canvasScrollContainerRef}
-          className={`flex-1 flex flex-col min-w-0 w-full min-h-0 ${fullPageBlockId ? "overflow-hidden p-0" : "overflow-visible p-4"}`}
+          className={`flex flex-col min-w-0 w-full min-h-0 ${fullPageBlockId ? "flex-1 overflow-hidden p-0" : "overflow-visible p-4"}`}
         >
           <FilterStateProvider>
             {/* Blocks always render - no conditional visibility. Edit mode changes behaviour only. */}

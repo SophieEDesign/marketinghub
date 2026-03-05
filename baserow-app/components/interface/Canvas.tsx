@@ -204,6 +204,13 @@ export default function Canvas({
     fullPageBlockId && blocks.length === 1 && blocks[0].id === fullPageBlockId
   )
   const fullPageBlock = isFullPageMode ? blocks[0] : null
+  const isFullPageCalendar =
+    isFullPageMode &&
+    fullPageBlock?.type === "grid" &&
+    fullPageBlock?.config?.view_type === "calendar"
+
+  // Measured container height for full-page calendar (fills viewport like Airtable)
+  const [fullPageCalendarContainerHeight, setFullPageCalendarContainerHeight] = useState(600)
 
   /**
    * CRITICAL: Grid layout must never be empty when blocks exist.
@@ -218,12 +225,19 @@ export default function Canvas({
     const cols = layoutSettings?.cols || 12
     // Full-page mode: single full-width item (grid always used; full-page content rendered inside)
     if (isFullPageMode && fullPageBlock) {
+      // Calendar: use dynamic h to fill viewport (Airtable-style). Others: fixed h.
+      const rowHeight = layoutSettings?.rowHeight ?? 30
+      const marginY = (layoutSettings?.margin ?? [10, 10])[1]
+      const dynamicH =
+        isFullPageCalendar && fullPageCalendarContainerHeight > 0
+          ? Math.max(2, Math.floor((fullPageCalendarContainerHeight + marginY) / (rowHeight + marginY)))
+          : 50
       return [{
         i: fullPageBlock.id,
         x: 0,
         y: 0,
         w: cols,
-        h: 50,
+        h: dynamicH,
         minW: 2,
         minH: 2,
         maxW: cols,
@@ -277,7 +291,7 @@ export default function Canvas({
         maxW: Math.max(2, maxW),
       }
     })
-  }, [blocks, layout, ephemeralDeltas, layoutSettings?.cols, isFullPageMode, fullPageBlock])
+  }, [blocks, layout, ephemeralDeltas, layoutSettings?.cols, layoutSettings?.rowHeight, layoutSettings?.margin, isFullPageMode, fullPageBlock, isFullPageCalendar, fullPageCalendarContainerHeight])
   
   // Layout version for preventing stale sync overwrites
   const layoutVersionRef = useRef<number>(0)
@@ -1719,6 +1733,15 @@ export default function Canvas({
       useCSSTransforms: true,
     }
   }, [layoutSettings?.cols, layoutSettings?.rowHeight, layoutSettings?.margin])
+
+  // Compute min height from layout so content can grow and main scroll works (react-grid-layout doesn't auto-grow)
+  const gridMinHeightPx = useMemo(() => {
+    if (!gridLayout.length) return 0
+    const rowHeight = GRID_CONFIG.rowHeight
+    const marginY = GRID_CONFIG.margin[1]
+    const maxRow = Math.max(0, ...gridLayout.map((item) => (item.y ?? 0) + (item.h ?? 4)))
+    return (maxRow + 1) * rowHeight + maxRow * marginY
+  }, [gridLayout, GRID_CONFIG.rowHeight, GRID_CONFIG.margin])
   
   // Add CSS for smooth block animations
   // CRITICAL: Height transitions are disabled - they delay reflow on collapse
@@ -1767,7 +1790,22 @@ export default function Canvas({
   // Log container width for debugging
   // CRITICAL: Must be declared before any early returns (Rules of Hooks)
   const containerRef = useRef<HTMLDivElement>(null)
-  
+
+  // Measure container height for full-page calendar (fills viewport like Airtable)
+  useEffect(() => {
+    if (!isFullPageCalendar || !containerRef.current) return
+    const el = containerRef.current
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const h = entry.contentRect.height
+        if (h > 0) setFullPageCalendarContainerHeight(h)
+      }
+    })
+    ro.observe(el)
+    setFullPageCalendarContainerHeight(el.getBoundingClientRect().height || 600)
+    return () => ro.disconnect()
+  }, [isFullPageCalendar])
+
   // Auto-scroll during resize/drag when cursor near viewport edge (react-grid-layout's built-in is unreliable with nested scroll)
   const scrollListenerActiveRef = useRef(false)
   const scrollRafRef = useRef<number | null>(null)
@@ -1914,7 +1952,14 @@ export default function Canvas({
       <div
         ref={containerRef}
         className={`flex-1 flex flex-col w-full min-w-0 relative ${isFullPageMode ? "overflow-hidden min-h-[100vh]" : "min-h-0"}`}
-        style={isFullPageMode ? undefined : { paddingBottom: isEditing ? "140px" : "80px" }}
+        style={
+          isFullPageMode
+            ? undefined
+            : {
+                paddingBottom: isEditing ? "140px" : "80px",
+                minHeight: gridMinHeightPx > 0 ? gridMinHeightPx : undefined,
+              }
+        }
         onClick={(e) => {
           // Context-driven: clicking empty canvas selects page (opens page settings)
           // Blocks use stopPropagation, so only empty-area clicks reach here

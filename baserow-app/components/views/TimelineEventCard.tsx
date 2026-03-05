@@ -124,12 +124,12 @@ export default function TimelineEventCard({
             />
           )}
 
-          <div className="flex-1 min-w-0 truncate font-medium">
+          <div className="card-title flex-1 min-w-0 truncate font-medium text-xs">
             {title || "—"}
           </div>
 
           {tag && (
-            <span className="truncate text-[11px] px-2 py-0.5 rounded-md flex-shrink-0 max-w-[80px]">
+            <span className="card-status flex-shrink-0 text-[11px] px-2 py-0.5 rounded-md bg-gray-100 truncate max-w-[80px]">
               {tag}
             </span>
           )}
