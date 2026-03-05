@@ -636,8 +636,14 @@ export default function BlockRenderer({
     return Array.from(sources)
   }, [filters])
 
+  // #region agent log
+  const onBlockError = (error: Error, errorInfo: React.ErrorInfo) => {
+    fetch('http://127.0.0.1:7242/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fa3112'},body:JSON.stringify({sessionId:'fa3112',location:'BlockRenderer.tsx',message:'Block error',data:{blockId:block.id,blockType:block.type,errorMessage:error?.message,errorStack:error?.stack?.slice(0,500),componentStack:errorInfo?.componentStack?.slice(0,500)},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
+  };
+  // #endregion
+
   return (
-    <ErrorBoundary resetKeys={[block.id]}>
+    <ErrorBoundary resetKeys={[block.id]} onError={onBlockError}>
       <div className="relative h-full w-full min-w-0 min-h-0">
         {/* Filter indicator - always mount, visibility toggled by isEditing for mount stability */}
         {filterBlockSources.length > 0 && (

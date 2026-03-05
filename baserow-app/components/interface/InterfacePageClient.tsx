@@ -73,7 +73,7 @@ function InterfacePageContent({
     )
   }
   return (
-    <div className="min-h-screen w-full min-w-0 flex flex-col">
+    <div className="h-full min-h-0 w-full min-w-0 flex flex-col overflow-hidden">
       <InterfaceBuilder
         page={(interfaceBuilderPage ?? fallbackPage) as any}
         initialBlocks={memoizedBlocks}

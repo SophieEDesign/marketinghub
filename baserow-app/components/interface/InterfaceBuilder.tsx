@@ -1615,7 +1615,7 @@ export default function InterfaceBuilder({
   }
 
   return (
-    <div className="flex flex-col min-h-screen w-full bg-gray-50 min-w-0">
+    <div className="flex flex-col h-full min-h-0 w-full bg-gray-50 min-w-0 overflow-hidden">
       {/* Main Canvas - flex-1 fills available space; no h-full/overflow-hidden on root */}
       <div className="flex-1 flex flex-col min-w-0 w-full min-h-0">
         {/* Toolbar / Interface Header */}

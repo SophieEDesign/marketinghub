@@ -1690,6 +1690,8 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
       const fullTooltip = [titleLine, ...cardLines].join("\n")
 
       // Build pills from cardFields (select values as inline pills)
+      // Event density by week span: 4 weeks = title + 2 pills, 6 weeks = title + 1 pill, 8 weeks = title only
+      const maxPills = visibleWeekSpan === 4 ? 2 : visibleWeekSpan === 6 ? 1 : 0
       const pills = cardFields.slice(0, 3).flatMap((f: { field: TableField; value: unknown }) => {
         if (!f?.field || f?.value === null || f?.value === undefined) return []
         const valueMap = f.field ? (stableLinkedValueLabelMaps[f.field.name] || stableLinkedValueLabelMaps[f.field.id]) : undefined
@@ -1710,7 +1712,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
           label,
           bgColor: isSelect && rawVal ? normalizeHexColor(resolveChoiceColor(rawVal, f.field.type as 'single_select' | 'multi_select', f.field.options)) : undefined,
         }))
-      })
+      }).slice(0, maxPills)
 
     return (
       <div className="flex items-start gap-1 h-full min-h-[2.5rem] min-w-0 px-1 py-0.5" title={fullTooltip}>
@@ -1775,7 +1777,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
       }
       return <div className="p-1 text-xs text-gray-500">Error rendering event</div>
     }
-  }, [stableLinkedValueLabelMaps])
+  }, [stableLinkedValueLabelMaps, visibleWeekSpan])
 
   // CRITICAL: FullCalendar's rx.set/rx.handle calls setState when eventClick prop changes.
   // Unstable handler identity → FullCalendar reinit → setState during commit → React #185.

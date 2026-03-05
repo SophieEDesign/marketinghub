@@ -246,7 +246,7 @@ export default function NonGridViewWrapper({
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
+    <div className="flex flex-col h-full min-h-0 flex-1 bg-gray-50">
       <ViewTopBar
         viewName={viewName}
         viewType={viewType}

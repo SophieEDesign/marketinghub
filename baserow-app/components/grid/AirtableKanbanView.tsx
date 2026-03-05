@@ -563,8 +563,9 @@ export default function AirtableKanbanView({
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="h-full min-w-0 bg-white overflow-y-auto overflow-x-auto [scrollbar-gutter:stable] pr-2">
-          <div className="flex flex-nowrap gap-4 p-6 h-full min-w-max">
+        <div className="w-full h-full min-w-0 min-h-0 flex flex-col overflow-hidden bg-white">
+          <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden">
+            <div className="flex gap-4 min-w-max p-4">
             {columns.map((column) => {
               const columnRows = groupedRows[column.id] || []
               const isCollapsed = collapsedColumns.has(column.id)
@@ -590,6 +591,7 @@ export default function AirtableKanbanView({
                 />
               )
             })}
+            </div>
           </div>
         </div>
         <DragOverlay>
@@ -710,7 +712,7 @@ function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
-      className="flex-shrink-0 w-[320px] min-w-[280px] max-w-[340px] bg-gray-50 rounded-lg flex flex-col h-full max-h-full border border-gray-200"
+      className="w-[280px] flex-shrink-0 flex flex-col bg-gray-50 rounded-lg border border-gray-200"
       data-column-id={column.id}
     >
       {/* Column Header */}
@@ -736,7 +738,7 @@ function KanbanColumn({
 
       {/* Cards */}
       {!isCollapsed && (
-        <div className="flex-1 px-3 py-3 overflow-hidden min-h-0">
+        <div className="flex-1 px-3 py-3 overflow-y-auto min-h-0">
           <SortableContext items={rows.map((r) => r.id)} strategy={verticalListSortingStrategy}>
             <div className="space-y-3">
               {rows.length === 0 ? (
@@ -823,7 +825,7 @@ function KanbanCard({ row, displayFields, showFieldLabels = false, tableFields, 
     <Card
       ref={setNodeRef}
       style={style}
-      className={`group hover:shadow-md transition-all duration-200 bg-white border border-gray-200 rounded-lg shadow-sm cursor-default ${
+      className={`max-w-[240px] overflow-hidden group hover:shadow-md transition-all duration-200 bg-white border border-gray-200 rounded-lg shadow-sm cursor-default ${
         selected ? "ring-2 ring-blue-400/50 bg-blue-50/40" : ""
       }`}
       onClick={() => onSelect()}
@@ -870,7 +872,7 @@ function KanbanCard({ row, displayFields, showFieldLabels = false, tableFields, 
                     </div>
                   )}
                   <div className={`flex items-center gap-1.5 min-w-0 flex-1`}>
-                  <div className={`flex-1 min-w-0 overflow-hidden ${isLongText ? "line-clamp-2" : "truncate"}`}>
+                  <div className={`flex-1 min-w-0 overflow-hidden ${isLongText ? "line-clamp-2 text-xs text-gray-600" : isFirst ? "truncate font-medium text-xs" : "truncate text-xs text-gray-600"}`}>
                     <CellFactory
                       field={full}
                       value={value}

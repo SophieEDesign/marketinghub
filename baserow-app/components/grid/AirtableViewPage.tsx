@@ -318,7 +318,7 @@ export default function AirtableViewPage({
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-gray-50">
+    <div className="flex flex-col h-full min-h-0 overflow-hidden bg-gray-50">
       <div className="flex-shrink-0">
         <ViewBuilderToolbar
           viewId={viewId}

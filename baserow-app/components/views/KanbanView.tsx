@@ -477,8 +477,9 @@ function KanbanView({
   }
 
   return (
-    <div className="w-full h-full min-w-0 overflow-y-auto overflow-x-auto bg-gray-50 [scrollbar-gutter:stable] pr-2">
-      <div className="flex flex-nowrap gap-4 p-6 min-w-max">
+    <div className="w-full h-full min-w-0 min-h-0 flex flex-col overflow-hidden bg-gray-50">
+      <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden">
+        <div className="flex gap-4 min-w-max p-4">
         {groups.map((groupName) => {
           const displayName =
             groupValueToLabel.get(groupName) ??
@@ -486,8 +487,8 @@ function KanbanView({
             groupName
           const headerColor = getColumnHeaderColor(groupName)
           return (
-          <div key={groupName} className="flex-shrink-0 w-[320px] min-w-[280px] max-w-[340px]">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 mb-3">
+          <div key={groupName} className="w-[280px] flex-shrink-0 flex flex-col">
+            <div className="flex-shrink-0 bg-white rounded-lg shadow-sm border border-gray-200 p-3 mb-3">
               <div className="flex items-center gap-2 flex-wrap">
                 {headerColor ? (
                   <span
@@ -502,7 +503,7 @@ function KanbanView({
                 <span className="text-xs text-gray-500">{groupedRows[groupName].length} items</span>
               </div>
             </div>
-            <div className="space-y-2">
+            <div className="flex-1 min-h-0 overflow-y-auto space-y-2">
               {groupedRows[groupName].map((row) => {
                 const cardColor = getCardColor(row)
                 const cardImage = getCardImage(row)
@@ -544,7 +545,7 @@ function KanbanView({
                   return (
                 <Card 
                   key={row.id} 
-                  className={`hover:shadow-md transition-shadow bg-white border-gray-200 rounded-lg cursor-default min-w-0 ${
+                  className={`max-w-[240px] overflow-hidden hover:shadow-md transition-shadow bg-white border-gray-200 rounded-lg cursor-default min-w-0 ${
                     selectedCardId === String(row.id) ? "ring-1 ring-blue-400/40 bg-blue-50/30" : ""
                   }`}
                   style={{ ...borderColor, ...rowFormattingStyle }}
@@ -605,7 +606,7 @@ function KanbanView({
                               </div>
                             )}
                             <div className={`flex items-center gap-1.5 min-w-0 flex-1`}>
-                            <div className={`flex-1 min-w-0 overflow-hidden ${isLongText ? "line-clamp-2" : "truncate"}`}>
+                            <div className={`flex-1 min-w-0 overflow-hidden ${isLongText ? "line-clamp-2 text-xs text-gray-600" : isFirst ? "truncate font-medium text-xs" : "truncate text-xs text-gray-600"}`}>
                               <CellFactory
                                 field={fieldObj}
                                 value={data[fieldObj.name]}
@@ -662,6 +663,7 @@ function KanbanView({
           </div>
           )
         })}
+        </div>
       </div>
     </div>
   )
