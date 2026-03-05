@@ -1,6 +1,6 @@
 "use client"
 
-import { Card, CardContent } from "@/components/ui/card"
+import CardContainer from "@/components/ui/CardContainer"
 import type { TableField } from "@/types/fields"
 import type { HighlightRule } from "@/lib/interface/types"
 import { evaluateHighlightRules, getFormattingStyle } from "@/lib/conditional-formatting/evaluator"
@@ -93,18 +93,19 @@ export default function TimelineEventCard({
         top: `${top}px`,
       }}
     >
-      <Card
-        className={`${cardHeightClass} shadow-sm transition-all hover:shadow-md ${
+      <CardContainer
+        density="compact"
+        className={`max-w-none ${cardHeightClass} ${
           effectiveColor ? "border-l-4" : ""
         } ${isDragging || isResizing ? "opacity-75" : ""} ${
           draggingOrResizingAny ? "cursor-grabbing" : "cursor-pointer"
         }`}
-        style={baseCardStyle}
+        styleOverrides={baseCardStyle}
         onMouseDown={onDragStart}
         onClick={onSelect}
         title={tooltip}
       >
-        <CardContent
+        <div
           className={`${cardPaddingClass} h-full flex items-center gap-2 min-w-0 overflow-hidden`}
         >
           <div
@@ -123,12 +124,12 @@ export default function TimelineEventCard({
             />
           )}
 
-          <div className="flex-1 min-w-0 text-xs font-medium truncate whitespace-nowrap">
+          <div className="flex-1 min-w-0 truncate font-medium">
             {title || "—"}
           </div>
 
           {tag && (
-            <span className="flex-shrink-0 px-2 py-0.5 rounded-md text-[10px] font-medium bg-gray-100 text-gray-700 truncate max-w-[80px]">
+            <span className="truncate text-[11px] px-2 py-0.5 rounded-md flex-shrink-0 max-w-[80px]">
               {tag}
             </span>
           )}
@@ -140,8 +141,8 @@ export default function TimelineEventCard({
             title="Drag to resize end date"
             data-timeline-resize="true"
           />
-        </CardContent>
-      </Card>
+        </div>
+      </CardContainer>
     </div>
   )
 }

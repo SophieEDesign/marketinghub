@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, memo } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import CardContainer from "@/components/ui/CardContainer"
 import { ChevronRight, Plus, Settings, Columns } from "lucide-react"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
 import type { TableRow } from "@/types/database"
@@ -478,7 +478,7 @@ function KanbanView({
 
   return (
     <div className="w-full h-full min-w-0 min-h-0 flex flex-col overflow-hidden bg-gray-50">
-      <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden">
+      <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden snap-x snap-proximity">
         <div className="flex gap-4 min-w-max p-4">
         {groups.map((groupName) => {
           const displayName =
@@ -487,21 +487,19 @@ function KanbanView({
             groupName
           const headerColor = getColumnHeaderColor(groupName)
           return (
-          <div key={groupName} className="w-[280px] flex-shrink-0 flex flex-col">
-            <div className="flex-shrink-0 bg-white rounded-lg shadow-sm border border-gray-200 p-3 mb-3">
-              <div className="flex items-center gap-2 flex-wrap">
-                {headerColor ? (
-                  <span
-                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white shrink-0"
-                    style={{ backgroundColor: headerColor }}
-                  >
-                    {displayName}
-                  </span>
-                ) : (
-                  <h3 className="text-sm font-semibold text-gray-900">{displayName}</h3>
-                )}
-                <span className="text-xs text-gray-500">{groupedRows[groupName].length} items</span>
-              </div>
+          <div key={groupName} className="w-[280px] flex-shrink-0 flex flex-col gap-2 p-2 rounded-xl bg-gray-50 snap-start">
+            <div className="flex items-center gap-2 flex-wrap shrink-0">
+              {headerColor ? (
+                <span
+                  className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white shrink-0"
+                  style={{ backgroundColor: headerColor }}
+                >
+                  {displayName}
+                </span>
+              ) : (
+                <h3 className="text-sm font-semibold text-gray-900 truncate min-w-0">{displayName}</h3>
+              )}
+              <span className="text-xs text-gray-500">{groupedRows[groupName].length} items</span>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto space-y-2">
               {groupedRows[groupName].map((row) => {
@@ -520,9 +518,10 @@ function KanbanView({
                   : {}
                 
                 return (() => {
+                  // Compact density: title + 1 field
                   const cardFieldIds = (Array.isArray(fieldIds) ? fieldIds : [])
                     .filter((fid) => fid !== groupingFieldId)
-                    .slice(0, 6)
+                    .slice(0, 2)
                   let cardFields = cardFieldIds
                     .map((fieldId) => (Array.isArray(tableFields) ? tableFields : []).find(
                       (f: any) => f?.name === fieldId || f?.id === fieldId
@@ -543,16 +542,16 @@ function KanbanView({
                   const IMAGE_ROW_HEIGHT = 112
 
                   return (
-                <Card 
-                  key={row.id} 
-                  className={`max-w-[240px] overflow-hidden hover:shadow-md transition-shadow bg-white border-gray-200 rounded-lg cursor-default min-w-0 ${
-                    selectedCardId === String(row.id) ? "ring-1 ring-blue-400/40 bg-blue-50/30" : ""
-                  }`}
-                  style={{ ...borderColor, ...rowFormattingStyle }}
+                <CardContainer
+                  key={row.id}
+                  density="compact"
+                  selected={selectedCardId === String(row.id)}
+                  styleOverrides={{ ...borderColor, ...rowFormattingStyle }}
+                  className="cursor-default"
                   onClick={() => setSelectedCardId(String(row.id))}
                   onDoubleClick={() => row.id != null && handleOpenRecord(String(row.id))}
                 >
-                  <CardContent className="p-3 min-w-0">
+                  <div className="min-w-0">
                     <div className="flex flex-col gap-1 min-w-0">
                       {cardFields.map((fieldObj, idx) => {
                         const isFirst = idx === 0
@@ -606,7 +605,7 @@ function KanbanView({
                               </div>
                             )}
                             <div className={`flex items-center gap-1.5 min-w-0 flex-1`}>
-                            <div className={`flex-1 min-w-0 overflow-hidden ${isLongText ? "line-clamp-2 text-xs text-gray-600" : isFirst ? "truncate font-medium text-xs" : "truncate text-xs text-gray-600"}`}>
+                            <div className={`flex-1 min-w-0 overflow-hidden ${isLongText ? "line-clamp-2 text-gray-600" : isFirst ? "truncate font-medium" : "truncate text-gray-600"}`}>
                               <CellFactory
                                 field={fieldObj}
                                 value={data[fieldObj.name]}
@@ -637,8 +636,8 @@ function KanbanView({
                         )
                       })}
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </CardContainer>
                   );
                 })();
               })}

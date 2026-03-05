@@ -66,6 +66,9 @@ export default function FieldBlock({
   const editPermission = config?.inline_edit_permission || 'both'
   const blockCanCreate = blockCanCreateRecords(config)
 
+  // CRITICAL: Must be before any early returns - hooks cannot be called conditionally (Rules of Hooks)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   // Handle creating new linked records
   const handleCreateLinkedRecord = useCallback(async (tableId: string): Promise<string | null> => {
     if (!tableId) return null
@@ -487,8 +490,6 @@ export default function FieldBlock({
   const attachments: Attachment[] = isAttachmentField && fieldValue 
     ? (Array.isArray(fieldValue) ? fieldValue : [fieldValue])
     : []
-
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   function generateUUID(): string {
     if (typeof crypto !== "undefined" && crypto.randomUUID) {

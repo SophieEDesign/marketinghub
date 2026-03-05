@@ -247,6 +247,7 @@ export default function NonGridViewWrapper({
 
   return (
     <div className="flex flex-col h-full min-h-0 flex-1 bg-gray-50">
+      <div className="shrink-0">
       <ViewTopBar
         viewName={viewName}
         viewType={viewType}
@@ -269,6 +270,7 @@ export default function NonGridViewWrapper({
         hasGroupBy={!!groupingFieldId}
         hiddenFieldsCount={hiddenFields.length}
       />
+      </div>
       <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
         {viewType === "form" && (
           <FormView

@@ -1701,7 +1701,7 @@ export default function AirtableGridView({
   }
 
   return (
-    <div ref={gridRef} className="flex flex-col h-full bg-gray-50 overflow-hidden w-full">
+    <div ref={gridRef} className="flex flex-col h-full min-h-0 bg-gray-50 overflow-hidden w-full">
       {/* Header */}
       <div
         ref={headerScrollRef}
@@ -1827,7 +1827,7 @@ export default function AirtableGridView({
       {/* Body */}
       <div
         ref={bodyScrollRef}
-        className="flex-1 overflow-x-auto overflow-y-auto bg-white grid-scroll-container w-full"
+        className="flex-1 min-h-0 overflow-x-auto overflow-y-auto bg-white grid-scroll-container w-full"
         style={{ maxWidth: '100%' }}
         onScroll={(e) => {
           const left = e.currentTarget.scrollLeft

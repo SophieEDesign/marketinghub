@@ -75,6 +75,8 @@ interface TimelineEvent {
   rowData: Record<string, any>
   color?: string
   groupValue?: string | null
+  /** When true, tag was used as title fallback - don't show tag pill to keep title dominant */
+  usedTagAsTitleFallback?: boolean
 }
 
 function TimelineView({
@@ -776,8 +778,9 @@ function TimelineView({
           end = start
         }
 
-        // Get title from configured title field or fallback
+        // Get title from configured title field or fallback (title is always dominant)
         let title = "Untitled"
+        let usedTagAsTitleFallback = false
         if (resolvedCardFields.titleField) {
           const titleValue = row.data[resolvedCardFields.titleField.name]
           if (titleValue !== null && titleValue !== undefined && titleValue !== "") {
@@ -786,11 +789,34 @@ function TimelineView({
         } else {
           // Fallback: use first non-date field
           const titleField = (Array.isArray(fieldIds) ? fieldIds : []).find(
-            (fid) => fid !== dateFieldId && fid !== startDateFieldId && fid !== endDateFieldId && 
+            (fid) => fid !== dateFieldId && fid !== startDateFieldId && fid !== endDateFieldId &&
                      fid !== fromFieldName && fid !== toFieldName
           )
           if (titleField) {
             title = String(row.data[titleField] || "Untitled")
+          }
+        }
+
+        // When title field is empty, use tag field value as title so the dominant text is meaningful
+        // (avoids "Untitled" + status pill where status visually takes over)
+        if (title === "Untitled" && resolvedCardFields.tagField) {
+          const tagVal = row.data[resolvedCardFields.tagField.name] ?? row.data[(resolvedCardFields.tagField as any).id]
+          if (tagVal != null && tagVal !== "") {
+            if (resolvedCardFields.tagField.type === "link_to_table") {
+              const arr = Array.isArray(tagVal) ? tagVal : [tagVal]
+              const first = arr[0]
+              const id = first && typeof first === "object" && "id" in first ? String((first as any).id) : String(tagVal)
+              const resolveLinked = (lid: string) => {
+                const map = linkedValueLabelMaps[resolvedCardFields.tagField!.name] || linkedValueLabelMaps[(resolvedCardFields.tagField as any).id] || {}
+                return map[lid?.trim()] || map[lid] || lid
+              }
+              title = id ? resolveLinked(id) : "Untitled"
+            } else if (resolvedCardFields.tagField.type === "multi_select" && Array.isArray(tagVal)) {
+              title = tagVal.length > 0 ? String(tagVal[0]).trim() : "Untitled"
+            } else {
+              title = String(tagVal).trim()
+            }
+            if (title !== "Untitled") usedTagAsTitleFallback = true
           }
         }
 
@@ -904,10 +930,11 @@ function TimelineView({
           rowData: row.data,
           color,
           groupValue,
+          usedTagAsTitleFallback,
         }
       })
       .sort((a, b) => a.start.getTime() - b.start.getTime())
-  }, [filteredRows, startDateFieldId, endDateFieldId, dateFieldId, fieldIds, tableFields, optimisticUpdates, resolvedColorField, resolvedDateFields, resolvedCardFields, resolvedGroupByField])
+  }, [filteredRows, startDateFieldId, endDateFieldId, dateFieldId, fieldIds, tableFields, optimisticUpdates, resolvedColorField, resolvedDateFields, resolvedCardFields, resolvedGroupByField, linkedValueLabelMaps])
 
   // Calculate timeline range based on zoom level
   const timelineRange = useMemo(() => {
@@ -1054,8 +1081,9 @@ function TimelineView({
     const titleFieldName = titleField?.name
     const tagFieldName = tagField?.name
 
+    // When tag was used as title fallback, don't show tag pill - keep title dominant
     let tag: string | undefined
-    if (tagField) {
+    if (!event.usedTagAsTitleFallback && tagField) {
       const val = event.rowData[tagField.name] ?? event.rowData[tagField.id]
       if (val != null && val !== '') {
         if (tagField.type === 'link_to_table') {
@@ -1467,7 +1495,7 @@ function TimelineView({
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden bg-white">
       {/* Toolbar */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
+      <div className="shrink-0 flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={handlePrevious}>
             <ChevronLeft className="h-4 w-4" />
@@ -1495,7 +1523,7 @@ function TimelineView({
 
       {/* Timeline */}
       <div className="flex-1 min-h-0 overflow-auto relative" ref={timelineRef}>
-        <div className="relative" style={{ minHeight: "100%", padding: "20px" }}>
+        <div className="relative p-4" style={{ minHeight: "100%" }}>
           {/* Time labels */}
           <div className="sticky top-0 bg-white z-10 border-b border-gray-200 pb-2 mb-4">
             <div className="relative h-8">

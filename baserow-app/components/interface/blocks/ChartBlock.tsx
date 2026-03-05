@@ -520,7 +520,7 @@ export default function ChartBlock({
     const totalCount = categoricalData.reduce((sum, item) => sum + item.count, 0)
 
     return (
-      <div className="h-full w-full p-4 overflow-hidden">
+      <div className="h-full w-full min-h-0 p-4 overflow-auto">
         <div className="space-y-3">
           {categoricalData.map((item) => {
             const bgColor = normalizeHexColor(item.color)
@@ -796,12 +796,12 @@ export default function ChartBlock({
 
   return (
     <div 
-      className={`h-full w-full overflow-hidden flex flex-col ${clickThrough && !isEditing ? 'cursor-pointer' : ''}`}
+      className={`h-full w-full min-h-0 min-w-0 overflow-auto flex flex-col ${clickThrough && !isEditing ? 'cursor-pointer' : ''}`}
       style={blockStyle}
     >
       {showTitle && (
         <div
-          className="mb-4 pb-2 border-b"
+          className="shrink-0 mb-4 pb-2 border-b"
           style={{
             backgroundColor: appearance.header_background,
             color: appearance.header_text_color || appearance.title_color,
@@ -810,9 +810,8 @@ export default function ChartBlock({
           <h3 className="text-lg font-semibold">{title}</h3>
         </div>
       )}
-      {/* Recharts needs a non-zero height. A parent min-height does NOT make `height="100%"` resolvable,
-          so we set `minHeight` directly on ResponsiveContainer to avoid a 0px chart. */}
-      <div className="flex-1 min-h-0">
+      {/* Recharts needs a non-zero height. When block height is smaller than chart needs, overflow-auto allows scroll. */}
+      <div className="flex-1 min-h-0 min-w-0 overflow-auto">
         <ResponsiveContainer width="100%" height="100%" minHeight={260}>
           {renderChart()}
         </ResponsiveContainer>

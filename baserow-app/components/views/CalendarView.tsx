@@ -1715,7 +1715,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
       }).slice(0, maxPills)
 
     return (
-      <div className="flex items-start gap-1 h-full min-h-[2.5rem] min-w-0 px-1 py-0.5" title={fullTooltip}>
+      <div className="flex items-start gap-1 h-full min-h-[2.5rem] min-w-0 px-1 py-0.5 overflow-hidden" title={fullTooltip}>
         {image && (
           <div
             className={`flex-shrink-0 w-4 h-4 rounded overflow-hidden bg-gray-100 mt-0.5 ${
@@ -1731,7 +1731,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
           </div>
         )}
         <div className="min-w-0 flex-1 overflow-hidden flex flex-col gap-0.5">
-          <div className="truncate whitespace-nowrap text-[11px] font-medium leading-tight">
+          <div className="truncate text-xs font-medium whitespace-nowrap">
             {titleField ? (
               <TimelineFieldValue
                 field={titleField}
@@ -1744,11 +1744,11 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
             )}
           </div>
           {pills.length > 0 && (
-            <div className="flex flex-wrap gap-1 items-center min-h-[1rem]">
+            <div className="flex flex-nowrap gap-1 items-center min-h-[1rem] overflow-hidden min-w-0">
               {pills.map((p, i) => (
                 <span
                   key={i}
-                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium truncate max-w-[6rem]"
+                  className="truncate text-[11px] px-2 py-0.5 rounded-md shrink-0 max-w-[5rem]"
                   style={p.bgColor ? (() => {
                   const hex = p.bgColor
                   if (!hex?.startsWith('#')) return { backgroundColor: hex, color: '#1f2937' }
@@ -2052,12 +2052,12 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
   }
 
   return (
-    <div className="w-full h-full min-w-0 min-h-0 flex flex-col bg-white overflow-hidden">
+    <div className="w-full h-full min-w-0 min-h-0 flex flex-col overflow-hidden bg-white">
       {renderAnchorControls()}
       {/* Scroll container: overflow-auto for single scroll; flex flex-col + min-h-0 for height propagation to FullCalendar */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 min-h-0 min-w-0 overflow-auto px-4 py-3 bg-white flex flex-col"
+        className="flex-1 min-h-0 min-w-0 overflow-auto p-4 bg-white flex flex-col"
       >
         {/* Wrapper: min-h-0 allows flex child to receive constrained height; FullCalendar height="100%" fills it */}
         {mounted ? (
