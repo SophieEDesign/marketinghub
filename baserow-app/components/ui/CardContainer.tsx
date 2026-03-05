@@ -11,8 +11,6 @@ export interface CardContainerProps extends React.HTMLAttributes<HTMLDivElement>
   styleOverrides?: React.CSSProperties
   /** When true, card is selected (e.g. ring highlight) */
   selected?: boolean
-  /** Render as a div (default) or pass a component for custom semantics */
-  as?: "div" | "article" | "button"
 }
 
 const baseClasses =
@@ -24,7 +22,6 @@ const CardContainer = forwardRef<HTMLDivElement, CardContainerProps>(
       density = "compact",
       styleOverrides,
       selected = false,
-      as: Component = "div",
       className = "",
       children,
       ...rest
@@ -33,15 +30,15 @@ const CardContainer = forwardRef<HTMLDivElement, CardContainerProps>(
   ) => {
     const selectedClasses = selected ? "ring-1 ring-blue-400/40 bg-blue-50/30" : ""
     return (
-      <Component
-        ref={ref as any}
+      <div
+        ref={ref}
         className={`${baseClasses} ${selectedClasses} ${className}`.trim()}
         style={styleOverrides}
         data-card-density={density}
         {...rest}
       >
         {children}
-      </Component>
+      </div>
     )
   }
 )
