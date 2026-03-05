@@ -59,11 +59,13 @@ export async function getLinkedTableMetadataCached(
   const supabase = createClient()
 
   const promise: Promise<LinkedTableMetadata | null> = (async () => {
-    const { data: targetTable, error: tableError } = await supabase
+    // Use limit(1) instead of single() to avoid 406 when table not found (RLS, wrong id, etc.)
+    const { data: tableData, error: tableError } = await supabase
       .from('tables')
       .select('supabase_table, primary_field_name')
       .eq('id', linkedTableId)
-      .single()
+      .limit(1)
+    const targetTable = tableData?.[0] ?? null
 
     if (tableError || !targetTable?.supabase_table) {
       if (process.env.NODE_ENV === 'development') {

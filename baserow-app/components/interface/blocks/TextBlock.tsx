@@ -402,6 +402,15 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     // This prevents race conditions where multiple saves could be triggered
     lastSavedContentRef.current = jsonStr
 
+    // #region agent log
+    if (typeof window !== 'undefined' && onUpdate) {
+      const count = (window as any).__textBlockOnUpdateCount = ((window as any).__textBlockOnUpdateCount || 0) + 1
+      if (count <= 3 || count > 25) {
+        fetch('http://127.0.0.1:7242/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fa3112'},body:JSON.stringify({sessionId:'fa3112',location:'TextBlock.tsx:onUpdate',message:'TextBlock onUpdate called',data:{count,blockId:block.id},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{})
+      }
+    }
+    // #endregion
+
     // Save ONLY to content_json
     // The parent (InterfaceBuilder) will reload blocks from API after this
     // which will trigger rehydration with fresh config

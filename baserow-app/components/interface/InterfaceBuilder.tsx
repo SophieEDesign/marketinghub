@@ -706,6 +706,14 @@ export default function InterfaceBuilder({
 
   const handleBlockUpdate = useCallback(
     async (blockId: string, configPatch: Partial<PageBlock["config"]>) => {
+      // #region agent log
+      if (typeof window !== 'undefined') {
+        const callCount = (window as any).__handleBlockUpdateCount = ((window as any).__handleBlockUpdateCount || 0) + 1
+        if (callCount <= 3 || callCount > 30) {
+          fetch('http://127.0.0.1:7242/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fa3112'},body:JSON.stringify({sessionId:'fa3112',location:'InterfaceBuilder.tsx:handleBlockUpdate',message:'handleBlockUpdate called',data:{callCount,blockId,configKeys:Object.keys(configPatch||{})},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{})
+        }
+      }
+      // #endregion
       // Phase 4: Track blocks dirty for EditModeGuard navigation protection
       setBlocksDirty(true)
       // 1) Optimistic in-place update (does not remount TipTap)
@@ -1299,6 +1307,11 @@ export default function InterfaceBuilder({
         block.config?.is_full_page === true &&
         !block.config?.table_id
       ) {
+        // #region agent log
+        if (typeof window !== 'undefined') {
+          fetch('http://127.0.0.1:7242/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fa3112'},body:JSON.stringify({sessionId:'fa3112',location:'InterfaceBuilder.tsx:correctivePass',message:'Corrective pass calling handleBlockUpdate',data:{blockId:block.id},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{})
+        }
+        // #endregion
         handleBlockUpdate(block.id, { ...block.config, is_full_page: false })
       }
     })

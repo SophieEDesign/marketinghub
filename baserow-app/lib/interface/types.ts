@@ -8,6 +8,7 @@ export type BlockType =
   | 'chart'
   | 'kpi'
   | 'text'
+  | 'html'
   | 'image'
   | 'gallery'
   | 'divider'
@@ -126,6 +127,8 @@ export interface BlockConfig {
   // Text block
   content?: string
   markdown?: boolean
+  // HTML block (custom bits)
+  html?: string
   // KPI comparison
   comparison?: {
     date_field: string

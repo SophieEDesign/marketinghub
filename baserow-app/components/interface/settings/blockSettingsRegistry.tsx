@@ -13,6 +13,7 @@ import TextAppearanceSettings from "./TextAppearanceSettings"
 import ActionDataSettings from "./ActionDataSettings"
 import ActionAppearanceSettings from "./ActionAppearanceSettings"
 import LinkPreviewDataSettings from "./LinkPreviewDataSettings"
+import HtmlDataSettings from "./HtmlDataSettings"
 import LinkPreviewAppearanceSettings from "./LinkPreviewAppearanceSettings"
 import GridDataSettings from "./GridDataSettings"
 import GridAppearanceSettings from "./GridAppearanceSettings"
@@ -73,6 +74,7 @@ const DATA_SETTINGS_RENDERERS: Partial<Record<BlockType, DataRenderer>> = {
   text: (ctx) => <TextDataSettings {...ctx} />,
   action: (ctx) => <ActionDataSettings {...ctx} />,
   link_preview: (ctx) => <LinkPreviewDataSettings {...ctx} />,
+  html: (ctx) => <HtmlDataSettings {...ctx} />,
   grid: (ctx) => <GridDataSettings {...ctx} />,
   form: (ctx) => <FormDataSettings {...ctx} />,
   record: (ctx) => <RecordDataSettings {...ctx} />,
@@ -150,6 +152,16 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
   link_preview: (ctx) => (
     <>
       <LinkPreviewAppearanceSettings config={ctx.config} onUpdate={ctx.onUpdateAppearance} />
+      <CommonAppearanceSettings
+        config={ctx.config}
+        onUpdate={ctx.onUpdateAppearance}
+        blockType={ctx.blockType}
+        fields={ctx.fields}
+      />
+    </>
+  ),
+  html: (ctx) => (
+    <>
       <CommonAppearanceSettings
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}

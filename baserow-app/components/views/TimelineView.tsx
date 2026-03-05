@@ -23,7 +23,6 @@ import { normalizeUuid } from "@/lib/utils/ids"
 import { sanitizeFieldName } from "@/lib/fields/validation"
 import { resolveSystemFieldAlias } from "@/lib/fields/systemFieldAliases"
 import { normalizeSelectOptionsForUi } from "@/lib/fields/select-options"
-import { getPrimaryField } from "@/lib/fields/primary"
 import { getFieldDisplayName } from "@/lib/fields/display"
 import type { HighlightRule } from "@/lib/interface/types"
 import { evaluateHighlightRules, getFormattingStyle } from "@/lib/conditional-formatting/evaluator"
@@ -576,26 +575,24 @@ function TimelineView({
     return { titleField: resolvedTitleField, tagField: resolvedTagField }
   }, [titleFieldProp, tagFieldProp, blockConfig, viewConfig, tableFields, resolvedDateFields, startDateFieldId, endDateFieldId, dateFieldId, fieldIds])
 
-  // Resolve group by field - fall back to primary field if not configured
+  // Resolve group by field - return null when no grouping is configured (all events in single lane)
   const resolvedGroupByField = useMemo(() => {
-    const groupFieldName = groupByFieldProp || 
-      blockConfig?.timeline_group_by || 
-      blockConfig?.group_by_field || 
+    const groupFieldName = groupByFieldProp ||
+      blockConfig?.timeline_group_by ||
+      blockConfig?.group_by_field ||
       blockConfig?.group_by ||
       viewConfig?.timeline_group_by ||
       null
-    
-    if (groupFieldName) {
-      // Timeline grouping is supported for many field types (not just select fields).
-      // For select fields, we preserve choice-order sorting when choices are available.
-      const field = tableFields.find(f => (f.name === groupFieldName || f.id === groupFieldName))
-      if (field) return field
+
+    // Treat undefined, null, empty string, or __none__ as "no grouping"
+    if (!groupFieldName || groupFieldName === "__none__") {
+      return null
     }
-    
-    // Fall back to primary field if no group field is configured
-    // This ensures we always group by a meaningful field instead of showing record IDs
-    const primaryField = getPrimaryField(tableFields)
-    return primaryField
+
+    // Timeline grouping is supported for many field types (not just select fields).
+    // For select fields, we preserve choice-order sorting when choices are available.
+    const field = tableFields.find(f => (f.name === groupFieldName || f.id === groupFieldName))
+    return field ?? null
   }, [groupByFieldProp, blockConfig, viewConfig, tableFields])
 
   // Resolve display labels for any link_to_table fields used in cards/grouping.
@@ -961,10 +958,9 @@ function TimelineView({
     })
   }, [events, timelineRange])
 
-  // Group events by group field (always use resolvedGroupByField which falls back to primary field)
+  // Group events by group field (null when no grouping configured = single lane)
   const groupedEvents = useMemo(() => {
     if (!resolvedGroupByField) {
-      // Shouldn't happen with primary field fallback, but handle gracefully
       return { 'Unassigned': visibleEvents }
     }
 

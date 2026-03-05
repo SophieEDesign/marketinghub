@@ -1589,9 +1589,6 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
     return "dayGridWeek6"
   }, [visibleWeekSpan])
 
-  // Default aspect ratio (overridden per-view in calendarViews)
-  const calendarAspectRatio = 1.2
-
   // FullCalendar: use stable plugins array (defined at module level to prevent React #185)
   const calendarHeaderToolbar = useMemo(
     () => ({
@@ -2055,13 +2052,14 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
   return (
     <div className="w-full h-full min-w-0 min-h-0 flex flex-col bg-white overflow-hidden">
       {renderAnchorControls()}
-      {/* Scroll container: stable ref for anchor scrolling; overflow-auto so wide calendar can scroll horizontally */}
+      {/* Scroll container: overflow-auto for single scroll; flex flex-col + min-h-0 for height propagation to FullCalendar */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 min-h-0 min-w-0 overflow-auto px-4 py-3 bg-white"
+        className="flex-1 min-h-0 min-w-0 overflow-auto px-4 py-3 bg-white flex flex-col"
       >
-        {/* CRITICAL: Only render FullCalendar after mount to prevent hydration mismatch (React error #185) */}
+        {/* Wrapper: min-h-0 allows flex child to receive constrained height; FullCalendar height="100%" fills it */}
         {mounted ? (
+          <div className="flex-1 min-h-0 min-w-[700px] w-full">
           <MemoizedFullCalendar
             ref={fullCalendarRef as React.LegacyRef<React.ComponentRef<typeof FullCalendar>>}
             key={calendarStableKey}
@@ -2073,8 +2071,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
             initialView={calendarInitialView}
             initialDate={calendarInitialDate}
             views={calendarViews}
-            height="auto"
-            aspectRatio={calendarAspectRatio}
+            height="100%"
             expandRows={true}
             dayMaxEvents={2}
             moreLinkClick="popover"
@@ -2091,6 +2088,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
             eventClick={handleEventClick}
             dateClick={handleDateClick}
           />
+          </div>
         ) : (
           <div className="flex items-center justify-center h-64 text-gray-500">
             Loading calendar...

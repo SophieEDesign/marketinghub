@@ -200,10 +200,10 @@ function ShellContent({
         defaultPageId={defaultPageId}
         coreDataSectionTitle={coreDataSectionTitle}
       />
-      {/* MainArea: InterfaceContainer + RecordPanel (inline) + RightSettingsPanel (edit mode only) */}
-      <div className="flex flex-1 min-w-0 overflow-hidden">
-        {/* InterfaceContainer - flex-1 fills remaining space; w-full when panels unmounted; contain for layout stability */}
-        <div className="flex flex-1 flex flex-col min-w-0 overflow-hidden w-full" style={{ contain: 'layout style paint' }}>
+      {/* MainArea: min-h-0 required for flex height propagation to CalendarView */}
+      <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden">
+        {/* InterfaceContainer: min-h-0 allows height to flow to main > CalendarView */}
+        <div className="flex flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden w-full" style={{ contain: 'layout style paint' }}>
           {!hideTopbar && (
             <Topbar
               title={title}

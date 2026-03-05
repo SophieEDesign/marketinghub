@@ -2341,6 +2341,14 @@ export default function Canvas({
           resizeHandles={['se', 'sw', 'ne', 'nw', 'e', 'w', 's', 'n']}
         >
           {blocks.map((block) => {
+            // #region agent log
+            if (typeof window !== 'undefined' && block === blocks[0]) {
+              const count = (window as any).__canvasMapRenderCount = ((window as any).__canvasMapRenderCount || 0) + 1
+              if (count <= 5 || count > 40) {
+                fetch('http://127.0.0.1:7242/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fa3112'},body:JSON.stringify({sessionId:'fa3112',location:'Canvas.tsx:blocks.map',message:'Canvas blocks.map render',data:{renderCount:count,blocksLen:blocks.length,pageId},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{})
+              }
+            }
+            // #endregion
             // Log each block being rendered via BlockRenderer
             debugLog('LAYOUT', `[Canvas] Rendering block via BlockRenderer: pageId=${pageId}, blockId=${block.id}, type=${block.type}`, {
               block,

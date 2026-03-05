@@ -130,6 +130,28 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       kpi_aggregate: 'count',
     },
   },
+  html: {
+    type: 'html',
+    label: 'HTML',
+    icon: 'Code',
+    defaultWidth: 6,
+    defaultHeight: 4,
+    minWidth: 2,
+    minHeight: 2,
+    defaultConfig: {
+      title: 'HTML',
+      html: '',
+    },
+    applicableSettings: {
+      fields: false,
+      filters: false,
+      sorts: false,
+      grouping: false,
+      appearance: true,
+      permissions: false,
+      conditionalFormatting: false,
+    },
+  },
   text: {
     type: 'text',
     label: 'Text',

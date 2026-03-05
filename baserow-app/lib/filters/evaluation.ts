@@ -110,21 +110,37 @@ export function toDateOnlyLocal(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
+/** Field types that store UUID (empty string is invalid - use is.null instead of eq.'') */
+const UUID_FIELD_TYPES = ['link_to_table', 'lookup'] as const
+function isUuidFieldType(fieldType?: string): boolean {
+  return fieldType != null && (UUID_FIELD_TYPES as readonly string[]).includes(fieldType)
+}
+
 /**
  * Convert a filter condition to a Supabase filter string
  * 
  * Used for OR groups where we need to build filter strings
  */
-function conditionToSupabaseString(condition: FilterCondition): string {
+function conditionToSupabaseString(condition: FilterCondition, tableFields?: TableField[]): string {
   const { field_id, operator } = condition
   const value = resolveDateOnlyDynamicValue(condition.value)
   const fieldName = field_id
   const fieldValue = value ?? ''
-  
+  const field = tableFields?.find(f => f.name === field_id || f.id === field_id)
+  const fieldType = field?.type
+
   switch (operator) {
     case 'equal':
+      // UUID columns reject empty string - use is.null instead
+      if ((fieldValue === '' || fieldValue == null) && isUuidFieldType(fieldType)) {
+        return `${fieldName}.is.null`
+      }
       return `${fieldName}.eq.${fieldValue}`
     case 'not_equal':
+      // UUID columns reject empty string - "not equal to empty" means "is not null"
+      if ((fieldValue === '' || fieldValue == null) && isUuidFieldType(fieldType)) {
+        return `${fieldName}.not.is.null`
+      }
       return `${fieldName}.neq.${fieldValue}`
     case 'contains':
       return `${fieldName}.ilike.%${fieldValue}%`
@@ -303,9 +319,11 @@ function applyCondition(
         // Checkbox: convert boolean to string for Supabase
         return query.eq(fieldName, value === true || value === 'true')
       }
+      // UUID columns reject empty string - use is.null instead of eq.''
+      if ((value === '' || value == null) && isUuidFieldType(fieldType)) {
+        return query.is(fieldName, null)
+      }
       // For linked fields, ensure we're comparing IDs, not labels
-      // Note: This is synchronous, so we can't resolve labels here
-      // The filter value should already be an ID when set via LookupFieldPicker
       return query.eq(fieldName, value)
       
     case 'not_equal':
@@ -315,6 +333,10 @@ function applyCondition(
       }
       if (fieldType === 'checkbox') {
         return query.neq(fieldName, value === true || value === 'true')
+      }
+      // UUID columns reject empty string - "not equal to empty" means "is not null"
+      if ((value === '' || value == null) && isUuidFieldType(fieldType)) {
+        return query.not(fieldName, 'is', null)
       }
       return query.neq(fieldName, value)
 
@@ -365,6 +387,10 @@ function applyCondition(
       if (fieldType === 'multi_select') {
         // Multi-select: check if null or empty array
         return query.or(`${fieldName}.is.null,${fieldName}.eq.{}`)
+      }
+      // UUID columns reject empty string - use only is.null (eq.'' is invalid)
+      if (isUuidFieldType(fieldType)) {
+        return query.is(fieldName, null)
       }
       // Text/number/date: check if null or empty string
       return query.or(`${fieldName}.is.null,${fieldName}.eq.`)
@@ -520,7 +546,7 @@ function applyGroup(
     // For OR groups, we need to use .or() with filter strings
     const orConditions = children
       .filter((child): child is FilterCondition => 'field_id' in child)
-      .map(conditionToSupabaseString)
+      .map(c => conditionToSupabaseString(c, tableFields))
       .filter(s => s.length > 0)
     
     if (orConditions.length > 0) {

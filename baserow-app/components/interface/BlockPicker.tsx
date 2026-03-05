@@ -1,6 +1,6 @@
 "use client"
 
-import { Grid, FileText, BarChart3, TrendingUp, Type, Image, Images, Minus, Zap, ExternalLink, Filter, Square, Calendar, Columns, GitBranch, List, Hash } from "lucide-react"
+import { Grid, FileText, BarChart3, TrendingUp, Type, Code, Image, Images, Minus, Zap, ExternalLink, Filter, Square, Calendar, Columns, GitBranch, List, Hash } from "lucide-react"
 import { BLOCK_REGISTRY, getAllBlockTypes } from "@/lib/interface/registry"
 import type { BlockType } from "@/lib/interface/types"
 
@@ -17,6 +17,7 @@ const iconMap: Record<BlockType, React.ElementType> = {
   chart: BarChart3,
   kpi: TrendingUp,
   text: Type,
+  html: Code,
   image: Image,
   gallery: Images,
   divider: Minus,

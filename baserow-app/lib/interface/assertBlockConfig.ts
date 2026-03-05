@@ -198,6 +198,16 @@ export function assertBlockConfig(
       }
       break
 
+    case 'html':
+      // HTML block can be empty (show setup UI)
+      if (!config.html) {
+        return {
+          valid: true,
+          showSetupUI: true,
+        }
+      }
+      break
+
     case 'image':
       // Image blocks can be empty (show upload prompt)
       // Always valid

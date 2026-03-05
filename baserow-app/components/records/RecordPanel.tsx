@@ -84,6 +84,17 @@ export default function RecordPanel() {
 
   if (!state.isOpen) return null
 
+  // When overlay opens, blur focused element (e.g. ProseMirror) to prevent "Blocked aria-hidden on
+  // an element because its descendant retained focus" - focus must move before aria-hidden is applied
+  useEffect(() => {
+    if (useOverlayLayout && !state.isPinned && state.isOpen) {
+      const active = document.activeElement as HTMLElement | null
+      if (active && (active.closest('.ProseMirror') || active.closest('[contenteditable="true"]'))) {
+        active.blur()
+      }
+    }
+  }, [useOverlayLayout, state.isPinned, state.isOpen])
+
   const panelContent = (
     <>
       {useOverlayLayout && !state.isPinned && state.isOpen && (

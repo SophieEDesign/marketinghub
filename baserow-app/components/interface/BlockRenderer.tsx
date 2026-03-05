@@ -37,6 +37,7 @@ import DividerBlock from "./blocks/DividerBlock"
 import ButtonBlock from "./blocks/ButtonBlock"
 import ActionBlock from "./blocks/ActionBlock"
 import LinkPreviewBlock from "./blocks/LinkPreviewBlock"
+import HtmlBlock from "./blocks/HtmlBlock"
 import FilterBlock from "./blocks/FilterBlock"
 import FieldBlock from "./blocks/FieldBlock"
 import FieldSectionBlock from "./blocks/FieldSectionBlock"
@@ -422,6 +423,9 @@ export default function BlockRenderer({
 
       case "link_preview":
         return <LinkPreviewBlock block={safeBlock} isEditing={canEdit} />
+
+      case "html":
+        return <HtmlBlock block={safeBlock} isEditing={canEdit} onUpdate={onUpdate ? (u) => handleUpdate(u) : undefined} />
 
       case "image":
         return (

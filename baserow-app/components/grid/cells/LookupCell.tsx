@@ -61,12 +61,13 @@ function LookupPill({ item, lookupTableId, lookupFieldId, onOpenRecord, lookupTa
       
       // If we have an ID, use it directly (preferred path)
       if (recordId) {
-        // Get the lookup table info
-        const { data: lookupTable, error: tableError } = await supabase
+        // Get the lookup table info (limit(1) avoids 406 when table not found)
+        const { data: tableData, error: tableError } = await supabase
           .from('tables')
           .select('id, name, supabase_table')
           .eq('id', lookupTableId)
-          .single()
+          .limit(1)
+        const lookupTable = tableData?.[0] ?? null
 
         if (tableError || !lookupTable) {
           console.error('Error loading lookup table:', tableError)
@@ -80,12 +81,13 @@ function LookupPill({ item, lookupTableId, lookupFieldId, onOpenRecord, lookupTa
       }
 
       // Fallback: search by value (current implementation)
-      // Get the lookup table info
-      const { data: lookupTable, error: tableError } = await supabase
+      // Get the lookup table info (limit(1) avoids 406 when table not found)
+      const { data: tableData2, error: tableError } = await supabase
         .from('tables')
         .select('id, name, supabase_table')
         .eq('id', lookupTableId)
-        .single()
+        .limit(1)
+      const lookupTable = tableData2?.[0] ?? null
 
       if (tableError || !lookupTable) {
         console.error('Error loading lookup table:', tableError)

@@ -72,12 +72,13 @@ export async function computeLookupValues(
 
       const linkedFieldName = linkedField.name
 
-      // Lookup table and result field name
-      const { data: lookupTable, error: tableErr } = await supabase
+      // Lookup table and result field name (limit(1) avoids 406 when table not found)
+      const { data: tableData, error: tableErr } = await supabase
         .from('tables')
         .select('supabase_table')
         .eq('id', lookupTableId)
-        .single()
+        .limit(1)
+      const lookupTable = tableData?.[0] ?? null
 
       if (tableErr || !lookupTable?.supabase_table) {
         if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {

@@ -53,6 +53,11 @@ export interface KPIBlockConfig extends BaseBlockConfig {
 // Note: content, text_content, markdown are already in BlockConfig
 export type TextBlockConfig = BaseBlockConfig
 
+// HTML Block Config (custom bits)
+export interface HtmlBlockConfig extends BaseBlockConfig {
+  html?: string
+}
+
 // Image Block Config
 export interface ImageBlockConfig extends BaseBlockConfig {
   image_url: string // Required (but can be empty for upload prompt)
@@ -117,6 +122,7 @@ export type BlockConfigUnion =
   | (ChartBlockConfig & { _type: 'chart' })
   | (KPIBlockConfig & { _type: 'kpi' })
   | (TextBlockConfig & { _type: 'text' })
+  | (HtmlBlockConfig & { _type: 'html' })
   | (ImageBlockConfig & { _type: 'image' })
   | (GalleryBlockConfig & { _type: 'gallery' })
   | (DividerBlockConfig & { _type: 'divider' })
@@ -128,7 +134,7 @@ export type BlockConfigUnion =
 
 /** Block types that have typed config in BlockConfigUnion (for drift detection). */
 export const BLOCK_CONFIG_UNION_TYPES = [
-  'grid', 'form', 'record', 'chart', 'kpi', 'text', 'image', 'gallery',
+  'grid', 'form', 'record', 'chart', 'kpi', 'text', 'html', 'image', 'gallery',
   'divider', 'button', 'action', 'link_preview', 'filter', 'record_context',
 ] as const
 
@@ -273,6 +279,13 @@ export function validateBlockConfig(
       if (!config.content && !config.text_content) {
         // Not an error - text blocks can start empty
         // But we'll note it for completeness
+      }
+      break
+
+    case 'html':
+      // HTML block has no required fields - it can render empty
+      if (config.html !== undefined && typeof config.html !== 'string') {
+        errors.push('HTML block html must be a string')
       }
       break
 

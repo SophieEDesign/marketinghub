@@ -39,11 +39,13 @@ async function getTableInfoCached(lookupTableId: string): Promise<TableInfo | nu
   const cached = tableInfoCache.get(lookupTableId)
   if (cached) return cached
   const supabase = createClient()
-  const { data: table, error } = await supabase
+  // Use limit(1) instead of single() to avoid 406 when table not found (RLS, wrong id, etc.)
+  const { data, error } = await supabase
     .from("tables")
     .select("supabase_table, name, primary_field_name")
     .eq("id", lookupTableId)
-    .single()
+    .limit(1)
+  const table = data?.[0] ?? null
   if (error || !table) return null
   tableInfoCache.set(lookupTableId, table as TableInfo)
   return table as TableInfo
