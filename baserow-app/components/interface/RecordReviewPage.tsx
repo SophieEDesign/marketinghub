@@ -293,6 +293,7 @@ export default function RecordReviewPage({
             onLayoutSave={onLayoutSave}
             titleField={pageConfig.title_field || pageConfig.left_panel?.title_field}
             showComments={pageConfig.comments_enabled !== false}
+            onRecordUpdate={() => setRefreshTrigger((t) => t + 1)}
           />
         ) : (
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col">

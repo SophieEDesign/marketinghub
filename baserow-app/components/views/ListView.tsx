@@ -183,12 +183,13 @@ export default function ListView({
         cascadeContext ?? (blockConfig ? { blockConfig } : undefined),
         interfaceMode,
         onRecordDeleted,
+        loadRows,
         (blockConfig as any)?.field_layout,
         onModalLayoutSave ?? undefined,
         tableFields
       )
     }
-  }, [blockConfig, modalFields, onRecordClick, openRecord, supabaseTableName, tableId, tableName, cascadeContext, interfaceMode, onRecordDeleted, onModalLayoutSave, tableFields])
+  }, [blockConfig, modalFields, onRecordClick, openRecord, supabaseTableName, tableId, tableName, cascadeContext, interfaceMode, onRecordDeleted, onModalLayoutSave, tableFields, loadRows])
 
   // Update currentGroupBy when groupBy prop changes
   useEffect(() => {
@@ -282,7 +283,10 @@ export default function ListView({
 
     try {
       const supabase = createClient()
-      let query = supabase.from(supabaseTableName).select("*")
+      let query = supabase
+        .from(supabaseTableName)
+        .select("*")
+        .is('deleted_at', null)
 
       // Apply filters using shared unified filter engine (includes date operators)
       if (currentFilters.length > 0) {

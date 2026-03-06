@@ -103,7 +103,10 @@ export default function HorizontalGroupedView({
       setLoading(true)
       try {
         const supabase = createClient()
-        let query = supabase.from(supabaseTableName).select("*")
+        let query = supabase
+          .from(supabaseTableName)
+          .select("*")
+          .is("deleted_at", null)
 
         // Apply filter tree first (supports groups/OR), then apply remaining flat filters
         const normalizedFields = (Array.isArray(tableFields) ? tableFields : []).map((f: any) => ({

@@ -787,10 +787,11 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
         viewId
       })
       
-      // Build query with filters
+      // Build query with filters (exclude soft-deleted records)
       let query = supabase
         .from(supabaseTableName)
         .select("*")
+        .is("deleted_at", null)
 
       // Apply filters using shared filter system (includes date range filters)
       const normalizedFields = loadedTableFields.map((f: TableField) => ({ name: f.name || f.id, type: f.type }))
@@ -1842,6 +1843,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
           bc?.modal_layout,
           cascadeContext ?? undefined,
           interfaceMode,
+          () => { if (resolvedTableId && supabaseTableName && loadRowsRef.current) loadRowsRef.current() },
           () => { if (resolvedTableId && supabaseTableName && loadRowsRef.current) loadRowsRef.current() },
           (bc as any)?.field_layout,
           onModalLayoutSave ?? undefined,

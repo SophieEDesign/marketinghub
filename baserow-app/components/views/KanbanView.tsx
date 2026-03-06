@@ -281,10 +281,11 @@ function KanbanView({
       }
       setSupabaseTableName(table.supabase_table)
 
-      // Load rows from the actual table (not table_rows)
+      // Load rows from the actual table (not table_rows); exclude soft-deleted records
       let query = supabase
         .from(table.supabase_table)
         .select("*")
+        .is("deleted_at", null)
 
       query = applyFiltersToQuery(query, filters, tableFields as any)
 
@@ -338,11 +339,12 @@ function KanbanView({
       cascadeContext ?? (blockConfig ? { blockConfig } : undefined),
       interfaceMode,
       onRecordDeleted,
+      () => loadRows(),
       (blockConfig as any)?.field_layout,
       onModalLayoutSave ?? undefined,
       tableFields
     )
-  }, [blockConfig, cascadeContext, modalFields, onRecordClick, openRecord, supabaseTableName, tableId, interfaceMode, onRecordDeleted, onModalLayoutSave, tableFields])
+  }, [blockConfig, cascadeContext, modalFields, onRecordClick, openRecord, supabaseTableName, tableId, interfaceMode, onRecordDeleted, onModalLayoutSave, tableFields, loadRows])
 
   const handleCellSave = useCallback(async (rowId: string, fieldName: string, value: any) => {
     if (!supabaseTableName) return

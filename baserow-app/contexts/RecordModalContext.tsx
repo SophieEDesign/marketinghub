@@ -33,6 +33,8 @@ export interface RecordModalOpenState {
   interfaceMode?: "view" | "edit"
   onSave?: (createdRecordId?: string | null) => void
   onDeleted?: () => void | Promise<void>
+  /** Called when a field is updated (edit mode); use to refresh parent view. */
+  onRecordUpdated?: () => void
   keySuffix?: string
   forceFlatLayout?: boolean
 }
@@ -62,6 +64,7 @@ export function RecordModalProvider({ children }: { children: ReactNode }) {
           openState.cascadeContext,
           openState.interfaceMode,
           openState.onDeleted,
+          openState.onRecordUpdated,
           openState.fieldLayout,
           openState.onLayoutSave ?? undefined,
           openState.tableFields

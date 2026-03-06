@@ -64,6 +64,8 @@ export interface RecordEditorCoreOptions {
   cascadeContext?: RecordEditorCascadeContext | null
   /** When true (default), persist each field change immediately (Airtable-style). Only applies when recordId exists (edit mode). */
   saveOnFieldChange?: boolean
+  /** Called after a field is successfully persisted; use to refresh parent UI (e.g. record list, cards). */
+  onRecordUpdate?: (recordId: string, fieldName: string, value: any) => void
 }
 
 export interface RecordEditorCoreResult {
@@ -152,6 +154,7 @@ export function useRecordEditorCore(
     onDeleted,
     cascadeContext,
     saveOnFieldChange = true,
+    onRecordUpdate,
   } = options
 
   const { role: userRole } = useUserRole()
@@ -480,6 +483,8 @@ export function useRecordEditorCore(
         [fieldName]: finalSavedValue,
         id: recordId,
       })
+
+      onRecordUpdate?.(recordId, fieldName, finalSavedValue)
     },
     [
       recordId,
@@ -492,6 +497,7 @@ export function useRecordEditorCore(
       tableId,
       fields,
       toast,
+      onRecordUpdate,
     ]
   )
 

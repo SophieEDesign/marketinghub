@@ -391,7 +391,10 @@ export default function MultiCalendarView({
           // Rule: quick filters apply on top; they must not overwrite view defaults.
           const effectiveFilters = [...viewDefaults, ...compatibleFilterBlocks, ...compatibleQuick]
 
-          let query = supabase.from(table.supabaseTable).select("*")
+          let query = supabase
+            .from(table.supabaseTable)
+            .select("*")
+            .is("deleted_at", null)
           const normalizedFields = tableFields.map((f) => ({ name: f.name || f.id, type: f.type }))
           query = applyFiltersToQuery(query, effectiveFilters, normalizedFields)
           query = query.order("created_at", { ascending: false })
@@ -681,9 +684,9 @@ export default function MultiCalendarView({
         onRecordClick(recordId, tableId)
         return
       }
-      openRecord(tableId, recordId, tableName, (blockConfig as any)?.modal_fields, (blockConfig as any)?.modal_layout, cascadeContext, interfaceMode, undefined, (blockConfig as any)?.field_layout)
+      openRecord(tableId, recordId, tableName, (blockConfig as any)?.modal_fields, (blockConfig as any)?.modal_layout, cascadeContext, interfaceMode, undefined, loadAll, (blockConfig as any)?.field_layout)
     },
-    [blockConfig, cascadeContext, onRecordClick, openRecord, interfaceMode]
+    [blockConfig, cascadeContext, onRecordClick, openRecord, interfaceMode, loadAll]
   )
 
   const onCalendarDateClick = useCallback(

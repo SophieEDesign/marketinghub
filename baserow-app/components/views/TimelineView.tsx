@@ -274,10 +274,11 @@ function TimelineView({
         return field.name
       }
 
-      // Build query with filters
+      // Build query with filters (exclude soft-deleted records)
       let query = supabase
         .from(supabaseTableName)
         .select("*")
+        .is("deleted_at", null)
 
       // Apply filters using shared filter system.
       // IMPORTANT: Keep `name` as the metadata field name to match how filters are stored.
@@ -1189,8 +1190,8 @@ function TimelineView({
       onRecordClick(rowId)
       return
     }
-    openRecord(tableId, rowId, supabaseTableName, (blockConfig as any)?.modal_fields ?? modalFields, (blockConfig as any)?.modal_layout, blockConfig ? { blockConfig } : undefined, interfaceMode, onRecordDeleted, (blockConfig as any)?.field_layout, onModalLayoutSave ?? undefined, tableFields)
-  }, [blockConfig, modalFields, onRecordClick, openRecord, supabaseTableName, tableId, interfaceMode, onRecordDeleted, onModalLayoutSave, tableFields])
+    openRecord(tableId, rowId, supabaseTableName, (blockConfig as any)?.modal_fields ?? modalFields, (blockConfig as any)?.modal_layout, blockConfig ? { blockConfig } : undefined, interfaceMode, onRecordDeleted, loadRows, (blockConfig as any)?.field_layout, onModalLayoutSave ?? undefined, tableFields)
+  }, [blockConfig, modalFields, onRecordClick, openRecord, supabaseTableName, tableId, interfaceMode, onRecordDeleted, onModalLayoutSave, tableFields, loadRows])
 
   const handleEventSelect = useCallback((event: TimelineEvent, e: React.MouseEvent) => {
     // Don't open/select if we're resizing/dragging.

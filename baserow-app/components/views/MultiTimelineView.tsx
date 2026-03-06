@@ -332,7 +332,10 @@ export default function MultiTimelineView({
           // Rule: quick filters apply on top; must not overwrite view defaults.
           const effectiveFilters = [...viewDefaults, ...compatibleFilterBlocks, ...compatibleQuick]
 
-          let query = supabase.from(table.supabaseTable).select("*")
+          let query = supabase
+            .from(table.supabaseTable)
+            .select("*")
+            .is("deleted_at", null)
           const normalizedFields = tableFields.map((f) => ({ name: f.name || f.id, type: f.type }))
           query = applyFiltersToQuery(query, effectiveFilters, normalizedFields)
           query = query.order("created_at", { ascending: false })
@@ -841,7 +844,7 @@ export default function MultiTimelineView({
                             onRecordClick(ev.rowId, ev.tableId)
                             return
                           }
-                          openRecord(ev.tableId, ev.rowId, ev.supabaseTableName, (blockConfig as any)?.modal_fields, (blockConfig as any)?.modal_layout, blockConfig ? { blockConfig } : undefined, interfaceMode, undefined, (blockConfig as any)?.field_layout)
+                          openRecord(ev.tableId, ev.rowId, ev.supabaseTableName, (blockConfig as any)?.modal_fields, (blockConfig as any)?.modal_layout, blockConfig ? { blockConfig } : undefined, interfaceMode, undefined, loadAll, (blockConfig as any)?.field_layout)
                         }}
                         onMouseDown={(e) => {
                           if (!canDrag) return

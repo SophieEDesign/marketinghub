@@ -639,6 +639,7 @@ export default function GridView({
         interfaceMode,
         onSave: () => loadRowsRef.current(),
         onDeleted: () => loadRowsRef.current(),
+        onRecordUpdated: () => loadRowsRef.current?.(),
         keySuffix: blockId ?? undefined,
       })
     }
@@ -1573,7 +1574,10 @@ export default function GridView({
         ? '*'
         : buildSelectClause(selectClause.split(','), { includeId: getRowIdColumn(), fallback: '*' })
 
-      let query = supabase.from(supabaseTableName).select(safeSelectClause || '*')
+      let query = supabase
+        .from(supabaseTableName)
+        .select(safeSelectClause || '*')
+        .is('deleted_at', null)
 
       // Apply filter-block tree first (supports groups/OR).
       if (filterTree) {
@@ -2447,6 +2451,7 @@ export default function GridView({
         interfaceMode,
         onSave: () => loadRows(),
         onDeleted: () => loadRows(),
+        onRecordUpdated: () => loadRows(),
         keySuffix: blockId ?? undefined,
       })
       return
@@ -2462,6 +2467,7 @@ export default function GridView({
       modalLayout,
       cascadeContext,
       interfaceMode,
+      () => loadRows(),
       () => loadRows(),
       fieldLayout,
       onModalLayoutSave,

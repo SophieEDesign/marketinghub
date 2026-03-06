@@ -135,7 +135,10 @@ export default function GalleryView({
       try {
         const supabase = createClient()
 
-        let query = supabase.from(supabaseTableName).select("*")
+        let query = supabase
+          .from(supabaseTableName)
+          .select("*")
+          .is("deleted_at", null)
 
         // Apply unified filters (supports date_range etc.)
         const normalizedFields = (Array.isArray(tableFields) ? tableFields : []).map((f: any) => ({
@@ -465,6 +468,7 @@ export default function GalleryView({
       blockConfig ? { blockConfig } : undefined,
       interfaceMode,
       onRecordDeleted,
+      () => loadRowsRef.current?.(),
       (blockConfig as any)?.field_layout,
       onModalLayoutSave ?? undefined,
       tableFields
