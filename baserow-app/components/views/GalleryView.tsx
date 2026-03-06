@@ -120,69 +120,67 @@ export default function GalleryView({
     loadTableInfo()
   }, [tableId])
 
-  // Load rows
-  useEffect(() => {
-    async function loadRows() {
-      // Guardrail: during page transitions/unmounts, tableId can temporarily be undefined
-      // while supabaseTableName is still set from a previous render. Never call split on it.
-      if (!supabaseTableName || !tableId) {
+  // Load rows - extracted for use in onRecordUpdated callback
+  const loadRows = useCallback(async () => {
+    if (!supabaseTableName || !tableId) {
+      setRows([])
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
+    try {
+      const supabase = createClient()
+
+      let query = supabase
+        .from(supabaseTableName)
+        .select("*")
+        .is("deleted_at", null)
+
+      const normalizedFields = (Array.isArray(tableFields) ? tableFields : []).map((f: any) => ({
+        name: f.name || f.field_name || f.id || f.field_id,
+        id: f.id || f.field_id,
+        type: f.type || f.field_type,
+        options: f.options || f.field_options,
+      }))
+      const baseFilters = filterTree ? stripFilterBlockFilters(filters || []) : (filters || [])
+      if (filterTree) {
+        query = applyFiltersToQuery(query, filterTree, normalizedFields)
+      }
+      query = applyFiltersToQuery(query, baseFilters, normalizedFields)
+
+      query = query.order("created_at", { ascending: false })
+
+      const { data, error } = await query
+      if (error) {
+        console.error("GalleryView: error loading rows", error)
         setRows([])
-        setLoading(false)
         return
       }
 
-      setLoading(true)
-      try {
-        const supabase = createClient()
-
-        let query = supabase
-          .from(supabaseTableName)
-          .select("*")
-          .is("deleted_at", null)
-
-        // Apply unified filters (supports date_range etc.)
-        const normalizedFields = (Array.isArray(tableFields) ? tableFields : []).map((f: any) => ({
-          name: f.name || f.field_name || f.id || f.field_id,
-          id: f.id || f.field_id,
-          type: f.type || f.field_type,
-          options: f.options || f.field_options,
-        }))
-        const baseFilters = filterTree ? stripFilterBlockFilters(filters || []) : (filters || [])
-        if (filterTree) {
-          query = applyFiltersToQuery(query, filterTree, normalizedFields)
-        }
-        query = applyFiltersToQuery(query, baseFilters, normalizedFields)
-
-        // Default ordering
-        query = query.order("created_at", { ascending: false })
-
-        const { data, error } = await query
-        if (error) {
-          console.error("GalleryView: error loading rows", error)
-          setRows([])
-          return
-        }
-
-        const sanitizedTableId = tableId.split(":")[0]
-        const tableRows: TableRow[] = (data || []).map((row: any) => ({
-          id: row.id,
-          table_id: sanitizedTableId,
-          data: row,
-          created_at: row.created_at,
-          updated_at: row.updated_at,
-        }))
-        setRows(tableRows)
-      } catch (e) {
-        console.error("GalleryView: exception loading rows", e)
-        setRows([])
-      } finally {
-        setLoading(false)
-      }
+      const sanitizedTableId = tableId.split(":")[0]
+      const tableRows: TableRow[] = (data || []).map((row: any) => ({
+        id: row.id,
+        table_id: sanitizedTableId,
+        data: row,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      }))
+      setRows(tableRows)
+    } catch (e) {
+      console.error("GalleryView: exception loading rows", e)
+      setRows([])
+    } finally {
+      setLoading(false)
     }
+  }, [supabaseTableName, tableId, filters, filterTree, tableFields])
 
+  const loadRowsRef = useRef<() => Promise<void>>()
+  loadRowsRef.current = loadRows
+
+  useEffect(() => {
     loadRows()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabaseTableName, tableId, JSON.stringify(filters), JSON.stringify(filterTree), reloadKey])
+  }, [loadRows, reloadKey])
 
   const safeFieldIds = useMemo(() => (Array.isArray(fieldIds) ? fieldIds : []), [fieldIds])
 

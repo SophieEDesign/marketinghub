@@ -71,6 +71,7 @@ export default function RecordReviewPage({
   // Airtable-style: default to view mode; user clicks Edit to enter edit mode
   const [recordInterfaceMode, setRecordInterfaceMode] = useState<"view" | "edit">("view")
   const [deleting, setDeleting] = useState(false)
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [tableFields, setTableFields] = useState<any[]>([])
   const [tableName, setTableName] = useState<string | null>(null)
   const { toast } = useToast()
@@ -254,6 +255,7 @@ export default function RecordReviewPage({
         selectedRecordId={selectedRecordId}
         onRecordSelect={handleRecordSelect}
         deletedRecordId={lastDeletedRecordId}
+        refreshTrigger={refreshTrigger}
         leftPanelSettings={leftPanelSettings}
         pageType={pageType as "record_view" | "record_review"}
         showAddRecord={pageShowAddRecord}
@@ -293,7 +295,7 @@ export default function RecordReviewPage({
             onLayoutSave={onLayoutSave}
             titleField={pageConfig.title_field || pageConfig.left_panel?.title_field}
             showComments={pageConfig.comments_enabled !== false}
-            onRecordUpdate={() => setRefreshTrigger((t) => t + 1)}
+            onRecordUpdate={() => setRefreshTrigger((t: number) => t + 1)}
           />
         ) : (
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col">

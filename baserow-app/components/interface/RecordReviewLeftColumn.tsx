@@ -43,6 +43,8 @@ interface RecordReviewLeftColumnProps {
   selectedRecordId: string | null
   onRecordSelect: (recordId: string) => void
   deletedRecordId?: string | null
+  /** Bump to force reload (e.g. after record updated in panel/modal). */
+  refreshTrigger?: number
   showAddRecord?: boolean
   pageConfig?: any
   leftPanelSettings?: {
@@ -79,6 +81,7 @@ export default function RecordReviewLeftColumn({
   selectedRecordId,
   onRecordSelect,
   deletedRecordId = null,
+  refreshTrigger,
   showAddRecord = false,
   pageConfig,
   leftPanelSettings,
@@ -346,6 +349,12 @@ export default function RecordReviewLeftColumn({
       abortController.abort()
     }
   }, [tableId, loadRecords])
+
+  // Reload when refreshTrigger bumps (e.g. record updated in panel/modal).
+  useEffect(() => {
+    if (refreshTrigger == null || !supabaseTableName) return
+    loadRecords(supabaseTableName)
+  }, [refreshTrigger, supabaseTableName, loadRecords])
 
   const handleOpenCreateModal = useCallback(() => {
     if (!isRecordView) return
