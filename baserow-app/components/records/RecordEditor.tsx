@@ -617,6 +617,19 @@ export default function RecordEditor({
             {recordTitle || "Record Details"}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
+            {recordId && onDeleted && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleDelete}
+                disabled={deleting || saving || loading || !canDeleteRecords}
+                className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+                title={!canDeleteRecords ? "You don't have permission to delete" : "Delete record"}
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </Button>
+            )}
             {interfaceMode === "edit" && canSave && (!saveOnFieldChange || !recordId) && (
               <Button
                 variant="default"
