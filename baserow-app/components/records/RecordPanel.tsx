@@ -107,7 +107,7 @@ export default function RecordPanel() {
 
       {/* Key: remount on record change only; interfaceMode is a prop, not a key */}
       <div
-        key={`record-panel-${state.recordId}`}
+        key={`record-panel-${state.recordId ?? "new"}`}
         className={`${
           useOverlayLayout
             ? "fixed right-0 top-0 h-full z-50"
@@ -224,7 +224,12 @@ export default function RecordPanel() {
             tableFields={state.tableFields}
             supabaseTableName={state.tableName}
             cascadeContext={state.cascadeContext}
+            initialData={state.initialData}
             active={active}
+            onSave={state.recordId === null ? (createdId) => {
+              state.onRecordCreated?.(createdId ?? "")
+              closeRecord()
+            } : undefined}
             onDeleted={() => {
               toast({ title: "Moved to trash", description: "The record has been moved to trash." })
               state.onRecordDeleted?.()

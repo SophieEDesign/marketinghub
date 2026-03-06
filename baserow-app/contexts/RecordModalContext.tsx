@@ -1,15 +1,14 @@
 "use client"
 
 /**
- * RecordModalContext — Edit: RecordPanel | Create: RecordModal
+ * RecordModalContext — Edit and Create both use RecordPanel
  *
  * - Edit mode (recordId set): delegates to RecordPanel (right-side panel).
- * - Create mode (recordId null): renders RecordModal (e.g. day-cell click, Add record).
+ * - Create mode (recordId null): opens RecordPanel in create mode (same UI as edit).
  */
 
-import React, { createContext, useContext, useCallback, useState, ReactNode } from "react"
+import React, { createContext, useContext, useCallback, ReactNode } from "react"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
-import RecordModal from "@/components/calendar/RecordModal"
 import type { TableField } from "@/types/fields"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { RecordEditorCascadeContext } from "@/lib/interface/record-editor-core"
@@ -48,8 +47,7 @@ interface RecordModalContextType {
 const RecordModalContext = createContext<RecordModalContextType | undefined>(undefined)
 
 export function RecordModalProvider({ children }: { children: ReactNode }) {
-  const { openRecord, closeRecord } = useRecordPanel()
-  const [createState, setCreateState] = useState<RecordModalOpenState | null>(null)
+  const { openRecord, openRecordForCreate, closeRecord, state: recordPanelState } = useRecordPanel()
 
   const openRecordModal = useCallback(
     (openState: RecordModalOpenState) => {
@@ -70,46 +68,34 @@ export function RecordModalProvider({ children }: { children: ReactNode }) {
           openState.tableFields
         )
       } else {
-        setCreateState(openState)
+        openRecordForCreate({
+          tableId: openState.tableId,
+          tableName,
+          tableFields: openState.tableFields,
+          modalFields: openState.modalFields,
+          modalLayout: openState.modalLayout,
+          initialData: openState.initialData,
+          cascadeContext: openState.cascadeContext,
+          onRecordCreated: (id) => openState.onSave?.(id),
+        })
       }
     },
-    [openRecord]
+    [openRecord, openRecordForCreate]
   )
 
   const closeRecordModal = useCallback(() => {
-    setCreateState(null)
     closeRecord()
   }, [closeRecord])
 
   const value: RecordModalContextType = {
     openRecordModal,
     closeRecordModal,
-    isRecordModalOpen: createState !== null,
+    isRecordModalOpen: recordPanelState.isOpen,
   }
 
   return (
     <RecordModalContext.Provider value={value}>
       {children}
-      {createState && (
-        <RecordModal
-          open={true}
-          onClose={() => setCreateState(null)}
-          tableId={createState.tableId}
-          recordId={null}
-          tableFields={createState.tableFields ?? []}
-          modalFields={createState.modalFields}
-          modalLayout={createState.modalLayout}
-          initialData={createState.initialData}
-          supabaseTableName={createState.supabaseTableName}
-          cascadeContext={createState.cascadeContext}
-          canEditLayout={createState.canEditLayout}
-          onLayoutSave={createState.onLayoutSave}
-          interfaceMode={createState.interfaceMode ?? "edit"}
-          onSave={createState.onSave}
-          onDeleted={createState.onDeleted}
-          forceFlatLayout={createState.forceFlatLayout}
-        />
-      )}
     </RecordModalContext.Provider>
   )
 }

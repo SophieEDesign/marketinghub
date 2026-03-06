@@ -30,11 +30,26 @@ interface RecordPanelState {
   onRecordDeleted?: () => void
   /** Called when a field is updated; views use this to refresh row data (e.g. card color from status). */
   onRecordUpdated?: () => void
+  /** Create mode only: initial data for new record (e.g. date from day-cell click). */
+  initialData?: Record<string, any>
+  /** Create mode only: called when record is saved with new id. */
+  onRecordCreated?: (createdRecordId: string) => void
 }
 
 interface RecordPanelContextType {
   state: RecordPanelState
   openRecord: (tableId: string, recordId: string, tableName: string, modalFields?: string[], modalLayout?: BlockConfig["modal_layout"], cascadeContext?: RecordEditorCascadeContext | null, interfaceMode?: "view" | "edit", onRecordDeleted?: () => void, onRecordUpdated?: () => void, fieldLayout?: FieldLayoutItem[], onLayoutSave?: (layout: FieldLayoutItem[]) => void | Promise<void>, tableFields?: TableField[]) => void
+  /** Open panel in create mode (same UI as edit). */
+  openRecordForCreate: (params: {
+    tableId: string
+    tableName: string
+    tableFields?: TableField[]
+    modalFields?: string[]
+    modalLayout?: BlockConfig["modal_layout"]
+    initialData?: Record<string, any>
+    cascadeContext?: RecordEditorCascadeContext | null
+    onRecordCreated?: (createdRecordId: string) => void
+  }) => void
   /** Fetches table supabase_table by id and opens the record in the panel. Use when only tableId + recordId are available (e.g. linked record click). */
   openRecordByTableId: (tableId: string, recordId: string, interfaceMode?: 'view' | 'edit') => Promise<void>
   closeRecord: () => void
@@ -154,6 +169,34 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
     }))
   }, [])
 
+  const openRecordForCreate = useCallback((params: {
+    tableId: string
+    tableName: string
+    tableFields?: TableField[]
+    modalFields?: string[]
+    modalLayout?: BlockConfig["modal_layout"]
+    initialData?: Record<string, any>
+    cascadeContext?: RecordEditorCascadeContext | null
+    onRecordCreated?: (createdRecordId: string) => void
+  }) => {
+    setSelectedContext({ type: "record", recordId: "__create__", tableId: params.tableId })
+    setState((prev) => ({
+      ...prev,
+      isOpen: true,
+      tableId: params.tableId,
+      recordId: null,
+      tableName: params.tableName,
+      modalFields: params.modalFields,
+      modalLayout: params.modalLayout,
+      tableFields: params.tableFields,
+      cascadeContext: params.cascadeContext,
+      interfaceMode: "edit",
+      initialData: params.initialData,
+      onRecordCreated: params.onRecordCreated,
+      history: [],
+    }))
+  }, [setSelectedContext])
+
   const openRecordByTableId = useCallback(async (tableId: string, recordId: string, interfaceMode?: 'view' | 'edit') => {
     try {
       const res = await fetch(`/api/tables/${tableId}`)
@@ -205,6 +248,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
   const contextValue = useMemo(() => ({
     state,
     openRecord,
+    openRecordForCreate,
     openRecordByTableId,
     closeRecord,
     setWidth,
@@ -217,6 +261,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
   }), [
     state,
     openRecord,
+    openRecordForCreate,
     openRecordByTableId,
     closeRecord,
     setWidth,
