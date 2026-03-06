@@ -82,6 +82,8 @@ export interface RecordEditorCoreResult {
   save: () => Promise<void>
   deleteRecord: (options?: { confirmMessage?: string; skipConfirm?: boolean }) => Promise<void>
   handleFieldChange: (fieldName: string, value: any) => void
+  /** Flush and persist the current value for a field immediately (e.g. on blur). Call when user leaves the field. Value is optional; when provided, use it (avoids race with async setState). */
+  handleFieldBlur: (fieldName: string, value?: any) => void
   /** Normalize value for link_to_table before save/update (shared with grid modal behaviour) */
   normalizeUpdateValue: (fieldName: string, value: any) => any
   /** Permission cascade; when cascadeContext was provided, shells must enforce these in UI and core gates save/delete. */
@@ -517,6 +519,25 @@ export function useRecordEditorCore(
     [saveOnFieldChange, recordId, cascadeContext, canEditRecords, persistFieldChange]
   )
 
+  const handleFieldBlur = useCallback(
+    (fieldName: string, value?: any) => {
+      if (!saveOnFieldChange || !recordId) return
+      if (cascadeContext != null && !canEditRecords) return
+
+      const existing = debounceTimersRef.current.get(fieldName)
+      if (existing) {
+        clearTimeout(existing)
+        debounceTimersRef.current.delete(fieldName)
+      }
+
+      const currentValue = value !== undefined ? value : formDataRef.current[fieldName]
+      const oldValue = baselineFormDataRef.current[fieldName]
+      if (currentValue === oldValue) return
+      persistFieldChange(fieldName, currentValue, oldValue)
+    },
+    [saveOnFieldChange, recordId, cascadeContext, canEditRecords, persistFieldChange]
+  )
+
   const save = useCallback(async () => {
     if (!effectiveTableName) return
     // Optional defence-in-depth: only enforce when cascadeContext was provided; do not change successful paths
@@ -657,6 +678,7 @@ export function useRecordEditorCore(
     save,
     deleteRecord,
     handleFieldChange,
+    handleFieldBlur,
     normalizeUpdateValue,
     canEditRecords,
     canDeleteRecords,

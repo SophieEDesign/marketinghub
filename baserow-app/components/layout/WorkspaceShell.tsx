@@ -203,7 +203,7 @@ function ShellContent({
       {/* MainArea: min-h-0 required for flex height propagation to CalendarView */}
       <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden">
         {/* InterfaceContainer: min-h-0 allows height to flow to main > CalendarView */}
-        <div className="flex flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden w-full" style={{ contain: 'layout style paint' }}>
+        <div className="flex flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden w-full">
           {!hideTopbar && (
             <Topbar
               title={title}

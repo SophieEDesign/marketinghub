@@ -1,6 +1,5 @@
 "use client"
 
-import { useEffect } from "react"
 import {
   Dialog,
   DialogContent,
@@ -56,14 +55,6 @@ export default function RecordModal({
   forceFlatLayout = false,
 }: RecordModalProps) {
   const { toast } = useToast()
-
-  // #region agent log
-  useEffect(() => {
-    if (open) {
-      fetch('http://127.0.0.1:7242/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fa3112'},body:JSON.stringify({sessionId:'fa3112',location:'RecordModal.tsx:open',message:'RecordModal opening',data:{recordId,tableId},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
-    }
-  }, [open, recordId, tableId])
-  // #endregion
 
   if (!open) return null
 

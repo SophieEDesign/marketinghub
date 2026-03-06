@@ -28,6 +28,7 @@ interface InlineFieldEditorProps {
   field: TableField
   value: any
   onChange: (value: any) => void
+  onBlur?: (value: any) => void
   isEditing: boolean
   onEditStart: () => void
   onEditEnd: () => void
@@ -50,6 +51,7 @@ export default function InlineFieldEditor({
   field,
   value,
   onChange,
+  onBlur,
   isEditing,
   onEditStart,
   onEditEnd,
@@ -121,6 +123,7 @@ export default function InlineFieldEditor({
   const handleBlur = () => {
     onChange(localValue)
     onEditEnd()
+    onBlur?.(localValue)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

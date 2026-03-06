@@ -38,6 +38,7 @@ interface RecordFieldsProps {
   fields: TableField[]
   formData: Record<string, any>
   onFieldChange: (fieldName: string, value: any) => void
+  onFieldBlur?: (fieldName: string, value?: any) => void
   fieldGroups: Record<string, string[]>
   tableId: string
   recordId: string
@@ -78,6 +79,7 @@ export default function RecordFields({
   fields,
   formData,
   onFieldChange,
+  onFieldBlur,
   fieldGroups,
   tableId,
   recordId,
@@ -777,6 +779,7 @@ export default function RecordFields({
               field={field}
               value={formData[field.name]}
               onChange={(value) => onFieldChange(field.name, value)}
+              onBlur={(value) => onFieldBlur?.(field.name, value)}
               isEditing={isThisEditing}
               onEditStart={() => {
                 if (!fieldEditable) return

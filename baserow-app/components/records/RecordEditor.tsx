@@ -135,6 +135,7 @@ export default function RecordEditor({
     save,
     deleteRecord,
     handleFieldChange,
+    handleFieldBlur,
     canEditRecords,
     canCreateRecords,
     canDeleteRecords,
@@ -452,6 +453,7 @@ export default function RecordEditor({
             fields={isEditingLayout ? layoutModeFields : visibleFields}
             formData={formData}
             onFieldChange={handleFieldChange}
+            onFieldBlur={handleFieldBlur}
             fieldGroups={fieldGroups}
             tableId={tableId}
             recordId={recordId || ""}
@@ -480,6 +482,7 @@ export default function RecordEditor({
             fields={visibleFields}
             formData={formData}
             onFieldChange={handleFieldChange}
+            onFieldBlur={handleFieldBlur}
             fieldGroups={fieldGroups}
             tableId={tableId}
             recordId={recordId}
@@ -527,6 +530,7 @@ export default function RecordEditor({
                       field={field}
                       value={formData[field.name]}
                       onChange={(v) => handleFieldChange(field.name, v)}
+                      onBlur={(v) => handleFieldBlur(field.name, v)}
                       required={field.required || false}
                       recordId={recordId || undefined}
                       tableName={effectiveTableName || undefined}
@@ -541,20 +545,21 @@ export default function RecordEditor({
     }
 
     return (
-      <div className="space-y-4 py-4">
-        {filteredFields.map((field) => (
-          <FieldEditor
-            key={field.id}
-            field={field}
-            value={formData[field.name]}
-            onChange={(v) => handleFieldChange(field.name, v)}
-            required={field.required || false}
-            recordId={recordId || undefined}
-            tableName={effectiveTableName || undefined}
-            isReadOnly={!effectiveEditable}
-          />
-        ))}
-      </div>
+        <div className="space-y-4 py-4">
+          {filteredFields.map((field) => (
+            <FieldEditor
+              key={field.id}
+              field={field}
+              value={formData[field.name]}
+              onChange={(v) => handleFieldChange(field.name, v)}
+              onBlur={(v) => handleFieldBlur(field.name, v)}
+              required={field.required || false}
+              recordId={recordId || undefined}
+              tableName={effectiveTableName || undefined}
+              isReadOnly={!effectiveEditable}
+            />
+          ))}
+        </div>
     )
   }
 

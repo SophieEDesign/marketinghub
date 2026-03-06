@@ -94,14 +94,6 @@ export default function RecordPanel() {
     }
   }, [useOverlayLayout, state.isPinned, state.isOpen])
 
-  // #region agent log
-  useEffect(() => {
-    if (state.isOpen) {
-      fetch('http://127.0.0.1:7242/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fa3112'},body:JSON.stringify({sessionId:'fa3112',location:'RecordPanel.tsx:open',message:'RecordPanel opening',data:{recordId:state.recordId,tableId:state.tableId},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-    }
-  }, [state.isOpen, state.recordId, state.tableId])
-  // #endregion
-
   if (!state.isOpen) return null
 
   const panelContent = (

@@ -1420,8 +1420,9 @@ function InterfacePageClientInternal({
         }`}
       >
         {/* When suppressMainScroll: use flex-1 min-h-0 so content fills viewport (full-page/calendar). Otherwise content grows for scroll. */}
+        {/* min-h-[100vh] when we have blocks ensures content exceeds viewport so scrollbar appears */}
         {/* In edit mode: extra padding-bottom so user can scroll to reach bottom resize handles and canvas isn't cut off */}
-        <div className={`w-full min-w-0 flex flex-col overflow-x-hidden relative ${suppressMainScroll ? "flex-1 min-h-0" : ""} ${isEditMode ? "pb-48" : ""}`}>
+        <div className={`w-full min-w-0 flex flex-col overflow-x-hidden relative ${suppressMainScroll ? "flex-1 min-h-0" : blocks.length > 0 ? "min-h-[100vh]" : ""} ${isEditMode ? "pb-48" : ""}`}>
           <InterfacePageContent
             useRecordReviewLayout={useRecordReviewLayout}
             hasPage={hasPage}

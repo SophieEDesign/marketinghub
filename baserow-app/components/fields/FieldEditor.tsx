@@ -287,6 +287,7 @@ export interface FieldEditorProps {
   field: TableField
   value: any
   onChange: (value: any) => void
+  onBlur?: (value: any) => void
   isReadOnly?: boolean // Override read-only state (for field-level permissions)
   showLabel?: boolean // Whether to show the field label (default: true)
   labelClassName?: string // Custom classes for the label
@@ -317,6 +318,7 @@ export default function FieldEditor({
   field,
   value,
   onChange,
+  onBlur,
   isReadOnly: propIsReadOnly,
   showLabel = true,
   labelClassName = FIELD_LABEL_CLASS_NO_MARGIN,
@@ -741,6 +743,7 @@ export default function FieldEditor({
           type="date"
           value={dateValueForInput}
           onChange={(e) => onChange(e.target.value || null)}
+          onBlur={(e) => onBlur?.(e.target.value || null)}
           className={`w-full px-3.5 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputClassName}`}
           required={required}
         />
@@ -890,6 +893,12 @@ export default function FieldEditor({
         onChange={(e) =>
           onChange(inputType === "number" ? (e.target.value === "" ? null : Number(e.target.value)) : e.target.value)
         }
+        onBlur={(e) => {
+          const v = inputType === "number"
+            ? (e.target.value === "" ? null : Number(e.target.value))
+            : e.target.value
+          onBlur?.(v)
+        }}
         className={`w-full px-3.5 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputClassName}`}
         placeholder={`Enter ${getFieldDisplayName(field)}...`}
         required={required}
