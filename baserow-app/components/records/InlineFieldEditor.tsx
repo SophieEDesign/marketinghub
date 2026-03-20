@@ -472,7 +472,7 @@ export default function InlineFieldEditor({
           <div className={cn("overflow-visible", readOnlyBoxClassName)}>
             {value ? (
               <div 
-                className="prose prose-sm max-w-none"
+                className="rich-text-view text-sm max-w-none"
                 dangerouslySetInnerHTML={{ __html: value }}
               />
             ) : (
@@ -486,7 +486,7 @@ export default function InlineFieldEditor({
           >
             {value ? (
               <div 
-                className="prose prose-sm max-w-none"
+                className="rich-text-view text-sm max-w-none"
                 dangerouslySetInnerHTML={{ __html: value }}
               />
             ) : (

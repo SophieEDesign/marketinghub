@@ -16,6 +16,7 @@ const MAX_WIDTH = 1200
 export default function RecordPanel() {
   const {
     state,
+    openRecord,
     closeRecord,
     setWidth,
     togglePin,
@@ -228,7 +229,25 @@ export default function RecordPanel() {
             active={active}
             onSave={state.recordId === null ? (createdId) => {
               state.onRecordCreated?.(createdId ?? "")
-              closeRecord()
+              // Switch to edit mode so user can continue editing; subsequent changes auto-save
+              if (createdId && state.tableId && state.tableName) {
+                openRecord(
+                  state.tableId,
+                  createdId,
+                  state.tableName,
+                  state.modalFields,
+                  state.modalLayout,
+                  state.cascadeContext,
+                  "edit",
+                  state.onRecordDeleted,
+                  state.onRecordUpdated,
+                  state.fieldLayout,
+                  state.onLayoutSave,
+                  state.tableFields
+                )
+              } else {
+                closeRecord()
+              }
             } : undefined}
             onDeleted={() => {
               toast({ title: "Moved to trash", description: "The record has been moved to trash." })

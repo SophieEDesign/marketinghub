@@ -808,7 +808,7 @@ export default function FieldEditor({
           <div className={`px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-600 min-h-[60px] ${inputClassName}`}>
             {value ? (
               <div 
-                className="prose prose-sm max-w-none"
+                className="rich-text-view text-sm max-w-none"
                 dangerouslySetInnerHTML={{ __html: value }}
               />
             ) : (

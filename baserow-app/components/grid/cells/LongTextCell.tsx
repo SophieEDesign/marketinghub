@@ -167,7 +167,7 @@ export default function LongTextCell({
           >
             {value && value.trim() && value !== '<p></p>' ? (
               <div 
-                className={`prose prose-sm max-w-none text-gray-900 ${wrapText ? 'line-clamp-2' : 'line-clamp-1'} overflow-hidden flex-1`}
+                className={`rich-text-view text-sm max-w-none text-gray-900 ${wrapText ? 'line-clamp-2' : 'line-clamp-1'} overflow-hidden flex-1`}
                 style={{ 
                   lineHeight: '1.25',
                   maxHeight: wrapText ? contentMaxHeight : 'none',

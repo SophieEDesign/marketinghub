@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
@@ -153,11 +153,18 @@ export default function RichTextEditor({
     )
   }
 
+  // Prevent toolbar clicks from stealing focus and triggering onBlur (which closes edit mode).
+  // Without this, clicking the bullet list button (etc.) causes the editor to blur and close.
+  const handleToolbarMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }, [])
+
   const Toolbar = () => {
     if (!showToolbar || !editable) return null
 
     return (
-      <div className="flex items-center gap-1 p-1 bg-white border border-gray-200 rounded-md shadow-sm flex-wrap">
+      <div className="flex items-center gap-1 p-1 bg-white border border-gray-200 rounded-md shadow-sm flex-wrap" onMouseDown={handleToolbarMouseDown}>
         {/* Heading selector */}
         <Select
           value={

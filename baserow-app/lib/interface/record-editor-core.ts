@@ -431,10 +431,14 @@ export function useRecordEditorCore(
       const supabase = createClient()
 
       const doUpdate = async (val: any) =>
-        supabase.from(tableToUse).update({ [fieldName]: val }).eq('id', recordId)
+        supabase.from(tableToUse).update({ [fieldName]: val }).eq('id', recordId).select().single()
 
       let finalSavedValue: any = normalizedValue
-      let { error } = await doUpdate(finalSavedValue)
+      let updatedRow: any = null
+      let error: any
+      const res = await doUpdate(finalSavedValue)
+      updatedRow = res.data
+      error = res.error
 
       if (
         error?.code === '42804' &&
@@ -444,6 +448,7 @@ export function useRecordEditorCore(
         const wrappedValue = finalSavedValue != null ? [finalSavedValue] : null
         const retry = await doUpdate(wrappedValue)
         error = retry.error
+        updatedRow = retry.data
         if (!retry.error) finalSavedValue = wrappedValue
       }
 
@@ -474,7 +479,11 @@ export function useRecordEditorCore(
         }
       }
 
-      const newBaseline = { ...formDataRef.current, [fieldName]: finalSavedValue }
+      const newBaseline = {
+        ...formDataRef.current,
+        [fieldName]: finalSavedValue,
+        ...(updatedRow?.updated_at != null && { updated_at: updatedRow.updated_at }),
+      }
       baselineFormDataRef.current = newBaseline
       setBaselineFormData(newBaseline)
 
@@ -527,6 +536,17 @@ export function useRecordEditorCore(
 
   const handleFieldBlur = useCallback(
     (fieldName: string, value?: any) => {
+      // Create mode: auto-save when user blurs a field and there are changes (so they don't forget to save when clicking out)
+      if (!recordId && canCreateRecords && !saving) {
+        const currentValue = value !== undefined ? value : formDataRef.current[fieldName]
+        const baseline = baselineFormDataRef.current
+        const hasChanges = JSON.stringify(formDataRef.current) !== JSON.stringify(baseline)
+        if (hasChanges && effectiveTableName) {
+          save()
+          return
+        }
+      }
+
       if (!saveOnFieldChange || !recordId) return
       if (cascadeContext != null && !canEditRecords) return
 
@@ -541,7 +561,7 @@ export function useRecordEditorCore(
       if (currentValue === oldValue) return
       persistFieldChange(fieldName, currentValue, oldValue)
     },
-    [saveOnFieldChange, recordId, cascadeContext, canEditRecords, persistFieldChange]
+    [saveOnFieldChange, recordId, cascadeContext, canEditRecords, canCreateRecords, saving, effectiveTableName, save, persistFieldChange]
   )
 
   const save = useCallback(async () => {
@@ -572,12 +592,28 @@ export function useRecordEditorCore(
         }
       }
       if (recordId) {
-        const { error } = await supabase
+        const baseline = baselineFormDataRef.current
+        const updatedAt = baseline?.updated_at
+        let query = supabase
           .from(effectiveTableName)
           .update(payload)
           .eq('id', recordId)
-        if (error) throw error
-        const newBaseline = { ...payload, id: recordId }
+        if (updatedAt != null) {
+          query = query.eq('updated_at', updatedAt)
+        }
+        const { data, error } = await query.select().single()
+        if (error) {
+          if (error.code === 'PGRST116' && updatedAt != null) {
+            toast({
+              variant: 'destructive',
+              title: 'Conflict',
+              description: 'Record was modified by another user. Reload to see changes.',
+            })
+            return
+          }
+          throw error
+        }
+        const newBaseline = data ? { ...data } : { ...payload, id: recordId }
         baselineFormDataRef.current = newBaseline
         setBaselineFormData(newBaseline)
         clearDraft()
@@ -612,6 +648,7 @@ export function useRecordEditorCore(
     canEditRecords,
     canCreateRecords,
     clearDraft,
+    toast,
   ])
 
   const deleteRecord = useCallback(

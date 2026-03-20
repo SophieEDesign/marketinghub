@@ -30,9 +30,10 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "react"
 import { useRouter } from "next/navigation"
-import { Responsive, WidthProvider, Layout } from "react-grid-layout"
+import { Responsive, Layout } from "react-grid-layout"
 import "react-grid-layout/css/styles.css"
 import "react-resizable/css/styles.css"
+import withResizeObserverWidthProvider from "@/lib/interface/ResizeObserverWidthProvider"
 import BlockRenderer from "./BlockRenderer"
 import BlockAppearanceWrapper from "./BlockAppearanceWrapper"
 import RecordPreviewSurface from "./record-preview/RecordPreviewSurface"
@@ -49,7 +50,7 @@ import { debugLog as devLog, debugWarn as devWarn, debugError as devError } from
 import { usePageAggregates } from "@/lib/dashboard/usePageAggregates"
 import { Settings2 } from "lucide-react"
 
-const ResponsiveGridLayout = WidthProvider(Responsive)
+const ResponsiveGridLayout = withResizeObserverWidthProvider(Responsive)
 
 interface CanvasProps {
   blocks: PageBlock[]
