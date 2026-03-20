@@ -145,6 +145,13 @@ export default function RichTextEditor({
     editorRef.current = editor
   }, [editor])
 
+  // Prevent toolbar clicks from stealing focus and triggering onBlur (which closes edit mode).
+  // Must be before early return to satisfy rules of hooks.
+  const handleToolbarMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }, [])
+
   if (!editor) {
     return (
       <div className={cn("border border-gray-300 rounded-md p-3", className)}>
@@ -152,13 +159,6 @@ export default function RichTextEditor({
       </div>
     )
   }
-
-  // Prevent toolbar clicks from stealing focus and triggering onBlur (which closes edit mode).
-  // Without this, clicking the bullet list button (etc.) causes the editor to blur and close.
-  const handleToolbarMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-  }, [])
 
   const Toolbar = () => {
     if (!showToolbar || !editable) return null

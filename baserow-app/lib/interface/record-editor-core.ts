@@ -534,36 +534,6 @@ export function useRecordEditorCore(
     [saveOnFieldChange, recordId, cascadeContext, canEditRecords, persistFieldChange]
   )
 
-  const handleFieldBlur = useCallback(
-    (fieldName: string, value?: any) => {
-      // Create mode: auto-save when user blurs a field and there are changes (so they don't forget to save when clicking out)
-      if (!recordId && canCreateRecords && !saving) {
-        const currentValue = value !== undefined ? value : formDataRef.current[fieldName]
-        const baseline = baselineFormDataRef.current
-        const hasChanges = JSON.stringify(formDataRef.current) !== JSON.stringify(baseline)
-        if (hasChanges && effectiveTableName) {
-          save()
-          return
-        }
-      }
-
-      if (!saveOnFieldChange || !recordId) return
-      if (cascadeContext != null && !canEditRecords) return
-
-      const existing = debounceTimersRef.current.get(fieldName)
-      if (existing) {
-        clearTimeout(existing)
-        debounceTimersRef.current.delete(fieldName)
-      }
-
-      const currentValue = value !== undefined ? value : formDataRef.current[fieldName]
-      const oldValue = baselineFormDataRef.current[fieldName]
-      if (currentValue === oldValue) return
-      persistFieldChange(fieldName, currentValue, oldValue)
-    },
-    [saveOnFieldChange, recordId, cascadeContext, canEditRecords, canCreateRecords, saving, effectiveTableName, save, persistFieldChange]
-  )
-
   const save = useCallback(async () => {
     if (!effectiveTableName) return
     // Optional defence-in-depth: only enforce when cascadeContext was provided; do not change successful paths
@@ -650,6 +620,36 @@ export function useRecordEditorCore(
     clearDraft,
     toast,
   ])
+
+  const handleFieldBlur = useCallback(
+    (fieldName: string, value?: any) => {
+      // Create mode: auto-save when user blurs a field and there are changes (so they don't forget to save when clicking out)
+      if (!recordId && canCreateRecords && !saving) {
+        const currentValue = value !== undefined ? value : formDataRef.current[fieldName]
+        const baseline = baselineFormDataRef.current
+        const hasChanges = JSON.stringify(formDataRef.current) !== JSON.stringify(baseline)
+        if (hasChanges && effectiveTableName) {
+          save()
+          return
+        }
+      }
+
+      if (!saveOnFieldChange || !recordId) return
+      if (cascadeContext != null && !canEditRecords) return
+
+      const existing = debounceTimersRef.current.get(fieldName)
+      if (existing) {
+        clearTimeout(existing)
+        debounceTimersRef.current.delete(fieldName)
+      }
+
+      const currentValue = value !== undefined ? value : formDataRef.current[fieldName]
+      const oldValue = baselineFormDataRef.current[fieldName]
+      if (currentValue === oldValue) return
+      persistFieldChange(fieldName, currentValue, oldValue)
+    },
+    [saveOnFieldChange, recordId, cascadeContext, canEditRecords, canCreateRecords, saving, effectiveTableName, save, persistFieldChange]
+  )
 
   const deleteRecord = useCallback(
     async (opts?: { confirmMessage?: string; skipConfirm?: boolean }) => {
