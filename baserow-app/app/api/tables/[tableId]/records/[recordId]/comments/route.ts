@@ -140,13 +140,13 @@ export async function POST(
         // #region agent log
         fetch('http://127.0.0.1:7242/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'36a8f0'},body:JSON.stringify({sessionId:'36a8f0',location:'comments/route.ts:beforeSend',message:'About to send mention email',data:{toEmail:email},hypothesisId:'A',timestamp:Date.now()})}).catch(()=>{});
         // #endregion
-        sendMentionNotification({
+        await sendMentionNotification({
           toEmail: email,
           commentAuthorName,
           recordUrl,
           commentPreview,
           tableName,
-        }).then((r)=>{ fetch('http://127.0.0.1:7242/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'36a8f0'},body:JSON.stringify({sessionId:'36a8f0',location:'comments/route.ts:afterSend',message:'sendMentionNotification resolved',data:r,hypothesisId:'A',timestamp:Date.now()})}).catch(()=>{}); }).catch((err) => { console.error("[comments] Mention email failed:", err); fetch('http://127.0.0.1:7242/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'36a8f0'},body:JSON.stringify({sessionId:'36a8f0',location:'comments/route.ts:sendError',message:'sendMentionNotification rejected',data:{err:String(err)},hypothesisId:'E',timestamp:Date.now()})}).catch(()=>{}); })
+        }).catch((err) => console.error("[comments] Mention email failed:", err))
       }
     }
 

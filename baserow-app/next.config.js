@@ -20,10 +20,10 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https:",
-              "font-src 'self'",
+              "font-src 'self' data:",
               "connect-src 'self' https: wss:",
               "frame-ancestors 'self'",
             ].join('; '),
