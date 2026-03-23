@@ -18,6 +18,9 @@ export async function sendMentionNotification(
   const { toEmail, commentAuthorName, recordUrl, commentPreview, tableName } = params
 
   const apiKey = process.env.RESEND_API_KEY
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'36a8f0'},body:JSON.stringify({sessionId:'36a8f0',location:'send-mention-notification.ts:entry',message:'sendMentionNotification entered',data:{toEmail,hasApiKey:!!apiKey?.trim()},hypothesisId:'D',timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   if (!apiKey?.trim()) {
     console.warn("[sendMentionNotification] RESEND_API_KEY not set, skipping email")
     return { success: false, error: "Email not configured" }
@@ -54,10 +57,16 @@ export async function sendMentionNotification(
     })
 
     if (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'36a8f0'},body:JSON.stringify({sessionId:'36a8f0',location:'send-mention-notification.ts:resendError',message:'Resend API error',data:{resendError:error},hypothesisId:'E',timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       console.error("[sendMentionNotification] Resend error:", error)
       return { success: false, error: error.message }
     }
 
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'36a8f0'},body:JSON.stringify({sessionId:'36a8f0',location:'send-mention-notification.ts:success',message:'Email sent successfully',data:{toEmail},hypothesisId:'E',timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     return { success: true }
   } catch (err: unknown) {
     const msg = (err as { message?: string })?.message || "Unknown error"

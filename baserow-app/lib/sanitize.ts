@@ -5,8 +5,15 @@
 
 import DOMPurify from "isomorphic-dompurify"
 
+/** Config shape for DOMPurify.sanitize() */
+interface SanitizeConfig {
+  ALLOWED_TAGS?: string[]
+  ALLOWED_ATTR?: string[]
+  ADD_ATTR?: string[]
+}
+
 /** Default config: safe for rich text (TipTap/Quill output) and general content */
-const DEFAULT_CONFIG: DOMPurify.Config = {
+const DEFAULT_CONFIG: SanitizeConfig = {
   ALLOWED_TAGS: [
     "p", "br", "strong", "em", "u", "s", "span",
     "h1", "h2", "h3", "h4", "h5", "h6",
@@ -18,15 +25,15 @@ const DEFAULT_CONFIG: DOMPurify.Config = {
 }
 
 /** Stricter config for HTML blocks (interface blocks) - no iframes or scripts */
-const HTML_BLOCK_CONFIG: DOMPurify.Config = {
+const HTML_BLOCK_CONFIG: SanitizeConfig = {
   ...DEFAULT_CONFIG,
   ALLOWED_TAGS: [
-    ...DEFAULT_CONFIG.ALLOWED_TAGS!,
+    ...(DEFAULT_CONFIG.ALLOWED_TAGS ?? []),
     "iframe", "img", "video", "audio", "source",
     "svg", "path",
   ],
   ALLOWED_ATTR: [
-    ...(DEFAULT_CONFIG.ALLOWED_ATTR || []),
+    ...(DEFAULT_CONFIG.ALLOWED_ATTR ?? []),
     "src", "alt", "width", "height", "frameborder", "allowfullscreen",
     "allow", "loading",
   ],
@@ -39,7 +46,7 @@ const HTML_BLOCK_CONFIG: DOMPurify.Config = {
  */
 export function sanitizeRichText(html: string): string {
   if (typeof html !== "string" || !html.trim()) return ""
-  return DOMPurify.sanitize(html, DEFAULT_CONFIG)
+  return DOMPurify.sanitize(html, DEFAULT_CONFIG) as string
 }
 
 /**
@@ -48,5 +55,5 @@ export function sanitizeRichText(html: string): string {
  */
 export function sanitizeHtmlBlock(html: string): string {
   if (typeof html !== "string" || !html.trim()) return ""
-  return DOMPurify.sanitize(html, HTML_BLOCK_CONFIG)
+  return DOMPurify.sanitize(html, HTML_BLOCK_CONFIG) as string
 }

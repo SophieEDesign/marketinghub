@@ -44,7 +44,7 @@ export default function OnboardingTour() {
 
   const handleCallback = useCallback((data: CallBackProps) => {
     const { status } = data
-    if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status)) {
+    if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
       setRun(false)
       try {
         localStorage.setItem(TOUR_STORAGE_KEY, "true")
