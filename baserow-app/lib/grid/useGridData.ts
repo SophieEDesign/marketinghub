@@ -637,7 +637,9 @@ export function useGridData({
   mutateRef.current = mutate
 
   // Realtime: when another user adds/edits/deletes rows, revalidate from server
-  useRealtimeTable(tableName, () => mutate())
+  useRealtimeTable(tableName, () => {
+    void mutate()
+  })
 
   // Sync SWR data to local rows state (SWR provides caching; we keep rows for mutations)
   useEffect(() => {
