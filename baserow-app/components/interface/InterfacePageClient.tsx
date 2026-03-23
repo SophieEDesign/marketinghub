@@ -26,6 +26,7 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 import { isAbortError } from "@/lib/api/error-handling"
 import PageActionsRegistrar from "./PageActionsRegistrar"
 import { debugLog, debugWarn, debugError } from "@/lib/debug"
+import { useRealtimeViewBlocks } from "@/lib/realtime/useRealtimeViewBlocks"
 // Lazy load InterfaceBuilder for dashboard/overview pages
 const InterfaceBuilder = dynamic(() => import("./InterfaceBuilder"), { ssr: false })
 // Lazy load RecordReviewPage for record_review pages
@@ -1018,6 +1019,9 @@ function InterfacePageClientInternal({
   // Layout hydration should only happen on initial mount or when block IDs change
   // Reloading blocks on edit mode entry causes layout resets
   // Blocks are already loaded in the useEffect above based on page/page_type
+
+  // Realtime: when another user adds/edits/deletes blocks, reload from API
+  useRealtimeViewBlocks(pageId, () => loadBlocks(true))
 
   const handleGridToggle = () => {
     setIsGridMode(!isGridMode)

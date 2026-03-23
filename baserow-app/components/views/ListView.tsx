@@ -30,6 +30,7 @@ import { isUserField, getUserDisplayNames } from "@/lib/users/userDisplay"
 import type { HighlightRule } from "@/lib/interface/types"
 import { evaluateHighlightRules, getFormattingStyle } from "@/lib/conditional-formatting/evaluator"
 import { getFieldDisplayName } from "@/lib/fields/display"
+import { useRealtimeTable } from "@/lib/realtime/useRealtimeTable"
 
 // PostgREST expects unquoted identifiers in order clauses; see `lib/supabase/postgrest`.
 
@@ -256,6 +257,9 @@ export default function ListView({
       }
     }
   }, [])
+
+  // Realtime: when another user adds/edits/deletes rows, reload list
+  useRealtimeTable(supabaseTableName, loadRows)
 
   async function loadRows() {
     // CRITICAL: Prevent concurrent loads

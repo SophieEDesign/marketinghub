@@ -10,6 +10,7 @@ import { isAbortError } from '@/lib/api/error-handling'
 import { useToast } from '@/components/ui/use-toast'
 import { syncLinkedFieldBidirectional } from '@/lib/dataView/linkedFields'
 import { computeLookupValues } from '@/lib/grid/computeLookupValues'
+import { useRealtimeTable } from '@/lib/realtime/useRealtimeTable'
 
 // Helper functions for SQL quoting (inline to avoid circular dependencies)
 function quoteIdent(ident: string): string {
@@ -634,6 +635,9 @@ export function useGridData({
 
   const mutateRef = useRef(mutate)
   mutateRef.current = mutate
+
+  // Realtime: when another user adds/edits/deletes rows, revalidate from server
+  useRealtimeTable(tableName, () => mutate())
 
   // Sync SWR data to local rows state (SWR provides caching; we keep rows for mutations)
   useEffect(() => {
