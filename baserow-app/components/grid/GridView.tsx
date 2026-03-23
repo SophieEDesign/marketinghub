@@ -3155,10 +3155,11 @@ export default function GridView({
       )}
 
       {/* Grid Table - when usePushDown: content grows and pushes blocks down; else scrolls */}
+      {/* usePushDown: overflow-visible so content can grow/flow for ephemeral expansion; parent must allow overflow */}
       <div
         className={
           usePushDown
-            ? "min-h-0 border border-gray-200 rounded-lg overflow-hidden bg-white flex flex-col relative"
+            ? "min-h-0 border border-gray-200 rounded-lg overflow-visible bg-white flex flex-col relative"
             : "flex-1 min-h-0 border border-gray-200 rounded-lg overflow-hidden bg-white flex flex-col relative"
         }
       >

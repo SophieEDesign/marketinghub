@@ -634,6 +634,20 @@ export default function GridBlock({
   // For non-grid views, the only "toolbar" we currently render is QuickFilterBar (filters).
   const showQuickFilters = showToolbar && appearance.show_filter !== false
 
+  // When grid uses grouping, it uses push-down (overflow-visible); container must allow overflow for content to flow.
+  const groupByRulesFromConfig = (config as any).group_by_rules as GroupRule[] | undefined
+  const groupByFromConfigRaw = (config as any).group_by_field || (config as any).group_by
+  const effectiveGroupByForPushDown = (() => {
+    if (groupByRulesFromConfig && groupByRulesFromConfig.length > 0 && groupByRulesFromConfig[0].type === 'field')
+      return groupByRulesFromConfig[0].field
+    if (groupByFromConfigRaw && typeof groupByFromConfigRaw === 'string') {
+      const match = safeTableFields.find((f) => f && (f.name === groupByFromConfigRaw || f.id === groupByFromConfigRaw))
+      return match?.name || groupByFromConfigRaw
+    }
+    return groupBy
+  })()
+  const isGridWithPushDown = viewType === 'grid' && !!effectiveGroupByForPushDown
+
   const { canCreateRecord, isAddRecordDisabled, handleAddRecord } = (() => {
     const permissions = config.permissions || {}
     const isViewOnly = permissions.mode === 'view'
@@ -1266,7 +1280,7 @@ export default function GridBlock({
   }
 
   return (
-    <div className="h-full w-full min-h-0 flex flex-col overflow-hidden" style={blockStyle}>
+    <div className={`h-full w-full min-h-0 flex flex-col ${isGridWithPushDown ? 'overflow-visible' : 'overflow-hidden'}`} style={blockStyle}>
       {/* Legacy header (title + optional add record) - only when appearance wrapper is not active */}
       {!wrapperHasAppearanceSettings &&
         (((appearance.showTitle ?? (appearance as any).show_title) !== false && blockTitle) ||
@@ -1381,7 +1395,8 @@ export default function GridBlock({
 
       {/* Single scroll container: GridView/CalendarView owns scroll; flex so child can flex-1. Calendar needs overflow-hidden so child controls scroll. */}
       {/* When isFullPage, parent provides height (no min-h). Otherwise calendar uses min-h-[100vh] for scroll. */}
-      <div className={`flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden ${viewType === 'calendar' && !isFullPage ? 'min-h-[100vh]' : ''} ${viewType === 'kanban' ? 'overflow-x-auto' : ''}`}>
+      {/* When grid uses push-down (grouping), overflow-visible so content can grow and flow to page scroll. */}
+      <div className={`flex-1 min-h-0 min-w-0 flex flex-col ${isGridWithPushDown ? 'overflow-visible' : 'overflow-hidden'} ${viewType === 'calendar' && !isFullPage ? 'min-h-[100vh]' : ''} ${viewType === 'kanban' ? 'overflow-x-auto' : ''}`}>
         {renderView()}
       </div>
     </div>
