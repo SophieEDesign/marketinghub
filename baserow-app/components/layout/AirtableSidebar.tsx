@@ -276,7 +276,7 @@ export default function AirtableSidebar({
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto">
         {/* Interfaces section header with Edit/Done toggle */}
-        <div className="px-3 mb-1 flex items-center justify-between">
+        <div className="flex-shrink-0 px-3 py-2 flex items-center justify-between border-b border-black/10">
           <button
             onClick={() => (isEditMode ? exitSidebarEdit() : enterSidebarEdit())}
             className={cn(

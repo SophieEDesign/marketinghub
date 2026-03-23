@@ -170,7 +170,7 @@ function ShellContent({
   const isPanelVisible = isEditMode
 
   return (
-    <div className="flex flex-col h-screen min-h-[100dvh] bg-gray-50 overflow-hidden">
+    <div className="flex flex-col h-screen min-h-[100dvh] bg-background overflow-hidden">
       {!hideTopbar && <OnboardingTour />}
       {/* Edit mode banner - full app width at top, above sidebar and content */}
       <EditModeBanner />
@@ -182,7 +182,7 @@ function ShellContent({
           <Button
             variant="ghost"
             size="sm"
-            className="h-10 w-10 p-0 bg-white/90 border border-gray-200 shadow"
+            className="h-10 w-10 p-0 bg-background/90 border border-border shadow"
             onClick={() => setSidebarOpen(!sidebarOpen)}
             aria-label="Toggle sidebar"
           >
@@ -213,7 +213,7 @@ function ShellContent({
               isAdmin={userRole === "admin"}
             />
           )}
-          <main className="flex-1 min-h-0 min-w-0 overflow-hidden">
+          <main className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
             {children}
           </main>
         </div>

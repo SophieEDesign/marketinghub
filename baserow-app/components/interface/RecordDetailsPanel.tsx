@@ -272,7 +272,7 @@ export default function RecordDetailsPanel({
 
   if (!recordId) {
     return (
-      <div className="flex-1 border-l flex flex-col overflow-hidden bg-white">
+      <div className="flex-1 border-l flex flex-col overflow-hidden bg-card">
         <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4">
           <div className="text-center">
             <p className="mb-2 font-medium">Select a record</p>
@@ -284,14 +284,14 @@ export default function RecordDetailsPanel({
   }
 
   return (
-    <div className="flex-1 border-l border-gray-200 flex flex-col overflow-hidden bg-white">
+    <div className="flex-1 border-l border-border flex flex-col overflow-hidden bg-card">
       {/* Header - Record context */}
-      <div className="border-b border-gray-200 bg-white flex-shrink-0">
+      <div className="border-b border-border bg-card flex-shrink-0">
         <div className="px-6 py-5">
           {loading ? (
             <div className="space-y-3">
-              <div className="h-7 w-64 bg-gray-200 rounded animate-pulse" />
-              <div className="h-4 w-48 bg-gray-200 rounded animate-pulse" />
+              <div className="h-7 w-64 bg-muted rounded animate-pulse" />
+              <div className="h-4 w-48 bg-muted rounded animate-pulse" />
             </div>
           ) : isEditingName && primaryNameField ? (
             <div className="flex items-center gap-2">
@@ -308,7 +308,7 @@ export default function RecordDetailsPanel({
                   }
                 }}
                 onBlur={handleNameSave}
-                className="flex-1 text-2xl font-semibold text-gray-900 border-none outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 py-1"
+                className="flex-1 text-2xl font-semibold text-foreground border-none outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 bg-transparent"
                 placeholder="Record name"
               />
             </div>
@@ -316,8 +316,8 @@ export default function RecordDetailsPanel({
             <div className="flex items-start gap-3">
               <div className="flex-1 min-w-0">
                 <h1
-                  className={`text-2xl font-semibold text-gray-900 min-w-0 truncate ${
-                    primaryNameField && pageEditable ? "cursor-text hover:bg-gray-50 -mx-2 px-2 py-1 rounded-md transition-colors" : ""
+                  className={`text-2xl font-semibold text-foreground min-w-0 truncate ${
+                    primaryNameField && pageEditable ? "cursor-text hover:bg-muted -mx-2 px-2 py-1 rounded-md transition-colors" : ""
                   }`}
                   onClick={() => {
                     if (primaryNameField && pageEditable) setIsEditingName(true)
@@ -335,7 +335,7 @@ export default function RecordDetailsPanel({
                         statusField.type === "checkbox"
                           ? statusValue
                             ? "bg-green-100 text-green-800 border-green-200"
-                            : "bg-gray-100 text-gray-600 border-gray-200"
+                            : "bg-muted text-muted-foreground border-border"
                           : "bg-blue-100 text-blue-800 border-blue-200"
                       }`}
                     >
@@ -412,7 +412,7 @@ export default function RecordDetailsPanel({
       </div>
 
       {/* Record Fields + Blocks */}
-      <div className="flex-1 overflow-auto bg-gray-50/30">
+      <div className="flex-1 overflow-auto bg-muted/30">
         {loading ? (
           <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4">
             <div className="text-center">

@@ -926,14 +926,14 @@ export default function RecordReviewLeftColumn({
 
   if (!tableId) {
     return (
-      <div className="w-80 border-r border-gray-200 bg-gray-50 p-4">
+      <div className="w-80 border-r border-border bg-muted/50 p-4">
         <p className="text-sm text-gray-500">No table selected</p>
       </div>
     )
   }
 
   return (
-    <div className="w-80 flex-shrink-0 border-r border-gray-200 bg-white flex flex-col h-full min-h-0">
+    <div className="w-80 flex-shrink-0 border-r border-border bg-card flex flex-col h-full min-h-0">
       {/* Header */}
       <div className="p-5 border-b border-gray-200">
         <h3 className="text-sm font-semibold text-gray-900 mb-4">{tableName || "Records"}</h3>

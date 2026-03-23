@@ -1606,12 +1606,12 @@ export default function InterfaceBuilder({
   }
 
   return (
-    <div className={`flex flex-col min-h-0 w-full bg-gray-50 min-w-0 ${fullPageBlockId ? "flex-1" : ""}`}>
+    <div className={`flex flex-col min-h-0 w-full bg-background min-w-0 ${fullPageBlockId ? "flex-1" : ""}`}>
       {/* Main Canvas - flex-1 only for full-page; otherwise content grows for main scroll */}
       <div className={`flex flex-col min-w-0 w-full min-h-0 ${fullPageBlockId ? "flex-1" : ""}`}>
         {/* Toolbar / Interface Header */}
         {!hideHeader && (
-        <div className="h-auto min-h-[56px] bg-white border-b border-gray-200 flex flex-col px-4 py-2">
+        <div className="h-auto min-h-[56px] bg-card border-b border-border flex flex-col px-4 py-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 flex-1 min-w-0">
               {/* Icon */}

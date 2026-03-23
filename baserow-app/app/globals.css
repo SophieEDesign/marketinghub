@@ -29,6 +29,8 @@
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
+    /* Override sidebar branding in dark mode so theme applies consistently */
+    --sidebar-bg: 222.2 47% 11%;
     --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;
     --popover: 222.2 84% 4.9%;
@@ -56,6 +58,20 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Sidebar: use theme in dark mode (inline style from branding overrides otherwise) */
+.dark [data-sidebar] {
+  background-color: hsl(var(--sidebar-bg, 222.2 47% 11%)) !important;
+  color: hsl(var(--sidebar-foreground, 210 40% 98%)) !important;
+}
+.dark [data-sidebar] a,
+.dark [data-sidebar] button,
+.dark [data-sidebar] [style*="color"] {
+  color: hsl(var(--sidebar-foreground, 210 40% 98%)) !important;
+}
+.dark [data-sidebar] .border-black\/10 {
+  border-color: hsl(var(--border)) !important;
 }
 
 /* TipTap Editor Styles - REAL EDITOR (not a renderer) */

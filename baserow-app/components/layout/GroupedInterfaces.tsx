@@ -1113,7 +1113,7 @@ export default function GroupedInterfaces({
       onDragCancel={handleDragCancel}
     >
       <div className="space-y-1">
-        <div className="px-2 mb-1 flex gap-1">
+        <div className="px-2 mb-2 flex gap-1 flex-shrink-0">
           <button
             onClick={() => setNewPageModalOpen(true)}
             className="flex-1 flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-black/10 rounded transition-colors"
@@ -1157,19 +1157,19 @@ export default function GroupedInterfaces({
 
       <DragOverlay>
         {activeId && isDragging ? (
-          <div className="bg-white border-2 border-blue-400 rounded shadow-xl p-2 opacity-90">
+          <div className="bg-white dark:bg-gray-800 border-2 border-blue-400 rounded shadow-xl p-2 opacity-95 text-gray-900 dark:text-gray-100">
             {activeId.startsWith("group-") ? (
               <div className="flex items-center gap-2">
-                <GripVertical className="h-3 w-3" style={{ color: sidebarTextColor }} />
-                <span className="text-xs font-semibold uppercase" style={{ color: sidebarTextColor }}>
+                <GripVertical className="h-3 w-3 text-gray-600 dark:text-gray-400" />
+                <span className="text-xs font-semibold uppercase">
                   {groups.find((g) => `group-${g.id}` === activeId)?.name}
                 </span>
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                <GripVertical className="h-3 w-3" style={{ color: sidebarTextColor }} />
-                <Layers className="h-4 w-4" style={{ color: sidebarTextColor }} />
-                <span className="text-sm" style={{ color: sidebarTextColor }}>
+                <GripVertical className="h-3 w-3 text-gray-600 dark:text-gray-400" />
+                <Layers className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                <span className="text-sm">
                   {pages.find((p) => `page-${p.id}` === activeId)?.name}
                 </span>
               </div>

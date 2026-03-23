@@ -112,8 +112,8 @@ export default function RecordPanel() {
         className={`${
           useOverlayLayout
             ? "fixed right-0 top-0 h-full z-50"
-            : "flex-shrink-0 border-l border-gray-200"
-        } bg-white shadow-xl flex flex-col transition-all duration-300 ease-out`}
+            : "flex-shrink-0 border-l border-border"
+        } bg-card shadow-xl flex flex-col transition-all duration-300 ease-out`}
         style={{
           width: state.isOpen ? panelWidth : "0px",
           minWidth: !useOverlayLayout && state.isOpen ? `${state.width}px` : undefined,
@@ -157,7 +157,7 @@ export default function RecordPanel() {
           />
         )}
 
-        <div className="h-10 border-b border-gray-200 flex items-center justify-between px-4 bg-white flex-shrink-0">
+        <div className="h-10 border-b border-border flex items-center justify-between px-4 bg-card flex-shrink-0">
           <div className="flex items-center gap-2">
             {canGoBack && (
               <button
