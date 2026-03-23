@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getTable } from "@/lib/crud/tables"
+import { getTableFields } from "@/lib/fields/schema"
+import { getPrimaryFieldName } from "@/lib/fields/primary"
+import { toPostgrestColumn } from "@/lib/supabase/postgrest"
 import { parseMentions } from "@/lib/comments/parse-mentions"
 import { sendMentionNotification } from "@/lib/email/send-mention-notification"
 import { formatUserDisplayName } from "@/lib/users/userDisplay"
@@ -106,6 +109,8 @@ export async function POST(
     const mentionedEmails = parseMentions(text)
     const commentAuthorName = formatUserDisplayName(user.email ?? null)
     const tableName = table.name || "Record"
+    // Use NEXT_PUBLIC_APP_URL for production so links point to your canonical domain
+    // (e.g. https://marketing.petersandmay.com), not a Vercel preview URL
     let baseUrl = process.env.NEXT_PUBLIC_APP_URL
     if (!baseUrl) {
       baseUrl = process.env.VERCEL_URL
@@ -115,6 +120,29 @@ export async function POST(
     if (!baseUrl.startsWith("http")) baseUrl = `https://${baseUrl}`
     const recordUrl = `${baseUrl}/tables/${tableId}?openRecord=${recordId}`
     const commentPreview = text.length > 150 ? `${text.slice(0, 150)}...` : text
+
+    // Resolve record summary (primary field value) for email context
+    let recordSummary: string | null = null
+    if (mentionedEmails.length > 0) {
+      const fields = await getTableFields(tableId)
+      const primaryName =
+        (table as { primary_field_name?: string | null }).primary_field_name &&
+        (table as { primary_field_name?: string }).primary_field_name !== "id"
+          ? toPostgrestColumn((table as { primary_field_name: string }).primary_field_name)
+          : null
+      const primaryCol = primaryName || getPrimaryFieldName(fields)
+      const safeCol = primaryCol ? toPostgrestColumn(primaryCol) : null
+      if (safeCol) {
+        const { data: recordRow } = await supabase
+          .from(table.supabase_table)
+          .select(safeCol)
+          .eq("id", recordId)
+          .maybeSingle()
+        const val = recordRow?.[safeCol]
+        if (val != null && typeof val === "string") recordSummary = val
+        else if (val != null) recordSummary = String(val)
+      }
+    }
 
     if (mentionedEmails.length > 0 && comment?.id) {
       const adminSupabase = createAdminClient()
@@ -138,6 +166,7 @@ export async function POST(
           recordUrl,
           commentPreview,
           tableName,
+          recordSummary,
         }).catch((err) => console.error("[comments] Mention email failed:", err))
       }
     }

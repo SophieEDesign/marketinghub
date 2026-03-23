@@ -204,8 +204,10 @@ export async function middleware(req: NextRequest) {
     redirectUrl.pathname = '/login';
     
     // Preserve the original URL as 'next' parameter for redirect after login
+    // Include query string (e.g. ?openRecord=xxx for email links) so post-login lands on the record
     if (pathname !== '/login') {
-      redirectUrl.searchParams.set('next', pathname);
+      const fullPath = pathname + (req.nextUrl.search || '');
+      redirectUrl.searchParams.set('next', fullPath);
     }
     
     return NextResponse.redirect(redirectUrl);

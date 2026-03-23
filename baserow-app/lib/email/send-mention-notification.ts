@@ -6,6 +6,8 @@ export interface MentionNotificationParams {
   recordUrl: string
   commentPreview: string
   tableName: string
+  /** Optional: record title/summary (e.g. primary field value) for context */
+  recordSummary?: string | null
 }
 
 /**
@@ -15,7 +17,7 @@ export interface MentionNotificationParams {
 export async function sendMentionNotification(
   params: MentionNotificationParams
 ): Promise<{ success: boolean; error?: string }> {
-  const { toEmail, commentAuthorName, recordUrl, commentPreview, tableName } = params
+  const { toEmail, commentAuthorName, recordUrl, commentPreview, tableName, recordSummary } = params
 
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey?.trim()) {
@@ -34,7 +36,7 @@ export async function sendMentionNotification(
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body style="font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <p><strong>${escapeHtml(commentAuthorName)}</strong> mentioned you in a comment on <strong>${escapeHtml(tableName)}</strong>:</p>
+  <p><strong>${escapeHtml(commentAuthorName)}</strong> mentioned you in a comment on <strong>${escapeHtml(tableName)}</strong>${recordSummary?.trim() ? ` (<em>${escapeHtml(String(recordSummary).slice(0, 100))}${String(recordSummary).length > 100 ? "…" : ""}</em>)` : ""}:</p>
   <blockquote style="border-left: 4px solid #ddd; margin: 16px 0; padding: 12px 16px; background: #f9f9f9;">
     ${escapeHtml(commentPreview)}
   </blockquote>
