@@ -322,17 +322,21 @@ export async function resolveLandingPage(): Promise<{ pageId: string | null; rea
     
     if (!profileError && profile && (profile as any).default_page_id) {
       const userDefaultPageId = (profile as any).default_page_id
-      const validation = await validatePageAccess(userDefaultPageId, userIsAdmin)
-      
-      if (validation.valid) {
-        console.log('[resolveLandingPage] returning user_default:', userDefaultPageId)
-        if (isDev) {
-          console.log('[Landing Page] Using user default page:', userDefaultPageId)
-        }
-        return { pageId: userDefaultPageId, reason: 'user_default' }
+      if (typeof userDefaultPageId !== "string") {
+        if (isDev) console.warn("[resolveLandingPage] default_page_id is not a string, skipping")
       } else {
-        if (isDev) {
-          console.warn('[Landing Page] User default page invalid:', userDefaultPageId, validation.reason)
+        const validation = await validatePageAccess(userDefaultPageId, userIsAdmin)
+      
+        if (validation.valid) {
+          console.log('[resolveLandingPage] returning user_default:', userDefaultPageId)
+          if (isDev) {
+            console.log('[Landing Page] Using user default page:', userDefaultPageId)
+          }
+          return { pageId: userDefaultPageId, reason: 'user_default' }
+        } else {
+          if (isDev) {
+            console.warn('[Landing Page] User default page invalid:', userDefaultPageId, validation.reason)
+          }
         }
       }
     }
@@ -374,13 +378,17 @@ export async function resolveLandingPage(): Promise<{ pageId: string | null; rea
         })
       }
     } else if (workspaceSettings?.default_interface_id) {
-      const workspaceDefaultPageId = workspaceSettings.default_interface_id
-      
-      if (isDev) {
+      let workspaceDefaultPageId = workspaceSettings.default_interface_id
+      if (typeof workspaceDefaultPageId !== "string") {
+        if (isDev) {
+          console.warn("[resolveLandingPage] default_interface_id is not a string, skipping:", typeof workspaceDefaultPageId)
+        }
+      } else if (isDev) {
         console.log('[Landing Page] Found workspace default page ID:', workspaceDefaultPageId)
       }
-      
-      const validation = await validatePageAccess(workspaceDefaultPageId, userIsAdmin)
+
+      if (typeof workspaceDefaultPageId === "string") {
+        const validation = await validatePageAccess(workspaceDefaultPageId, userIsAdmin)
       
       if (isDev) {
         console.log('[Landing Page] Workspace default page validation:', {
@@ -391,20 +399,21 @@ export async function resolveLandingPage(): Promise<{ pageId: string | null; rea
         })
       }
       
-      if (validation.valid) {
-        console.log('[resolveLandingPage] returning workspace_default:', workspaceDefaultPageId)
-        if (isDev) {
-          console.log('[Landing Page] ✓ Using workspace default page:', workspaceDefaultPageId)
-        }
-        return { pageId: workspaceDefaultPageId, reason: 'workspace_default' }
-      } else {
-        if (isDev) {
-          console.error('[Landing Page] ✗ Workspace default page validation FAILED:', {
-            pageId: workspaceDefaultPageId,
-            reason: validation.reason,
-            userIsAdmin,
-            note: 'Will fall back to first accessible page'
-          })
+        if (validation.valid) {
+          console.log('[resolveLandingPage] returning workspace_default:', workspaceDefaultPageId)
+          if (isDev) {
+            console.log('[Landing Page] ✓ Using workspace default page:', workspaceDefaultPageId)
+          }
+          return { pageId: workspaceDefaultPageId, reason: 'workspace_default' }
+        } else {
+          if (isDev) {
+            console.error('[Landing Page] ✗ Workspace default page validation FAILED:', {
+              pageId: workspaceDefaultPageId,
+              reason: validation.reason,
+              userIsAdmin,
+              note: 'Will fall back to first accessible page'
+            })
+          }
         }
       }
     } else if (isDev) {

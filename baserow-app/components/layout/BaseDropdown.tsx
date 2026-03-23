@@ -129,7 +129,7 @@ export default function BaseDropdown({
         )}
         <DropdownMenuItem asChild>
           <Link
-            href={defaultPageId ? `/pages/${defaultPageId}` : "/"}
+            href={typeof defaultPageId === "string" ? `/pages/${defaultPageId}` : "/"}
             prefetch={false}
             className="flex items-center gap-2 cursor-pointer"
           >

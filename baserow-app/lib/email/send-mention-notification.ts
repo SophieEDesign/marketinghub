@@ -46,7 +46,7 @@ export async function sendMentionNotification(
 
   try {
     const resend = new Resend(apiKey.trim())
-    const { error } = await resend.emails.send({
+    const { data, error } = await resend.emails.send({
       from: fromEmail,
       to: toEmail,
       subject: `${commentAuthorName} mentioned you in a comment`,
@@ -54,10 +54,13 @@ export async function sendMentionNotification(
     })
 
     if (error) {
-      console.error("[sendMentionNotification] Resend error:", error)
+      console.error("[sendMentionNotification] Resend error:", JSON.stringify(error), "toEmail:", toEmail)
       return { success: false, error: error.message }
     }
 
+    if (data?.id) {
+      console.log("[sendMentionNotification] Email sent, id:", data.id, "to:", toEmail)
+    }
     return { success: true }
   } catch (err: unknown) {
     const msg = (err as { message?: string })?.message || "Unknown error"

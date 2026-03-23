@@ -44,8 +44,8 @@ export default function ActionBlock({ block, isEditing = false }: ActionBlockPro
 
   function executeAction() {
     if (actionType === "navigate") {
-      if (route) {
-        router.push(route)
+      if (typeof route === "string" && route.trim()) {
+        router.push(route.trim())
       } else if (url) {
         window.open(url, "_blank")
       }

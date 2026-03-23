@@ -47,17 +47,19 @@ export default function RecentsFavoritesSection({ primaryColor, sidebarTextColor
   }
 
   function navigateToEntity(item: Favorite) {
+    const entityId = typeof item.entity_id === "string" ? item.entity_id : null
+    if (!entityId) return
     switch (item.entity_type) {
       case 'table':
-        router.push(`/tables/${item.entity_id}`)
+        router.push(`/tables/${entityId}`)
         break
       case 'interface':
       case 'page':
-        router.push(`/pages/${item.entity_id}`)
+        router.push(`/pages/${entityId}`)
         break
       case 'view':
         if (item.table_id) {
-          router.push(`/tables/${item.table_id}/views/${item.entity_id}`)
+          router.push(`/tables/${item.table_id}/views/${entityId}`)
         }
         break
     }

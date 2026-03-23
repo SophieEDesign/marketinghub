@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation"
+import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { isAdmin } from "@/lib/roles"
 import { getInterfacePage, querySqlView } from "@/lib/interface/pages"
@@ -7,12 +9,20 @@ import InterfacePageClient from "@/components/interface/InterfacePageClient"
 
 const isDev = process.env.NODE_ENV === 'development'
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export default async function PagePage({
   params,
 }: {
   params: { pageId: string }
 }) {
-  const { pageId } = params
+  const { pageId } = await params
+  if (!pageId || typeof pageId !== "string" || !UUID_REGEX.test(pageId)) {
+    if (isDev) {
+      console.warn("[Page Render] Invalid pageId, redirecting home:", pageId)
+    }
+    redirect("/")
+  }
   const supabase = await createClient()
   const admin = await isAdmin()
 
