@@ -104,7 +104,6 @@ export async function POST(
 
     // Process @mentions: resolve emails to users, insert comment_mentions, send emails
     const mentionedEmails = parseMentions(text)
-    console.log("[comments-debug] mentionedEmails:", mentionedEmails, "text sample:", text.slice(0, 80))
     const commentAuthorName = formatUserDisplayName(user.email ?? null)
     const tableName = table.name || "Record"
     let baseUrl = process.env.NEXT_PUBLIC_APP_URL
@@ -120,32 +119,26 @@ export async function POST(
     if (mentionedEmails.length > 0 && comment?.id) {
       const adminSupabase = createAdminClient()
       for (const email of mentionedEmails) {
-        const { data: profile, error: profileErr } = await adminSupabase
+        const { data: profile } = await adminSupabase
           .from("user_profile_sync_status")
           .select("user_id")
           .ilike("email", email)
           .maybeSingle()
 
-        console.log("[comments-debug] profile lookup:", { email, found: !!profile?.user_id, profileUserId: profile?.user_id, isSelf: profile?.user_id === user.id, profileError: profileErr?.message })
-
-        if (!profile?.user_id || profile.user_id === user.id) continue
+        if (!profile?.user_id) continue
 
         await supabase.from("comment_mentions").insert({
           comment_id: comment.id,
           mentioned_user_id: profile.user_id,
         })
 
-        const sendResult = await sendMentionNotification({
+        await sendMentionNotification({
           toEmail: email,
           commentAuthorName,
           recordUrl,
           commentPreview,
           tableName,
-        }).catch((err) => {
-          console.error("[comments] Mention email failed:", err)
-          return { success: false, error: String(err) }
-        })
-        console.log("[comments-debug] sendMentionNotification result:", { toEmail: email, ...sendResult })
+        }).catch((err) => console.error("[comments] Mention email failed:", err))
       }
     }
 
