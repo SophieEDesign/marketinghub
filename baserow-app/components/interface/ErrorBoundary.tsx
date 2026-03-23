@@ -40,6 +40,11 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("ErrorBoundary caught an error:", error, errorInfo)
+    // #region agent log
+    try {
+      fetch('http://127.0.0.1:7242/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f14c63'},body:JSON.stringify({sessionId:'f14c63',location:'ErrorBoundary.tsx:componentDidCatch',message:'ErrorBoundary caught error',data:{errorMessage:error?.message,errorName:error?.name,componentStack:errorInfo?.componentStack?.slice(0,500)},hypothesisId:'B',timestamp:Date.now()})}).catch(()=>{});
+    } catch (_) {}
+    // #endregion
     if (this.props.onError) {
       this.props.onError(error, errorInfo)
     }
