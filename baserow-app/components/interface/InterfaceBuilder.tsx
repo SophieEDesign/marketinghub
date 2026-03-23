@@ -1742,10 +1742,10 @@ export default function InterfaceBuilder({
         )}
 
         {/* Canvas - no flex-1 so content can grow; main scroll in InterfacePageClient handles overflow */}
-        {/* Full-page: no scroll, no padding. Normal: overflow-visible so content flows to main (single scroll surface, no nested scrollbars). Parent has overflow-x-hidden. */}
+        {/* Full-page: no scroll, no padding. Normal: overflow-x-hidden prevents blocks spilling horizontally; overflow-y-visible for vertical flow. Parent has overflow-x-hidden. */}
         <div
           ref={canvasScrollContainerRef}
-          className={`flex flex-col min-w-0 w-full min-h-0 ${fullPageBlockId ? "flex-1 overflow-hidden p-0" : "overflow-visible p-4"}`}
+          className={`flex flex-col min-w-0 w-full min-h-0 ${fullPageBlockId ? "flex-1 overflow-hidden p-0" : "overflow-x-hidden overflow-y-visible p-4"}`}
         >
           <FilterStateProvider>
             {/* Blocks always render - no conditional visibility. Edit mode changes behaviour only. */}

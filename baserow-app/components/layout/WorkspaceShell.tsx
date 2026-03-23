@@ -203,9 +203,9 @@ function ShellContent({
         coreDataSectionTitle={coreDataSectionTitle}
       />
       {/* MainArea: min-h-0 required for flex height propagation to CalendarView */}
-      <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden">
+      <div className="flex flex-row flex-1 min-h-0 min-w-0 overflow-hidden">
         {/* InterfaceContainer: min-h-0 allows height to flow to main > CalendarView */}
-        <div className="flex flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden w-full">
+        <div className="flex flex-1 basis-0 flex flex-col min-h-0 min-w-0 overflow-hidden">
           {!hideTopbar && (
             <Topbar
               title={title}
@@ -219,9 +219,9 @@ function ShellContent({
         </div>
         {/* RecordPanel - inline on right when open (desktop); overlay on mobile (portaled) */}
         {!hideRecordPanel && <RecordPanel />}
-        {/* RightSettingsPanel: conditional mount, edit mode only, flex sibling */}
+        {/* RightSettingsPanel: conditional mount, edit mode only, flex sibling. flex flex-col min-h-0 for scroll. */}
         {isPanelVisible && (
-          <div className="flex-shrink-0 w-[360px]">
+          <div className="flex flex-col min-h-0 flex-shrink-0 w-[360px] overflow-hidden">
             <RightSettingsPanel />
           </div>
         )}

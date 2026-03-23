@@ -1955,7 +1955,7 @@ export default function Canvas({
       {/* flex-1 flex flex-col min-h-0: fill parent flex; min-h-0 prevents flex collapse; flex flex-col for block list. */}
       <div
         ref={containerRef}
-        className={`flex-1 flex flex-col w-full min-w-0 relative ${isFullPageMode ? "overflow-hidden min-h-[100vh]" : "min-h-0"}`}
+        className={`flex-1 flex flex-col w-full max-w-full min-w-0 relative ${isFullPageMode ? "overflow-hidden min-h-[100vh]" : "min-h-0"}`}
         style={
           isFullPageMode
             ? undefined
