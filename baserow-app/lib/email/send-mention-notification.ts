@@ -24,7 +24,7 @@ export async function sendMentionNotification(
   }
 
   const fromEmail =
-    process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev"
+    process.env.RESEND_FROM_EMAIL || "marketing@petersandmay.com"
 
   const html = `
 <!DOCTYPE html>
