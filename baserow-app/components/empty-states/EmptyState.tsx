@@ -2,9 +2,12 @@
 
 import { ReactNode } from "react"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 interface EmptyStateProps {
   icon?: ReactNode
+  /** Optional illustration - use for key empty states (tables, interfaces) */
+  illustration?: ReactNode
   title: string
   description?: string
   action?: {
@@ -20,6 +23,7 @@ interface EmptyStateProps {
 
 export default function EmptyState({
   icon,
+  illustration,
   title,
   description,
   action,
@@ -28,14 +32,17 @@ export default function EmptyState({
 }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-      {icon && (
-        <div className="mb-4 text-gray-300">
-          {icon}
+      {(illustration || icon) && (
+        <div className={cn(
+          "mb-4 flex items-center justify-center",
+          illustration && "rounded-xl bg-muted/30 p-6"
+        )}>
+          {illustration ?? icon}
         </div>
       )}
-      <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
+      <h3 className="text-lg font-semibold text-foreground mb-2">{title}</h3>
       {description && (
-        <p className="text-sm text-gray-500 max-w-md mb-6">{description}</p>
+        <p className="text-sm text-muted-foreground max-w-md mb-6">{description}</p>
       )}
       {children && (
         <div className="mb-6">{children}</div>

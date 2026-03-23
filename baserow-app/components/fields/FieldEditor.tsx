@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select"
 import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/LookupFieldPicker"
 import RichTextEditor from "@/components/fields/RichTextEditor"
+import { sanitizeRichText } from "@/lib/sanitize"
 import AttachmentPreview, { type Attachment } from "@/components/attachments/AttachmentPreview"
 import RecordModal from "@/components/calendar/RecordModal"
 
@@ -809,7 +810,7 @@ export default function FieldEditor({
             {value ? (
               <div 
                 className="rich-text-view text-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: value }}
+                dangerouslySetInnerHTML={{ __html: sanitizeRichText(value) }}
               />
             ) : (
               <span className="italic">—</span>

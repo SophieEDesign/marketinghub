@@ -1,7 +1,8 @@
 "use client"
 
-import { FileText, Plus, Layout } from "lucide-react"
+import { FileText, Layout } from "lucide-react"
 import EmptyState from "./EmptyState"
+import { EmptyInterfaceIllustration } from "./EmptyStateIllustrations"
 
 interface EmptyInterfaceStateProps {
   onAddBlock?: (type: string) => void
@@ -17,7 +18,7 @@ export default function EmptyInterfaceState({
 }: EmptyInterfaceStateProps) {
   return (
     <EmptyState
-      icon={<FileText className="h-12 w-12" />}
+      illustration={<EmptyInterfaceIllustration className="w-28 h-20" />}
       title="This interface is empty"
       description="Add blocks to build your interface. Start with a grid view, chart, or text block."
     >

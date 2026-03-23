@@ -13,6 +13,8 @@ import InteractionFailsafe from "@/components/layout/InteractionFailsafe"
 import NavigationProgress from "@/components/layout/NavigationProgress"
 import PerformanceMonitor from "@/components/layout/PerformanceMonitor"
 import SWRProvider from "@/components/providers/SWRProvider"
+import { ThemeProvider } from "@/contexts/ThemeContext"
+import ThemeScript from "@/components/layout/ThemeScript"
 import { getWorkspaceSettings } from "@/lib/branding"
 
 const inter = Inter({ 
@@ -77,8 +79,10 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
+        <ThemeScript />
+        <ThemeProvider>
         <SWRProvider>
           <ConsoleErrorFilter />
           <DiagnosticsInitializer />
@@ -88,13 +92,15 @@ export default function RootLayout({
           {/* STEP 1: Temporarily disabled to verify not causing heavy message listeners or loops */}
           {/* <NavigationDiagnostics /> */}
           <DynamicTitle />
+          <CommandPaletteProvider>
           <RootErrorBoundary>
             {children}
           </RootErrorBoundary>
           <Toaster />
-          <CommandPaletteProvider />
+          </CommandPaletteProvider>
           <div id="modal-root" />
         </SWRProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

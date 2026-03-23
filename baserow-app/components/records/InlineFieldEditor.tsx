@@ -22,6 +22,7 @@ import {
   normalizeHexColor,
 } from "@/lib/field-colors"
 import { getFieldDisplayName } from "@/lib/fields/display"
+import { sanitizeRichText } from "@/lib/sanitize"
 import { FIELD_LABEL_CLASS_NO_MARGIN, FIELD_LABEL_GAP_CLASS } from "@/lib/fields/field-label"
 
 interface InlineFieldEditorProps {
@@ -473,7 +474,7 @@ export default function InlineFieldEditor({
             {value ? (
               <div 
                 className="rich-text-view text-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: value }}
+                dangerouslySetInnerHTML={{ __html: sanitizeRichText(value) }}
               />
             ) : (
               <span className="italic">—</span>
@@ -487,7 +488,7 @@ export default function InlineFieldEditor({
             {value ? (
               <div 
                 className="rich-text-view text-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: value }}
+                dangerouslySetInnerHTML={{ __html: sanitizeRichText(value) }}
               />
             ) : (
               <span className="text-gray-400 italic">Click to add text...</span>

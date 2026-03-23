@@ -18,6 +18,7 @@ import { useIsMobile } from "@/hooks/useResponsive"
 import { useBranding } from "@/contexts/BrandingContext"
 import { Button } from "@/components/ui/button"
 import { Menu } from "lucide-react"
+import OnboardingTour from "./OnboardingTour"
 import type { Table, View } from "@/types/database"
 
 interface InterfacePage {
@@ -170,6 +171,7 @@ function ShellContent({
 
   return (
     <div className="flex flex-col h-screen min-h-[100dvh] bg-gray-50 overflow-hidden">
+      {!hideTopbar && <OnboardingTour />}
       {/* Edit mode banner - full app width at top, above sidebar and content */}
       <EditModeBanner />
       <EditModeGuard />

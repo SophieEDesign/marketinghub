@@ -22,6 +22,7 @@ import { useGridData, type GridRow } from '@/lib/grid/useGridData'
 import { useOperationFeedback } from '@/hooks/useOperationFeedback'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { ErrorState } from '@/components/ui/ErrorState'
+import { GridSkeleton } from '@/components/ui/GridSkeleton'
 import { CellFactory } from './CellFactory'
 import GridColumnHeader from './GridColumnHeader'
 import BulkActionBar from './BulkActionBar'
@@ -1625,21 +1626,16 @@ export default function AirtableGridView({
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-64">
-        <div className="text-gray-500 mb-2">Loading grid data...</div>
+      <div className="flex flex-col h-64">
+        <GridSkeleton columns={Math.min(safeFields.length || 5, 6)} rows={6} className="flex-1" />
         {loadingTime > 5 && (
-          <div className="text-sm text-yellow-600 mt-2">
-            Taking longer than expected ({loadingTime}s). 
+          <div className="text-sm text-yellow-600 mt-2 px-4">
+            Taking longer than expected ({loadingTime}s).
             {loadingTime > 10 && (
               <span className="block mt-1 text-xs">
                 If this continues, try refreshing the page or check the browser console for errors.
               </span>
             )}
-          </div>
-        )}
-        {typeof window !== 'undefined' && (process.env.NODE_ENV === 'development' || localStorage.getItem('DEBUG_GRID') === '1') && (
-          <div className="text-xs text-gray-400 mt-2">
-            Debug: tableName={tableName}, tableId={tableIdState || tableId}, fields={fields?.length || 0}
           </div>
         )}
       </div>

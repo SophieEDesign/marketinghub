@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import RichTextEditor from '@/components/fields/RichTextEditor'
+import { sanitizeRichText } from "@/lib/sanitize"
 import TextCellModal from '@/components/grid/TextCellModal'
 import {
   ContextMenu,
@@ -172,7 +173,7 @@ export default function LongTextCell({
                   lineHeight: '1.25',
                   maxHeight: wrapText ? contentMaxHeight : 'none',
                 }}
-                dangerouslySetInnerHTML={{ __html: value }}
+                dangerouslySetInnerHTML={{ __html: sanitizeRichText(value) }}
               />
             ) : (
               <span className={`text-gray-400 italic truncate w-full`}>

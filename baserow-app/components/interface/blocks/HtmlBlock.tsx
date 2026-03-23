@@ -2,6 +2,7 @@
 
 import type { PageBlock } from "@/lib/interface/types"
 import { Code } from "lucide-react"
+import { sanitizeHtmlBlock } from "@/lib/sanitize"
 
 interface HtmlBlockProps {
   block: PageBlock
@@ -25,7 +26,7 @@ export default function HtmlBlock({ block, isEditing = false }: HtmlBlockProps) 
 
   return (
     <div className="w-full h-full min-h-0 overflow-auto">
-      <div dangerouslySetInnerHTML={{ __html: html }} />
+      <div dangerouslySetInnerHTML={{ __html: sanitizeHtmlBlock(html) }} />
     </div>
   )
 }

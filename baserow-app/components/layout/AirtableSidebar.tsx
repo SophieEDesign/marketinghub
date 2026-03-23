@@ -80,7 +80,7 @@ export default function AirtableSidebar({
   
   // Load initial state - use default on server, sync from localStorage on client after mount
   // This prevents hydration mismatches
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["interfaces"]))
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
   const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set())
   const [isMounted, setIsMounted] = useState(false)
   
@@ -226,6 +226,7 @@ export default function AirtableSidebar({
       
       <div 
         data-sidebar
+        data-tour="sidebar"
         className={cn(
           "flex flex-col h-screen shadow-sm transition-transform duration-300 flex-shrink-0",
           isMobile 

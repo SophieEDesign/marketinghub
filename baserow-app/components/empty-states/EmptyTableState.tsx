@@ -1,7 +1,7 @@
 "use client"
 
-import { Database, Plus } from "lucide-react"
 import EmptyState from "./EmptyState"
+import { EmptyTableIllustration } from "./EmptyStateIllustrations"
 
 interface EmptyTableStateProps {
   onCreateRecord?: () => void
@@ -16,7 +16,7 @@ export default function EmptyTableState({
 }: EmptyTableStateProps) {
   return (
     <EmptyState
-      icon={<Database className="h-12 w-12" />}
+      illustration={<EmptyTableIllustration className="w-28 h-20" />}
       title="No records yet"
       description="Get started by adding your first record or importing data from a CSV file."
       action={onCreateRecord ? {

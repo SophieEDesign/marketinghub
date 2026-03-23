@@ -2,7 +2,9 @@ import { NextResponse } from 'next/server'
 import { runScheduledAutomations } from '@/lib/automations/scheduler'
 
 /**
- * API endpoint for Vercel Cron to trigger scheduled automations
+ * API endpoint for Vercel Cron to trigger scheduled automations.
+ * Exempt from session middleware - auth via CRON_SECRET bearer token only.
+ *
  * Configure in vercel.json:
  * {
  *   "crons": [{
@@ -10,9 +12,11 @@ import { runScheduledAutomations } from '@/lib/automations/scheduler'
  *     "schedule": "every minute" or use cron syntax
  *   }]
  * }
+ *
+ * Production: Set CRON_SECRET in Vercel env. Vercel adds "Authorization: Bearer <CRON_SECRET>"
+ * to cron requests automatically when CRON_SECRET is configured.
  */
 export async function GET(request: Request) {
-  // Verify cron secret if needed
   const authHeader = request.headers.get('authorization')
   if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

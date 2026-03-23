@@ -1,11 +1,20 @@
 "use client"
 
-import { useState } from "react"
 import CommandPalette from "./CommandPalette"
+import { CommandPaletteProvider as CommandPaletteContextProvider, useCommandPalette } from "@/contexts/CommandPaletteContext"
 
-export default function CommandPaletteProvider() {
-  const [open, setOpen] = useState(false)
+function CommandPaletteDialog() {
+  const ctx = useCommandPalette()
+  if (!ctx) return null
+  return <CommandPalette open={ctx.open} onOpenChange={ctx.setOpen} />
+}
 
-  return <CommandPalette open={open} onOpenChange={setOpen} />
+export default function CommandPaletteProvider({ children }: { children?: React.ReactNode }) {
+  return (
+    <CommandPaletteContextProvider>
+      {children}
+      <CommandPaletteDialog />
+    </CommandPaletteContextProvider>
+  )
 }
 

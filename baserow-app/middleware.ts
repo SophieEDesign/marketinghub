@@ -63,8 +63,9 @@ function isProtectedRoute(pathname: string): boolean {
  */
 function isPublicApiRoute(pathname: string): boolean {
   const publicApiRoutes = [
-    '/api/workspace-settings',  // Allow unauthenticated access for branding on login page
-    '/api/auth',                 // Auth-related APIs (if any)
+    '/api/workspace-settings',         // Allow unauthenticated access for branding on login page
+    '/api/auth',                       // Auth-related APIs (if any)
+    '/api/automations/run-scheduled',  // Cron endpoint - auth via CRON_SECRET bearer token only
   ];
 
   return publicApiRoutes.some(route => matchesRoute(pathname, route));

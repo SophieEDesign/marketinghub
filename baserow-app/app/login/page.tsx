@@ -14,6 +14,7 @@ import {
   validateEmail, 
   performPostAuthRedirect
 } from "@/lib/auth-utils"
+import ThemeToggle from "@/components/layout/ThemeToggle"
 
 function LoginForm() {
   const [email, setEmail] = useState("")
@@ -143,7 +144,10 @@ function LoginForm() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
+    <div className="flex min-h-screen items-center justify-center p-4 relative">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           {logoUrl && (
