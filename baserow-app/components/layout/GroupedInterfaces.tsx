@@ -201,8 +201,8 @@ export default function GroupedInterfaces({
     return result
   }, [pages, ungroupedGroupId])
 
-  // Get uncategorized pages (but we won't show them in a separate section)
-  const uncategorizedPages = pagesByGroup["uncategorized"] || []
+  // Get uncategorized/ungrouped pages - use ungroupedGroupId as key (never "uncategorized")
+  const uncategorizedPages = pagesByGroup[ungroupedGroupId] || []
 
   // Filter groups based on mode
   // In Browse mode, hide system groups (like "Ungrouped") BUT only if they're empty
@@ -1060,9 +1060,6 @@ export default function GroupedInterfaces({
         {sortedGroups.map((group) => {
           const isCollapsed = collapsedGroups.has(group.id)
           const groupPages = pagesByGroup[group.id] || []
-          
-          // Skip empty groups in Browse mode
-          if (groupPages.length === 0) return null
           
           return (
             <div key={group.id} className="py-0.5">

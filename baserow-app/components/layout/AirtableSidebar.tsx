@@ -20,10 +20,13 @@ import {
   Calendar,
   Clock,
   LayoutGrid,
+  Check,
+  Edit2,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useBranding } from "@/contexts/BrandingContext"
 import { usePageActions } from "@/contexts/PageActionsContext"
+import { useSidebarEditMode } from "@/contexts/EditModeContext"
 import RecentsFavoritesSection from "./RecentsFavoritesSection"
 import BaseDropdown from "./BaseDropdown"
 import { cn } from "@/lib/utils"
@@ -75,6 +78,7 @@ export default function AirtableSidebar({
   const router = useRouter()
   const { brandName, logoUrl, primaryColor, sidebarColor, sidebarTextColor } = useBranding()
   const { pageActions } = usePageActions()
+  const { isEditing: isSidebarEditMode, enter: enterSidebarEdit, exit: exitSidebarEdit } = useSidebarEditMode()
   const isMobile = useIsMobile()
   const previousPathnameRef = useRef<string | null>(null)
   
@@ -116,8 +120,8 @@ export default function AirtableSidebar({
   const isCollapsed = isMobile ? !isOpen : internalCollapsed
   
   const isAdmin = userRole === 'admin'
-  // When in edit mode, show Add page and reorder UI in sidebar
-  const isEditMode = pageActions?.isEditing ?? false
+  // Sidebar edit mode: independent of page edit mode. Use dedicated "Edit interfaces" button.
+  const isEditMode = isSidebarEditMode
 
   const params = useParams()
   const isInterfacePage = (params?.pageId as string) != null
@@ -271,6 +275,31 @@ export default function AirtableSidebar({
 
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto">
+        {/* Interfaces section header with Edit/Done toggle */}
+        <div className="px-3 mb-1 flex items-center justify-between">
+          <button
+            onClick={() => (isEditMode ? exitSidebarEdit() : enterSidebarEdit())}
+            className={cn(
+              "flex items-center gap-2 px-2 py-1.5 text-xs font-medium rounded transition-colors",
+              isEditMode && "bg-black/20"
+            )}
+            style={{ color: sidebarTextColor }}
+            title={isEditMode ? "Done editing interfaces" : "Edit interfaces"}
+            aria-label={isEditMode ? "Done editing interfaces" : "Edit interfaces"}
+          >
+            {isEditMode ? (
+              <>
+                <Check className="h-3.5 w-3.5" />
+                <span>Done</span>
+              </>
+            ) : (
+              <>
+                <Edit2 className="h-3.5 w-3.5" />
+                <span>Edit</span>
+              </>
+            )}
+          </button>
+        </div>
         {/* Primary Navigation (Airtable-style) */}
         <div className="py-2">
           <GroupedInterfaces

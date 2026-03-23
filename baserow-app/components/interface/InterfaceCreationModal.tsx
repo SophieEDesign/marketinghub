@@ -110,7 +110,7 @@ export default function InterfaceCreationModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100">
         <DialogHeader>
           <DialogTitle>Create New Interface</DialogTitle>
           <DialogDescription>
