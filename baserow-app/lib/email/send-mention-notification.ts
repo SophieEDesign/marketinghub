@@ -19,7 +19,7 @@ export async function sendMentionNotification(
 
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey?.trim()) {
-    console.warn("[sendMentionNotification] RESEND_API_KEY not set, skipping email")
+    console.warn("[sendMentionNotification] RESEND_API_KEY not set, skipping email. toEmail:", toEmail)
     return { success: false, error: "Email not configured" }
   }
 
@@ -54,10 +54,11 @@ export async function sendMentionNotification(
     })
 
     if (error) {
-      console.error("[sendMentionNotification] Resend error:", error)
+      console.error("[sendMentionNotification] Resend error:", error, "toEmail:", toEmail)
       return { success: false, error: error.message }
     }
 
+    console.log("[sendMentionNotification] Email sent successfully to:", toEmail)
     return { success: true }
   } catch (err: unknown) {
     const msg = (err as { message?: string })?.message || "Unknown error"
