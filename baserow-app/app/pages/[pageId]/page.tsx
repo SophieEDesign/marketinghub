@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation"
-import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { isAdmin } from "@/lib/roles"
 import { getInterfacePage, querySqlView } from "@/lib/interface/pages"
