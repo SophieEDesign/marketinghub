@@ -125,10 +125,11 @@ export async function POST(
     let recordSummary: string | null = null
     if (mentionedEmails.length > 0) {
       const fields = await getTableFields(tableId)
+      const tableWithPrimary = table as { primary_field_name?: string | null }
+      const configuredPrimary = tableWithPrimary.primary_field_name
       const primaryName =
-        (table as { primary_field_name?: string | null }).primary_field_name &&
-        (table as { primary_field_name?: string }).primary_field_name !== "id"
-          ? toPostgrestColumn((table as { primary_field_name: string }).primary_field_name)
+        configuredPrimary && configuredPrimary !== "id"
+          ? toPostgrestColumn(configuredPrimary)
           : null
       const primaryCol = primaryName || getPrimaryFieldName(fields)
       const safeCol = primaryCol ? toPostgrestColumn(primaryCol) : null
@@ -138,7 +139,8 @@ export async function POST(
           .select(safeCol)
           .eq("id", recordId)
           .maybeSingle()
-        const val = recordRow?.[safeCol]
+        const row = recordRow as Record<string, unknown> | null
+        const val = row?.[safeCol]
         if (val != null && typeof val === "string") recordSummary = val
         else if (val != null) recordSummary = String(val)
       }
