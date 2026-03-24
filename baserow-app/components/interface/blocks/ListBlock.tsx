@@ -24,6 +24,7 @@ import { VIEWS_ENABLED } from "@/lib/featureFlags"
 import type { GroupRule } from "@/lib/grouping/types"
 import type { FieldLayoutItem } from "@/lib/interface/field-layout-utils"
 import { getVisibleFieldsForCard } from "@/lib/interface/field-layout-helpers"
+import { useMarketingDashboard } from "@/contexts/MarketingDashboardContext"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 function isUuidLike(value: string | null | undefined): value is string {
@@ -55,6 +56,7 @@ export default function ListBlock({
   onEphemeralHeightDelta,
   rowHeight = 30,
 }: ListBlockProps) {
+  const marketingDashboardStyle = useMarketingDashboard()
   const { toast } = useToast()
   const { config } = block
   const configContentKey = config ? JSON.stringify(config) : ''
@@ -557,6 +559,7 @@ export default function ListBlock({
         onHeightChange={(groupBy || (groupByRulesFromConfig && groupByRulesFromConfig.length > 0)) ? handleHeightChange : undefined}
         rowHeight={rowHeight}
         cascadeContext={cascadeContext}
+        marketingDashboardStyle={marketingDashboardStyle}
       />
       </div>
     </div>

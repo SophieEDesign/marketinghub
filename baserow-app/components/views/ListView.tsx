@@ -31,6 +31,7 @@ import type { HighlightRule } from "@/lib/interface/types"
 import { evaluateHighlightRules, getFormattingStyle } from "@/lib/conditional-formatting/evaluator"
 import { getFieldDisplayName } from "@/lib/fields/display"
 import { useRealtimeTable } from "@/lib/realtime/useRealtimeTable"
+import { cn } from "@/lib/utils"
 
 // PostgREST expects unquoted identifiers in order clauses; see `lib/supabase/postgrest`.
 
@@ -83,6 +84,8 @@ interface ListViewProps {
   blockConfig?: Record<string, any>
   /** Callback to save field layout when user edits modal layout in right panel. */
   onModalLayoutSave?: (fieldLayout: import("@/lib/interface/field-layout-utils").FieldLayoutItem[]) => void
+  /** Marketing Dashboard: softer cards / list rows */
+  marketingDashboardStyle?: boolean
 }
 
 export default function ListView({
@@ -118,6 +121,7 @@ export default function ListView({
   onRecordDeleted,
   blockConfig,
   onModalLayoutSave,
+  marketingDashboardStyle = false,
 }: ListViewProps) {
   const router = useRouter()
   const { openRecord } = useRecordPanel()
@@ -969,7 +973,14 @@ export default function ListView({
               : "flex-1 min-h-0 overflow-y-auto"
           }
         >
-          <div className="border border-gray-200 rounded-lg bg-white">
+          <div
+            className={cn(
+              "border bg-white",
+              marketingDashboardStyle
+                ? "marketing-card border-border/50 rounded-card-lg shadow-card"
+                : "border-gray-200 rounded-lg"
+            )}
+          >
             <table className="w-full border-collapse">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50">
@@ -1175,7 +1186,14 @@ export default function ListView({
   return (
     <div ref={contentRef} className="h-full flex flex-col">
       <div className="flex-1 overflow-auto">
-        <div className="border border-gray-200 rounded-lg bg-white">
+        <div
+          className={cn(
+            "border bg-white",
+            marketingDashboardStyle
+              ? "marketing-card border-border/50 rounded-card-lg shadow-card"
+              : "border-gray-200 rounded-lg"
+          )}
+        >
           <table className="w-full border-collapse">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">

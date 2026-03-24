@@ -32,6 +32,7 @@ import { VIEWS_ENABLED } from "@/lib/featureFlags"
 import { normalizeUuid } from "@/lib/utils/ids"
 import { isAbortError } from "@/lib/api/error-handling"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
+import { useMarketingDashboard } from "@/contexts/MarketingDashboardContext"
 import { startOfWeek, endOfWeek, startOfDay, addWeeks, startOfMonth, endOfMonth, addMonths } from "date-fns"
 import type { GroupRule } from "@/lib/grouping/types"
 import { getVisibleFieldsFromLayout } from "@/lib/interface/field-layout-helpers"
@@ -79,6 +80,7 @@ export default function GridBlock({
   isFullPage = false,
   openRecordInEditModeForBlock,
 }: GridBlockProps) {
+  const marketingDashboardStyle = useMarketingDashboard()
   // #region HOOK CHECK - GridBlock render start
   if (process.env.NODE_ENV === 'development') {
     console.log('[HOOK CHECK]', 'GridBlock render start', { blockId: block.id, viewType: block.config?.view_type })
@@ -1046,6 +1048,7 @@ export default function GridBlock({
             interfaceMode={interfaceMode}
             onRecordDeleted={() => setRefreshKey((k) => k + 1)}
             onModalLayoutSave={onModalLayoutSave ?? undefined}
+            marketingDashboardStyle={marketingDashboardStyle}
           />
         )
       }
@@ -1151,6 +1154,7 @@ export default function GridBlock({
             interfaceMode={interfaceMode}
             onRecordDeleted={() => setRefreshKey((k) => k + 1)}
             onModalLayoutSave={onModalLayoutSave ?? undefined}
+            marketingDashboardStyle={marketingDashboardStyle}
           />
         )
       }

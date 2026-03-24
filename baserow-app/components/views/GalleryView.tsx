@@ -19,6 +19,8 @@ import { Button } from "@/components/ui/button"
 import EmptyState from "@/components/empty-states/EmptyState"
 import type { HighlightRule } from "@/lib/interface/types"
 import { evaluateHighlightRules, getFormattingStyle } from "@/lib/conditional-formatting/evaluator"
+import { cn } from "@/lib/utils"
+import { getMarketingStatusPillClassNames, isMarketingStatusField } from "@/lib/status-colors"
 
 interface GalleryViewProps {
   tableId: string
@@ -55,6 +57,8 @@ interface GalleryViewProps {
   onRecordDeleted?: () => void
   /** Callback to save field layout when user edits modal layout in right panel. */
   onModalLayoutSave?: (fieldLayout: import("@/lib/interface/field-layout-utils").FieldLayoutItem[]) => void
+  /** Marketing Dashboard: rounded cards, softer borders, status pill styling */
+  marketingDashboardStyle?: boolean
 }
 
 export default function GalleryView({
@@ -80,6 +84,7 @@ export default function GalleryView({
   interfaceMode = 'view',
   onRecordDeleted,
   onModalLayoutSave,
+  marketingDashboardStyle = false,
 }: GalleryViewProps) {
   const { openRecord } = useRecordPanel()
   const [rows, setRows] = useState<TableRow[]>([])
@@ -515,9 +520,13 @@ export default function GalleryView({
       return (
         <Card
           key={reactKey}
-          className={`hover:shadow-md transition-shadow bg-white border-gray-200 rounded-lg overflow-hidden cursor-default ${
+          className={cn(
+            "hover:shadow-md transition-shadow bg-white overflow-hidden cursor-default",
+            marketingDashboardStyle
+              ? "marketing-card border-border/50 rounded-card-lg"
+              : "border-gray-200 rounded-lg",
             selectedCardId === String(row.id) ? "ring-1 ring-blue-400/40 bg-blue-50/30" : ""
-          }`}
+          )}
           style={{ ...borderColor, ...rowFormattingStyle }}
           onClick={() => setSelectedCardId(String(row.id))}
           onDoubleClick={() => handleOpenRecord(String(row.id))}
@@ -585,11 +594,26 @@ export default function GalleryView({
                 const label = fieldObj?.name || fieldName
                 const fieldValue = row.data?.[fieldObj?.name || fieldName]
                 const isVirtual = fieldObj?.type === "formula" || fieldObj?.type === "lookup"
+                const statusPill =
+                  marketingDashboardStyle &&
+                  isMarketingStatusField(fieldObj?.name || fieldName, fieldObj?.type) &&
+                  (fieldValue !== null && fieldValue !== undefined && String(fieldValue).trim() !== "")
+                const pillCls = statusPill ? getMarketingStatusPillClassNames(fieldValue) : null
                 return (
                   <div key={fieldName} className="text-xs text-gray-700">
                     <span className="text-gray-500 font-medium">{label}:</span>{" "}
                     <span className="text-gray-900" onDoubleClick={(e) => e.stopPropagation()}>
-                      {fieldObj ? (
+                      {statusPill && pillCls ? (
+                        <span
+                          className={cn(
+                            "inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium max-w-full truncate",
+                            pillCls.bg,
+                            pillCls.text
+                          )}
+                        >
+                          {String(fieldValue)}
+                        </span>
+                      ) : fieldObj ? (
                         <CellFactory
                           field={fieldObj}
                           value={fieldValue}
@@ -626,6 +650,7 @@ export default function GalleryView({
       highlightRules,
       tableFields,
       titleField,
+      marketingDashboardStyle,
     ]
   )
 

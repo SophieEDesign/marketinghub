@@ -46,6 +46,7 @@ function InterfacePageContent({
   pageTableId,
   recordContext,
   setRecordContext,
+  marketingDashboard,
 }: {
   useRecordReviewLayout: boolean
   hasPage: boolean
@@ -59,6 +60,7 @@ function InterfacePageContent({
   pageTableId: string | null
   recordContext: RecordContext
   setRecordContext: (ctx: RecordContext) => void
+  marketingDashboard: boolean
 }) {
   if (useRecordReviewLayout && hasPage) {
     return (
@@ -85,6 +87,7 @@ function InterfacePageContent({
         recordTableId={recordContext?.tableId ?? null}
         onRecordContextChange={setRecordContext}
         mode="view"
+        marketingDashboard={marketingDashboard}
       />
     </div>
   )
@@ -138,6 +141,13 @@ function InterfacePageClientInternal({
 
   // Content pages only: ephemeral record context (never persisted). Not used for record_review/record_view.
   const [recordContext, setRecordContext] = useState<RecordContext>(null)
+
+  /** Marketing Dashboard page: calmer shell, search hint, card styling (name or config.layout_style). */
+  const marketingDashboard = useMemo(() => {
+    if (!page) return false
+    const cfg = page.config as { layout_style?: string } | undefined
+    return page.name === "Marketing Dashboard" || cfg?.layout_style === "marketing_dashboard"
+  }, [page?.name, page?.config])
   
   // Track previous pageId to reset blocks when page changes
   // CRITICAL: Use ref to track actual pageId changes, not effect dependencies
@@ -1467,6 +1477,7 @@ function InterfacePageClientInternal({
             pageTableId={pageTableId}
             recordContext={recordContext}
             setRecordContext={setRecordContext}
+            marketingDashboard={marketingDashboard}
           />
           {blocksLoading && (
             <div className="absolute inset-0 bg-white/60 flex items-center justify-center z-10 pointer-events-none">

@@ -24,11 +24,20 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
     --radius: 0.5rem;
+    /* Marketing workspace: calm hierarchy (Linear / Notion-inspired) */
+    --radius-card: 0.875rem;
+    --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+    --shadow-card-hover: 0 4px 6px -1px rgb(0 0 0 / 0.06), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+    --accent-hue: 238;
+    /* Light mode: indigo link */
+    --accent-link: 238 76% 58%;
+    --section-gap: 2rem;
   }
 
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
+    --accent-link: 234 89% 74%;
     /* Override sidebar branding in dark mode so theme applies consistently */
     --sidebar-bg: 222.2 47% 11%;
     --card: 222.2 84% 4.9%;
@@ -57,6 +66,35 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer base {
+  .marketing-dashboard-shell {
+    --section-gap: 2rem;
+  }
+}
+
+@layer base {
+  .marketing-card {
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+    border-color: hsl(var(--border) / 0.55);
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+  }
+  .marketing-card:hover {
+    box-shadow: var(--shadow-card-hover);
+  }
+}
+
+@layer base {
+  a.text-accent-link,
+  .text-accent-link {
+    color: hsl(var(--accent-link));
+  }
+  .ring-accent-focus:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--accent-link) / 0.35);
   }
 }
 

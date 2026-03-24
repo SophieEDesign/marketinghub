@@ -34,6 +34,7 @@ import {
 import { usePageAggregates } from "@/lib/dashboard/usePageAggregates"
 import { useFilterState } from "@/lib/interface/filter-state"
 import SaveStatusIndicator from "@/components/save-status/SaveStatusIndicator"
+import { MarketingDashboardCanvasShell } from "@/components/interface/MarketingDashboardLayout"
 import { createClient } from "@/lib/supabase/client"
 import type { FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
@@ -62,6 +63,8 @@ interface InterfaceBuilderProps {
   onRecordContextChange?: (context: RecordContext) => void // Content pages: set/clear page-level record context
   pageEditable?: boolean // Page-level editability (for field blocks)
   editableFieldNames?: string[] // Field-level editable list (for field blocks)
+  /** Marketing Dashboard: calmer layout, search hint, card styling context */
+  marketingDashboard?: boolean
 }
 
 export default function InterfaceBuilder({
@@ -79,6 +82,7 @@ export default function InterfaceBuilder({
   onRecordContextChange,
   pageEditable,
   editableFieldNames = [],
+  marketingDashboard = false,
 }: InterfaceBuilderProps) {
   const { primaryColor } = useBranding()
   const { toast } = useToast()
@@ -1745,10 +1749,17 @@ export default function InterfaceBuilder({
         {/* Full-page: no scroll, no padding. Normal: overflow-x-hidden prevents blocks spilling horizontally; overflow-y-visible for vertical flow. Parent has overflow-x-hidden. */}
         <div
           ref={canvasScrollContainerRef}
-          className={`flex flex-col min-w-0 w-full min-h-0 ${fullPageBlockId ? "flex-1 overflow-hidden p-0" : "overflow-x-hidden overflow-y-visible p-4"}`}
+          className={`flex flex-col min-w-0 w-full min-h-0 ${
+            fullPageBlockId
+              ? "flex-1 overflow-hidden p-0"
+              : marketingDashboard
+                ? "overflow-x-hidden overflow-y-visible p-0"
+                : "overflow-x-hidden overflow-y-visible p-4"
+          }`}
         >
           <FilterStateProvider>
             {/* Blocks always render - no conditional visibility. Edit mode changes behaviour only. */}
+            <MarketingDashboardCanvasShell enabled={marketingDashboard}>
             <Canvas
               blocks={blocks}
               isEditing={effectiveIsEditing}
@@ -1837,6 +1848,7 @@ export default function InterfaceBuilder({
                   : undefined
               }
             />
+            </MarketingDashboardCanvasShell>
           </FilterStateProvider>
           {/* Footer spacer to ensure bottom content is visible and resize handles reachable in editor */}
           <div className={`w-full ${effectiveIsEditing ? 'h-64' : 'h-48'}`} />
