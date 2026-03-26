@@ -12,7 +12,7 @@
     "test:watch": "vitest",
     "predeploy-check": "tsx scripts/predeploy-check.ts",
     "repair-linked-fields": "tsx scripts/repair-linked-fields.ts",
-    "seed:marketing-dashboard": "node --experimental-strip-types scripts/seed-marketing-dashboard.ts",
+    "seed:marketing-dashboard": "node scripts/seed-marketing-dashboard.cjs",
     "prebuild": "npm run predeploy-check",
     "test:e2e": "playwright test"
   },

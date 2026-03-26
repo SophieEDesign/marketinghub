@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import { Link2, Plus, X, Calculator, Link as LinkIcon, Paperclip, ExternalLink, Mail, Pencil } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { formatDateByField, formatNumericValue } from "@/lib/fields/format"
-import { cn } from "@/lib/utils"
+import { cn, toISODateString } from "@/lib/utils"
 import type { TableField } from "@/types/fields"
 import { useToast } from "@/components/ui/use-toast"
 import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/LookupFieldPicker"
@@ -112,7 +112,10 @@ export default function InlineFieldEditor({
     if (isEditing && inputRef.current) {
       inputRef.current.focus()
       if (inputRef.current instanceof HTMLInputElement || inputRef.current instanceof HTMLTextAreaElement) {
-        inputRef.current.select()
+        // `select()` on type="date" fights native segment editing and makes digits jump while typing.
+        if (inputRef.current.type !== "date") {
+          inputRef.current.select()
+        }
       }
     }
   }, [isEditing])
@@ -122,9 +125,15 @@ export default function InlineFieldEditor({
   }
 
   const handleBlur = () => {
-    onChange(localValue)
+    const committed =
+      field.type === "date"
+        ? localValue
+          ? (toISODateString(localValue) ?? null)
+          : null
+        : localValue
+    onChange(committed)
     onEditEnd()
-    onBlur?.(localValue)
+    onBlur?.(committed)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -349,10 +358,11 @@ export default function InlineFieldEditor({
 
   // Date fields
   if (field.type === "date") {
-    // For input: use ISO format (YYYY-MM-DD) - HTML5 date input requires this
-    const dateValueForInput = value ? new Date(value).toISOString().split("T")[0] : ""
     // For display: use field's date_format option or UK format
     const dateValueForDisplay = formatDateByField(value, field, "—")
+    // While editing, bind to localValue — parent value only updates on blur (like other inline types).
+    // Controlling from prop `value` here would reset the picker/typing on every render.
+    const dateInputValue = localValue ? (toISODateString(localValue) ?? "") : ""
 
     if (isEditing && !isReadOnly) {
       return (
@@ -361,7 +371,7 @@ export default function InlineFieldEditor({
           <input
             ref={inputRef as React.RefObject<HTMLInputElement>}
             type="date"
-            value={dateValueForInput}
+            value={dateInputValue}
             onChange={(e) => handleChange(e.target.value || null)}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}

@@ -1,22 +1,47 @@
 /**
  * One-off seed: creates the "Marketing Dashboard" interface page and view_blocks.
+ * CommonJS so Node resolves @supabase/supabase-js from baserow-app/node_modules reliably.
+ *
+ * Loads optional vars from .env.local (next to package.json) if not already set.
  *
  * Requires:
  * - NEXT_PUBLIC_SUPABASE_URL
  * - SUPABASE_SERVICE_ROLE_KEY
  *
- * Run from baserow-app:
- *   npx tsx scripts/seed-marketing-dashboard.ts
- *
- * Idempotent: if a non-archived page named "Marketing Dashboard" exists, exits without changes.
+ * Run from baserow-app: npm run seed:marketing-dashboard
  */
-import { createClient } from "@supabase/supabase-js"
+
+const fs = require("fs")
+const path = require("path")
+
+function loadEnvLocal() {
+  const envPath = path.join(__dirname, "..", ".env.local")
+  if (!fs.existsSync(envPath)) return
+  const text = fs.readFileSync(envPath, "utf8")
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith("#")) continue
+    const eq = trimmed.indexOf("=")
+    if (eq <= 0) continue
+    const key = trimmed.slice(0, eq).trim()
+    let val = trimmed.slice(eq + 1).trim()
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+      val = val.slice(1, -1)
+    }
+    if (!process.env[key]) process.env[key] = val
+  }
+}
+
+loadEnvLocal()
+
+const { createClient } = require("@supabase/supabase-js")
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 if (!supabaseUrl || !supabaseServiceKey) {
   console.error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY")
+  console.error("Set them in the environment or in baserow-app/.env.local")
   process.exit(1)
 }
 
@@ -26,11 +51,22 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 
 const ACTIVE_STATUS = ["live", "Live", "in progress", "In Progress", "Active", "active"]
 
-function matchTable(
-  rows: { id: string; name: string }[],
-  pred: (name: string) => boolean
-): string | undefined {
+function matchTable(rows, pred) {
   return rows.find((t) => pred(t.name))?.id
+}
+
+function section(html, y, h = 2) {
+  return {
+    type: "html",
+    position_x: 0,
+    position_y: y,
+    width: 12,
+    height: h,
+    config: {
+      title: "",
+      html,
+    },
+  }
 }
 
 async function main() {
@@ -109,19 +145,7 @@ async function main() {
 
   const pageId = page.id
 
-  const section = (html: string, y: number, h = 2) => ({
-    type: "html" as const,
-    position_x: 0,
-    position_y: y,
-    width: 12,
-    height: h,
-    config: {
-      title: "",
-      html,
-    },
-  })
-
-  const blocks: Array<Record<string, unknown>> = [
+  const blocks = [
     section(
       `<div class="pt-1 pb-2 border-b border-border/50"><h2 class="text-lg font-semibold tracking-tight text-foreground">Focus</h2><p class="text-sm text-muted-foreground mt-1">Active work, this week, and priorities</p></div>`,
       0,
@@ -296,21 +320,18 @@ async function main() {
     },
   })
 
-  const rows = blocks.map((b, order_index) => {
-    const row = b as Record<string, unknown>
-    return {
-      page_id: pageId,
-      view_id: null,
-      type: row.type as string,
-      position_x: row.position_x as number,
-      position_y: row.position_y as number,
-      width: row.width as number,
-      height: row.height as number,
-      config: row.config,
-      order_index,
-      is_archived: false,
-    }
-  })
+  const rows = blocks.map((b, order_index) => ({
+    page_id: pageId,
+    view_id: null,
+    type: b.type,
+    position_x: b.position_x,
+    position_y: b.position_y,
+    width: b.width,
+    height: b.height,
+    config: b.config,
+    order_index,
+    is_archived: false,
+  }))
 
   const { error: bErr } = await supabase.from("view_blocks").insert(rows)
 
