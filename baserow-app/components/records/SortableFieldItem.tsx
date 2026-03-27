@@ -53,11 +53,15 @@ export default function SortableFieldItem({
       style={style}
       className={cn(
         "relative group",
-        !isVisible && "opacity-50"
+        !isVisible && "opacity-50",
+        // When sortable is disabled, dnd-kit can still leave the draggable node intercepting clicks
+        // (e.g. first column stops responding after editing a field further down). Let events pass
+        // through the wrapper; children opt back in with pointer-events-auto.
+        !layoutMode && "pointer-events-none"
       )}
     >
       {layoutMode && (
-        <div className="absolute left-0 top-0 bottom-0 flex items-center z-10 -ml-0.5">
+        <div className="absolute left-0 top-0 bottom-0 flex items-center z-10 -ml-0.5 pointer-events-auto">
           <div
             {...attributes}
             {...listeners}
@@ -83,7 +87,7 @@ export default function SortableFieldItem({
           )}
         </div>
       )}
-      <div className={cn(layoutMode && "ml-10")}>
+      <div className={cn(layoutMode && "ml-10", "pointer-events-auto min-w-0")}>
         {children}
       </div>
     </div>

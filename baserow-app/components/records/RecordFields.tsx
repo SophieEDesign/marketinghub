@@ -103,6 +103,11 @@ export default function RecordFields({
   const { toast } = useToast()
   const [editingField, setEditingField] = useState<string | null>(null)
   const [tableName, setTableName] = useState<string | undefined>(propTableName)
+
+  // Clear single-field edit mode when switching records (e.g. create → saved id) so no stale id blocks clicks.
+  useEffect(() => {
+    setEditingField(null)
+  }, [recordId])
   const supabase = createClient()
   const columnsContainerRef = useRef<HTMLDivElement | null>(null)
   const hasBootstrappedColumnsRef = useRef(false)
@@ -489,7 +494,9 @@ export default function RecordFields({
 
   // Drag and drop sensors for layout mode
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
