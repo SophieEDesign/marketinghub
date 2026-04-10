@@ -1,5 +1,11 @@
 "use client"
 
+/**
+ * TECH DEBT: Uses the parallel ViewBlock stack and @/components/blocks/BlockRenderer.
+ * Migrate to PageBlock + GET /api/pages/[pageId]/blocks when this surface is still needed;
+ * see docs/architecture/BLOCK_SYSTEM_CANONICAL.md.
+ */
+
 import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase/client"
 import BlockRenderer from "@/components/blocks/BlockRenderer"

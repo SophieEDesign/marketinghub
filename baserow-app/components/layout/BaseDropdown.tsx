@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { ChevronDown, Table2, Settings, Shield, Home, Edit2, Eye, Menu } from "lucide-react"
+import { ChevronDown, Table2, Settings, Home, Edit2, Eye, Menu } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useBranding } from "@/contexts/BrandingContext"
 import {
@@ -134,7 +134,7 @@ export default function BaseDropdown({
             className="flex items-center gap-2 cursor-pointer"
           >
             <Home className="h-4 w-4" />
-            Back to home
+            Home
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
@@ -145,8 +145,8 @@ export default function BaseDropdown({
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href="/settings" className="flex items-center gap-2 cursor-pointer">
-            <Shield className="h-4 w-4" />
-            Permissions
+            <Settings className="h-4 w-4" />
+            Workspace settings
           </Link>
         </DropdownMenuItem>
       </DropdownMenuContent>

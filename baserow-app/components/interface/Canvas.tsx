@@ -48,6 +48,8 @@ import { CANVAS_LAYOUT_DEFAULTS } from "@/lib/interface/canvas-layout-defaults"
 import { debugLog, debugWarn, isDebugEnabled } from "@/lib/interface/debug-flags"
 import { debugLog as devLog, debugWarn as devWarn, debugError as devError } from "@/lib/debug"
 import { usePageAggregates } from "@/lib/dashboard/usePageAggregates"
+import { useCanvasPageFiltersResolver } from "@/components/interface/canvas/useCanvasPageFiltersResolver"
+import { useCanvasTopFieldBlockIds } from "@/components/interface/canvas/useCanvasTopFieldBlockIds"
 import { Settings2 } from "lucide-react"
 
 const ResponsiveGridLayout = withResizeObserverWidthProvider(Responsive)
@@ -147,51 +149,16 @@ export default function Canvas({
   const router = useRouter()
   // Get filters from filter blocks for this block
   const { getFiltersForBlock, getFilterTreeForBlock } = useFilterState()
-  
-  // CRITICAL: Stabilize pageFilters callback to prevent usePageAggregates from recalculating
-  // on every render. A new callback each render caused React error #185 (maximum update depth).
-  const pageFiltersResolver = useCallback(
-    (blockId: string) => {
-      const block = blocks.find(b => b.id === blockId)
-      const blockTableId = block?.config?.table_id || pageTableId
-      return getFiltersForBlock(blockId, blockTableId)
-    },
-    [blocks, pageTableId, getFiltersForBlock]
-  )
-  
+
+  const pageFiltersResolver = useCanvasPageFiltersResolver(blocks, pageTableId, getFiltersForBlock)
+
   // CRITICAL: Fetch aggregate data at page level (inside FilterStateProvider)
   // This eliminates duplicate requests - SWR handles deduplication automatically
   // Fetch all aggregates for KPI blocks using per-block page filters.
   // This ensures a Filter block only affects the KPI blocks it targets.
   const aggregateData = usePageAggregates(blocks, pageFiltersResolver)
-  
-  // Identify top two field blocks (by y position) for inline editing without Edit button
-  // Only consider field blocks in the right column (x >= 4) for record view pages
-  const topTwoFieldBlockIds = useMemo(() => {
-    const fieldBlocks = blocks
-      .filter(block => {
-        // Only field blocks
-        if (block.type !== 'field') return false
-        // For record view pages, only consider blocks in right column (x >= 4)
-        // For other pages, consider all field blocks
-        const blockX = block.x ?? 0
-        if (mode === 'view' && recordId) {
-          return blockX >= 4
-        }
-        return true
-      })
-      .sort((a, b) => {
-        // Sort by y position, then by x position
-        const aY = a.y ?? 0
-        const bY = b.y ?? 0
-        if (aY !== bY) return aY - bY
-        return (a.x ?? 0) - (b.x ?? 0)
-      })
-      .slice(0, 2) // Get top two
-      .map(block => block.id)
-    
-    return new Set(fieldBlocks)
-  }, [blocks, mode, recordId])
+
+  const topTwoFieldBlockIds = useCanvasTopFieldBlockIds(blocks, mode, recordId)
   
   // Persistent layout state (saved to DB)
   const [layout, setLayout] = useState<Layout[]>([])

@@ -306,6 +306,12 @@ export default async function WorkspaceShellWrapper({
     }
   }
 
+  const landingPageTitle: string | null =
+    defaultPageId != null
+      ? (interfacePages.find((p: { id: string }) => p.id === defaultPageId)?.name as string | undefined) ??
+        null
+      : null
+
   return (
     <BrandingProvider settings={brandingSettings}>
       <DynamicFavicon />
@@ -324,6 +330,7 @@ export default async function WorkspaceShellWrapper({
               hideTopbar={hideTopbar}
               hideRecordPanel={hideRecordPanel}
               defaultPageId={defaultPageId}
+              landingPageTitle={landingPageTitle}
             >
               {children}
             </WorkspaceShell>

@@ -37,6 +37,7 @@ import { startOfWeek, endOfWeek, startOfDay, addWeeks, startOfMonth, endOfMonth,
 import type { GroupRule } from "@/lib/grouping/types"
 import { getVisibleFieldsFromLayout } from "@/lib/interface/field-layout-helpers"
 import type { FieldLayoutItem } from "@/lib/interface/field-layout-utils"
+import { buildRecordContextFilters } from "@/lib/interface/record-context-filters"
 
 interface GridBlockProps {
   block: PageBlock
@@ -46,6 +47,8 @@ interface GridBlockProps {
   pageTableId?: string | null // Table ID from the page
   pageId?: string | null // Page ID
   recordId?: string | null // Record ID for record review pages (used to detect record context)
+  /** Table ID of the selected record_context row (with recordId); enables record_context_link filters */
+  recordTableId?: string | null
   filters?: FilterConfig[] // Page-level or filter block filters
   filterTree?: FilterTree // Canonical filter tree from filter blocks (supports groups/OR)
   onRecordClick?: (recordId: string, tableId?: string) => void // Callback for record clicks (for RecordReview integration)
@@ -69,6 +72,7 @@ export default function GridBlock({
   pageTableId = null,
   pageId = null,
   recordId = null,
+  recordTableId = null,
   filters = [],
   filterTree = null,
   onRecordClick,
@@ -365,12 +369,19 @@ export default function GridBlock({
     return mergeViewDefaultFiltersWithUserQuickFilters(viewDefaultFilters, userQuickFilters)
   }, [viewDefaultFilters, userQuickFilters])
 
+  const recordContextLinkKey = JSON.stringify(config?.record_context_link ?? null)
+  const recordContextFilters = useMemo(
+    () => buildRecordContextFilters(config?.record_context_link, recordId, recordTableId),
+    [recordId, recordTableId, recordContextLinkKey]
+  )
+
   // Merge filters with proper precedence:
   // - builder-owned view defaults (with session-only user overrides)
   // - filter block filters (additive, cannot override)
+  // - record_context_link (when page has a record_context selection)
   const allFilters = useMemo(() => {
-    return mergeFilters(viewFiltersWithUserOverrides, filters, [])
-  }, [viewFiltersWithUserOverrides, filters])
+    return mergeFilters(viewFiltersWithUserOverrides, filters, recordContextFilters)
+  }, [viewFiltersWithUserOverrides, filters, recordContextFilters])
   const [loading, setLoading] = useState(true)
   const [table, setTable] = useState<{ supabase_table: string; name?: string | null } | null>(null)
   const [tableFields, setTableFields] = useState<any[]>([])

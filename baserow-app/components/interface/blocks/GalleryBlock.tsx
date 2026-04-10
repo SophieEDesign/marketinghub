@@ -12,6 +12,8 @@ interface GalleryBlockProps {
   interfaceMode?: 'view' | 'edit'
   pageTableId?: string | null
   pageId?: string | null
+  recordId?: string | null
+  recordTableId?: string | null
   filters?: FilterConfig[]
   filterTree?: FilterTree
   onRecordClick?: (recordId: string) => void
@@ -30,6 +32,8 @@ export default function GalleryBlock({
   interfaceMode = 'view',
   pageTableId = null,
   pageId = null,
+  recordId = null,
+  recordTableId = null,
   filters = [],
   filterTree = null,
   onRecordClick,
@@ -52,6 +56,8 @@ export default function GalleryBlock({
       interfaceMode={interfaceMode}
       pageTableId={pageTableId}
       pageId={pageId}
+      recordId={recordId}
+      recordTableId={recordTableId}
       filters={filters}
       filterTree={filterTree}
       onRecordClick={onRecordClick}

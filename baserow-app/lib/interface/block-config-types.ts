@@ -111,6 +111,11 @@ export interface RecordContextBlockConfig extends BaseBlockConfig {
   selectionMode: 'single'
 }
 
+// Field Section Block (record layouts: renders all fields in a section)
+export interface FieldSectionBlockConfig extends BaseBlockConfig {
+  group_name?: string
+}
+
 /**
  * Discriminated Union of all block configs
  * Use this with block.type to get proper type narrowing
@@ -131,11 +136,12 @@ export type BlockConfigUnion =
   | (LinkPreviewBlockConfig & { _type: 'link_preview' })
   | (FilterBlockConfig & { _type: 'filter' })
   | (RecordContextBlockConfig & { _type: 'record_context' })
+  | (FieldSectionBlockConfig & { _type: 'field_section' })
 
 /** Block types that have typed config in BlockConfigUnion (for drift detection). */
 export const BLOCK_CONFIG_UNION_TYPES = [
   'grid', 'form', 'record', 'chart', 'kpi', 'text', 'html', 'image', 'gallery',
-  'divider', 'button', 'action', 'link_preview', 'filter', 'record_context',
+  'divider', 'button', 'action', 'link_preview', 'filter', 'record_context', 'field_section',
 ] as const
 
 /**
@@ -339,6 +345,10 @@ export function validateBlockConfig(
       if (!config.field_id) {
         errors.push('Field block requires field_id')
       }
+      break
+
+    case 'field_section':
+      // Section can be empty until configured (setup UI in block)
       break
 
     case 'record_context':

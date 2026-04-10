@@ -73,11 +73,11 @@ export default function RecentsFavoritesSection({ primaryColor, sidebarTextColor
     <>
       {/* Favorites Section */}
       {favorites.length > 0 && (
-        <div className="py-2 border-t border-black/10">
+        <div className="py-2 border-t border-border/50">
           <div className="px-3 mb-1">
             <button
               onClick={() => toggleSection('favorites')}
-              className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold uppercase tracking-wider hover:bg-black/10 rounded transition-colors"
+              className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold uppercase tracking-wider hover:bg-black/[0.06] rounded-lg transition-colors"
               style={{ color: sidebarTextColor }}
             >
               <span>Starred</span>
@@ -96,7 +96,7 @@ export default function RecentsFavoritesSection({ primaryColor, sidebarTextColor
                   <button
                     key={`favorite-${item.entity_type}-${item.entity_id}`}
                     onClick={() => navigateToEntity(item)}
-                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-sm hover:bg-black/10 ${isActive ? 'bg-black/20 font-medium' : ''}`}
+                    className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg transition-colors text-sm hover:bg-black/[0.06] ${isActive ? "bg-black/[0.07] font-medium" : ""}`}
                     style={{ color: sidebarTextColor }}
                   >
                     <Star className="h-3 w-3 flex-shrink-0 fill-yellow-400 text-yellow-400" />

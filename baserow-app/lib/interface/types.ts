@@ -96,6 +96,15 @@ export interface BlockConfig {
   kanban_card_fields?: string[]
   filters?: BlockFilter[]
   sorts?: BlockSort[]
+  /**
+   * Narrow this block to rows linked to the record_context selection.
+   * See `buildRecordContextFilters` in `lib/interface/record-context-filters.ts`.
+   */
+  record_context_link?: {
+    field: string
+    parent_table_id?: string
+    operator?: "equal" | "is_any_of" | "contains"
+  }
   group_by?: string
   chart_type?: ChartType
   chart_x_axis?: string
@@ -161,6 +170,14 @@ export interface BlockConfig {
   target_blocks?: 'all' | string[]
   // Field block
   field_id?: string
+  /** Field section block: section key matching table field groups / field_sections.name */
+  group_name?: string
+  /** Optional subset of field names to show within the section */
+  field_names?: string[]
+  /** Field section: default collapsed state */
+  collapsed?: boolean
+  /** Field section: show labels on fields */
+  show_labels?: boolean
   allowed_fields?: string[]
   allowed_operators?: string[]
   allow_inline_edit?: boolean // Enable inline editing for field block

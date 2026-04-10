@@ -65,7 +65,8 @@ interface ShellProps {
   hideTopbar?: boolean // Option to hide topbar (for interface pages that have their own toolbar)
   hideRecordPanel?: boolean // Option to hide the global RecordPanel (for pages that have their own record detail panel)
   defaultPageId?: string | null // For "Back to home" link - never link to abstract /
-  /** Section title for Core Data (tables) in sidebar. Default: "Core Data" */
+  landingPageTitle?: string | null
+  /** Section title for the tables area in sidebar. Default: "Data & tables" */
   coreDataSectionTitle?: string
 }
 
@@ -81,6 +82,7 @@ export default function Shell({
   hideTopbar = false,
   hideRecordPanel = false,
   defaultPageId = null,
+  landingPageTitle = null,
   coreDataSectionTitle,
 }: ShellProps) {
   const isMobile = useIsMobile()
@@ -128,6 +130,7 @@ export default function Shell({
           userRole={userRole}
           hideRecordPanel={hideRecordPanel}
           defaultPageId={defaultPageId}
+          landingPageTitle={landingPageTitle}
           coreDataSectionTitle={coreDataSectionTitle}
         >
           {children}
@@ -152,6 +155,7 @@ function ShellContent({
   hideTopbar = false,
   hideRecordPanel = false,
   defaultPageId = null,
+  landingPageTitle = null,
   coreDataSectionTitle,
   isMobile,
   sidebarOpen,
@@ -200,6 +204,7 @@ function ShellContent({
         isOpen={isMobile ? sidebarOpen : undefined}
         onClose={isMobile ? () => setSidebarOpen(false) : undefined}
         defaultPageId={defaultPageId}
+        landingPageTitle={landingPageTitle}
         coreDataSectionTitle={coreDataSectionTitle}
       />
       {/* MainArea: min-h-0 required for flex height propagation to CalendarView */}

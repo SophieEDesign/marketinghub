@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef, type CSSProperties } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { useBranding } from "@/contexts/BrandingContext"
 import {
@@ -178,6 +178,28 @@ export default function GroupedInterfaces({
   const saveCollapseState = useCallback((collapsed: Set<string>) => {
     localStorage.setItem("interface-groups-collapsed", JSON.stringify(Array.from(collapsed)))
   }, [])
+
+  function browseGroupLabel(group: InterfaceGroup): string {
+    if (group.id === "ungrouped-system-virtual") return "Other"
+    if (group.is_system === true && group.name === "Ungrouped") return "Other"
+    if (group.name === "Ungrouped" && group.id === ungroupedGroupId) return "Other"
+    return group.name
+  }
+
+  // Keep the folder open for the group that contains the current page (browse mode)
+  useEffect(() => {
+    if (editMode || !currentPageId) return
+    const page = pages.find((p) => p.id === currentPageId)
+    if (!page) return
+    const gid = page.group_id || ungroupedGroupId || "ungrouped-system-virtual"
+    setCollapsedGroups((prev) => {
+      if (!prev.has(gid)) return prev
+      const next = new Set(prev)
+      next.delete(gid)
+      saveCollapseState(next)
+      return next
+    })
+  }, [currentPageId, editMode, pages, ungroupedGroupId, saveCollapseState])
 
   // Organize pages by group
   // Pages without group_id go to "Ungrouped" system group
@@ -875,12 +897,19 @@ export default function GroupedInterfaces({
     const isActive = currentPageId === targetPageId
 
     const className = cn(
-      "flex items-center rounded-md px-3 py-1.5 text-sm transition-colors",
-      level > 0 && "pl-10",
-      "hover:bg-black/10",
-      isActive && "bg-black/20 font-semibold"
+      "relative flex items-center rounded-lg py-2 pr-3 text-sm transition-colors",
+      level > 0 ? "pl-10" : "pl-3",
+      "hover:bg-black/[0.06]",
+      isActive && "bg-black/[0.07] font-medium"
     )
-    const style = { color: sidebarTextColor }
+    const style: CSSProperties = {
+      color: isActive ? primaryColor : sidebarTextColor,
+      ...(isActive
+        ? {
+            boxShadow: `inset 3px 0 0 0 ${primaryColor}`,
+          }
+        : {}),
+    }
 
     return (
       <a
@@ -1070,8 +1099,8 @@ export default function GroupedInterfaces({
                   toggleGroup(group.id)
                 }}
                 className={cn(
-                  "w-full flex items-center gap-2 px-3 py-2 rounded-md transition-colors",
-                  "hover:bg-black/10"
+                  "w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors",
+                  "hover:bg-black/[0.06]"
                 )}
                 style={{ color: sidebarTextColor }}
               >
@@ -1082,7 +1111,9 @@ export default function GroupedInterfaces({
                 ) : (
                   <Folder className="h-4 w-4 flex-shrink-0" style={{ color: sidebarTextColor }} />
                 )}
-                <span className="flex-1 text-left truncate text-sm font-semibold">{group.name}</span>
+                <span className="flex-1 text-left truncate text-sm font-semibold">
+                  {browseGroupLabel(group)}
+                </span>
                 {isCollapsed ? (
                   <ChevronRight className="h-4 w-4 flex-shrink-0 opacity-70" style={{ color: sidebarTextColor }} />
                 ) : (
@@ -1126,10 +1157,10 @@ export default function GroupedInterfaces({
             onClick={handleCreateGroup}
             className="flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-black/10 rounded transition-colors"
             style={{ color: sidebarTextColor }}
-            title="New Interface"
+            title="New section"
           >
             <Plus className="h-4 w-4" style={{ color: sidebarTextColor }} />
-            <span className="hidden sm:inline">Interface</span>
+            <span className="hidden sm:inline">Section</span>
           </button>
         </div>
 
@@ -1142,7 +1173,7 @@ export default function GroupedInterfaces({
             <UncategorizedDroppable>
               <div className="px-2 py-1">
                 <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 px-2">
-                  Ungrouped
+                  Other
                 </div>
                 <div className="ml-4 space-y-0.5">
                   {uncategorizedPages.map((page) => (

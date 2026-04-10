@@ -29,6 +29,7 @@ import DividerAppearanceSettings from "./DividerAppearanceSettings"
 import FilterBlockSettings from "./FilterBlockSettings"
 import FieldDataSettings from "./FieldDataSettings"
 import FieldAppearanceSettings from "./FieldAppearanceSettings"
+import FieldSectionDataSettings from "./FieldSectionDataSettings"
 import ButtonDataSettings from "./ButtonDataSettings"
 import ButtonAppearanceSettings from "./ButtonAppearanceSettings"
 import HorizontalGroupedDataSettings from "./HorizontalGroupedDataSettings"
@@ -87,6 +88,9 @@ const DATA_SETTINGS_RENDERERS: Partial<Record<BlockType, DataRenderer>> = {
     />
   ),
   field: (ctx) => <FieldDataSettings {...ctx} pageTableId={ctx.pageTableId ?? null} />,
+  field_section: (ctx) => (
+    <FieldSectionDataSettings {...ctx} pageTableId={ctx.pageTableId ?? null} />
+  ),
   number: (ctx) => <FieldDataSettings {...ctx} pageTableId={ctx.pageTableId ?? null} />,
   button: (ctx) => <ButtonDataSettings {...ctx} />,
   list: (ctx) => <GridDataSettings {...ctx} />,
@@ -228,6 +232,16 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
   field: (ctx) => (
     <>
       <FieldAppearanceSettings config={ctx.config} onUpdate={ctx.onUpdateConfig} />
+      <CommonAppearanceSettings
+        config={ctx.config}
+        onUpdate={ctx.onUpdateAppearance}
+        blockType={ctx.blockType}
+        fields={ctx.fields}
+      />
+    </>
+  ),
+  field_section: (ctx) => (
+    <>
       <CommonAppearanceSettings
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}

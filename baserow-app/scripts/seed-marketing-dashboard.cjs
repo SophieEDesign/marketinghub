@@ -1,12 +1,6 @@
 /**
  * One-off seed: creates the "Marketing Dashboard" interface page and view_blocks.
- * CommonJS so Node resolves @supabase/supabase-js from baserow-app/node_modules reliably.
- *
- * Loads optional vars from .env.local (next to package.json) if not already set.
- *
- * Requires:
- * - NEXT_PUBLIC_SUPABASE_URL
- * - SUPABASE_SERVICE_ROLE_KEY
+ * Layout: Quarterly Themes as planning spine, content calendar, compact lists, single campaign gallery (no duplicate "all campaigns").
  *
  * Run from baserow-app: npm run seed:marketing-dashboard
  */
@@ -50,6 +44,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 })
 
 const ACTIVE_STATUS = ["live", "Live", "in progress", "In Progress", "Active", "active"]
+const TASK_DONE_STATUSES = ["Done", "Complete", "Closed", "Cancelled", "Archived"]
 
 function matchTable(rows, pred) {
   return rows.find((t) => pred(t.name))?.id
@@ -62,10 +57,7 @@ function section(html, y, h = 2) {
     position_y: y,
     width: 12,
     height: h,
-    config: {
-      title: "",
-      html,
-    },
+    config: { title: "", html },
   }
 }
 
@@ -110,6 +102,10 @@ async function main() {
     tables,
     (n) => /quarterly/i.test(n) && /theme/i.test(n)
   )
+  const tasksTableId = matchTable(
+    tables,
+    (n) => /^(tasks?)$/i.test(n.trim()) || (/task/i.test(n) && !/contact/i.test(n))
+  )
 
   if (!campaignTableId || !contentTableId) {
     console.error(
@@ -145,9 +141,40 @@ async function main() {
 
   const pageId = page.id
 
+  const thirdKpi = tasksTableId
+    ? {
+        type: "kpi",
+        position_x: 8,
+        position_y: 3,
+        width: 4,
+        height: 4,
+        config: {
+          title: "Open tasks",
+          kpi_label: "Not closed",
+          table_id: tasksTableId,
+          kpi_aggregate: "count",
+          filters: [{ field: "status", operator: "is_not_any_of", value: TASK_DONE_STATUSES }],
+        },
+      }
+    : {
+        type: "kpi",
+        position_x: 8,
+        position_y: 3,
+        width: 4,
+        height: 4,
+        config: {
+          title: "All content",
+          kpi_label: "Pipeline",
+          table_id: contentTableId,
+          kpi_aggregate: "count",
+          filters: [],
+        },
+      }
+
+  /** @type {any[]} */
   const blocks = [
     section(
-      `<div class="pt-1 pb-2 border-b border-border/50"><h2 class="text-lg font-semibold tracking-tight text-foreground">Focus</h2><p class="text-sm text-muted-foreground mt-1">Active work, this week, and priorities</p></div>`,
+      `<div class="pt-1 pb-2 border-b border-border/50"><h2 class="text-lg font-semibold tracking-tight text-foreground">Focus</h2><p class="text-sm text-muted-foreground mt-1">Campaigns, this week, and next actions</p></div>`,
       0,
       3
     ),
@@ -159,7 +186,7 @@ async function main() {
       height: 4,
       config: {
         title: "Active campaigns",
-        kpi_label: "Active campaigns",
+        kpi_label: "Active",
         table_id: campaignTableId,
         kpi_aggregate: "count",
         filters: [{ field: "status", operator: "is_any_of", value: ACTIVE_STATUS }],
@@ -179,78 +206,32 @@ async function main() {
         filters: [{ field: "date", operator: "date_next_days", value: 7 }],
       },
     },
-    {
-      type: "kpi",
-      position_x: 8,
-      position_y: 3,
-      width: 4,
-      height: 4,
-      config: {
-        title: "Total content",
-        kpi_label: "All content",
-        table_id: contentTableId,
-        kpi_aggregate: "count",
-        filters: [],
-      },
-    },
-    {
-      type: "grid",
-      position_x: 0,
-      position_y: 7,
-      width: 12,
-      height: 10,
-      config: {
-        title: "Active campaigns",
-        table_id: campaignTableId,
-        view_type: "gallery",
-        visible_fields: ["name", "status", "content"],
-        filters: [{ field: "status", operator: "is_any_of", value: ACTIVE_STATUS }],
-        row_limit: 12,
-        appearance: { showTitle: true, border: "none" },
-      },
-    },
-    {
-      type: "grid",
-      position_x: 0,
-      position_y: 17,
-      width: 12,
-      height: 10,
-      config: {
-        title: "This week's content",
-        table_id: contentTableId,
-        view_type: "list",
-        filters: [{ field: "date", operator: "date_next_days", value: 7 }],
-        row_limit: 7,
-        list_title_field: "content_name",
-        pill_fields: ["status"],
-        visible_fields: ["content_name", "status", "date"],
-        appearance: { showTitle: true, border: "none" },
-      },
-    },
+    thirdKpi,
     section(
-      `<div class="pt-4 pb-2 border-b border-border/50"><h2 class="text-lg font-semibold tracking-tight text-foreground">Strategy context</h2><p class="text-sm text-muted-foreground mt-1">Quarterly themes</p></div>`,
-      27,
+      `<div class="pt-4 pb-2 border-b border-border/50"><h2 class="text-lg font-semibold tracking-tight text-foreground">Planning spine</h2><p class="text-sm text-muted-foreground mt-1">Quarterly themes — link content and tasks here</p></div>`,
+      7,
       3
     ),
   ]
 
-  let nextY = 30
+  let nextY = 10
   if (quarterlyThemesTableId) {
     blocks.push({
       type: "grid",
       position_x: 0,
       position_y: nextY,
       width: 12,
-      height: 8,
+      height: 7,
       config: {
         title: "Quarterly themes",
         table_id: quarterlyThemesTableId,
         view_type: "gallery",
         row_limit: 8,
+        visible_fields: ["name"],
         appearance: { showTitle: true, border: "none" },
       },
     })
-    nextY += 8
+    nextY += 7
   } else {
     blocks.push({
       type: "html",
@@ -260,7 +241,7 @@ async function main() {
       height: 3,
       config: {
         title: "",
-        html: `<p class="text-sm text-muted-foreground py-2">No <strong>Quarterly Themes</strong> table found in the catalog. Add one under Core Data to show themes here.</p>`,
+        html: `<p class="text-sm text-muted-foreground py-2">No <strong>Quarterly Themes</strong> table found. Add one under Core Data to anchor planning here.</p>`,
       },
     })
     nextY += 3
@@ -268,57 +249,107 @@ async function main() {
 
   blocks.push(
     section(
-      `<div class="pt-4 pb-2 border-b border-border/50"><h2 class="text-lg font-semibold tracking-tight text-foreground">Campaigns overview</h2><p class="text-sm text-muted-foreground mt-1">All campaigns</p></div>`,
+      `<div class="pt-4 pb-2 border-b border-border/50"><h2 class="text-lg font-semibold tracking-tight text-foreground">Content calendar</h2><p class="text-sm text-muted-foreground mt-1">Scheduled content by date</p></div>`,
       nextY,
-      3
+      2
     )
   )
-  nextY += 3
+  nextY += 2
 
   blocks.push({
     type: "grid",
     position_x: 0,
     position_y: nextY,
     width: 12,
-    height: 12,
+    height: 14,
     config: {
-      title: "All campaigns",
-      table_id: campaignTableId,
-      view_type: "gallery",
-      visible_fields: ["name", "status", "content"],
-      row_limit: 20,
+      title: "Content calendar",
+      table_id: contentTableId,
+      view_type: "calendar",
+      calendar_date_field: "date",
+      default_date_range_preset: "thisMonth",
+      visible_fields: ["content_name", "status", "quarterly_theme"],
       appearance: { showTitle: true, border: "none" },
     },
   })
-  nextY += 12
+  nextY += 14
+
+  blocks.push({
+    type: "grid",
+    position_x: 0,
+    position_y: nextY,
+    width: 12,
+    height: 6,
+    config: {
+      title: "This week's content",
+      table_id: contentTableId,
+      view_type: "list",
+      filters: [{ field: "date", operator: "date_next_days", value: 7 }],
+      row_limit: 8,
+      list_title_field: "content_name",
+      pill_fields: ["status"],
+      visible_fields: ["content_name", "status", "date", "quarterly_theme"],
+      appearance: { showTitle: true, border: "none" },
+    },
+  })
+  nextY += 6
 
   blocks.push(
     section(
-      `<div class="pt-4 pb-2 border-b border-border/50"><h2 class="text-lg font-semibold tracking-tight text-foreground">Content snapshot</h2><p class="text-sm text-muted-foreground mt-1">Upcoming and recent items</p></div>`,
+      `<div class="pt-4 pb-2 border-b border-border/50"><h2 class="text-lg font-semibold tracking-tight text-foreground">Campaigns</h2><p class="text-sm text-muted-foreground mt-1">Active campaigns only</p></div>`,
       nextY,
-      3
+      2
     )
   )
-  nextY += 3
+  nextY += 2
 
   blocks.push({
     type: "grid",
     position_x: 0,
     position_y: nextY,
     width: 12,
-    height: 12,
+    height: 9,
     config: {
-      title: "Content",
-      table_id: contentTableId,
-      view_type: "list",
-      sorts: [{ field: "date", direction: "asc" }],
-      row_limit: 10,
-      list_title_field: "content_name",
-      pill_fields: ["status"],
-      visible_fields: ["content_name", "status", "date"],
+      title: "Active campaigns",
+      table_id: campaignTableId,
+      view_type: "gallery",
+      visible_fields: ["name", "status", "content"],
+      filters: [{ field: "status", operator: "is_any_of", value: ACTIVE_STATUS }],
+      row_limit: 16,
       appearance: { showTitle: true, border: "none" },
     },
   })
+  nextY += 9
+
+  if (tasksTableId) {
+    blocks.push(
+      section(
+        `<div class="pt-4 pb-2 border-b border-border/50"><h2 class="text-lg font-semibold tracking-tight text-foreground">Tasks</h2><p class="text-sm text-muted-foreground mt-1">Linked to themes and content</p></div>`,
+        nextY,
+        2
+      )
+    )
+    nextY += 2
+    blocks.push({
+      type: "grid",
+      position_x: 0,
+      position_y: nextY,
+      width: 12,
+      height: 8,
+      config: {
+        title: "Open tasks",
+        table_id: tasksTableId,
+        view_type: "list",
+        filters: [{ field: "status", operator: "is_not_any_of", value: TASK_DONE_STATUSES }],
+        row_limit: 12,
+        sorts: [{ field: "created_at", direction: "desc" }],
+        list_title_field: "name",
+        pill_fields: ["status"],
+        visible_fields: ["name", "status", "theme", "content"],
+        appearance: { showTitle: true, border: "none" },
+      },
+    })
+  }
 
   const rows = blocks.map((b, order_index) => ({
     page_id: pageId,

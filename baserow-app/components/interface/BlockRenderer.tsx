@@ -12,26 +12,7 @@ import { normalizeBlockConfig, isBlockConfigComplete } from "@/lib/interface/blo
 import { assertBlockConfig, shouldShowBlockSetupUI } from "@/lib/interface/assertBlockConfig"
 import { useMemo, useEffect } from "react"
 import dynamic from "next/dynamic"
-import FormBlock from "./blocks/FormBlock"
-import RecordBlock from "./blocks/RecordBlock"
-import KPIBlock from "./blocks/KPIBlock"
 import TextBlock from "./blocks/TextBlock"
-import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
-
-const BlockLoadingPlaceholder = () => (
-  <div className="h-full min-h-[120px] flex items-center justify-center bg-gray-50/50 rounded-lg animate-pulse">
-    <LoadingSpinner size="sm" />
-  </div>
-)
-
-const GridBlock = dynamic(() => import("./blocks/GridBlock"), {
-  ssr: false,
-  loading: () => <BlockLoadingPlaceholder />,
-})
-const ChartBlock = dynamic(() => import("./blocks/ChartBlock"), {
-  ssr: false,
-  loading: () => <BlockLoadingPlaceholder />,
-})
 import ImageBlock from "./blocks/ImageBlock"
 import DividerBlock from "./blocks/DividerBlock"
 import ButtonBlock from "./blocks/ButtonBlock"
@@ -41,6 +22,46 @@ import HtmlBlock from "./blocks/HtmlBlock"
 import FilterBlock from "./blocks/FilterBlock"
 import FieldBlock from "./blocks/FieldBlock"
 import FieldSectionBlock from "./blocks/FieldSectionBlock"
+import NumberBlock from "./blocks/NumberBlock"
+import { ErrorBoundary } from "./ErrorBoundary"
+import LazyBlockWrapper from "./LazyBlockWrapper"
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
+import type { FilterConfig } from "@/lib/interface/filters"
+import type { FilterTree } from "@/lib/filters/canonical-model"
+import { debugWarn, debugError } from "@/lib/debug"
+import { runBlockDriftChecks } from "@/lib/interface/block-drift"
+import { assertBlockSizingInvariant } from "@/lib/interface/block-sizing"
+
+const BlockLoadingPlaceholder = () => (
+  <div className="h-full min-h-[120px] flex items-center justify-center bg-gray-50/50 rounded-lg animate-pulse">
+    <LoadingSpinner size="sm" />
+  </div>
+)
+
+const FormBlock = dynamic(() => import("./blocks/FormBlock"), {
+  ssr: false,
+  loading: () => <BlockLoadingPlaceholder />,
+})
+const RecordBlock = dynamic(() => import("./blocks/RecordBlock"), {
+  ssr: false,
+  loading: () => <BlockLoadingPlaceholder />,
+})
+const KPIBlock = dynamic(() => import("./blocks/KPIBlock"), {
+  ssr: false,
+  loading: () => <BlockLoadingPlaceholder />,
+})
+const RecordContextBlock = dynamic(() => import("./blocks/RecordContextBlock"), {
+  ssr: false,
+  loading: () => <BlockLoadingPlaceholder />,
+})
+const GridBlock = dynamic(() => import("./blocks/GridBlock"), {
+  ssr: false,
+  loading: () => <BlockLoadingPlaceholder />,
+})
+const ChartBlock = dynamic(() => import("./blocks/ChartBlock"), {
+  ssr: false,
+  loading: () => <BlockLoadingPlaceholder />,
+})
 const KanbanBlock = dynamic(() => import("./blocks/KanbanBlock"), {
   ssr: false,
   loading: () => <BlockLoadingPlaceholder />,
@@ -79,20 +100,10 @@ const GalleryBlock = dynamic(() => import("./blocks/GalleryBlock"), {
   ssr: false,
   loading: () => <BlockLoadingPlaceholder />,
 })
-import ListBlock from "./blocks/ListBlock"
-import NumberBlock from "./blocks/NumberBlock"
 const HorizontalGroupedBlock = dynamic(() => import("./blocks/HorizontalGroupedBlock"), {
   ssr: false,
   loading: () => <BlockLoadingPlaceholder />,
 })
-import RecordContextBlock from "./blocks/RecordContextBlock"
-import { ErrorBoundary } from "./ErrorBoundary"
-import type { FilterConfig } from "@/lib/interface/filters"
-import type { FilterTree } from "@/lib/filters/canonical-model"
-import LazyBlockWrapper from "./LazyBlockWrapper"
-import { debugLog, debugWarn, debugError } from "@/lib/debug"
-import { runBlockDriftChecks } from "@/lib/interface/block-drift"
-import { assertBlockSizingInvariant } from "@/lib/interface/block-sizing"
 
 // Module-level Set to track warned blocks across all component instances
 const warnedBlocks = new Set<string>()
@@ -168,22 +179,12 @@ export default function BlockRenderer({
   openRecordInEditModeForBlock?: { blockId: string; recordId: string; tableId: string } | null
 }) {
   const diagnosticsEnabled = process.env.NODE_ENV === 'development'
-  
-  // #region HOOK CHECK - Before useEffect blockDriftChecks
-  if (process.env.NODE_ENV === 'development') {
-    debugLog('[HOOK CHECK]', 'BlockRenderer before useEffect blockDriftChecks')
-  }
-  // #endregion
+
   useEffect(() => {
     if (process.env.NODE_ENV !== 'development' || blockDriftChecksRun) return
     blockDriftChecksRun = true
     runBlockDriftChecks()
   }, [])
-  // #region HOOK CHECK - After useEffect blockDriftChecks
-  if (process.env.NODE_ENV === 'development') {
-    debugLog('[HOOK CHECK]', 'BlockRenderer after useEffect blockDriftChecks')
-  }
-  // #endregion
 
   // Normalize config to prevent crashes
   const safeConfig = normalizeBlockConfig(block.type, block.config)
@@ -200,11 +201,9 @@ export default function BlockRenderer({
     record_id: safeConfig.record_id || recordId || undefined,
   }
 
-  // #region HOOK CHECK - Before useMemo safeBlock
-  if (process.env.NODE_ENV === 'development') {
-    debugLog('[HOOK CHECK]', 'BlockRenderer before useMemo safeBlock')
-  }
-  // #endregion
+  // Serialize config only when `block.config` reference changes (avoids JSON.stringify on every render in useMemo deps).
+  const configFingerprint = useMemo(() => JSON.stringify(block.config), [block.config])
+
   // CRITICAL: Memoize safeBlock so block components receive a stable reference.
   // New object every render caused React #185 (maximum update depth) in CalendarBlock/GridBlock.
   const safeBlock = useMemo<PageBlock>(() => ({
@@ -218,13 +217,8 @@ export default function BlockRenderer({
     block.w,
     block.h,
     recordId ?? '',
-    JSON.stringify(block.config),
+    configFingerprint,
   ])
-  // #region HOOK CHECK - After useMemo safeBlock
-  if (process.env.NODE_ENV === 'development') {
-    debugLog('[HOOK CHECK]', 'BlockRenderer after useMemo safeBlock')
-  }
-  // #endregion
 
   const handleUpdate = (updates: Partial<PageBlock["config"]>) => {
     if (onUpdate) {
@@ -304,6 +298,7 @@ export default function BlockRenderer({
               pageTableId={pageTableId}
               pageId={pageId}
               recordId={recordId}
+              recordTableId={recordTableId}
               filters={filters}
               filterTree={filterTree}
               onRecordClick={onRecordClick}
@@ -454,6 +449,8 @@ export default function BlockRenderer({
               interfaceMode={interfaceMode}
               pageTableId={pageTableId}
               pageId={pageId}
+              recordId={recordId}
+              recordTableId={recordTableId}
               filters={filters}
               filterTree={filterTree}
               onRecordClick={onRecordClick}
@@ -491,6 +488,8 @@ export default function BlockRenderer({
               interfaceMode={interfaceMode}
               pageTableId={pageTableId}
               pageId={pageId}
+              recordId={recordId}
+              recordTableId={recordTableId}
               filters={filters}
               filterTree={filterTree}
               onRecordClick={onRecordClick}
@@ -511,6 +510,8 @@ export default function BlockRenderer({
               interfaceMode={interfaceMode}
               pageTableId={pageTableId}
               pageId={pageId}
+              recordId={recordId}
+              recordTableId={recordTableId}
               filters={filters}
               filterTree={filterTree}
               onRecordClick={onRecordClick}
@@ -547,6 +548,8 @@ export default function BlockRenderer({
               interfaceMode={interfaceMode}
               pageTableId={pageTableId}
               pageId={pageId}
+              recordId={recordId}
+              recordTableId={recordTableId}
               filters={filters}
               filterTree={filterTree}
               onRecordClick={onRecordClick}
@@ -578,6 +581,7 @@ export default function BlockRenderer({
               pageTableId={pageTableId}
               pageId={pageId}
               recordId={recordId}
+              recordTableId={recordTableId}
               filters={filters}
               filterTree={filterTree}
               onRecordClick={onRecordClick}
