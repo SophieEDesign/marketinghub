@@ -45,14 +45,14 @@ function Breadcrumb({
   }
 
   return (
-    <div className="flex items-center gap-1 text-sm text-gray-600 flex-wrap">
+    <div className="flex items-center gap-1 text-sm text-muted-foreground flex-wrap">
       {items.map((item, i) => (
         <span key={`${item.label}-${i}`} className="flex items-center gap-1">
-          {i > 0 && <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />}
+          {i > 0 && <ChevronRight className="h-4 w-4 text-muted-foreground/70 flex-shrink-0" />}
           <button
             type="button"
             onClick={() => onNavigate(item.ctx)}
-            className={`hover:text-gray-900 hover:underline ${i === items.length - 1 ? "font-medium text-gray-900" : ""}`}
+            className={`hover:text-foreground hover:underline ${i === items.length - 1 ? "font-medium text-foreground" : ""}`}
           >
             {item.label}
           </button>
@@ -81,7 +81,7 @@ export default function RightSettingsPanel() {
   return (
     <div className="w-full h-full min-h-0 flex flex-col bg-card border-l border-border overflow-hidden">
       {/* Header: Back + title + ellipsis for record/field; breadcrumb + close otherwise */}
-      <div className="border-b border-gray-200 px-4 py-3 flex-shrink-0">
+      <div className="border-b border-border px-4 py-3 flex-shrink-0">
         <div className="flex items-center justify-between gap-2">
           {selectedContext?.type === "field" &&
           selectedContext.fieldId &&
@@ -105,7 +105,7 @@ export default function RightSettingsPanel() {
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <span className="font-semibold text-gray-900 truncate">
+                <span className="font-semibold text-foreground truncate">
                   {fieldViewMode === "schema"
                     ? "Field settings"
                     : (() => {
@@ -137,7 +137,7 @@ export default function RightSettingsPanel() {
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <span className="font-semibold text-gray-900 truncate">
+                <span className="font-semibold text-foreground truncate">
                   {data?.onLayoutSave ? "Right panel – Record" : "Modal layout"}
                 </span>
               </div>

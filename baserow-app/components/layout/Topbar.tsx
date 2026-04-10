@@ -19,7 +19,7 @@ export default function Topbar({ title, onSidebarToggle, isAdmin }: TopbarProps)
   const commandPalette = useCommandPalette()
 
   return (
-    <div className="h-14 border-b border-border bg-background flex items-center justify-between px-6">
+    <div className="h-14 border-b border-border bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/70 flex items-center justify-between px-6">
       <div className="flex items-center gap-4 flex-1">
         {onSidebarToggle && (
           <Button

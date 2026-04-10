@@ -1,6 +1,8 @@
 "use client"
 
+import type { CSSProperties } from "react"
 import { useRouter } from "next/navigation"
+import { cn } from "@/lib/utils"
 import type { PageBlock } from "@/lib/interface/types"
 import { TrendingUp, TrendingDown, ArrowRight, Filter } from "lucide-react"
 import type { FilterConfig } from "@/lib/interface/filters"
@@ -127,40 +129,31 @@ export default function KPIBlock({
   // Apply appearance settings
   const appearance = config.appearance || {}
   
-  // Map appearance.background to actual colors (KPI-specific color scheme)
-  const getBackgroundColor = () => {
-    // Custom background color takes precedence
+  const getBackgroundColor = (): string | undefined => {
     if (appearance.background_color) return appearance.background_color
-    
-    // Map new Airtable-style background options to colors
     switch (appearance.background) {
-      case 'tinted':
-        // Light green for tinted
-        return '#E8FFEA'
-      case 'emphasised':
-        // Light pink for emphasised
-        return '#FFE8EC'
-      case 'subtle':
-        // Light orange for subtle
-        return '#FFF3E0'
-      case 'none':
+      case "tinted":
+        return "#E8FFEA"
+      case "emphasised":
+        return "#FFE8EC"
+      case "subtle":
+        return "#FFF3E0"
+      case "none":
       default:
-        // White background (default)
-        return '#FFFFFF'
+        return undefined
     }
   }
 
-  // Get text color based on background (for completed/positive states)
-  const getTextColor = () => {
+  const useCardShell =
+    !appearance.background_color &&
+    (appearance.background === undefined || appearance.background === "none")
+
+  const getTextColor = (): string | undefined => {
     if (appearance.text_color) return appearance.text_color
     if (appearance.title_color) return appearance.title_color
-    
-    // If background is white (none), use green for positive/completed state
     const bgColor = getBackgroundColor()
-    if (bgColor === '#FFFFFF' || bgColor === 'white' || !bgColor) {
-      return '#166534' // Dark green for completed
-    }
-    return '#111827' // Dark grey/black for others
+    if (!bgColor) return undefined
+    return "#111827"
   }
 
   // Get border radius
@@ -178,11 +171,16 @@ export default function KPIBlock({
     return '16px' // Default normal
   }
 
-  const blockStyle: React.CSSProperties = {
-    backgroundColor: getBackgroundColor(),
-    borderColor: appearance.border_color,
-    borderWidth: appearance.border_width !== undefined ? `${appearance.border_width}px` : 
-                 (appearance.border === 'none' ? '0px' : appearance.border === 'card' ? '1px' : '1px'),
+  const bgColorResolved = getBackgroundColor()
+  const blockStyle: CSSProperties = {
+    ...(bgColorResolved ? { backgroundColor: bgColorResolved } : {}),
+    ...(appearance.border_color ? { borderColor: appearance.border_color } : {}),
+    borderWidth:
+      appearance.border_width !== undefined
+        ? `${appearance.border_width}px`
+        : appearance.border === "none"
+          ? "0px"
+          : "1px",
     borderRadius: getBorderRadius(),
     padding: getPadding(),
   }
@@ -219,28 +217,57 @@ export default function KPIBlock({
 
   const textColor = getTextColor()
 
+  const hideChromeBorder =
+    appearance.border === "none" ||
+    (typeof appearance.border_width === "number" && appearance.border_width === 0)
+
   return (
-    <div 
-      className={`h-full w-full overflow-auto flex flex-col ${isClickable ? 'cursor-pointer hover:opacity-90 transition-opacity' : ''}`}
+    <div
+      className={cn(
+        "h-full w-full overflow-auto flex flex-col relative rounded-card",
+        !hideChromeBorder && "border border-border",
+        useCardShell && !appearance.border_color && "bg-card shadow-card",
+        isClickable &&
+          "cursor-pointer transition-shadow duration-200 hover:shadow-card-hover"
+      )}
       style={blockStyle}
       onClick={handleClick}
     >
+      {useCardShell && (
+        <div
+          className="pointer-events-none absolute bottom-0 left-4 right-4 h-0.5 rounded-full bg-gradient-to-r from-chart-1 via-chart-3 to-chart-5 opacity-70"
+          aria-hidden
+        />
+      )}
       {showTitle && (
         <div
-          className="mb-4 pb-2 border-b"
+          className="mb-4 pb-2 border-b border-border"
           style={{
             backgroundColor: appearance.header_background,
             color: appearance.header_text_color || textColor,
           }}
         >
-          <h3 className="text-lg font-semibold">{displayLabel}</h3>
+          <h3
+            className={cn(
+              "text-lg font-semibold",
+              !appearance.header_text_color && !textColor && "text-foreground"
+            )}
+          >
+            {displayLabel}
+          </h3>
         </div>
       )}
       <div className={`flex-1 flex flex-col justify-center ${getAlignmentClass()}`}>
         <div className={`w-full ${getAlignmentClass().includes('text-center') ? 'text-center' : getAlignmentClass().includes('text-left') ? 'text-left' : 'text-right'}`}>
           {!showTitle && (
             <div className={`flex items-center gap-2 mb-3 ${getAlignmentClass().includes('text-center') ? 'justify-center' : getAlignmentClass().includes('text-left') ? 'justify-start' : 'justify-end'}`}>
-              <p className="text-sm font-medium" style={{ color: textColor }}>
+              <p
+                className={cn(
+                  "text-sm font-medium",
+                  !textColor && "text-muted-foreground"
+                )}
+                style={textColor ? { color: textColor } : undefined}
+              >
                 {displayLabel}
               </p>
               {hasFilters && isEditing && (
@@ -253,7 +280,14 @@ export default function KPIBlock({
               )}
             </div>
           )}
-          <p className={`${getValueSizeClass()} font-bold mb-2`} style={{ color: textColor }}>
+          <p
+            className={cn(
+              getValueSizeClass(),
+              "font-bold mb-2 tracking-tight",
+              !textColor && "text-foreground"
+            )}
+            style={textColor ? { color: textColor } : undefined}
+          >
             {displayValue}
           </p>
           
@@ -265,7 +299,7 @@ export default function KPIBlock({
               ) : comparisonData.trend === 'down' ? (
                 <TrendingDown className="h-4 w-4 text-red-600" />
               ) : null}
-              <span className={comparisonData.trend === 'up' ? 'text-green-600' : comparisonData.trend === 'down' ? 'text-red-600' : 'text-gray-600'}>
+              <span className={comparisonData.trend === 'up' ? 'text-green-600' : comparisonData.trend === 'down' ? 'text-red-600' : 'text-muted-foreground'}>
                 {comparisonData.changePercent !== null && comparisonData.changePercent !== 0 && (
                   <>
                     {comparisonData.changePercent > 0 ? '+' : ''}
@@ -278,7 +312,10 @@ export default function KPIBlock({
 
           {/* Target comparison */}
           {target !== undefined && target !== null && value !== null && (
-            <div className="text-xs mt-1" style={{ color: textColor, opacity: 0.7 }}>
+            <div
+              className={cn("text-xs mt-1", !textColor && "text-muted-foreground")}
+              style={textColor ? { color: textColor, opacity: 0.85 } : undefined}
+            >
               Target: {typeof target === 'number' ? target.toLocaleString() : target}
               {typeof target === 'number' && (
                 <span className={value >= target ? ' text-green-600' : ' text-red-600'}>
@@ -289,14 +326,27 @@ export default function KPIBlock({
           )}
 
           {aggregate !== "count" && field && (
-            <p className="text-xs mt-1" style={{ color: textColor, opacity: 0.7 }}>
+            <p
+              className={cn("text-xs mt-1", !textColor && "text-muted-foreground opacity-90")}
+              style={textColor ? { color: textColor, opacity: 0.75 } : undefined}
+            >
               {aggregate.toUpperCase()} of {field}
             </p>
           )}
 
           {/* Click-through hint */}
           {isClickable && (
-            <div className={`mt-3 flex items-center gap-1 text-xs ${getAlignmentClass().includes('text-center') ? 'justify-center' : getAlignmentClass().includes('text-left') ? 'justify-start' : 'justify-end'}`} style={{ color: textColor, opacity: 0.6 }}>
+            <div
+              className={cn(
+                "mt-3 flex items-center gap-1 text-xs text-muted-foreground",
+                getAlignmentClass().includes("text-center")
+                  ? "justify-center"
+                  : getAlignmentClass().includes("text-left")
+                    ? "justify-start"
+                    : "justify-end"
+              )}
+              style={textColor ? { color: textColor, opacity: 0.65 } : undefined}
+            >
               <span>Click to view records</span>
               <ArrowRight className="h-3 w-3" />
             </div>

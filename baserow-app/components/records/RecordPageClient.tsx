@@ -184,7 +184,7 @@ export default function RecordPageClient({
 
   if (loading) {
     return (
-      <div className="h-screen flex flex-col bg-gray-50">
+      <div className="h-screen flex flex-col bg-canvas">
         <div className="bg-white border-b border-gray-200 px-4 py-4 flex-shrink-0">
           <div className="flex items-center gap-2">
             <div className="h-8 w-20 bg-gray-200 rounded animate-pulse" />
@@ -267,7 +267,7 @@ export default function RecordPageClient({
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="h-screen flex flex-col bg-canvas">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 mobile:px-3 py-4 mobile:py-3 flex-shrink-0">
         <div className="flex items-center justify-between">

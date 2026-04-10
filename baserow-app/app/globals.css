@@ -32,6 +32,16 @@
     /* Light mode: indigo link */
     --accent-link: 238 76% 58%;
     --section-gap: 2rem;
+    /* App canvas: subtle tint behind main content (tables, interface pages) */
+    --canvas: 220 14% 97%;
+    --canvas-muted: 220 13% 94%;
+    /* Chart series (HSL components for hsl(var(--chart-N))) */
+    --chart-1: 262 83% 58%;
+    --chart-2: 173 58% 42%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 350 75% 52%;
+    --chart-5: 270 65% 55%;
+    --chart-6: 199 89% 48%;
   }
 
   .dark {
@@ -57,6 +67,14 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+    --canvas: 222.2 47% 11%;
+    --canvas-muted: 217.2 32.6% 14%;
+    --chart-1: 234 89% 74%;
+    --chart-2: 173 58% 55%;
+    --chart-3: 45 93% 62%;
+    --chart-4: 350 80% 68%;
+    --chart-5: 270 75% 72%;
+    --chart-6: 199 85% 62%;
   }
 }
 

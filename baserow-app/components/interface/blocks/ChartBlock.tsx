@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState, useMemo, useId, type CSSProperties } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import type { AggregateType, PageBlock } from "@/lib/interface/types"
@@ -28,7 +28,14 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts"
-import { BarChart3, LineChart as LineChartIcon, PieChart as PieChartIcon } from "lucide-react"
+import { BarChart3 } from "lucide-react"
+import { useTheme } from "@/contexts/ThemeContext"
+import {
+  DEFAULT_CHART_COLORS_LIGHT,
+  SCHEME_PALETTES,
+  readCssChartVars,
+  getLegendLayout,
+} from "@/lib/charts/chartPalettes"
 
 interface ChartBlockProps {
   block: PageBlock
@@ -74,7 +81,15 @@ export default function ChartBlock({
   // Otherwise use explicit chart_x_axis
   const xAxis = groupBy ? groupBy : config?.chart_x_axis
   const clickThrough = config?.click_through
-  
+  const appearance = config.appearance || {}
+  const chartInstanceId = useId().replace(/:/g, "")
+
+  const { resolvedTheme } = useTheme()
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
+  const [seriesColors, setSeriesColors] = useState<string[]>(() => [
+    ...DEFAULT_CHART_COLORS_LIGHT,
+  ])
+
   const [rawData, setRawData] = useState<any[]>([])
   const [chartData, setChartData] = useState<ChartDataPoint[]>([])
   const [categoricalData, setCategoricalData] = useState<CategoricalLegendItem[]>([])
@@ -97,6 +112,25 @@ export default function ChartBlock({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableId])
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)")
+    const sync = () => setPrefersReducedMotion(mq.matches)
+    sync()
+    mq.addEventListener("change", sync)
+    return () => mq.removeEventListener("change", sync)
+  }, [])
+
+  const colorSchemeKey = appearance.color_scheme || "default"
+  useEffect(() => {
+    const isDark = resolvedTheme === "dark"
+    const named = SCHEME_PALETTES[colorSchemeKey]
+    if (named) {
+      setSeriesColors(isDark ? named.dark : named.light)
+      return
+    }
+    setSeriesColors(readCssChartVars())
+  }, [colorSchemeKey, resolvedTheme])
 
   useEffect(() => {
     // Load data when we have:
@@ -580,14 +614,37 @@ export default function ChartBlock({
   }
 
   function renderChart() {
-    // Color palette for charts
-    const COLORS = [
-      '#0088FE', '#00C49F', '#FFBB28', '#FF8042',
-      '#8884d8', '#82ca9d', '#ffc658', '#ff7300',
-      '#8dd1e1', '#d084d0', '#ffb347', '#87ceeb'
-    ]
+    const showGrid = appearance.show_grid !== false
+    const showLegend = appearance.show_legend !== false
+    const legendProps = getLegendLayout(appearance.legend_position)
+    const primary = seriesColors[0] ?? DEFAULT_CHART_COLORS_LIGHT[0]
+    const secondary = seriesColors[1] ?? primary
+    const gradId = `barGrad-${chartInstanceId}`
+    const chartAnimActive = !prefersReducedMotion
+    const chartAnimDuration = prefersReducedMotion ? 0 : 550
 
-    // Generate Y-axis label based on metric type
+    const tooltipContentStyle: CSSProperties = {
+      backgroundColor: "hsl(var(--popover))",
+      border: "1px solid hsl(var(--border))",
+      borderRadius: "10px",
+      boxShadow: "0 12px 40px -12px rgb(0 0 0 / 0.25)",
+    }
+    const tooltipLabelStyle: CSSProperties = {
+      color: "hsl(var(--muted-foreground))",
+      fontSize: 12,
+      fontWeight: 600,
+    }
+    const tooltipItemStyle: CSSProperties = {
+      color: "hsl(var(--popover-foreground))",
+      fontSize: 13,
+    }
+
+    const axisTick = {
+      fill: "hsl(var(--muted-foreground))",
+      fontSize: 11,
+    }
+    const axisStroke = "hsl(var(--border))"
+
     const getYAxisLabel = () => {
       if (metricType === "count") return "Count"
       const metricLabel = metricField || "Value"
@@ -603,100 +660,270 @@ export default function ChartBlock({
     const yAxisLabel = getYAxisLabel()
     const xAxisLabel = groupBy || xAxis || "Category"
 
+    const gridEl = showGrid ? (
+      <CartesianGrid
+        strokeDasharray="4 6"
+        stroke={axisStroke}
+        strokeOpacity={0.45}
+        vertical={false}
+      />
+    ) : null
+
+    const legendEl = showLegend ? (
+      <Legend
+        {...legendProps}
+        wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
+      />
+    ) : null
+
+    const tooltipEl = (
+      <Tooltip
+        contentStyle={tooltipContentStyle}
+        labelStyle={tooltipLabelStyle}
+        itemStyle={tooltipItemStyle}
+        cursor={{ fill: "hsl(var(--muted) / 0.35)" }}
+      />
+    )
+
+    const barGradientDefs = (
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={primary} stopOpacity={1} />
+          <stop offset="100%" stopColor={secondary} stopOpacity={0.72} />
+        </linearGradient>
+      </defs>
+    )
+
     switch (chartType) {
       case "bar":
         return (
-          <BarChart data={chartData} onClick={handleChartClick}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis 
-              dataKey="name" 
-              angle={-45}
+          <BarChart
+            data={chartData}
+            onClick={handleChartClick}
+            margin={{ top: 8, right: 8, left: 4, bottom: 8 }}
+          >
+            {barGradientDefs}
+            {gridEl}
+            <XAxis
+              dataKey="name"
+              angle={-40}
               textAnchor="end"
-              height={80}
+              height={78}
               interval={0}
-              label={{ value: xAxisLabel, position: 'insideBottom', offset: -5 }}
+              tick={axisTick}
+              stroke={axisStroke}
+              label={{
+                value: xAxisLabel,
+                position: "insideBottom",
+                offset: -2,
+                fill: "hsl(var(--muted-foreground))",
+                fontSize: 11,
+              }}
             />
-            <YAxis label={{ value: yAxisLabel, angle: -90, position: 'insideLeft' }} />
-            <Tooltip />
-            <Legend />
-            <Bar dataKey="value" fill={COLORS[0]} />
+            <YAxis
+              tick={axisTick}
+              stroke={axisStroke}
+              label={{
+                value: yAxisLabel,
+                angle: -90,
+                position: "insideLeft",
+                fill: "hsl(var(--muted-foreground))",
+                fontSize: 11,
+              }}
+            />
+            {tooltipEl}
+            {legendEl}
+            <Bar
+              dataKey="value"
+              fill={`url(#${gradId})`}
+              radius={[10, 10, 4, 4]}
+              maxBarSize={56}
+              isAnimationActive={chartAnimActive}
+              animationDuration={chartAnimDuration}
+            />
           </BarChart>
         )
       case "line":
         return (
-          <LineChart data={chartData} onClick={handleChartClick}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis 
+          <LineChart
+            data={chartData}
+            onClick={handleChartClick}
+            margin={{ top: 8, right: 8, left: 4, bottom: 8 }}
+          >
+            {gridEl}
+            <XAxis
               dataKey="name"
-              angle={-45}
+              angle={-40}
               textAnchor="end"
-              height={80}
+              height={78}
               interval={0}
-              label={{ value: xAxisLabel, position: 'insideBottom', offset: -5 }}
+              tick={axisTick}
+              stroke={axisStroke}
+              label={{
+                value: xAxisLabel,
+                position: "insideBottom",
+                offset: -2,
+                fill: "hsl(var(--muted-foreground))",
+                fontSize: 11,
+              }}
             />
-            <YAxis label={{ value: yAxisLabel, angle: -90, position: 'insideLeft' }} />
-            <Tooltip />
-            <Legend />
-            <Line type="monotone" dataKey="value" stroke={COLORS[0]} strokeWidth={2} />
+            <YAxis
+              tick={axisTick}
+              stroke={axisStroke}
+              label={{
+                value: yAxisLabel,
+                angle: -90,
+                position: "insideLeft",
+                fill: "hsl(var(--muted-foreground))",
+                fontSize: 11,
+              }}
+            />
+            {tooltipEl}
+            {legendEl}
+            <Line
+              type="monotone"
+              dataKey="value"
+              stroke={primary}
+              strokeWidth={3}
+              dot={{
+                r: 4,
+                strokeWidth: 2,
+                stroke: "hsl(var(--background))",
+                fill: primary,
+              }}
+              activeDot={{ r: 7, strokeWidth: 0, fill: primary }}
+              isAnimationActive={chartAnimActive}
+              animationDuration={chartAnimDuration}
+            />
           </LineChart>
         )
       case "pie":
         return (
-          <PieChart>
+          <PieChart margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
             <Pie
               data={chartData}
               cx="50%"
               cy="50%"
               labelLine={false}
-              label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-              outerRadius={80}
-              fill="#8884d8"
+              label={({ name, percent }) =>
+                `${name}: ${(percent * 100).toFixed(0)}%`
+              }
+              outerRadius="42%"
+              innerRadius="22%"
+              paddingAngle={2}
               dataKey="value"
               onClick={handleChartClick}
+              stroke="hsl(var(--background))"
+              strokeWidth={2}
+              isAnimationActive={chartAnimActive}
+              animationDuration={chartAnimDuration}
             >
-              {chartData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              {chartData.map((_, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={seriesColors[index % seriesColors.length]}
+                />
               ))}
             </Pie>
-            <Tooltip />
-            <Legend />
+            {tooltipEl}
+            {legendEl}
           </PieChart>
         )
       case "stacked_bar":
         return (
-          <BarChart data={chartData} onClick={handleChartClick}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis 
+          <BarChart
+            data={chartData}
+            onClick={handleChartClick}
+            margin={{ top: 8, right: 8, left: 4, bottom: 8 }}
+          >
+            {barGradientDefs}
+            {gridEl}
+            <XAxis
               dataKey="name"
-              angle={-45}
+              angle={-40}
               textAnchor="end"
-              height={80}
+              height={78}
               interval={0}
-              label={{ value: xAxisLabel, position: 'insideBottom', offset: -5 }}
+              tick={axisTick}
+              stroke={axisStroke}
+              label={{
+                value: xAxisLabel,
+                position: "insideBottom",
+                offset: -2,
+                fill: "hsl(var(--muted-foreground))",
+                fontSize: 11,
+              }}
             />
-            <YAxis label={{ value: yAxisLabel, angle: -90, position: 'insideLeft' }} />
-            <Tooltip />
-            <Legend />
-            <Bar dataKey="value" stackId="a" fill={COLORS[0]} />
+            <YAxis
+              tick={axisTick}
+              stroke={axisStroke}
+              label={{
+                value: yAxisLabel,
+                angle: -90,
+                position: "insideLeft",
+                fill: "hsl(var(--muted-foreground))",
+                fontSize: 11,
+              }}
+            />
+            {tooltipEl}
+            {legendEl}
+            <Bar
+              dataKey="value"
+              stackId="a"
+              fill={`url(#${gradId})`}
+              radius={[8, 8, 0, 0]}
+              maxBarSize={52}
+              isAnimationActive={chartAnimActive}
+              animationDuration={chartAnimDuration}
+            />
           </BarChart>
         )
       default:
-        // Default to bar chart if unknown type
         return (
-          <BarChart data={chartData} onClick={handleChartClick}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis 
-              dataKey="name" 
-              angle={-45}
+          <BarChart
+            data={chartData}
+            onClick={handleChartClick}
+            margin={{ top: 8, right: 8, left: 4, bottom: 8 }}
+          >
+            {barGradientDefs}
+            {gridEl}
+            <XAxis
+              dataKey="name"
+              angle={-40}
               textAnchor="end"
-              height={80}
+              height={78}
               interval={0}
-              label={{ value: xAxisLabel, position: 'insideBottom', offset: -5 }}
+              tick={axisTick}
+              stroke={axisStroke}
+              label={{
+                value: xAxisLabel,
+                position: "insideBottom",
+                offset: -2,
+                fill: "hsl(var(--muted-foreground))",
+                fontSize: 11,
+              }}
             />
-            <YAxis label={{ value: yAxisLabel, angle: -90, position: 'insideLeft' }} />
-            <Tooltip />
-            <Legend />
-            <Bar dataKey="value" fill={COLORS[0]} />
+            <YAxis
+              tick={axisTick}
+              stroke={axisStroke}
+              label={{
+                value: yAxisLabel,
+                angle: -90,
+                position: "insideLeft",
+                fill: "hsl(var(--muted-foreground))",
+                fontSize: 11,
+              }}
+            />
+            {tooltipEl}
+            {legendEl}
+            <Bar
+              dataKey="value"
+              fill={`url(#${gradId})`}
+              radius={[10, 10, 4, 4]}
+              maxBarSize={56}
+              isAnimationActive={chartAnimActive}
+              animationDuration={chartAnimDuration}
+            />
           </BarChart>
         )
     }
@@ -779,9 +1006,7 @@ export default function ChartBlock({
     )
   }
 
-  // Apply appearance settings
-  const appearance = config.appearance || {}
-  const blockStyle: React.CSSProperties = {
+  const blockStyle: CSSProperties = {
     backgroundColor: appearance.background_color,
     borderColor: appearance.border_color,
     borderWidth: appearance.border_width !== undefined ? `${appearance.border_width}px` : '1px',
@@ -801,7 +1026,7 @@ export default function ChartBlock({
     >
       {showTitle && (
         <div
-          className="shrink-0 mb-4 pb-2 border-b"
+          className="shrink-0 mb-4 pb-2 border-b border-border"
           style={{
             backgroundColor: appearance.header_background,
             color: appearance.header_text_color || appearance.title_color,

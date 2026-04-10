@@ -66,6 +66,18 @@ const config = {
         },
         /** Indigo accent for marketing workspace (links, focus) */
         "accent-link": "hsl(var(--accent-link))",
+        canvas: {
+          DEFAULT: "hsl(var(--canvas))",
+          muted: "hsl(var(--canvas-muted))",
+        },
+        chart: {
+          1: "hsl(var(--chart-1))",
+          2: "hsl(var(--chart-2))",
+          3: "hsl(var(--chart-3))",
+          4: "hsl(var(--chart-4))",
+          5: "hsl(var(--chart-5))",
+          6: "hsl(var(--chart-6))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
