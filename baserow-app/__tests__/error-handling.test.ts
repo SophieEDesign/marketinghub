@@ -5,7 +5,7 @@
  * Run: npm test error-handling
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   isAbortError,
   isTableNotFoundError,
@@ -101,6 +101,14 @@ describe('Error Handling Utilities', () => {
   })
 
   describe('createErrorResponse()', () => {
+    // Vercel / CI runs tests with NODE_ENV=production; 5xx responses are sanitized then.
+    beforeEach(() => {
+      vi.stubEnv('NODE_ENV', 'development')
+    })
+    afterEach(() => {
+      vi.unstubAllEnvs()
+    })
+
     it('should create error response with error message', () => {
       const error = { message: 'Custom error message' }
       const response = createErrorResponse(error, 'Default message', 500)
@@ -198,7 +206,6 @@ describe('Error Handling Utilities', () => {
       expect(response.error).toBe('Something went wrong')
       expect(response).not.toHaveProperty('code')
       expect(response).not.toHaveProperty('details')
-      vi.unstubAllEnvs()
     })
   })
 })
