@@ -40,7 +40,10 @@ export default async function RecordPage({
   const coreData = await isCoreDataTable(tableId)
   if (!coreData) {
     const views = await getViews(tableId).catch(() => [])
-    const defaultView = views.find((v: View) => v.type === "grid") || views[0]
+    const defaultView =
+      views.find((v: View) => v.is_default === true) ||
+      views.find((v: View) => v.type === "grid") ||
+      views[0]
     if (defaultView?.id) {
       redirect(`/tables/${tableId}/views/${defaultView.id}?openRecord=${recordId}`)
     }

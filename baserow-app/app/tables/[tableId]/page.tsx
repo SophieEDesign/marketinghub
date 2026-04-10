@@ -112,6 +112,7 @@ export default async function TablePage({
               type: 'grid',
               config: {},
               access_level: 'authenticated',
+              is_default: true,
             },
           ])
           .select()
@@ -126,9 +127,12 @@ export default async function TablePage({
       }
     }
 
-    // Find default grid view or first non-interface view
+    // Prefer explicit default, then first grid, then first non-interface view
     // Note: Interface views don't have table_id, so they won't be in this list
-    const defaultGridView = views.find((v: View) => v.type === 'grid') || views.find((v: View) => v.type !== 'interface')
+    const defaultGridView =
+      views.find((v: View) => v.is_default === true) ||
+      views.find((v: View) => v.type === 'grid') ||
+      views.find((v: View) => v.type !== 'interface')
     
     // If default grid view exists, redirect to it directly
     // Only redirect if we have a valid view ID to prevent redirect loops

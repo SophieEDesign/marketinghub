@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useLayoutEffect } from "react"
 import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import {
@@ -14,6 +14,8 @@ import {
   Grid3x3,
   Layout,
   Calendar,
+  Image as ImageIconLucide,
+  List,
   FileText,
   Settings,
   X,
@@ -110,6 +112,10 @@ export default function ViewTopBar({
   const searchParams = useSearchParams()
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "")
   const [debouncedQuery, setDebouncedQuery] = useState(searchQuery)
+  const onSearchRef = useRef(onSearch)
+  useLayoutEffect(() => {
+    onSearchRef.current = onSearch
+  }, [onSearch])
   const [viewManagementDialogOpen, setViewManagementDialogOpen] = useState(false)
   const [viewManagementAction, setViewManagementAction] = useState<"rename" | "duplicate" | "delete" | null>(null)
   const [editingViewId, setEditingViewId] = useState<string | null>(null)
@@ -161,8 +167,8 @@ export default function ViewTopBar({
       params.delete("q")
     }
     router.replace(`?${params.toString()}`, { scroll: false })
-    onSearch?.(debouncedQuery)
-  }, [debouncedQuery, router, searchParams, onSearch])
+    onSearchRef.current?.(debouncedQuery)
+  }, [debouncedQuery, router, searchParams])
 
   // Sync with URL on mount/change
   useEffect(() => {
@@ -193,6 +199,12 @@ export default function ViewTopBar({
         return <Clock className="h-4 w-4" />
       case "form":
         return <FileText className="h-4 w-4" />
+      case "gallery":
+        return <ImageIconLucide className="h-4 w-4" />
+      case "horizontal_grouped":
+        return <Layout className="h-4 w-4" />
+      case "list":
+        return <List className="h-4 w-4" />
       default:
         return <Grid3x3 className="h-4 w-4" />
     }

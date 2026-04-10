@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import ViewTopBar from "@/components/layout/ViewTopBar"
 import FormView from "@/components/views/FormView"
@@ -21,6 +21,8 @@ import type { FilterType } from "@/types/database"
 import { applyFiltersToQuery, type FilterConfig } from "@/lib/interface/filters"
 import type { GroupRule } from "@/lib/grouping/types"
 import { normalizeUuid } from "@/lib/utils/ids"
+import { setDefaultTableView } from "@/lib/views/setDefaultTableView"
+import { useToast } from "@/components/ui/use-toast"
 
 interface ViewSummary {
   id: string
@@ -82,6 +84,7 @@ export default function NonGridViewWrapper({
 }: NonGridViewWrapperProps) {
   const viewUuid = normalizeUuid(viewId)
   const router = useRouter()
+  const { toast } = useToast()
   const searchParams = useSearchParams()
   const searchQuery = searchParams.get("q") || ""
   const [designSidebarOpen, setDesignSidebarOpen] = useState(false)
@@ -245,6 +248,26 @@ export default function NonGridViewWrapper({
     router.refresh()
   }
 
+  const noopSearch = useCallback(() => {}, [])
+
+  const handleViewAction = useCallback(
+    async (action: "duplicate" | "rename" | "delete" | "setDefault") => {
+      if (action !== "setDefault") return
+      const result = await setDefaultTableView(tableId, viewId)
+      if (result.ok) {
+        toast({ title: "Default view updated", description: "This view opens first when you open the table." })
+        router.refresh()
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Could not set default",
+          description: result.message,
+        })
+      }
+    },
+    [tableId, viewId, router, toast]
+  )
+
   return (
     <div className="flex flex-col h-full min-h-0 flex-1 bg-canvas">
       <div className="shrink-0">
@@ -257,7 +280,8 @@ export default function NonGridViewWrapper({
         tableFields={tableFields}
         tableName={viewType === "kanban" ? tableInfo?.name ?? undefined : undefined}
         onCustomizeCards={() => setCustomizeCardsDialogOpen(true)}
-        onSearch={() => {}} // Handled via URL params
+        onSearch={viewType === "form" ? undefined : noopSearch}
+        onViewAction={handleViewAction}
         onFilter={() => setFilterDialogOpen(true)}
         onSort={() => setSortDialogOpen(true)}
         onGroup={["kanban", "gallery", "timeline"].includes(viewType) ? () => setCustomizeCardsDialogOpen(true) : undefined}

@@ -13,6 +13,8 @@ import type { ViewType, FilterType } from "@/types/database"
 import { normalizeUuid } from "@/lib/utils/ids"
 import { isAbortError } from "@/lib/api/error-handling"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
+import { useToast } from "@/components/ui/use-toast"
+import { setDefaultTableView } from "@/lib/views/setDefaultTableView"
 
 interface ViewSummary {
   id: string
@@ -82,6 +84,7 @@ export default function AirtableViewPage({
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const { toast } = useToast()
   const { openRecord } = useRecordPanel()
   const gridActionsRef = useRef<AirtableGridActions | null>(null)
   const handleGridActionsReady = useCallback((actions: AirtableGridActions) => {
@@ -405,13 +408,26 @@ export default function AirtableViewPage({
             router.refresh()
           }}
           cardFields={cardFields}
-          onViewAction={(action) => {
+          onViewAction={async (action) => {
             if (action === "delete") {
               // ViewManagementDialog handles the deletion and redirect
-              // No additional action needed here
-            } else if (action === "setDefault") {
-              // TODO: Implement set as default
-              alert("Set as default functionality coming soon")
+              return
+            }
+            if (action === "setDefault") {
+              const result = await setDefaultTableView(tableId, viewId)
+              if (result.ok) {
+                toast({
+                  title: "Default view updated",
+                  description: "This view opens first when you open the table.",
+                })
+                router.refresh()
+              } else {
+                toast({
+                  variant: "destructive",
+                  title: "Could not set default",
+                  description: result.message,
+                })
+              }
             }
           }}
           onDesign={() => setDesignSidebarOpen(true)}

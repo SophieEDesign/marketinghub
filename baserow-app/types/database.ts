@@ -69,6 +69,8 @@ export interface View {
   group_id?: string | null // For interface grouping
   order_index?: number // For ordering within groups
   is_admin_only?: boolean // If true, only admins can see this interface
+  /** When true, this view opens first from /tables/[tableId] for its table. */
+  is_default?: boolean
 }
 
 export interface ViewField {

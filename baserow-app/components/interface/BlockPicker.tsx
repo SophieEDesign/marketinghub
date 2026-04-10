@@ -1,40 +1,12 @@
 "use client"
 
-import { Grid, FileText, BarChart3, TrendingUp, Type, Code, Image, Images, Minus, Zap, ExternalLink, Filter, Square, Calendar, Columns, GitBranch, List, Hash } from "lucide-react"
 import { BLOCK_REGISTRY, getAllBlockTypes } from "@/lib/interface/registry"
 import type { BlockType } from "@/lib/interface/types"
+import BlockPickerPanel, { blockPickerIconMap } from "@/components/interface/BlockPickerPanel"
 
 interface BlockPickerProps {
   onSelectBlock: (type: BlockType) => void
   isCollapsed?: boolean
-}
-
-const iconMap: Record<BlockType, React.ElementType> = {
-  grid: Grid,
-  form: FileText,
-  record: FileText,
-  record_context: List,
-  chart: BarChart3,
-  kpi: TrendingUp,
-  text: Type,
-  html: Code,
-  image: Image,
-  gallery: Images,
-  divider: Minus,
-  button: Zap,
-  action: Zap,
-  link_preview: ExternalLink,
-  filter: Filter,
-  field: Square,
-  field_section: Square,
-  calendar: Calendar,
-  multi_calendar: Calendar,
-  kanban: Columns,
-  timeline: GitBranch,
-  multi_timeline: GitBranch,
-  list: List,
-  number: Hash,
-  horizontal_grouped: Columns,
 }
 
 export default function BlockPicker({ onSelectBlock, isCollapsed = false }: BlockPickerProps) {
@@ -44,14 +16,15 @@ export default function BlockPicker({ onSelectBlock, isCollapsed = false }: Bloc
     return (
       <div className="w-16 bg-white border-r border-gray-200 p-2 space-y-2">
         {blockTypes.map((type) => {
-          const Icon = iconMap[type]
+          const Icon = blockPickerIconMap[type]
           const def = BLOCK_REGISTRY[type]
+          const label = def?.label ?? type
           return (
             <button
               key={type}
               onClick={() => onSelectBlock(type)}
               className="w-full p-2 rounded-md hover:bg-gray-100 transition-colors"
-              title={def.label}
+              title={label}
             >
               <Icon className="h-5 w-5 text-gray-600 mx-auto" />
             </button>
@@ -62,31 +35,10 @@ export default function BlockPicker({ onSelectBlock, isCollapsed = false }: Bloc
   }
 
   return (
-    <div className="w-64 bg-white border-r border-gray-200 p-4">
-      <h3 className="text-sm font-semibold text-gray-700 mb-3">Add Block</h3>
-      <div className="space-y-1">
-        {blockTypes.map((type) => {
-          const Icon = iconMap[type]
-          const def = BLOCK_REGISTRY[type]
-          return (
-            <button
-              key={type}
-              onClick={() => onSelectBlock(type)}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 transition-colors text-left"
-            >
-              <Icon className="h-5 w-5 text-gray-600" />
-              <div className="flex-1">
-                <div className="text-sm font-medium text-gray-900">{def.label}</div>
-                <div className="text-xs text-gray-500">
-                  {type === 'divider' 
-                    ? 'Create spacing between sections'
-                    : `${def.defaultWidth}×${def.defaultHeight}`
-                  }
-                </div>
-              </div>
-            </button>
-          )
-        })}
+    <div className="w-64 bg-white border-r border-gray-200 p-4 flex flex-col min-h-0">
+      <h3 className="text-sm font-semibold text-gray-700 mb-3 shrink-0">Add Block</h3>
+      <div className="min-h-0 flex-1 overflow-hidden">
+        <BlockPickerPanel onSelectBlock={onSelectBlock} />
       </div>
     </div>
   )
