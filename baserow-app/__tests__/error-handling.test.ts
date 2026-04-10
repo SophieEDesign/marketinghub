@@ -5,7 +5,7 @@
  * Run: npm test error-handling
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   isAbortError,
   isTableNotFoundError,
@@ -186,6 +186,19 @@ describe('Error Handling Utilities', () => {
       const response = createErrorResponse(error, 'Default', 400)
       // Status code is not included in response object, but parameter exists for consistency
       expect(response.error).toBe('Error')
+    })
+
+    it('should hide internal error details for 5xx in production', () => {
+      vi.stubEnv('NODE_ENV', 'production')
+      const response = createErrorResponse(
+        { message: 'postgres://secret@host/db', code: 'XX', details: 'stack trace' },
+        'Something went wrong',
+        500
+      )
+      expect(response.error).toBe('Something went wrong')
+      expect(response).not.toHaveProperty('code')
+      expect(response).not.toHaveProperty('details')
+      vi.unstubAllEnvs()
     })
   })
 })

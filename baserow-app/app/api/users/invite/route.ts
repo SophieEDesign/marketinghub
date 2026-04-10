@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isAdmin } from '@/lib/roles'
 import { getAuthRateLimiter } from '@/lib/rate-limit'
+import { getRequestIp } from '@/lib/request-ip'
 
 const MAX_BODY_SIZE = 1024 * 10 // 10KB
 
@@ -10,9 +11,7 @@ export async function POST(request: NextRequest) {
     // Rate limiting: 5 invites per 15 min per IP (when Upstash configured)
     const authLimiter = getAuthRateLimiter()
     if (authLimiter) {
-      const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-        || request.headers.get('x-real-ip')
-        || 'unknown'
+      const ip = getRequestIp(request)
       const { success } = await authLimiter.limit(`invite:${ip}`)
       if (!success) {
         return NextResponse.json(

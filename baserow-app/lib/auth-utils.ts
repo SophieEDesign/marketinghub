@@ -2,18 +2,21 @@
  * Utility functions for authentication
  */
 
+import type { Session, SupabaseClient, User } from '@supabase/supabase-js'
+
 /**
  * Log auth error details in development mode only
  * Never logs to console in production to avoid exposing sensitive information
  */
-function logAuthError(error: any, context?: string): void {
+function logAuthError(error: unknown, context?: string): void {
   if (process.env.NODE_ENV === 'development') {
     const contextMsg = context ? `[${context}] ` : ''
+    const e = error as { message?: string; code?: string; status?: unknown; name?: string } | null
     console.error(`${contextMsg}Auth error details:`, {
-      message: error?.message,
-      code: error?.code,
-      status: error?.status,
-      name: error?.name,
+      message: e?.message,
+      code: e?.code,
+      status: e?.status,
+      name: e?.name,
       fullError: error,
     })
   }
@@ -31,16 +34,17 @@ function logAuthError(error: any, context?: string): void {
  * @param context - Optional context string for logging (e.g., 'signIn', 'signUp')
  * @returns User-friendly error message string
  */
-export function authErrorToMessage(error: any, context?: string): string {
+export function authErrorToMessage(error: unknown, context?: string): string {
   // Log full error details in development mode
   logAuthError(error, context)
-  
-  if (!error) {
+
+  if (error == null || typeof error !== 'object') {
     return 'An unexpected error occurred. Please try again.'
   }
-  
-  const message = error.message || ''
-  const code = error.code || error.status || ''
+
+  const err = error as { message?: string; code?: string | number; status?: string | number }
+  const message = err.message || ''
+  const code = err.code ?? err.status ?? ''
   const errorString = String(message).toLowerCase()
   
   // Map specific Supabase auth error codes first (most reliable)
@@ -106,7 +110,7 @@ export function authErrorToMessage(error: any, context?: string): string {
  * @deprecated Use authErrorToMessage instead for consistency
  * This function is kept for backward compatibility but delegates to authErrorToMessage
  */
-export function getAuthErrorMessage(error: any): string {
+export function getAuthErrorMessage(error: unknown): string {
   return authErrorToMessage(error, 'legacy')
 }
 
@@ -217,9 +221,9 @@ export function validatePassword(password: string): { valid: boolean; error?: st
  * This is more reliable than polling and eliminates race conditions
  */
 export async function waitForSession(
-  supabase: any,
+  supabase: SupabaseClient,
   timeoutMs: number = 5000
-): Promise<{ user: any | null; error: string | null }> {
+): Promise<{ user: User | null; error: string | null }> {
   return new Promise((resolve) => {
     let resolved = false
     let timeoutId: NodeJS.Timeout | null = null
@@ -248,7 +252,7 @@ export async function waitForSession(
 
     // Listen for auth state changes
     const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
-      async (event: string, session: any) => {
+      async (event: string, session: Session | null) => {
         if (resolved) return
 
         // Check for SIGNED_IN event
@@ -304,7 +308,7 @@ export async function waitForSession(
  * Handles all redirect logic in one place to avoid duplication
  */
 export async function performPostAuthRedirect(
-  supabase: any,
+  supabase: SupabaseClient,
   searchParams: URLSearchParams,
   options?: {
     checkPasswordSetup?: boolean
@@ -358,8 +362,9 @@ export async function performPostAuthRedirect(
       safeNext = '/'
     }
     window.location.href = safeNext
-  } catch (error: any) {
-    const errorMsg = error.message || 'Failed to redirect after authentication'
+  } catch (error: unknown) {
+    const errorMsg =
+      error instanceof Error ? error.message : 'Failed to redirect after authentication'
     if (options?.onError) {
       options.onError(errorMsg)
     }

@@ -11,11 +11,6 @@ export default function PageError({
 }) {
   useEffect(() => {
     console.error("Page error:", error)
-    // #region agent log
-    try {
-      fetch('http://127.0.0.1:7242/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f14c63'},body:JSON.stringify({sessionId:'f14c63',location:'pages/[pageId]/error.tsx',message:'Route error boundary rendered',data:{errorMessage:error?.message,errorName:error?.name},hypothesisId:'B',timestamp:Date.now()})}).catch(()=>{});
-    } catch (_) {}
-    // #endregion
   }, [error])
 
   return (

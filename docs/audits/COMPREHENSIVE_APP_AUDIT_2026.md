@@ -5,6 +5,8 @@
 **Auditor:** AI Code Assistant  
 **Scope:** Full-stack audit covering security, performance, code quality, architecture, testing, accessibility, UX, and documentation
 
+**April 2026 follow-up:** Security and hardening changes are summarized in [SECURITY_REVIEW_2026-04.md](./SECURITY_REVIEW_2026-04.md); see also [README.md](./README.md) and [MODERNIZATION_ROADMAP.md](./MODERNIZATION_ROADMAP.md).
+
 ---
 
 ## Executive Summary

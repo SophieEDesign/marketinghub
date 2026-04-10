@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { isAdmin } from '@/lib/roles'
 import { updateWorkspaceSettings } from '@/lib/branding'
+import { getApiRateLimiter } from '@/lib/rate-limit'
+import { getRequestIp } from '@/lib/request-ip'
 
 /**
  * GET /api/workspace-settings - Get workspace settings
@@ -9,6 +11,18 @@ import { updateWorkspaceSettings } from '@/lib/branding'
  */
 export async function GET(request: NextRequest) {
   try {
+    const limiter = getApiRateLimiter()
+    if (limiter) {
+      const ip = getRequestIp(request)
+      const { success } = await limiter.limit(`workspace-settings:${ip}`)
+      if (!success) {
+        return NextResponse.json(
+          { error: 'Too many requests. Please try again later.' },
+          { status: 429 }
+        )
+      }
+    }
+
     const supabase = await createClient()
     
     const { data: settings, error } = await supabase

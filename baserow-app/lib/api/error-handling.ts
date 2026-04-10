@@ -83,14 +83,20 @@ export function createErrorResponse(
   statusCode: number = 500
 ): ApiErrorResponse {
   const errorObj = error as { message?: string; error?: string; code?: string | number; details?: string } | null
-  const errorMessage = errorObj?.message || errorObj?.error || defaultMessage
   if (process.env.NODE_ENV === 'development') {
     console.error(defaultMessage, error)
   }
+
+  const isProd = process.env.NODE_ENV === 'production'
+  const hideInternalDetails = isProd && statusCode >= 500
+  const errorMessage = hideInternalDetails
+    ? defaultMessage
+    : (errorObj?.message || errorObj?.error || defaultMessage)
+
   return {
     error: errorMessage,
-    ...(errorObj?.code && { code: errorObj.code }),
-    ...(errorObj?.details && { details: errorObj.details }),
+    ...(!hideInternalDetails && errorObj?.code && { code: errorObj.code }),
+    ...(!hideInternalDetails && errorObj?.details && { details: errorObj.details }),
   }
 }
 

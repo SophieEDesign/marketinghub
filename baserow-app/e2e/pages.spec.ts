@@ -18,4 +18,10 @@ test.describe('Pages', () => {
     await expect(emailInput).toBeVisible({ timeout: 5000 })
     await expect(submitButton).toBeVisible({ timeout: 5000 })
   })
+
+  test('login page wires visible labels to email and password fields', async ({ page }) => {
+    await page.goto('/login')
+    await expect(page.getByLabel('Email', { exact: true })).toBeVisible({ timeout: 5000 })
+    await expect(page.getByLabel('Password', { exact: true })).toBeVisible({ timeout: 5000 })
+  })
 })

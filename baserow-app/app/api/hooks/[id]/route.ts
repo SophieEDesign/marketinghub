@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { executeAutomation } from '@/lib/automations/engine'
 import type { Automation } from '@/types/database'
+import { getApiRateLimiter } from '@/lib/rate-limit'
+import { getRequestIp } from '@/lib/request-ip'
 
 /**
  * Webhook endpoint for triggering automations
@@ -12,7 +14,20 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const supabase = await createClient()
+    const limiter = getApiRateLimiter()
+    if (limiter) {
+      const ip = getRequestIp(request)
+      const { success } = await limiter.limit(`webhook:${ip}`)
+      if (!success) {
+        return NextResponse.json(
+          { error: 'Too many requests. Please try again later.' },
+          { status: 429 }
+        )
+      }
+    }
+
+    // No end-user session on external webhooks — use service role to resolve automations (webhook_id is unguessable)
+    const supabase = createAdminClient()
 
     // Find automation with matching webhook_id
     const { data: automations, error } = await supabase

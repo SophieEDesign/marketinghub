@@ -68,7 +68,16 @@ function isPublicApiRoute(pathname: string): boolean {
     '/api/automations/run-scheduled',  // Cron endpoint - auth via CRON_SECRET bearer token only
   ];
 
-  return publicApiRoutes.some(route => matchesRoute(pathname, route));
+  if (publicApiRoutes.some(route => matchesRoute(pathname, route))) {
+    return true;
+  }
+
+  // External automation webhooks (Zapier, etc.) — no session; secured by unguessable webhook_id in URL + rate limits in route
+  if (pathname.startsWith('/api/hooks/')) {
+    return true;
+  }
+
+  return false;
 }
 
 /**

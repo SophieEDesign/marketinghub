@@ -161,17 +161,7 @@ function InterfacePageClientInternal({
   
   // CRITICAL: Track if loadBlocks is currently executing to prevent concurrent calls
   const blocksLoadingRef = useRef<boolean>(false)
-  
-  // #region agent log
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const hasPage = Boolean(page && page.id)
-    if (hasPage && !blocksLoading && blocks.length === 0 && blocksLoadedRef.current?.loaded) {
-      try { fetch('http://127.0.0.1:7242/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f14c63'},body:JSON.stringify({sessionId:'f14c63',location:'InterfacePageClient.tsx:emptyBlocks',message:'Render with empty blocks after load',data:{pageId,hasPage,blocksLoading,blocksLength:blocks.length},hypothesisId:'A',timestamp:Date.now()})}).catch(()=>{}); } catch (_) {}
-    }
-  }, [pageId, page?.id, blocksLoading, blocks.length])
-  // #endregion
-  
+
   // Restore block edit mode from localStorage when navigating to a page (persists across refresh/navigation)
   useEffect(() => {
     if (!pageId || typeof window === "undefined") return
@@ -250,9 +240,6 @@ function InterfacePageClientInternal({
   // Only change edit state when user explicitly calls enter/exit via UI.
   useEffect(() => {
     if (previousRoutePageIdRef.current !== null && previousRoutePageIdRef.current !== pageId) {
-      // #region agent log
-      try { fetch('http://127.0.0.1:7242/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f14c63'},body:JSON.stringify({sessionId:'f14c63',location:'InterfacePageClient.tsx:navReset',message:'Nav reset clearing state',data:{from:previousRoutePageIdRef.current,to:pageId},hypothesisId:'D',timestamp:Date.now()})}).catch(()=>{}); } catch (_) {}
-      // #endregion
       if (process.env.NODE_ENV === "development") {
         debugLog("[Nav] Route pageId changed:", { from: previousRoutePageIdRef.current, to: pageId })
       }
@@ -1006,9 +993,6 @@ function InterfacePageClientInternal({
       // Phase 4: Guard - do not overwrite blocks when user has unsaved changes (same page, forceReload)
       if (!signal?.aborted) {
         if (blocksDirty && forceReload) {
-          // #region agent log
-          try { fetch('http://127.0.0.1:7242/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f14c63'},body:JSON.stringify({sessionId:'f14c63',location:'InterfacePageClient.tsx:loadBlocks',message:'setBlocks SKIPPED blocksDirty',data:{pageId,blocksDirty,forceReload},hypothesisId:'C',timestamp:Date.now()})}).catch(()=>{}); } catch (_) {}
-          // #endregion
           if (process.env.NODE_ENV === 'development') {
             debugLog('[loadBlocks] Skipping setBlocks - blocks dirty, save before reloading')
           }
@@ -1017,28 +1001,17 @@ function InterfacePageClientInternal({
             title: "Unsaved changes",
             description: "You have unsaved changes. Save before reloading.",
           })
-        } else         if (blocksChanged || forceReload) {
+        } else if (blocksChanged || forceReload) {
           setBlocks(pageBlocks)
-          // #region agent log
-          try { fetch('http://127.0.0.1:7242/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f14c63'},body:JSON.stringify({sessionId:'f14c63',location:'InterfacePageClient.tsx:loadBlocks',message:'setBlocks called',data:{pageId,blocksCount:pageBlocks.length,blocksChanged,forceReload},hypothesisId:'A',timestamp:Date.now()})}).catch(()=>{}); } catch (_) {}
-          // #endregion
         } else if (process.env.NODE_ENV === 'development') {
           debugLog(`[loadBlocks] Blocks unchanged - skipping setBlocks to prevent re-render`)
         }
-        // #region agent log
-        if (!(blocksChanged || forceReload) && pageBlocks.length > 0) {
-          try { fetch('http://127.0.0.1:7242/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f14c63'},body:JSON.stringify({sessionId:'f14c63',location:'InterfacePageClient.tsx:loadBlocks',message:'setBlocks SKIPPED',data:{pageId,blocksCount:pageBlocks.length,blocksChanged,forceReload,blocksDirty},hypothesisId:'A',timestamp:Date.now()})}).catch(()=>{}); } catch (_) {}
-        }
-        // #endregion
         blocksLoadedRef.current = { pageId, loaded: true }
       }
     } catch (error) {
       // Ignore abort errors (expected during navigation/unmount) - prevents "Uncaught (in promise)"
       if (!isAbortError(error)) {
         debugError("Error loading blocks:", error)
-        // #region agent log
-        try { fetch('http://127.0.0.1:7242/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f14c63'},body:JSON.stringify({sessionId:'f14c63',location:'InterfacePageClient.tsx:loadBlocks',message:'loadBlocks threw',data:{pageId,errorMessage:(error as Error)?.message,aborted:!!signal?.aborted},hypothesisId:'D',timestamp:Date.now()})}).catch(()=>{}); } catch (_) {}
-        // #endregion
       }
       // CRITICAL: Never clear blocks on error - preserve existing blocks
       if (!signal?.aborted) {

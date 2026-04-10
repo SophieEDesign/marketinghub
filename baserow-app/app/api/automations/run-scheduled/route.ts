@@ -18,7 +18,18 @@ import { runScheduledAutomations } from '@/lib/automations/scheduler'
  */
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization')
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const cronSecret = process.env.CRON_SECRET
+  const isProd = process.env.NODE_ENV === 'production'
+
+  if (isProd) {
+    if (!cronSecret) {
+      console.error('[run-scheduled] CRON_SECRET must be set in production')
+      return NextResponse.json({ error: 'Service unavailable' }, { status: 503 })
+    }
+    if (authHeader !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+  } else if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

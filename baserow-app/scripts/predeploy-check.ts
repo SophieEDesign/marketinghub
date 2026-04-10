@@ -419,10 +419,13 @@ async function runLint() {
 async function runTests() {
   console.log('🔍 Running tests...')
   const { execSync } = require('child_process')
+  const path = require('path')
+  const appRoot = path.join(__dirname, '..')
+  const vitestEntry = path.join(appRoot, 'node_modules', 'vitest', 'vitest.mjs')
   try {
     // Check if vitest is available
     try {
-      execSync('npx vitest run --reporter=verbose', { stdio: 'inherit' })
+      execSync(`node "${vitestEntry}" run --reporter=verbose`, { stdio: 'inherit', cwd: appRoot })
       console.log('✅ Tests passed')
       return true
     } catch (error) {
@@ -448,8 +451,18 @@ async function runTests() {
 /**
  * Main validation function
  */
+function warnProductionSecurityEnv() {
+  if (process.env.VERCEL_ENV !== 'production') return
+  if (!process.env.CRON_SECRET) {
+    console.warn(
+      '⚠️  CRON_SECRET is not set. In production, /api/automations/run-scheduled returns 503 until CRON_SECRET is configured (Vercel Cron sends Authorization: Bearer <CRON_SECRET>).'
+    )
+  }
+}
+
 async function runChecks() {
   console.log('🚀 Starting pre-deployment validation...\n')
+  warnProductionSecurityEnv()
 
   // Run checks in order
   const typecheckPassed = await runTypecheck()
