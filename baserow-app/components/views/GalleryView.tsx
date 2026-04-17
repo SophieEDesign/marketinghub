@@ -112,6 +112,9 @@ export default function GalleryView({
           .select("supabase_table")
           .eq("id", sanitizedTableId)
           .single()
+        // #region agent log
+        fetch('http://127.0.0.1:7903/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'909a6f'},body:JSON.stringify({sessionId:'909a6f',runId:'initial',hypothesisId:'H1',location:'GalleryView.tsx:loadTableInfo',message:'Resolved table metadata',data:{tableId,sanitizedTableId,hasSupabaseTable:Boolean(data?.supabase_table),errorCode:error?.code||null,errorMessage:error?.message||null},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         if (error || !data?.supabase_table) {
           setSupabaseTableName(null)
           return
@@ -131,6 +134,9 @@ export default function GalleryView({
   // Load rows - extracted for use in onRecordUpdated callback
   const loadRows = useCallback(async () => {
     if (!supabaseTableName || !tableId) {
+      // #region agent log
+      fetch('http://127.0.0.1:7903/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'909a6f'},body:JSON.stringify({sessionId:'909a6f',runId:'initial',hypothesisId:'H1',location:'GalleryView.tsx:loadRows:early-return',message:'Skipped loadRows due to missing table linkage',data:{hasSupabaseTableName:Boolean(supabaseTableName),hasTableId:Boolean(tableId)},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       setRows([])
       setLoading(false)
       return
@@ -167,6 +173,9 @@ export default function GalleryView({
       }
 
       if (error) {
+        // #region agent log
+        fetch('http://127.0.0.1:7903/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'909a6f'},body:JSON.stringify({sessionId:'909a6f',runId:'initial',hypothesisId:'H4',location:'GalleryView.tsx:loadRows:error-branch',message:'Supabase returned query error',data:{tableName:supabaseTableName,errorCode:error?.code||null,errorMessage:error?.message||null,errorDetails:error?.details||null,errorHint:error?.hint||null,filterTreeActive:Boolean(filterTree),baseFiltersCount:Array.isArray(baseFilters)?baseFilters.length:0},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         if (!isAbortError(error)) {
           console.error("GalleryView: error loading rows", error)
         }
@@ -184,6 +193,9 @@ export default function GalleryView({
       }))
       setRows(tableRows)
     } catch (e) {
+      // #region agent log
+      fetch('http://127.0.0.1:7903/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'909a6f'},body:JSON.stringify({sessionId:'909a6f',runId:'initial',hypothesisId:'H5',location:'GalleryView.tsx:loadRows:exception',message:'Exception thrown while loading rows',data:{tableName:supabaseTableName,errorName:(e as any)?.name||null,errorMessage:(e as any)?.message||null,isAbortError:isAbortError(e)},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       if (!isAbortError(e)) {
         console.error("GalleryView: exception loading rows", e)
       }
