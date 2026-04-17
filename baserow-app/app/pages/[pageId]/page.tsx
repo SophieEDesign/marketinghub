@@ -10,14 +10,34 @@ const isDev = process.env.NODE_ENV === 'development'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+function containsBigInt(value: unknown, seen = new WeakSet<object>()): boolean {
+  if (typeof value === "bigint") return true
+  if (value == null) return false
+  if (typeof value !== "object") return false
+  const obj = value as object
+  if (seen.has(obj)) return false
+  seen.add(obj)
+  if (Array.isArray(value)) {
+    return value.some((entry) => containsBigInt(entry, seen))
+  }
+  return Object.values(value as Record<string, unknown>).some((entry) => containsBigInt(entry, seen))
+}
+
+function sanitizeForClient<T>(value: T): T {
+  return JSON.parse(
+    JSON.stringify(value, (_key, current) => (typeof current === "bigint" ? current.toString() : current))
+  ) as T
+}
+
 export default async function PagePage({
   params,
 }: {
   params: { pageId: string }
 }) {
-  // #region agent log
-  console.info("[agent-debug]", { sessionId: "909a6f", runId: "initial", hypothesisId: "H6", location: "app/pages/[pageId]/page.tsx:entry", message: "Entered server page renderer", data: { hasParams: Boolean(params) }, timestamp: Date.now() })
-  // #endregion
+  try {
+    // #region agent log
+    console.info("[agent-debug]", { sessionId: "909a6f", runId: "initial", hypothesisId: "H6", location: "app/pages/[pageId]/page.tsx:entry", message: "Entered server page renderer", data: { hasParams: Boolean(params) }, timestamp: Date.now() })
+    // #endregion
   // #region agent log
   console.error("[agent-debug]", {
     sessionId: "909a6f",
@@ -116,6 +136,26 @@ export default async function PagePage({
   // CRITICAL: Load page data FIRST - never redirect before data is loaded
   // Load interface page from new system
   let page = await getInterfacePage(pageId)
+  // #region agent log
+  console.error("[agent-debug]", {
+    sessionId: "909a6f",
+    runId: "initial",
+    hypothesisId: "H18",
+    location: "app/pages/[pageId]/page.tsx:page-fetch-summary",
+    message: "Resolved page metadata for SSR render path",
+    data: {
+      pageId,
+      hasPage: Boolean(page),
+      pageType: page?.page_type ?? null,
+      hasName: typeof page?.name === "string",
+      hasConfig: Boolean(page?.config),
+      hasSourceView: Boolean(page?.source_view),
+      hasSavedViewId: Boolean((page as any)?.saved_view_id),
+      hasBaseTable: Boolean((page as any)?.base_table),
+    },
+    timestamp: Date.now(),
+  })
+  // #endregion
   // #region agent log
   console.info("[agent-debug]", { sessionId: "909a6f", runId: "initial", hypothesisId: "H9", location: "app/pages/[pageId]/page.tsx:getInterfacePage", message: "Loaded interface page metadata", data: { pageId, found: Boolean(page), pageType: page?.page_type || null, hasSourceView: Boolean(page?.source_view) }, timestamp: Date.now() })
   // #endregion
@@ -224,14 +264,103 @@ export default async function PagePage({
   console.info("[agent-debug]", { sessionId: "909a6f", runId: "initial", hypothesisId: "H6", location: "app/pages/[pageId]/page.tsx:pre-return", message: "Server page renderer reached return", data: { pageId, pageResolved: Boolean(page), pageName, initialDataCount: Array.isArray(initialData) ? initialData.length : 0 }, timestamp: Date.now() })
   // #endregion
   
+  const initialDataHasBigInt = containsBigInt(initialData)
+  const initialPageHasBigInt = containsBigInt(page ?? null)
+  let safeInitialData = initialData
+  let safeInitialPage = page || undefined
+
+  // #region agent log
+  console.error("[agent-debug]", {
+    sessionId: "909a6f",
+    runId: "initial",
+    hypothesisId: "H18",
+    location: "app/pages/[pageId]/page.tsx:handoff-summary",
+    message: "Preparing InterfacePageClient SSR handoff payload",
+    data: {
+      pageId,
+      pageName,
+      initialDataCount: Array.isArray(initialData) ? initialData.length : -1,
+      initialDataHasBigInt,
+      initialPageHasBigInt,
+      hideRecordPanel,
+    },
+    timestamp: Date.now(),
+  })
+  // #endregion
+
+  if (initialDataHasBigInt || initialPageHasBigInt) {
+    // #region agent log
+    console.error("[agent-debug]", {
+      sessionId: "909a6f",
+      runId: "initial",
+      hypothesisId: "H18",
+      location: "app/pages/[pageId]/page.tsx:handoff-sanitize",
+      message: "Detected BigInt in SSR handoff; sanitizing to JSON-safe payload",
+      data: { pageId, initialDataHasBigInt, initialPageHasBigInt },
+      timestamp: Date.now(),
+    })
+    // #endregion
+    safeInitialData = sanitizeForClient(initialData)
+    safeInitialPage = sanitizeForClient(page || undefined)
+  }
+
+  try {
+    JSON.stringify({ pageId, safeInitialPage, safeInitialData })
+    // #region agent log
+    console.error("[agent-debug]", {
+      sessionId: "909a6f",
+      runId: "initial",
+      hypothesisId: "H18",
+      location: "app/pages/[pageId]/page.tsx:handoff-serializable",
+      message: "SSR handoff payload passed JSON serialization check",
+      data: { pageId },
+      timestamp: Date.now(),
+    })
+    // #endregion
+  } catch (serializeError) {
+    // #region agent log
+    console.error("[agent-debug]", {
+      sessionId: "909a6f",
+      runId: "initial",
+      hypothesisId: "H18",
+      location: "app/pages/[pageId]/page.tsx:handoff-serialize-fail",
+      message: "SSR handoff payload failed JSON serialization check",
+      data: {
+        pageId,
+        errorMessage: serializeError instanceof Error ? serializeError.message : String(serializeError),
+      },
+      timestamp: Date.now(),
+    })
+    // #endregion
+    throw serializeError
+  }
+
   return (
-    <WorkspaceShellWrapper title={pageName} hideTopbar={true} hideRecordPanel={hideRecordPanel}>
-      <InterfacePageClient
-        pageId={pageId}
-        initialPage={page || undefined}
-        initialData={initialData}
-        isAdmin={admin}
-      />
-    </WorkspaceShellWrapper>
-  )
+      <WorkspaceShellWrapper title={pageName} hideTopbar={true} hideRecordPanel={hideRecordPanel}>
+        <InterfacePageClient
+          pageId={pageId}
+        initialPage={safeInitialPage}
+        initialData={safeInitialData}
+          isAdmin={admin}
+        />
+      </WorkspaceShellWrapper>
+    )
+  } catch (error) {
+    // #region agent log
+    console.error("[agent-debug]", {
+      sessionId: "909a6f",
+      runId: "initial",
+      hypothesisId: "H16",
+      location: "app/pages/[pageId]/page.tsx:outer-catch",
+      message: "Unhandled exception in pages route renderer",
+      data: {
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorName: error instanceof Error ? error.name : typeof error,
+        hasStack: Boolean(error instanceof Error && error.stack),
+      },
+      timestamp: Date.now(),
+    })
+    // #endregion
+    throw error
+  }
 }

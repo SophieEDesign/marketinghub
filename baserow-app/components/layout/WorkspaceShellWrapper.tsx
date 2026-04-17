@@ -27,17 +27,18 @@ export default async function WorkspaceShellWrapper({
   hideTopbar = false,
   hideRecordPanel = false,
 }: WorkspaceShellWrapperProps) {
-  // #region agent log
-  console.info("[agent-debug]", {
-    sessionId: "909a6f",
-    runId: "initial",
-    hypothesisId: "H11",
-    location: "components/layout/WorkspaceShellWrapper.tsx:entry",
-    message: "Entered WorkspaceShellWrapper",
-    data: { hasTitle: Boolean(title), hideTopbar, hideRecordPanel },
-    timestamp: Date.now(),
-  })
-  // #endregion
+  try {
+    // #region agent log
+    console.info("[agent-debug]", {
+      sessionId: "909a6f",
+      runId: "initial",
+      hypothesisId: "H11",
+      location: "components/layout/WorkspaceShellWrapper.tsx:entry",
+      message: "Entered WorkspaceShellWrapper",
+      data: { hasTitle: Boolean(title), hideTopbar, hideRecordPanel },
+      timestamp: Date.now(),
+    })
+    // #endregion
   // #region agent log
   console.error("[agent-debug]", {
     sessionId: "909a6f",
@@ -467,32 +468,50 @@ export default async function WorkspaceShellWrapper({
   })
   // #endregion
 
-  return (
-    <BrandingProvider settings={brandingSettings}>
-      <DynamicFavicon />
-      <EditModeProvider>
-        <UIModeProvider>
-          <SidebarModeProvider>
-            <div data-page-title={finalTitle}>
-            <WorkspaceShell
-              title={title}
-              tables={tables}
-              views={viewsByTable}
-              interfacePages={interfacePages as any}
-              interfaceGroups={interfaceGroups}
-              dashboards={dashboards}
-              userRole={userRole}
-              hideTopbar={hideTopbar}
-              hideRecordPanel={hideRecordPanel}
-              defaultPageId={defaultPageId}
-              landingPageTitle={landingPageTitle}
-            >
-              {children}
-            </WorkspaceShell>
-            </div>
-          </SidebarModeProvider>
-        </UIModeProvider>
-      </EditModeProvider>
-    </BrandingProvider>
-  )
+    return (
+      <BrandingProvider settings={brandingSettings}>
+        <DynamicFavicon />
+        <EditModeProvider>
+          <UIModeProvider>
+            <SidebarModeProvider>
+              <div data-page-title={finalTitle}>
+              <WorkspaceShell
+                title={title}
+                tables={tables}
+                views={viewsByTable}
+                interfacePages={interfacePages as any}
+                interfaceGroups={interfaceGroups}
+                dashboards={dashboards}
+                userRole={userRole}
+                hideTopbar={hideTopbar}
+                hideRecordPanel={hideRecordPanel}
+                defaultPageId={defaultPageId}
+                landingPageTitle={landingPageTitle}
+              >
+                {children}
+              </WorkspaceShell>
+              </div>
+            </SidebarModeProvider>
+          </UIModeProvider>
+        </EditModeProvider>
+      </BrandingProvider>
+    )
+  } catch (error) {
+    // #region agent log
+    console.error("[agent-debug]", {
+      sessionId: "909a6f",
+      runId: "initial",
+      hypothesisId: "H17",
+      location: "components/layout/WorkspaceShellWrapper.tsx:outer-catch",
+      message: "Unhandled exception in workspace shell wrapper",
+      data: {
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorName: error instanceof Error ? error.name : typeof error,
+        hasStack: Boolean(error instanceof Error && error.stack),
+      },
+      timestamp: Date.now(),
+    })
+    // #endregion
+    throw error
+  }
 }

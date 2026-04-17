@@ -141,6 +141,29 @@ export async function GET(
       }
     })
 
+    // #region agent log
+    console.error("[agent-debug]", {
+      sessionId: "909a6f",
+      runId: "initial",
+      hypothesisId: "H19",
+      location: "app/api/pages/[pageId]/blocks/route.ts:get-summary",
+      message: "Computed block payload summary for page",
+      data: {
+        pageId,
+        blockCount: blocks.length,
+        blockTypes: Array.from(new Set(blocks.map((b: any) => b.type))),
+        blocksMissingType: blocks.filter((b: any) => !b.type).length,
+        blocksMissingConfig: blocks.filter((b: any) => b.config == null).length,
+        sampleConfigKeys: blocks.slice(0, 5).map((b: any) => ({
+          id: b.id,
+          type: b.type,
+          keys: b.config && typeof b.config === "object" ? Object.keys(b.config).slice(0, 12) : [],
+        })),
+      },
+      timestamp: Date.now(),
+    })
+    // #endregion
+
     // CRITICAL: Log final response for debugging
     // This confirms edit and public receive identical block IDs + position values
     if (process.env.NODE_ENV === 'development') {
@@ -182,6 +205,19 @@ export async function GET(
       }
     )
   } catch (error: any) {
+    // #region agent log
+    console.error("[agent-debug]", {
+      sessionId: "909a6f",
+      runId: "initial",
+      hypothesisId: "H19",
+      location: "app/api/pages/[pageId]/blocks/route.ts:catch",
+      message: "Unhandled exception while loading blocks API payload",
+      data: {
+        errorMessage: error?.message || String(error),
+      },
+      timestamp: Date.now(),
+    })
+    // #endregion
     return NextResponse.json(
       { error: error.message || 'Failed to load blocks' },
       { status: 500 }
