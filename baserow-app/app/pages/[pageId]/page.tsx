@@ -18,7 +18,50 @@ export default async function PagePage({
   // #region agent log
   console.info("[agent-debug]", { sessionId: "909a6f", runId: "initial", hypothesisId: "H6", location: "app/pages/[pageId]/page.tsx:entry", message: "Entered server page renderer", data: { hasParams: Boolean(params) }, timestamp: Date.now() })
   // #endregion
-  const { pageId } = await params
+  let resolvedParams: { pageId?: string } | undefined
+  try {
+    resolvedParams = await params
+    // #region agent log
+    console.info("[agent-debug]", {
+      sessionId: "909a6f",
+      runId: "initial",
+      hypothesisId: "H10",
+      location: "app/pages/[pageId]/page.tsx:params-await",
+      message: "Resolved params await successfully",
+      data: {
+        paramsType: typeof resolvedParams,
+        hasPageId: Boolean(resolvedParams && typeof resolvedParams.pageId !== "undefined"),
+      },
+      timestamp: Date.now(),
+    })
+    // #endregion
+  } catch (error) {
+    // #region agent log
+    console.error("[agent-debug]", {
+      sessionId: "909a6f",
+      runId: "initial",
+      hypothesisId: "H10",
+      location: "app/pages/[pageId]/page.tsx:params-await:catch",
+      message: "Failed while awaiting params",
+      data: { errorMessage: error instanceof Error ? error.message : String(error) },
+      timestamp: Date.now(),
+    })
+    // #endregion
+    throw error
+  }
+
+  const pageId = resolvedParams?.pageId
+  // #region agent log
+  console.info("[agent-debug]", {
+    sessionId: "909a6f",
+    runId: "initial",
+    hypothesisId: "H10",
+    location: "app/pages/[pageId]/page.tsx:pageId-read",
+    message: "Read pageId from resolved params",
+    data: { pageId, isString: typeof pageId === "string" },
+    timestamp: Date.now(),
+  })
+  // #endregion
   // #region agent log
   console.info("[agent-debug]", { sessionId: "909a6f", runId: "initial", hypothesisId: "H6", location: "app/pages/[pageId]/page.tsx:params", message: "Resolved route params", data: { pageId, isUuid: Boolean(pageId && UUID_REGEX.test(pageId)) }, timestamp: Date.now() })
   // #endregion

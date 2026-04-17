@@ -168,11 +168,22 @@ export default function GroupedInterfaces({
       try {
         const collapsed = JSON.parse(saved)
         setCollapsedGroups(new Set(collapsed))
-      } catch (e) {
-        // Ignore parse errors
+      } catch {
+        // Ignore parse errors and use default collapsed state below
+        const defaultCollapsed = new Set(initialGroups.filter((g) => g && g.id).map((g) => g.id))
+        setCollapsedGroups(defaultCollapsed)
+        localStorage.setItem(
+          "interface-groups-collapsed",
+          JSON.stringify(Array.from(defaultCollapsed))
+        )
       }
+    } else {
+      // Default behavior: keep groups closed until user explicitly opens them.
+      const defaultCollapsed = new Set(initialGroups.filter((g) => g && g.id).map((g) => g.id))
+      setCollapsedGroups(defaultCollapsed)
+      localStorage.setItem("interface-groups-collapsed", JSON.stringify(Array.from(defaultCollapsed)))
     }
-  }, [])
+  }, [initialGroups])
 
   // Save collapse state to localStorage
   const saveCollapseState = useCallback((collapsed: Set<string>) => {
