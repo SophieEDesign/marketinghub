@@ -27,6 +27,17 @@ export default async function WorkspaceShellWrapper({
   hideTopbar = false,
   hideRecordPanel = false,
 }: WorkspaceShellWrapperProps) {
+  // #region agent log
+  console.info("[agent-debug]", {
+    sessionId: "909a6f",
+    runId: "initial",
+    hypothesisId: "H11",
+    location: "components/layout/WorkspaceShellWrapper.tsx:entry",
+    message: "Entered WorkspaceShellWrapper",
+    data: { hasTitle: Boolean(title), hideTopbar, hideRecordPanel },
+    timestamp: Date.now(),
+  })
+  // #endregion
   const supabase = await createClient()
   
   // Check authentication - redirect to login if not authenticated
@@ -297,9 +308,42 @@ export default async function WorkspaceShellWrapper({
   // Resolve default page for "Back to home" link - never link to abstract / route
   let defaultPageId: string | null = null
   try {
+    // #region agent log
+    console.info("[agent-debug]", {
+      sessionId: "909a6f",
+      runId: "initial",
+      hypothesisId: "H11",
+      location: "components/layout/WorkspaceShellWrapper.tsx:resolveLandingPage:start",
+      message: "Resolving landing page for shell links",
+      data: { interfacePageCount: interfacePages.length },
+      timestamp: Date.now(),
+    })
+    // #endregion
     const { pageId } = await resolveLandingPage()
     defaultPageId = pageId
+    // #region agent log
+    console.info("[agent-debug]", {
+      sessionId: "909a6f",
+      runId: "initial",
+      hypothesisId: "H11",
+      location: "components/layout/WorkspaceShellWrapper.tsx:resolveLandingPage:success",
+      message: "Resolved landing page for shell links",
+      data: { defaultPageId },
+      timestamp: Date.now(),
+    })
+    // #endregion
   } catch {
+    // #region agent log
+    console.error("[agent-debug]", {
+      sessionId: "909a6f",
+      runId: "initial",
+      hypothesisId: "H11",
+      location: "components/layout/WorkspaceShellWrapper.tsx:resolveLandingPage:catch",
+      message: "resolveLandingPage failed in shell wrapper",
+      data: {},
+      timestamp: Date.now(),
+    })
+    // #endregion
     // Fallback: first accessible interface page
     if (interfacePages.length > 0) {
       defaultPageId = interfacePages[0].id
@@ -311,6 +355,18 @@ export default async function WorkspaceShellWrapper({
       ? (interfacePages.find((p: { id: string }) => p.id === defaultPageId)?.name as string | undefined) ??
         null
       : null
+
+  // #region agent log
+  console.info("[agent-debug]", {
+    sessionId: "909a6f",
+    runId: "initial",
+    hypothesisId: "H11",
+    location: "components/layout/WorkspaceShellWrapper.tsx:pre-return",
+    message: "WorkspaceShellWrapper reached return",
+    data: { defaultPageId, landingPageTitle, tablesCount: tables.length },
+    timestamp: Date.now(),
+  })
+  // #endregion
 
   return (
     <BrandingProvider settings={brandingSettings}>
