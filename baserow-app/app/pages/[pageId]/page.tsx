@@ -15,7 +15,13 @@ export default async function PagePage({
 }: {
   params: { pageId: string }
 }) {
+  // #region agent log
+  fetch('http://127.0.0.1:7903/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'909a6f'},body:JSON.stringify({sessionId:'909a6f',runId:'initial',hypothesisId:'H6',location:'app/pages/[pageId]/page.tsx:entry',message:'Entered server page renderer',data:{hasParams:Boolean(params)},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   const { pageId } = await params
+  // #region agent log
+  fetch('http://127.0.0.1:7903/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'909a6f'},body:JSON.stringify({sessionId:'909a6f',runId:'initial',hypothesisId:'H6',location:'app/pages/[pageId]/page.tsx:params',message:'Resolved route params',data:{pageId,isUuid:Boolean(pageId && UUID_REGEX.test(pageId))},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   if (!pageId || typeof pageId !== "string" || !UUID_REGEX.test(pageId)) {
     if (isDev) {
       console.warn("[Page Render] Invalid pageId, redirecting home:", pageId)
@@ -23,11 +29,20 @@ export default async function PagePage({
     redirect("/")
   }
   const supabase = await createClient()
+  // #region agent log
+  fetch('http://127.0.0.1:7903/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'909a6f'},body:JSON.stringify({sessionId:'909a6f',runId:'initial',hypothesisId:'H7',location:'app/pages/[pageId]/page.tsx:createClient',message:'Server Supabase client created',data:{pageId,hasClient:Boolean(supabase)},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   const admin = await isAdmin()
+  // #region agent log
+  fetch('http://127.0.0.1:7903/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'909a6f'},body:JSON.stringify({sessionId:'909a6f',runId:'initial',hypothesisId:'H8',location:'app/pages/[pageId]/page.tsx:isAdmin',message:'Resolved admin status',data:{pageId,admin},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 
   // CRITICAL: Load page data FIRST - never redirect before data is loaded
   // Load interface page from new system
   let page = await getInterfacePage(pageId)
+  // #region agent log
+  fetch('http://127.0.0.1:7903/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'909a6f'},body:JSON.stringify({sessionId:'909a6f',runId:'initial',hypothesisId:'H9',location:'app/pages/[pageId]/page.tsx:getInterfacePage',message:'Loaded interface page metadata',data:{pageId,found:Boolean(page),pageType:page?.page_type||null,hasSourceView:Boolean(page?.source_view)},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   let pageName = "Interface Page"
   let initialData: any[] = []
 
@@ -91,10 +106,16 @@ export default async function PagePage({
       if (page.source_view) {
         try {
           initialData = await querySqlView(page.source_view, page.config?.default_filters || {})
+          // #region agent log
+          fetch('http://127.0.0.1:7903/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'909a6f'},body:JSON.stringify({sessionId:'909a6f',runId:'initial',hypothesisId:'H9',location:'app/pages/[pageId]/page.tsx:querySqlView:success',message:'Loaded SQL view data',data:{pageId,sourceView:page.source_view,rowCount:Array.isArray(initialData)?initialData.length:null},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
           if (isDev) {
             console.log('[Page Render] Loaded initial data:', { count: initialData.length })
           }
         } catch (error) {
+          // #region agent log
+          fetch('http://127.0.0.1:7903/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'909a6f'},body:JSON.stringify({sessionId:'909a6f',runId:'initial',hypothesisId:'H9',location:'app/pages/[pageId]/page.tsx:querySqlView:catch',message:'Failed loading SQL view data but continuing',data:{pageId,sourceView:page?.source_view||null,errorMessage:error instanceof Error ? error.message : String(error)},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
           // Data load error - log but continue rendering
           // The page component will handle showing the error state
           console.error('[Page Render] Error loading initial SQL view data (continuing to render):', error)
@@ -123,6 +144,9 @@ export default async function PagePage({
   if (isDev && page) {
     console.log('[Page Render] Rendering page:', { pageId, pageName, hasData: initialData.length > 0 })
   }
+  // #region agent log
+  fetch('http://127.0.0.1:7903/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'909a6f'},body:JSON.stringify({sessionId:'909a6f',runId:'initial',hypothesisId:'H6',location:'app/pages/[pageId]/page.tsx:pre-return',message:'Server page renderer reached return',data:{pageId,pageResolved:Boolean(page),pageName,initialDataCount:Array.isArray(initialData)?initialData.length:0},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   
   return (
     <WorkspaceShellWrapper title={pageName} hideTopbar={true} hideRecordPanel={hideRecordPanel}>
