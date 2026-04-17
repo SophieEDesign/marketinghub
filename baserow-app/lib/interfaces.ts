@@ -303,13 +303,46 @@ async function getAccessibleInterfacePages(): Promise<Interface[]> {
  */
 export async function resolveLandingPage(): Promise<{ pageId: string | null; reason: string }> {
   const supabase = await createClient()
+  // #region agent log
+  console.error("[agent-debug]", {
+    sessionId: "909a6f",
+    runId: "initial",
+    hypothesisId: "H14",
+    location: "lib/interfaces.ts:resolveLandingPage:entry",
+    message: "Entered resolveLandingPage",
+    data: {},
+    timestamp: Date.now(),
+  })
+  // #endregion
   const { data: { user } } = await supabase.auth.getUser()
+  // #region agent log
+  console.error("[agent-debug]", {
+    sessionId: "909a6f",
+    runId: "initial",
+    hypothesisId: "H14",
+    location: "lib/interfaces.ts:resolveLandingPage:after-getUser",
+    message: "Completed auth.getUser in resolveLandingPage",
+    data: { hasUser: Boolean(user) },
+    timestamp: Date.now(),
+  })
+  // #endregion
   
   if (!user) {
     return { pageId: null, reason: 'User not authenticated' }
   }
   
   const userIsAdmin = await isAdmin()
+  // #region agent log
+  console.error("[agent-debug]", {
+    sessionId: "909a6f",
+    runId: "initial",
+    hypothesisId: "H14",
+    location: "lib/interfaces.ts:resolveLandingPage:after-isAdmin",
+    message: "Resolved isAdmin in resolveLandingPage",
+    data: { userIsAdmin },
+    timestamp: Date.now(),
+  })
+  // #endregion
   const isDev = process.env.NODE_ENV === 'development'
   
   // Priority 1: Check user default page (if field exists in profiles)

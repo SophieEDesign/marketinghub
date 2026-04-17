@@ -50,9 +50,31 @@ export default async function WorkspaceShellWrapper({
   })
   // #endregion
   const supabase = await createClient()
+  // #region agent log
+  console.error("[agent-debug]", {
+    sessionId: "909a6f",
+    runId: "initial",
+    hypothesisId: "H13",
+    location: "components/layout/WorkspaceShellWrapper.tsx:after-createClient",
+    message: "createClient completed in shell wrapper",
+    data: { hasSupabase: Boolean(supabase) },
+    timestamp: Date.now(),
+  })
+  // #endregion
   
   // Check authentication - redirect to login if not authenticated
   const { data: { user } } = await supabase.auth.getUser()
+  // #region agent log
+  console.error("[agent-debug]", {
+    sessionId: "909a6f",
+    runId: "initial",
+    hypothesisId: "H13",
+    location: "components/layout/WorkspaceShellWrapper.tsx:after-getUser",
+    message: "auth.getUser completed in shell wrapper",
+    data: { hasUser: Boolean(user) },
+    timestamp: Date.now(),
+  })
+  // #endregion
   if (!user) {
     // Note: For better redirect preservation, the login page should be accessed
     // with ?next=/desired-path parameter. This component redirects to /login
@@ -72,8 +94,30 @@ export default async function WorkspaceShellWrapper({
     getUserRole(),
     getWorkspaceSettings().catch(() => null),
   ])
+  // #region agent log
+  console.error("[agent-debug]", {
+    sessionId: "909a6f",
+    runId: "initial",
+    hypothesisId: "H13",
+    location: "components/layout/WorkspaceShellWrapper.tsx:after-initial-parallel",
+    message: "Initial parallel data load completed",
+    data: { tablesCount: tables.length, hasUserRole: Boolean(userRole), hasBranding: Boolean(brandingSettings) },
+    timestamp: Date.now(),
+  })
+  // #endregion
   
   const userIsAdmin = await isAdmin()
+  // #region agent log
+  console.error("[agent-debug]", {
+    sessionId: "909a6f",
+    runId: "initial",
+    hypothesisId: "H13",
+    location: "components/layout/WorkspaceShellWrapper.tsx:after-isAdmin-userIsAdmin",
+    message: "Resolved userIsAdmin in shell wrapper",
+    data: { userIsAdmin },
+    timestamp: Date.now(),
+  })
+  // #endregion
 
   // Fetch views for all tables using existing getViews function
   // Handle errors gracefully - tables may not have views yet
@@ -89,9 +133,31 @@ export default async function WorkspaceShellWrapper({
       }
     })
   )
+  // #region agent log
+  console.error("[agent-debug]", {
+    sessionId: "909a6f",
+    runId: "initial",
+    hypothesisId: "H13",
+    location: "components/layout/WorkspaceShellWrapper.tsx:after-viewsByTable",
+    message: "Loaded viewsByTable in shell wrapper",
+    data: { tableCount: tables.length, viewsTableKeys: Object.keys(viewsByTable).length },
+    timestamp: Date.now(),
+  })
+  // #endregion
 
   // Check if user is admin for filtering
   const admin = await isAdmin()
+  // #region agent log
+  console.error("[agent-debug]", {
+    sessionId: "909a6f",
+    runId: "initial",
+    hypothesisId: "H13",
+    location: "components/layout/WorkspaceShellWrapper.tsx:after-isAdmin-admin",
+    message: "Resolved admin flag in shell wrapper",
+    data: { admin },
+    timestamp: Date.now(),
+  })
+  // #endregion
   
   // Fetch interface groups
   let interfaceGroups: any[] = []
@@ -377,6 +443,17 @@ export default async function WorkspaceShellWrapper({
       ? (interfacePages.find((p: { id: string }) => p.id === defaultPageId)?.name as string | undefined) ??
         null
       : null
+  // #region agent log
+  console.error("[agent-debug]", {
+    sessionId: "909a6f",
+    runId: "initial",
+    hypothesisId: "H13",
+    location: "components/layout/WorkspaceShellWrapper.tsx:after-landingPageTitle",
+    message: "Computed landingPageTitle in shell wrapper",
+    data: { defaultPageId, landingPageTitle, interfacePagesCount: interfacePages.length },
+    timestamp: Date.now(),
+  })
+  // #endregion
 
   // #region agent log
   console.info("[agent-debug]", {
