@@ -13,6 +13,7 @@
     "predeploy-check": "tsx scripts/predeploy-check.ts",
     "repair-linked-fields": "tsx scripts/repair-linked-fields.ts",
     "seed:marketing-dashboard": "node scripts/seed-marketing-dashboard.cjs",
+    "apply:marketing-hub": "node scripts/apply-marketing-hub-workspace.cjs",
     "seed:quarterly-planning": "node scripts/seed-quarterly-planning-page.cjs",
     "prebuild": "npm run predeploy-check",
     "test:e2e": "playwright test"
