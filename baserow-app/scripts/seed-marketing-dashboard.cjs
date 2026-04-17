@@ -1,6 +1,6 @@
 /**
- * One-off seed: creates the "Marketing Dashboard" interface page and view_blocks.
- * Layout: Quarterly Themes as planning spine, content calendar, compact lists, single campaign gallery (no duplicate "all campaigns").
+ * One-off seed: creates a new "Marketing Dashboard (Theme-led)" interface page variant.
+ * Layout: Themes (top), Campaigns (middle), Upcoming Content (bottom).
  *
  * Run from baserow-app: npm run seed:marketing-dashboard
  */
@@ -43,37 +43,47 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 })
 
-const ACTIVE_STATUS = ["live", "Live", "in progress", "In Progress", "Active", "active"]
-const TASK_DONE_STATUSES = ["Done", "Complete", "Closed", "Cancelled", "Archived"]
-
 function matchTable(rows, pred) {
   return rows.find((t) => pred(t.name))?.id
 }
 
-function section(html, y, h = 2) {
+function normalizeName(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+}
+
+function fieldNameFromRecord(field) {
+  return field?.name || field?.field_name || field?.key || ""
+}
+
+function pickFieldName(fields, patterns) {
+  const candidates = fields.map((f) => fieldNameFromRecord(f)).filter(Boolean)
+  for (const pattern of patterns) {
+    const hit = candidates.find((name) => pattern.test(normalizeName(name)) || pattern.test(String(name).toLowerCase()))
+    if (hit) return hit
+  }
+  return null
+}
+
+function section(title, description, y, h = 2) {
+  const escapedTitle = String(title || "").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  const escapedDescription = String(description || "").replace(/</g, "&lt;").replace(/>/g, "&gt;")
   return {
     type: "html",
     position_x: 0,
     position_y: y,
     width: 12,
     height: h,
-    config: { title: "", html },
+    config: {
+      title: "",
+      html: `<div class="pt-2 pb-2 border-b border-border/50"><h2 class="text-lg font-semibold tracking-tight text-foreground">${escapedTitle}</h2><p class="text-sm text-muted-foreground mt-1">${escapedDescription}</p></div>`,
+    },
   }
 }
 
 async function main() {
-  const { data: existing } = await supabase
-    .from("interface_pages")
-    .select("id, name")
-    .eq("name", "Marketing Dashboard")
-    .eq("is_archived", false)
-    .maybeSingle()
-
-  if (existing) {
-    console.log(`Marketing Dashboard page already exists (id=${existing.id}). Skipping.`)
-    process.exit(0)
-  }
-
   const { data: groups, error: gErr } = await supabase
     .from("interface_groups")
     .select("id")
@@ -102,23 +112,66 @@ async function main() {
     tables,
     (n) => /quarterly/i.test(n) && /theme/i.test(n)
   )
-  const tasksTableId = matchTable(
-    tables,
-    (n) => /^(tasks?)$/i.test(n.trim()) || (/task/i.test(n) && !/contact/i.test(n))
-  )
-
-  if (!campaignTableId || !contentTableId) {
+  if (!campaignTableId || !contentTableId || !quarterlyThemesTableId) {
     console.error(
-      "Could not resolve Campaigns and Content tables. Found:",
+      "Could not resolve Quarterly Themes, Campaigns, and Content tables. Found:",
       tables.map((t) => t.name).join(", ")
     )
     process.exit(1)
   }
 
+  const [themeFieldsRes, campaignFieldsRes, contentFieldsRes] = await Promise.all([
+    supabase.from("table_fields").select("name, field_name, key").eq("table_id", quarterlyThemesTableId),
+    supabase.from("table_fields").select("name, field_name, key").eq("table_id", campaignTableId),
+    supabase.from("table_fields").select("name, field_name, key").eq("table_id", contentTableId),
+  ])
+
+  if (themeFieldsRes.error || campaignFieldsRes.error || contentFieldsRes.error) {
+    console.error("Could not load table_fields metadata", {
+      themes: themeFieldsRes.error,
+      campaigns: campaignFieldsRes.error,
+      content: contentFieldsRes.error,
+    })
+    process.exit(1)
+  }
+
+  const themeFields = themeFieldsRes.data || []
+  const campaignFields = campaignFieldsRes.data || []
+  const contentFields = contentFieldsRes.data || []
+
+  const themeNameField = pickFieldName(themeFields, [/^name$/, /theme_name/, /title/]) || "name"
+  const themeNotesField = pickFieldName(themeFields, [/key_message/, /key_messages?/, /notes?/, /message/, /summary/, /description/])
+  const campaignNameField = pickFieldName(campaignFields, [/^name$/, /campaign_name/, /title/]) || "name"
+  const campaignStatusField = pickFieldName(campaignFields, [/^status$/, /campaign_status/, /state/]) || "status"
+  const campaignThemeLinkField = pickFieldName(campaignFields, [/quarterly_theme/, /theme/, /quarterlythemes?/, /theme_link/])
+  const contentNameField = pickFieldName(contentFields, [/content_name/, /^name$/, /title/]) || "content_name"
+  const contentDateField = pickFieldName(contentFields, [/^date$/, /publish_date/, /scheduled_date/, /due_date/]) || "date"
+  const contentCampaignField = pickFieldName(contentFields, [/campaigns?/, /linked_campaign/, /campaign_link/])
+
+  const baseVariantName = "Marketing Dashboard (Theme-led)"
+  const { data: existingVariantRows, error: variantErr } = await supabase
+    .from("interface_pages")
+    .select("name")
+    .eq("is_archived", false)
+    .ilike("name", `${baseVariantName}%`)
+
+  if (variantErr) {
+    console.error("Failed to check existing dashboard variants", variantErr)
+    process.exit(1)
+  }
+
+  const existingNames = new Set((existingVariantRows || []).map((row) => row.name))
+  let pageName = baseVariantName
+  if (existingNames.has(pageName)) {
+    let n = 2
+    while (existingNames.has(`${baseVariantName} ${n}`)) n += 1
+    pageName = `${baseVariantName} ${n}`
+  }
+
   const { data: page, error: pErr } = await supabase
     .from("interface_pages")
     .insert({
-      name: "Marketing Dashboard",
+      name: pageName,
       page_type: "content",
       group_id: groupId,
       order_index: 0,
@@ -141,215 +194,98 @@ async function main() {
 
   const pageId = page.id
 
-  const thirdKpi = tasksTableId
-    ? {
-        type: "kpi",
-        position_x: 8,
-        position_y: 3,
-        width: 4,
-        height: 4,
-        config: {
-          title: "Open tasks",
-          kpi_label: "Not closed",
-          table_id: tasksTableId,
-          kpi_aggregate: "count",
-          filters: [{ field: "status", operator: "is_not_any_of", value: TASK_DONE_STATUSES }],
-        },
-      }
-    : {
-        type: "kpi",
-        position_x: 8,
-        position_y: 3,
-        width: 4,
-        height: 4,
-        config: {
-          title: "All content",
-          kpi_label: "Pipeline",
-          table_id: contentTableId,
-          kpi_aggregate: "count",
-          filters: [],
-        },
-      }
-
   /** @type {any[]} */
-  const blocks = [
-    section(
-      `<div class="pt-1 pb-2 border-b border-border/50"><h2 class="text-lg font-semibold tracking-tight text-foreground">Focus</h2><p class="text-sm text-muted-foreground mt-1">Campaigns, this week, and next actions</p></div>`,
-      0,
-      3
-    ),
-    {
-      type: "kpi",
-      position_x: 0,
-      position_y: 3,
-      width: 4,
-      height: 4,
-      config: {
-        title: "Active campaigns",
-        kpi_label: "Active",
-        table_id: campaignTableId,
-        kpi_aggregate: "count",
-        filters: [{ field: "status", operator: "is_any_of", value: ACTIVE_STATUS }],
-      },
-    },
-    {
-      type: "kpi",
-      position_x: 4,
-      position_y: 3,
-      width: 4,
-      height: 4,
-      config: {
-        title: "Content this week",
-        kpi_label: "This week",
-        table_id: contentTableId,
-        kpi_aggregate: "count",
-        filters: [{ field: "date", operator: "date_next_days", value: 7 }],
-      },
-    },
-    thirdKpi,
-    section(
-      `<div class="pt-4 pb-2 border-b border-border/50"><h2 class="text-lg font-semibold tracking-tight text-foreground">Planning spine</h2><p class="text-sm text-muted-foreground mt-1">Quarterly themes — link content and tasks here</p></div>`,
-      7,
-      3
-    ),
-  ]
+  const blocks = []
+  let nextY = 0
 
-  let nextY = 10
-  if (quarterlyThemesTableId) {
-    blocks.push({
-      type: "grid",
-      position_x: 0,
-      position_y: nextY,
-      width: 12,
-      height: 7,
-      config: {
-        title: "Quarterly themes",
-        table_id: quarterlyThemesTableId,
-        view_type: "gallery",
-        row_limit: 8,
-        visible_fields: ["name"],
-        appearance: { showTitle: true, border: "none" },
-      },
-    })
-    nextY += 7
-  } else {
-    blocks.push({
-      type: "html",
-      position_x: 0,
-      position_y: nextY,
-      width: 12,
-      height: 3,
-      config: {
-        title: "",
-        html: `<p class="text-sm text-muted-foreground py-2">No <strong>Quarterly Themes</strong> table found. Add one under Core Data to anchor planning here.</p>`,
-      },
-    })
-    nextY += 3
+  blocks.push(section("Themes", "Current quarterly themes and key messaging", nextY, 3))
+  nextY += 3
+
+  const themeVisibleFields = [themeNameField]
+  if (themeNotesField && !themeVisibleFields.includes(themeNotesField)) {
+    themeVisibleFields.push(themeNotesField)
+  }
+  blocks.push({
+    type: "grid",
+    position_x: 0,
+    position_y: nextY,
+    width: 12,
+    height: 7,
+    config: {
+      title: "Themes",
+      table_id: quarterlyThemesTableId,
+      view_type: "gallery",
+      row_limit: 12,
+      visible_fields: themeVisibleFields,
+      appearance: { showTitle: true, border: "none" },
+    },
+  })
+  nextY += 8
+
+  blocks.push(section("Campaigns", "Campaigns and editorials aligned to themes", nextY, 2))
+  nextY += 2
+
+  const campaignVisibleFields = [campaignNameField]
+  if (campaignStatusField && !campaignVisibleFields.includes(campaignStatusField)) {
+    campaignVisibleFields.push(campaignStatusField)
+  }
+  if (campaignThemeLinkField && !campaignVisibleFields.includes(campaignThemeLinkField)) {
+    campaignVisibleFields.push(campaignThemeLinkField)
   }
 
-  blocks.push(
-    section(
-      `<div class="pt-4 pb-2 border-b border-border/50"><h2 class="text-lg font-semibold tracking-tight text-foreground">Content calendar</h2><p class="text-sm text-muted-foreground mt-1">Scheduled content by date</p></div>`,
-      nextY,
-      2
-    )
-  )
-  nextY += 2
+  const campaignsConfig = {
+    title: "Campaigns",
+    table_id: campaignTableId,
+    view_type: "list",
+    row_limit: 16,
+    list_title_field: campaignNameField,
+    pill_fields: campaignStatusField ? [campaignStatusField] : [],
+    visible_fields: campaignVisibleFields,
+    appearance: { showTitle: true, border: "none" },
+  }
+  if (campaignThemeLinkField) {
+    campaignsConfig.group_by_field = campaignThemeLinkField
+  }
 
   blocks.push({
     type: "grid",
     position_x: 0,
     position_y: nextY,
     width: 12,
-    height: 14,
-    config: {
-      title: "Content calendar",
-      table_id: contentTableId,
-      view_type: "calendar",
-      calendar_date_field: "date",
-      default_date_range_preset: "thisMonth",
-      visible_fields: ["content_name", "status", "quarterly_theme"],
-      appearance: { showTitle: true, border: "none" },
-    },
-  })
-  nextY += 14
-
-  blocks.push({
-    type: "grid",
-    position_x: 0,
-    position_y: nextY,
-    width: 12,
-    height: 6,
-    config: {
-      title: "This week's content",
-      table_id: contentTableId,
-      view_type: "list",
-      filters: [{ field: "date", operator: "date_next_days", value: 7 }],
-      row_limit: 8,
-      list_title_field: "content_name",
-      pill_fields: ["status"],
-      visible_fields: ["content_name", "status", "date", "quarterly_theme"],
-      appearance: { showTitle: true, border: "none" },
-    },
-  })
-  nextY += 6
-
-  blocks.push(
-    section(
-      `<div class="pt-4 pb-2 border-b border-border/50"><h2 class="text-lg font-semibold tracking-tight text-foreground">Campaigns</h2><p class="text-sm text-muted-foreground mt-1">Active campaigns only</p></div>`,
-      nextY,
-      2
-    )
-  )
-  nextY += 2
-
-  blocks.push({
-    type: "grid",
-    position_x: 0,
-    position_y: nextY,
-    width: 12,
-    height: 9,
-    config: {
-      title: "Active campaigns",
-      table_id: campaignTableId,
-      view_type: "gallery",
-      visible_fields: ["name", "status", "content"],
-      filters: [{ field: "status", operator: "is_any_of", value: ACTIVE_STATUS }],
-      row_limit: 16,
-      appearance: { showTitle: true, border: "none" },
-    },
+    height: 8,
+    config: campaignsConfig,
   })
   nextY += 9
 
-  if (tasksTableId) {
-    blocks.push(
-      section(
-        `<div class="pt-4 pb-2 border-b border-border/50"><h2 class="text-lg font-semibold tracking-tight text-foreground">Tasks</h2><p class="text-sm text-muted-foreground mt-1">Linked to themes and content</p></div>`,
-        nextY,
-        2
-      )
-    )
-    nextY += 2
-    blocks.push({
-      type: "grid",
-      position_x: 0,
-      position_y: nextY,
-      width: 12,
-      height: 8,
-      config: {
-        title: "Open tasks",
-        table_id: tasksTableId,
-        view_type: "list",
-        filters: [{ field: "status", operator: "is_not_any_of", value: TASK_DONE_STATUSES }],
-        row_limit: 12,
-        sorts: [{ field: "created_at", direction: "desc" }],
-        list_title_field: "name",
-        pill_fields: ["status"],
-        visible_fields: ["name", "status", "theme", "content"],
-        appearance: { showTitle: true, border: "none" },
-      },
-    })
+  blocks.push(section("Upcoming Content", "Recent and upcoming planned content", nextY, 2))
+  nextY += 2
+
+  const contentVisibleFields = [contentNameField]
+  if (contentCampaignField && !contentVisibleFields.includes(contentCampaignField)) {
+    contentVisibleFields.push(contentCampaignField)
   }
+  if (contentDateField && !contentVisibleFields.includes(contentDateField)) {
+    contentVisibleFields.push(contentDateField)
+  }
+
+  blocks.push({
+    type: "grid",
+    position_x: 0,
+    position_y: nextY,
+    width: 12,
+    height: 7,
+    config: {
+      title: "Upcoming Content",
+      table_id: contentTableId,
+      view_type: "list",
+      row_limit: 10,
+      list_title_field: contentNameField,
+      visible_fields: contentVisibleFields,
+      sorts: [{ field: contentDateField, direction: "asc" }],
+      filters: [{ field: contentDateField, operator: "date_next_days", value: 45 }],
+      appearance: { showTitle: true, border: "none" },
+    },
+  })
 
   const rows = blocks.map((b, order_index) => ({
     page_id: pageId,
@@ -372,7 +308,7 @@ async function main() {
     process.exit(1)
   }
 
-  console.log(`Created Marketing Dashboard page id=${pageId} with ${rows.length} blocks.`)
+  console.log(`Created ${pageName} page id=${pageId} with ${rows.length} blocks.`)
   console.log(`Open: /pages/${pageId}`)
 }
 
