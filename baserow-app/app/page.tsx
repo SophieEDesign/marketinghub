@@ -8,6 +8,15 @@ import { authErrorToMessage } from "@/lib/auth-utils"
 
 const isDev = process.env.NODE_ENV === 'development'
 
+function normalizePageId(value: unknown): string | null {
+  if (typeof value === "string" && value.length > 0) return value
+  if (value && typeof value === "object" && "id" in value) {
+    const nestedId = (value as { id?: unknown }).id
+    if (typeof nestedId === "string" && nestedId.length > 0) return nestedId
+  }
+  return null
+}
+
 export default async function HomePage({
   searchParams,
 }: {
@@ -61,7 +70,19 @@ export default async function HomePage({
   // Only redirect if user is authenticated AND valid default exists
   // This redirect happens ONCE at server render time - client-side effects cannot override it
   try {
-    const { pageId, reason } = await resolveLandingPage()
+    const { pageId: rawPageId, reason } = await resolveLandingPage()
+    const pageId = normalizePageId(rawPageId)
+    // #region agent log
+    console.error("[agent-debug]", {
+      sessionId: "909a6f",
+      runId: "initial",
+      hypothesisId: "H15",
+      location: "app/page.tsx:resolveLandingPage:normalized",
+      message: "Normalized resolved landing page id in root redirect",
+      data: { rawType: typeof rawPageId, normalizedPageId: pageId, reason },
+      timestamp: Date.now(),
+    })
+    // #endregion
     
     if (isDev) {
       console.log(`[Default Page] resolveLandingPage returned:`, { 
