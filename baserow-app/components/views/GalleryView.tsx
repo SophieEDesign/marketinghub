@@ -21,6 +21,7 @@ import type { HighlightRule } from "@/lib/interface/types"
 import { evaluateHighlightRules, getFormattingStyle } from "@/lib/conditional-formatting/evaluator"
 import { cn } from "@/lib/utils"
 import { getMarketingStatusPillClassNames, isMarketingStatusField } from "@/lib/status-colors"
+import { isAbortError } from "@/lib/api/error-handling"
 
 interface GalleryViewProps {
   tableId: string
@@ -117,7 +118,9 @@ export default function GalleryView({
         }
         setSupabaseTableName(data.supabase_table)
       } catch (e) {
-        console.error("GalleryView: error loading table info", e)
+        if (!isAbortError(e)) {
+          console.error("GalleryView: error loading table info", e)
+        }
         setSupabaseTableName(null)
       }
     }
@@ -164,7 +167,9 @@ export default function GalleryView({
       }
 
       if (error) {
-        console.error("GalleryView: error loading rows", error)
+        if (!isAbortError(error)) {
+          console.error("GalleryView: error loading rows", error)
+        }
         setRows([])
         return
       }
@@ -179,7 +184,9 @@ export default function GalleryView({
       }))
       setRows(tableRows)
     } catch (e) {
-      console.error("GalleryView: exception loading rows", e)
+      if (!isAbortError(e)) {
+        console.error("GalleryView: exception loading rows", e)
+      }
       setRows([])
     } finally {
       setLoading(false)
