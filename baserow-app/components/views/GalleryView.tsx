@@ -137,11 +137,6 @@ export default function GalleryView({
     try {
       const supabase = createClient()
 
-      let query = supabase
-        .from(supabaseTableName)
-        .select("*")
-        .is("deleted_at", null)
-
       const normalizedFields = (Array.isArray(tableFields) ? tableFields : []).map((f: any) => ({
         name: f.name || f.field_name || f.id || f.field_id,
         id: f.id || f.field_id,
@@ -149,14 +144,25 @@ export default function GalleryView({
         options: f.options || f.field_options,
       }))
       const baseFilters = filterTree ? stripFilterBlockFilters(filters || []) : (filters || [])
-      if (filterTree) {
-        query = applyFiltersToQuery(query, filterTree, normalizedFields)
+      const buildQuery = (includeSoftDeleteFilter: boolean) => {
+        let query = supabase.from(supabaseTableName).select("*")
+        if (includeSoftDeleteFilter) {
+          query = query.is("deleted_at", null)
+        }
+        if (filterTree) {
+          query = applyFiltersToQuery(query, filterTree, normalizedFields)
+        }
+        query = applyFiltersToQuery(query, baseFilters, normalizedFields)
+        return query.order("created_at", { ascending: false })
       }
-      query = applyFiltersToQuery(query, baseFilters, normalizedFields)
 
-      query = query.order("created_at", { ascending: false })
+      let { data, error } = await buildQuery(true)
 
-      const { data, error } = await query
+      // Some legacy tables do not have deleted_at; retry without soft-delete filter.
+      if (error?.code === "42703" && String(error?.message || "").includes("deleted_at")) {
+        ;({ data, error } = await buildQuery(false))
+      }
+
       if (error) {
         console.error("GalleryView: error loading rows", error)
         setRows([])

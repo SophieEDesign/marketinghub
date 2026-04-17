@@ -55,7 +55,7 @@ function normalizeName(value) {
 }
 
 function fieldNameFromRecord(field) {
-  return field?.name || field?.field_name || field?.key || ""
+  return field?.name || ""
 }
 
 function pickFieldName(fields, patterns) {
@@ -121,9 +121,9 @@ async function main() {
   }
 
   const [themeFieldsRes, campaignFieldsRes, contentFieldsRes] = await Promise.all([
-    supabase.from("table_fields").select("name, field_name, key").eq("table_id", quarterlyThemesTableId),
-    supabase.from("table_fields").select("name, field_name, key").eq("table_id", campaignTableId),
-    supabase.from("table_fields").select("name, field_name, key").eq("table_id", contentTableId),
+    supabase.from("table_fields").select("name").eq("table_id", quarterlyThemesTableId),
+    supabase.from("table_fields").select("name").eq("table_id", campaignTableId),
+    supabase.from("table_fields").select("name").eq("table_id", contentTableId),
   ])
 
   if (themeFieldsRes.error || campaignFieldsRes.error || contentFieldsRes.error) {
@@ -147,6 +147,23 @@ async function main() {
   const contentNameField = pickFieldName(contentFields, [/content_name/, /^name$/, /title/]) || "content_name"
   const contentDateField = pickFieldName(contentFields, [/^date$/, /publish_date/, /scheduled_date/, /due_date/]) || "date"
   const contentCampaignField = pickFieldName(contentFields, [/campaigns?/, /linked_campaign/, /campaign_link/])
+  const { data: anchorViews, error: anchorErr } = await supabase
+    .from("views")
+    .select("id, table_id")
+    .in("table_id", [quarterlyThemesTableId, campaignTableId, contentTableId])
+    .limit(10)
+
+  if (anchorErr) {
+    console.error("Failed to load views for page anchor", anchorErr)
+    process.exit(1)
+  }
+  const savedViewAnchorId = anchorViews?.[0]?.id || null
+  if (!savedViewAnchorId) {
+    console.error(
+      "Could not find a saved view for Quarterly Themes/Campaigns/Content. Create one view on any of these tables and retry."
+    )
+    process.exit(1)
+  }
 
   const baseVariantName = "Marketing Dashboard (Theme-led)"
   const { data: existingVariantRows, error: variantErr } = await supabase
@@ -178,7 +195,7 @@ async function main() {
       config: { layout_style: "marketing_dashboard" },
       source_view: null,
       base_table: null,
-      saved_view_id: null,
+      saved_view_id: savedViewAnchorId,
       dashboard_layout_id: null,
       form_config_id: null,
       record_config_id: null,
