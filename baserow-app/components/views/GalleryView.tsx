@@ -96,6 +96,7 @@ export default function GalleryView({
   const [groupValueLabelMaps, setGroupValueLabelMaps] = useState<Record<string, Record<string, string>>>({})
   // Ref for measuring content height
   const contentRef = useRef<HTMLDivElement>(null)
+  const lastLoadRequestKeyRef = useRef<string | null>(null)
 
   // Resolve supabase table name
   useEffect(() => {
@@ -129,14 +130,42 @@ export default function GalleryView({
   }, [tableId])
 
   // Load rows - extracted for use in onRecordUpdated callback
-  const loadRows = useCallback(async () => {
+  const loadRows = useCallback(async (forceReload = false) => {
     if (!supabaseTableName || !tableId) {
       setRows([])
       setLoading(false)
       return
     }
 
-    setLoading(true)
+    const requestKey = JSON.stringify({
+      supabaseTableName,
+      tableId,
+      filterCount: Array.isArray(filters) ? filters.length : 0,
+      hasFilterTree: Boolean(filterTree),
+      tableFieldCount: Array.isArray(tableFields) ? tableFields.length : 0,
+      forceReload,
+    })
+    if (!forceReload && lastLoadRequestKeyRef.current === requestKey) {
+      return
+    }
+    lastLoadRequestKeyRef.current = requestKey
+
+    // Avoid UI flicker on background refreshes; keep cards visible unless this is initial load.
+    const isInitialLoad = rows.length === 0
+    if (isInitialLoad) {
+      setLoading(true)
+    }
+    // #region agent log
+    console.error("[agent-debug]", {
+      sessionId: "909a6f",
+      runId: "initial",
+      hypothesisId: "H20",
+      location: "components/views/GalleryView.tsx:loadRows:start",
+      message: "GalleryView started loading rows",
+      data: { tableId, supabaseTableName, isInitialLoad, forceReload, requestKey },
+      timestamp: Date.now(),
+    })
+    // #endregion
     try {
       const supabase = createClient()
 
@@ -183,21 +212,43 @@ export default function GalleryView({
         updated_at: row.updated_at,
       }))
       setRows(tableRows)
+      // #region agent log
+      console.error("[agent-debug]", {
+        sessionId: "909a6f",
+        runId: "initial",
+        hypothesisId: "H20",
+        location: "components/views/GalleryView.tsx:loadRows:success",
+        message: "GalleryView loaded rows successfully",
+        data: { tableId, rowCount: tableRows.length },
+        timestamp: Date.now(),
+      })
+      // #endregion
     } catch (e) {
       if (!isAbortError(e)) {
         console.error("GalleryView: exception loading rows", e)
+        // #region agent log
+        console.error("[agent-debug]", {
+          sessionId: "909a6f",
+          runId: "initial",
+          hypothesisId: "H20",
+          location: "components/views/GalleryView.tsx:loadRows:catch",
+          message: "GalleryView loadRows threw an exception",
+          data: { tableId, errorMessage: e instanceof Error ? e.message : String(e) },
+          timestamp: Date.now(),
+        })
+        // #endregion
       }
-      setRows([])
+      // Preserve previous rows on transient failures to avoid flash-to-empty loops.
     } finally {
       setLoading(false)
     }
-  }, [supabaseTableName, tableId, filters, filterTree, tableFields])
+  }, [supabaseTableName, tableId, filters, filterTree, tableFields, rows.length])
 
   const loadRowsRef = useRef<() => Promise<void>>()
   loadRowsRef.current = loadRows
 
   useEffect(() => {
-    loadRows()
+    loadRows(Boolean(reloadKey))
   }, [loadRows, reloadKey])
 
   const safeFieldIds = useMemo(() => (Array.isArray(fieldIds) ? fieldIds : []), [fieldIds])

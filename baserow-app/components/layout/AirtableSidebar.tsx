@@ -61,6 +61,40 @@ interface AirtableSidebarProps {
   coreDataSectionTitle?: string
 }
 
+function getReadableTextColor(backgroundColor: string): string {
+  const trimmed = backgroundColor.trim()
+
+  const hexMatch = trimmed.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/)
+  if (hexMatch) {
+    const hex = hexMatch[1]
+    const normalized =
+      hex.length === 3
+        ? hex
+            .split("")
+            .map((c) => c + c)
+            .join("")
+        : hex
+    const r = parseInt(normalized.slice(0, 2), 16)
+    const g = parseInt(normalized.slice(2, 4), 16)
+    const b = parseInt(normalized.slice(4, 6), 16)
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+    return luminance > 0.6 ? "#111827" : "#FFFFFF"
+  }
+
+  const rgbMatch = trimmed.match(
+    /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*[\d.]+\s*)?\)$/
+  )
+  if (rgbMatch) {
+    const r = Math.min(255, Number(rgbMatch[1]))
+    const g = Math.min(255, Number(rgbMatch[2]))
+    const b = Math.min(255, Number(rgbMatch[3]))
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+    return luminance > 0.6 ? "#111827" : "#FFFFFF"
+  }
+
+  return "#FFFFFF"
+}
+
 export default function AirtableSidebar({
   interfacePages = [],
   interfaceGroups = [],
@@ -177,9 +211,15 @@ export default function AirtableSidebar({
     opacity: 0.65,
   }
 
+  const activeTextColor = getReadableTextColor(primaryColor)
   const navActiveStyle = (active: boolean): CSSProperties => ({
-    color: active ? primaryColor : sidebarTextColor,
-    ...(active ? { boxShadow: `inset 3px 0 0 0 ${primaryColor}` } : {}),
+    color: active ? activeTextColor : sidebarTextColor,
+    ...(active
+      ? {
+          backgroundColor: primaryColor,
+          boxShadow: "none",
+        }
+      : {}),
   })
 
   if (isMobile && !isOpen) {
