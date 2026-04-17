@@ -18,6 +18,17 @@ export default async function PagePage({
   // #region agent log
   console.info("[agent-debug]", { sessionId: "909a6f", runId: "initial", hypothesisId: "H6", location: "app/pages/[pageId]/page.tsx:entry", message: "Entered server page renderer", data: { hasParams: Boolean(params) }, timestamp: Date.now() })
   // #endregion
+  // #region agent log
+  console.error("[agent-debug]", {
+    sessionId: "909a6f",
+    runId: "initial",
+    hypothesisId: "H12",
+    location: "app/pages/[pageId]/page.tsx:post-entry",
+    message: "Reached immediately after entry log",
+    data: { hasParams: Boolean(params) },
+    timestamp: Date.now(),
+  })
+  // #endregion
   let resolvedParams: { pageId?: string } | undefined
   try {
     resolvedParams = await params
@@ -32,6 +43,17 @@ export default async function PagePage({
         paramsType: typeof resolvedParams,
         hasPageId: Boolean(resolvedParams && typeof resolvedParams.pageId !== "undefined"),
       },
+      timestamp: Date.now(),
+    })
+    // #endregion
+    // #region agent log
+    console.error("[agent-debug]", {
+      sessionId: "909a6f",
+      runId: "initial",
+      hypothesisId: "H12",
+      location: "app/pages/[pageId]/page.tsx:params-await:post",
+      message: "Completed await params",
+      data: { hasPageId: Boolean(resolvedParams?.pageId) },
       timestamp: Date.now(),
     })
     // #endregion
@@ -51,6 +73,17 @@ export default async function PagePage({
   }
 
   const pageId = resolvedParams?.pageId
+  // #region agent log
+  console.error("[agent-debug]", {
+    sessionId: "909a6f",
+    runId: "initial",
+    hypothesisId: "H12",
+    location: "app/pages/[pageId]/page.tsx:pageId-read:error-channel",
+    message: "Read pageId checkpoint",
+    data: { pageId, type: typeof pageId },
+    timestamp: Date.now(),
+  })
+  // #endregion
   // #region agent log
   console.info("[agent-debug]", {
     sessionId: "909a6f",

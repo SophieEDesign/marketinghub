@@ -38,6 +38,17 @@ export default async function WorkspaceShellWrapper({
     timestamp: Date.now(),
   })
   // #endregion
+  // #region agent log
+  console.error("[agent-debug]", {
+    sessionId: "909a6f",
+    runId: "initial",
+    hypothesisId: "H12",
+    location: "components/layout/WorkspaceShellWrapper.tsx:post-entry",
+    message: "Reached immediately after shell entry",
+    data: { hasTitle: Boolean(title) },
+    timestamp: Date.now(),
+  })
+  // #endregion
   const supabase = await createClient()
   
   // Check authentication - redirect to login if not authenticated
@@ -316,6 +327,17 @@ export default async function WorkspaceShellWrapper({
       location: "components/layout/WorkspaceShellWrapper.tsx:resolveLandingPage:start",
       message: "Resolving landing page for shell links",
       data: { interfacePageCount: interfacePages.length },
+      timestamp: Date.now(),
+    })
+    // #endregion
+    // #region agent log
+    console.error("[agent-debug]", {
+      sessionId: "909a6f",
+      runId: "initial",
+      hypothesisId: "H12",
+      location: "components/layout/WorkspaceShellWrapper.tsx:resolveLandingPage:post-start",
+      message: "Checkpoint before await resolveLandingPage",
+      data: {},
       timestamp: Date.now(),
     })
     // #endregion
