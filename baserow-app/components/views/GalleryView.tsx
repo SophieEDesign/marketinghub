@@ -741,17 +741,17 @@ export default function GalleryView({
   }
 
   if (!imageField) {
-    return (
-      <EmptyState
-        icon={<Image className="h-12 w-12" />}
-        title="Image field required"
-        description="Gallery view needs an image field to display cards. Set the cover image field in block settings."
-        action={onOpenSettings ? {
-          label: "Configure Image Field",
-          onClick: onOpenSettings,
-        } : undefined}
-      />
-    )
+    // #region agent log
+    console.error("[agent-debug]", {
+      sessionId: "909a6f",
+      runId: "initial",
+      hypothesisId: "H22",
+      location: "components/views/GalleryView.tsx:no-image-field-fallback",
+      message: "Rendering gallery cards without image field",
+      data: { tableId, rowCount: filteredRows.length },
+      timestamp: Date.now(),
+    })
+    // #endregion
   }
 
   if (filteredRows.length === 0) {
