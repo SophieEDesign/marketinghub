@@ -141,7 +141,7 @@ async function fetchRequiredMetadata() {
     theme: firstViewFor(quarterlyThemes.id),
     campaigns: firstViewFor(campaigns.id),
     content: firstViewFor(content.id),
-    resources: resources ? firstViewFor(resources.id) : firstViewFor(content.id),
+    resources: resources ? firstViewFor(resources.id) || firstViewFor(content.id) : firstViewFor(content.id),
   }
   if (!anchors.home || !anchors.theme || !anchors.campaigns || !anchors.content) {
     throw new Error("Missing saved views for required page anchors")
