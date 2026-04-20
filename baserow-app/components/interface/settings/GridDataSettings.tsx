@@ -84,7 +84,7 @@ const VIEW_TYPE_OPTIONS: ViewTypeOption[] = [
     label: 'Gallery',
     icon: ImageIcon,
     description: 'Card-based visual layout',
-    requiredFields: ['attachment', 'url'] as FieldType[],
+    requiredFields: [],
   },
   {
     type: 'list',
@@ -258,7 +258,7 @@ export default function GridDataSettings({
                     {!isCompatible && (
                       <div className="text-xs text-amber-600 mt-1">
                         {option.type === 'gallery'
-                          ? 'Requires an attachment or URL field'
+                          ? 'Optional: add an image/URL field for cover images'
                           : 'Requires date fields'}
                       </div>
                     )}
