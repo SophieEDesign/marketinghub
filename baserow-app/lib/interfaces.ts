@@ -36,12 +36,6 @@ export interface InterfacePermission {
   created_at: string
 }
 
-function postAgentDebugLog(hypothesisId: string, location: string, message: string, data: Record<string, unknown> = {}) {
-  // #region agent log
-  fetch('http://127.0.0.1:7903/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'909a6f'},body:JSON.stringify({sessionId:'909a6f',runId:'initial',hypothesisId,location,message,data,timestamp:Date.now()})}).catch(()=>{})
-  // #endregion
-}
-
 /**
  * Get all interface categories
  */
@@ -309,7 +303,6 @@ async function getAccessibleInterfacePages(): Promise<Interface[]> {
  */
 export async function resolveLandingPage(): Promise<{ pageId: string | null; reason: string }> {
   const supabase = await createClient()
-  postAgentDebugLog("H26", "lib/interfaces.ts:resolveLandingPage:entry-fetch-log", "Entered resolveLandingPage", {})
   // #region agent log
   console.error("[agent-debug]", {
     sessionId: "909a6f",
@@ -322,7 +315,6 @@ export async function resolveLandingPage(): Promise<{ pageId: string | null; rea
   })
   // #endregion
   const { data: { user } } = await supabase.auth.getUser()
-  postAgentDebugLog("H26", "lib/interfaces.ts:resolveLandingPage:after-getUser-fetch-log", "Resolved auth.getUser", { hasUser: Boolean(user) })
   // #region agent log
   console.error("[agent-debug]", {
     sessionId: "909a6f",
@@ -340,7 +332,6 @@ export async function resolveLandingPage(): Promise<{ pageId: string | null; rea
   }
   
   const userIsAdmin = await isAdmin()
-  postAgentDebugLog("H26", "lib/interfaces.ts:resolveLandingPage:after-isAdmin-fetch-log", "Resolved admin in landing page resolver", { userIsAdmin })
   // #region agent log
   console.error("[agent-debug]", {
     sessionId: "909a6f",
@@ -442,7 +433,6 @@ export async function resolveLandingPage(): Promise<{ pageId: string | null; rea
       }
       
         if (validation.valid) {
-          postAgentDebugLog("H26", "lib/interfaces.ts:resolveLandingPage:return-workspace-default-fetch-log", "Returning workspace default page", { workspaceDefaultPageId })
           console.log('[resolveLandingPage] returning workspace_default:', workspaceDefaultPageId)
           if (isDev) {
             console.log('[Landing Page] ✓ Using workspace default page:', workspaceDefaultPageId)
@@ -505,7 +495,6 @@ export async function resolveLandingPage(): Promise<{ pageId: string | null; rea
       // Ignore errors checking workspace settings
     }
     
-    postAgentDebugLog("H26", "lib/interfaces.ts:resolveLandingPage:return-first-accessible-fetch-log", "Returning first accessible fallback page", { pageId: accessiblePages[0].id, count: accessiblePages.length })
     console.log('[resolveLandingPage] returning first_accessible:', accessiblePages[0].id)
     if (isDev) {
       console.log('[Landing Page] Using first accessible page:', accessiblePages[0].id, '(fallback)')
@@ -524,7 +513,6 @@ export async function resolveLandingPage(): Promise<{ pageId: string | null; rea
       .limit(1)
     
     if (anyPages && anyPages.length > 0) {
-      postAgentDebugLog("H26", "lib/interfaces.ts:resolveLandingPage:return-final-fallback-fetch-log", "Returning final fallback page", { pageId: anyPages[0].id })
       console.log('[resolveLandingPage] returning first_page_fallback:', anyPages[0].id)
       if (isDev) {
         console.log('[Landing Page] Using first page (any):', anyPages[0].id, '(final fallback)')
