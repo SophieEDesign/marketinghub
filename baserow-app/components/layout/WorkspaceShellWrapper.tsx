@@ -42,10 +42,11 @@ function sanitizeForClient<T>(value: T): T {
 
 const MARKETING_CORE_PAGE_ORDER = [
   "Marketing Home",
-  "Internal Staff Hub",
   "Theme Workspace",
-  "Campaign Workspace",
   "Content Planning",
+  "Campaign Archive",
+  "Campaign Workspace",
+  "Internal Staff Hub",
 ] as const
 const QUIET_PAGE_HINTS = ["test", "admin", "debug", "raw", "seed", "tmp"]
 

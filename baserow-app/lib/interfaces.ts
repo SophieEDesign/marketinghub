@@ -303,55 +303,13 @@ async function getAccessibleInterfacePages(): Promise<Interface[]> {
  */
 export async function resolveLandingPage(): Promise<{ pageId: string | null; reason: string }> {
   const supabase = await createClient()
-  const runId = "debug-pass-1"
-  const emitDebug = (hypothesisId: string, location: string, message: string, data: Record<string, unknown>) => {
-    // #region agent log
-    fetch('http://127.0.0.1:7903/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'909a6f'},body:JSON.stringify({sessionId:'909a6f',runId,hypothesisId,location,message,data,timestamp:Date.now()})}).catch(()=>{})
-    // #endregion
-  }
-  // #region agent log
-  console.error("[agent-debug]", {
-    sessionId: "909a6f",
-    runId: "initial",
-    hypothesisId: "H14",
-    location: "lib/interfaces.ts:resolveLandingPage:entry",
-    message: "Entered resolveLandingPage",
-    data: {},
-    timestamp: Date.now(),
-  })
-  // #endregion
-  emitDebug("H26", "lib/interfaces.ts:resolveLandingPage:entry", "Entered resolveLandingPage", {})
   const { data: { user } } = await supabase.auth.getUser()
-  // #region agent log
-  console.error("[agent-debug]", {
-    sessionId: "909a6f",
-    runId: "initial",
-    hypothesisId: "H14",
-    location: "lib/interfaces.ts:resolveLandingPage:after-getUser",
-    message: "Completed auth.getUser in resolveLandingPage",
-    data: { hasUser: Boolean(user) },
-    timestamp: Date.now(),
-  })
-  // #endregion
-  emitDebug("H26", "lib/interfaces.ts:resolveLandingPage:after-getUser", "Completed auth.getUser in resolveLandingPage", { hasUser: Boolean(user) })
   
   if (!user) {
     return { pageId: null, reason: 'User not authenticated' }
   }
   
   const userIsAdmin = await isAdmin()
-  // #region agent log
-  console.error("[agent-debug]", {
-    sessionId: "909a6f",
-    runId: "initial",
-    hypothesisId: "H14",
-    location: "lib/interfaces.ts:resolveLandingPage:after-isAdmin",
-    message: "Resolved isAdmin in resolveLandingPage",
-    data: { userIsAdmin },
-    timestamp: Date.now(),
-  })
-  // #endregion
-  emitDebug("H26", "lib/interfaces.ts:resolveLandingPage:after-isAdmin", "Resolved isAdmin in resolveLandingPage", { userIsAdmin })
   const isDev = process.env.NODE_ENV === 'development'
   
   // Priority 1: Check user default page (if field exists in profiles)
@@ -443,7 +401,6 @@ export async function resolveLandingPage(): Promise<{ pageId: string | null; rea
       
         if (validation.valid) {
           console.log('[resolveLandingPage] returning workspace_default:', workspaceDefaultPageId)
-          emitDebug("H26", "lib/interfaces.ts:resolveLandingPage:return-workspace-default", "Resolved workspace default page", { workspaceDefaultPageId })
           if (isDev) {
             console.log('[Landing Page] ✓ Using workspace default page:', workspaceDefaultPageId)
           }
@@ -506,7 +463,6 @@ export async function resolveLandingPage(): Promise<{ pageId: string | null; rea
     }
     
     console.log('[resolveLandingPage] returning first_accessible:', accessiblePages[0].id)
-    emitDebug("H26", "lib/interfaces.ts:resolveLandingPage:return-first-accessible", "Falling back to first accessible page", { pageId: accessiblePages[0].id, accessibleCount: accessiblePages.length })
     if (isDev) {
       console.log('[Landing Page] Using first accessible page:', accessiblePages[0].id, '(fallback)')
     }

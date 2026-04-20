@@ -155,17 +155,6 @@ export default function GalleryView({
     if (isInitialLoad) {
       setLoading(true)
     }
-    // #region agent log
-    console.error("[agent-debug]", {
-      sessionId: "909a6f",
-      runId: "initial",
-      hypothesisId: "H20",
-      location: "components/views/GalleryView.tsx:loadRows:start",
-      message: "GalleryView started loading rows",
-      data: { tableId, supabaseTableName, isInitialLoad, forceReload, requestKey },
-      timestamp: Date.now(),
-    })
-    // #endregion
     try {
       const supabase = createClient()
 
@@ -212,31 +201,9 @@ export default function GalleryView({
         updated_at: row.updated_at,
       }))
       setRows(tableRows)
-      // #region agent log
-      console.error("[agent-debug]", {
-        sessionId: "909a6f",
-        runId: "initial",
-        hypothesisId: "H20",
-        location: "components/views/GalleryView.tsx:loadRows:success",
-        message: "GalleryView loaded rows successfully",
-        data: { tableId, rowCount: tableRows.length },
-        timestamp: Date.now(),
-      })
-      // #endregion
     } catch (e) {
       if (!isAbortError(e)) {
         console.error("GalleryView: exception loading rows", e)
-        // #region agent log
-        console.error("[agent-debug]", {
-          sessionId: "909a6f",
-          runId: "initial",
-          hypothesisId: "H20",
-          location: "components/views/GalleryView.tsx:loadRows:catch",
-          message: "GalleryView loadRows threw an exception",
-          data: { tableId, errorMessage: e instanceof Error ? e.message : String(e) },
-          timestamp: Date.now(),
-        })
-        // #endregion
       }
       // Preserve previous rows on transient failures to avoid flash-to-empty loops.
     } finally {
@@ -741,17 +708,7 @@ export default function GalleryView({
   }
 
   if (!imageField) {
-    // #region agent log
-    console.error("[agent-debug]", {
-      sessionId: "909a6f",
-      runId: "initial",
-      hypothesisId: "H22",
-      location: "components/views/GalleryView.tsx:no-image-field-fallback",
-      message: "Rendering gallery cards without image field",
-      data: { tableId, rowCount: filteredRows.length },
-      timestamp: Date.now(),
-    })
-    // #endregion
+    // Render cards without cover images when imageField is not configured.
   }
 
   if (filteredRows.length === 0) {
