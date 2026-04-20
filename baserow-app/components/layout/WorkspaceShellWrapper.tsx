@@ -21,6 +21,25 @@ interface WorkspaceShellWrapperProps {
   hideRecordPanel?: boolean // Option to hide the global RecordPanel (for pages that have their own record detail panel)
 }
 
+function containsBigInt(value: unknown, seen = new WeakSet<object>()): boolean {
+  if (typeof value === "bigint") return true
+  if (value == null) return false
+  if (typeof value !== "object") return false
+  const obj = value as object
+  if (seen.has(obj)) return false
+  seen.add(obj)
+  if (Array.isArray(value)) {
+    return value.some((entry) => containsBigInt(entry, seen))
+  }
+  return Object.values(value as Record<string, unknown>).some((entry) => containsBigInt(entry, seen))
+}
+
+function sanitizeForClient<T>(value: T): T {
+  return JSON.parse(
+    JSON.stringify(value, (_key, current) => (typeof current === "bigint" ? current.toString() : current))
+  ) as T
+}
+
 export default async function WorkspaceShellWrapper({
   children,
   title,
@@ -501,6 +520,99 @@ export default async function WorkspaceShellWrapper({
   })
   // #endregion
 
+  const shellPayloadHasBigInt = containsBigInt({
+    tables,
+    viewsByTable,
+    interfacePages,
+    interfaceGroups,
+    dashboards,
+  })
+  // #region agent log
+  console.error("[agent-debug]", {
+    sessionId: "909a6f",
+    runId: "initial",
+    hypothesisId: "H23",
+    location: "components/layout/WorkspaceShellWrapper.tsx:shell-props-summary",
+    message: "Prepared WorkspaceShell props before SSR handoff",
+    data: {
+      tablesCount: tables.length,
+      viewsTableKeys: Object.keys(viewsByTable).length,
+      interfacePagesCount: interfacePages.length,
+      interfaceGroupsCount: interfaceGroups.length,
+      dashboardsCount: dashboards.length,
+      hasBigInt: shellPayloadHasBigInt,
+    },
+    timestamp: Date.now(),
+  })
+  // #endregion
+
+  let safeTables = tables
+  let safeViewsByTable = viewsByTable
+  let safeInterfacePages = interfacePages
+  let safeInterfaceGroups = interfaceGroups
+  let safeDashboards = dashboards
+
+  if (shellPayloadHasBigInt) {
+    // #region agent log
+    console.error("[agent-debug]", {
+      sessionId: "909a6f",
+      runId: "initial",
+      hypothesisId: "H23",
+      location: "components/layout/WorkspaceShellWrapper.tsx:shell-props-sanitize",
+      message: "Detected BigInt in WorkspaceShell props; sanitizing payload",
+      data: {},
+      timestamp: Date.now(),
+    })
+    // #endregion
+    safeTables = sanitizeForClient(tables)
+    safeViewsByTable = sanitizeForClient(viewsByTable)
+    safeInterfacePages = sanitizeForClient(interfacePages)
+    safeInterfaceGroups = sanitizeForClient(interfaceGroups)
+    safeDashboards = sanitizeForClient(dashboards)
+  }
+
+  try {
+    JSON.stringify({
+      title: title ?? null,
+      tables: safeTables,
+      views: safeViewsByTable,
+      interfacePages: safeInterfacePages,
+      interfaceGroups: safeInterfaceGroups,
+      dashboards: safeDashboards,
+      userRole,
+      hideTopbar,
+      hideRecordPanel,
+      defaultPageId,
+      landingPageTitle,
+    })
+    // #region agent log
+    console.error("[agent-debug]", {
+      sessionId: "909a6f",
+      runId: "initial",
+      hypothesisId: "H23",
+      location: "components/layout/WorkspaceShellWrapper.tsx:shell-props-serializable",
+      message: "WorkspaceShell props passed JSON serialization preflight",
+      data: {},
+      timestamp: Date.now(),
+    })
+    // #endregion
+  } catch (serializeError) {
+    // #region agent log
+    console.error("[agent-debug]", {
+      sessionId: "909a6f",
+      runId: "initial",
+      hypothesisId: "H23",
+      location: "components/layout/WorkspaceShellWrapper.tsx:shell-props-serialize-fail",
+      message: "WorkspaceShell props failed JSON serialization preflight",
+      data: {
+        errorMessage: serializeError instanceof Error ? serializeError.message : String(serializeError),
+      },
+      timestamp: Date.now(),
+    })
+    // #endregion
+    throw serializeError
+  }
+
     return (
       <BrandingProvider settings={brandingSettings}>
         <DynamicFavicon />
@@ -510,11 +622,11 @@ export default async function WorkspaceShellWrapper({
               <div data-page-title={finalTitle}>
               <WorkspaceShell
                 title={title}
-                tables={tables}
-                views={viewsByTable}
-                interfacePages={interfacePages as any}
-                interfaceGroups={interfaceGroups}
-                dashboards={dashboards}
+                tables={safeTables}
+                views={safeViewsByTable}
+                interfacePages={safeInterfacePages as any}
+                interfaceGroups={safeInterfaceGroups}
+                dashboards={safeDashboards}
                 userRole={userRole}
                 hideTopbar={hideTopbar}
                 hideRecordPanel={hideRecordPanel}
