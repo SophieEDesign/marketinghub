@@ -40,6 +40,24 @@ function sanitizeForClient<T>(value: T): T {
   ) as T
 }
 
+const MARKETING_CORE_PAGE_ORDER = [
+  "Marketing Home",
+  "Internal Staff Hub",
+  "Theme Workspace",
+  "Campaign Workspace",
+  "Content Planning",
+] as const
+const QUIET_PAGE_HINTS = ["test", "admin", "debug", "raw", "seed", "tmp"]
+
+function getNavPriority(name: string, isAdminOnly: boolean): number {
+  const coreIndex = MARKETING_CORE_PAGE_ORDER.findIndex((n) => n.toLowerCase() === String(name || "").toLowerCase())
+  if (coreIndex >= 0) return coreIndex
+  if (isAdminOnly) return 500
+  const normalized = String(name || "").toLowerCase()
+  if (QUIET_PAGE_HINTS.some((hint) => normalized.includes(hint))) return 600
+  return 200
+}
+
 export default async function WorkspaceShellWrapper({
   children,
   title,
@@ -340,6 +358,14 @@ export default async function WorkspaceShellWrapper({
     // If fails, interfacePages remains empty array
     console.error('Error loading interface pages:', error)
   }
+
+  interfacePages = [...interfacePages].sort((a, b) => {
+    const priorityDiff = getNavPriority(a.name || "", Boolean(a.is_admin_only)) - getNavPriority(b.name || "", Boolean(b.is_admin_only))
+    if (priorityDiff !== 0) return priorityDiff
+    const orderDiff = (a.order_index || 0) - (b.order_index || 0)
+    if (orderDiff !== 0) return orderDiff
+    return String(a.name || "").localeCompare(String(b.name || ""))
+  })
 
   // Fetch dashboards from dashboards table - handle case where table might not exist
   let dashboards: any[] = []

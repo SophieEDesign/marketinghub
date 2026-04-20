@@ -916,8 +916,8 @@ export default function ListView({
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center text-gray-400 text-sm">
-        Loading...
+      <div className={cn("h-full flex items-center justify-center text-sm", marketingDashboardStyle ? "text-muted-foreground" : "text-gray-400")}>
+        {marketingDashboardStyle ? "Preparing your marketing view..." : "Loading..."}
       </div>
     )
   }
@@ -1162,11 +1162,13 @@ export default function ListView({
         <div className="flex-1 flex items-center justify-center p-4">
           <EmptyState
             icon={<Database className="h-12 w-12" />}
-            title="No records found"
+            title={marketingDashboardStyle ? "No marketing records yet" : "No records found"}
             description={searchQuery 
               ? "No records match your search query. Try adjusting your search or clear it to see all records."
               : filters.length > 0
-              ? "No records match your current filters. Try adjusting your filters or create a new record."
+              ? "No records match your current filters. Try widening the filter window."
+              : marketingDashboardStyle
+              ? "This section is ready. Add records or broaden date ranges to populate it."
               : "This table doesn't have any records yet. Create your first record to get started."}
             action={searchQuery ? {
               label: "Clear Search",

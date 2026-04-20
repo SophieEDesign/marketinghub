@@ -34,6 +34,12 @@ export default async function PagePage({
 }: {
   params: { pageId: string }
 }) {
+  const runId = "debug-pass-1"
+  const emitDebug = (hypothesisId: string, location: string, message: string, data: Record<string, unknown>) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7903/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'909a6f'},body:JSON.stringify({sessionId:'909a6f',runId,hypothesisId,location,message,data,timestamp:Date.now()})}).catch(()=>{})
+    // #endregion
+  }
   try {
     // #region agent log
     console.info("[agent-debug]", { sessionId: "909a6f", runId: "initial", hypothesisId: "H6", location: "app/pages/[pageId]/page.tsx:entry", message: "Entered server page renderer", data: { hasParams: Boolean(params) }, timestamp: Date.now() })
@@ -49,6 +55,7 @@ export default async function PagePage({
     timestamp: Date.now(),
   })
   // #endregion
+  emitDebug("H27", "app/pages/[pageId]/page.tsx:post-entry", "Reached immediately after entry log", { hasParams: Boolean(params) })
   let resolvedParams: { pageId?: string } | undefined
   try {
     resolvedParams = await params
@@ -361,6 +368,11 @@ export default async function PagePage({
       timestamp: Date.now(),
     })
     // #endregion
+    emitDebug("H27", "app/pages/[pageId]/page.tsx:outer-catch", "Unhandled exception in pages route renderer", {
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorName: error instanceof Error ? error.name : typeof error,
+      hasStack: Boolean(error instanceof Error && error.stack),
+    })
     throw error
   }
 }

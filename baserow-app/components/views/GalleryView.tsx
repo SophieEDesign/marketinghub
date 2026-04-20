@@ -720,8 +720,8 @@ export default function GalleryView({
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center text-gray-400 text-sm">
-        Loading...
+      <div className={cn("h-full flex items-center justify-center text-sm", marketingDashboardStyle ? "text-muted-foreground" : "text-gray-400")}>
+        {marketingDashboardStyle ? "Preparing curated cards..." : "Loading..."}
       </div>
     )
   }
@@ -758,9 +758,11 @@ export default function GalleryView({
     return (
       <EmptyState
         icon={<Database className="h-12 w-12" />}
-        title="No records found"
+        title={marketingDashboardStyle ? "Nothing to review yet" : "No records found"}
         description={filters.length > 0 
-          ? "No records match your current filters. Try adjusting your filters or create a new record."
+          ? "No records match your current filters. Try widening your filter criteria."
+          : marketingDashboardStyle
+          ? "Add records or broaden your date/status filters to populate this gallery."
           : "This table doesn't have any records yet. Create your first record to get started."}
         action={undefined}
       />
@@ -768,7 +770,7 @@ export default function GalleryView({
   }
 
   return (
-    <div ref={contentRef} className="w-full h-full overflow-y-auto overflow-x-hidden bg-gray-50">
+    <div ref={contentRef} className={cn("w-full h-full overflow-y-auto overflow-x-hidden", marketingDashboardStyle ? "bg-background" : "bg-gray-50")}>
       {Array.isArray(groupedRows) && groupedRows.length > 0 ? (
         <div className="p-6 space-y-6">
           {groupedRows.map((group) => {
