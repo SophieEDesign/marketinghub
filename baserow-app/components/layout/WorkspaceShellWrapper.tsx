@@ -401,15 +401,44 @@ export default async function WorkspaceShellWrapper({
     console.error("[agent-debug]", {
       sessionId: "909a6f",
       runId: "initial",
-      hypothesisId: "H12",
-      location: "components/layout/WorkspaceShellWrapper.tsx:resolveLandingPage:post-start",
-      message: "Checkpoint before await resolveLandingPage",
+      hypothesisId: "H21",
+      location: "components/layout/WorkspaceShellWrapper.tsx:resolveLandingPage:before-await",
+      message: "About to await resolveLandingPage in shell wrapper",
       data: {},
       timestamp: Date.now(),
     })
     // #endregion
-    const { pageId } = await resolveLandingPage()
-    defaultPageId = pageId
+    const resolvedLanding = await resolveLandingPage()
+    // #region agent log
+    console.error("[agent-debug]", {
+      sessionId: "909a6f",
+      runId: "initial",
+      hypothesisId: "H21",
+      location: "components/layout/WorkspaceShellWrapper.tsx:resolveLandingPage:after-await",
+      message: "resolveLandingPage returned in shell wrapper",
+      data: {
+        hasResult: Boolean(resolvedLanding),
+        resultType: typeof resolvedLanding,
+        pageIdType: typeof (resolvedLanding as any)?.pageId,
+      },
+      timestamp: Date.now(),
+    })
+    // #endregion
+    const resolvedPageId = (resolvedLanding as any)?.pageId
+    defaultPageId = typeof resolvedPageId === "string" ? resolvedPageId : null
+    if (resolvedPageId != null && typeof resolvedPageId !== "string") {
+      // #region agent log
+      console.error("[agent-debug]", {
+        sessionId: "909a6f",
+        runId: "initial",
+        hypothesisId: "H21",
+        location: "components/layout/WorkspaceShellWrapper.tsx:resolveLandingPage:non-string-pageId",
+        message: "resolveLandingPage returned non-string pageId; using null fallback",
+        data: { resolvedPageIdType: typeof resolvedPageId },
+        timestamp: Date.now(),
+      })
+      // #endregion
+    }
     // #region agent log
     console.info("[agent-debug]", {
       sessionId: "909a6f",
@@ -421,15 +450,19 @@ export default async function WorkspaceShellWrapper({
       timestamp: Date.now(),
     })
     // #endregion
-  } catch {
+  } catch (error) {
     // #region agent log
     console.error("[agent-debug]", {
       sessionId: "909a6f",
       runId: "initial",
-      hypothesisId: "H11",
+      hypothesisId: "H21",
       location: "components/layout/WorkspaceShellWrapper.tsx:resolveLandingPage:catch",
       message: "resolveLandingPage failed in shell wrapper",
-      data: {},
+      data: {
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorName: error instanceof Error ? error.name : typeof error,
+        hasStack: Boolean(error instanceof Error && error.stack),
+      },
       timestamp: Date.now(),
     })
     // #endregion
