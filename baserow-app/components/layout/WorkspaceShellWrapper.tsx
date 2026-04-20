@@ -21,6 +21,12 @@ interface WorkspaceShellWrapperProps {
   hideRecordPanel?: boolean // Option to hide the global RecordPanel (for pages that have their own record detail panel)
 }
 
+function postAgentDebugLog(hypothesisId: string, location: string, message: string, data: Record<string, unknown> = {}) {
+  // #region agent log
+  fetch('http://127.0.0.1:7903/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'909a6f'},body:JSON.stringify({sessionId:'909a6f',runId:'initial',hypothesisId,location,message,data,timestamp:Date.now()})}).catch(()=>{})
+  // #endregion
+}
+
 function containsBigInt(value: unknown, seen = new WeakSet<object>()): boolean {
   if (typeof value === "bigint") return true
   if (value == null) return false
@@ -47,6 +53,7 @@ export default async function WorkspaceShellWrapper({
   hideRecordPanel = false,
 }: WorkspaceShellWrapperProps) {
   try {
+    postAgentDebugLog("H25", "components/layout/WorkspaceShellWrapper.tsx:entry-fetch-log", "Entered shell wrapper", { hasTitle: Boolean(title), hideTopbar, hideRecordPanel })
     // #region agent log
     console.info("[agent-debug]", {
       sessionId: "909a6f",
@@ -114,6 +121,7 @@ export default async function WorkspaceShellWrapper({
     getUserRole(),
     getWorkspaceSettings().catch(() => null),
   ])
+  postAgentDebugLog("H25", "components/layout/WorkspaceShellWrapper.tsx:after-initial-load-fetch-log", "Loaded core shell data", { tablesCount: tables.length, hasUserRole: Boolean(userRole) })
   // #region agent log
   console.error("[agent-debug]", {
     sessionId: "909a6f",
@@ -428,6 +436,7 @@ export default async function WorkspaceShellWrapper({
     })
     // #endregion
     const resolvedLanding = await resolveLandingPage()
+    postAgentDebugLog("H25", "components/layout/WorkspaceShellWrapper.tsx:after-resolveLandingPage-fetch-log", "resolveLandingPage returned", { hasResult: Boolean(resolvedLanding), pageIdType: typeof (resolvedLanding as any)?.pageId })
     // #region agent log
     console.error("[agent-debug]", {
       sessionId: "909a6f",
@@ -585,6 +594,7 @@ export default async function WorkspaceShellWrapper({
       defaultPageId,
       landingPageTitle,
     })
+    postAgentDebugLog("H25", "components/layout/WorkspaceShellWrapper.tsx:shell-props-serializable-fetch-log", "Shell props passed serialization preflight", { defaultPageId, interfacePagesCount: safeInterfacePages.length })
     // #region agent log
     console.error("[agent-debug]", {
       sessionId: "909a6f",
@@ -642,6 +652,10 @@ export default async function WorkspaceShellWrapper({
       </BrandingProvider>
     )
   } catch (error) {
+    postAgentDebugLog("H25", "components/layout/WorkspaceShellWrapper.tsx:outer-catch-fetch-log", "Unhandled exception in shell wrapper", {
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorName: error instanceof Error ? error.name : typeof error,
+    })
     // #region agent log
     console.error("[agent-debug]", {
       sessionId: "909a6f",

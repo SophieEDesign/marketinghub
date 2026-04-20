@@ -10,6 +10,12 @@ const isDev = process.env.NODE_ENV === 'development'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+function postAgentDebugLog(hypothesisId: string, location: string, message: string, data: Record<string, unknown> = {}) {
+  // #region agent log
+  fetch('http://127.0.0.1:7903/ingest/9d016980-ed95-431c-a758-912799743da1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'909a6f'},body:JSON.stringify({sessionId:'909a6f',runId:'initial',hypothesisId,location,message,data,timestamp:Date.now()})}).catch(()=>{})
+  // #endregion
+}
+
 function containsBigInt(value: unknown, seen = new WeakSet<object>()): boolean {
   if (typeof value === "bigint") return true
   if (value == null) return false
@@ -35,6 +41,7 @@ export default async function PagePage({
   params: { pageId: string }
 }) {
   try {
+    postAgentDebugLog("H24", "app/pages/[pageId]/page.tsx:entry-fetch-log", "Entered page renderer with endpoint logger", { hasParams: Boolean(params) })
     // #region agent log
     console.info("[agent-debug]", { sessionId: "909a6f", runId: "initial", hypothesisId: "H6", location: "app/pages/[pageId]/page.tsx:entry", message: "Entered server page renderer", data: { hasParams: Boolean(params) }, timestamp: Date.now() })
     // #endregion
@@ -52,6 +59,7 @@ export default async function PagePage({
   let resolvedParams: { pageId?: string } | undefined
   try {
     resolvedParams = await params
+    postAgentDebugLog("H24", "app/pages/[pageId]/page.tsx:after-params-await-fetch-log", "Resolved params await", { hasPageId: Boolean(resolvedParams?.pageId) })
     // #region agent log
     console.info("[agent-debug]", {
       sessionId: "909a6f",
@@ -93,6 +101,7 @@ export default async function PagePage({
   }
 
   const pageId = resolvedParams?.pageId
+  postAgentDebugLog("H24", "app/pages/[pageId]/page.tsx:pageId-checkpoint-fetch-log", "Read pageId value", { pageIdType: typeof pageId, hasPageId: Boolean(pageId) })
   // #region agent log
   console.error("[agent-debug]", {
     sessionId: "909a6f",
@@ -136,6 +145,7 @@ export default async function PagePage({
   // CRITICAL: Load page data FIRST - never redirect before data is loaded
   // Load interface page from new system
   let page = await getInterfacePage(pageId)
+  postAgentDebugLog("H24", "app/pages/[pageId]/page.tsx:after-page-fetch-fetch-log", "Fetched interface page for SSR", { hasPage: Boolean(page), pageType: page?.page_type ?? null })
   // #region agent log
   console.error("[agent-debug]", {
     sessionId: "909a6f",
@@ -306,6 +316,7 @@ export default async function PagePage({
 
   try {
     JSON.stringify({ pageId, safeInitialPage, safeInitialData })
+    postAgentDebugLog("H24", "app/pages/[pageId]/page.tsx:handoff-serializable-fetch-log", "Handoff payload serializable", { pageId })
     // #region agent log
     console.error("[agent-debug]", {
       sessionId: "909a6f",
@@ -346,6 +357,10 @@ export default async function PagePage({
       </WorkspaceShellWrapper>
     )
   } catch (error) {
+    postAgentDebugLog("H24", "app/pages/[pageId]/page.tsx:outer-catch-fetch-log", "Unhandled exception in page renderer", {
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorName: error instanceof Error ? error.name : typeof error,
+    })
     // #region agent log
     console.error("[agent-debug]", {
       sessionId: "909a6f",
