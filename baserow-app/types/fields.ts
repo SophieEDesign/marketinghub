@@ -120,9 +120,10 @@ export interface LookupFieldFilter {
   field: string
   
   // Filter operator
-  operator: 'equal' | 'not_equal' | 'contains' | 'not_contains' | 
-            'greater_than' | 'less_than' | 'greater_than_or_equal' | 
-            'less_than_or_equal' | 'is_empty' | 'is_not_empty' | 
+  operator: 'equal' | 'not_equal' | 'contains' | 'not_contains' |
+            'is_any_of' | 'is_not_any_of' |
+            'greater_than' | 'less_than' | 'greater_than_or_equal' |
+            'less_than_or_equal' | 'is_empty' | 'is_not_empty' |
             'date_range'
   
   // Value source type
