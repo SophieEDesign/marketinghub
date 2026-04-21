@@ -704,12 +704,22 @@ function buildContentPlanningBlocks(ctx) {
     },
   })
   y += 3
+  const contentMainColumnX = 0
+  const contentMainColumnW = 8
+  const contentSideColumnX = 8
+  const contentSideColumnW = 4
+  const contentSectionGap = 1
+  const contentKpiWidth = 2
+  const contentKpiHeight = 3
+  const contentQueueHeight = 10
+  const contentCalendarHeight = 5
+
   blocks.push({
     type: "kpi",
-    position_x: 0,
+    position_x: contentSideColumnX,
     position_y: y,
-    width: 3,
-    height: 3,
+    width: contentKpiWidth,
+    height: contentKpiHeight,
     config: {
       title: "Scheduled soon",
       kpi_label: "Next 7 days",
@@ -723,10 +733,10 @@ function buildContentPlanningBlocks(ctx) {
   })
   blocks.push({
     type: "kpi",
-    position_x: 3,
+    position_x: contentSideColumnX + contentKpiWidth,
     position_y: y,
-    width: 3,
-    height: 3,
+    width: contentKpiWidth,
+    height: contentKpiHeight,
     config: {
       title: "In progress",
       kpi_label: "Content items",
@@ -740,10 +750,10 @@ function buildContentPlanningBlocks(ctx) {
   })
   blocks.push({
     type: "kpi",
-    position_x: 6,
-    position_y: y,
-    width: 3,
-    height: 3,
+    position_x: contentSideColumnX,
+    position_y: y + contentKpiHeight + contentSectionGap,
+    width: contentKpiWidth,
+    height: contentKpiHeight,
     config: {
       title: "Awaiting approval",
       kpi_label: "Content items",
@@ -757,10 +767,10 @@ function buildContentPlanningBlocks(ctx) {
   })
   blocks.push({
     type: "kpi",
-    position_x: 9,
-    position_y: y,
-    width: 3,
-    height: 3,
+    position_x: contentSideColumnX + contentKpiWidth,
+    position_y: y + contentKpiHeight + contentSectionGap,
+    width: contentKpiWidth,
+    height: contentKpiHeight,
     config: {
       title: "Ready to plan",
       kpi_label: "Not scheduled",
@@ -773,15 +783,13 @@ function buildContentPlanningBlocks(ctx) {
       ]),
     },
   })
-  y += 5
-
   const queueVisibleFields = [contentName, contentStatus, contentDate].filter(Boolean)
   blocks.push({
     type: "grid",
-    position_x: 0,
+    position_x: contentMainColumnX,
     position_y: y,
-    width: 8,
-    height: 10,
+    width: contentMainColumnW,
+    height: contentQueueHeight,
     config: {
       title: "Content Queue",
       table_id: ctx.content.id,
@@ -811,10 +819,10 @@ function buildContentPlanningBlocks(ctx) {
   })
   blocks.push({
     type: "grid",
-    position_x: 8,
-    position_y: y,
-    width: 4,
-    height: 10,
+    position_x: contentSideColumnX,
+    position_y: y + (contentKpiHeight * 2) + (contentSectionGap * 2),
+    width: contentSideColumnW,
+    height: contentQueueHeight - 1,
     config: {
       title: "Upcoming Content",
       table_id: ctx.content.id,
@@ -830,14 +838,12 @@ function buildContentPlanningBlocks(ctx) {
       appearance: { showTitle: true, border: "none", compact: true, padding: "compact", showDivider: true },
     },
   })
-  y += 12
-
   blocks.push({
     type: "grid",
-    position_x: 0,
-    position_y: y,
-    width: 12,
-    height: 5,
+    position_x: contentMainColumnX,
+    position_y: y + contentQueueHeight + contentSectionGap,
+    width: contentMainColumnW,
+    height: contentCalendarHeight,
     config: {
       title: "Planning Calendar",
       table_id: ctx.content.id,
