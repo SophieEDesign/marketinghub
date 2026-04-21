@@ -226,9 +226,9 @@ export default function KPIBlock({
 
   const marketingCardStyle: CSSProperties | undefined = marketingDashboardStyle
     ? {
-        borderColor: "rgba(203, 213, 225, 0.55)",
+        borderColor: "rgba(203, 213, 225, 0.48)",
         borderWidth: "1px",
-        backgroundColor: "rgba(248, 250, 252, 0.78)",
+        backgroundColor: "rgba(248, 250, 252, 0.9)",
       }
     : undefined
 
@@ -239,20 +239,24 @@ export default function KPIBlock({
         !hideChromeBorder && "border border-border",
         useCardShell && !appearance.border_color && (marketingDashboardStyle ? "bg-background shadow-none" : "bg-card shadow-card"),
         isClickable &&
-          "cursor-pointer transition-shadow duration-200 hover:shadow-card-hover"
+          "cursor-pointer transition-shadow duration-200 hover:shadow-card-hover",
+        marketingDashboardStyle && "px-0"
       )}
       style={{ ...blockStyle, ...marketingCardStyle }}
       onClick={handleClick}
     >
       {useCardShell && (
         <div
-          className="pointer-events-none absolute bottom-0 left-4 right-4 h-0.5 rounded-full bg-gradient-to-r from-chart-1 via-chart-3 to-chart-5 opacity-70"
+          className={cn(
+            "pointer-events-none absolute bottom-0 left-4 right-4 h-0.5 rounded-full bg-gradient-to-r from-chart-1 via-chart-3 to-chart-5",
+            marketingDashboardStyle ? "opacity-45" : "opacity-70"
+          )}
           aria-hidden
         />
       )}
       {showTitle && (
         <div
-          className="mb-4 pb-2 border-b border-border"
+          className={cn("border-b border-border", marketingDashboardStyle ? "mb-3 pb-2" : "mb-4 pb-2")}
           style={{
             backgroundColor: appearance.header_background,
             color: appearance.header_text_color || textColor,
@@ -271,10 +275,18 @@ export default function KPIBlock({
       <div className={`flex-1 flex flex-col justify-center ${getAlignmentClass()}`}>
         <div className={`w-full ${getAlignmentClass().includes('text-center') ? 'text-center' : getAlignmentClass().includes('text-left') ? 'text-left' : 'text-right'}`}>
           {!showTitle && (
-            <div className={`flex items-center gap-2 mb-3 ${getAlignmentClass().includes('text-center') ? 'justify-center' : getAlignmentClass().includes('text-left') ? 'justify-start' : 'justify-end'}`}>
+            <div className={`flex items-center gap-2 ${marketingDashboardStyle ? "mb-2.5" : "mb-3"} ${getAlignmentClass().includes('text-center') ? 'justify-center' : getAlignmentClass().includes('text-left') ? 'justify-start' : 'justify-end'}`}>
+              {marketingDashboardStyle && (
+                <span
+                  className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-muted/70"
+                  aria-hidden
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-accent-link/70" />
+                </span>
+              )}
               <p
                 className={cn(
-                  marketingDashboardStyle ? "text-xs font-medium tracking-wide uppercase" : "text-sm font-medium",
+                  marketingDashboardStyle ? "text-[11px] font-medium tracking-[0.08em] uppercase text-muted-foreground/90" : "text-sm font-medium",
                   !textColor && "text-muted-foreground"
                 )}
                 style={textColor ? { color: textColor } : undefined}
@@ -294,7 +306,7 @@ export default function KPIBlock({
           <p
             className={cn(
               getValueSizeClass(),
-              "font-bold mb-2 tracking-tight",
+              marketingDashboardStyle ? "font-semibold mb-1.5 tracking-tight text-foreground" : "font-bold mb-2 tracking-tight",
               !textColor && "text-foreground"
             )}
             style={textColor ? { color: textColor } : undefined}
@@ -325,7 +337,7 @@ export default function KPIBlock({
           {target !== undefined && target !== null && value !== null && (
             <div
               className={cn("text-xs mt-1", !textColor && "text-muted-foreground")}
-              style={textColor ? { color: textColor, opacity: 0.85 } : undefined}
+              style={textColor ? { color: textColor, opacity: marketingDashboardStyle ? 0.72 : 0.85 } : undefined}
             >
               Target: {typeof target === 'number' ? target.toLocaleString() : target}
               {typeof target === 'number' && (
@@ -338,8 +350,8 @@ export default function KPIBlock({
 
           {aggregate !== "count" && field && (
             <p
-              className={cn("text-xs mt-1", !textColor && "text-muted-foreground opacity-90")}
-              style={textColor ? { color: textColor, opacity: 0.75 } : undefined}
+              className={cn("text-xs mt-1", !textColor && "text-muted-foreground", marketingDashboardStyle ? "opacity-75" : "opacity-90")}
+              style={textColor ? { color: textColor, opacity: marketingDashboardStyle ? 0.65 : 0.75 } : undefined}
             >
               {aggregate.toUpperCase()} of {field}
             </p>
@@ -349,14 +361,14 @@ export default function KPIBlock({
           {isClickable && (
             <div
               className={cn(
-                "mt-3 flex items-center gap-1 text-xs text-muted-foreground",
+                "mt-2.5 flex items-center gap-1 text-xs text-muted-foreground",
                 getAlignmentClass().includes("text-center")
                   ? "justify-center"
                   : getAlignmentClass().includes("text-left")
                     ? "justify-start"
                     : "justify-end"
               )}
-              style={textColor ? { color: textColor, opacity: 0.65 } : undefined}
+              style={textColor ? { color: textColor, opacity: marketingDashboardStyle ? 0.55 : 0.65 } : undefined}
             >
               <span>Click to view records</span>
               <ArrowRight className="h-3 w-3" />

@@ -26,8 +26,8 @@
     --radius: 0.5rem;
     /* Marketing workspace: calm hierarchy (Linear / Notion-inspired) */
     --radius-card: 0.875rem;
-    --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
-    --shadow-card-hover: 0 4px 6px -1px rgb(0 0 0 / 0.06), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+    --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.05), 0 1px 1px -1px rgb(15 23 42 / 0.04);
+    --shadow-card-hover: 0 6px 14px -8px rgb(15 23 42 / 0.18), 0 2px 4px -2px rgb(15 23 42 / 0.1);
     --accent-hue: 238;
     /* Light mode: indigo link */
     --accent-link: 238 76% 58%;
@@ -89,7 +89,7 @@
 
 @layer base {
   .marketing-dashboard-shell {
-    --section-gap: 2rem;
+    --section-gap: 2.25rem;
   }
 }
 
@@ -97,11 +97,13 @@
   .marketing-card {
     border-radius: var(--radius-card);
     box-shadow: var(--shadow-card);
-    border-color: hsl(var(--border) / 0.55);
-    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+    border-color: hsl(var(--border) / 0.48);
+    background-color: hsl(var(--background) / 0.95);
+    transition: box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
   }
   .marketing-card:hover {
     box-shadow: var(--shadow-card-hover);
+    border-color: hsl(var(--border) / 0.62);
   }
 }
 

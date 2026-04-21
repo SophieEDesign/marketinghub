@@ -53,15 +53,17 @@ export default function MarketingDashboardLayout({ children }: MarketingDashboar
     <MarketingDashboardProvider>
       <div
         className={cn(
-          "marketing-dashboard-shell flex flex-col min-h-0 min-w-0 w-full gap-8",
-          "px-4 py-6 md:px-8 md:py-8"
+          "marketing-dashboard-shell flex flex-col min-h-0 min-w-0 w-full gap-7 md:gap-8 lg:gap-9",
+          "px-4 py-5 md:px-8 md:py-7 lg:py-8"
         )}
         data-marketing-dashboard
       >
         {!bannerDismissed ? (
-          <div className="flex items-center justify-between gap-3 rounded-card border border-border/50 bg-muted/30 px-3 py-2 text-sm text-muted-foreground shadow-card">
+          <div className="flex items-center justify-between gap-3 rounded-card border border-border/45 bg-background/90 px-3.5 py-2.5 text-sm text-muted-foreground shadow-card">
             <div className="flex items-center gap-2 min-w-0">
-              <Search className="h-4 w-4 shrink-0 text-accent-link" aria-hidden />
+              <div className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted/70 text-accent-link">
+                <Search className="h-3.5 w-3.5" aria-hidden />
+              </div>
               <span>
                 Press{" "}
                 <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-background px-1.5 font-mono text-[10px] font-medium text-foreground">
@@ -78,7 +80,7 @@ export default function MarketingDashboardLayout({ children }: MarketingDashboar
               <button
                 type="button"
                 onClick={() => commandPalette?.openPalette()}
-                className="text-xs font-medium text-accent-link hover:underline ring-accent-focus rounded px-2 py-1"
+                className="text-xs font-medium text-accent-link/90 hover:text-accent-link hover:underline ring-accent-focus rounded px-2 py-1"
               >
                 Open search
               </button>
@@ -96,7 +98,7 @@ export default function MarketingDashboardLayout({ children }: MarketingDashboar
           <button
             type="button"
             onClick={() => commandPalette?.openPalette()}
-            className="self-start text-xs text-muted-foreground hover:text-accent-link flex items-center gap-1.5"
+            className="self-start text-xs text-muted-foreground/90 hover:text-accent-link flex items-center gap-1.5 rounded-md px-1.5 py-1 transition-colors"
           >
             <Search className="h-3.5 w-3.5" />
             <span>
@@ -104,7 +106,7 @@ export default function MarketingDashboardLayout({ children }: MarketingDashboar
             </span>
           </button>
         )}
-        <div className="flex flex-col min-h-0 min-w-0 w-full gap-10">{children}</div>
+        <div className="flex flex-col min-h-0 min-w-0 w-full gap-8 md:gap-9 lg:gap-10">{children}</div>
       </div>
     </MarketingDashboardProvider>
   )

@@ -882,8 +882,8 @@ export default function ListView({
         onDoubleClick={() => handleOpenRecord(String(recordId))}
         className={`border-b ${marketingDashboardStyle ? "border-border/30" : "border-gray-200"} last:border-b-0 cursor-pointer transition-colors ${
           selectedRecordId === String(recordId)
-            ? (marketingDashboardStyle ? "bg-muted/40" : "bg-blue-50")
-            : (marketingDashboardStyle ? "hover:bg-muted/20" : "hover:bg-gray-50")
+            ? (marketingDashboardStyle ? "bg-muted/30" : "bg-blue-50")
+            : (marketingDashboardStyle ? "hover:bg-muted/15" : "hover:bg-gray-50")
         }`}
         style={{ ...borderColor, ...rowFormattingStyle }}
       >
@@ -892,20 +892,25 @@ export default function ListView({
             key={col.key}
             className={cn(
               "px-3 text-sm text-gray-900 align-top",
-              marketingDashboardStyle ? "py-3" : "py-2"
+              marketingDashboardStyle ? "py-3.5 text-foreground/90" : "py-2"
             )}
           >
             {renderCellValue(col)}
           </td>
         ))}
-        <td className={cn("px-3 text-right align-top w-12", marketingDashboardStyle ? "py-3" : "py-2")}>
+        <td className={cn("px-3 text-right align-top w-12", marketingDashboardStyle ? "py-3.5" : "py-2")}>
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation()
               handleOpenRecord(String(recordId))
             }}
-            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 hover:underline"
+            className={cn(
+              "inline-flex items-center gap-1 text-xs hover:underline",
+              marketingDashboardStyle
+                ? "text-muted-foreground hover:text-foreground"
+                : "text-blue-600 hover:text-blue-800"
+            )}
             title="Open full record"
           >
             <ExternalLink className="h-4 w-4 shrink-0" />
@@ -937,7 +942,7 @@ export default function ListView({
     return (
       <div ref={contentRef} className="h-full flex flex-col">
         {/* Toolbar */}
-        <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 border-b bg-white">
+        <div className={cn("flex-shrink-0 flex items-center gap-2 px-4 border-b bg-white", marketingDashboardStyle ? "py-2.5 border-border/35" : "py-2")}>
           <Button
             variant="outline"
             size="sm"
@@ -987,7 +992,7 @@ export default function ListView({
             className={cn(
               "border bg-white",
               marketingDashboardStyle
-                ? "marketing-card border-border/50 rounded-card-lg shadow-card"
+                ? "marketing-card border-border/40 rounded-card-lg shadow-card"
                 : "border-gray-200 rounded-lg"
             )}
           >
@@ -1060,10 +1065,10 @@ export default function ListView({
                     const textColorStyle = finalHeaderTextColor ? { color: finalHeaderTextColor } : {}
 
                     return (
-                      <tr key={node.pathKey} className={cn("border-b", marketingDashboardStyle ? "border-border/20" : "border-gray-200")}>
+                      <tr key={node.pathKey} className={cn("border-b", marketingDashboardStyle ? "border-border/25" : "border-gray-200")}>
                         <td
                           colSpan={tableColumns.length + 1}
-                          className={cn("px-3", marketingDashboardStyle ? "py-4" : "py-2")}
+                          className={cn("px-3", marketingDashboardStyle ? "py-4.5" : "py-2")}
                           style={{ backgroundColor: finalHeaderBgColor, ...textColorStyle }}
                         >
                           <div className="flex items-center justify-between gap-2">
@@ -1087,7 +1092,7 @@ export default function ListView({
                               <span
                                 className={cn(
                                   "inline-flex items-center truncate",
-                                  marketingDashboardStyle ? "text-base font-medium" : "px-2 py-0.5 rounded-full text-sm font-medium"
+                                  marketingDashboardStyle ? "text-base font-medium tracking-tight" : "px-2 py-0.5 rounded-full text-sm font-medium"
                                 )}
                                 style={{
                                   backgroundColor: marketingDashboardStyle ? "transparent" : (groupColor ? `${groupColor}CC` : undefined),
@@ -1210,17 +1215,22 @@ export default function ListView({
           className={cn(
             "border bg-white",
             marketingDashboardStyle
-              ? "marketing-card border-border/50 rounded-card-lg shadow-card"
+              ? "marketing-card border-border/40 rounded-card-lg shadow-card"
               : "border-gray-200 rounded-lg"
           )}
         >
           <table className="w-full border-collapse">
             <thead>
-              <tr className="border-b border-gray-200 bg-gray-50">
+              <tr className={cn("border-b", marketingDashboardStyle ? "border-border/30 bg-muted/25" : "border-gray-200 bg-gray-50")}>
                 {tableColumns.map((col) => (
                   <th
                     key={col.key}
-                    className="px-3 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider"
+                    className={cn(
+                      "px-3 text-left text-xs font-medium uppercase",
+                      marketingDashboardStyle
+                        ? "py-2.5 tracking-[0.08em] text-muted-foreground/90"
+                        : "py-2 text-gray-600 tracking-wider"
+                    )}
                   >
                     {getFieldDisplayName(col.field)}
                   </th>
