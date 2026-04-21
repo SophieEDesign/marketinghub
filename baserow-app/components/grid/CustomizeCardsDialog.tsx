@@ -243,6 +243,7 @@ export default function CustomizeCardsDialog({
     (f) =>
       f.type === "single_select" ||
       f.type === "multi_select" ||
+      f.type === "lookup" ||
       f.type === "text" ||
       f.type === "long_text"
   )

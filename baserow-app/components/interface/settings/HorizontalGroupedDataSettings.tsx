@@ -95,7 +95,7 @@ export default function HorizontalGroupedDataSettings({
               fields={fields}
               filterGroupableFields={true}
               label="Group by *"
-              description="Add up to 2 grouping levels to group records into nested sections. Each group appears as a separate tab."
+              description="Add up to 2 grouping levels to group records into nested sections. Multi-value fields can place one record in multiple groups."
             />
           </div>
 

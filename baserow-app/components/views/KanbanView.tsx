@@ -22,6 +22,20 @@ import { getLinkedFieldValueFromRow, linkedValueToIds, resolveLinkedFieldDisplay
 import type { LinkedField } from "@/types/fields"
 import { getFieldDisplayName } from "@/lib/fields/display"
 
+function normalizeKanbanGroupKey(value: unknown): string {
+  if (value == null) return "Uncategorized"
+  const trimmed = String(value).trim()
+  return trimmed === "" ? "Uncategorized" : trimmed
+}
+
+function getKanbanGroupKeys(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    const keys = value.map((v) => normalizeKanbanGroupKey(v)).filter(Boolean)
+    return keys.length > 0 ? Array.from(new Set(keys)) : ["Uncategorized"]
+  }
+  return [normalizeKanbanGroupKey(value)]
+}
+
 interface KanbanViewProps {
   tableId: string
   viewId: string
@@ -406,21 +420,23 @@ function KanbanView({
     const groups: Record<string, TableRow[]> = {}
     const isLinkField = groupingField?.type === "link_to_table"
     filteredRows.forEach((row) => {
-      let groupValue: string
+      let groupValues: string[]
       if (!groupingFieldName) {
-        groupValue = "Uncategorized"
+        groupValues = ["Uncategorized"]
       } else if (isLinkField && groupingField) {
         const fieldValue = getLinkedFieldValueFromRow(row as { data?: Record<string, unknown> }, groupingField as LinkedField)
         const ids = linkedValueToIds(fieldValue)
-        groupValue = ids.length > 0 ? ids[0] : "Uncategorized"
+        groupValues = ids.length > 0 ? Array.from(new Set(ids.map((id) => normalizeKanbanGroupKey(id)))) : ["Uncategorized"]
       } else {
         const raw = row.data?.[groupingFieldName]
-        groupValue = raw != null && raw !== "" ? String(raw).trim() : "Uncategorized"
+        groupValues = getKanbanGroupKeys(raw)
       }
-      if (!groups[groupValue]) {
-        groups[groupValue] = []
-      }
-      groups[groupValue].push(row)
+      groupValues.forEach((groupValue) => {
+        if (!groups[groupValue]) {
+          groups[groupValue] = []
+        }
+        groups[groupValue].push(row)
+      })
     })
     return groups
   }

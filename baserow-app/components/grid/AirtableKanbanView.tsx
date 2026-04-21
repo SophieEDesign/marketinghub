@@ -87,6 +87,20 @@ interface KanbanColumn {
   collapsed: boolean
 }
 
+function normalizeGroupKey(value: unknown): string {
+  if (value == null) return "—"
+  const trimmed = String(value).trim()
+  return trimmed === "" ? "—" : trimmed
+}
+
+function getGroupKeysForValue(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    const keys = value.map((v) => normalizeGroupKey(v)).filter(Boolean)
+    return keys.length > 0 ? Array.from(new Set(keys)) : ["—"]
+  }
+  return [normalizeGroupKey(value)]
+}
+
 export default function AirtableKanbanView({
   tableId,
   viewId,
@@ -114,6 +128,7 @@ export default function AirtableKanbanView({
 
   const canEdit = userRole === "admin" || userRole === "editor"
   const canManageColumns = userRole === "admin"
+  const canEditGroupValue = !!groupField && groupField.type !== "lookup" && groupField.type !== "formula"
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -126,7 +141,7 @@ export default function AirtableKanbanView({
   useEffect(() => {
     if (kanbanGroupField) {
       const field = tableFields.find((f) => f.name === kanbanGroupField)
-      if (field && (field.type === "single_select" || field.type === "multi_select")) {
+      if (field && field.type !== "formula") {
         setGroupField(field)
       } else {
         setGroupField(null)
@@ -248,17 +263,13 @@ export default function AirtableKanbanView({
     if (!groupField) return {}
     const groups: Record<string, typeof filteredRows> = {}
     filteredRows.forEach((row) => {
-      const value = row[groupField.name]
-      const key =
-        value == null || value === ""
-          ? "—"
-          : Array.isArray(value)
-            ? (value[0] ?? "—")
-            : String(value).trim() || "—"
-      if (!groups[key]) {
-        groups[key] = []
-      }
-      groups[key].push(row)
+      const keys = getGroupKeysForValue(row[groupField.name])
+      keys.forEach((key) => {
+        if (!groups[key]) {
+          groups[key] = []
+        }
+        groups[key].push(row)
+      })
     })
     // Rows are already sorted globally, so order is preserved within each group
     return groups
@@ -266,7 +277,19 @@ export default function AirtableKanbanView({
 
   // Derive columns from select options so header shows label, not id (DB may store option id)
   const columns = useMemo((): KanbanColumn[] => {
-    if (!groupField || (groupField.type !== "single_select" && groupField.type !== "multi_select")) return []
+    if (!groupField) return []
+    if (groupField.type !== "single_select" && groupField.type !== "multi_select") {
+      const dataKeys = Object.keys(groupedRows)
+      const orderedKeys = dataKeys
+        .filter((key) => key !== "—")
+        .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base", numeric: true }))
+      const keys = dataKeys.includes("—") ? ["—", ...orderedKeys] : orderedKeys
+      return keys.map((key) => ({
+        id: key,
+        name: key,
+        collapsed: collapsedColumns.has(key),
+      }))
+    }
     const { selectOptions } = normalizeSelectOptionsForUi(groupField.type, groupField.options)
     const idToLabel = new Map<string, string>()
     for (const o of selectOptions) {
@@ -277,9 +300,8 @@ export default function AirtableKanbanView({
 
     const uniqueInData = new Set<string>()
     filteredRows.forEach((row) => {
-      const v = row[groupField.name]
-      const key = v == null || v === "" ? "—" : Array.isArray(v) ? (v[0] ?? "—") : String(v).trim() || "—"
-      uniqueInData.add(key)
+      const keys = getGroupKeysForValue(row[groupField.name])
+      keys.forEach((key) => uniqueInData.add(key))
     })
 
     const ordered = [...selectOptions].sort((a, b) => a.sort_index - b.sort_index)
@@ -306,7 +328,7 @@ export default function AirtableKanbanView({
       }
     }
     return result
-  }, [groupField, filteredRows, collapsedColumns])
+  }, [groupField, filteredRows, collapsedColumns, groupedRows])
 
   function handleDragStart(event: DragStartEvent) {
     setActiveId(event.active.id as string)
@@ -314,7 +336,7 @@ export default function AirtableKanbanView({
 
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
-    if (!over || !groupField) {
+    if (!over || !groupField || !canEditGroupValue) {
       setActiveId(null)
       return
     }
@@ -354,10 +376,10 @@ export default function AirtableKanbanView({
       return
     }
 
-    const currentValue = row[groupField.name]
+    const currentKeys = getGroupKeysForValue(row[groupField.name])
 
     // If dropped on same column, it's a reorder (no-op for now)
-    if (currentValue === targetColumn) {
+    if (currentKeys.includes(targetColumn)) {
       setActiveId(null)
       return
     }
@@ -383,7 +405,7 @@ export default function AirtableKanbanView({
   }
 
   async function handleAddCard(columnId: string) {
-    if (!groupField) return
+    if (!groupField || !canEditGroupValue) return
 
     try {
       const newValue = groupField.type === "multi_select" ? [columnId] : columnId
@@ -501,10 +523,8 @@ export default function AirtableKanbanView({
   }
 
   if (!groupField) {
-    // Check if there are any select fields available
-    const selectFields = tableFields.filter(
-      (f) => f.type === "single_select" || f.type === "multi_select"
-    )
+    // Check if there are any fields available for grouping
+    const supportedFields = tableFields.filter((f) => f.type !== "formula")
     
     return (
       <div className="flex items-center justify-center h-full bg-gray-50">
@@ -528,13 +548,13 @@ export default function AirtableKanbanView({
             Group Field Required
           </h3>
           <p className="text-sm text-gray-600 mb-4">
-            Kanban view requires a field to group cards by. Please select a single-select or multi-select field to use as the grouping field.
+            Kanban view requires a field to group cards by. Please select a supported field in view settings.
           </p>
-          {selectFields.length > 0 ? (
+          {supportedFields.length > 0 ? (
             <div className="mt-4">
-              <p className="text-xs text-gray-500 mb-2">Available select fields:</p>
+              <p className="text-xs text-gray-500 mb-2">Available fields:</p>
               <ul className="text-sm text-gray-700 space-y-1">
-                {selectFields.map((field) => (
+                {supportedFields.map((field) => (
                   <li key={field.id} className="flex items-center justify-center gap-2">
                     <span className="font-medium">{field.name}</span>
                     <span className="text-xs text-gray-400">({field.type})</span>
@@ -547,7 +567,7 @@ export default function AirtableKanbanView({
             </div>
           ) : (
             <p className="text-xs text-gray-500">
-              No select fields found. Create a single-select or multi-select field first.
+              No supported fields found. Create a field first.
             </p>
           )}
         </div>
@@ -582,6 +602,7 @@ export default function AirtableKanbanView({
                   showFieldLabels={showFieldLabels}
                   groupField={groupField}
                   canEdit={canEdit}
+                  canEditGroupValue={canEditGroupValue}
                   onCardSelect={(row) => setSelectedRowId(String(row.id))}
                   onCardOpen={handleOpenRow}
                   tableFields={tableFields}
@@ -659,6 +680,7 @@ interface KanbanColumnProps {
   showFieldLabels?: boolean
   groupField: TableField
   canEdit: boolean
+  canEditGroupValue: boolean
   onCardSelect: (row: Record<string, any>) => void
   onCardOpen: (row: Record<string, any>) => void
   tableFields: TableField[]
@@ -677,6 +699,7 @@ function KanbanColumn({
   showFieldLabels = false,
   groupField,
   canEdit,
+  canEditGroupValue,
   onCardSelect,
   onCardOpen,
   tableFields,
@@ -756,7 +779,7 @@ function KanbanColumn({
                     selected={selectedRowId === String(row.id)}
                     onSelect={() => onCardSelect(row)}
                     onOpen={() => onCardOpen(row)}
-                    canEdit={canEdit}
+                  canEdit={canEdit && canEditGroupValue}
                     tableName={tableName}
                     onCellSave={onCellSave}
                   />
@@ -768,7 +791,7 @@ function KanbanColumn({
       )}
 
       {/* Add Card Button */}
-      {!isCollapsed && canEdit && (
+      {!isCollapsed && canEdit && canEditGroupValue && (
         <div className="flex-shrink-0">
           <Button
             variant="ghost"

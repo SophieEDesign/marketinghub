@@ -95,13 +95,17 @@ export function getOperatorsForFieldType(fieldType: string): OperatorOption[] {
 
     case 'lookup':
       // Lookup fields are read-only but filterable
-      // Operators depend on the underlying field type being looked up
-      // For now, provide basic operators
       return [
         { value: 'equal', label: 'Is', requiresValue: true },
         { value: 'not_equal', label: 'Is not', requiresValue: true },
+        { value: 'is_any_of', label: 'Is any of', requiresValue: true, supportsMultiValue: true },
+        { value: 'is_not_any_of', label: 'Is not any of', requiresValue: true, supportsMultiValue: true },
         { value: 'contains', label: 'Contains', requiresValue: true },
         { value: 'not_contains', label: 'Does not contain', requiresValue: true },
+        { value: 'greater_than', label: 'Greater than', requiresValue: true },
+        { value: 'less_than', label: 'Less than', requiresValue: true },
+        { value: 'greater_than_or_equal', label: 'Greater than or equal', requiresValue: true },
+        { value: 'less_than_or_equal', label: 'Less than or equal', requiresValue: true },
         { value: 'is_empty', label: 'Is empty', requiresValue: false },
         { value: 'is_not_empty', label: 'Is not empty', requiresValue: false },
       ]

@@ -68,9 +68,9 @@ export default function GroupDialog({
     }
   }, [groupBy, groupByRules, isOpen])
 
-  // Filter fields that can be grouped (not formula, not lookup)
+  // Filter fields that can be grouped (lookup is supported, formula remains excluded)
   const groupableFields = tableFields.filter(
-    (f) => f.type !== "formula" && f.type !== "lookup"
+    (f) => f.type !== "formula"
   )
 
   // Get date fields for date grouping
@@ -178,7 +178,7 @@ export default function GroupDialog({
         <DialogHeader>
           <DialogTitle>Group Records</DialogTitle>
           <DialogDescription>
-            Add up to 2 grouping levels to create nested groups (like Airtable). Records will be grouped hierarchically by the selected fields.
+            Add up to 2 grouping levels to create nested groups (like Airtable). Multi-value fields can place a record in multiple groups.
           </DialogDescription>
         </DialogHeader>
 

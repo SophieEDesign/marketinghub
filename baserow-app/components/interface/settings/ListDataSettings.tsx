@@ -149,11 +149,6 @@ export default function ListDataSettings({
     return [...dateFields, ...numberFields].filter(f => !metaFields.includes(f.name))
   }
 
-  // Get groupable fields (not formula, not lookup)
-  const groupableFields = fields.filter(
-    (f) => f.type !== "formula" && f.type !== "lookup"
-  )
-
   return (
     <div className="space-y-6">
       {/* Table Selection */}
@@ -415,7 +410,7 @@ export default function ListDataSettings({
           }}
           fields={fields}
           filterGroupableFields={true}
-          description="Add up to 2 grouping levels to create nested groups (like Airtable). Records will be grouped hierarchically by the selected fields."
+          description="Add up to 2 grouping levels to create nested groups (like Airtable). Multi-value fields can place a record in multiple groups."
         />
       )}
 

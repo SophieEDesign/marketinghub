@@ -29,6 +29,23 @@ function isEmptyValue(v: any): boolean {
   return false
 }
 
+function toGroupPrimitive(v: any): string | number | boolean | null {
+  if (v == null) return null
+  if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return v
+  if (v instanceof Date) return v.toISOString()
+  if (Array.isArray(v)) return v.length > 0 ? toGroupPrimitive(v[0]) : null
+  if (typeof v === 'object') {
+    const candidate =
+      (v as any).label ??
+      (v as any).name ??
+      (v as any).value ??
+      (v as any).title ??
+      (v as any).id
+    return candidate == null ? null : toGroupPrimitive(candidate)
+  }
+  return null
+}
+
 function buildContext(fields: TableField[], opts?: GroupTreeOptions): GroupContext {
   const fieldByName = new Map<string, TableField>()
   const fieldById = new Map<string, TableField>()
@@ -134,7 +151,8 @@ function getGroupKeysForValue(ctx: GroupContext, rule: GroupRule, field: TableFi
     // Field grouping
     // Use the raw stored value for the stable group key (avoid collisions when labels repeat),
     // but render the user-facing label via optional mapping (e.g. link_to_table UUID -> name).
-    const rawKey = safeString(v).trim()
+    const primitive = toGroupPrimitive(v)
+    const rawKey = safeString(primitive).trim()
     if (!rawKey) {
       keys.push(emptyKey)
       continue

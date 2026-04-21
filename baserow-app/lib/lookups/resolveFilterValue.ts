@@ -98,5 +98,23 @@ export async function resolveFilterValue(
       return { value: null, shouldApply: false }
   }
   
+  if (filter.operator === 'is_any_of' || filter.operator === 'is_not_any_of') {
+    const toArray = (input: any): any[] => {
+      if (Array.isArray(input)) return input
+      if (typeof input === 'string') {
+        return input
+          .split(',')
+          .map((v) => v.trim())
+          .filter(Boolean)
+      }
+      if (input === null || input === undefined || input === '') return []
+      return [input]
+    }
+    value = toArray(value)
+    if (value.length === 0) {
+      return { value: null, shouldApply: false }
+    }
+  }
+
   return { value, value2, shouldApply: true }
 }

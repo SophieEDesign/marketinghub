@@ -30,9 +30,9 @@ export default function GroupBySelector({
   filterGroupableFields = true,
   placeholder = "Select a field",
 }: GroupBySelectorProps) {
-  // Filter out formula and lookup fields if filterGroupableFields is true
+  // Filter out formula fields if filterGroupableFields is true
   const groupableFields = filterGroupableFields
-    ? fields.filter((f) => f.type !== "formula" && f.type !== "lookup")
+    ? fields.filter((f) => f.type !== "formula")
     : fields
 
   const displayValue = value || "__none__"

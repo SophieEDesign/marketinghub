@@ -38,6 +38,7 @@ import type { GroupRule } from "@/lib/grouping/types"
 import { getVisibleFieldsFromLayout } from "@/lib/interface/field-layout-helpers"
 import type { FieldLayoutItem } from "@/lib/interface/field-layout-utils"
 import { buildRecordContextFilters } from "@/lib/interface/record-context-filters"
+import { cn } from "@/lib/utils"
 
 interface GridBlockProps {
   block: PageBlock

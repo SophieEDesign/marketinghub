@@ -66,6 +66,18 @@ export async function applyLookupFilters(
     const fieldType = lookupField.type
     
     try {
+      const normalizeAsArray = (input: any): any[] => {
+        if (Array.isArray(input)) return input.filter((v) => v !== null && v !== undefined && String(v).trim() !== '')
+        if (typeof input === 'string') {
+          return input
+            .split(',')
+            .map((v) => v.trim())
+            .filter(Boolean)
+        }
+        if (input === null || input === undefined || input === '') return []
+        return [input]
+      }
+
       switch (filter.operator) {
         case 'equal':
           query = query.eq(fieldName, value)
@@ -73,6 +85,25 @@ export async function applyLookupFilters(
         case 'not_equal':
           query = query.neq(fieldName, value)
           break
+        case 'is_any_of': {
+          const values = normalizeAsArray(value)
+          if (values.length === 0) {
+            skippedFilters.push(filter)
+            continue
+          }
+          query = query.in(fieldName, values)
+          break
+        }
+        case 'is_not_any_of': {
+          const values = normalizeAsArray(value)
+          if (values.length === 0) {
+            skippedFilters.push(filter)
+            continue
+          }
+          const encodedValues = `(${values.map((v) => `"${String(v).replaceAll('"', '\\"')}"`).join(',')})`
+          query = query.not(fieldName, 'in', encodedValues)
+          break
+        }
         case 'contains':
           if (fieldType === 'text' || fieldType === 'long_text') {
             query = query.ilike(fieldName, `%${value}%`)

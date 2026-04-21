@@ -636,14 +636,13 @@ export default function GridDataSettings({
             fields={fields}
             filterGroupableFields={false}
             label="Group by *"
-            description="Select a single-select or multi-select field to group cards into columns."
-            placeholder="Select a select field"
+            description="Select a field to group cards into columns. Multi-value fields (like lookup/multi-select) can place one record in multiple columns."
+            placeholder="Select a grouping field"
           />
-          {fields.filter((f) => f.type === "single_select" || f.type === "multi_select").length ===
+          {fields.filter((f) => f.type !== "formula").length ===
             0 && (
             <p className="text-xs text-amber-600 mt-1">
-              No select fields found. Please add a single-select or multi-select field to the
-              table.
+              No groupable fields found. Please add a field to the table.
             </p>
           )}
 

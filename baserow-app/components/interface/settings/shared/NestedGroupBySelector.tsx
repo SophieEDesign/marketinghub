@@ -58,9 +58,9 @@ export default function NestedGroupBySelector({
     }
   }, [groupByRules, value])
 
-  // Filter fields that can be grouped (not formula, not lookup)
+  // Filter fields that can be grouped (lookup is supported, formula remains excluded)
   const groupableFields = filterGroupableFields
-    ? fields.filter((f) => f.type !== "formula" && f.type !== "lookup")
+    ? fields.filter((f) => f.type !== "formula")
     : fields
 
   // Get date fields for date grouping
@@ -119,7 +119,7 @@ export default function NestedGroupBySelector({
         )}
         {!description && (
           <p className="text-xs text-gray-500 mt-1">
-            Add up to 2 grouping levels to create nested groups (like Airtable). Records will be grouped hierarchically by the selected fields.
+            Add up to 2 grouping levels to create nested groups (like Airtable). Multi-value fields can place a record in multiple groups.
           </p>
         )}
       </div>

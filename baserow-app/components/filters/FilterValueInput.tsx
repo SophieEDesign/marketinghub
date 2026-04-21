@@ -40,7 +40,7 @@ interface FilterValueInputProps {
  * - Number fields: Number input
  * - Text fields: Text input
  * - Linked fields: Record picker (future)
- * - Lookup fields: Read-only display
+ * - Lookup fields: Derived value input
  */
 export default function FilterValueInput({
   field,
@@ -419,12 +419,28 @@ export default function FilterValueInput({
     )
   }
 
-  // Lookup fields: Read-only display
+  // Lookup fields: Derived value input
   if (field.type === 'lookup') {
+    const isMultiValueOperator = operator === 'is_any_of' || operator === 'is_not_any_of'
+    const stringValue = Array.isArray(value) ? value.join(', ') : (value as string || "")
     return (
-      <div className={`${controlHeight} flex items-center text-xs text-gray-400 px-3 border border-gray-300 rounded-md bg-gray-50 ${className}`}>
-        Filter by derived value
-      </div>
+      <Input
+        type="text"
+        value={stringValue}
+        onChange={(e) => {
+          if (isMultiValueOperator) {
+            const values = e.target.value
+              .split(',')
+              .map((v) => v.trim())
+              .filter(Boolean)
+            onChange(values)
+            return
+          }
+          onChange(e.target.value)
+        }}
+        placeholder={isMultiValueOperator ? "Comma-separated values..." : "Filter by derived value..."}
+        className={`${controlHeight} ${textSize} ${className}`}
+      />
     )
   }
 

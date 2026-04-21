@@ -107,6 +107,39 @@ const mapRowHeightToAirtable = (height: string): 'short' | 'medium' | 'tall' => 
   return 'medium'
 }
 
+const getFieldMetadataOrder = (field: TableField): number => field.order_index ?? field.position ?? 0
+
+const sortFieldNamesByMetadata = (fields: TableField[]): string[] =>
+  [...fields]
+    .sort((a, b) => {
+      const aOrder = getFieldMetadataOrder(a)
+      const bOrder = getFieldMetadataOrder(b)
+      if (aOrder !== bOrder) return aOrder - bOrder
+      return (a.name || '').localeCompare(b.name || '')
+    })
+    .map((f) => f.name)
+    .filter((name): name is string => typeof name === 'string' && name.length > 0)
+
+const mergeColumnOrderWithMetadata = (persistedOrder: string[], fields: TableField[]): string[] => {
+  const metadataOrder = sortFieldNamesByMetadata(fields)
+  const metadataSet = new Set(metadataOrder)
+  const sanitizedPersistedOrder = persistedOrder.filter((name) => metadataSet.has(name))
+
+  if (sanitizedPersistedOrder.length === 0) {
+    return metadataOrder
+  }
+
+  const persistedSet = new Set(sanitizedPersistedOrder)
+  const merged = [...sanitizedPersistedOrder]
+  for (const fieldName of metadataOrder) {
+    if (!persistedSet.has(fieldName)) {
+      merged.push(fieldName)
+    }
+  }
+
+  return merged
+}
+
 export default function AirtableGridView({
   tableName,
   tableId,
@@ -592,35 +625,12 @@ export default function AirtableGridView({
             const sanitizedOrder = (data.column_order as unknown[])
               .filter((name: unknown): name is string => typeof name === 'string' && name.trim().length > 0)
             
-            // Get current field names
-            const allFieldNames = Array.isArray(safeFields)
-              ? safeFields
-                  .filter((f) => f && typeof f === 'object' && f.name)
-                  .map((f) => f.name)
-                  .filter((name: unknown): name is string => typeof name === 'string' && name.length > 0)
-              : []
-            
-            // Validate that all fields in persisted order still exist
-            const validOrder = sanitizedOrder.filter((name: string) => allFieldNames.includes(name))
-            
-            if (validOrder.length > 0 && validOrder.length === sanitizedOrder.length) {
-              // All fields in order are valid - use it
-              // Add any missing fields to the end
-              const missingFields = allFieldNames.filter(name => !validOrder.includes(name))
-              setColumnOrder([...validOrder, ...missingFields])
-            } else {
-              // Some fields in order are stale - rebuild from current fields
-              setColumnOrder(allFieldNames)
-            }
+            const allFields = Array.isArray(safeFields) ? safeFields : []
+            const mergedOrder = mergeColumnOrderWithMetadata(sanitizedOrder, allFields)
+            setColumnOrder(mergedOrder)
           } else if (Array.isArray(safeFields) && safeFields.length > 0) {
             // No persisted order - initialize from fields
-            const sortedFields = [...safeFields].sort((a, b) => {
-              const aOrder = a.order_index ?? a.position ?? 0
-              const bOrder = b.order_index ?? b.position ?? 0
-              if (aOrder !== bOrder) return aOrder - bOrder
-              return (a.name || '').localeCompare(b.name || '')
-            })
-            setColumnOrder(sortedFields.map((f) => f.name).filter((name): name is string => typeof name === 'string' && name.length > 0))
+            setColumnOrder(sortFieldNamesByMetadata(safeFields))
           }
           if (data.column_wrap_text && typeof data.column_wrap_text === 'object') {
             setColumnWrapText(data.column_wrap_text as Record<string, boolean>)
@@ -686,32 +696,12 @@ export default function AirtableGridView({
             ? order.filter((name): name is string => typeof name === 'string' && name.trim().length > 0)
             : []
           
-          const allFieldNames = Array.isArray(safeFields)
-            ? safeFields
-                .filter((f) => f && typeof f === 'object' && f.name)
-                .map((f) => f.name)
-                .filter((name): name is string => typeof name === 'string' && name.length > 0)
-            : []
-          
-          if (sanitizedOrder.length > 0 && sanitizedOrder.every((name: string) => allFieldNames.includes(name))) {
-            // All fields in order are valid - use it
-            // Add any missing fields to the end
-            const missingFields = allFieldNames.filter(name => !sanitizedOrder.includes(name))
-            setColumnOrder([...sanitizedOrder, ...missingFields])
-          } else {
-            // Invalid order - rebuild from current fields
-            setColumnOrder(allFieldNames)
-          }
+          const allFields = Array.isArray(safeFields) ? safeFields : []
+          setColumnOrder(mergeColumnOrderWithMetadata(sanitizedOrder, allFields))
         } catch {
           // Fallback: initialize from fields
           if (Array.isArray(safeFields) && safeFields.length > 0) {
-            const sortedFields = [...safeFields].sort((a, b) => {
-              const aOrder = a.order_index ?? a.position ?? 0
-              const bOrder = b.order_index ?? b.position ?? 0
-              if (aOrder !== bOrder) return aOrder - bOrder
-              return (a.name || '').localeCompare(b.name || '')
-            })
-            setColumnOrder(sortedFields.map((f) => f.name).filter((name): name is string => typeof name === 'string' && name.length > 0))
+            setColumnOrder(sortFieldNamesByMetadata(safeFields))
           } else {
             setColumnOrder([])
           }
@@ -719,14 +709,7 @@ export default function AirtableGridView({
       } else {
         // No saved order - initialize from fields
         if (Array.isArray(safeFields) && safeFields.length > 0) {
-          // Sort fields by order_index, then by position, then by name
-          const sortedFields = [...safeFields].sort((a, b) => {
-            const aOrder = a.order_index ?? a.position ?? 0
-            const bOrder = b.order_index ?? b.position ?? 0
-            if (aOrder !== bOrder) return aOrder - bOrder
-            return (a.name || '').localeCompare(b.name || '')
-          })
-          setColumnOrder(sortedFields.map((f) => f.name).filter((name): name is string => typeof name === 'string' && name.length > 0))
+          setColumnOrder(sortFieldNamesByMetadata(safeFields))
         } else {
           setColumnOrder([])
         }
@@ -1378,6 +1361,22 @@ export default function AirtableGridView({
         return
       }
 
+      // Keep rendered order consistent immediately (without waiting for settings reload).
+      if (newField.name && targetField.name) {
+        markLayoutDirty()
+        setColumnOrder((prev) => {
+          const current = Array.isArray(prev) ? prev.filter((name) => name !== newField.name) : []
+          const targetIndex = current.indexOf(targetField.name)
+          if (targetIndex === -1) {
+            return current.length > 0 ? [...current, newField.name] : [newField.name]
+          }
+          const insertIndex = insertTargetField.position === 'left' ? targetIndex : targetIndex + 1
+          const next = [...current]
+          next.splice(insertIndex, 0, newField.name)
+          return next
+        })
+      }
+
       // Calculate target order_index
       const targetOrderIndex = targetField.order_index ?? targetField.position ?? 0
       const newOrderIndex = insertTargetField.position === 'left' 
@@ -1425,7 +1424,7 @@ export default function AirtableGridView({
       setFieldBuilderOpen(false)
       setInsertTargetField(null)
     }
-  }, [insertTargetField, tableId, onTableFieldsRefresh])
+  }, [insertTargetField, tableId, onTableFieldsRefresh, markLayoutDirty])
 
   // Keyboard shortcuts for copy/paste
   useEffect(() => {
