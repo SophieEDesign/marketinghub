@@ -22,6 +22,7 @@ import { evaluateHighlightRules, getFormattingStyle } from "@/lib/conditional-fo
 import { cn } from "@/lib/utils"
 import { getMarketingStatusPillClassNames, isMarketingStatusField } from "@/lib/status-colors"
 import { isAbortError } from "@/lib/api/error-handling"
+import { resolveContentIcon } from "@/lib/ui/content-icons"
 
 interface GalleryViewProps {
   tableId: string
@@ -537,6 +538,7 @@ export default function GalleryView({
         (f: any) => f?.name === titleField || f?.id === titleField
       ) as TableField | undefined
       const titleValue = titleFieldObj ? row.data?.[titleFieldObj.name] : row.data?.[titleField]
+      const HeaderIcon = resolveContentIcon(row.data || {})
 
       // Evaluate conditional formatting rules
       const matchingRule = highlightRules && highlightRules.length > 0
@@ -576,33 +578,36 @@ export default function GalleryView({
           )}
           <CardContent className="p-4 space-y-2">
             <div className="flex items-start justify-between gap-2">
-              <div
-                className="min-w-0 flex-1 text-sm font-semibold text-gray-900 truncate whitespace-nowrap"
-                onDoubleClick={(e) => e.stopPropagation()}
-              >
-                {titleFieldObj ? (
-                  <CellFactory
-                    field={titleFieldObj}
-                    value={titleValue}
-                    rowId={String(row.id)}
-                    tableName={supabaseTableName || ""}
-                    editable={
-                      !titleFieldObj.options?.read_only &&
-                      titleFieldObj.type !== "formula" &&
-                      titleFieldObj.type !== "lookup" &&
-                      !!supabaseTableName
-                    }
-                    wrapText={true}
-                    rowHeight={32}
-                    onSave={(value) => handleCellSave(String(row.id), titleFieldObj.name, value)}
-                  />
-                ) : (
-                  <span>
-                    {titleValue !== undefined && titleValue !== null && String(titleValue).trim() !== ""
-                      ? String(titleValue)
-                      : "Untitled"}
-                  </span>
-                )}
+              <div className="min-w-0 flex-1 flex items-center gap-1.5">
+                {HeaderIcon ? <HeaderIcon className="h-4 w-4 shrink-0 opacity-70 text-gray-500" aria-hidden /> : null}
+                <div
+                  className="min-w-0 text-sm font-semibold text-gray-900 truncate whitespace-nowrap"
+                  onDoubleClick={(e) => e.stopPropagation()}
+                >
+                  {titleFieldObj ? (
+                    <CellFactory
+                      field={titleFieldObj}
+                      value={titleValue}
+                      rowId={String(row.id)}
+                      tableName={supabaseTableName || ""}
+                      editable={
+                        !titleFieldObj.options?.read_only &&
+                        titleFieldObj.type !== "formula" &&
+                        titleFieldObj.type !== "lookup" &&
+                        !!supabaseTableName
+                      }
+                      wrapText={true}
+                      rowHeight={32}
+                      onSave={(value) => handleCellSave(String(row.id), titleFieldObj.name, value)}
+                    />
+                  ) : (
+                    <span>
+                      {titleValue !== undefined && titleValue !== null && String(titleValue).trim() !== ""
+                        ? String(titleValue)
+                        : "Untitled"}
+                    </span>
+                  )}
+                </div>
               </div>
               <button
                 type="button"

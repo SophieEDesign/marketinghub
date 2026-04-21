@@ -861,108 +861,184 @@ function buildInternalStaffBlocks(ctx) {
 
   const resourceTitle = pickFieldName(resourceFields, [/^name$/i, /^title$/i, /document/i, /resource/i], "name")
   const resourceType = pickFieldName(resourceFields, [/^type$/i, /category/i, /format/i], null)
+  const resourceCategory = pickFieldName(resourceFields, [/^category$/i, /segment/i, /group/i], null)
   const resourceOwner = pickFieldName(resourceFields, [/owner/i, /assignee/i, /team/i], null)
   const resourceLink = pickFieldName(resourceFields, [/url/i, /link/i, /document_link/i, /drive/i], null)
   const resourceStatus = pickFieldName(resourceFields, [/^status$/i, /state/i], null)
+  const resourceUpdatedAt = pickFieldName(resourceFields, [/^updated_at$/i, /last_updated/i, /modified/i, /updated/i], null)
+  const resourceDescription = pickFieldName(resourceFields, [/description/i, /summary/i, /notes?/i, /details?/i], null)
+  const resourceIsArchived = pickFieldName(resourceFields, [/^is_archived$/i, /^archived$/i], null)
+  const resourceDeletedAt = pickFieldName(resourceFields, [/^deleted_at$/i], null)
 
   const contactName = pickFieldName(contactFields, [/^name$/i, /contact/i], "name")
+  const contactRole = pickFieldName(contactFields, [/role/i, /title/i, /job/i], null)
   const contactTeam = pickFieldName(contactFields, [/team/i, /department/i, /division/i], null)
   const contactEmail = pickFieldName(contactFields, [/email/i], null)
+  const contactIsArchived = pickFieldName(contactFields, [/^is_archived$/i, /^archived$/i], null)
+  const contactDeletedAt = pickFieldName(contactFields, [/^deleted_at$/i], null)
+  const linkTypeValues = ["Link", "Tool", "Useful Link", "External", "Platform"]
 
   const blocks = []
   let y = 0
-  blocks.push(section("Internal Staff Hub", "Central place for team resources, documents, and internal contacts", y, 2))
-  y += 2
+  blocks.push({
+    type: "html",
+    position_x: 0,
+    position_y: y,
+    width: 12,
+    height: 2,
+    config: {
+      title: "",
+      html: `<div class="rounded-card-lg border border-border/60 bg-card px-5 py-4 shadow-sm"><div class="flex items-start justify-between gap-4"><div><h2 class="text-xl font-semibold tracking-tight text-foreground">Internal Staff Hub</h2><p class="mt-1 text-sm text-muted-foreground">Your central place for resources, contacts, updates and support.</p></div><div class="flex items-center gap-2"><div class="hidden md:flex items-center rounded-md border border-border/70 bg-background px-3 py-1.5 text-xs text-muted-foreground min-w-[180px]">Search resources...</div><button class="inline-flex items-center rounded-md border border-border/70 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground">+ Add resource</button></div></div></div>`,
+    },
+  })
+  y += 3
+
+  const baseResourceFilters = compactFilters(resourceFields, [
+    { field: resourceTitle, operator: "is_not_empty", value: "" },
+    ...(resourceIsArchived ? [{ field: resourceIsArchived, operator: "is_not_any_of", value: [true, "true", 1, "1"] }] : []),
+    ...(resourceDeletedAt ? [{ field: resourceDeletedAt, operator: "is_empty", value: "" }] : []),
+  ])
+  const baseContactFilters = compactFilters(contactFields, [
+    ...(contactName ? [{ field: contactName, operator: "is_not_empty", value: "" }] : []),
+    ...(contactIsArchived ? [{ field: contactIsArchived, operator: "is_not_any_of", value: [true, "true", 1, "1"] }] : []),
+    ...(contactDeletedAt ? [{ field: contactDeletedAt, operator: "is_empty", value: "" }] : []),
+  ])
 
   blocks.push({
     type: "kpi",
     position_x: 0,
     position_y: y,
-    width: 4,
+    width: 3,
     height: 3,
     config: {
-      title: "Resources",
-      kpi_label: "Total",
+      title: "Total resources",
+      kpi_label: "Available to staff",
       table_id: resourceTable.id,
       kpi_aggregate: "count",
-      filters: compactFilters(resourceFields, [{ field: resourceTitle, operator: "is_not_empty", value: "" }]),
+      filters: baseResourceFilters,
     },
   })
   blocks.push({
     type: "kpi",
-    position_x: 4,
+    position_x: 3,
     position_y: y,
-    width: 4,
+    width: 3,
     height: 3,
     config: {
-      title: "Linked docs",
-      kpi_label: "With link",
+      title: "With links",
+      kpi_label: "Quick access",
       table_id: resourceTable.id,
       kpi_aggregate: "count",
-      filters: compactFilters(resourceFields, resourceLink ? [{ field: resourceLink, operator: "is_not_empty", value: "" }] : []),
+      filters: compactFilters(resourceFields, [
+        ...baseResourceFilters,
+        ...(resourceLink ? [{ field: resourceLink, operator: "is_not_empty", value: "" }] : []),
+      ]),
     },
   })
   blocks.push({
     type: "kpi",
-    position_x: 8,
+    position_x: 6,
     position_y: y,
-    width: 4,
+    width: 3,
     height: 3,
     config: {
-      title: "Active items",
-      kpi_label: "In use",
+      title: "Internal contacts",
+      kpi_label: "Team directory",
+      table_id: ctx.contacts ? ctx.contacts.id : resourceTable.id,
+      kpi_aggregate: "count",
+      filters: ctx.contacts ? baseContactFilters : baseResourceFilters,
+    },
+  })
+  blocks.push({
+    type: "kpi",
+    position_x: 9,
+    position_y: y,
+    width: 3,
+    height: 3,
+    config: {
+      title: "Recently updated",
+      kpi_label: resourceUpdatedAt ? "Last 30 days" : "Active set",
       table_id: resourceTable.id,
       kpi_aggregate: "count",
-      filters: compactFilters(
-        resourceFields,
-        resourceStatus
+      filters: compactFilters(resourceFields, [
+        ...baseResourceFilters,
+        ...(resourceUpdatedAt
+          ? [{ field: resourceUpdatedAt, operator: "date_last_days", value: 30 }]
+          : resourceStatus
           ? [{ field: resourceStatus, operator: "is_any_of", value: ["Active", "Live", "Published", "In Use"] }]
-          : [{ field: resourceTitle, operator: "is_not_empty", value: "" }]
-      ),
+          : []),
+      ]),
     },
   })
-  y += 3
+  y += 4
 
-  const primaryVisible = [resourceTitle, resourceType, resourceOwner, resourceLink].filter(Boolean)
+  const primaryVisible = [resourceTitle, resourceType, resourceCategory, resourceUpdatedAt, resourceLink].filter(Boolean)
   blocks.push({
     type: "grid",
     position_x: 0,
     position_y: y,
     width: 12,
-    height: 8,
+    height: 7,
     config: {
-      title: ctx.resources ? "Resource Library" : "Resource Library (using Content table)",
+      title: "Resource Library",
       table_id: resourceTable.id,
       view_type: "list",
-      row_limit: 20,
+      row_limit: 7,
       list_title_field: resourceTitle,
       visible_fields: primaryVisible,
-      ...(resourceType ? { group_by_field: resourceType } : {}),
-      ...(resourceStatus ? { pill_fields: [resourceStatus] } : {}),
-      filters: compactFilters(resourceFields, [{ field: resourceTitle, operator: "is_not_empty", value: "" }]),
-      appearance: { showTitle: true, border: "none" },
+      list_subtitle_fields: [resourceDescription].filter(Boolean),
+      list_meta_fields: [resourceType, resourceCategory, resourceUpdatedAt, resourceOwner].filter(Boolean),
+      ...(resourceType ? { pill_fields: [resourceType] } : resourceStatus ? { pill_fields: [resourceStatus] } : {}),
+      filters: baseResourceFilters,
+      sorts: [...(resourceUpdatedAt ? [{ field: resourceUpdatedAt, direction: "desc" }] : [])],
+      appearance: { showTitle: true, border: "none", compact: true, padding: "compact" },
     },
   })
   y += 8
 
   if (ctx.contacts && contactName) {
-    const supportVisible = [contactName, contactTeam, contactEmail].filter(Boolean)
+    const supportVisible = [contactName, contactRole, contactTeam, contactEmail].filter(Boolean)
     blocks.push({
       type: "grid",
       position_x: 0,
       position_y: y,
-      width: 12,
+      width: 7,
       height: 6,
       config: {
         title: "Internal Contacts",
         table_id: ctx.contacts.id,
         view_type: "list",
-        row_limit: 10,
+        row_limit: 6,
         list_title_field: contactName,
         visible_fields: supportVisible,
+        list_meta_fields: [contactRole, contactTeam, contactEmail].filter(Boolean),
         ...(contactTeam ? { group_by_field: contactTeam } : {}),
-        filters: compactFilters(contactFields, [{ field: contactName, operator: "is_not_empty", value: "" }]),
-        appearance: { showTitle: true, border: "none" },
+        filters: baseContactFilters,
+        appearance: { showTitle: true, border: "none", compact: true, padding: "compact" },
+      },
+    })
+    blocks.push({
+      type: "grid",
+      position_x: 7,
+      position_y: y,
+      width: 5,
+      height: 6,
+      config: {
+        title: "Useful Links",
+        table_id: resourceTable.id,
+        view_type: "list",
+        row_limit: 6,
+        list_title_field: resourceTitle,
+        visible_fields: [resourceTitle, resourceDescription, resourceLink].filter(Boolean),
+        list_subtitle_fields: [resourceDescription].filter(Boolean),
+        list_meta_fields: [resourceType].filter(Boolean),
+        ...(resourceType ? { pill_fields: [resourceType] } : {}),
+        filters: compactFilters(resourceFields, [
+          ...baseResourceFilters,
+          ...(resourceLink ? [{ field: resourceLink, operator: "is_not_empty", value: "" }] : []),
+          ...(resourceType ? [{ field: resourceType, operator: "is_any_of", value: linkTypeValues }] : []),
+        ]),
+        appearance: { showTitle: true, border: "none", compact: true, padding: "compact" },
       },
     })
   } else {
@@ -970,11 +1046,34 @@ function buildInternalStaffBlocks(ctx) {
       type: "html",
       position_x: 0,
       position_y: y,
-      width: 12,
+      width: 7,
       height: 4,
       config: {
-        title: "How to use this page",
-        html: `<div class="rounded-lg border border-border/60 bg-card p-4"><p class="text-sm text-muted-foreground">Add a dedicated Resources/Documents table to make this page fully document-led. For now, this page uses your existing data model and remains member-accessible.</p></div>`,
+        title: "Internal Contacts",
+        html: `<div class="rounded-card-lg border border-border/60 bg-card p-4 shadow-sm"><p class="text-sm text-muted-foreground">No contact table is connected yet. Add a Contacts table to enable the internal directory panel.</p></div>`,
+      },
+    })
+    blocks.push({
+      type: "grid",
+      position_x: 7,
+      position_y: y,
+      width: 5,
+      height: 6,
+      config: {
+        title: "Useful Links",
+        table_id: resourceTable.id,
+        view_type: "list",
+        row_limit: 6,
+        list_title_field: resourceTitle,
+        visible_fields: [resourceTitle, resourceDescription, resourceLink].filter(Boolean),
+        list_subtitle_fields: [resourceDescription].filter(Boolean),
+        list_meta_fields: [resourceType].filter(Boolean),
+        ...(resourceType ? { pill_fields: [resourceType] } : {}),
+        filters: compactFilters(resourceFields, [
+          ...baseResourceFilters,
+          ...(resourceLink ? [{ field: resourceLink, operator: "is_not_empty", value: "" }] : []),
+        ]),
+        appearance: { showTitle: true, border: "none", compact: true, padding: "compact" },
       },
     })
   }

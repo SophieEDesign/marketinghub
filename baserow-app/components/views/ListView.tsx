@@ -32,6 +32,7 @@ import { evaluateHighlightRules, getFormattingStyle } from "@/lib/conditional-fo
 import { getFieldDisplayName } from "@/lib/fields/display"
 import { useRealtimeTable } from "@/lib/realtime/useRealtimeTable"
 import { cn } from "@/lib/utils"
+import { resolveContentIcon } from "@/lib/ui/content-icons"
 
 // PostgREST expects unquoted identifiers in order clauses; see `lib/supabase/postgrest`.
 
@@ -872,7 +873,17 @@ export default function ListView({
           return renderPill({ field: col.field, value: String(raw).trim(), density: 'compact' })
         }
       }
-      return formatFieldValue(col.field, raw)
+      const renderedValue = formatFieldValue(col.field, raw)
+      if (col.type === "title") {
+        const Icon = resolveContentIcon(row)
+        return (
+          <span className="inline-flex items-center gap-1.5 min-w-0">
+            {Icon ? <Icon className="h-4 w-4 shrink-0 opacity-70" aria-hidden /> : null}
+            <span className="truncate">{renderedValue}</span>
+          </span>
+        )
+      }
+      return renderedValue
     }
 
     return (

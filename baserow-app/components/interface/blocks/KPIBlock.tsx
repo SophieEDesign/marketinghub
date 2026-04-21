@@ -8,6 +8,7 @@ import { TrendingUp, TrendingDown, ArrowRight, Filter } from "lucide-react"
 import type { FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import { useMarketingDashboard } from "@/contexts/MarketingDashboardContext"
+import { resolveKpiIcon } from "@/lib/ui/content-icons"
 
 interface KPIBlockProps {
   block: PageBlock
@@ -45,6 +46,8 @@ export default function KPIBlock({
   const comparison = config?.comparison
   const target = config?.target_value
   const clickThrough = config?.click_through
+  const iconName = config?.icon ?? config?.kpi_icon
+  const KpiIcon = resolveKpiIcon(iconName)
   const blockFilters = config?.filters || []
   const hasFilters = blockFilters.length > 0
   
@@ -272,8 +275,14 @@ export default function KPIBlock({
           </h3>
         </div>
       )}
-      <div className={`flex-1 flex flex-col justify-center ${getAlignmentClass()}`}>
-        <div className={`w-full ${getAlignmentClass().includes('text-center') ? 'text-center' : getAlignmentClass().includes('text-left') ? 'text-left' : 'text-right'}`}>
+      <div className="flex-1 flex items-center">
+        {KpiIcon ? (
+          <div className="mr-3 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted/50 text-muted-foreground">
+            <KpiIcon className="h-4 w-4 opacity-80" aria-hidden />
+          </div>
+        ) : null}
+        <div className={`flex-1 flex flex-col justify-center ${getAlignmentClass()}`}>
+          <div className={`w-full ${getAlignmentClass().includes('text-center') ? 'text-center' : getAlignmentClass().includes('text-left') ? 'text-left' : 'text-right'}`}>
           {!showTitle && (
             <div className={`flex items-center gap-2 ${marketingDashboardStyle ? "mb-2.5" : "mb-3"} ${getAlignmentClass().includes('text-center') ? 'justify-center' : getAlignmentClass().includes('text-left') ? 'justify-start' : 'justify-end'}`}>
               {marketingDashboardStyle && (
@@ -374,6 +383,7 @@ export default function KPIBlock({
               <ArrowRight className="h-3 w-3" />
             </div>
           )}
+          </div>
         </div>
       </div>
     </div>
