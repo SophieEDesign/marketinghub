@@ -7,6 +7,7 @@ import type { PageBlock } from "@/lib/interface/types"
 import { TrendingUp, TrendingDown, ArrowRight, Filter } from "lucide-react"
 import type { FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
+import { useMarketingDashboard } from "@/contexts/MarketingDashboardContext"
 
 interface KPIBlockProps {
   block: PageBlock
@@ -34,6 +35,7 @@ export default function KPIBlock({
   aggregateData,
 }: KPIBlockProps) {
   const router = useRouter()
+  const marketingDashboardStyle = useMarketingDashboard()
   const { config } = block
   // KPI block MUST have table_id configured - no fallback to page table
   const tableId = config?.table_id
@@ -196,6 +198,7 @@ export default function KPIBlock({
 
   // Get value size class
   const getValueSizeClass = () => {
+    if (marketingDashboardStyle) return "text-2xl"
     switch (appearance.value_size) {
       case 'small': return 'text-2xl'
       case 'medium': return 'text-3xl'
@@ -221,16 +224,24 @@ export default function KPIBlock({
     appearance.border === "none" ||
     (typeof appearance.border_width === "number" && appearance.border_width === 0)
 
+  const marketingCardStyle: CSSProperties | undefined = marketingDashboardStyle
+    ? {
+        borderColor: "rgba(203, 213, 225, 0.55)",
+        borderWidth: "1px",
+        backgroundColor: "rgba(248, 250, 252, 0.78)",
+      }
+    : undefined
+
   return (
     <div
       className={cn(
         "h-full w-full overflow-auto flex flex-col relative rounded-card",
         !hideChromeBorder && "border border-border",
-        useCardShell && !appearance.border_color && "bg-card shadow-card",
+        useCardShell && !appearance.border_color && (marketingDashboardStyle ? "bg-background shadow-none" : "bg-card shadow-card"),
         isClickable &&
           "cursor-pointer transition-shadow duration-200 hover:shadow-card-hover"
       )}
-      style={blockStyle}
+      style={{ ...blockStyle, ...marketingCardStyle }}
       onClick={handleClick}
     >
       {useCardShell && (
@@ -263,7 +274,7 @@ export default function KPIBlock({
             <div className={`flex items-center gap-2 mb-3 ${getAlignmentClass().includes('text-center') ? 'justify-center' : getAlignmentClass().includes('text-left') ? 'justify-start' : 'justify-end'}`}>
               <p
                 className={cn(
-                  "text-sm font-medium",
+                  marketingDashboardStyle ? "text-xs font-medium tracking-wide uppercase" : "text-sm font-medium",
                   !textColor && "text-muted-foreground"
                 )}
                 style={textColor ? { color: textColor } : undefined}

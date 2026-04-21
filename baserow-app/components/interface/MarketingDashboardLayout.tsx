@@ -53,7 +53,7 @@ export default function MarketingDashboardLayout({ children }: MarketingDashboar
     <MarketingDashboardProvider>
       <div
         className={cn(
-          "marketing-dashboard-shell flex flex-col min-h-0 min-w-0 w-full gap-6",
+          "marketing-dashboard-shell flex flex-col min-h-0 min-w-0 w-full gap-8",
           "px-4 py-6 md:px-8 md:py-8"
         )}
         data-marketing-dashboard
@@ -104,7 +104,7 @@ export default function MarketingDashboardLayout({ children }: MarketingDashboar
             </span>
           </button>
         )}
-        <div className="flex flex-col min-h-0 min-w-0 w-full gap-8">{children}</div>
+        <div className="flex flex-col min-h-0 min-w-0 w-full gap-10">{children}</div>
       </div>
     </MarketingDashboardProvider>
   )

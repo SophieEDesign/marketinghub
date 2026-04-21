@@ -2043,7 +2043,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
   const renderAnchorControls = () => {
     if (!resolvedDateFieldId || !showDateRangeControls) return null
     return (
-      <div className="mb-4">
+      <div className="mb-3">
         <CalendarAnchorControls
           onScrollToDate={handleScrollToDate}
           disabled={loading}
@@ -2059,7 +2059,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
       {/* Scroll container: overflow-auto for single scroll; flex flex-col + min-h-0 for height propagation to FullCalendar */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 min-h-0 min-w-0 overflow-auto p-2 bg-white flex flex-col"
+        className="flex-1 min-h-0 min-w-0 overflow-auto p-1.5 bg-white flex flex-col"
       >
         {/* Wrapper: min-h-0 allows flex child to receive constrained height; FullCalendar height="100%" fills it */}
         {mounted ? (
@@ -2081,8 +2081,8 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
             moreLinkClick="popover"
             eventDisplay="block"
             eventClassNames={calendarEventClassNames}
-            dayCellClassNames="hover:bg-gray-50 transition-colors min-h-[4rem]"
-            dayHeaderClassNames="text-xs font-medium text-gray-700 py-1"
+            dayCellClassNames="hover:bg-muted/20 transition-colors min-h-[4rem]"
+            dayHeaderClassNames="text-[11px] font-medium text-muted-foreground py-1"
             eventTextColor="#1f2937"
             eventBorderColor="transparent"
             eventBackgroundColor="#f3f4f6"

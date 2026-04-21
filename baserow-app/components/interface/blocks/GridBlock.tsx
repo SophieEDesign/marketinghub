@@ -1339,7 +1339,13 @@ export default function GridBlock({
 
         const headerCompact = isFullPage
         return (
-          <div className={`flex items-center gap-2 flex-shrink-0 border-b border-gray-200/80 bg-white min-h-0 overflow-x-auto min-w-0 ${headerCompact ? "py-1.5 px-3" : "py-2.5 px-4"}`}>
+          <div
+            className={cn(
+              "flex items-center gap-2 flex-shrink-0 min-h-0 overflow-x-auto min-w-0",
+              marketingDashboardStyle ? "border-b border-border/40 bg-muted/10 py-1.5 px-3" : "border-b border-gray-200/80 bg-white",
+              !marketingDashboardStyle && (headerCompact ? "py-1.5 px-3" : "py-2.5 px-4")
+            )}
+          >
             <div className={`flex items-center gap-2 flex-1 min-w-0 flex-wrap ${headerCompact ? "gap-2" : "gap-3"}`}>
               {showQuickFilters && (
                 <QuickFilterBar

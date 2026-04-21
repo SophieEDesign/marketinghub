@@ -262,34 +262,60 @@ async function applyPageBlocksAdditive(pageId, blocks) {
 
 function buildMarketingHomeBlocks(ctx) {
   const themeFields = ctx.fieldsByTable.get(ctx.quarterlyThemes.id) || []
-  const campaignFields = ctx.fieldsByTable.get(ctx.campaigns.id) || []
   const contentFields = ctx.fieldsByTable.get(ctx.content.id) || []
 
   const themeName = pickFieldName(themeFields, [/^name$/i, /theme/i], "name")
   const themeStatus = pickFieldName(themeFields, [/^status$/i, /state/i], null)
   const themeSummary = pickFieldName(themeFields, [/summary/i, /description/i, /brief/i, /notes?/i], null)
+  const themeYear = pickFieldName(themeFields, [/^year$/i, /fiscal_year/i, /planning_year/i], null)
+  const themeDate = pickFieldName(themeFields, [/start_date/i, /date/i, /period_start/i, /from_date/i], null)
   const contentName = pickFieldName(contentFields, [/content_name/i, /^name$/i], "content_name")
   const contentDate = pickFieldName(contentFields, [/^date$/i, /publish_date/i, /due_date/i], "date")
   const contentStatus = pickFieldName(contentFields, [/^status$/i, /state/i], null)
-  const contentCampaign = pickFieldName(contentFields, [/campaigns?/i], null)
+  const contentTheme = pickFieldName(contentFields, [/quarterly_theme/i, /^theme$/i], null)
 
   const blocks = []
+  const now = new Date()
+  const currentYear = now.getFullYear()
+  const yearStart = `${currentYear}-01-01`
+  const yearEnd = `${currentYear}-12-31`
+  const themeCurrentYearFilters = compactFilters(
+    themeFields,
+    themeYear
+      ? [
+          { field: themeName, operator: "is_not_empty", value: "" },
+          { field: themeYear, operator: "is_any_of", value: [String(currentYear), currentYear] },
+        ]
+      : themeDate
+      ? [
+          { field: themeName, operator: "is_not_empty", value: "" },
+          { field: themeDate, operator: "date_range", value: { start: yearStart, end: yearEnd } },
+        ]
+      : [{ field: themeName, operator: "is_not_empty", value: "" }]
+  )
+
   let y = 0
-  blocks.push(section("Marketing Home", "Snapshot: themes, active campaigns, and upcoming content", y, 2))
-  y += 2
+  blocks.push(section("Marketing Home", "Focus areas now, active work in progress, and what is happening next", y, 2))
+  y += 3
   blocks.push({
     type: "kpi",
-    position_x: 0,
+    position_x: 1,
     position_y: y,
-    width: 4,
+    width: 5,
     height: 3,
-    config: { title: "Themes", kpi_label: "Active themes", table_id: ctx.quarterlyThemes.id, kpi_aggregate: "count", filters: [] },
+    config: {
+      title: "Active themes",
+      kpi_label: String(currentYear),
+      table_id: ctx.quarterlyThemes.id,
+      kpi_aggregate: "count",
+      filters: themeCurrentYearFilters,
+    },
   })
   blocks.push({
     type: "kpi",
-    position_x: 4,
+    position_x: 6,
     position_y: y,
-    width: 4,
+    width: 5,
     height: 3,
     config: {
       title: "Content next 30 days",
@@ -298,15 +324,17 @@ function buildMarketingHomeBlocks(ctx) {
       kpi_aggregate: "count",
       filters: compactFilters(contentFields, [
         { field: contentName, operator: "is_not_empty", value: "" },
+        { field: contentDate, operator: "is_not_empty", value: "" },
         { field: contentDate, operator: "date_next_days", value: 30 },
       ]),
     },
   })
+  y += 4
   blocks.push({
     type: "kpi",
-    position_x: 8,
+    position_x: 1,
     position_y: y,
-    width: 4,
+    width: 10,
     height: 3,
     config: {
       title: "In progress",
@@ -316,51 +344,80 @@ function buildMarketingHomeBlocks(ctx) {
       filters: compactFilters(contentFields, [
         ...(contentStatus ? [{ field: contentStatus, operator: "is_any_of", value: ["In Progress", "Draft", "Planned", "Scheduled"] }] : []),
         { field: contentName, operator: "is_not_empty", value: "" },
+        { field: contentDate, operator: "is_not_empty", value: "" },
       ]),
     },
   })
-  y += 3
+  y += 4
 
   const primaryFields = [themeName, themeStatus, themeSummary].filter(Boolean).slice(0, 3)
   blocks.push({
     type: "grid",
-    position_x: 0,
+    position_x: 1,
     position_y: y,
-    width: 12,
+    width: 10,
     height: 8,
     config: {
       title: "Active Themes",
       table_id: ctx.quarterlyThemes.id,
       view_type: "gallery",
-      row_limit: 10,
+      row_limit: 6,
       list_title_field: themeName,
       visible_fields: primaryFields,
       ...(themeStatus ? { pill_fields: [themeStatus] } : {}),
-      filters: compactFilters(themeFields, [{ field: themeName, operator: "is_not_empty", value: "" }]),
+      filters: themeCurrentYearFilters,
       appearance: { showTitle: true, border: "none" },
     },
   })
-  y += 8
+  y += 9
 
-  const supportingFields = [contentName, contentDate].filter(Boolean)
-  if (contentCampaign) supportingFields.push(contentCampaign)
+  const activeWorkFields = [contentName, contentStatus, contentTheme].filter(Boolean)
   blocks.push({
     type: "grid",
-    position_x: 0,
+    position_x: 1,
     position_y: y,
-    width: 12,
+    width: 10,
+    height: 6,
+    config: {
+      title: "What's in progress",
+      table_id: ctx.content.id,
+      view_type: "list",
+      row_limit: 10,
+      list_title_field: contentName,
+      visible_fields: activeWorkFields,
+      ...(contentStatus ? { pill_fields: [contentStatus] } : {}),
+      ...(contentTheme ? { group_by_field: contentTheme } : {}),
+      filters: compactFilters(contentFields, [
+        { field: contentName, operator: "is_not_empty", value: "" },
+        ...(contentStatus ? [{ field: contentStatus, operator: "is_any_of", value: ["In Progress", "Planned", "Scheduled", "Draft"] }] : []),
+        { field: contentDate, operator: "date_next_days", value: 45 },
+      ]),
+      sorts: [{ field: contentDate, direction: "asc" }],
+      appearance: { showTitle: true, border: "none" },
+    },
+  })
+  y += 7
+
+  const supportingFields = [contentName, contentDate, contentStatus].filter(Boolean)
+  if (contentTheme) supportingFields.push(contentTheme)
+  blocks.push({
+    type: "grid",
+    position_x: 1,
+    position_y: y,
+    width: 10,
     height: 6,
     config: {
       title: "Upcoming Content",
       table_id: ctx.content.id,
       view_type: "list",
-      row_limit: 8,
+      row_limit: 6,
       list_title_field: contentName,
       visible_fields: supportingFields,
+      ...(contentStatus ? { pill_fields: [contentStatus] } : {}),
       filters: compactFilters(contentFields, [
         { field: contentName, operator: "is_not_empty", value: "" },
         { field: contentDate, operator: "is_not_empty", value: "" },
-        { field: contentDate, operator: "date_next_days", value: 45 },
+        { field: contentDate, operator: "date_next_days", value: 30 },
       ]),
       sorts: [{ field: contentDate, direction: "asc" }],
       appearance: { showTitle: true, border: "none" },
@@ -372,64 +429,43 @@ function buildMarketingHomeBlocks(ctx) {
 
 function buildThemeWorkspaceBlocks(ctx) {
   const themeFields = ctx.fieldsByTable.get(ctx.quarterlyThemes.id) || []
-  const matrixFields = ctx.matrix ? ctx.fieldsByTable.get(ctx.matrix.id) || [] : []
   const contentFields = ctx.fieldsByTable.get(ctx.content.id) || []
 
   const themeName = pickFieldName(themeFields, [/^name$/i, /theme/i], "name")
   const themeStatus = pickFieldName(themeFields, [/^status$/i, /state/i], null)
   const themeSummary = pickFieldName(themeFields, [/summary/i, /description/i, /brief/i, /notes?/i], null)
-  const matrixTheme = pickFieldName(matrixFields, [/quarterly_theme/i, /^theme$/i], "quarterly_themes")
-  const matrixDivision = pickFieldName(matrixFields, [/division/i], "division")
-  const matrixMessage = pickFieldName(matrixFields, [/key_message/i, /notes?/i, /seasonal/i], null)
-  const contentName = pickFieldName(contentFields, [/content_name/i, /^name$/i], "content_name")
+  const themeYear = pickFieldName(themeFields, [/^year$/i, /fiscal_year/i, /planning_year/i], null)
+  const themeDate = pickFieldName(themeFields, [/start_date/i, /date/i, /period_start/i, /from_date/i], null)
+  const contentName = pickFieldName(contentFields, [/content_name/i, /^name$/i, /title/i, /headline/i], null)
   const contentStatus = pickFieldName(contentFields, [/^status$/i, /state/i], null)
-  const contentDate = pickFieldName(contentFields, [/^date$/i, /publish_date/i], "date")
+  const contentDate = pickFieldName(contentFields, [/^date$/i, /publish_date/i, /due_date/i], null)
   const contentTheme = pickFieldName(contentFields, [/quarterly_theme/i, /^theme$/i], null)
+  const fallbackContentTitle = (contentFields || []).find((f) => f?.name && !/^id$/i.test(f.name) && !/_id$/i.test(f.name))?.name || null
+  const contentDisplayField = contentName || fallbackContentTitle || "content_name"
 
   const blocks = []
+  const now = new Date()
+  const currentYear = now.getFullYear()
+  const yearStart = `${currentYear}-01-01`
+  const yearEnd = `${currentYear}-12-31`
+  const themeCurrentYearFilters = compactFilters(
+    themeFields,
+    themeYear
+      ? [
+          { field: themeName, operator: "is_not_empty", value: "" },
+          { field: themeYear, operator: "is_any_of", value: [String(currentYear), currentYear] },
+        ]
+      : themeDate
+      ? [
+          { field: themeName, operator: "is_not_empty", value: "" },
+          { field: themeDate, operator: "date_range", value: { start: yearStart, end: yearEnd } },
+        ]
+      : [{ field: themeName, operator: "is_not_empty", value: "" }]
+  )
+
   let y = 0
-  blocks.push(section("Theme Workspace", "Planning brain: themes, division alignment, and linked execution", y, 2))
+  blocks.push(section("Theme Workspace", "Planning view: current themes first, then the content flowing under each theme", y, 2))
   y += 2
-  blocks.push({
-    type: "kpi",
-    position_x: 0,
-    position_y: y,
-    width: 4,
-    height: 3,
-    config: { title: "Themes", kpi_label: "Total", table_id: ctx.quarterlyThemes.id, kpi_aggregate: "count", filters: [] },
-  })
-  blocks.push({
-    type: "kpi",
-    position_x: 4,
-    position_y: y,
-    width: 4,
-    height: 3,
-    config: {
-      title: "Theme-linked content",
-      kpi_label: "Linked",
-      table_id: ctx.content.id,
-      kpi_aggregate: "count",
-      filters: compactFilters(contentFields, contentTheme ? [{ field: contentTheme, operator: "is_not_empty", value: "" }] : []),
-    },
-  })
-  blocks.push({
-    type: "kpi",
-    position_x: 8,
-    position_y: y,
-    width: 4,
-    height: 3,
-    config: {
-      title: "Upcoming theme content",
-      kpi_label: "Next 45d",
-      table_id: ctx.content.id,
-      kpi_aggregate: "count",
-      filters: compactFilters(contentFields, [
-        ...(contentTheme ? [{ field: contentTheme, operator: "is_not_empty", value: "" }] : []),
-        { field: contentDate, operator: "date_next_days", value: 45 },
-      ]),
-    },
-  })
-  y += 3
 
   const themeVisible = [themeName, themeStatus, themeSummary].filter(Boolean).slice(0, 3)
   blocks.push({
@@ -437,68 +473,89 @@ function buildThemeWorkspaceBlocks(ctx) {
     position_x: 0,
     position_y: y,
     width: 12,
-    height: 8,
+    height: 7,
     config: {
-      title: "Themes",
+      title: `Quarterly Themes (${currentYear})`,
       table_id: ctx.quarterlyThemes.id,
-      view_type: "list",
-      row_limit: 14,
+      view_type: "gallery",
+      row_limit: 6,
       list_title_field: themeName,
       visible_fields: themeVisible,
       ...(themeStatus ? { pill_fields: [themeStatus] } : {}),
-      filters: compactFilters(themeFields, [{ field: themeName, operator: "is_not_empty", value: "" }]),
+      filters: themeCurrentYearFilters,
       appearance: { showTitle: true, border: "none" },
     },
   })
   y += 8
 
-  const contentVisible = [contentName, contentStatus, contentDate, contentTheme].filter(Boolean)
+  const contentVisible = [contentDisplayField, contentStatus, contentDate, contentTheme].filter(Boolean)
   blocks.push({
     type: "grid",
     position_x: 0,
     position_y: y,
     width: 12,
-    height: 6,
+    height: 8,
     config: {
-      title: "Theme Content Pipeline",
+      title: "Content by Theme",
       table_id: ctx.content.id,
       view_type: "list",
-      row_limit: 10,
-      list_title_field: contentName,
+      row_limit: 8,
+      list_title_field: contentDisplayField,
       visible_fields: contentVisible,
       ...(contentStatus ? { pill_fields: [contentStatus] } : {}),
       ...(contentTheme ? { group_by_field: contentTheme } : {}),
       filters: compactFilters(contentFields, [
-        { field: contentName, operator: "is_not_empty", value: "" },
-        { field: contentDate, operator: "is_not_empty", value: "" },
-        { field: contentDate, operator: "date_next_days", value: 60 },
+        { field: contentDisplayField, operator: "is_not_empty", value: "" },
+        ...(contentTheme ? [{ field: contentTheme, operator: "is_not_empty", value: "" }] : []),
+        ...(contentDate
+          ? [{ field: contentDate, operator: "date_next_days", value: 60 }]
+          : contentStatus
+          ? [{ field: contentStatus, operator: "is_any_of", value: ["In Progress", "Planned", "Scheduled", "Active", "Draft"] }]
+          : []),
       ]),
-      sorts: [{ field: contentDate, direction: "asc" }],
+      ...(contentDate ? { sorts: [{ field: contentDate, direction: "asc" }] } : {}),
       appearance: { showTitle: true, border: "none" },
     },
   })
-  y += 6
+  y += 9
 
-  if (ctx.matrix) {
-    const matrixVisible = [matrixTheme, matrixDivision, matrixMessage].filter(Boolean).slice(0, 3)
-    blocks.push({
-      type: "grid",
-      position_x: 0,
-      position_y: y,
-      width: 12,
-      height: 4,
-      config: {
-        title: "Theme-Division Reference",
-        table_id: ctx.matrix.id,
-        view_type: "list",
-        row_limit: 8,
-        list_title_field: matrixTheme || matrixDivision || "id",
-        visible_fields: matrixVisible,
-        ...(matrixTheme ? { group_by_field: matrixTheme } : {}),
-        appearance: { showTitle: true, border: "none" },
-      },
-    })
-  }
+  blocks.push(section("Planning Snapshot", "Quick indicators for volume and upcoming work under current themes", y, 2))
+  y += 2
+  blocks.push({
+    type: "kpi",
+    position_x: 0,
+    position_y: y,
+    width: 6,
+    height: 3,
+    config: {
+      title: "Content items per theme",
+      kpi_label: "Theme-linked",
+      table_id: ctx.content.id,
+      kpi_aggregate: "count",
+      filters: compactFilters(contentFields, [
+        { field: contentDisplayField, operator: "is_not_empty", value: "" },
+        ...(contentTheme ? [{ field: contentTheme, operator: "is_not_empty", value: "" }] : []),
+      ]),
+    },
+  })
+  blocks.push({
+    type: "kpi",
+    position_x: 6,
+    position_y: y,
+    width: 6,
+    height: 3,
+    config: {
+      title: "Upcoming content",
+      kpi_label: "Next 60d",
+      table_id: ctx.content.id,
+      kpi_aggregate: "count",
+      filters: compactFilters(contentFields, [
+        { field: contentDisplayField, operator: "is_not_empty", value: "" },
+        ...(contentTheme ? [{ field: contentTheme, operator: "is_not_empty", value: "" }] : []),
+        ...(contentDate ? [{ field: contentDate, operator: "date_next_days", value: 60 }] : []),
+      ]),
+    },
+  })
 
   return blocks
 }
@@ -620,12 +677,33 @@ function buildContentPlanningBlocks(ctx) {
   const contentName = pickFieldName(contentFields, [/content_name/i, /^name$/i], "content_name")
   const contentDate = pickFieldName(contentFields, [/^date$/i, /publish_date/i], "date")
   const contentStatus = pickFieldName(contentFields, [/^status$/i], "status")
-  const contentCampaign = pickFieldName(contentFields, [/campaigns?/i], null)
+  const contentPriority = pickFieldName(contentFields, [/^priority$/i, /priority/i, /urgency/i, /importance/i], null)
   const contentTheme = pickFieldName(contentFields, [/quarterly_theme/i, /^theme$/i], null)
+  const queueStatuses = [
+    "To do",
+    "Todo",
+    "In Progress",
+    "In progress",
+    "Draft",
+    "Planned",
+    "Scheduled",
+    "Sent for Approval",
+    "Waiting for approval",
+    "Awaiting approval",
+  ]
+  const todoStatuses = ["To do", "Todo"]
+  const inProgressStatuses = ["In Progress", "In progress", "Draft", "Planned", "Scheduled"]
+  const awaitingApprovalStatuses = ["Sent for Approval", "Waiting for approval", "Awaiting approval"]
+  const queueFilters = compactFilters(contentFields, [
+    { field: contentName, operator: "is_not_empty", value: "" },
+    ...(contentDate ? [{ field: contentDate, operator: "is_not_empty", value: "" }] : []),
+    ...(contentStatus ? [{ field: contentStatus, operator: "is_any_of", value: queueStatuses }] : []),
+    ...(contentDate ? [{ field: contentDate, operator: "date_next_days", value: 42 }] : []),
+  ])
 
   const blocks = []
   let y = 0
-  blocks.push(section("Content Planning", "Production surface: upcoming, scheduled, and recently delivered content", y, 2))
+  blocks.push(section("Content Planning", "Daily workflow: what to ship next, what is moving, and what is blocked on approval", y, 2))
   y += 2
   blocks.push({
     type: "kpi",
@@ -634,13 +712,14 @@ function buildContentPlanningBlocks(ctx) {
     width: 4,
     height: 3,
     config: {
-      title: "Upcoming (14d)",
-      kpi_label: "Scheduled soon",
+      title: "To do",
+      kpi_label: "Planned queue",
       table_id: ctx.content.id,
       kpi_aggregate: "count",
       filters: compactFilters(contentFields, [
         { field: contentName, operator: "is_not_empty", value: "" },
-        { field: contentDate, operator: "date_next_days", value: 14 },
+        ...(contentDate ? [{ field: contentDate, operator: "is_not_empty", value: "" }] : []),
+        ...(contentStatus ? [{ field: contentStatus, operator: "is_any_of", value: todoStatuses }] : []),
       ]),
     },
   })
@@ -652,13 +731,16 @@ function buildContentPlanningBlocks(ctx) {
     height: 3,
     config: {
       title: "In progress",
-      kpi_label: "Execution",
+      kpi_label: "Active queue",
       table_id: ctx.content.id,
       kpi_aggregate: "count",
       filters: compactFilters(
         contentFields,
         contentStatus
-          ? [{ field: contentStatus, operator: "is_any_of", value: ["In Progress", "Draft", "Planned", "Scheduled"] }]
+          ? [
+              { field: contentName, operator: "is_not_empty", value: "" },
+              { field: contentStatus, operator: "is_any_of", value: inProgressStatuses },
+            ]
           : [{ field: contentName, operator: "is_not_empty", value: "" }]
       ),
     },
@@ -670,61 +752,71 @@ function buildContentPlanningBlocks(ctx) {
     width: 4,
     height: 3,
     config: {
-      title: "Ready with date",
-      kpi_label: "Scheduled",
+      title: "Awaiting approval",
+      kpi_label: "Needs decision",
       table_id: ctx.content.id,
       kpi_aggregate: "count",
-      filters: compactFilters(contentFields, [
-        { field: contentName, operator: "is_not_empty", value: "" },
-        { field: contentDate, operator: "is_not_empty", value: "" },
-      ]),
+      filters: compactFilters(
+        contentFields,
+        contentStatus
+          ? [
+              { field: contentName, operator: "is_not_empty", value: "" },
+              { field: contentStatus, operator: "is_any_of", value: awaitingApprovalStatuses },
+            ]
+          : [{ field: contentName, operator: "is_not_empty", value: "" }]
+      ),
     },
   })
-  y += 3
+  y += 4
 
-  const primaryFields = [contentName, contentStatus, contentDate].filter(Boolean)
-  if (contentCampaign) primaryFields.push(contentCampaign)
+  const primaryFields = [contentName, contentDate, contentTheme].filter(Boolean)
   blocks.push({
     type: "grid",
     position_x: 0,
     position_y: y,
     width: 12,
-    height: 8,
+    height: 10,
     config: {
       title: "Content Queue",
       table_id: ctx.content.id,
       view_type: "list",
-      row_limit: 16,
+      row_limit: 6,
       list_title_field: contentName,
-      visible_fields: [contentName, contentStatus, contentDate, contentTheme].filter(Boolean),
+      visible_fields: primaryFields,
       pill_fields: contentStatus ? [contentStatus] : [],
       ...(contentStatus ? { group_by_field: contentStatus } : {}),
-      filters: compactFilters(contentFields, [
-        { field: contentName, operator: "is_not_empty", value: "" },
-        { field: contentDate, operator: "is_not_empty", value: "" },
-        { field: contentDate, operator: "date_next_days", value: 90 },
-      ]),
-      sorts: [{ field: contentDate, direction: "asc" }],
-      appearance: { showTitle: true, border: "none" },
+      filters: queueFilters,
+      list_meta_fields: [contentDate, contentTheme].filter(Boolean),
+      list_subtitle_fields: [],
+      sorts: [
+        ...(contentDate ? [{ field: contentDate, direction: "asc" }] : []),
+        ...(contentStatus ? [{ field: contentStatus, direction: "asc" }] : []),
+      ],
+      appearance: { showTitle: true, border: "none", compact: true },
     },
   })
-  y += 8
+  y += 12
 
   blocks.push({
     type: "grid",
     position_x: 0,
     position_y: y,
     width: 12,
-    height: 7,
+    height: 6,
     config: {
       title: "Planning Calendar",
       table_id: ctx.content.id,
       view_type: "calendar",
       calendar_date_field: contentDate,
-      default_date_range_preset: "thisMonth",
-      visible_fields: [contentName, contentStatus, contentDate].filter(Boolean),
-      filters: compactFilters(contentFields, [{ field: contentName, operator: "is_not_empty", value: "" }]),
-      appearance: { showTitle: true, border: "none" },
+      default_date_range_preset: "thisWeek",
+      visible_week_span: 6,
+      visible_fields: [contentName, contentDate, contentTheme].filter(Boolean),
+      filters: queueFilters,
+      sorts: [
+        ...(contentDate ? [{ field: contentDate, direction: "asc" }] : []),
+        ...(contentStatus ? [{ field: contentStatus, direction: "asc" }] : []),
+      ],
+      appearance: { showTitle: true, border: "none", compact: true, event_density: "compact" },
     },
   })
 

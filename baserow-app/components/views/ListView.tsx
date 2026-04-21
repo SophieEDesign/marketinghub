@@ -686,6 +686,13 @@ export default function ListView({
     return SEMANTIC_COLORS[Math.abs(hash) % SEMANTIC_COLORS.length]
   }, [])
 
+  const normalizePlannerGroupLabel = useCallback((label: string) => {
+    const trimmed = String(label || "").trim().toLowerCase()
+    if (trimmed === "todo") return "To do"
+    if (trimmed === "sent for approval") return "Awaiting approval"
+    return label
+  }, [])
+
   // Status-based row color from colorField (single-select choice colors)
   const getRowColor = useCallback((row: Record<string, any>): string | null => {
     if (!colorField || typeof colorField !== 'string') return null
@@ -873,22 +880,25 @@ export default function ListView({
         key={recordId}
         onClick={() => setSelectedRecordId(String(recordId))}
         onDoubleClick={() => handleOpenRecord(String(recordId))}
-        className={`border-b border-gray-200 last:border-b-0 cursor-pointer transition-colors ${
+        className={`border-b ${marketingDashboardStyle ? "border-border/30" : "border-gray-200"} last:border-b-0 cursor-pointer transition-colors ${
           selectedRecordId === String(recordId)
-            ? 'bg-blue-50'
-            : 'hover:bg-gray-50'
+            ? (marketingDashboardStyle ? "bg-muted/40" : "bg-blue-50")
+            : (marketingDashboardStyle ? "hover:bg-muted/20" : "hover:bg-gray-50")
         }`}
         style={{ ...borderColor, ...rowFormattingStyle }}
       >
         {tableColumns.map((col) => (
           <td
             key={col.key}
-            className="px-3 py-2 text-sm text-gray-900 align-top"
+            className={cn(
+              "px-3 text-sm text-gray-900 align-top",
+              marketingDashboardStyle ? "py-3" : "py-2"
+            )}
           >
             {renderCellValue(col)}
           </td>
         ))}
-        <td className="px-3 py-2 text-right align-top w-12">
+        <td className={cn("px-3 text-right align-top w-12", marketingDashboardStyle ? "py-3" : "py-2")}>
           <button
             type="button"
             onClick={(e) => {
@@ -982,19 +992,21 @@ export default function ListView({
             )}
           >
             <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  {tableColumns.map((col) => (
-                    <th
-                      key={col.key}
-                      className="px-3 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider"
-                    >
-                      {getFieldDisplayName(col.field)}
-                    </th>
-                  ))}
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-600 uppercase tracking-wider w-12" />
-                </tr>
-              </thead>
+              {!marketingDashboardStyle && (
+                <thead>
+                  <tr className="border-b border-gray-200 bg-gray-50">
+                    {tableColumns.map((col) => (
+                      <th
+                        key={col.key}
+                        className="px-3 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider"
+                      >
+                        {getFieldDisplayName(col.field)}
+                      </th>
+                    ))}
+                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-600 uppercase tracking-wider w-12" />
+                  </tr>
+                </thead>
+              )}
               <tbody>
                 {flattenedGroups.map((it, idx) => {
                   if (it.type === 'group') {
@@ -1009,6 +1021,7 @@ export default function ListView({
                           ? 'Year'
                           : 'Month'
                         : (groupFieldForLabel ? getFieldDisplayName(groupFieldForLabel) : node.rule.field)
+                    const normalizedLabel = normalizePlannerGroupLabel(node.label)
 
                     let groupColor: string | null = null
                     if (node.rule.type === 'field') {
@@ -1039,16 +1052,18 @@ export default function ListView({
                     const groupFormattingStyle = groupMatchingRule
                       ? getFormattingStyle(groupMatchingRule)
                       : {}
-                    const finalHeaderBgColor = groupFormattingStyle.backgroundColor || (groupColor ? `${groupColor}80` : 'rgb(249, 250, 251)')
+                    const finalHeaderBgColor = marketingDashboardStyle
+                      ? "transparent"
+                      : (groupFormattingStyle.backgroundColor || (groupColor ? `${groupColor}80` : 'rgb(249, 250, 251)'))
                     const finalHeaderTextColor = groupFormattingStyle.color || (groupColor ? undefined : undefined)
                     const textColorClass = finalHeaderTextColor ? '' : (groupColor ? getTextColorForBackground(groupColor) : 'text-gray-900')
                     const textColorStyle = finalHeaderTextColor ? { color: finalHeaderTextColor } : {}
 
                     return (
-                      <tr key={node.pathKey} className="border-b border-gray-200">
+                      <tr key={node.pathKey} className={cn("border-b", marketingDashboardStyle ? "border-border/20" : "border-gray-200")}>
                         <td
                           colSpan={tableColumns.length + 1}
-                          className="px-3 py-2"
+                          className={cn("px-3", marketingDashboardStyle ? "py-4" : "py-2")}
                           style={{ backgroundColor: finalHeaderBgColor, ...textColorStyle }}
                         >
                           <div className="flex items-center justify-between gap-2">
@@ -1070,14 +1085,17 @@ export default function ListView({
                                 <ChevronDown className="h-4 w-4 flex-shrink-0" style={{ opacity: 0.7 }} />
                               )}
                               <span
-                                className="inline-flex items-center px-2 py-0.5 rounded-full text-sm font-medium truncate"
+                                className={cn(
+                                  "inline-flex items-center truncate",
+                                  marketingDashboardStyle ? "text-base font-medium" : "px-2 py-0.5 rounded-full text-sm font-medium"
+                                )}
                                 style={{
-                                  backgroundColor: groupColor ? `${groupColor}CC` : undefined,
-                                  border: groupColor ? `1px solid ${groupColor}FF` : undefined,
+                                  backgroundColor: marketingDashboardStyle ? "transparent" : (groupColor ? `${groupColor}CC` : undefined),
+                                  border: marketingDashboardStyle ? undefined : (groupColor ? `1px solid ${groupColor}FF` : undefined),
                                   ...textColorStyle,
                                 }}
                               >
-                                {ruleLabel}: {node.label}
+                                {marketingDashboardStyle ? normalizedLabel : `${ruleLabel}: ${normalizedLabel}`}
                               </span>
                               <span className="text-sm flex-shrink-0" style={{ opacity: 0.8 }}>{node.size}</span>
                             </button>
