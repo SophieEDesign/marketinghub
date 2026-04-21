@@ -358,6 +358,7 @@ export default function FilterBlock({
 
   const title = appearance.title || config.title || "Filters"
   const showTitle = appearance.show_title !== false && title
+  const compactYearMode = config?.compact_year === true
 
   // Count conditions in filter tree
   const conditionCount = useMemo(() => {
@@ -425,6 +426,29 @@ export default function FilterBlock({
   const isEmpty = isEmptyFilterTree(filterTree)
   const hasDefaults = defaultFilterTree !== null && !isEmptyFilterTree(defaultFilterTree as FilterTree)
   const isAtDefaults = JSON.stringify(filterTree) === JSON.stringify(defaultFilterTree)
+
+  if (compactYearMode && !isEditing) {
+    const dateRangeCondition = emittedFilters.find((f) => f.operator === "date_range")
+    const rangeLabel =
+      dateRangeCondition?.value && typeof dateRangeCondition.value === "string" && dateRangeCondition.value2
+        ? `${dateRangeCondition.value} to ${String((dateRangeCondition as any).value2)}`
+        : conditionCount > 0
+        ? "Filtered"
+        : "All years"
+    return (
+      <div className="h-full w-full overflow-hidden rounded-lg border border-border/60 bg-card p-3 shadow-sm">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm font-semibold text-foreground">{title}</p>
+          {conditionCount > 0 && (
+            <Badge variant="secondary" className="text-[10px]">
+              Filtered
+            </Badge>
+          )}
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground truncate">{rangeLabel}</p>
+      </div>
+    )
+  }
 
   return (
     <div className="h-full w-full overflow-hidden flex flex-col rounded-lg border border-gray-200 min-w-0" style={blockStyle}>

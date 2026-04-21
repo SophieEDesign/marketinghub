@@ -323,6 +323,7 @@ function buildMarketingHomeBlocks(ctx) {
       table_id: ctx.content.id,
       target_blocks: "all",
       allowed_fields: contentDate ? [contentDate] : [],
+      compact_year: true,
       // Default to current year; users can change from the filter block UI.
       filter_tree: contentDate
         ? {
