@@ -950,14 +950,14 @@ export default function MultiCalendarView({
         </Panel>
       )}
 
-      <div ref={containerRef} className="flex-1 min-h-0 min-w-0 w-full max-w-full overflow-x-hidden">
+      <div ref={containerRef} className="flex-1 min-h-0 min-w-0 w-full max-w-full overflow-x-hidden overflow-y-visible">
         {/* CRITICAL: FullCalendar only renders after mount (guarded by outer mounted check) */}
         {/* FullCalendar generates dynamic DOM IDs that differ between server and client */}
         <FullCalendar
           ref={fullCalendarRef}
           plugins={calendarPlugins}
           initialView="dayGridMonth"
-          height="100%"
+          height="auto"
           events={events}
           editable={!isViewOnly && !isEditing}
           eventDrop={handleEventDrop}

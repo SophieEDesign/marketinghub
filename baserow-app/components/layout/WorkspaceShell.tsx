@@ -222,7 +222,7 @@ function ShellContent({
               isAdmin={userRole === "admin"}
             />
           )}
-          <main className="flex flex-col flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden">
+          <main className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
             {children}
           </main>
         </div>

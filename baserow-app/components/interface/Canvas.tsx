@@ -1922,7 +1922,7 @@ export default function Canvas({
       {/* flex-1 flex flex-col min-h-0: fill parent flex; min-h-0 prevents flex collapse; flex flex-col for block list. */}
       <div
         ref={containerRef}
-        className={`flex-1 flex flex-col w-full max-w-full min-w-0 relative ${isFullPageMode ? "overflow-hidden min-h-[100vh]" : "min-h-0"}`}
+        className={`flex flex-col w-full max-w-full min-w-0 relative ${isFullPageMode ? "flex-1 overflow-hidden min-h-[100vh]" : "min-h-0"}`}
         style={
           isFullPageMode
             ? undefined
@@ -1940,7 +1940,7 @@ export default function Canvas({
         }}
       >
         {/* CRITICAL: ResponsiveGridLayout is ALWAYS rendered - no conditional wrapping or early return */}
-        <div className="flex-1 flex flex-col min-h-0 min-w-0">
+        <div className={`${isFullPageMode ? "flex-1" : ""} flex flex-col min-h-0 min-w-0`}>
         {/* Drag ghost/preview */}
         {isEditing && dragGhost && containerRef.current && (
           <CanvasDragGhostOverlay

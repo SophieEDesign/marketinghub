@@ -196,6 +196,10 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
   // DEBUG_CALENDAR: Enable via localStorage.DEBUG_CALENDAR=1
   // CRITICAL: Use useState to prevent hydration mismatch - localStorage access must happen after mount
   const [calendarDebugEnabled, setCalendarDebugEnabled] = useState(false)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const fullCalendarRef = useRef<{ getApi?: () => { updateSize: () => void } } | null>(null)
+  const hasScrolledToInitialRef = useRef(false)
+  const [containerWidth, setContainerWidth] = useState(0)
   
   // Lifecycle logging
   useEffect(() => {
@@ -260,10 +264,6 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
   const prevDateToTimeRef = useRef<number | null>(null)
   const prevDateFromKeyRef = useRef<string>("")
   const prevDateToKeyRef = useRef<string>("")
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const fullCalendarRef = useRef<{ getApi?: () => { updateSize: () => void } } | null>(null)
-  const hasScrolledToInitialRef = useRef(false)
-  const [containerWidth, setContainerWidth] = useState(0)
 
   const areLinkedValueMapsEqual = useCallback(
     (a: Record<string, Record<string, string>>, b: Record<string, Record<string, string>>): boolean => {
@@ -2081,11 +2081,11 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
       {/* Scroll container: overflow-auto for single scroll; flex flex-col + min-h-0 for height propagation to FullCalendar */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 min-h-0 min-w-0 max-w-full overflow-x-hidden overflow-y-auto p-2 md:p-3 bg-background flex flex-col"
+        className="calendar-embed flex-1 min-h-0 min-w-0 max-w-full overflow-x-hidden overflow-y-visible p-0 bg-background flex flex-col"
       >
         {/* Wrapper: min-h-0 allows flex child to receive constrained height; FullCalendar height="100%" fills it */}
         {mounted ? (
-          <div className="flex-1 min-h-0 min-w-0 w-full max-w-full">
+          <div className="flex-1 min-h-0 min-w-0 w-full max-w-full px-3 pb-3 md:px-4 md:pb-4">
           <MemoizedFullCalendar
             ref={fullCalendarRef as React.LegacyRef<React.ComponentRef<typeof FullCalendar>>}
             key={calendarStableKey}
@@ -2097,7 +2097,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
             initialView={calendarInitialView}
             initialDate={calendarInitialDate}
             views={calendarViews}
-            height="100%"
+            height="auto"
             expandRows={true}
             dayMaxEvents={2}
             moreLinkClick="popover"

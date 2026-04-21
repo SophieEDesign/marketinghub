@@ -58,7 +58,7 @@ export default function MarketingDashboardLayout({ children }: MarketingDashboar
         )}
         data-marketing-dashboard
       >
-        <div className="mx-auto flex w-full max-w-screen-2xl min-h-0 min-w-0 flex-col gap-7 md:gap-8 lg:gap-9">
+        <div className="mx-auto flex w-full max-w-none min-h-0 min-w-0 flex-col gap-7 md:gap-8 lg:gap-9">
         {!bannerDismissed ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border/45 bg-background/90 px-3.5 py-2.5 text-sm text-muted-foreground shadow-card sm:flex-nowrap">
             <div className="flex items-center gap-2 min-w-0">

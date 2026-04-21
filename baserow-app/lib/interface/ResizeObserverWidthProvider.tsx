@@ -41,10 +41,15 @@ export default function withResizeObserverWidthProvider<P extends { width?: numb
       if (node.parentElement) {
         ro.observe(node.parentElement)
       }
+      if (node.parentElement?.parentElement) {
+        ro.observe(node.parentElement.parentElement)
+      }
       window.addEventListener("resize", updateWidth)
+      const rafId = requestAnimationFrame(updateWidth)
 
       return () => {
         window.removeEventListener("resize", updateWidth)
+        cancelAnimationFrame(rafId)
         ro.disconnect()
       }
     }, [])
