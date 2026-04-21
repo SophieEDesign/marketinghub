@@ -452,7 +452,7 @@ export default function SettingsPanel({
         </TabsList>
 
         {/* Content - pointer-events-none when readOnly to disable all controls */}
-        <div className={`flex-1 overflow-y-auto p-4 space-y-6 ${readOnly ? 'pointer-events-none' : ''}`}>
+        <div className={`flex-1 ${embedded ? "overflow-visible" : "overflow-y-auto"} p-4 space-y-6 ${readOnly ? 'pointer-events-none' : ''}`}>
           {/* Validation Errors */}
           {validationErrors.length > 0 && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
@@ -573,7 +573,7 @@ export default function SettingsPanel({
   )
 
   return embedded ? (
-    <div className="p-4">{panelContent}</div>
+    <div className="min-h-0">{panelContent}</div>
   ) : (
     <>
       {/* Backdrop: click outside to close. Exclude sidebar (md:left-64) so navigation stays clickable. */}

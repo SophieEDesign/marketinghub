@@ -474,7 +474,7 @@ export default function RecordLayoutSettings({
 
       {/* Fields - for record_context (right panel): ModalFieldsSelector style. For modal: Airtable-style visible/hidden. */}
       {hasPageConfig ? (
-        <div className="flex-1 overflow-y-auto min-h-0 p-4">
+        <div className="flex-1 overflow-visible min-h-0 p-4">
           <ModalFieldsSelector
             value={
               visibleItems.length === 0 || visibleItems.length >= fields.filter((f) => !f.options?.system).length
@@ -565,7 +565,7 @@ export default function RecordLayoutSettings({
             )}
           </div>
           {fieldsExpanded && (
-            <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4">
+            <div className="flex-1 overflow-visible min-h-0 p-4 space-y-4">
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={draftLayout.map((i) => i.field_id)} strategy={verticalListSortingStrategy}>
                   <div>

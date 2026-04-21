@@ -221,6 +221,8 @@ export default function MultiCalendarView({
   const [createDate, setCreateDate] = useState<Date | undefined>(undefined)
 
   const loadingRef = useRef(false)
+  const fullCalendarRef = useRef<FullCalendar | null>(null)
+  const containerRef = useRef<HTMLDivElement | null>(null)
 
   // Lifecycle: Mark as mounted to prevent hydration mismatch with FullCalendar
   useEffect(() => {
@@ -233,6 +235,19 @@ export default function MultiCalendarView({
       setMounted(false)
     }
   }, [createDate])
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el || !mounted) return
+    const ro = new ResizeObserver(() => {
+      const api = fullCalendarRef.current?.getApi?.()
+      if (api?.updateSize) {
+        requestAnimationFrame(() => api.updateSize())
+      }
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [mounted])
 
   const effectiveEnabledSources = useMemo(() => {
     const enabledSet = new Set(enabledSourceIds)
@@ -912,10 +927,11 @@ export default function MultiCalendarView({
         </div>
       )}
 
-      <div className="flex-1 min-h-0">
+      <div ref={containerRef} className="flex-1 min-h-0">
         {/* CRITICAL: FullCalendar only renders after mount (guarded by outer mounted check) */}
         {/* FullCalendar generates dynamic DOM IDs that differ between server and client */}
         <FullCalendar
+          ref={fullCalendarRef}
           plugins={calendarPlugins}
           initialView="dayGridMonth"
           height="100%"

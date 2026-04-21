@@ -138,7 +138,7 @@ export default function FieldBlockSettings({
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="data" className="flex-1 overflow-y-auto p-4 space-y-6 mt-0">
+        <TabsContent value="data" className="flex-1 overflow-visible p-4 space-y-6 mt-0">
           {/* Source */}
           <div className="space-y-2">
             <Label className="text-sm font-medium text-gray-700">Source</Label>
@@ -235,7 +235,7 @@ export default function FieldBlockSettings({
           </div>
         </TabsContent>
 
-        <TabsContent value="appearance" className="flex-1 overflow-y-auto p-4 mt-0 space-y-6">
+        <TabsContent value="appearance" className="flex-1 overflow-visible p-4 mt-0 space-y-6">
           {/* Size */}
           <div className="space-y-2">
             <Label className="text-sm font-medium text-gray-700">Size</Label>

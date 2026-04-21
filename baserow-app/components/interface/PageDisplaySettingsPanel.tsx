@@ -589,7 +589,7 @@ export default function PageDisplaySettingsPanel({
           </div>
     )
     return embedded ? (
-      <div className="p-4 overflow-y-auto">
+      <div className="p-4">
         <div className="mb-4">
           <h2 className="text-lg font-semibold">Page Settings</h2>
           <p className="text-sm text-muted-foreground">Configure settings for this content page</p>
@@ -664,7 +664,7 @@ export default function PageDisplaySettingsPanel({
           </div>
     )
     return embedded ? (
-      <div className="p-4 overflow-y-auto">
+      <div className="p-4">
         <div className="mb-4">
           <h2 className="text-lg font-semibold">Record View Settings</h2>
           <p className="text-sm text-muted-foreground">Configure page-level settings for this Record View.</p>
@@ -1301,7 +1301,7 @@ export default function PageDisplaySettingsPanel({
         </>
   )
   return embedded ? (
-    <div className="p-4 overflow-y-auto">
+    <div className="p-4">
       <div className="mb-4">
         <h2 className="text-lg font-semibold">Page Display Settings</h2>
         <p className="text-sm text-muted-foreground">Configure data source, filters, sorting, and display options for this page</p>

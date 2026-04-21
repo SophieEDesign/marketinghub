@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button"
 import { Menu } from "lucide-react"
 import OnboardingTour from "./OnboardingTour"
 import type { Table, View } from "@/types/database"
+import { SHELL_RIGHT_SETTINGS_WIDTH_PX } from "@/lib/interface/layout-constants"
 
 interface InterfacePage {
   id: string
@@ -226,7 +227,14 @@ function ShellContent({
         {!hideRecordPanel && <RecordPanel />}
         {/* RightSettingsPanel: conditional mount, edit mode only, flex sibling. flex flex-col min-h-0 for scroll. */}
         {isPanelVisible && (
-          <div className="flex flex-col min-h-0 flex-shrink-0 w-[360px] overflow-hidden">
+          <div
+            className="flex flex-col min-h-0 flex-shrink-0 overflow-hidden"
+            style={{
+              width: `${SHELL_RIGHT_SETTINGS_WIDTH_PX}px`,
+              minWidth: `${SHELL_RIGHT_SETTINGS_WIDTH_PX}px`,
+              maxWidth: `${SHELL_RIGHT_SETTINGS_WIDTH_PX}px`,
+            }}
+          >
             <RightSettingsPanel />
           </div>
         )}

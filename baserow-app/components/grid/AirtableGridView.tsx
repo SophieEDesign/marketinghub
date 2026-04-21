@@ -247,6 +247,7 @@ export default function AirtableGridView({
   const [scrollLeft, setScrollLeft] = useState(0)
   const [scrollTop, setScrollTop] = useState(0)
   const [containerHeight, setContainerHeight] = useState(600)
+  const [containerWidth, setContainerWidth] = useState(0)
   const [sorts, setSorts] = useState<Array<{ field: string; direction: 'asc' | 'desc' }>>([])
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [groupValueLabelMaps, setGroupValueLabelMaps] = useState<Record<string, Record<string, string>>>({})
@@ -912,11 +913,17 @@ export default function AirtableGridView({
 
     const updateHeight = () => {
       setContainerHeight(gridRef.current?.clientHeight || 600)
+      setContainerWidth(gridRef.current?.clientWidth || 0)
     }
 
     updateHeight()
+    const ro = new ResizeObserver(updateHeight)
+    ro.observe(gridRef.current)
     window.addEventListener('resize', updateHeight)
-    return () => window.removeEventListener('resize', updateHeight)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', updateHeight)
+    }
   }, [])
 
   // Sync scroll between header and body
@@ -1139,7 +1146,7 @@ export default function AirtableGridView({
       columnsWidth +
       (onAddField ? FROZEN_COLUMN_WIDTH : 0)
     )
-  }, [columnOrder, columnWidths, onAddField])
+  }, [columnOrder, columnWidths, onAddField, containerWidth])
 
   const markLayoutDirty = useCallback(() => {
     layoutDirtyRef.current = true

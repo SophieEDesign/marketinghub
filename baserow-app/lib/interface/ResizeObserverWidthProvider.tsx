@@ -40,10 +40,10 @@ export default function withResizeObserverWidthProvider<P extends { width?: numb
       return () => ro.disconnect()
     }, [])
 
-    if (width === undefined) {
-      return <div ref={containerRef} className="w-full" style={{ width: "100%" }} />
-    }
-
-    return <ComposedComponent {...(props as P)} width={width} />
+    return (
+      <div ref={containerRef} className="w-full h-full min-w-0 min-h-0" style={{ width: "100%" }}>
+        {width !== undefined ? <ComposedComponent {...(props as P)} width={width} /> : null}
+      </div>
+    )
   }
 }

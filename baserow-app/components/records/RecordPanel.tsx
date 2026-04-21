@@ -59,8 +59,9 @@ export default function RecordPanel() {
     }
   }, [state.isFullscreen, state.history.length, router, goBack, closeRecord])
 
-  // Desktop: inline (pushes content left, Airtable-style). Mobile: overlay (full-screen).
-  const useOverlayLayout = isMobile
+  // Desktop edit mode keeps the shell as a stable 3-region layout (sidebar, canvas, settings).
+  // Record panel overlays in edit mode to avoid starving center width with multiple fixed side columns.
+  const useOverlayLayout = isMobile || isEdit()
   const panelWidth = state.isFullscreen ? "100%" : `${state.width}px`
   // In edit mode, always show Back so user can close (X is hidden). Otherwise show when we can go to previous record.
   const canGoBack = state.isFullscreen || state.history.length > 1 || isEdit()
