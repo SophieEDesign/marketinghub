@@ -13,6 +13,7 @@ import FieldBlockSettings from "./settings/FieldBlockSettings"
 import FieldSchemaSettings from "./settings/FieldSchemaSettings"
 import { getFieldDisplayName } from "@/lib/fields/display"
 import type { SelectedContext } from "@/contexts/SelectionContext"
+import { PanelHeader } from "@/components/layout/ui-system"
 
 function Breadcrumb({
   context,
@@ -79,9 +80,9 @@ export default function RightSettingsPanel() {
 
   // Panel always on right; flex sibling of InterfaceContainer. Mounted only when in edit mode.
   return (
-    <div className="w-full h-full min-h-0 flex flex-col bg-card border-l border-border overflow-hidden">
+    <div className="w-full h-full min-h-0 flex flex-col bg-card border-l border-border/60 overflow-hidden">
       {/* Header: Back + title + ellipsis for record/field; breadcrumb + close otherwise */}
-      <div className="border-b border-border px-4 py-3 flex-shrink-0">
+      <PanelHeader className="flex-shrink-0">
         <div className="flex items-center justify-between gap-2">
           {selectedContext?.type === "field" &&
           selectedContext.fieldId &&
@@ -171,10 +172,10 @@ export default function RightSettingsPanel() {
             </>
           )}
         </div>
-      </div>
+      </PanelHeader>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto overscroll-contain min-h-0">
+      <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 bg-background/60">
         {!selectedContext && !(recordPanelState.isOpen && recordPanelState.recordId) && (
           <div className="p-4 text-sm text-muted-foreground space-y-2">
             <p>{hasInterfacePageContext ? "Select an element to configure." : "No selection"}</p>

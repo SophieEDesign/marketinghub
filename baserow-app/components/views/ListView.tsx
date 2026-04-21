@@ -33,6 +33,7 @@ import { getFieldDisplayName } from "@/lib/fields/display"
 import { useRealtimeTable } from "@/lib/realtime/useRealtimeTable"
 import { cn } from "@/lib/utils"
 import { resolveContentIcon } from "@/lib/ui/content-icons"
+import { BLOCK_EMBED_CLASSNAME, Panel } from "@/components/layout/ui-system"
 
 // PostgREST expects unquoted identifiers in order clauses; see `lib/supabase/postgrest`.
 
@@ -902,8 +903,8 @@ export default function ListView({
           <td
             key={col.key}
             className={cn(
-              "px-3 text-sm text-gray-900 align-top",
-              marketingDashboardStyle ? "py-3.5 text-foreground/90" : "py-2"
+              "px-3 text-sm text-foreground align-top",
+              marketingDashboardStyle ? "py-3.5 text-foreground/90" : "py-2.5"
             )}
           >
             {renderCellValue(col)}
@@ -920,7 +921,7 @@ export default function ListView({
               "inline-flex items-center gap-1 text-xs hover:underline",
               marketingDashboardStyle
                 ? "text-muted-foreground hover:text-foreground"
-                : "text-blue-600 hover:text-blue-800"
+                : "text-accent-link hover:opacity-90"
             )}
             title="Open full record"
           >
@@ -942,7 +943,7 @@ export default function ListView({
 
   if (loading) {
     return (
-      <div className={cn("h-full flex items-center justify-center text-sm", marketingDashboardStyle ? "text-muted-foreground" : "text-gray-400")}>
+      <div className={cn("h-full flex items-center justify-center text-sm", marketingDashboardStyle ? "text-muted-foreground" : "text-muted-foreground")}>
         {marketingDashboardStyle ? "Preparing your marketing view..." : "Loading..."}
       </div>
     )
@@ -951,9 +952,9 @@ export default function ListView({
   // Render grouped (nested) or ungrouped
   if (flattenedGroups && flattenedGroups.length > 0) {
     return (
-      <div ref={contentRef} className="h-full min-w-0 w-full flex flex-col">
+      <div ref={contentRef} className={`${BLOCK_EMBED_CLASSNAME} h-full flex flex-col`}>
         {/* Toolbar */}
-        <div className={cn("flex-shrink-0 flex flex-wrap items-center gap-2 px-4 border-b bg-white", marketingDashboardStyle ? "py-2.5 border-border/35" : "py-2")}>
+        <div className={cn("flex-shrink-0 flex flex-wrap items-center gap-2 px-4 border-b bg-background", marketingDashboardStyle ? "py-2.5 border-border/35" : "py-2.5 border-border/55")}>
           <Button
             variant="outline"
             size="sm"
@@ -999,12 +1000,12 @@ export default function ListView({
               : "flex-1 min-h-0 min-w-0 overflow-y-auto"
           }
         >
-          <div
+          <Panel
             className={cn(
-              "w-full min-w-0 max-w-full border bg-white",
+              "w-full",
               marketingDashboardStyle
-                ? "marketing-card border-border/40 rounded-card-lg shadow-card"
-                : "border-gray-200 rounded-lg"
+                ? "marketing-card border-border/40 rounded-card-lg shadow-card bg-white"
+                : "border-gray-200 rounded-lg bg-white"
             )}
           >
             <div className="w-full max-w-full min-w-0 overflow-x-auto">
@@ -1015,12 +1016,12 @@ export default function ListView({
                     {tableColumns.map((col) => (
                       <th
                         key={col.key}
-                        className="px-3 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider"
+                        className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
                       >
                         {getFieldDisplayName(col.field)}
                       </th>
                     ))}
-                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-600 uppercase tracking-wider w-12" />
+                    <th className="px-3 py-2.5 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider w-12" />
                   </tr>
                 </thead>
               )}
@@ -1140,7 +1141,7 @@ export default function ListView({
               </tbody>
             </table>
             </div>
-          </div>
+          </Panel>
         </div>
 
         {/* Dialogs */}
@@ -1222,14 +1223,14 @@ export default function ListView({
   }
 
   return (
-    <div ref={contentRef} className="h-full min-w-0 w-full flex flex-col">
+    <div ref={contentRef} className={`${BLOCK_EMBED_CLASSNAME} h-full flex flex-col`}>
       <div className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden">
-        <div
+        <Panel
           className={cn(
-            "w-full min-w-0 max-w-full border bg-white",
+            "w-full",
             marketingDashboardStyle
-              ? "marketing-card border-border/40 rounded-card-lg shadow-card"
-              : "border-gray-200 rounded-lg"
+              ? "marketing-card border-border/40 rounded-card-lg shadow-card bg-white"
+              : "border-gray-200 rounded-lg bg-white"
           )}
         >
           <div className="w-full max-w-full min-w-0 overflow-x-auto">
@@ -1256,7 +1257,7 @@ export default function ListView({
             </tbody>
           </table>
           </div>
-        </div>
+        </Panel>
       </div>
     </div>
   )

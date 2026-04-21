@@ -45,6 +45,7 @@ import { normalizeUuid } from "@/lib/utils/ids"
 import { isAbortError } from "@/lib/api/error-handling"
 import { useOperationFeedback } from "@/hooks/useOperationFeedback"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
+import { BLOCK_EMBED_CLASSNAME, Panel } from "@/components/layout/ui-system"
 
 type MultiSource = {
   id: string
@@ -223,6 +224,7 @@ export default function MultiCalendarView({
   const loadingRef = useRef(false)
   const fullCalendarRef = useRef<FullCalendar | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const [containerWidth, setContainerWidth] = useState(0)
 
   // Lifecycle: Mark as mounted to prevent hydration mismatch with FullCalendar
   useEffect(() => {
@@ -236,18 +238,39 @@ export default function MultiCalendarView({
     }
   }, [createDate])
 
+  const requestCalendarResize = useCallback(() => {
+    const api = fullCalendarRef.current?.getApi?.()
+    if (!api?.updateSize) return
+    requestAnimationFrame(() => {
+      api.updateSize()
+      requestAnimationFrame(() => api.updateSize())
+    })
+  }, [])
+
   useEffect(() => {
     const el = containerRef.current
     if (!el || !mounted) return
-    const ro = new ResizeObserver(() => {
-      const api = fullCalendarRef.current?.getApi?.()
-      if (api?.updateSize) {
-        requestAnimationFrame(() => api.updateSize())
+    const ro = new ResizeObserver((entries) => {
+      const nextWidth = Math.floor(entries[0]?.contentRect?.width ?? el.getBoundingClientRect().width)
+      if (nextWidth > 0) {
+        setContainerWidth((prev) => (prev === nextWidth ? prev : nextWidth))
       }
     })
     ro.observe(el)
     return () => ro.disconnect()
   }, [mounted])
+
+  useEffect(() => {
+    if (!mounted || containerWidth <= 0) return
+    requestCalendarResize()
+  }, [mounted, containerWidth, requestCalendarResize])
+
+  useEffect(() => {
+    if (!mounted) return
+    const onWindowResize = () => requestCalendarResize()
+    window.addEventListener("resize", onWindowResize)
+    return () => window.removeEventListener("resize", onWindowResize)
+  }, [mounted, requestCalendarResize])
 
   const effectiveEnabledSources = useMemo(() => {
     const enabledSet = new Set(enabledSourceIds)
@@ -787,22 +810,22 @@ export default function MultiCalendarView({
   })
 
   return (
-    <div className="h-full w-full flex flex-col">
+    <div className={`${BLOCK_EMBED_CLASSNAME} h-full flex flex-col overflow-hidden`}>
       {/* Error messages */}
       {hasErrors && !isEditing && (
-        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 space-y-2">
+        <Panel className="mb-3 border-red-200/80 bg-red-50/70 p-3 space-y-2">
           <div className="text-sm font-medium text-red-800">Some sources failed to load:</div>
           {errorMessages.map(({ label, error }, idx) => (
             <div key={idx} className="text-xs text-red-700">
               <span className="font-medium">{label}:</span> {error}
             </div>
           ))}
-        </div>
+        </Panel>
       )}
 
       {/* Unified header: toggles + quick filters + add */}
       {!isEditing && (
-        <div className="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3">
+        <Panel className="mb-3 border-border/50 bg-muted/30 p-3 md:p-4 space-y-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-3 flex-wrap">
               <div className="flex items-center gap-3 flex-wrap">
@@ -824,7 +847,7 @@ export default function MultiCalendarView({
                       />
                       <span className="inline-flex items-center gap-2">
                         <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                        <span className="text-gray-700">{item.label}</span>
+                        <span className="text-foreground/80">{item.label}</span>
                       </span>
                     </label>
                   )
@@ -867,7 +890,7 @@ export default function MultiCalendarView({
           {effectiveEnabledSources.length > 0 && (
             <div className="flex items-center gap-3 flex-wrap">
               <div className="min-w-[220px]">
-                <Label className="text-xs text-gray-600">Quick filters for</Label>
+                <Label className="text-xs text-muted-foreground">Quick filters for</Label>
                 <Select
                   value={quickFilterSourceId || "__none__"}
                   onValueChange={(v) => setQuickFilterSourceId(v === "__none__" ? "" : v)}
@@ -924,10 +947,10 @@ export default function MultiCalendarView({
               ? ((blockConfig as any).default_date_range_preset as 'today' | 'thisWeek' | 'thisMonth' | 'nextWeek' | 'nextMonth' | 'custom')
               : null}
           />
-        </div>
+        </Panel>
       )}
 
-      <div ref={containerRef} className="flex-1 min-h-0">
+      <div ref={containerRef} className="flex-1 min-h-0 min-w-0 w-full max-w-full overflow-x-hidden">
         {/* CRITICAL: FullCalendar only renders after mount (guarded by outer mounted check) */}
         {/* FullCalendar generates dynamic DOM IDs that differ between server and client */}
         <FullCalendar
@@ -940,6 +963,8 @@ export default function MultiCalendarView({
           eventDrop={handleEventDrop}
           eventClick={onCalendarEventClick}
           dateClick={onCalendarDateClick}
+          handleWindowResize={true}
+          windowResizeDelay={50}
           // Enforce unified styling even if FullCalendar/theme CSS overrides event colors.
           eventDidMount={(arg: any) => {
             const el = arg?.el as HTMLElement | undefined

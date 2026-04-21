@@ -14,7 +14,7 @@ export interface CardContainerProps extends React.HTMLAttributes<HTMLDivElement>
 }
 
 const baseClasses =
-  "bg-white rounded-lg border border-gray-200 shadow-sm px-3 py-2 text-xs min-w-0 overflow-hidden max-w-[260px] hover:border-gray-300 hover:shadow-md transition-all"
+  "marketing-card bg-card rounded-card-lg border border-border/55 shadow-card px-3 py-2 text-xs min-w-0 overflow-hidden max-w-[260px] transition-all"
 
 const CardContainer = forwardRef<HTMLDivElement, CardContainerProps>(
   (
@@ -28,7 +28,7 @@ const CardContainer = forwardRef<HTMLDivElement, CardContainerProps>(
     },
     ref
   ) => {
-    const selectedClasses = selected ? "ring-1 ring-blue-400/40 bg-blue-50/30" : ""
+    const selectedClasses = selected ? "ring-1 ring-accent-link/35 bg-muted/35 border-border/70" : "hover:border-border/70 hover:shadow-card-hover"
     return (
       <div
         ref={ref}

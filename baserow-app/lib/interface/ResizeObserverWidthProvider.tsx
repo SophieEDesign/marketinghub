@@ -20,15 +20,17 @@ export default function withResizeObserverWidthProvider<P extends { width?: numb
 ): ComponentType<Omit<P, "width">> {
   return function ResizeObserverWidthProvider(props: Omit<P, "width">) {
     const containerRef = useRef<HTMLDivElement>(null)
-    const [width, setWidth] = useState<number | undefined>(undefined)
+    const [width, setWidth] = useState<number>(0)
 
     useEffect(() => {
       const node = containerRef.current
       if (!node) return
 
       const updateWidth = () => {
-        const w = node.offsetWidth
-        if (w > 0) setWidth(w)
+        const measured = Math.floor(node.getBoundingClientRect().width)
+        if (measured > 0) {
+          setWidth((prev) => (prev === measured ? prev : measured))
+        }
       }
 
       // Initial measurement (after layout)
@@ -36,13 +38,24 @@ export default function withResizeObserverWidthProvider<P extends { width?: numb
 
       const ro = new ResizeObserver(updateWidth)
       ro.observe(node)
+      if (node.parentElement) {
+        ro.observe(node.parentElement)
+      }
+      window.addEventListener("resize", updateWidth)
 
-      return () => ro.disconnect()
+      return () => {
+        window.removeEventListener("resize", updateWidth)
+        ro.disconnect()
+      }
     }, [])
 
     return (
-      <div ref={containerRef} className="w-full h-full min-w-0 min-h-0" style={{ width: "100%" }}>
-        {width !== undefined ? <ComposedComponent {...(props as P)} width={width} /> : null}
+      <div
+        ref={containerRef}
+        className="w-full h-full min-w-0 min-h-0 max-w-full"
+        style={{ width: "100%", maxWidth: "100%", minWidth: 0 }}
+      >
+        <ComposedComponent {...(props as P)} width={width} />
       </div>
     )
   }

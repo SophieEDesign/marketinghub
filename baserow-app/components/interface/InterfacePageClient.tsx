@@ -27,6 +27,8 @@ import { isAbortError } from "@/lib/api/error-handling"
 import PageActionsRegistrar from "./PageActionsRegistrar"
 import { debugLog, debugWarn, debugError } from "@/lib/debug"
 import { useRealtimeViewBlocks } from "@/lib/realtime/useRealtimeViewBlocks"
+import { CanvasContainer, BLOCK_EMBED_CLASSNAME } from "@/components/layout/ui-system"
+import { AppPageHeader } from "@/components/layout/ui-system"
 // Lazy load InterfaceBuilder for dashboard/overview pages
 const InterfaceBuilder = dynamic(() => import("./InterfaceBuilder"), { ssr: false })
 // Lazy load RecordReviewPage for record_review pages
@@ -76,7 +78,7 @@ function InterfacePageContent({
     )
   }
   return (
-    <div className="min-h-0 w-full min-w-0 flex flex-col">
+    <div className={`min-h-0 flex flex-col ${BLOCK_EMBED_CLASSNAME}`}>
       <InterfaceBuilder
         page={(interfaceBuilderPage ?? fallbackPage) as any}
         initialBlocks={memoizedBlocks}
@@ -1348,16 +1350,16 @@ function InterfacePageClientInternal({
     <div className="relative flex w-full flex-1 min-h-0 min-w-0 max-w-full flex-col overflow-hidden">
       {/* Loading overlay: single scroll surface; do not unmount tree */}
       {loading && !hasPage && (
-        <div className="absolute inset-0 flex items-center justify-center z-20 bg-white">
+        <div className="absolute inset-0 flex items-center justify-center z-20 bg-background">
           <LoadingSpinner size="lg" text="Loading interface page..." />
         </div>
       )}
       {/* Page not found overlay */}
       {!loading && !hasPage && (
-        <div className="absolute inset-0 flex items-center justify-center z-20 bg-white">
+        <div className="absolute inset-0 flex items-center justify-center z-20 bg-background">
           <div className="text-center">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">Page not found</h2>
-            <p className="text-sm text-gray-500">The page you&apos;re looking for doesn&apos;t exist.</p>
+            <h2 className="text-lg font-semibold text-foreground mb-2">Page not found</h2>
+            <p className="text-sm text-muted-foreground">The page you&apos;re looking for doesn&apos;t exist.</p>
           </div>
         </div>
       )}
@@ -1367,9 +1369,10 @@ function InterfacePageClientInternal({
       )}
       {/* Header - Admin Only. Compact when single calendar (suppressMainScroll) for Airtable-style */}
       {!isViewer && hasPage && isAdmin && (
-        <div className={`flex-shrink-0 border-b bg-white px-4 flex items-center justify-between ${suppressMainScroll ? "py-2" : "py-3"}`}>
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            {isEditingTitle ? (
+        <AppPageHeader
+          className={suppressMainScroll ? "py-2" : undefined}
+          title={
+            isEditingTitle ? (
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <input
                   ref={titleInputRef}
@@ -1383,48 +1386,42 @@ function InterfacePageClientInternal({
                   }`}
                   disabled={isSavingTitle}
                 />
-                {isSavingTitle && (
-                  <span className="text-xs text-gray-400">Saving...</span>
-                )}
+                {isSavingTitle && <span className="text-xs text-muted-foreground">Saving...</span>}
               </div>
             ) : (
-              <>
-                <h1 
-                  className={`font-semibold cursor-text hover:text-blue-600 transition-colors flex-1 min-w-0 truncate ${suppressMainScroll ? "text-base" : "text-lg"}`}
-                  onClick={handleStartEditTitle}
-                  title="Click to edit page title"
-                >
-                  {page?.name}
-                </h1>
-                {page?.updated_at && (
-                  <span className="text-xs text-gray-500 flex-shrink-0" suppressHydrationWarning>
-                    Updated {formatDateUK(page?.updated_at ?? "")}
-                  </span>
-                )}
-              </>
-            )}
-          </div>
-        </div>
+              <span
+                className={`cursor-text hover:text-accent-link transition-colors ${suppressMainScroll ? "text-base" : "text-lg"}`}
+                onClick={handleStartEditTitle}
+                title="Click to edit page title"
+              >
+                {page?.name}
+              </span>
+            )
+          }
+          meta={
+            page?.updated_at ? (
+              <span suppressHydrationWarning>Updated {formatDateUK(page?.updated_at ?? "")}</span>
+            ) : null
+          }
+        />
       )}
       
       {/* Header without Edit Button - Non-admin with View Only badge */}
       {!isViewer && hasPage && !isAdmin && (
-        <div className={`flex-shrink-0 border-b bg-white px-4 flex items-center justify-between ${suppressMainScroll ? "py-2" : "py-3"}`}>
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <h1 className={`font-semibold flex-1 min-w-0 truncate ${suppressMainScroll ? "text-base" : "text-lg"}`}>{page?.name}</h1>
-            <span 
-              className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded flex-shrink-0"
-              title="Ask an admin to edit this page"
-            >
+        <AppPageHeader
+          className={suppressMainScroll ? "py-2" : undefined}
+          title={<span className={suppressMainScroll ? "text-base" : "text-lg"}>{page?.name}</span>}
+          actions={
+            <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-md flex-shrink-0" title="Ask an admin to edit this page">
               View only
             </span>
-            {page?.updated_at && (
-              <span className="text-xs text-gray-500 flex-shrink-0" suppressHydrationWarning>
-                Updated {formatDateUK(page?.updated_at ?? "")}
-              </span>
-            )}
-          </div>
-        </div>
+          }
+          meta={
+            page?.updated_at ? (
+              <span suppressHydrationWarning>Updated {formatDateUK(page?.updated_at ?? "")}</span>
+            ) : null
+          }
+        />
       )}
 
       {/* Interface scroll area - single vertical scroll container for interface content */}
@@ -1436,7 +1433,10 @@ function InterfacePageClientInternal({
         {/* When suppressMainScroll: use flex-1 min-h-0 so content fills viewport (full-page/calendar). Otherwise content grows for scroll. */}
         {/* min-h-[100vh] when we have blocks ensures content exceeds viewport so scrollbar appears */}
         {/* In edit mode: extra padding-bottom so user can scroll to reach bottom resize handles and canvas isn't cut off */}
-        <div className={`relative flex w-full max-w-full min-w-0 flex-col overflow-x-hidden ${suppressMainScroll ? "flex-1 min-h-0" : blocks.length > 0 ? "min-h-[100vh]" : ""} ${isEditMode ? "pb-48" : ""}`}>
+        <CanvasContainer
+          fullBleed
+          className={`relative overflow-x-hidden ${suppressMainScroll ? "flex-1 min-h-0" : blocks.length > 0 ? "min-h-[100vh]" : ""} ${isEditMode ? "pb-48" : ""}`}
+        >
           <InterfacePageContent
             useRecordReviewLayout={useRecordReviewLayout}
             hasPage={hasPage}
@@ -1457,7 +1457,7 @@ function InterfacePageClientInternal({
               <LoadingSpinner size="lg" text="Loading blocks..." />
             </div>
           )}
-        </div>
+        </CanvasContainer>
       </div>
 
       {/* Page settings now in RightSettingsPanel */}

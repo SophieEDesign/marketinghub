@@ -289,6 +289,7 @@ export default async function WorkspaceShellWrapper({
     let newPagesQuery = supabase
       .from('interface_pages')
       .select('id, name, page_type, group_id, order_index, created_at, updated_at, created_by, is_admin_only, is_hidden')
+      .is('is_archived', false)
       .order('order_index', { ascending: true })
       .order('created_at', { ascending: false })
     
@@ -323,6 +324,7 @@ export default async function WorkspaceShellWrapper({
       .from('views')
       .select('id, name, description, table_id, type, access_level, allowed_roles, created_at, updated_at, owner_id, group_id, order_index, is_admin_only')
       .eq('type', 'interface')
+      .or('is_archived.is.null,is_archived.eq.false')
       .order('order_index', { ascending: true })
       .order('created_at', { ascending: false })
     

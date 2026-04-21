@@ -2539,7 +2539,7 @@ export default function Canvas({
             {/* Block Content - ALWAYS visible; never conditional on isEditing. No transition/willChange - immediate paint. */}
             {/* overflow-hidden for all blocks: single scroll per surface (Canvas/InterfaceContainer) */}
             <div
-              className={`block-content h-full w-full min-h-0 min-w-0 rounded-lg ${block.config?.locked ? 'pointer-events-none opacity-75' : ''} ${
+              className={`block-content h-full w-full max-w-full min-h-0 min-w-0 rounded-lg ${block.config?.locked ? 'pointer-events-none opacity-75' : ''} ${
                 block.type === 'field' ? 'overflow-visible' :
                 'overflow-hidden'
               }`}
@@ -2677,7 +2677,7 @@ export default function Canvas({
                 block={block}
                 className={isEditing ? "pointer-events-auto" : ""}
               >
-                <div className="h-full w-full">
+                <div className="h-full w-full max-w-full min-h-0 min-w-0">
                   <BlockRenderer
                     block={block}
                     isEditing={isEditing && !block.config?.locked}

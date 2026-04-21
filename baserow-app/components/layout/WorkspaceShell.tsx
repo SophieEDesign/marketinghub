@@ -21,6 +21,7 @@ import { Menu } from "lucide-react"
 import OnboardingTour from "./OnboardingTour"
 import type { Table, View } from "@/types/database"
 import { SHELL_RIGHT_SETTINGS_WIDTH_PX } from "@/lib/interface/layout-constants"
+import { AppShell } from "@/components/layout/ui-system"
 
 interface InterfacePage {
   id: string
@@ -180,36 +181,38 @@ function ShellContent({
       {/* Edit mode banner - full app width at top, above sidebar and content */}
       <EditModeBanner />
       <EditModeGuard />
-      <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden">
-      {/* When topbar is hidden (some pages have their own toolbar), still provide a mobile hamburger toggle */}
-      {hideTopbar && isMobile && (
-        <div className="fixed top-3 left-3 z-50 desktop:hidden">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-10 w-10 p-0 bg-background/90 border border-border shadow"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            aria-label="Toggle sidebar"
-          >
-            <Menu className="h-5 w-5" style={{ color: primaryColor }} />
-          </Button>
-        </div>
-      )}
-
-      <AirtableSidebar
-        interfacePages={interfacePages}
-        interfaceGroups={interfaceGroups}
-        tables={tables}
-        views={views}
-        userRole={userRole}
-        isOpen={isMobile ? sidebarOpen : undefined}
-        onClose={isMobile ? () => setSidebarOpen(false) : undefined}
-        defaultPageId={defaultPageId}
-        landingPageTitle={landingPageTitle}
-        coreDataSectionTitle={coreDataSectionTitle}
-      />
-      {/* MainArea: min-h-0 required for flex height propagation to CalendarView */}
-      <div className="flex flex-row flex-1 min-h-0 min-w-0 overflow-hidden">
+      <AppShell
+        sidebar={
+          <AirtableSidebar
+            interfacePages={interfacePages}
+            interfaceGroups={interfaceGroups}
+            tables={tables}
+            views={views}
+            userRole={userRole}
+            isOpen={isMobile ? sidebarOpen : undefined}
+            onClose={isMobile ? () => setSidebarOpen(false) : undefined}
+            defaultPageId={defaultPageId}
+            landingPageTitle={landingPageTitle}
+            coreDataSectionTitle={coreDataSectionTitle}
+          />
+        }
+        canvas={
+          <>
+            {/* When topbar is hidden (some pages have their own toolbar), still provide a mobile hamburger toggle */}
+            {hideTopbar && isMobile && (
+              <div className="fixed top-3 left-3 z-50 desktop:hidden">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-10 w-10 p-0 bg-background/90 border border-border shadow"
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  aria-label="Toggle sidebar"
+                >
+                  <Menu className="h-5 w-5" style={{ color: primaryColor }} />
+                </Button>
+              </div>
+            )}
+            <div className="flex flex-row flex-1 min-h-0 min-w-0 overflow-hidden">
         {/* InterfaceContainer: min-h-0 allows height to flow to main > CalendarView */}
         <div className="flex flex-1 basis-0 flex flex-col min-h-0 min-w-0 overflow-hidden">
           {!hideTopbar && (
@@ -238,8 +241,10 @@ function ShellContent({
             <RightSettingsPanel />
           </div>
         )}
-      </div>
-      </div>
+            </div>
+          </>
+        }
+      />
     </div>
   )
 }

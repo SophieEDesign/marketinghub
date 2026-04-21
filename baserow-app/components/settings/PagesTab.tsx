@@ -143,6 +143,7 @@ export default function SettingsPagesTab() {
       const { data: interfacePages, error: interfacePagesError } = await supabase
         .from('interface_pages')
         .select('id, name, page_type, group_id, updated_at, created_at')
+        .is('is_archived', false)
         .order('updated_at', { ascending: false })
 
       if (interfacePagesError) {

@@ -15,3 +15,15 @@ export const BLOCK_HEADER_PADDING = 'px-4 py-3'
 
 /** Optional: standard gap between form fields or list items (for future use). */
 export const FORM_FIELD_GAP = 'space-y-4'
+
+/** App-level horizontal page padding for headers and action rows. */
+export const APP_PAGE_PADDING_X = "px-4 md:px-6"
+
+/** Standard compact vertical spacing for bars/headers. */
+export const APP_BAR_PADDING_Y = "py-2.5"
+
+/** Standard section gap used by page canvases. */
+export const APP_SECTION_GAP = "gap-4 md:gap-6"
+
+/** Unified panel shell radius utility. */
+export const APP_PANEL_RADIUS = "rounded-card-lg"
