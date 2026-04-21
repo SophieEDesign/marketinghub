@@ -244,24 +244,15 @@ export default function GroupedInterfaces({
   const uncategorizedPages = pagesByGroup[ungroupedGroupId] || []
 
   // Filter groups based on mode
-  // In Browse mode, hide system groups (like "Ungrouped") BUT only if they're empty
-  // In Edit mode, show all groups including system groups
+  // In Browse mode, hide any group that has no visible pages
+  // In Edit mode, show all groups so hidden/empty structure can still be managed
   const visibleGroups = useMemo(() => {
     if (editMode) {
       return allGroups
     }
-    
-    // In Browse mode, show system groups only if they have pages
-    // Handle case where is_system might be undefined (column doesn't exist yet)
-    return allGroups.filter(g => {
-      const isSystemGroup = g.is_system === true || (g.name === 'Ungrouped' && g.id === ungroupedGroupId)
-      if (isSystemGroup) {
-        const groupPages = pagesByGroup[g.id] || []
-        return groupPages.length > 0 // Show system groups if they have pages
-      }
-      return true // Show all non-system groups
-    })
-  }, [editMode, allGroups, pagesByGroup, ungroupedGroupId])
+
+    return allGroups.filter((g) => (pagesByGroup[g.id] || []).length > 0)
+  }, [editMode, allGroups, pagesByGroup])
 
   // Sort groups by order_index (system groups go to end)
   const sortedGroups = useMemo(() => {

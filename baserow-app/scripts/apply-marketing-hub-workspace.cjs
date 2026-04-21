@@ -680,7 +680,7 @@ function buildContentPlanningBlocks(ctx) {
   const contentTheme = pickFieldName(contentFields, [/quarterly_theme/i, /^theme$/i], null)
   const isArchivedField = pickFieldName(contentFields, [/^is_archived$/i, /^archived$/i], null)
   const deletedAtField = pickFieldName(contentFields, [/^deleted_at$/i], null)
-  const todoStatuses = ["Todo", "To do"]
+  const todoStatuses = ["Todo", "To do", "Ready to plan"]
   const inProgressStatuses = ["In Progress", "In progress"]
   const awaitingApprovalStatuses = ["Sent for Approval", "Awaiting approval", "Waiting for approval"]
   const baseQueueFilters = compactFilters(contentFields, [
@@ -711,13 +711,13 @@ function buildContentPlanningBlocks(ctx) {
     width: 3,
     height: 3,
     config: {
-      title: "To do",
-      kpi_label: "Content items",
+      title: "Scheduled soon",
+      kpi_label: "Next 7 days",
       table_id: ctx.content.id,
       kpi_aggregate: "count",
       filters: compactFilters(contentFields, [
         ...baseQueueFilters,
-        ...(contentStatus ? [{ field: contentStatus, operator: "is_any_of", value: todoStatuses }] : []),
+        ...(contentDate ? [{ field: contentDate, operator: "date_next_days", value: 7 }] : []),
       ]),
     },
   })
@@ -762,19 +762,20 @@ function buildContentPlanningBlocks(ctx) {
     width: 3,
     height: 3,
     config: {
-      title: "Due soon",
-      kpi_label: "Next 7 days",
+      title: "Ready to plan",
+      kpi_label: "Not scheduled",
       table_id: ctx.content.id,
       kpi_aggregate: "count",
       filters: compactFilters(contentFields, [
         ...baseQueueFilters,
-        ...(contentDate ? [{ field: contentDate, operator: "date_next_days", value: 7 }] : []),
+        ...(contentStatus ? [{ field: contentStatus, operator: "is_any_of", value: todoStatuses }] : []),
+        ...(contentDate ? [{ field: contentDate, operator: "is_empty", value: "" }] : []),
       ]),
     },
   })
-  y += 4
+  y += 5
 
-  const queueVisibleFields = [contentName, contentTheme, contentDate].filter(Boolean)
+  const queueVisibleFields = [contentName, contentStatus, contentDate].filter(Boolean)
   blocks.push({
     type: "grid",
     position_x: 0,
@@ -785,7 +786,7 @@ function buildContentPlanningBlocks(ctx) {
       title: "Content Queue",
       table_id: ctx.content.id,
       view_type: "list",
-      row_limit: 14,
+      row_limit: 12,
       list_title_field: contentName,
       visible_fields: queueVisibleFields,
       pill_fields: contentStatus ? [contentStatus] : [],
@@ -802,10 +803,10 @@ function buildContentPlanningBlocks(ctx) {
             ]
           : []),
       ]),
-      list_meta_fields: [contentTheme, contentDate].filter(Boolean),
+      list_meta_fields: [contentDate].filter(Boolean),
       list_subtitle_fields: [],
       sorts: [...(contentDate ? [{ field: contentDate, direction: "asc" }] : [])],
-      appearance: { showTitle: true, border: "none", compact: true, padding: "compact" },
+      appearance: { showTitle: true, border: "none", compact: true, padding: "compact", showDivider: true },
     },
   })
   blocks.push({
@@ -820,16 +821,16 @@ function buildContentPlanningBlocks(ctx) {
       view_type: "list",
       row_limit: 6,
       list_title_field: contentName,
-      visible_fields: [contentName, contentTheme, contentDate].filter(Boolean),
+      visible_fields: [contentName, contentDate].filter(Boolean),
       filters: compactFilters(contentFields, [
         ...baseQueueFilters,
         ...(contentDate ? [{ field: contentDate, operator: "date_next_days", value: 14 }] : []),
       ]),
       sorts: [...(contentDate ? [{ field: contentDate, direction: "asc" }] : [])],
-      appearance: { showTitle: true, border: "none", compact: true, padding: "compact" },
+      appearance: { showTitle: true, border: "none", compact: true, padding: "compact", showDivider: true },
     },
   })
-  y += 11
+  y += 12
 
   blocks.push({
     type: "grid",
