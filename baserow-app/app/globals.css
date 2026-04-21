@@ -91,6 +91,18 @@
   .marketing-dashboard-shell {
     --section-gap: 2.25rem;
   }
+  .marketing-dashboard-shell .react-grid-layout {
+    width: 100% !important;
+    max-width: 100%;
+  }
+  .marketing-dashboard-shell .react-grid-item {
+    min-width: 0;
+  }
+  .marketing-dashboard-shell .react-grid-item > * {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
 }
 
 @layer base {

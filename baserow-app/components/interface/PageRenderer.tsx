@@ -166,9 +166,9 @@ export default function PageRenderer({
   }
 
   return (
-    <div className="h-full flex flex-col min-h-0">
+    <div className="h-full w-full max-w-full min-w-0 flex flex-col min-h-0">
       {/* Content - no overflow here; WorkspaceShell main is the single scroll owner */}
-      <div className="flex-1 min-h-0 min-w-0">
+      <div className="flex-1 min-h-0 min-w-0 w-full max-w-full">
         {content}
       </div>
     </div>

@@ -20,6 +20,7 @@ export interface InterfacePage {
   updated_at: string
   created_by: string | null
   is_admin_only: boolean
+  is_hidden: boolean
   // Page anchors - exactly one must be set
   saved_view_id: string | null // For list/gallery/kanban/calendar/timeline/record_review
   dashboard_layout_id: string | null // For dashboard/overview (references view_blocks.view_id)
@@ -252,7 +253,7 @@ export async function createInterfacePage(
  */
 export async function updateInterfacePage(
   pageId: string,
-  updates: Partial<Pick<InterfacePage, 'name' | 'page_type' | 'source_view' | 'base_table' | 'config' | 'group_id' | 'order_index'>>
+  updates: Partial<Pick<InterfacePage, 'name' | 'page_type' | 'source_view' | 'base_table' | 'config' | 'group_id' | 'order_index' | 'is_hidden'>>
 ): Promise<InterfacePage> {
   const supabase = await createClient()
   
@@ -307,6 +308,7 @@ export async function updateInterfacePage(
   if (updates.base_table !== undefined) updateData.base_table = updates.base_table
   if (updates.group_id !== undefined) updateData.group_id = updates.group_id
   if (updates.order_index !== undefined) updateData.order_index = updates.order_index
+  if (updates.is_hidden !== undefined) updateData.is_hidden = updates.is_hidden
   // CRITICAL: Only update config if explicitly provided (preserve existing config otherwise)
   if (updates.config !== undefined) updateData.config = updates.config
 

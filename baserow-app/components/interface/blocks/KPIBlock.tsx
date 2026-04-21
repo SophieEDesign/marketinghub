@@ -235,7 +235,7 @@ export default function KPIBlock({
   return (
     <div
       className={cn(
-        "h-full w-full overflow-auto flex flex-col relative rounded-card",
+        "relative flex h-full w-full max-w-full min-w-0 flex-col overflow-hidden rounded-card",
         !hideChromeBorder && "border border-border",
         useCardShell && !appearance.border_color && (marketingDashboardStyle ? "bg-background shadow-none" : "bg-card shadow-card"),
         isClickable &&

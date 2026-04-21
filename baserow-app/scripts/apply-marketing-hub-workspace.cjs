@@ -677,145 +677,176 @@ function buildContentPlanningBlocks(ctx) {
   const contentName = pickFieldName(contentFields, [/content_name/i, /^name$/i], "content_name")
   const contentDate = pickFieldName(contentFields, [/^date$/i, /publish_date/i], "date")
   const contentStatus = pickFieldName(contentFields, [/^status$/i], "status")
-  const contentPriority = pickFieldName(contentFields, [/^priority$/i, /priority/i, /urgency/i, /importance/i], null)
   const contentTheme = pickFieldName(contentFields, [/quarterly_theme/i, /^theme$/i], null)
-  const queueStatuses = [
-    "To do",
-    "Todo",
-    "In Progress",
-    "In progress",
-    "Draft",
-    "Planned",
-    "Scheduled",
-    "Sent for Approval",
-    "Waiting for approval",
-    "Awaiting approval",
-  ]
-  const todoStatuses = ["To do", "Todo"]
-  const inProgressStatuses = ["In Progress", "In progress", "Draft", "Planned", "Scheduled"]
-  const awaitingApprovalStatuses = ["Sent for Approval", "Waiting for approval", "Awaiting approval"]
-  const queueFilters = compactFilters(contentFields, [
+  const isArchivedField = pickFieldName(contentFields, [/^is_archived$/i, /^archived$/i], null)
+  const deletedAtField = pickFieldName(contentFields, [/^deleted_at$/i], null)
+  const todoStatuses = ["Todo", "To do"]
+  const inProgressStatuses = ["In Progress", "In progress"]
+  const awaitingApprovalStatuses = ["Sent for Approval", "Awaiting approval", "Waiting for approval"]
+  const baseQueueFilters = compactFilters(contentFields, [
     { field: contentName, operator: "is_not_empty", value: "" },
     ...(contentDate ? [{ field: contentDate, operator: "is_not_empty", value: "" }] : []),
-    ...(contentStatus ? [{ field: contentStatus, operator: "is_any_of", value: queueStatuses }] : []),
-    ...(contentDate ? [{ field: contentDate, operator: "date_next_days", value: 42 }] : []),
+    ...(isArchivedField ? [{ field: isArchivedField, operator: "is_not_any_of", value: [true, "true", 1, "1"] }] : []),
+    ...(deletedAtField ? [{ field: deletedAtField, operator: "is_empty", value: "" }] : []),
   ])
 
   const blocks = []
   let y = 0
-  blocks.push(section("Content Planning", "Daily workflow: what to ship next, what is moving, and what is blocked on approval", y, 2))
-  y += 2
+  blocks.push({
+    type: "html",
+    position_x: 0,
+    position_y: y,
+    width: 12,
+    height: 2,
+    config: {
+      title: "",
+      html: `<div class="rounded-card-lg border border-border/60 bg-card px-5 py-4 shadow-sm"><div class="flex items-start justify-between gap-4"><div><h2 class="text-xl font-semibold tracking-tight text-foreground">Content Planning</h2><p class="mt-1 text-sm text-muted-foreground">Plan, prioritise, and track upcoming content across themes</p></div><button class="inline-flex items-center rounded-md border border-border/70 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground">+ Add content</button></div></div>`,
+    },
+  })
+  y += 3
   blocks.push({
     type: "kpi",
     position_x: 0,
     position_y: y,
-    width: 4,
+    width: 3,
     height: 3,
     config: {
       title: "To do",
-      kpi_label: "Planned queue",
+      kpi_label: "Content items",
       table_id: ctx.content.id,
       kpi_aggregate: "count",
       filters: compactFilters(contentFields, [
-        { field: contentName, operator: "is_not_empty", value: "" },
-        ...(contentDate ? [{ field: contentDate, operator: "is_not_empty", value: "" }] : []),
+        ...baseQueueFilters,
         ...(contentStatus ? [{ field: contentStatus, operator: "is_any_of", value: todoStatuses }] : []),
       ]),
     },
   })
   blocks.push({
     type: "kpi",
-    position_x: 4,
+    position_x: 3,
     position_y: y,
-    width: 4,
+    width: 3,
     height: 3,
     config: {
       title: "In progress",
-      kpi_label: "Active queue",
+      kpi_label: "Content items",
       table_id: ctx.content.id,
       kpi_aggregate: "count",
-      filters: compactFilters(
-        contentFields,
-        contentStatus
-          ? [
-              { field: contentName, operator: "is_not_empty", value: "" },
-              { field: contentStatus, operator: "is_any_of", value: inProgressStatuses },
-            ]
-          : [{ field: contentName, operator: "is_not_empty", value: "" }]
-      ),
+      filters: compactFilters(contentFields, [
+        ...baseQueueFilters,
+        ...(contentStatus ? [{ field: contentStatus, operator: "is_any_of", value: inProgressStatuses }] : []),
+      ]),
     },
   })
   blocks.push({
     type: "kpi",
-    position_x: 8,
+    position_x: 6,
     position_y: y,
-    width: 4,
+    width: 3,
     height: 3,
     config: {
       title: "Awaiting approval",
-      kpi_label: "Needs decision",
+      kpi_label: "Content items",
       table_id: ctx.content.id,
       kpi_aggregate: "count",
-      filters: compactFilters(
-        contentFields,
-        contentStatus
-          ? [
-              { field: contentName, operator: "is_not_empty", value: "" },
-              { field: contentStatus, operator: "is_any_of", value: awaitingApprovalStatuses },
-            ]
-          : [{ field: contentName, operator: "is_not_empty", value: "" }]
-      ),
+      filters: compactFilters(contentFields, [
+        ...baseQueueFilters,
+        ...(contentStatus ? [{ field: contentStatus, operator: "is_any_of", value: awaitingApprovalStatuses }] : []),
+      ]),
+    },
+  })
+  blocks.push({
+    type: "kpi",
+    position_x: 9,
+    position_y: y,
+    width: 3,
+    height: 3,
+    config: {
+      title: "Due soon",
+      kpi_label: "Next 7 days",
+      table_id: ctx.content.id,
+      kpi_aggregate: "count",
+      filters: compactFilters(contentFields, [
+        ...baseQueueFilters,
+        ...(contentDate ? [{ field: contentDate, operator: "date_next_days", value: 7 }] : []),
+      ]),
     },
   })
   y += 4
 
-  const primaryFields = [contentName, contentDate, contentTheme].filter(Boolean)
+  const queueVisibleFields = [contentName, contentTheme, contentDate].filter(Boolean)
   blocks.push({
     type: "grid",
     position_x: 0,
     position_y: y,
-    width: 12,
+    width: 8,
     height: 10,
     config: {
       title: "Content Queue",
       table_id: ctx.content.id,
       view_type: "list",
-      row_limit: 6,
+      row_limit: 14,
       list_title_field: contentName,
-      visible_fields: primaryFields,
+      visible_fields: queueVisibleFields,
       pill_fields: contentStatus ? [contentStatus] : [],
       ...(contentStatus ? { group_by_field: contentStatus } : {}),
-      filters: queueFilters,
-      list_meta_fields: [contentDate, contentTheme].filter(Boolean),
+      filters: compactFilters(contentFields, [
+        ...baseQueueFilters,
+        ...(contentStatus
+          ? [
+              {
+                field: contentStatus,
+                operator: "is_any_of",
+                value: [...todoStatuses, ...inProgressStatuses, ...awaitingApprovalStatuses],
+              },
+            ]
+          : []),
+      ]),
+      list_meta_fields: [contentTheme, contentDate].filter(Boolean),
       list_subtitle_fields: [],
-      sorts: [
-        ...(contentDate ? [{ field: contentDate, direction: "asc" }] : []),
-        ...(contentStatus ? [{ field: contentStatus, direction: "asc" }] : []),
-      ],
-      appearance: { showTitle: true, border: "none", compact: true },
+      sorts: [...(contentDate ? [{ field: contentDate, direction: "asc" }] : [])],
+      appearance: { showTitle: true, border: "none", compact: true, padding: "compact" },
     },
   })
-  y += 12
+  blocks.push({
+    type: "grid",
+    position_x: 8,
+    position_y: y,
+    width: 4,
+    height: 10,
+    config: {
+      title: "Upcoming Content",
+      table_id: ctx.content.id,
+      view_type: "list",
+      row_limit: 6,
+      list_title_field: contentName,
+      visible_fields: [contentName, contentTheme, contentDate].filter(Boolean),
+      filters: compactFilters(contentFields, [
+        ...baseQueueFilters,
+        ...(contentDate ? [{ field: contentDate, operator: "date_next_days", value: 14 }] : []),
+      ]),
+      sorts: [...(contentDate ? [{ field: contentDate, direction: "asc" }] : [])],
+      appearance: { showTitle: true, border: "none", compact: true, padding: "compact" },
+    },
+  })
+  y += 11
 
   blocks.push({
     type: "grid",
     position_x: 0,
     position_y: y,
     width: 12,
-    height: 6,
+    height: 5,
     config: {
       title: "Planning Calendar",
       table_id: ctx.content.id,
       view_type: "calendar",
       calendar_date_field: contentDate,
-      default_date_range_preset: "thisWeek",
-      visible_week_span: 6,
+      default_date_range_preset: "thisMonth",
+      visible_week_span: 4,
       visible_fields: [contentName, contentDate, contentTheme].filter(Boolean),
-      filters: queueFilters,
-      sorts: [
-        ...(contentDate ? [{ field: contentDate, direction: "asc" }] : []),
-        ...(contentStatus ? [{ field: contentStatus, direction: "asc" }] : []),
-      ],
+      filters: compactFilters(contentFields, [...baseQueueFilters]),
+      sorts: [...(contentDate ? [{ field: contentDate, direction: "asc" }] : [])],
       appearance: { showTitle: true, border: "none", compact: true, event_density: "compact" },
     },
   })

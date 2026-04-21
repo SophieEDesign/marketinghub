@@ -18,6 +18,7 @@ export interface InterfacePage {
   updated_at: string
   created_by: string | null
   is_admin_only: boolean
+  is_hidden: boolean
   // Page anchors - exactly one must be set
   saved_view_id: string | null // For list/gallery/kanban/calendar/timeline/record_review
   dashboard_layout_id: string | null // For dashboard/overview (references view_blocks.view_id)

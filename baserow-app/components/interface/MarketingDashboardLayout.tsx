@@ -53,13 +53,14 @@ export default function MarketingDashboardLayout({ children }: MarketingDashboar
     <MarketingDashboardProvider>
       <div
         className={cn(
-          "marketing-dashboard-shell flex flex-col min-h-0 min-w-0 w-full gap-7 md:gap-8 lg:gap-9",
-          "px-4 py-5 md:px-8 md:py-7 lg:py-8"
+          "marketing-dashboard-shell flex flex-col min-h-0 min-w-0 w-full",
+          "px-3 py-5 sm:px-4 md:px-6 md:py-7 lg:px-8 lg:py-8"
         )}
         data-marketing-dashboard
       >
+        <div className="mx-auto flex w-full max-w-screen-2xl min-h-0 min-w-0 flex-col gap-7 md:gap-8 lg:gap-9">
         {!bannerDismissed ? (
-          <div className="flex items-center justify-between gap-3 rounded-card border border-border/45 bg-background/90 px-3.5 py-2.5 text-sm text-muted-foreground shadow-card">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border/45 bg-background/90 px-3.5 py-2.5 text-sm text-muted-foreground shadow-card sm:flex-nowrap">
             <div className="flex items-center gap-2 min-w-0">
               <div className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted/70 text-accent-link">
                 <Search className="h-3.5 w-3.5" aria-hidden />
@@ -106,7 +107,8 @@ export default function MarketingDashboardLayout({ children }: MarketingDashboar
             </span>
           </button>
         )}
-        <div className="flex flex-col min-h-0 min-w-0 w-full gap-8 md:gap-9 lg:gap-10">{children}</div>
+        <div className="flex w-full min-h-0 min-w-0 max-w-full flex-col gap-8 md:gap-9 lg:gap-10">{children}</div>
+        </div>
       </div>
     </MarketingDashboardProvider>
   )

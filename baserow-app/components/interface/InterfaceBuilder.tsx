@@ -1610,9 +1610,9 @@ export default function InterfaceBuilder({
   }
 
   return (
-    <div className={`flex flex-col min-h-0 w-full bg-background min-w-0 ${fullPageBlockId ? "flex-1" : ""}`}>
+    <div className={`flex flex-col min-h-0 min-w-0 w-full max-w-full bg-background ${fullPageBlockId ? "flex-1" : ""}`}>
       {/* Main Canvas - flex-1 only for full-page; otherwise content grows for main scroll */}
-      <div className={`flex flex-col min-w-0 w-full min-h-0 ${fullPageBlockId ? "flex-1" : ""}`}>
+      <div className={`flex flex-col min-h-0 min-w-0 w-full max-w-full ${fullPageBlockId ? "flex-1" : ""}`}>
         {/* Toolbar / Interface Header */}
         {!hideHeader && (
         <div className="h-auto min-h-[56px] bg-card border-b border-border flex flex-col px-4 py-2">
@@ -1749,12 +1749,12 @@ export default function InterfaceBuilder({
         {/* Full-page: no scroll, no padding. Normal: overflow-x-hidden prevents blocks spilling horizontally; overflow-y-visible for vertical flow. Parent has overflow-x-hidden. */}
         <div
           ref={canvasScrollContainerRef}
-          className={`flex flex-col min-w-0 w-full min-h-0 ${
+          className={`flex flex-col min-h-0 min-w-0 w-full max-w-full ${
             fullPageBlockId
               ? "flex-1 overflow-hidden p-0"
               : marketingDashboard
-                ? "overflow-x-hidden overflow-y-visible p-0"
-                : "overflow-x-hidden overflow-y-visible p-4"
+                ? "overflow-x-clip overflow-y-visible p-0"
+                : "overflow-x-clip overflow-y-visible p-4"
           }`}
         >
           <FilterStateProvider>

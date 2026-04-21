@@ -940,14 +940,14 @@ export default function ListView({
   // Render grouped (nested) or ungrouped
   if (flattenedGroups && flattenedGroups.length > 0) {
     return (
-      <div ref={contentRef} className="h-full flex flex-col">
+      <div ref={contentRef} className="h-full min-w-0 w-full flex flex-col">
         {/* Toolbar */}
-        <div className={cn("flex-shrink-0 flex items-center gap-2 px-4 border-b bg-white", marketingDashboardStyle ? "py-2.5 border-border/35" : "py-2")}>
+        <div className={cn("flex-shrink-0 flex flex-wrap items-center gap-2 px-4 border-b bg-white", marketingDashboardStyle ? "py-2.5 border-border/35" : "py-2")}>
           <Button
             variant="outline"
             size="sm"
             onClick={() => setGroupDialogOpen(true)}
-            className="h-8"
+            className="h-8 shrink-0"
           >
             <Group className="h-4 w-4 mr-2" />
             Group
@@ -956,7 +956,7 @@ export default function ListView({
             variant="outline"
             size="sm"
             onClick={() => setFilterDialogOpen(true)}
-            className="h-8"
+            className="h-8 shrink-0"
           >
             <Filter className="h-4 w-4 mr-2" />
             Filter
@@ -971,7 +971,7 @@ export default function ListView({
               variant="outline"
               size="sm"
               onClick={handleOpenCreateModal}
-              className="h-8 ml-auto"
+              className="h-8 shrink-0 ml-auto"
               title="Add a new record"
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -984,18 +984,19 @@ export default function ListView({
         <div
           className={
             onHeightChange
-              ? "min-h-0 overflow-visible"
-              : "flex-1 min-h-0 overflow-y-auto"
+              ? "min-h-0 min-w-0 overflow-visible"
+              : "flex-1 min-h-0 min-w-0 overflow-y-auto"
           }
         >
           <div
             className={cn(
-              "border bg-white",
+              "w-full min-w-0 max-w-full border bg-white",
               marketingDashboardStyle
                 ? "marketing-card border-border/40 rounded-card-lg shadow-card"
                 : "border-gray-200 rounded-lg"
             )}
           >
+            <div className="w-full max-w-full min-w-0 overflow-x-auto">
             <table className="w-full border-collapse">
               {!marketingDashboardStyle && (
                 <thead>
@@ -1127,6 +1128,7 @@ export default function ListView({
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
 
@@ -1209,16 +1211,17 @@ export default function ListView({
   }
 
   return (
-    <div ref={contentRef} className="h-full flex flex-col">
-      <div className="flex-1 overflow-auto">
+    <div ref={contentRef} className="h-full min-w-0 w-full flex flex-col">
+      <div className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden">
         <div
           className={cn(
-            "border bg-white",
+            "w-full min-w-0 max-w-full border bg-white",
             marketingDashboardStyle
               ? "marketing-card border-border/40 rounded-card-lg shadow-card"
               : "border-gray-200 rounded-lg"
           )}
         >
+          <div className="w-full max-w-full min-w-0 overflow-x-auto">
           <table className="w-full border-collapse">
             <thead>
               <tr className={cn("border-b", marketingDashboardStyle ? "border-border/30 bg-muted/25" : "border-gray-200 bg-gray-50")}>
@@ -1241,6 +1244,7 @@ export default function ListView({
               {rowsToRender.map((row) => renderTableRow(row))}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
     </div>

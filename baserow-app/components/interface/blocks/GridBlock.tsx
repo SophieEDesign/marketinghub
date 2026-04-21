@@ -613,6 +613,18 @@ export default function GridBlock({
     : viewSorts
 
   if (isLoading || !table) {
+    if (marketingDashboardStyle) {
+      return (
+        <div className="h-full w-full rounded-card-lg border border-border/50 bg-card p-4 shadow-sm">
+          <div className="animate-pulse space-y-3">
+            <div className="h-4 w-1/3 rounded bg-muted" />
+            <div className="h-10 rounded bg-muted/70" />
+            <div className="h-10 rounded bg-muted/70" />
+            <div className="h-10 rounded bg-muted/70" />
+          </div>
+        </div>
+      )
+    }
     return (
       <div className="h-full flex items-center justify-center text-gray-400 text-sm">
         Loading...
@@ -1296,13 +1308,13 @@ export default function GridBlock({
   }
 
   return (
-    <div className={`h-full w-full min-h-0 flex flex-col ${isGridWithPushDown ? 'overflow-visible' : 'overflow-hidden'}`} style={blockStyle}>
+    <div className={`h-full w-full max-w-full min-h-0 min-w-0 flex flex-col ${isGridWithPushDown ? 'overflow-visible' : 'overflow-hidden'}`} style={blockStyle}>
       {/* Legacy header (title + optional add record) - only when appearance wrapper is not active */}
       {!wrapperHasAppearanceSettings &&
         (((appearance.showTitle ?? (appearance as any).show_title) !== false && blockTitle) ||
           showAddRecord) && (
           <div
-            className="mb-4 pb-2 border-b flex items-center justify-between gap-3"
+            className="mb-4 pb-2 border-b flex flex-wrap items-center justify-between gap-3"
             style={{
               backgroundColor: appearance.header_background,
               color: appearance.header_text_color || appearance.title_color,
@@ -1323,6 +1335,7 @@ export default function GridBlock({
                 onClick={handleAddRecord}
                 disabled={isAddRecordDisabled}
                 title={!canCreateRecord ? 'Adding records is disabled for this block' : 'Add a new record'}
+                className="shrink-0"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Add record
@@ -1342,7 +1355,7 @@ export default function GridBlock({
         return (
           <div
             className={cn(
-              "flex items-center gap-2 flex-shrink-0 min-h-0 overflow-x-auto min-w-0",
+              "flex flex-wrap items-center gap-2 flex-shrink-0 min-h-0 min-w-0",
               marketingDashboardStyle ? "border-b border-border/40 bg-muted/10 py-1.5 px-3" : "border-b border-gray-200/80 bg-white",
               !marketingDashboardStyle && (headerCompact ? "py-1.5 px-3" : "py-2.5 px-4")
             )}
@@ -1390,7 +1403,7 @@ export default function GridBlock({
 
       {/* New appearance wrapper active: it renders the title header. Keep Add record available without duplicating the title. */}
       {wrapperHasAppearanceSettings && showAddRecord && viewType !== "calendar" && (
-        <div className="mb-3 flex justify-end">
+        <div className="mb-3 flex flex-wrap justify-end gap-2">
           <Button
             type="button"
             size="sm"
@@ -1418,7 +1431,7 @@ export default function GridBlock({
       {/* Single scroll container: GridView/CalendarView owns scroll; flex so child can flex-1. Calendar needs overflow-hidden so child controls scroll. */}
       {/* When isFullPage, parent provides height (no min-h). Otherwise calendar uses min-h-[100vh] for scroll. */}
       {/* When grid uses push-down (grouping), overflow-visible so content can grow and flow to page scroll. */}
-      <div className={`flex-1 min-h-0 min-w-0 flex flex-col ${isGridWithPushDown ? 'overflow-visible' : 'overflow-hidden'} ${viewType === 'calendar' && !isFullPage ? 'min-h-[100vh]' : ''} ${viewType === 'kanban' ? 'overflow-x-auto' : ''}`}>
+      <div className={`flex-1 min-h-0 min-w-0 max-w-full flex flex-col ${isGridWithPushDown ? 'overflow-visible' : 'overflow-hidden'} ${viewType === 'calendar' && !isFullPage ? 'min-h-[100vh]' : ''}`}>
         {renderView()}
       </div>
     </div>

@@ -55,6 +55,7 @@ interface InterfacePage {
   description?: string
   group_id?: string | null
   order_index?: number
+  is_hidden?: boolean
 }
 
 interface InterfaceGroup {
@@ -214,10 +215,15 @@ export default function GroupedInterfaces({
 
   // Organize pages by group
   // Pages without group_id go to "Ungrouped" system group
+  const pagesForDisplay = useMemo(
+    () => (editMode ? pages : pages.filter((page) => !page.is_hidden)),
+    [editMode, pages]
+  )
+
   const pagesByGroup = useMemo(() => {
     const result: Record<string, InterfacePage[]> = {}
     
-    pages.forEach(page => {
+    pagesForDisplay.forEach(page => {
       // If page has no group_id, assign to "Ungrouped" system group
       const groupId = page.group_id || ungroupedGroupId || 'ungrouped-system-virtual'
       if (!result[groupId]) {
@@ -232,7 +238,7 @@ export default function GroupedInterfaces({
     })
     
     return result
-  }, [pages, ungroupedGroupId])
+  }, [pagesForDisplay, ungroupedGroupId])
 
   // Get uncategorized/ungrouped pages - use ungroupedGroupId as key (never "uncategorized")
   const uncategorizedPages = pagesByGroup[ungroupedGroupId] || []
@@ -446,6 +452,29 @@ export default function GroupedInterfaces({
       // Revert on error
       setEditingPageId(null)
       setIsRenaming(false)
+    }
+  }
+
+  const handleTogglePageHidden = async (page: InterfacePage) => {
+    try {
+      const nextHidden = !Boolean(page.is_hidden)
+      const response = await fetch(`/api/pages/${page.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_hidden: nextHidden }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Failed to update page visibility" }))
+        throw new Error(errorData.error || "Failed to update page visibility")
+      }
+
+      setPages((prev) => prev.map((p) => (p.id === page.id ? { ...p, is_hidden: nextHidden } : p)))
+      window.dispatchEvent(new CustomEvent("pages-updated"))
+      onRefresh?.()
+    } catch (error) {
+      console.error("Failed to toggle page visibility:", error)
+      alert(error instanceof Error ? error.message : "Failed to update page visibility.")
     }
   }
 
@@ -976,11 +1005,17 @@ export default function GroupedInterfaces({
     const targetPageId = page.id
     const isActive = currentPageId === targetPageId
 
+    const isHidden = Boolean(page.is_hidden)
+
     return (
       <div 
         ref={setNodeRef} 
         style={style}
-        className={`group/page ${isDragging ? 'pointer-events-none' : ''}`}
+        className={cn(
+          "group/page",
+          isDragging ? "pointer-events-none" : "",
+          isHidden && "opacity-60"
+        )}
       >
         <div className="flex items-center gap-1">
           {canDrag ? (
@@ -1043,7 +1078,10 @@ export default function GroupedInterfaces({
               }}
             >
               <Layers className="h-4 w-4 flex-shrink-0" style={{ color: isActive ? primaryColor : sidebarTextColor }} />
-              <span className="text-sm truncate">{page.name}</span>
+              <span className={cn("text-sm truncate", isHidden && "italic text-muted-foreground")}>
+                {page.name}
+                {isHidden ? " (Hidden)" : ""}
+              </span>
             </a>
           )}
             <DropdownMenu>
@@ -1059,6 +1097,9 @@ export default function GroupedInterfaces({
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => handleStartEditPage(page)}>
                 Rename
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleTogglePageHidden(page)}>
+                {isHidden ? "Show in sidebar" : "Hide from sidebar"}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -1085,10 +1126,10 @@ export default function GroupedInterfaces({
   if (!editMode) {
     // Browse mode - clean navigation UI
     // If no groups exist but pages do, show pages directly
-    if (sortedGroups.length === 0 && pages.length > 0) {
+    if (sortedGroups.length === 0 && pagesForDisplay.length > 0) {
       return (
         <div className="space-y-0.5 px-1">
-          {pages.map((page) => (
+          {pagesForDisplay.map((page) => (
             <NavigationPage key={page.id} page={page} level={0} />
           ))}
         </div>

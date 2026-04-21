@@ -2054,16 +2054,16 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
   }
 
   return (
-    <div className="w-full h-full min-w-0 min-h-0 flex flex-col overflow-hidden bg-white">
+    <div className="w-full h-full min-w-0 min-h-0 max-w-full flex flex-col overflow-hidden bg-white">
       {renderAnchorControls()}
       {/* Scroll container: overflow-auto for single scroll; flex flex-col + min-h-0 for height propagation to FullCalendar */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 min-h-0 min-w-0 overflow-auto p-1.5 bg-white flex flex-col"
+        className="flex-1 min-h-0 min-w-0 max-w-full overflow-auto p-1.5 bg-white flex flex-col"
       >
         {/* Wrapper: min-h-0 allows flex child to receive constrained height; FullCalendar height="100%" fills it */}
         {mounted ? (
-          <div className="flex-1 min-h-0 min-w-[700px] w-full">
+          <div className="flex-1 min-h-0 min-w-[640px] md:min-w-[700px] w-full">
           <MemoizedFullCalendar
             ref={fullCalendarRef as React.LegacyRef<React.ComponentRef<typeof FullCalendar>>}
             key={calendarStableKey}

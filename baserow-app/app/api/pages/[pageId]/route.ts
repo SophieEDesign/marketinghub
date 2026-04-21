@@ -25,6 +25,7 @@ interface ViewData {
   group_id?: string | null
   default_view?: string | null
   hide_view_switcher?: boolean
+  is_hidden?: boolean
 }
 
 interface Page {
@@ -45,6 +46,7 @@ interface Page {
   group_id: string | null
   default_view: string | null
   hide_view_switcher: boolean
+  is_hidden: boolean
 }
 
 const DEFAULT_LAYOUT = { cols: 12, rowHeight: 30, margin: [10, 10] as [number, number] }
@@ -75,6 +77,7 @@ function convertViewToPage(data: ViewData): Page {
     group_id: data.group_id ?? null,
     default_view: data.default_view ?? null,
     hide_view_switcher: data.hide_view_switcher ?? false,
+    is_hidden: data.is_hidden ?? false,
   }
 }
 
@@ -129,16 +132,45 @@ export async function PATCH(
       is_admin_only, 
       group_id, 
       default_view, 
-      hide_view_switcher 
+      hide_view_switcher,
+      is_hidden,
     } = body
 
-    // Get existing view to preserve config
+    // Get existing view to preserve config for legacy views-backed interface pages
     const { data: existing } = await supabase
       .from('views')
       .select('config')
       .eq('id', params.pageId)
       .eq('type', 'interface')
-      .single()
+      .maybeSingle()
+
+    if (!existing) {
+      // Fallback for interface_pages-backed entries
+      const pageUpdates: Record<string, unknown> = {
+        updated_at: new Date().toISOString(),
+      }
+
+      if (name !== undefined) pageUpdates.name = name
+      if (is_admin_only !== undefined) pageUpdates.is_admin_only = is_admin_only
+      if (group_id !== undefined) pageUpdates.group_id = group_id || null
+      if (is_hidden !== undefined) pageUpdates.is_hidden = is_hidden
+
+      const { data: pageData, error: pageError } = await supabase
+        .from('interface_pages')
+        .update(pageUpdates)
+        .eq('id', params.pageId)
+        .select('*')
+        .single()
+
+      if (pageError) {
+        return NextResponse.json(
+          { error: pageError.message },
+          { status: 500 }
+        )
+      }
+
+      return NextResponse.json({ page: pageData })
+    }
 
     const updates: Record<string, unknown> = {
       updated_at: new Date().toISOString(),

@@ -36,6 +36,7 @@ interface InterfacePage {
   description?: string
   group_id?: string | null
   order_index?: number
+  is_hidden?: boolean
 }
 
 interface InterfaceGroup {

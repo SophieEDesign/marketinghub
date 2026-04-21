@@ -288,7 +288,7 @@ export default async function WorkspaceShellWrapper({
     // Load from new interface_pages table
     let newPagesQuery = supabase
       .from('interface_pages')
-      .select('id, name, page_type, group_id, order_index, created_at, updated_at, created_by, is_admin_only')
+      .select('id, name, page_type, group_id, order_index, created_at, updated_at, created_by, is_admin_only, is_hidden')
       .order('order_index', { ascending: true })
       .order('created_at', { ascending: false })
     
@@ -313,6 +313,7 @@ export default async function WorkspaceShellWrapper({
         group_id: page.group_id || null,
         order_index: page.order_index || 0,
         is_admin_only: page.is_admin_only ?? true,
+        is_hidden: page.is_hidden ?? false,
         is_new_system: true, // Flag to indicate this is from new system
       }))
     }
@@ -350,6 +351,7 @@ export default async function WorkspaceShellWrapper({
           group_id: view.group_id || null,
           order_index: view.order_index || 0,
           is_admin_only: view.is_admin_only ?? true,
+          is_hidden: false,
           is_new_system: false, // Flag to indicate this is from old system
         }))
       

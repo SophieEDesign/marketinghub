@@ -1345,7 +1345,7 @@ function InterfacePageClientInternal({
   }
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 min-w-0 overflow-x-hidden w-full">
+    <div className="flex w-full flex-1 min-h-0 min-w-0 max-w-full flex-col overflow-x-clip">
       {/* Loading overlay: single scroll surface; do not unmount tree */}
       {loading && !hasPage && (
         <div className="absolute inset-0 flex items-center justify-center z-20 bg-white">
@@ -1429,14 +1429,14 @@ function InterfacePageClientInternal({
 
       {/* Interface scroll area - single vertical scroll container for interface content */}
       <div
-        className={`flex-1 min-h-0 min-w-0 overflow-x-hidden flex flex-col ${
+        className={`flex-1 min-h-0 min-w-0 max-w-full overflow-x-clip flex flex-col ${
           suppressMainScroll ? "overflow-y-hidden" : "overflow-y-auto"
         }`}
       >
         {/* When suppressMainScroll: use flex-1 min-h-0 so content fills viewport (full-page/calendar). Otherwise content grows for scroll. */}
         {/* min-h-[100vh] when we have blocks ensures content exceeds viewport so scrollbar appears */}
         {/* In edit mode: extra padding-bottom so user can scroll to reach bottom resize handles and canvas isn't cut off */}
-        <div className={`w-full max-w-full min-w-0 flex flex-col overflow-x-hidden relative ${suppressMainScroll ? "flex-1 min-h-0" : blocks.length > 0 ? "min-h-[100vh]" : ""} ${isEditMode ? "pb-48" : ""}`}>
+        <div className={`relative flex w-full max-w-full min-w-0 flex-col overflow-x-clip ${suppressMainScroll ? "flex-1 min-h-0" : blocks.length > 0 ? "min-h-[100vh]" : ""} ${isEditMode ? "pb-48" : ""}`}>
           <InterfacePageContent
             useRecordReviewLayout={useRecordReviewLayout}
             hasPage={hasPage}

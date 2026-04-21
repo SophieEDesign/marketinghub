@@ -441,6 +441,18 @@ export default function ListBlock({
       }))
 
   if (isLoading) {
+    if (marketingDashboardStyle) {
+      return (
+        <div className="h-full w-full rounded-card-lg border border-border/50 bg-card p-4 shadow-sm">
+          <div className="animate-pulse space-y-3">
+            <div className="h-4 w-1/3 rounded bg-muted" />
+            <div className="h-10 rounded bg-muted/70" />
+            <div className="h-10 rounded bg-muted/70" />
+            <div className="h-10 rounded bg-muted/70" />
+          </div>
+        </div>
+      )
+    }
     return (
       <div className="h-full flex items-center justify-center text-gray-400 text-sm">
         Loading...

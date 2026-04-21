@@ -2548,8 +2548,8 @@ export default function Canvas({
               {isFullPageMode && fullPageBlock && block.id === fullPageBlock.id ? (
                 /* Full-page: rail layout (left block + right preview) or fill layout */
                 isRail ? (
-                  <div className="flex h-full w-full overflow-hidden">
-                    <div className="h-full overflow-hidden border-r flex flex-col relative" style={{ width: fullPageDef?.fullPageMaxWidth ?? 360 }}>
+                  <div className="flex h-full w-full min-w-0 max-w-full overflow-hidden">
+                    <div className="relative h-full shrink-0 overflow-hidden border-r flex flex-col" style={{ width: `clamp(280px, 28vw, ${fullPageDef?.fullPageMaxWidth ?? 360}px)` }}>
                       {isEditing && fullPageBlock.type === "record_context" && (
                         <div className="absolute top-2 left-2 z-10 flex items-center gap-1">
                           {onConfigureLeftPanel && (
