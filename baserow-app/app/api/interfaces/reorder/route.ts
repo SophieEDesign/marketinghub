@@ -1,29 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { isAdmin } from '@/lib/roles'
-
-function isPermissionDenied(error: { code?: string; message?: string } | null | undefined) {
-  return Boolean(
-    error &&
-    (error.code === '42501' ||
-      error.code === 'PGRST301' ||
-      error.message?.toLowerCase().includes('permission') ||
-      error.message?.toLowerCase().includes('policy'))
-  )
-}
+import { forbiddenResponse, isPermissionDeniedError, requireAdmin } from '@/lib/api/authz'
 
 /**
  * POST /api/interfaces/reorder - Reorder interfaces within or between groups
  */
 export async function POST(request: NextRequest) {
   try {
-    const admin = await isAdmin()
-    if (!admin) {
-      return NextResponse.json(
-        { error: 'Unauthorized: Admin access required' },
-        { status: 403 }
-      )
-    }
+    const { admin, response } = await requireAdmin()
+    if (!admin && response) return response
     const supabase = await createClient()
     const body = await request.json()
     const { interfaceUpdates } = body // Array of { id, group_id, order_index }
@@ -64,12 +49,7 @@ export async function POST(request: NextRequest) {
           .single()
         
         if (createError || !newGroup) {
-          if (isPermissionDenied(createError as any)) {
-            return NextResponse.json(
-              { error: 'Unauthorized: Admin access required' },
-              { status: 403 }
-            )
-          }
+          if (isPermissionDeniedError(createError as any)) return forbiddenResponse()
           return NextResponse.json(
             { error: 'Failed to create Ungrouped group' },
             { status: 500 }
@@ -106,7 +86,7 @@ export async function POST(request: NextRequest) {
         .eq('id', update.id)
       
       if (error) {
-        if (isPermissionDenied(error)) {
+        if (isPermissionDeniedError(error)) {
           throw new Error('FORBIDDEN')
         }
         throw new Error(`Failed to update interface page ${update.id}`)
@@ -121,10 +101,7 @@ export async function POST(request: NextRequest) {
   } catch (error: unknown) {
     const errorMessage = (error as { message?: string })?.message || ''
     if (errorMessage === 'FORBIDDEN') {
-      return NextResponse.json(
-        { error: 'Unauthorized: Admin access required' },
-        { status: 403 }
-      )
+      return forbiddenResponse()
     }
     return NextResponse.json(
       { error: 'Failed to reorder interfaces' },

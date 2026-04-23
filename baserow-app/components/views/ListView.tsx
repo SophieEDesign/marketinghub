@@ -876,11 +876,11 @@ export default function ListView({
         return (
           <span className="inline-flex items-center gap-1.5 min-w-0">
             {Icon ? <Icon className="h-4 w-4 shrink-0 opacity-70" aria-hidden /> : null}
-            <span className="truncate">{renderedValue}</span>
+            <span className="whitespace-normal break-words">{renderedValue}</span>
           </span>
         )
       }
-      return renderedValue
+      return <span className="whitespace-normal break-words">{renderedValue}</span>
     }
 
     return (
@@ -900,13 +900,13 @@ export default function ListView({
             key={col.key}
             className={cn(
               "px-3 text-sm text-foreground align-top",
-              marketingDashboardStyle ? "py-3.5 text-foreground/90" : "py-2.5"
+              marketingDashboardStyle ? "py-2.5 text-foreground/90" : "py-2"
             )}
           >
             {renderCellValue(col)}
           </td>
         ))}
-        <td className={cn("px-3 text-right align-top w-12", marketingDashboardStyle ? "py-3.5" : "py-2")}>
+        <td className={cn("px-3 text-right align-top w-12", marketingDashboardStyle ? "py-2.5" : "py-2")}>
           <button
             type="button"
             onClick={(e) => {
@@ -1077,7 +1077,7 @@ export default function ListView({
                       <tr key={node.pathKey} className={cn("border-b", marketingDashboardStyle ? "border-border/25" : "border-gray-200")}>
                         <td
                           colSpan={tableColumns.length + 1}
-                          className={cn("px-3", marketingDashboardStyle ? "py-4.5" : "py-2")}
+                          className={cn("px-3", marketingDashboardStyle ? "py-2.5" : "py-2")}
                           style={{ backgroundColor: finalHeaderBgColor, ...textColorStyle }}
                         >
                           <div className="flex items-center justify-between gap-2">

@@ -1,16 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { isAdmin } from '@/lib/roles'
-
-function isPermissionDenied(error: { code?: string; message?: string } | null | undefined) {
-  return Boolean(
-    error &&
-    (error.code === '42501' ||
-      error.code === 'PGRST301' ||
-      error.message?.toLowerCase().includes('permission') ||
-      error.message?.toLowerCase().includes('policy'))
-  )
-}
+import { forbiddenResponse, isPermissionDeniedError, requireAdmin } from '@/lib/api/authz'
 
 /**
  * GET /api/interface-groups - Get all interface groups
@@ -81,13 +71,8 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const admin = await isAdmin()
-    if (!admin) {
-      return NextResponse.json(
-        { error: 'Unauthorized: Admin access required' },
-        { status: 403 }
-      )
-    }
+    const { admin, response } = await requireAdmin()
+    if (!admin && response) return response
     const supabase = await createClient()
 
     const body = await request.json()
@@ -135,12 +120,7 @@ export async function POST(request: NextRequest) {
           { status: 503 }
         )
       }
-      if (isPermissionDenied(error)) {
-        return NextResponse.json(
-          { error: 'Unauthorized: Admin access required' },
-          { status: 403 }
-        )
-      }
+      if (isPermissionDeniedError(error)) return forbiddenResponse()
       console.error('Error creating interface group:', error)
       return NextResponse.json(
         { error: 'Failed to create interface group' },

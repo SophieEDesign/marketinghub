@@ -1,16 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { isAdmin } from '@/lib/roles'
-
-function isPermissionDenied(error: { code?: string; message?: string } | null | undefined) {
-  return Boolean(
-    error &&
-    (error.code === '42501' ||
-      error.code === 'PGRST301' ||
-      error.message?.toLowerCase().includes('permission') ||
-      error.message?.toLowerCase().includes('policy'))
-  )
-}
+import { forbiddenResponse, isPermissionDeniedError, requireAdmin } from '@/lib/api/authz'
 
 /**
  * PATCH /api/interface-groups/[groupId] - Update an interface group
@@ -20,13 +10,8 @@ export async function PATCH(
   { params }: { params: Promise<{ groupId: string }> }
 ) {
   try {
-    const admin = await isAdmin()
-    if (!admin) {
-      return NextResponse.json(
-        { error: 'Unauthorized: Admin access required' },
-        { status: 403 }
-      )
-    }
+    const { admin, response } = await requireAdmin()
+    if (!admin && response) return response
     const { groupId } = await params
     const supabase = await createClient()
     
@@ -49,12 +34,7 @@ export async function PATCH(
       .single()
 
     if (error) {
-      if (isPermissionDenied(error)) {
-        return NextResponse.json(
-          { error: 'Unauthorized: Admin access required' },
-          { status: 403 }
-        )
-      }
+      if (isPermissionDeniedError(error)) return forbiddenResponse()
       return NextResponse.json(
         { error: 'Failed to update interface group' },
         { status: 500 }
@@ -79,13 +59,8 @@ export async function DELETE(
   { params }: { params: Promise<{ groupId: string }> }
 ) {
   try {
-    const admin = await isAdmin()
-    if (!admin) {
-      return NextResponse.json(
-        { error: 'Unauthorized: Admin access required' },
-        { status: 403 }
-      )
-    }
+    const { admin, response } = await requireAdmin()
+    if (!admin && response) return response
     const { groupId } = await params
     const supabase = await createClient()
 
@@ -104,12 +79,7 @@ export async function DELETE(
       .from('interface_pages')
       .update({ group_id: targetGroupId })
       .eq('group_id', groupId)
-    if (movePagesError && isPermissionDenied(movePagesError)) {
-      return NextResponse.json(
-        { error: 'Unauthorized: Admin access required' },
-        { status: 403 }
-      )
-    }
+    if (movePagesError && isPermissionDeniedError(movePagesError)) return forbiddenResponse()
 
     // Also move views table entries (for backward compatibility)
     await supabase
@@ -125,12 +95,7 @@ export async function DELETE(
       .eq('id', groupId)
 
     if (error) {
-      if (isPermissionDenied(error)) {
-        return NextResponse.json(
-          { error: 'Unauthorized: Admin access required' },
-          { status: 403 }
-        )
-      }
+      if (isPermissionDeniedError(error)) return forbiddenResponse()
       return NextResponse.json(
         { error: 'Failed to delete interface group' },
         { status: 500 }

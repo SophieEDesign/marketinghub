@@ -1709,7 +1709,7 @@ export default function AirtableGridView({
       {/* Header */}
       <div
         ref={headerScrollRef}
-        className="flex-shrink-0 border-b border-gray-200 bg-white overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+        className="flex-shrink-0 border-b border-gray-200 bg-white overflow-x-auto overflow-y-hidden"
         style={{ height: HEADER_HEIGHT }}
         onScroll={(e) => {
           const left = e.currentTarget.scrollLeft

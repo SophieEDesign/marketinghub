@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { isAdmin } from '@/lib/roles'
+import { forbiddenResponse, isPermissionDeniedError, requireAdmin } from '@/lib/api/authz'
 
 interface ViewConfig {
   settings?: {
@@ -146,13 +146,8 @@ export async function PATCH(
       .maybeSingle()
 
     if (!existing) {
-      const admin = await isAdmin()
-      if (!admin) {
-        return NextResponse.json(
-          { error: 'Unauthorized: Admin access required' },
-          { status: 403 }
-        )
-      }
+          const { admin, response } = await requireAdmin()
+          if (!admin && response) return response
 
       // Fallback for interface_pages-backed entries
       const pageUpdates: Record<string, unknown> = {
@@ -171,18 +166,8 @@ export async function PATCH(
         .select('*')
         .single()
 
-      if (pageError) {
-        if (
-          pageError.code === '42501' ||
-          pageError.code === 'PGRST301' ||
-          pageError.message?.toLowerCase().includes('permission') ||
-          pageError.message?.toLowerCase().includes('policy')
-        ) {
-          return NextResponse.json(
-            { error: 'Unauthorized: Admin access required' },
-            { status: 403 }
-          )
-        }
+          if (pageError) {
+            if (isPermissionDeniedError(pageError)) return forbiddenResponse()
         return NextResponse.json(
           { error: 'Failed to update page' },
           { status: 500 }
