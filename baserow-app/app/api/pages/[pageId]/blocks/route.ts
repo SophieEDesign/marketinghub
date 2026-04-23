@@ -18,20 +18,10 @@ export async function GET(
     const { pageId } = await params
     const supabase = await createClient()
 
-    // CRITICAL FIX: Query blocks where EITHER page_id OR view_id matches
-    // This handles:
-    // 1. Blocks with page_id set (new interface_pages system)
-    // 2. Blocks with view_id set (legacy views system)
-    // 3. Blocks that might have been migrated or created in different contexts
-    // 
-    // CRITICAL: Do NOT filter by status - public and edit must load the same blocks
-    // Only filter by:
-    // - is_archived = false (exclude archived blocks)
-    // - page_id = pageId OR view_id = pageId
-    // Order by: order_index, then position_y, then position_x
-    // 
-    // We use .or() to match either column, preventing silent filtering failures
-    const { data, error } = await supabase
+    // Prefer canonical interface-page blocks (page_id) and only fall back to
+    // legacy view-linked blocks (view_id) when page-linked blocks do not exist.
+    // This prevents mixed payloads that can temporarily render stale/legacy layouts.
+    const pageBlocksResult = await supabase
       .from('view_blocks')
       // Only select what the API actually returns/uses (cuts payload and JSON parse time)
       .select(
@@ -50,17 +40,51 @@ export async function GET(
           'updated_at',
         ].join(',')
       )
-      .or(`page_id.eq.${pageId},view_id.eq.${pageId}`)
+      .eq('page_id', pageId)
       .eq('is_archived', false) // CRITICAL: Only exclude archived blocks, not by status
       .order('order_index', { ascending: true })
       .order('position_y', { ascending: true })
       .order('position_x', { ascending: true })
 
+    let data = pageBlocksResult.data
+    let error = pageBlocksResult.error
+    let queryType = "page_id only"
+
+    if (!error && (!data || data.length === 0)) {
+      const legacyBlocksResult = await supabase
+        .from('view_blocks')
+        .select(
+          [
+            'id',
+            'page_id',
+            'view_id',
+            'type',
+            'position_x',
+            'position_y',
+            'width',
+            'height',
+            'config',
+            'order_index',
+            'created_at',
+            'updated_at',
+          ].join(',')
+        )
+        .eq('view_id', pageId)
+        .eq('is_archived', false)
+        .order('order_index', { ascending: true })
+        .order('position_y', { ascending: true })
+        .order('position_x', { ascending: true })
+
+      data = legacyBlocksResult.data
+      error = legacyBlocksResult.error
+      queryType = "view_id fallback"
+    }
+
     // CRITICAL: Log query results for debugging
     // This confirms edit and public fetch identical block IDs + position values
     if (process.env.NODE_ENV === 'development') {
       console.log(`[API GET /blocks] pageId=${pageId}`, {
-        queryType: 'page_id OR view_id (both checked)',
+        queryType,
         dbRowCount: data?.length || 0,
         blockIds: data?.map((b: any) => b.id) || [],
         blockPositions: data?.map((b: any) => ({
@@ -73,8 +97,7 @@ export async function GET(
         blocksWithPageId: data?.filter((b: any) => b.page_id === pageId).length || 0,
         blocksWithViewId: data?.filter((b: any) => b.view_id === pageId).length || 0,
         error: error?.message,
-        // CRITICAL: No status filtering - edit and public must see same blocks
-        note: 'No status filtering applied - edit and public fetch identical blocks',
+        note: "Prefer page_id blocks, fallback to view_id blocks only when needed",
       })
     }
 
@@ -82,7 +105,7 @@ export async function GET(
       console.error(`[API GET /blocks] ERROR: pageId=${pageId}`, {
         error: error.message,
         errorCode: error.code,
-        queryType: 'page_id OR view_id',
+        queryType,
       })
       return NextResponse.json(
         { error: error.message },
@@ -168,7 +191,7 @@ export async function GET(
     // This confirms edit and public receive identical block IDs + position values
     if (process.env.NODE_ENV === 'development') {
       console.log(`[API GET /blocks] RESPONSE: pageId=${pageId}`, {
-        queryType: 'page_id OR view_id (both checked)',
+        queryType,
         dbRowCount: data?.length || 0,
         blocksCount: blocks.length,
         blockIds: blocks.map((b) => b.id),
