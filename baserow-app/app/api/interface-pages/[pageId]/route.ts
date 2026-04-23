@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getInterfacePage, updateInterfacePage, deleteInterfacePage } from '@/lib/interface/pages'
+import { isAdmin } from '@/lib/roles'
+
+function isPermissionDenied(message: string) {
+  const normalized = message.toLowerCase()
+  return normalized.includes('permission') || normalized.includes('policy') || normalized.includes('forbidden')
+}
 
 export async function GET(
   request: NextRequest,
@@ -29,15 +35,27 @@ export async function PATCH(
   { params }: { params: Promise<{ pageId: string }> }
 ) {
   try {
+    const admin = await isAdmin()
+    if (!admin) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Admin access required' },
+        { status: 403 }
+      )
+    }
     const { pageId } = await params
     const body = await request.json()
     const page = await updateInterfacePage(pageId, body)
     return NextResponse.json(page)
   } catch (error: unknown) {
-    console.error('Error updating interface page:', error)
     const errorMessage = (error as { message?: string })?.message || 'Failed to update page'
+    if (isPermissionDenied(errorMessage)) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Admin access required' },
+        { status: 403 }
+      )
+    }
     return NextResponse.json(
-      { error: errorMessage },
+      { error: 'Failed to update page' },
       { status: 500 }
     )
   }
@@ -48,6 +66,13 @@ export async function DELETE(
   { params }: { params: Promise<{ pageId: string }> }
 ) {
   try {
+    const admin = await isAdmin()
+    if (!admin) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Admin access required' },
+        { status: 403 }
+      )
+    }
     const { pageId } = await params
     
     // Verify user is authenticated
@@ -64,20 +89,17 @@ export async function DELETE(
     await deleteInterfacePage(pageId)
     return NextResponse.json({ success: true })
   } catch (error: unknown) {
-    console.error('Error deleting interface page:', error)
     const errorObj = error as { message?: string } | null
     const errorMessage = errorObj?.message || ''
-    
-    // Return appropriate status codes
-    const status = errorMessage.includes('permission') || errorMessage.includes('not found') 
-      ? 403 
-      : errorMessage.includes('Authentication') 
-      ? 401 
-      : 500
-    
+    if (isPermissionDenied(errorMessage)) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Admin access required' },
+        { status: 403 }
+      )
+    }
     return NextResponse.json(
-      { error: errorMessage },
-      { status }
+      { error: 'Failed to delete page' },
+      { status: 500 }
     )
   }
 }

@@ -1,5 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { isAdmin } from '@/lib/roles'
+
+function isPermissionDenied(error: { code?: string; message?: string } | null | undefined) {
+  return Boolean(
+    error &&
+    (error.code === '42501' ||
+      error.code === 'PGRST301' ||
+      error.message?.toLowerCase().includes('permission') ||
+      error.message?.toLowerCase().includes('policy'))
+  )
+}
 
 /**
  * GET /api/interface-groups - Get all interface groups
@@ -70,14 +81,14 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
-      // Silently fail - interface groups are optional
-      console.warn('User not authenticated, cannot create interface group')
-      return NextResponse.json({ group: null }, { status: 200 })
+    const admin = await isAdmin()
+    if (!admin) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Admin access required' },
+        { status: 403 }
+      )
     }
+    const supabase = await createClient()
 
     const body = await request.json()
     const { name, workspace_id } = body
@@ -113,28 +124,36 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      // If table doesn't exist or RLS error, silently fail
-      if (error.code === '42P01' || error.code === 'PGRST116' || 
-          error.code === 'PGRST301' ||
-          error.message?.includes('relation') || 
-          error.message?.includes('does not exist') ||
-          error.message?.includes('permission') ||
-          error.message?.includes('policy')) {
-        console.warn('interface_groups table may not exist or RLS blocking, cannot create group')
-        return NextResponse.json({ group: null }, { status: 200 })
+      if (
+        error.code === '42P01' ||
+        error.code === 'PGRST116' ||
+        error.message?.includes('relation') ||
+        error.message?.includes('does not exist')
+      ) {
+        return NextResponse.json(
+          { error: 'Interface groups are unavailable. Run pending migrations.' },
+          { status: 503 }
+        )
       }
-      
+      if (isPermissionDenied(error)) {
+        return NextResponse.json(
+          { error: 'Unauthorized: Admin access required' },
+          { status: 403 }
+        )
+      }
       console.error('Error creating interface group:', error)
       return NextResponse.json(
-        { error: error.message || 'Failed to create interface group' },
+        { error: 'Failed to create interface group' },
         { status: 500 }
       )
     }
 
     return NextResponse.json({ group }, { status: 201 })
   } catch (error: any) {
-    // Silently fail - interface groups are optional
     console.warn('Error creating interface group:', error)
-    return NextResponse.json({ group: null }, { status: 200 })
+    return NextResponse.json(
+      { error: 'Failed to create interface group' },
+      { status: 500 }
+    )
   }
 }

@@ -1,5 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { isAdmin } from '@/lib/roles'
+
+function isPermissionDenied(error: { code?: string; message?: string } | null | undefined) {
+  return Boolean(
+    error &&
+    (error.code === '42501' ||
+      error.code === 'PGRST301' ||
+      error.message?.toLowerCase().includes('permission') ||
+      error.message?.toLowerCase().includes('policy'))
+  )
+}
 
 /**
  * PATCH /api/interface-groups/[groupId] - Update an interface group
@@ -9,14 +20,15 @@ export async function PATCH(
   { params }: { params: Promise<{ groupId: string }> }
 ) {
   try {
+    const admin = await isAdmin()
+    if (!admin) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Admin access required' },
+        { status: 403 }
+      )
+    }
     const { groupId } = await params
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    // Optional: Check authentication (RLS will handle it, but we can be explicit)
-    // if (!user) {
-    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    // }
     
     const body = await request.json()
     const { name, order_index, collapsed, is_admin_only, icon } = body
@@ -37,8 +49,14 @@ export async function PATCH(
       .single()
 
     if (error) {
+      if (isPermissionDenied(error)) {
+        return NextResponse.json(
+          { error: 'Unauthorized: Admin access required' },
+          { status: 403 }
+        )
+      }
       return NextResponse.json(
-        { error: error.message || 'Failed to update interface group' },
+        { error: 'Failed to update interface group' },
         { status: 500 }
       )
     }
@@ -46,7 +64,7 @@ export async function PATCH(
     return NextResponse.json({ group })
   } catch (error: any) {
     return NextResponse.json(
-      { error: error.message || 'Failed to update interface group' },
+      { error: 'Failed to update interface group' },
       { status: 500 }
     )
   }
@@ -61,14 +79,15 @@ export async function DELETE(
   { params }: { params: Promise<{ groupId: string }> }
 ) {
   try {
+    const admin = await isAdmin()
+    if (!admin) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Admin access required' },
+        { status: 403 }
+      )
+    }
     const { groupId } = await params
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    // Optional: Check authentication (RLS will handle it, but we can be explicit)
-    // if (!user) {
-    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    // }
 
     // Find the "Ungrouped" system group to move pages to
     const { data: ungroupedGroup } = await supabase
@@ -81,10 +100,16 @@ export async function DELETE(
     const targetGroupId = ungroupedGroup?.id || null
 
     // Move all interface pages in this group to Ungrouped (or null if no Ungrouped group)
-    await supabase
+    const { error: movePagesError } = await supabase
       .from('interface_pages')
       .update({ group_id: targetGroupId })
       .eq('group_id', groupId)
+    if (movePagesError && isPermissionDenied(movePagesError)) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Admin access required' },
+        { status: 403 }
+      )
+    }
 
     // Also move views table entries (for backward compatibility)
     await supabase
@@ -100,8 +125,14 @@ export async function DELETE(
       .eq('id', groupId)
 
     if (error) {
+      if (isPermissionDenied(error)) {
+        return NextResponse.json(
+          { error: 'Unauthorized: Admin access required' },
+          { status: 403 }
+        )
+      }
       return NextResponse.json(
-        { error: error.message || 'Failed to delete interface group' },
+        { error: 'Failed to delete interface group' },
         { status: 500 }
       )
     }
@@ -109,7 +140,7 @@ export async function DELETE(
     return NextResponse.json({ success: true })
   } catch (error: any) {
     return NextResponse.json(
-      { error: error.message || 'Failed to delete interface group' },
+      { error: 'Failed to delete interface group' },
       { status: 500 }
     )
   }

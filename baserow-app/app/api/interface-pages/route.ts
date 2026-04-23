@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createInterfacePage, getAllInterfacePages } from '@/lib/interface/pages'
 import { PageType } from '@/lib/interface/page-types'
 import { PageConfig } from '@/lib/interface/page-config'
+import { isAdmin } from '@/lib/roles'
 
 export async function GET() {
   try {
@@ -18,6 +19,13 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const admin = await isAdmin()
+    if (!admin) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Admin access required' },
+        { status: 403 }
+      )
+    }
     const body = await request.json()
     const {
       name,
@@ -47,8 +55,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(page)
   } catch (error: any) {
     console.error('Error creating interface page:', error)
+    const message = String(error?.message || '')
+    if (message.toLowerCase().includes('permission') || message.toLowerCase().includes('policy')) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Admin access required' },
+        { status: 403 }
+      )
+    }
     return NextResponse.json(
-      { error: error.message || 'Failed to create page' },
+      { error: 'Failed to create page' },
       { status: 500 }
     )
   }

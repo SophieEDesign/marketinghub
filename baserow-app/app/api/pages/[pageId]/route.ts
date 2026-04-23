@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { isAdmin } from '@/lib/roles'
 
 interface ViewConfig {
   settings?: {
@@ -145,6 +146,14 @@ export async function PATCH(
       .maybeSingle()
 
     if (!existing) {
+      const admin = await isAdmin()
+      if (!admin) {
+        return NextResponse.json(
+          { error: 'Unauthorized: Admin access required' },
+          { status: 403 }
+        )
+      }
+
       // Fallback for interface_pages-backed entries
       const pageUpdates: Record<string, unknown> = {
         updated_at: new Date().toISOString(),
@@ -163,8 +172,19 @@ export async function PATCH(
         .single()
 
       if (pageError) {
+        if (
+          pageError.code === '42501' ||
+          pageError.code === 'PGRST301' ||
+          pageError.message?.toLowerCase().includes('permission') ||
+          pageError.message?.toLowerCase().includes('policy')
+        ) {
+          return NextResponse.json(
+            { error: 'Unauthorized: Admin access required' },
+            { status: 403 }
+          )
+        }
         return NextResponse.json(
-          { error: pageError.message },
+          { error: 'Failed to update page' },
           { status: 500 }
         )
       }

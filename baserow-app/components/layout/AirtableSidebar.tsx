@@ -320,32 +320,34 @@ export default function AirtableSidebar({
             </div>
           </div>
 
-          <div className="flex-shrink-0 px-3 pb-2 flex items-center border-b border-border/50">
-            <button
-              type="button"
-              onClick={() => (isEditMode ? exitSidebarEdit() : enterSidebarEdit())}
-              className={cn(
-                "flex items-center gap-2 px-2 py-1.5 text-xs font-medium rounded-lg transition-colors",
-                "hover:bg-black/[0.06]",
-                isEditMode && "bg-black/[0.1]"
-              )}
-              style={{ color: sidebarTextColor }}
-              title={isEditMode ? "Finish organising the sidebar" : "Reorder pages and sections"}
-              aria-label={isEditMode ? "Done organising sidebar" : "Organise sidebar"}
-            >
-              {isEditMode ? (
-                <>
-                  <Check className="h-3.5 w-3.5" />
-                  <span>Done</span>
-                </>
-              ) : (
-                <>
-                  <Edit2 className="h-3.5 w-3.5" />
-                  <span>Organise</span>
-                </>
-              )}
-            </button>
-          </div>
+          {isAdmin && (
+            <div className="flex-shrink-0 px-3 pb-2 flex items-center border-b border-border/50">
+              <button
+                type="button"
+                onClick={() => (isEditMode ? exitSidebarEdit() : enterSidebarEdit())}
+                className={cn(
+                  "flex items-center gap-2 px-2 py-1.5 text-xs font-medium rounded-lg transition-colors",
+                  "hover:bg-black/[0.06]",
+                  isEditMode && "bg-black/[0.1]"
+                )}
+                style={{ color: sidebarTextColor }}
+                title={isEditMode ? "Finish organising the sidebar" : "Reorder pages and sections"}
+                aria-label={isEditMode ? "Done organising sidebar" : "Organise sidebar"}
+              >
+                {isEditMode ? (
+                  <>
+                    <Check className="h-3.5 w-3.5" />
+                    <span>Done</span>
+                  </>
+                ) : (
+                  <>
+                    <Edit2 className="h-3.5 w-3.5" />
+                    <span>Organise</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
 
           <div className="px-2 pt-2 pb-1 space-y-1">
             {homeHref && (
@@ -374,7 +376,7 @@ export default function AirtableSidebar({
             <GroupedInterfaces
               interfacePages={interfacePages}
               interfaceGroups={interfaceGroups}
-              editMode={isEditMode}
+              editMode={isEditMode && isAdmin}
               onRefresh={() => {
                 window.dispatchEvent(new CustomEvent("pages-updated"))
                 router.refresh()
