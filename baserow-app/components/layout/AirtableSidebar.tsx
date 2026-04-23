@@ -60,6 +60,10 @@ interface AirtableSidebarProps {
   landingPageTitle?: string | null
   /** Section title for the tables tree. Default: "Data & tables" */
   coreDataSectionTitle?: string
+  /** When true, desktop sidebar defaults to compact icon rail. */
+  autoCompact?: boolean
+  /** Called when user manually expands while autoCompact is active. */
+  onAutoCompactDismiss?: () => void
 }
 
 function getReadableTextColor(backgroundColor: string): string {
@@ -107,6 +111,8 @@ export default function AirtableSidebar({
   defaultPageId = null,
   landingPageTitle = null,
   coreDataSectionTitle = "Data & tables",
+  autoCompact = false,
+  onAutoCompactDismiss,
 }: AirtableSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
@@ -158,9 +164,29 @@ export default function AirtableSidebar({
 
   const [internalCollapsed, setInternalCollapsed] = useState(false)
   const [newPageModalOpen, setNewPageModalOpen] = useState(false)
+  const [manuallyExpandedDuringAutoCompact, setManuallyExpandedDuringAutoCompact] = useState(false)
+
+  useEffect(() => {
+    if (!autoCompact) {
+      setManuallyExpandedDuringAutoCompact(false)
+    }
+  }, [autoCompact])
+
+  const collapseToRail = () => {
+    setInternalCollapsed(true)
+  }
+
+  const expandFromRail = () => {
+    if (autoCompact) {
+      setManuallyExpandedDuringAutoCompact(true)
+      onAutoCompactDismiss?.()
+    }
+    setInternalCollapsed(false)
+  }
 
   const isOpen = isOpenProp !== undefined ? isOpenProp : !internalCollapsed
-  const isCollapsed = isMobile ? !isOpen : internalCollapsed
+  const shouldForceCompactOnDesktop = !isMobile && autoCompact && !manuallyExpandedDuringAutoCompact
+  const isCollapsed = isMobile ? !isOpen : (internalCollapsed || shouldForceCompactOnDesktop)
 
   const isAdmin = userRole === "admin"
   const isEditMode = isSidebarEditMode
@@ -246,7 +272,7 @@ export default function AirtableSidebar({
         />
         <button
           type="button"
-          onClick={() => setInternalCollapsed(false)}
+          onClick={expandFromRail}
           className="p-2 hover:bg-black/[0.06] rounded-lg transition-colors"
           style={{ color: sidebarTextColor }}
           title="Expand sidebar"
@@ -301,7 +327,7 @@ export default function AirtableSidebar({
               type="button"
               onClick={() => {
                 if (isMobile && onClose) onClose()
-                else setInternalCollapsed(true)
+                else collapseToRail()
               }}
               className="p-1 hover:bg-black/[0.06] rounded-lg transition-colors"
               style={{ color: sidebarTextColor }}

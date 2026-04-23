@@ -117,6 +117,7 @@ function TimelineView({
   const [zoomLevel, setZoomLevel] = useState<ZoomLevel>("month")
   const [scrollPosition, setScrollPosition] = useState(0)
   const timelineRef = useRef<HTMLDivElement>(null)
+  const [timelineWidth, setTimelineWidth] = useState(0)
   const [linkedValueLabelMaps, setLinkedValueLabelMaps] = useState<Record<string, Record<string, string>>>({})
 
   const areLinkedValueMapsEqual = useCallback(
@@ -181,6 +182,36 @@ function TimelineView({
 
   // Prevent stale/overlapping loads from causing UI flicker.
   const loadSeqRef = useRef(0)
+
+  const measureTimelineWidth = useCallback(() => {
+    const next = Math.floor(timelineRef.current?.clientWidth || 0)
+    if (next > 0) {
+      setTimelineWidth((prev) => (prev === next ? prev : next))
+    }
+  }, [])
+
+  useEffect(() => {
+    measureTimelineWidth()
+  }, [measureTimelineWidth])
+
+  useEffect(() => {
+    const el = timelineRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => measureTimelineWidth())
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [measureTimelineWidth])
+
+  useEffect(() => {
+    const handleWindowResize = () => measureTimelineWidth()
+    const handleLayoutResize = () => measureTimelineWidth()
+    window.addEventListener("resize", handleWindowResize)
+    window.addEventListener("app:layout-resize", handleLayoutResize)
+    return () => {
+      window.removeEventListener("resize", handleWindowResize)
+      window.removeEventListener("app:layout-resize", handleLayoutResize)
+    }
+  }, [measureTimelineWidth])
 
   useEffect(() => {
     let cancelled = false
@@ -1146,31 +1177,31 @@ function TimelineView({
   // Calculate pixel positions for events - cards constrained 160-240px
   const getEventPosition = useCallback(
     (event: TimelineEvent) => {
-      const timelineWidth = timelineRef.current?.clientWidth || 1000
+      const effectiveWidth = timelineWidth || timelineRef.current?.clientWidth || 1000
       const rangeMs = timelineRange.end.getTime() - timelineRange.start.getTime()
       const startMs = event.start.getTime() - timelineRange.start.getTime()
       const durationMs = event.end.getTime() - event.start.getTime()
 
-      const left = (startMs / rangeMs) * timelineWidth
-      const rawWidth = (durationMs / rangeMs) * timelineWidth
+      const left = (startMs / rangeMs) * effectiveWidth
+      const rawWidth = (durationMs / rangeMs) * effectiveWidth
       const width = Math.min(240, Math.max(160, rawWidth))
 
       return { left, width }
     },
-    [timelineRange]
+    [timelineRange, timelineWidth]
   )
 
   // Generate time labels based on zoom level
   const timeLabels = useMemo(() => {
     const labels: Array<{ date: Date; label: string; position: number }> = []
-    const timelineWidth = timelineRef.current?.clientWidth || 1000
+    const effectiveWidth = timelineWidth || timelineRef.current?.clientWidth || 1000
     const rangeMs = timelineRange.end.getTime() - timelineRange.start.getTime()
 
     let current = new Date(timelineRange.start)
     const increment = getIncrementForZoom(zoomLevel)
 
     while (current <= timelineRange.end) {
-      const position = ((current.getTime() - timelineRange.start.getTime()) / rangeMs) * timelineWidth
+      const position = ((current.getTime() - timelineRange.start.getTime()) / rangeMs) * effectiveWidth
       labels.push({
         date: new Date(current),
         label: formatDateForZoom(current, zoomLevel),
@@ -1180,7 +1211,7 @@ function TimelineView({
     }
 
     return labels
-  }, [timelineRange, zoomLevel])
+  }, [timelineRange, zoomLevel, timelineWidth])
 
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
 

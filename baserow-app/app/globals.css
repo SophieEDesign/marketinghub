@@ -89,7 +89,7 @@
 
 @layer base {
   .marketing-dashboard-shell {
-    --section-gap: 2.25rem;
+    --section-gap: 1.4rem;
   }
   .marketing-dashboard-shell .react-grid-layout {
     width: 100% !important;
@@ -102,6 +102,46 @@
     width: 100%;
     min-width: 0;
     max-width: 100%;
+  }
+
+  /* Dashboard density pass: tighter spacing while keeping structure intact */
+  [data-marketing-dashboard] .rounded-card-lg,
+  [data-marketing-dashboard] .rounded-card {
+    border-radius: 0.7rem;
+  }
+
+  [data-marketing-dashboard] .marketing-card {
+    padding: 0.625rem;
+  }
+
+  [data-marketing-dashboard] h2,
+  [data-marketing-dashboard] h3 {
+    line-height: 1.2;
+  }
+
+  [data-marketing-dashboard] table th {
+    padding-top: 0.45rem;
+    padding-bottom: 0.45rem;
+  }
+
+  [data-marketing-dashboard] table td {
+    vertical-align: top;
+  }
+
+  [data-marketing-dashboard] table td > *,
+  [data-marketing-dashboard] table td span,
+  [data-marketing-dashboard] table td div {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  [data-marketing-dashboard] .inline-flex.items-center.gap-1.text-xs {
+    white-space: nowrap;
+  }
+
+  [data-marketing-dashboard] button.h-8,
+  [data-marketing-dashboard] .h-8 {
+    min-height: 1.75rem;
   }
 }
 
@@ -650,14 +690,14 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: nowrap;
-  gap: 0.5rem;
+  gap: 0.35rem;
   margin: 0;
-  padding: 0.5rem 0 0.75rem;
+  padding: 0.3rem 0 0.45rem;
   border-bottom: 1px solid hsl(var(--border) / 0.55);
 }
 
 .calendar-embed .fc .fc-toolbar-title {
-  font-size: 0.95rem;
+  font-size: 0.88rem;
   line-height: 1.2;
   font-weight: 600;
   color: hsl(var(--foreground));
@@ -678,8 +718,8 @@
 }
 
 .calendar-embed .fc .fc-button {
-  height: 30px;
-  padding: 0 0.6rem;
+  height: 27px;
+  padding: 0 0.45rem;
   border-radius: 0.5rem;
   border: 1px solid hsl(var(--border) / 0.7);
   background: hsl(var(--background));
@@ -713,7 +753,7 @@
 }
 
 .calendar-embed .fc .fc-view-harness {
-  margin-top: 0.7rem;
+  margin-top: 0.45rem;
 }
 
 .calendar-embed .fc .fc-scrollgrid {
@@ -732,7 +772,7 @@
 }
 
 .calendar-embed .fc .fc-col-header-cell-cushion {
-  padding: 0.45rem 0.35rem;
+  padding: 0.35rem 0.3rem;
   font-size: 0.69rem;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -741,7 +781,7 @@
 }
 
 .calendar-embed .fc .fc-daygrid-day-frame {
-  padding: 0.18rem 0.2rem;
+  padding: 0.14rem 0.16rem;
 }
 
 .calendar-embed .fc .fc-daygrid-day-number {

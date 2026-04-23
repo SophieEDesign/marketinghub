@@ -79,7 +79,7 @@ function InterfacePageContent({
     )
   }
   return (
-    <div className={`min-h-0 flex flex-col ${BLOCK_EMBED_CLASSNAME}`}>
+    <div className={`min-h-0 min-w-0 w-full max-w-full flex flex-col ${BLOCK_EMBED_CLASSNAME}`}>
       <InterfaceBuilder
         page={(interfaceBuilderPage ?? fallbackPage) as any}
         initialBlocks={memoizedBlocks}
@@ -1441,16 +1441,15 @@ function InterfacePageClientInternal({
 
       {/* Interface scroll area - single vertical scroll container for interface content */}
       <div
-        className={`flex-1 min-h-0 min-w-0 max-w-full overflow-x-hidden flex flex-col ${
-          suppressMainScroll ? "overflow-y-hidden" : "overflow-y-auto"
-        }`}
+        className="flex-1 min-h-0 min-w-0 max-w-full overflow-hidden flex flex-col"
       >
         {/* When suppressMainScroll: use flex-1 min-h-0 so content fills viewport (full-page/calendar). Otherwise content grows for scroll. */}
         {/* min-h-[100vh] when we have blocks ensures content exceeds viewport so scrollbar appears */}
         {/* In edit mode: extra padding-bottom so user can scroll to reach bottom resize handles and canvas isn't cut off */}
         <CanvasContainer
+          scrollOwner={suppressMainScroll ? "parent" : "self"}
           fullBleed
-          className={`relative overflow-x-hidden ${suppressMainScroll ? "flex-1 min-h-0" : blocks.length > 0 ? "min-h-[100vh]" : ""} ${isEditMode ? "pb-48" : ""}`}
+          className={`relative overflow-x-hidden ${suppressMainScroll ? "flex-1 min-h-0" : "min-h-full"} ${isEditMode ? "pb-48" : ""}`}
         >
           <InterfacePageContent
             useRecordReviewLayout={useRecordReviewLayout}

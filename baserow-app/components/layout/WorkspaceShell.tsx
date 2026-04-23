@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import AirtableSidebar from "./AirtableSidebar"
 import Topbar from "./Topbar"
 import EditModeBanner from "./EditModeBanner"
@@ -14,6 +14,7 @@ import RightSettingsPanel from "@/components/interface/RightSettingsPanel"
 import RecordPanel from "@/components/records/RecordPanel"
 import { MainScrollProvider } from "@/contexts/MainScrollContext"
 import { useUIMode } from "@/contexts/UIModeContext"
+import { useSelectionContext } from "@/contexts/SelectionContext"
 import { useIsMobile } from "@/hooks/useResponsive"
 import { useBranding } from "@/contexts/BrandingContext"
 import { Button } from "@/components/ui/button"
@@ -21,7 +22,7 @@ import { Menu } from "lucide-react"
 import OnboardingTour from "./OnboardingTour"
 import type { Table, View } from "@/types/database"
 import { SHELL_RIGHT_SETTINGS_WIDTH_PX } from "@/lib/interface/layout-constants"
-import { AppShell } from "@/components/layout/ui-system"
+import { AppShell, CANVAS_SURFACE_CLASSNAME } from "@/components/layout/ui-system"
 
 interface InterfacePage {
   id: string
@@ -170,10 +171,29 @@ function ShellContent({
   primaryColor: string
 }) {
   const isEditMode = useUIMode().isEdit()
+  const { selectedContext } = useSelectionContext()
+  const [sidebarAutoCompactDismissed, setSidebarAutoCompactDismissed] = useState(false)
 
   // Right Settings Panel: always visible in Edit Mode - cannot be closed/crossed off.
   // UIModeContext is single source of truth. Panel shows "Select an element" when no context.
   const isPanelVisible = isEditMode
+  const hasBlockLevelSelection = useMemo(
+    () =>
+      selectedContext?.type === "block" ||
+      selectedContext?.type === "recordList" ||
+      selectedContext?.type === "field" ||
+      selectedContext?.type === "record",
+    [selectedContext?.type]
+  )
+  const shouldAutoCompactSidebar =
+    !isMobile && isEditMode && isPanelVisible && hasBlockLevelSelection && !sidebarAutoCompactDismissed
+
+  // Reset manual override when edit-panel state no longer requires compact mode.
+  useEffect(() => {
+    if (!isEditMode || !isPanelVisible || !hasBlockLevelSelection) {
+      setSidebarAutoCompactDismissed(false)
+    }
+  }, [isEditMode, isPanelVisible, hasBlockLevelSelection])
 
   return (
     <div className="flex flex-col h-screen min-h-[100dvh] bg-background overflow-hidden">
@@ -194,6 +214,8 @@ function ShellContent({
             defaultPageId={defaultPageId}
             landingPageTitle={landingPageTitle}
             coreDataSectionTitle={coreDataSectionTitle}
+            autoCompact={shouldAutoCompactSidebar}
+            onAutoCompactDismiss={() => setSidebarAutoCompactDismissed(true)}
           />
         }
         canvas={
@@ -212,37 +234,38 @@ function ShellContent({
                 </Button>
               </div>
             )}
-            <div className="flex flex-row flex-1 min-h-0 min-w-0 overflow-hidden">
-        {/* InterfaceContainer: min-h-0 allows height to flow to main > CalendarView */}
-        <div className="flex flex-1 basis-0 flex flex-col min-h-0 min-w-0 overflow-hidden">
-          {!hideTopbar && (
-            <Topbar
-              title={title}
-              onSidebarToggle={isMobile ? () => setSidebarOpen(!sidebarOpen) : undefined}
-              isAdmin={userRole === "admin"}
-            />
-          )}
-          <main className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
-            {children}
-          </main>
-        </div>
-        {/* RecordPanel - inline on right when open (desktop); overlay on mobile (portaled) */}
-        {!hideRecordPanel && <RecordPanel />}
-        {/* RightSettingsPanel: conditional mount, edit mode only, flex sibling. flex flex-col min-h-0 for scroll. */}
-        {isPanelVisible && (
-          <div
-            className="flex flex-col min-h-0 flex-shrink-0 overflow-hidden"
-            style={{
-              width: `${SHELL_RIGHT_SETTINGS_WIDTH_PX}px`,
-              minWidth: `${SHELL_RIGHT_SETTINGS_WIDTH_PX}px`,
-              maxWidth: `${SHELL_RIGHT_SETTINGS_WIDTH_PX}px`,
-            }}
-          >
-            <RightSettingsPanel />
-          </div>
-        )}
+            <div className={CANVAS_SURFACE_CLASSNAME}>
+              {/* InterfaceContainer: min-h-0 allows height to flow to main > CalendarView */}
+              <div className="flex flex-1 basis-0 flex-col min-h-0 min-w-0 overflow-hidden">
+                {!hideTopbar && (
+                  <Topbar
+                    title={title}
+                    onSidebarToggle={isMobile ? () => setSidebarOpen(!sidebarOpen) : undefined}
+                    isAdmin={userRole === "admin"}
+                  />
+                )}
+                <main className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
+                  {children}
+                </main>
+              </div>
+              {/* RecordPanel - inline on right when open (desktop); overlay on mobile (portaled) */}
+              {!hideRecordPanel && <RecordPanel />}
             </div>
           </>
+        }
+        rightPanel={
+          isPanelVisible ? (
+            <div
+              className="flex flex-col min-h-0 flex-shrink-0 overflow-hidden"
+              style={{
+                width: `${SHELL_RIGHT_SETTINGS_WIDTH_PX}px`,
+                minWidth: `${SHELL_RIGHT_SETTINGS_WIDTH_PX}px`,
+                maxWidth: `${SHELL_RIGHT_SETTINGS_WIDTH_PX}px`,
+              }}
+            >
+              <RightSettingsPanel />
+            </div>
+          ) : null
         }
       />
     </div>

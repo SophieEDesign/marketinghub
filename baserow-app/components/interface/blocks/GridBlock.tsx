@@ -1355,8 +1355,8 @@ export default function GridBlock({
         return (
           <div
             className={cn(
-              "flex flex-wrap items-center gap-2 flex-shrink-0 min-h-0 min-w-0",
-              marketingDashboardStyle ? "border-b border-border/40 bg-muted/10 py-1.5 px-3" : "border-b border-gray-200/80 bg-white",
+              "flex flex-wrap items-center gap-1.5 flex-shrink-0 min-h-0 min-w-0",
+              marketingDashboardStyle ? "border-b border-border/40 bg-muted/10 py-1 px-2.5" : "border-b border-gray-200/80 bg-white",
               !marketingDashboardStyle && (headerCompact ? "py-1.5 px-3" : "py-2.5 px-4")
             )}
           >
@@ -1372,7 +1372,7 @@ export default function GridBlock({
                 />
               )}
               {showQuickFilters && hasAnyDateField && (
-                <div className={`bg-gray-200 flex-shrink-0 ${headerCompact ? "h-4 w-px" : "h-5 w-px"}`} aria-hidden />
+                <div className={`bg-gray-200 flex-shrink-0 ${headerCompact ? "h-3.5 w-px" : "h-5 w-px"}`} aria-hidden />
               )}
               {hasAnyDateField && (
                 <CalendarAnchorControls
@@ -1391,7 +1391,7 @@ export default function GridBlock({
                 onClick={handleAddRecord}
                 disabled={isAddRecordDisabled}
                 title={!canCreateRecord ? "Adding records is disabled for this block" : "Add a new record"}
-                className={`text-xs flex-shrink-0 ${headerCompact ? "h-7 px-2" : "h-8"}`}
+                className={`text-xs flex-shrink-0 ${headerCompact ? "h-6.5 px-2" : "h-8"}`}
               >
                 <Plus className={`mr-1.5 ${headerCompact ? "h-3 w-3" : "h-3.5 w-3"}`} />
                 Add record
@@ -1431,7 +1431,7 @@ export default function GridBlock({
       {/* Single scroll container: GridView/CalendarView owns scroll; flex so child can flex-1. Calendar needs overflow-hidden so child controls scroll. */}
       {/* Non-full-page calendar must not force viewport min-height inside a fixed grid item, or lower content gets clipped. */}
       {/* When grid uses push-down (grouping), overflow-visible so content can grow and flow to page scroll. */}
-      <div className={`flex-1 min-h-0 min-w-0 max-w-full flex flex-col ${isGridWithPushDown ? 'overflow-visible' : 'overflow-hidden'}`}>
+      <div className={`flex-1 min-h-0 min-w-0 max-w-full flex flex-col ${(isGridWithPushDown || marketingDashboardStyle) ? 'overflow-visible' : 'overflow-hidden'}`}>
         {renderView()}
       </div>
     </div>

@@ -170,6 +170,7 @@ export default function KPIBlock({
 
   // Get padding
   const getPadding = () => {
+    if (marketingDashboardStyle) return '10px'
     if (typeof appearance.padding === 'number') return `${appearance.padding}px`
     if (appearance.padding === 'compact') return '12px'
     if (appearance.padding === 'spacious') return '24px'
@@ -201,7 +202,7 @@ export default function KPIBlock({
 
   // Get value size class
   const getValueSizeClass = () => {
-    if (marketingDashboardStyle) return "text-2xl"
+    if (marketingDashboardStyle) return "text-[1.45rem]"
     switch (appearance.value_size) {
       case 'small': return 'text-2xl'
       case 'medium': return 'text-3xl'
@@ -259,7 +260,7 @@ export default function KPIBlock({
       )}
       {showTitle && (
         <div
-          className={cn("border-b border-border", marketingDashboardStyle ? "mb-3 pb-2" : "mb-4 pb-2")}
+          className={cn("border-b border-border", marketingDashboardStyle ? "mb-2 pb-1.5" : "mb-4 pb-2")}
           style={{
             backgroundColor: appearance.header_background,
             color: appearance.header_text_color || textColor,
@@ -277,17 +278,17 @@ export default function KPIBlock({
       )}
       <div className="flex-1 flex items-center">
         {KpiIcon ? (
-          <div className="mr-3 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted/50 text-muted-foreground">
-            <KpiIcon className="h-4 w-4 opacity-80" aria-hidden />
+          <div className={cn("mr-2.5 inline-flex shrink-0 items-center justify-center rounded-md bg-muted/50 text-muted-foreground", marketingDashboardStyle ? "h-7 w-7" : "h-8 w-8")}>
+            <KpiIcon className={cn("opacity-80", marketingDashboardStyle ? "h-3.5 w-3.5" : "h-4 w-4")} aria-hidden />
           </div>
         ) : null}
         <div className={`flex-1 flex flex-col justify-center ${getAlignmentClass()}`}>
           <div className={`w-full ${getAlignmentClass().includes('text-center') ? 'text-center' : getAlignmentClass().includes('text-left') ? 'text-left' : 'text-right'}`}>
           {!showTitle && (
-            <div className={`flex items-center gap-2 ${marketingDashboardStyle ? "mb-2.5" : "mb-3"} ${getAlignmentClass().includes('text-center') ? 'justify-center' : getAlignmentClass().includes('text-left') ? 'justify-start' : 'justify-end'}`}>
+            <div className={`flex items-center gap-1.5 ${marketingDashboardStyle ? "mb-1.5" : "mb-3"} ${getAlignmentClass().includes('text-center') ? 'justify-center' : getAlignmentClass().includes('text-left') ? 'justify-start' : 'justify-end'}`}>
               {marketingDashboardStyle && (
                 <span
-                  className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-muted/70"
+                  className="inline-flex h-4.5 w-4.5 items-center justify-center rounded-full bg-muted/70"
                   aria-hidden
                 >
                   <span className="h-1.5 w-1.5 rounded-full bg-accent-link/70" />
@@ -295,7 +296,7 @@ export default function KPIBlock({
               )}
               <p
                 className={cn(
-                  marketingDashboardStyle ? "text-[11px] font-medium tracking-[0.08em] uppercase text-muted-foreground/90" : "text-sm font-medium",
+                  marketingDashboardStyle ? "text-[10px] font-medium tracking-[0.06em] uppercase text-muted-foreground/90" : "text-sm font-medium",
                   !textColor && "text-muted-foreground"
                 )}
                 style={textColor ? { color: textColor } : undefined}
@@ -315,7 +316,7 @@ export default function KPIBlock({
           <p
             className={cn(
               getValueSizeClass(),
-              marketingDashboardStyle ? "font-semibold mb-1.5 tracking-tight text-foreground" : "font-bold mb-2 tracking-tight",
+              marketingDashboardStyle ? "font-semibold mb-1 tracking-tight text-foreground leading-tight" : "font-bold mb-2 tracking-tight",
               !textColor && "text-foreground"
             )}
             style={textColor ? { color: textColor } : undefined}
@@ -325,7 +326,7 @@ export default function KPIBlock({
           
           {/* Comparison indicator */}
           {comparisonData && comparisonData.change !== null && (
-            <div className={`flex items-center gap-1 text-sm mb-1 ${getAlignmentClass().includes('text-center') ? 'justify-center' : getAlignmentClass().includes('text-left') ? 'justify-start' : 'justify-end'}`}>
+            <div className={`flex items-center gap-1 text-xs mb-0.5 ${getAlignmentClass().includes('text-center') ? 'justify-center' : getAlignmentClass().includes('text-left') ? 'justify-start' : 'justify-end'}`}>
               {comparisonData.trend === 'up' ? (
                 <TrendingUp className="h-4 w-4 text-green-600" />
               ) : comparisonData.trend === 'down' ? (
@@ -370,7 +371,7 @@ export default function KPIBlock({
           {isClickable && (
             <div
               className={cn(
-                "mt-2.5 flex items-center gap-1 text-xs text-muted-foreground",
+                "mt-1.5 flex items-center gap-1 text-xs text-muted-foreground",
                 getAlignmentClass().includes("text-center")
                   ? "justify-center"
                   : getAlignmentClass().includes("text-left")

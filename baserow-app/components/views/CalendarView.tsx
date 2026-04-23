@@ -246,8 +246,13 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
   useEffect(() => {
     if (!mounted) return
     const onWindowResize = () => requestCalendarResize()
+    const onLayoutResize = () => requestCalendarResize()
     window.addEventListener("resize", onWindowResize)
-    return () => window.removeEventListener("resize", onWindowResize)
+    window.addEventListener("app:layout-resize", onLayoutResize)
+    return () => {
+      window.removeEventListener("resize", onWindowResize)
+      window.removeEventListener("app:layout-resize", onLayoutResize)
+    }
   }, [mounted, requestCalendarResize])
 
   // CRITICAL: Initialize resolvedTableId from prop immediately (don't wait for useEffect)
@@ -2065,7 +2070,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
   const renderAnchorControls = () => {
     if (!resolvedDateFieldId || !showDateRangeControls) return null
     return (
-      <div className="mb-3">
+      <div className="mb-1.5">
         <CalendarAnchorControls
           onScrollToDate={handleScrollToDate}
           disabled={loading}
@@ -2085,7 +2090,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
       >
         {/* Wrapper: min-h-0 allows flex child to receive constrained height; FullCalendar height="100%" fills it */}
         {mounted ? (
-          <div className="flex-1 min-h-0 min-w-0 w-full max-w-full px-3 pb-3 md:px-4 md:pb-4">
+          <div className="flex-1 min-h-0 min-w-0 w-full max-w-full px-2 pb-2 md:px-3 md:pb-3">
           <MemoizedFullCalendar
             ref={fullCalendarRef as React.LegacyRef<React.ComponentRef<typeof FullCalendar>>}
             key={calendarStableKey}
@@ -2103,7 +2108,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
             moreLinkClick="popover"
             eventDisplay="block"
             eventClassNames={calendarEventClassNames}
-            dayCellClassNames="hover:bg-muted/20 transition-colors min-h-[4rem]"
+            dayCellClassNames="hover:bg-muted/20 transition-colors min-h-[3.25rem]"
             dayHeaderClassNames="text-[11px] font-medium text-muted-foreground py-1"
             eventTextColor="#1f2937"
             eventBorderColor="transparent"

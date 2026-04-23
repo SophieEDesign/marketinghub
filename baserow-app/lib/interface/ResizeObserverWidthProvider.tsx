@@ -29,7 +29,13 @@ export default function withResizeObserverWidthProvider<P extends { width?: numb
       const updateWidth = () => {
         const measured = Math.floor(node.getBoundingClientRect().width)
         if (measured > 0) {
-          setWidth((prev) => (prev === measured ? prev : measured))
+          setWidth((prev) => {
+            if (prev === measured) return prev
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new Event("app:layout-resize"))
+            }
+            return measured
+          })
         }
       }
 

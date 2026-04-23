@@ -900,13 +900,13 @@ export default function ListView({
             key={col.key}
             className={cn(
               "px-3 text-sm text-foreground align-top",
-              marketingDashboardStyle ? "py-2.5 text-foreground/90" : "py-2"
+              marketingDashboardStyle ? "py-2 text-foreground/90" : "py-2"
             )}
           >
             {renderCellValue(col)}
           </td>
         ))}
-        <td className={cn("px-3 text-right align-top w-12", marketingDashboardStyle ? "py-2.5" : "py-2")}>
+        <td className={cn("px-3 text-right align-top w-12", marketingDashboardStyle ? "py-2" : "py-2")}>
           <button
             type="button"
             onClick={(e) => {
@@ -950,12 +950,12 @@ export default function ListView({
     return (
       <div ref={contentRef} className={`${BLOCK_EMBED_CLASSNAME} h-full flex flex-col`}>
         {/* Toolbar */}
-        <div className={cn("flex-shrink-0 flex flex-wrap items-center gap-2 px-4 border-b bg-background", marketingDashboardStyle ? "py-2.5 border-border/35" : "py-2.5 border-border/55")}>
+        <div className={cn("flex-shrink-0 flex flex-wrap items-center gap-1.5 px-3 border-b bg-background", marketingDashboardStyle ? "py-2 border-border/35" : "py-2.5 border-border/55")}>
           <Button
             variant="outline"
             size="sm"
             onClick={() => setGroupDialogOpen(true)}
-            className="h-8 shrink-0"
+            className="h-7 shrink-0"
           >
             <Group className="h-4 w-4 mr-2" />
             Group
@@ -964,7 +964,7 @@ export default function ListView({
             variant="outline"
             size="sm"
             onClick={() => setFilterDialogOpen(true)}
-            className="h-8 shrink-0"
+            className="h-7 shrink-0"
           >
             <Filter className="h-4 w-4 mr-2" />
             Filter
@@ -979,7 +979,7 @@ export default function ListView({
               variant="outline"
               size="sm"
               onClick={handleOpenCreateModal}
-              className="h-8 shrink-0 ml-auto"
+              className="h-7 shrink-0 ml-auto"
               title="Add a new record"
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -991,7 +991,7 @@ export default function ListView({
         {/* Grouped Content - when onHeightChange: overflow-visible so content grows and pushes blocks down; else overflow-y-auto for scroll */}
         <div
           className={
-            onHeightChange
+            onHeightChange || marketingDashboardStyle
               ? "min-h-0 min-w-0 overflow-visible"
               : "flex-1 min-h-0 min-w-0 overflow-y-auto"
           }
@@ -1222,7 +1222,7 @@ export default function ListView({
     <div ref={contentRef} className={`${BLOCK_EMBED_CLASSNAME} h-full flex flex-col`}>
       <div
         className={
-          onHeightChange
+            onHeightChange || marketingDashboardStyle
             ? "min-h-0 min-w-0 overflow-visible overflow-x-hidden"
             : "flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden"
         }
@@ -1245,7 +1245,7 @@ export default function ListView({
                     className={cn(
                       "px-3 text-left text-xs font-medium uppercase",
                       marketingDashboardStyle
-                        ? "py-2.5 tracking-[0.08em] text-muted-foreground/90"
+                        ? "py-2 tracking-[0.07em] text-muted-foreground/90"
                         : "py-2 text-gray-600 tracking-wider"
                     )}
                   >
