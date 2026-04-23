@@ -74,7 +74,7 @@ export async function POST(
       .eq('user_id', userId)
       .single()
 
-    const role = profile?.role || user.user_metadata?.role || 'member'
+    const role = profile?.role || 'member'
 
     // Get the base URL for the redirect link
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL ||
@@ -90,7 +90,7 @@ export async function POST(
     if (!hasPassword) {
       // Generate password recovery link (for users without passwords)
       // This allows them to set their password
-      const { data: recoveryData, error: recoveryError } = await adminClient.auth.admin.generateLink({
+      const { error: recoveryError } = await adminClient.auth.admin.generateLink({
         type: 'recovery',
         email: email,
         options: {
@@ -141,31 +141,25 @@ export async function POST(
           } else {
             const errorData = await resetResponse.json().catch(() => ({}))
             console.error('Password reset email error:', errorData)
-            // Fallback: return the recovery link
+            // Do not return one-time auth links in API responses.
             return NextResponse.json({
               success: true,
-              message: 'Password reset link generated. Please send this link to the user manually.',
-              recoveryLink: recoveryData?.properties?.action_link,
-              note: 'You can copy the recoveryLink above and send it to the user via email.',
+              message: 'Password reset flow initiated. If email delivery fails, retry from the admin panel.',
             })
           }
         } catch (fetchError) {
           console.error('Error calling password reset endpoint:', fetchError)
-          // Fallback: return the recovery link
+          // Do not return one-time auth links in API responses.
           return NextResponse.json({
             success: true,
-            message: 'Password reset link generated. Please send this link to the user manually.',
-            recoveryLink: recoveryData?.properties?.action_link,
-            note: 'You can copy the recoveryLink above and send it to the user via email.',
+            message: 'Password reset flow initiated. If email delivery fails, retry from the admin panel.',
           })
         }
       } else {
-        // Fallback: return the recovery link
+        // Do not return one-time auth links in API responses.
         return NextResponse.json({
           success: true,
-          message: 'Password reset link generated. Please send this link to the user manually.',
-          recoveryLink: recoveryData?.properties?.action_link,
-          note: 'You can copy the recoveryLink above and send it to the user via email.',
+          message: 'Password reset flow initiated. If email delivery fails, retry from the admin panel.',
         })
       }
     }

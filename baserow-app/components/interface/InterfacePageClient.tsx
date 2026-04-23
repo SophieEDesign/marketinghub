@@ -140,6 +140,7 @@ function InterfacePageClientInternal({
   const [blocksLoading, setBlocksLoading] = useState(false)
   const [dataLoading, setDataLoading] = useState(false)
   const [pageTableId, setPageTableId] = useState<string | null>(null)
+  const tableResolutionSeqRef = useRef(0)
 
   // Content pages only: ephemeral record context (never persisted). Not used for record_review/record_view.
   const [recordContext, setRecordContext] = useState<RecordContext>(null)
@@ -226,15 +227,28 @@ function InterfacePageClientInternal({
       setPageTableId(null)
       return
     }
-    
+
+    const resolutionSeq = ++tableResolutionSeqRef.current
+    let cancelled = false
+
     // Resolve tableId from page using the same logic as PageRenderer
     const resolveTableId = async () => {
       const { getPageTableId } = await import('@/lib/interface/page-table-utils')
       const tableId = await getPageTableId(page)
+      // Ignore stale async resolution when navigating rapidly between pages.
+      if (cancelled || resolutionSeq !== tableResolutionSeqRef.current) return
       setPageTableId(tableId)
     }
-    
-    resolveTableId()
+
+    resolveTableId().catch((error) => {
+      if (process.env.NODE_ENV === 'development') {
+        debugError('Error resolving page table id:', error)
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
   }, [page?.id, page?.base_table, page?.saved_view_id])
 
   // CRITICAL: When route pageId changes (navigation), reset page state so we refetch and remount.

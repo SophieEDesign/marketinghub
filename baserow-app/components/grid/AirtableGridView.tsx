@@ -928,18 +928,22 @@ export default function AirtableGridView({
 
   // Sync scroll between header and body
   useEffect(() => {
-    if (headerScrollRef.current && bodyScrollRef.current) {
-      bodyScrollRef.current.addEventListener('scroll', () => {
-        if (bodyScrollRef.current) {
-          const left = bodyScrollRef.current.scrollLeft
-          const top = bodyScrollRef.current.scrollTop
-          setScrollLeft(left)
-          setScrollTop(top)
-          if (headerScrollRef.current) {
-            headerScrollRef.current.scrollLeft = left
-          }
-        }
-      })
+    const bodyEl = bodyScrollRef.current
+    if (!bodyEl) return
+
+    const handleBodyScroll = () => {
+      const left = bodyEl.scrollLeft
+      const top = bodyEl.scrollTop
+      setScrollLeft(left)
+      setScrollTop(top)
+      if (headerScrollRef.current) {
+        headerScrollRef.current.scrollLeft = left
+      }
+    }
+
+    bodyEl.addEventListener('scroll', handleBodyScroll, { passive: true })
+    return () => {
+      bodyEl.removeEventListener('scroll', handleBodyScroll)
     }
   }, [])
 

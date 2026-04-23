@@ -21,6 +21,18 @@ interface WorkspaceShellWrapperProps {
   hideRecordPanel?: boolean // Option to hide the global RecordPanel (for pages that have their own record detail panel)
 }
 
+const HOT_PATH_DEBUG = process.env.HOT_PATH_DEBUG === "true"
+
+function hotPathInfo(message: string, payload: Record<string, unknown>) {
+  if (!HOT_PATH_DEBUG) return
+  console.info(message, payload)
+}
+
+function hotPathError(message: string, payload: Record<string, unknown>) {
+  if (!HOT_PATH_DEBUG) return
+  console.error(message, payload)
+}
+
 function containsBigInt(value: unknown, seen = new WeakSet<object>()): boolean {
   if (typeof value === "bigint") return true
   if (value == null) return false
@@ -67,7 +79,7 @@ export default async function WorkspaceShellWrapper({
 }: WorkspaceShellWrapperProps) {
   try {
     // #region agent log
-    console.info("[agent-debug]", {
+    hotPathInfo("[agent-debug]", {
       sessionId: "909a6f",
       runId: "initial",
       hypothesisId: "H11",
@@ -78,7 +90,7 @@ export default async function WorkspaceShellWrapper({
     })
     // #endregion
   // #region agent log
-  console.error("[agent-debug]", {
+  hotPathError("[agent-debug]", {
     sessionId: "909a6f",
     runId: "initial",
     hypothesisId: "H12",
@@ -90,7 +102,7 @@ export default async function WorkspaceShellWrapper({
   // #endregion
   const supabase = await createClient()
   // #region agent log
-  console.error("[agent-debug]", {
+  hotPathError("[agent-debug]", {
     sessionId: "909a6f",
     runId: "initial",
     hypothesisId: "H13",
@@ -104,7 +116,7 @@ export default async function WorkspaceShellWrapper({
   // Check authentication - redirect to login if not authenticated
   const { data: { user } } = await supabase.auth.getUser()
   // #region agent log
-  console.error("[agent-debug]", {
+  hotPathError("[agent-debug]", {
     sessionId: "909a6f",
     runId: "initial",
     hypothesisId: "H13",
@@ -134,7 +146,7 @@ export default async function WorkspaceShellWrapper({
     getWorkspaceSettings().catch(() => null),
   ])
   // #region agent log
-  console.error("[agent-debug]", {
+  hotPathError("[agent-debug]", {
     sessionId: "909a6f",
     runId: "initial",
     hypothesisId: "H13",
@@ -147,7 +159,7 @@ export default async function WorkspaceShellWrapper({
   
   const userIsAdmin = await isAdmin()
   // #region agent log
-  console.error("[agent-debug]", {
+  hotPathError("[agent-debug]", {
     sessionId: "909a6f",
     runId: "initial",
     hypothesisId: "H13",
@@ -173,7 +185,7 @@ export default async function WorkspaceShellWrapper({
     })
   )
   // #region agent log
-  console.error("[agent-debug]", {
+  hotPathError("[agent-debug]", {
     sessionId: "909a6f",
     runId: "initial",
     hypothesisId: "H13",
@@ -187,7 +199,7 @@ export default async function WorkspaceShellWrapper({
   // Check if user is admin for filtering
   const admin = await isAdmin()
   // #region agent log
-  console.error("[agent-debug]", {
+  hotPathError("[agent-debug]", {
     sessionId: "909a6f",
     runId: "initial",
     hypothesisId: "H13",
@@ -437,7 +449,7 @@ export default async function WorkspaceShellWrapper({
   let defaultPageId: string | null = null
   try {
     // #region agent log
-    console.info("[agent-debug]", {
+    hotPathInfo("[agent-debug]", {
       sessionId: "909a6f",
       runId: "initial",
       hypothesisId: "H11",
@@ -448,7 +460,7 @@ export default async function WorkspaceShellWrapper({
     })
     // #endregion
     // #region agent log
-    console.error("[agent-debug]", {
+    hotPathError("[agent-debug]", {
       sessionId: "909a6f",
       runId: "initial",
       hypothesisId: "H21",
@@ -460,7 +472,7 @@ export default async function WorkspaceShellWrapper({
     // #endregion
     const resolvedLanding = await resolveLandingPage()
     // #region agent log
-    console.error("[agent-debug]", {
+    hotPathError("[agent-debug]", {
       sessionId: "909a6f",
       runId: "initial",
       hypothesisId: "H21",
@@ -478,7 +490,7 @@ export default async function WorkspaceShellWrapper({
     defaultPageId = typeof resolvedPageId === "string" ? resolvedPageId : null
     if (resolvedPageId != null && typeof resolvedPageId !== "string") {
       // #region agent log
-      console.error("[agent-debug]", {
+      hotPathError("[agent-debug]", {
         sessionId: "909a6f",
         runId: "initial",
         hypothesisId: "H21",
@@ -490,7 +502,7 @@ export default async function WorkspaceShellWrapper({
       // #endregion
     }
     // #region agent log
-    console.info("[agent-debug]", {
+    hotPathInfo("[agent-debug]", {
       sessionId: "909a6f",
       runId: "initial",
       hypothesisId: "H11",
@@ -502,7 +514,7 @@ export default async function WorkspaceShellWrapper({
     // #endregion
   } catch (error) {
     // #region agent log
-    console.error("[agent-debug]", {
+    hotPathError("[agent-debug]", {
       sessionId: "909a6f",
       runId: "initial",
       hypothesisId: "H21",
@@ -528,7 +540,7 @@ export default async function WorkspaceShellWrapper({
         null
       : null
   // #region agent log
-  console.error("[agent-debug]", {
+  hotPathError("[agent-debug]", {
     sessionId: "909a6f",
     runId: "initial",
     hypothesisId: "H13",
@@ -540,7 +552,7 @@ export default async function WorkspaceShellWrapper({
   // #endregion
 
   // #region agent log
-  console.info("[agent-debug]", {
+  hotPathInfo("[agent-debug]", {
     sessionId: "909a6f",
     runId: "initial",
     hypothesisId: "H11",
@@ -559,7 +571,7 @@ export default async function WorkspaceShellWrapper({
     dashboards,
   })
   // #region agent log
-  console.error("[agent-debug]", {
+  hotPathError("[agent-debug]", {
     sessionId: "909a6f",
     runId: "initial",
     hypothesisId: "H23",
@@ -585,7 +597,7 @@ export default async function WorkspaceShellWrapper({
 
   if (shellPayloadHasBigInt) {
     // #region agent log
-    console.error("[agent-debug]", {
+    hotPathError("[agent-debug]", {
       sessionId: "909a6f",
       runId: "initial",
       hypothesisId: "H23",
@@ -617,7 +629,7 @@ export default async function WorkspaceShellWrapper({
       landingPageTitle,
     })
     // #region agent log
-    console.error("[agent-debug]", {
+    hotPathError("[agent-debug]", {
       sessionId: "909a6f",
       runId: "initial",
       hypothesisId: "H23",
@@ -629,7 +641,7 @@ export default async function WorkspaceShellWrapper({
     // #endregion
   } catch (serializeError) {
     // #region agent log
-    console.error("[agent-debug]", {
+    hotPathError("[agent-debug]", {
       sessionId: "909a6f",
       runId: "initial",
       hypothesisId: "H23",
@@ -674,7 +686,7 @@ export default async function WorkspaceShellWrapper({
     )
   } catch (error) {
     // #region agent log
-    console.error("[agent-debug]", {
+    hotPathError("[agent-debug]", {
       sessionId: "909a6f",
       runId: "initial",
       hypothesisId: "H17",

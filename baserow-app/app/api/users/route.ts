@@ -66,7 +66,9 @@ export async function GET(request: NextRequest) {
 
             if (isPending && authUser.email) {
               // This is a pending invitation - user hasn't accepted yet
-              const role = (authUser.user_metadata?.role || 'member') as 'admin' | 'member'
+              const role = (
+                authUser.app_metadata?.role === 'admin' ? 'admin' : 'member'
+              ) as 'admin' | 'member'
               
               users.push({
                 id: `pending-${authUser.id}`, // Use a temporary ID since no profile exists

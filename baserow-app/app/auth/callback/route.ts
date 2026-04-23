@@ -19,7 +19,6 @@ export async function GET(request: NextRequest) {
       // CRITICAL: Do NOT overwrite an existing profile role on login.
       // Overwriting would allow accidental (or malicious) role changes via user metadata.
       const userMetadata = sessionData.user.user_metadata || {}
-      const requestedRole = (userMetadata.role === 'admin' ? 'admin' : 'member') as 'admin' | 'member'
 
       try {
         const { data: existingProfile, error: existingProfileError } = await supabase
@@ -32,13 +31,12 @@ export async function GET(request: NextRequest) {
         if (!existingProfileError && existingProfile?.role) {
           // noop
         } else {
-          // Create profile with safest default. If the user was provisioned via a trusted invite flow
-          // that sets role metadata, we can use it ONLY for initial creation.
+          // Create profile with safest default; authoritative role assignment must come from admin flows.
           const { error: insertError } = await supabase
             .from('profiles')
             .insert({
               user_id: sessionData.user.id,
-              role: requestedRole,
+              role: 'member',
             })
 
           if (insertError && process.env.NODE_ENV === 'development') {

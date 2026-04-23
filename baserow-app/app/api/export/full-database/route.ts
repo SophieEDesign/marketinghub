@@ -3,10 +3,19 @@ import { createClient } from '@/lib/supabase/server'
 import { getTables } from '@/lib/crud/tables'
 import { getTableFields } from '@/lib/fields/schema'
 import { getOptionValueToLabelMap, isSelectField } from '@/lib/fields/select-options'
+import { isAdmin } from '@/lib/roles'
 import type { TableField } from '@/types/fields'
 
 export async function GET() {
   try {
+    const admin = await isAdmin()
+    if (!admin) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Admin access required' },
+        { status: 403 }
+      )
+    }
+
     const tables = await getTables()
     const supabase = await createClient()
 

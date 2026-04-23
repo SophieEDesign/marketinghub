@@ -7,6 +7,8 @@ import type { LayoutItem, PageBlock, BlockType } from '@/lib/interface/types'
 import { dbBlockToPageBlock } from '@/lib/interface/layout-mapping'
 import { debugLog, debugWarn } from '@/lib/interface/debug-flags'
 
+const HOT_PATH_DEBUG = process.env.HOT_PATH_DEBUG === 'true'
+
 /**
  * GET /api/pages/[pageId]/blocks - Load blocks for a page
  */
@@ -82,7 +84,7 @@ export async function GET(
 
     // CRITICAL: Log query results for debugging
     // This confirms edit and public fetch identical block IDs + position values
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV === 'development' && HOT_PATH_DEBUG) {
       console.log(`[API GET /blocks] pageId=${pageId}`, {
         queryType,
         dbRowCount: data?.length || 0,
@@ -164,32 +166,9 @@ export async function GET(
       }
     })
 
-    // #region agent log
-    console.error("[agent-debug]", {
-      sessionId: "909a6f",
-      runId: "initial",
-      hypothesisId: "H19",
-      location: "app/api/pages/[pageId]/blocks/route.ts:get-summary",
-      message: "Computed block payload summary for page",
-      data: {
-        pageId,
-        blockCount: blocks.length,
-        blockTypes: Array.from(new Set(blocks.map((b: any) => b.type))),
-        blocksMissingType: blocks.filter((b: any) => !b.type).length,
-        blocksMissingConfig: blocks.filter((b: any) => b.config == null).length,
-        sampleConfigKeys: blocks.slice(0, 5).map((b: any) => ({
-          id: b.id,
-          type: b.type,
-          keys: b.config && typeof b.config === "object" ? Object.keys(b.config).slice(0, 12) : [],
-        })),
-      },
-      timestamp: Date.now(),
-    })
-    // #endregion
-
     // CRITICAL: Log final response for debugging
     // This confirms edit and public receive identical block IDs + position values
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV === 'development' && HOT_PATH_DEBUG) {
       console.log(`[API GET /blocks] RESPONSE: pageId=${pageId}`, {
         queryType,
         dbRowCount: data?.length || 0,
@@ -228,19 +207,6 @@ export async function GET(
       }
     )
   } catch (error: any) {
-    // #region agent log
-    console.error("[agent-debug]", {
-      sessionId: "909a6f",
-      runId: "initial",
-      hypothesisId: "H19",
-      location: "app/api/pages/[pageId]/blocks/route.ts:catch",
-      message: "Unhandled exception while loading blocks API payload",
-      data: {
-        errorMessage: error?.message || String(error),
-      },
-      timestamp: Date.now(),
-    })
-    // #endregion
     return NextResponse.json(
       { error: error.message || 'Failed to load blocks' },
       { status: 500 }
@@ -295,14 +261,14 @@ export async function PATCH(
     }
 
     // Update individual blocks if provided
-    const updatedBlocks: PageBlock[] = []
+    let updatedBlocks: PageBlock[] = []
     if (blockUpdates && Array.isArray(blockUpdates)) {
       const supabase = await createClient()
       const { data: { user } } = await supabase.auth.getUser()
       const createdBy = user?.id ?? null
 
-      await Promise.all(
-        blockUpdates.map(async (update: { id: string; config?: any }) => {
+      updatedBlocks = await Promise.all(
+        blockUpdates.map(async (update: { id: string; config?: any }): Promise<PageBlock> => {
           // Get current block to determine type
           const { data: currentBlock } = await supabase
             .from('view_blocks')
@@ -331,7 +297,7 @@ export async function PATCH(
           }
 
           // DEBUG_TEXT: Log received content_json (server-side, always logs in dev)
-          if (process.env.NODE_ENV === 'development' && update.config?.content_json) {
+          if (process.env.NODE_ENV === 'development' && HOT_PATH_DEBUG && update.config?.content_json) {
             // Note: DEBUG_TEXT flag is client-side only, but we log in dev mode
             console.log(`[DEBUG TEXT] Block ${update.id}: RECEIVED`, {
               blockId: update.id,
@@ -351,7 +317,7 @@ export async function PATCH(
           }
 
           // DEBUG_TEXT: Log before normalization
-          if (process.env.NODE_ENV === 'development' && update.config?.content_json) {
+          if (process.env.NODE_ENV === 'development' && HOT_PATH_DEBUG && update.config?.content_json) {
             console.log(`[DEBUG TEXT] Block ${update.id}: BEFORE NORMALIZE`, {
               blockId: update.id,
               configToNormalize,
@@ -367,7 +333,7 @@ export async function PATCH(
           )
 
           // DEBUG_TEXT: Log after normalization
-          if (process.env.NODE_ENV === 'development' && update.config?.content_json) {
+          if (process.env.NODE_ENV === 'development' && HOT_PATH_DEBUG && update.config?.content_json) {
             console.log(`[DEBUG TEXT] Block ${update.id}: AFTER NORMALIZE`, {
               blockId: update.id,
               normalizedConfig,
@@ -415,7 +381,7 @@ export async function PATCH(
           }
 
           // DEBUG_TEXT: Log persisted data from DB
-          if (process.env.NODE_ENV === 'development' && update.config?.content_json) {
+          if (process.env.NODE_ENV === 'development' && HOT_PATH_DEBUG && update.config?.content_json) {
             console.log(`[DEBUG TEXT] Block ${update.id}: PERSISTED`, {
               blockId: update.id,
               updatedBlockFromDB: updatedBlock,
@@ -425,8 +391,8 @@ export async function PATCH(
             })
           }
 
-          // Convert to PageBlock format and add to results
-          updatedBlocks.push({
+          // Convert to PageBlock format
+          return {
             id: updatedBlock.id,
             page_id: updatedBlock.page_id || updatedBlock.view_id,
             type: updatedBlock.type,
@@ -438,7 +404,7 @@ export async function PATCH(
             order_index: updatedBlock.order_index ?? 0,
             created_at: updatedBlock.created_at,
             updated_at: updatedBlock.updated_at,
-          })
+          }
         })
       )
     }
