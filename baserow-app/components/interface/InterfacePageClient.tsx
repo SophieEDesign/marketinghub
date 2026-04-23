@@ -1449,7 +1449,7 @@ function InterfacePageClientInternal({
         <CanvasContainer
           scrollOwner={suppressMainScroll ? "parent" : "self"}
           fullBleed
-          className={`relative overflow-x-hidden ${suppressMainScroll ? "flex-1 min-h-0" : "min-h-full"} ${isEditMode ? "pb-48" : ""}`}
+          className={`relative ${suppressMainScroll ? "flex-1 min-h-0" : "min-h-full"} ${isEditMode ? "pb-48" : ""}`}
         >
           <InterfacePageContent
             useRecordReviewLayout={useRecordReviewLayout}

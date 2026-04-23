@@ -6,7 +6,7 @@ import { APP_BAR_PADDING_Y, APP_PAGE_PADDING_X } from "@/lib/interface/spacing-t
 
 export const PANEL_DESKTOP_WIDTH = 360
 export const BLOCK_EMBED_CLASSNAME = "w-full min-w-0 min-h-0 max-w-full"
-export const CANVAS_SURFACE_CLASSNAME = "flex flex-1 min-h-0 min-w-0 w-full max-w-full flex-col overflow-hidden"
+export const CANVAS_SURFACE_CLASSNAME = "flex flex-1 min-h-0 min-w-0 w-full max-w-full overflow-hidden"
 
 export function AppShell({
   sidebar,
@@ -22,8 +22,10 @@ export function AppShell({
   return (
     <div className={cn("flex flex-1 min-h-0 min-w-0 overflow-hidden", className)}>
       {sidebar}
-      <div className={CANVAS_SURFACE_CLASSNAME}>
-        {canvas}
+      <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden">
+        <div className={CANVAS_SURFACE_CLASSNAME}>
+          {canvas}
+        </div>
         {rightPanel}
       </div>
     </div>

@@ -1,11 +1,17 @@
 import { redirect } from "next/navigation"
 import { getAllInterfacePages } from "@/lib/interface/pages"
+import { resolveLandingPage } from "@/lib/interfaces"
 
 function normalizeName(name: string): string {
   return name.trim().toLowerCase()
 }
 
 export default async function MarketingHomePage() {
+  const { pageId } = await resolveLandingPage()
+  if (pageId) {
+    redirect(`/pages/${pageId}`)
+  }
+
   const pages = await getAllInterfacePages()
 
   const exactMarketingHome = pages.find((p) => normalizeName(p.name) === "marketing home")

@@ -22,7 +22,7 @@ import { Menu } from "lucide-react"
 import OnboardingTour from "./OnboardingTour"
 import type { Table, View } from "@/types/database"
 import { SHELL_RIGHT_SETTINGS_WIDTH_PX } from "@/lib/interface/layout-constants"
-import { AppShell, CANVAS_SURFACE_CLASSNAME } from "@/components/layout/ui-system"
+import { AppShell } from "@/components/layout/ui-system"
 
 interface InterfacePage {
   id: string
@@ -234,7 +234,7 @@ function ShellContent({
                 </Button>
               </div>
             )}
-            <div className={CANVAS_SURFACE_CLASSNAME}>
+            <div className="flex flex-1 min-h-0 min-w-0 w-full max-w-full">
               {/* InterfaceContainer: min-h-0 allows height to flow to main > CalendarView */}
               <div className="flex flex-1 basis-0 flex-col min-h-0 min-w-0 overflow-hidden">
                 {!hideTopbar && (

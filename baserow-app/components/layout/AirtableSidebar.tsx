@@ -165,12 +165,27 @@ export default function AirtableSidebar({
   const [internalCollapsed, setInternalCollapsed] = useState(false)
   const [newPageModalOpen, setNewPageModalOpen] = useState(false)
   const [manuallyExpandedDuringAutoCompact, setManuallyExpandedDuringAutoCompact] = useState(false)
+  const [desktopCollapsePrefsMounted, setDesktopCollapsePrefsMounted] = useState(false)
 
   useEffect(() => {
     if (!autoCompact) {
       setManuallyExpandedDuringAutoCompact(false)
     }
   }, [autoCompact])
+
+  useEffect(() => {
+    if (isMobile) return
+    setDesktopCollapsePrefsMounted(true)
+    const saved = localStorage.getItem("sidebar-collapsed-desktop")
+    if (saved === "true") {
+      setInternalCollapsed(true)
+    }
+  }, [isMobile])
+
+  useEffect(() => {
+    if (isMobile || !desktopCollapsePrefsMounted) return
+    localStorage.setItem("sidebar-collapsed-desktop", internalCollapsed ? "true" : "false")
+  }, [internalCollapsed, isMobile, desktopCollapsePrefsMounted])
 
   const collapseToRail = () => {
     setInternalCollapsed(true)
