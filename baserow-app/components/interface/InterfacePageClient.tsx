@@ -29,6 +29,7 @@ import { debugLog, debugWarn, debugError } from "@/lib/debug"
 import { useRealtimeViewBlocks } from "@/lib/realtime/useRealtimeViewBlocks"
 import { CanvasContainer, BLOCK_EMBED_CLASSNAME } from "@/components/layout/ui-system"
 import { AppPageHeader } from "@/components/layout/ui-system"
+import { shouldApplyResolvedTableId } from "@/lib/immediate-phase/guards"
 // Lazy load InterfaceBuilder for dashboard/overview pages
 const InterfaceBuilder = dynamic(() => import("./InterfaceBuilder"), { ssr: false })
 // Lazy load RecordReviewPage for record_review pages
@@ -236,7 +237,7 @@ function InterfacePageClientInternal({
       const { getPageTableId } = await import('@/lib/interface/page-table-utils')
       const tableId = await getPageTableId(page)
       // Ignore stale async resolution when navigating rapidly between pages.
-      if (cancelled || resolutionSeq !== tableResolutionSeqRef.current) return
+      if (!shouldApplyResolvedTableId(cancelled, resolutionSeq, tableResolutionSeqRef.current)) return
       setPageTableId(tableId)
     }
 

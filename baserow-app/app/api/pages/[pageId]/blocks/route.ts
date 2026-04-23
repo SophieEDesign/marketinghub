@@ -6,6 +6,7 @@ import { validateBlockConfig } from '@/lib/interface/block-config-types'
 import type { LayoutItem, PageBlock, BlockType } from '@/lib/interface/types'
 import { dbBlockToPageBlock } from '@/lib/interface/layout-mapping'
 import { debugLog, debugWarn } from '@/lib/interface/debug-flags'
+import { mapInStableOrder } from '@/lib/immediate-phase/guards'
 
 const HOT_PATH_DEBUG = process.env.HOT_PATH_DEBUG === 'true'
 
@@ -267,8 +268,9 @@ export async function PATCH(
       const { data: { user } } = await supabase.auth.getUser()
       const createdBy = user?.id ?? null
 
-      updatedBlocks = await Promise.all(
-        blockUpdates.map(async (update: { id: string; config?: any }): Promise<PageBlock> => {
+      updatedBlocks = await mapInStableOrder(
+        blockUpdates,
+        async (update: { id: string; config?: any }): Promise<PageBlock> => {
           // Get current block to determine type
           const { data: currentBlock } = await supabase
             .from('view_blocks')
@@ -405,7 +407,7 @@ export async function PATCH(
             created_at: updatedBlock.created_at,
             updated_at: updatedBlock.updated_at,
           }
-        })
+        }
       )
     }
 

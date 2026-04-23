@@ -49,6 +49,7 @@ import { formatCellValue } from '@/lib/dataView/clipboard'
 import FieldBuilderModal from './FieldBuilderModal'
 import { getFieldDisplayName } from '@/lib/fields/display'
 import { debugLog, debugWarn, debugError } from '@/lib/debug'
+import { attachScrollSyncListener } from '@/lib/immediate-phase/guards'
 
 type Sort = { field: string; direction: 'asc' | 'desc' }
 
@@ -941,10 +942,7 @@ export default function AirtableGridView({
       }
     }
 
-    bodyEl.addEventListener('scroll', handleBodyScroll, { passive: true })
-    return () => {
-      bodyEl.removeEventListener('scroll', handleBodyScroll)
-    }
+    return attachScrollSyncListener(bodyEl, handleBodyScroll)
   }, [])
 
   const effectiveGroupRules = useMemo<GroupRule[]>(() => {

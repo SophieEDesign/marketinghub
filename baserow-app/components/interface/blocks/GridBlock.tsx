@@ -1145,8 +1145,8 @@ export default function GridBlock({
               direction: s.direction as 'asc' | 'desc',
             }))
 
-        // Only pass onHeightChange when grouping is active
-        const isGrouped = !!effectiveGroupBy || (groupByRulesFromConfig && groupByRulesFromConfig.length > 0)
+        // Let ListView report content height so the block can grow instead of scrolling internally.
+        const canAutoSizeListHeight = true
 
         return (
           <ListView
@@ -1172,7 +1172,7 @@ export default function GridBlock({
             modalFields={modalFieldsForRecord}
             blockConfig={config}
             reloadKey={refreshKey}
-            onHeightChange={isGrouped ? handleHeightChange : undefined}
+            onHeightChange={canAutoSizeListHeight ? handleHeightChange : undefined}
             rowHeight={rowHeight}
             cascadeContext={cascadeContext}
             interfaceMode={interfaceMode}

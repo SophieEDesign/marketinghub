@@ -642,7 +642,7 @@ export default function GalleryView({
                       {statusPill && pillCls ? (
                         <span
                           className={cn(
-                            "inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium max-w-full truncate",
+                            "inline-block max-w-full whitespace-normal break-words px-2 py-0.5 rounded-full text-[11px] font-medium leading-tight",
                             pillCls.bg,
                             pillCls.text
                           )}

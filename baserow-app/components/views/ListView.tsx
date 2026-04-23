@@ -533,14 +533,10 @@ export default function ListView({
     didInitChoiceGroupCollapseRef.current = true
   }, [currentGroupBy, defaultChoiceGroupsCollapsed, effectiveGroupRules.length, groupModel?.rootGroups])
 
-  // Measure content height when grouping changes (expand/collapse or enable/disable)
-  // When onHeightChange is provided, inner div uses overflow-visible so content grows; contentRef (outer)
-  // scrollHeight then reflects full content height (toolbar + table).
+  // Measure content height when content layout changes.
+  // When onHeightChange is provided, the list can expand the block instead of using an inner scrollbar.
   useEffect(() => {
     if (!onHeightChange || !contentRef.current) return
-    
-    const isGrouped = effectiveGroupRules.length > 0
-    if (!isGrouped) return // No grouping, skip measurement
 
     const timeoutId = setTimeout(() => {
       if (!contentRef.current) return
@@ -561,7 +557,7 @@ export default function ListView({
     }, 100)
 
     return () => clearTimeout(timeoutId)
-  }, [collapsedGroups, effectiveGroupRules.length, currentGroupBy, onHeightChange, rowHeight])
+  }, [collapsedGroups, effectiveGroupRules.length, currentGroupBy, onHeightChange, rowHeight, filteredRows.length])
 
   // Handle group change
   const handleGroupChange = useCallback(async (fieldName: string | null) => {
@@ -1224,7 +1220,13 @@ export default function ListView({
 
   return (
     <div ref={contentRef} className={`${BLOCK_EMBED_CLASSNAME} h-full flex flex-col`}>
-      <div className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden">
+      <div
+        className={
+          onHeightChange
+            ? "min-h-0 min-w-0 overflow-visible overflow-x-hidden"
+            : "flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden"
+        }
+      >
         <Panel
           className={cn(
             "w-full",
