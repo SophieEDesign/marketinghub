@@ -1626,9 +1626,9 @@ export default function InterfaceBuilder({
               )}
               {/* Title and Description */}
               <div className="flex-1 min-w-0">
-                <h1 className="text-lg font-semibold text-gray-900 truncate">{currentPage.name}</h1>
+                <h1 className="text-lg font-semibold text-gray-900 whitespace-normal break-words">{currentPage.name}</h1>
                 {currentPage.description && (
-                  <p className="text-xs text-gray-500 mt-0.5 truncate">{currentPage.description}</p>
+                  <p className="text-xs text-gray-500 mt-0.5 whitespace-normal break-words">{currentPage.description}</p>
                 )}
                 {currentPage.updated_at && !effectiveIsEditing && (
                   <p className="text-xs text-gray-400 mt-1" suppressHydrationWarning>

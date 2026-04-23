@@ -1922,7 +1922,7 @@ export default function Canvas({
       {/* flex-1 flex flex-col min-h-0: fill parent flex; min-h-0 prevents flex collapse; flex flex-col for block list. */}
       <div
         ref={containerRef}
-        className={`flex flex-col w-full max-w-full min-w-0 relative ${isFullPageMode ? "flex-1 overflow-hidden min-h-[100vh]" : "min-h-0"}`}
+        className={`flex flex-col w-full min-w-0 relative ${isFullPageMode ? "flex-1 overflow-hidden min-h-[100vh]" : "min-h-0"}`}
         style={
           isFullPageMode
             ? undefined
@@ -2539,7 +2539,7 @@ export default function Canvas({
             {/* Block Content - ALWAYS visible; never conditional on isEditing. No transition/willChange - immediate paint. */}
             {/* overflow-hidden for all blocks: single scroll per surface (Canvas/InterfaceContainer) */}
             <div
-              className={`block-content h-full w-full max-w-full min-h-0 min-w-0 rounded-lg ${block.config?.locked ? 'pointer-events-none opacity-75' : ''} ${
+              className={`block-content h-full w-full min-h-0 min-w-0 rounded-lg ${block.config?.locked ? 'pointer-events-none opacity-75' : ''} ${
                 block.type === 'field' ? 'overflow-visible' :
                 'overflow-hidden'
               }`}
@@ -2548,7 +2548,7 @@ export default function Canvas({
               {isFullPageMode && fullPageBlock && block.id === fullPageBlock.id ? (
                 /* Full-page: rail layout (left block + right preview) or fill layout */
                 isRail ? (
-                  <div className="flex h-full w-full min-w-0 max-w-full overflow-hidden">
+                  <div className="flex h-full w-full min-w-0 overflow-hidden">
                     <div className="relative h-full shrink-0 overflow-hidden border-r flex flex-col" style={{ width: `clamp(280px, 28vw, ${fullPageDef?.fullPageMaxWidth ?? 360}px)` }}>
                       {isEditing && fullPageBlock.type === "record_context" && (
                         <div className="absolute top-2 left-2 z-10 flex items-center gap-1">
@@ -2677,7 +2677,7 @@ export default function Canvas({
                 block={block}
                 className={isEditing ? "pointer-events-auto" : ""}
               >
-                <div className="h-full w-full max-w-full min-h-0 min-w-0">
+                <div className="h-full w-full min-h-0 min-w-0">
                   <BlockRenderer
                     block={block}
                     isEditing={isEditing && !block.config?.locked}

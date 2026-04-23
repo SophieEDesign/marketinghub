@@ -215,11 +215,13 @@ export default function QuickFilterBar({
   }
 
   const pillClass = extraCompact
-    ? "inline-flex items-center gap-1.5 rounded-full border bg-white px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50"
-    : "inline-flex items-center gap-2 rounded-full border bg-white px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+    ? "inline-flex items-center gap-1 rounded-full border bg-white px-2 py-0.5 text-[11px] text-gray-700 hover:bg-gray-50"
+    : compact
+    ? "inline-flex items-center gap-1.5 rounded-full border bg-white px-2.5 py-1 text-[11px] text-gray-700 hover:bg-gray-50"
+    : "inline-flex items-center gap-1.5 rounded-full border bg-white px-2.5 py-1 text-[11px] text-gray-700 hover:bg-gray-50"
 
   return (
-    <div className={`flex items-center flex-wrap ${extraCompact ? "gap-1 py-0" : compact ? "gap-2 py-0.5" : "gap-2 py-2"}`}>
+    <div className={`flex items-center flex-wrap ${extraCompact ? "gap-1 py-0" : compact ? "gap-1.5 py-0.5" : "gap-1.5 py-1"}`}>
       {items.map((item) => {
         const field = fieldsByName.get(item.field)
         if (!field) return null
@@ -249,11 +251,11 @@ export default function QuickFilterBar({
                     e.stopPropagation()
                     clearOne(item.field)
                   }}
-                  className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full hover:bg-gray-100"
+                  className="ml-0.5 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full hover:bg-gray-100"
                   title="Clear"
                   role="button"
                 >
-                  <X className="h-3 w-3 text-gray-400" />
+                  <X className="h-2.5 w-2.5 text-gray-400" />
                 </span>
               </button>
             </PopoverTrigger>
@@ -330,10 +332,10 @@ export default function QuickFilterBar({
           <PopoverTrigger asChild>
             <button
               type="button"
-              className={extraCompact ? "inline-flex items-center gap-1 rounded-full border border-dashed bg-white px-2 py-1 text-[11px] text-gray-600 hover:bg-gray-50" : "inline-flex items-center gap-1 rounded-full border border-dashed bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50"}
+              className={extraCompact ? "inline-flex items-center gap-1 rounded-full border border-dashed bg-white px-2 py-0.5 text-[11px] text-gray-600 hover:bg-gray-50" : "inline-flex items-center gap-1 rounded-full border border-dashed bg-white px-2.5 py-1 text-[11px] text-gray-600 hover:bg-gray-50"}
               aria-label="Add Filter"
             >
-              <Plus className={extraCompact ? "h-3 w-3" : "h-3.5 w-3.5"} />
+              <Plus className={extraCompact ? "h-2.5 w-2.5" : "h-3 w-3"} />
               Add Filter
             </button>
           </PopoverTrigger>
@@ -364,20 +366,20 @@ export default function QuickFilterBar({
 
       {/* Modified indicator + reset */}
       {isModified && (
-        <div className="flex items-center gap-2 ml-2">
-          <Badge variant="secondary" className="text-xs">
-            Filters modified
+        <div className="flex items-center gap-1.5 ml-1">
+          <Badge variant="secondary" className="h-6 px-2 text-[11px]">
+            Filtered
           </Badge>
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            className="h-7 px-2 text-xs text-gray-600"
+            className="h-6 px-2 text-[11px] text-gray-600"
             onClick={resetAll}
             title="Reset to default view"
           >
-            <RotateCcw className="h-3.5 w-3.5 mr-1" />
-            Reset to default view
+            <RotateCcw className="h-3 w-3 mr-1" />
+            Reset
           </Button>
         </div>
       )}
