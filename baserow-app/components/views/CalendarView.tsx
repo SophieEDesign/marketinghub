@@ -1624,6 +1624,11 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
     if (visibleWeekSpan === 8) return "dayGridWeek8"
     return "dayGridWeek6"
   }, [visibleWeekSpan])
+  const calendarAspectRatio = useMemo(() => {
+    if (visibleWeekSpan === 4) return 0.9
+    if (visibleWeekSpan === 8) return 1.35
+    return 1.1
+  }, [visibleWeekSpan])
 
   // FullCalendar: use stable plugins array (defined at module level to prevent React #185)
   const calendarHeaderToolbar = useMemo(
@@ -2116,8 +2121,9 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
             initialView={calendarInitialView}
             initialDate={calendarInitialDate}
             views={calendarViews}
-            height="100%"
-            contentHeight="100%"
+            height="auto"
+            contentHeight="auto"
+            aspectRatio={calendarAspectRatio}
             expandRows={true}
             dayMaxEvents={2}
             moreLinkClick="popover"
