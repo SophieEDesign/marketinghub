@@ -569,7 +569,7 @@ export default function GalleryView({
         <Card
           key={reactKey}
           className={cn(
-            "w-full min-w-0 h-full min-h-[188px] hover:shadow-md transition-shadow bg-white border border-black/5 overflow-hidden cursor-default",
+            "w-full min-w-0 min-h-[188px] hover:shadow-md transition-shadow bg-white border border-black/5 overflow-hidden cursor-default",
             marketingDashboardStyle
               ? "marketing-card rounded-card-lg"
               : "rounded-xl",
@@ -579,8 +579,8 @@ export default function GalleryView({
           onClick={() => setSelectedCardId(String(row.id))}
           onDoubleClick={() => handleOpenRecord(String(row.id))}
         >
-          <CardContent className="h-full p-4 md:p-5">
-            <div className="h-full flex items-center justify-between gap-3">
+          <CardContent className="p-4 md:p-5">
+            <div className="flex items-center justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <div className="mb-3 flex justify-center">
                   <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-black/5 bg-slate-100/80">
@@ -759,7 +759,13 @@ export default function GalleryView({
   }
 
   return (
-    <div ref={contentRef} className={cn("w-full h-full overflow-y-auto overflow-x-hidden", marketingDashboardStyle ? "bg-background" : "bg-gray-50")}>
+    <div
+      ref={contentRef}
+      className={cn(
+        "w-full h-full min-h-0 max-h-full overflow-y-auto overflow-x-hidden overscroll-contain",
+        marketingDashboardStyle ? "bg-background" : "bg-gray-50"
+      )}
+    >
       {Array.isArray(groupedRows) && groupedRows.length > 0 ? (
         <div className="p-6 space-y-6">
           {groupedRows.map((group) => {

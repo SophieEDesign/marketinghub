@@ -1358,17 +1358,18 @@ export default function GridBlock({
             <div className="flex h-12 min-w-0 items-center justify-between gap-2 px-4 py-3">
               <h3 className="truncate text-sm font-semibold text-foreground">{calendarTitle}</h3>
               <div className="flex items-center gap-2">
-                {showAddRecord && (
+                {showAddRecord && canCreateRecord && (
                   <Button
                     type="button"
-                    size="sm"
+                    size="icon"
+                    variant="outline"
                     onClick={handleAddRecord}
                     disabled={isAddRecordDisabled}
-                    title={!canCreateRecord ? "Adding records is disabled for this block" : "Add a new record"}
-                    className="h-8 px-3"
+                    title="Add a new record"
+                    className="h-8 w-8"
+                    aria-label="Add record"
                   >
-                    <Plus className="mr-1.5 h-3.5 w-3.5" />
-                    Add record
+                    <Plus className="h-3.5 w-3.5" />
                   </Button>
                 )}
                 <Button type="button" size="sm" variant="outline" className="h-8 px-3">

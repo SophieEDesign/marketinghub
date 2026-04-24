@@ -300,7 +300,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
   const isViewOnly = permissions.mode === 'view'
   const allowInlineCreate = permissions.allowInlineCreate ?? true
   const allowOpenRecord = permissions.allowOpenRecord ?? true
-  const canCreateRecord = showAddRecord && !isViewOnly && allowInlineCreate
+  const canCreateRecord = !isViewOnly && allowInlineCreate
   
   // View config state - calendar settings from view config
   const [viewConfig, setViewConfig] = useState<{

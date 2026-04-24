@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Plus, RotateCcw, X } from "lucide-react"
+import { Filter, Plus, X } from "lucide-react"
 import type { TableField } from "@/types/fields"
 import type { FilterConfig } from "@/lib/interface/filters"
 import { serializeFiltersForComparison } from "@/lib/interface/filters"
@@ -105,6 +105,8 @@ export interface QuickFilterBarProps {
   compact?: boolean
   /** When true (full-page calendar), use extra-small pills */
   extraCompact?: boolean
+  /** When true, show compact filtered-state icon instead of text badge/reset button */
+  showFilteredIconOnly?: boolean
 }
 
 export default function QuickFilterBar({
@@ -114,6 +116,7 @@ export default function QuickFilterBar({
   onChange,
   compact = false,
   extraCompact = false,
+  showFilteredIconOnly = false,
 }: QuickFilterBarProps) {
   const quickableFields = useMemo(() => getQuickableFields(tableFields), [tableFields])
 
@@ -190,8 +193,6 @@ export default function QuickFilterBar({
     const active = new Set(items.map((i) => i.field))
     return quickableFields.filter((f) => !active.has(f.name))
   }, [items, quickableFields])
-
-  const resetAll = () => setItems(baseline)
 
   const clearOne = (fieldName: string) => {
     const baselineItem = baselineByField.get(fieldName)
@@ -364,23 +365,22 @@ export default function QuickFilterBar({
         </Popover>
       )}
 
-      {/* Modified indicator + reset */}
+      {/* Modified indicator */}
       {isModified && (
-        <div className="flex items-center gap-1.5 ml-1">
-          <Badge variant="secondary" className="h-6 px-2 text-[11px]">
-            Filtered
-          </Badge>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-6 px-2 text-[11px] text-gray-600"
-            onClick={resetAll}
-            title="Reset to default view"
-          >
-            <RotateCcw className="h-3 w-3 mr-1" />
-            Reset
-          </Button>
+        <div className="flex items-center ml-1">
+          {showFilteredIconOnly ? (
+            <span
+              className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-blue-700"
+              title="Filters active"
+              aria-label="Filters active"
+            >
+              <Filter className="h-3.5 w-3.5" />
+            </span>
+          ) : (
+            <Badge variant="secondary" className="h-6 px-2 text-[11px]">
+              Filtered
+            </Badge>
+          )}
         </div>
       )}
     </div>

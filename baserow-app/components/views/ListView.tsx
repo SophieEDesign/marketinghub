@@ -536,6 +536,8 @@ export default function ListView({
   // Measure content height when content layout changes.
   // When onHeightChange is provided, the list can expand the block instead of using an inner scrollbar.
   useEffect(() => {
+    // Marketing dashboard cards should keep a fixed internal viewport and never auto-expand.
+    if (marketingDashboardStyle) return
     if (!onHeightChange || !contentRef.current) return
 
     const timeoutId = setTimeout(() => {
@@ -991,7 +993,9 @@ export default function ListView({
         {/* Grouped Content - keep internal scroll unless explicit dynamic-height mode is enabled */}
         <div
           className={
-            onHeightChange
+            marketingDashboardStyle
+              ? "h-[360px] max-h-[360px] min-h-0 min-w-0 overflow-y-auto overflow-x-hidden"
+              : onHeightChange
               ? "min-h-0 min-w-0 overflow-visible"
               : "flex-1 min-h-0 min-w-0 overflow-y-auto"
           }
@@ -1222,7 +1226,9 @@ export default function ListView({
     <div ref={contentRef} className={`${BLOCK_EMBED_CLASSNAME} h-full flex flex-col`}>
       <div
         className={
-            onHeightChange
+            marketingDashboardStyle
+            ? "h-[360px] max-h-[360px] min-h-0 min-w-0 overflow-y-auto overflow-x-hidden"
+            : onHeightChange
             ? "min-h-0 min-w-0 overflow-visible overflow-x-hidden"
             : "flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden"
         }

@@ -498,7 +498,7 @@ export default function ListBlock({
     <div className="h-full w-full flex flex-col min-h-0" style={blockStyle}>
       {showHeader && (
         <div
-          className="mb-3 flex-shrink-0 flex items-center justify-between gap-3"
+          className="mb-2 flex-shrink-0 flex items-center justify-between gap-2"
           style={{
             backgroundColor: appearance.header_background,
             color: appearance.header_text_color || appearance.title_color,
@@ -506,7 +506,7 @@ export default function ListBlock({
         >
           <div className="min-w-0 flex-1">
             {((appearance.showTitle ?? (appearance as any).show_title) !== false && (appearance.title || (isEditing ? config.title : table?.name))) && (
-              <h3 className="text-xl font-bold text-gray-900 truncate">{appearance.title || (isEditing ? config.title : table?.name)}</h3>
+              <h3 className="text-lg font-semibold text-gray-900 truncate">{appearance.title || (isEditing ? config.title : table?.name)}</h3>
             )}
           </div>
           {showAddRecord && (
@@ -527,12 +527,14 @@ export default function ListBlock({
 
       {/* Quick filters (session-only; never saved to the view) */}
       {!isEditing && (
-        <div className="flex-shrink-0">
+        <div className="flex-shrink-0 mb-1">
           <QuickFilterBar
             storageKey={`mh:quickFilters:${pageId || "page"}:${block.id}`}
             tableFields={safeTableFields}
             viewDefaultFilters={viewDefaultFilters}
             onChange={setUserQuickFilters}
+            compact={marketingDashboardStyle}
+            showFilteredIconOnly={marketingDashboardStyle}
           />
         </div>
       )}
