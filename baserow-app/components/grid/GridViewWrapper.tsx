@@ -112,6 +112,9 @@ interface GridViewWrapperProps {
   interfaceMode?: 'view' | 'edit'
   /** Optional block id for record modal remount key. */
   blockId?: string | null
+  recordLimit?: number
+  overflowBehaviour?: 'view_all' | 'scroll' | 'paginate'
+  displayMode?: 'fit' | 'fixed'
 }
 
 export default function GridViewWrapper({
@@ -147,6 +150,9 @@ export default function GridViewWrapper({
   openRecordInEditMode = null,
   interfaceMode = 'view',
   blockId = null,
+  recordLimit = 20,
+  overflowBehaviour = 'view_all',
+  displayMode = 'fit',
 }: GridViewWrapperProps) {
   const router = useRouter()
   // CRITICAL: Normalize all inputs at wrapper entry point
@@ -890,6 +896,9 @@ export default function GridViewWrapper({
         isEditing={isEditing}
         interfaceMode={interfaceMode}
         blockId={blockId}
+          recordLimit={recordLimit}
+          overflowBehaviour={overflowBehaviour}
+          displayMode={displayMode}
         onRecordClick={onRecordClick}
           rowHeight={rowHeight}
           wrapText={wrapText}

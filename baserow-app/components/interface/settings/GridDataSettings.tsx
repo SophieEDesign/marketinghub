@@ -29,6 +29,8 @@ import NestedGroupBySelector from "./shared/NestedGroupBySelector"
 import type { GroupRule } from "@/lib/grouping/types"
 import SortSelector from "./shared/SortSelector"
 import { Switch } from "@/components/ui/switch"
+import { Input } from "@/components/ui/input"
+import { getDefaultRecordLimitForBlock } from "@/lib/interface/block-display-settings"
 
 interface GridDataSettingsProps {
   config: BlockConfig
@@ -119,6 +121,10 @@ export default function GridDataSettings({
 
   const compatibleTypes = getCompatibleViewTypes()
   const currentViewType: ViewType = config?.view_type || 'grid'
+  const defaultRecordLimit = getDefaultRecordLimitForBlock(currentViewType as any)
+  const recordLimit = Number(config.record_limit ?? config.row_limit ?? defaultRecordLimit)
+  const overflowBehaviour = (config.overflow_behaviour || 'view_all') as 'view_all' | 'scroll' | 'paginate'
+  const displayMode = (config.display_mode || 'fit') as 'fit' | 'fixed'
 
   const { metadata: viewMeta } = useViewMeta(config.view_id, config.table_id)
 
@@ -198,6 +204,73 @@ export default function GridDataSettings({
           tableId={config.table_id}
         />
       )}
+
+      {/* Unified display controls for data blocks */}
+      <div className="space-y-3 border-t border-gray-200 pt-4">
+        <h3 className="text-sm font-semibold text-gray-900">Display</h3>
+
+        <div className="space-y-2">
+          <Label>Display height</Label>
+          <Select
+            value={displayMode}
+            onValueChange={(value: 'fit' | 'fixed') => onUpdate({ display_mode: value })}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="fit">Fit to data</SelectItem>
+              <SelectItem value="fixed">Fixed height with internal scroll</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Record limit</Label>
+          <div className="grid grid-cols-2 gap-2">
+            {[5, 10, 20, 50].map((n) => (
+              <Button
+                key={n}
+                type="button"
+                variant={recordLimit === n ? "default" : "outline"}
+                onClick={() => onUpdate({ record_limit: n, row_limit: n })}
+                className="h-8"
+              >
+                {n} {n === 20 ? "(default)" : ""}
+              </Button>
+            ))}
+          </div>
+          <Input
+            type="number"
+            min={1}
+            value={recordLimit}
+            onChange={(e) => {
+              const parsed = Number(e.target.value)
+              if (Number.isFinite(parsed) && parsed > 0) {
+                onUpdate({ record_limit: Math.floor(parsed), row_limit: Math.floor(parsed) })
+              }
+            }}
+            placeholder="Custom limit"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label>When records exceed limit</Label>
+          <Select
+            value={overflowBehaviour}
+            onValueChange={(value: 'view_all' | 'scroll' | 'paginate') => onUpdate({ overflow_behaviour: value })}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="view_all">Show "View all"</SelectItem>
+              <SelectItem value="scroll">Enable internal scroll</SelectItem>
+              <SelectItem value="paginate">Paginate (where supported)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
       {/* B. Permissions (Airtable parity: view/edit, add/delete inline, open record, modal layout) */}
       <div className="space-y-4 border-t border-gray-200 pt-4">

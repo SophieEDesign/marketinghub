@@ -39,6 +39,7 @@ import { getVisibleFieldsFromLayout } from "@/lib/interface/field-layout-helpers
 import type { FieldLayoutItem } from "@/lib/interface/field-layout-utils"
 import { buildRecordContextFilters } from "@/lib/interface/record-context-filters"
 import { cn } from "@/lib/utils"
+import { resolveBlockDisplaySettings } from "@/lib/interface/block-display-settings"
 
 interface GridBlockProps {
   block: PageBlock
@@ -93,6 +94,7 @@ export default function GridBlock({
   // #endregion
   
   const { config } = block
+  const displaySettings = resolveBlockDisplaySettings(block.type, config)
 
   // CRITICAL: block.config is often a new object each render (from CalendarBlock/BlockRenderer).
   // Passing unstable blockConfig to CalendarView → blockConfigRef changes → handleEventClick deps
@@ -673,6 +675,7 @@ export default function GridBlock({
     return groupBy
   })()
   const isGridWithPushDown = viewType === 'grid' && !!effectiveGroupByForPushDown
+  const allowInternalScroll = displaySettings.displayMode === "fixed" && displaySettings.overflowBehaviour === "scroll"
 
   const { canCreateRecord, isAddRecordDisabled, handleAddRecord } = (() => {
     const permissions = config.permissions || {}
@@ -1073,6 +1076,9 @@ export default function GridBlock({
             onRecordDeleted={() => setRefreshKey((k) => k + 1)}
             onModalLayoutSave={onModalLayoutSave ?? undefined}
             marketingDashboardStyle={marketingDashboardStyle}
+            recordLimit={displaySettings.recordLimit}
+            displayMode={displaySettings.displayMode}
+            overflowBehaviour={displaySettings.overflowBehaviour}
           />
         )
       }
@@ -1179,6 +1185,9 @@ export default function GridBlock({
             onRecordDeleted={() => setRefreshKey((k) => k + 1)}
             onModalLayoutSave={onModalLayoutSave ?? undefined}
             marketingDashboardStyle={marketingDashboardStyle}
+            recordLimit={displaySettings.recordLimit}
+            displayMode={displaySettings.displayMode}
+            overflowBehaviour={displaySettings.overflowBehaviour}
           />
         )
       }
@@ -1294,6 +1303,9 @@ export default function GridBlock({
             onModalLayoutSave={onModalLayoutSave}
             canEditLayout={canEditLayout}
             blockId={block.id}
+            recordLimit={displaySettings.recordLimit}
+            overflowBehaviour={displaySettings.overflowBehaviour}
+            displayMode={displaySettings.displayMode}
             openRecordInEditMode={
               openRecordInEditModeForBlock &&
               openRecordInEditModeForBlock.blockId === block.id &&
@@ -1308,7 +1320,7 @@ export default function GridBlock({
   }
 
   return (
-    <div className={`h-full w-full max-w-full min-h-0 min-w-0 flex flex-col ${(isGridWithPushDown || viewType === "calendar") ? 'overflow-visible' : 'overflow-hidden'}`} style={blockStyle}>
+    <div className={`h-full w-full max-w-full min-h-0 min-w-0 flex flex-col ${(isGridWithPushDown || viewType === "calendar" || !allowInternalScroll) ? 'overflow-visible' : 'overflow-hidden'}`} style={blockStyle}>
       {/* Legacy header (title + optional add record) - only when appearance wrapper is not active */}
       {!wrapperHasAppearanceSettings &&
         (((appearance.showTitle ?? (appearance as any).show_title) !== false && blockTitle) ||
@@ -1432,7 +1444,7 @@ export default function GridBlock({
       {/* Single scroll container: GridView/CalendarView owns scroll; flex so child can flex-1. Calendar needs overflow-hidden so child controls scroll. */}
       {/* Non-full-page calendar must not force viewport min-height inside a fixed grid item, or lower content gets clipped. */}
       {/* When grid uses push-down (grouping), overflow-visible so content can grow and flow to page scroll. */}
-      <div className={`flex flex-col min-w-0 w-full min-h-0 flex-1 ${(isGridWithPushDown || marketingDashboardStyle || viewType === "calendar") ? 'overflow-visible' : 'overflow-hidden'}`}>
+      <div className={`flex flex-col min-w-0 w-full min-h-0 flex-1 ${(isGridWithPushDown || marketingDashboardStyle || viewType === "calendar" || !allowInternalScroll) ? 'overflow-visible' : 'overflow-hidden'}`}>
         {renderView()}
       </div>
     </div>

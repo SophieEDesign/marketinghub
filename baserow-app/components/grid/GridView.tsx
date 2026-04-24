@@ -148,9 +148,10 @@ interface GridViewProps {
   interfaceMode?: 'view' | 'edit'
   /** Optional block id for remount key (when block/layout changes, modal remounts). */
   blockId?: string | null
+  recordLimit?: number
+  overflowBehaviour?: 'view_all' | 'scroll' | 'paginate'
+  displayMode?: 'fit' | 'fixed'
 }
-
-const ITEMS_PER_PAGE = 100
 
 function shallowEqualRecordNumber(a: Record<string, number>, b: Record<string, number>): boolean {
   const aKeys = Object.keys(a)
@@ -591,6 +592,9 @@ export default function GridView({
   openRecordInEditMode = null,
   interfaceMode = 'view',
   blockId = null,
+  recordLimit = 20,
+  overflowBehaviour = 'view_all',
+  displayMode = 'fit',
 }: GridViewProps) {
   const router = useRouter()
   const { openRecord } = useRecordPanel()
@@ -605,6 +609,9 @@ export default function GridView({
   const [isMissingPhysicalTable, setIsMissingPhysicalTable] = useState(false)
   const [initializingFields, setInitializingFields] = useState(false)
   const [columnOrder, setColumnOrder] = useState<string[]>([])
+  const itemsPerPage = overflowBehaviour === "paginate"
+    ? Math.max(5, recordLimit)
+    : Math.max(20, recordLimit)
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
   const [resizingColumn, setResizingColumn] = useState<string | null>(null)
   const [rowHeights, setRowHeights] = useState<Record<string, number>>({})
@@ -1641,10 +1648,10 @@ export default function GridView({
       // For client-side sorting, we need to fetch more rows to sort properly
       // Otherwise, limit results for performance
       if (!needsClientSideSort) {
-        query = query.limit(ITEMS_PER_PAGE)
+        query = query.limit(itemsPerPage)
       } else {
         // Fetch more rows for client-side sorting (will limit after sorting)
-        query = query.limit(ITEMS_PER_PAGE * 2)
+        query = query.limit(itemsPerPage * 2)
       }
 
       const { data, error } = await query
@@ -1854,7 +1861,7 @@ export default function GridView({
             retryQuery = retryQuery.order(rowIdColumn, { ascending: false })
           }
 
-          retryQuery = retryQuery.limit(retryNeedsClientSideSort ? ITEMS_PER_PAGE * 2 : ITEMS_PER_PAGE)
+          retryQuery = retryQuery.limit(retryNeedsClientSideSort ? itemsPerPage * 2 : itemsPerPage)
 
           const retry = await retryQuery
           if (!retry.error) {
@@ -1872,7 +1879,7 @@ export default function GridView({
                 dataArray,
                 filteredRetrySorts.map(s => ({ field_name: s.field_name, direction: s.direction as 'asc' | 'desc', order_index: s.order_index })),
                 safeTableFields
-              )).slice(0, ITEMS_PER_PAGE)
+              )).slice(0, itemsPerPage)
             }
             setRows(dataArray)
             setLoading(false)
@@ -2058,7 +2065,7 @@ export default function GridView({
             safeTableFields
           )
           // Limit after sorting
-          computedRows = computedRows.slice(0, ITEMS_PER_PAGE)
+          computedRows = computedRows.slice(0, itemsPerPage)
         }
         
         setIsMissingPhysicalTable(false)
@@ -2861,7 +2868,10 @@ export default function GridView({
   
   // Measure content height and report ephemeral delta (not total height)
   // When onHeightChange provided and grouped: use overflow-visible so content grows; contentRef scrollHeight reflects full content
-  const usePushDown = Boolean(onHeightChange && effectiveGroupRules.length > 0)
+  const usePushDown = Boolean(
+    (displayMode === "fit" && onHeightChange) ||
+    (onHeightChange && effectiveGroupRules.length > 0)
+  )
   useEffect(() => {
     if (!onHeightChange || !contentRef.current) {
       baseHeightRef.current = null

@@ -25,6 +25,7 @@ import type { GroupRule } from "@/lib/grouping/types"
 import type { FieldLayoutItem } from "@/lib/interface/field-layout-utils"
 import { getVisibleFieldsForCard } from "@/lib/interface/field-layout-helpers"
 import { useMarketingDashboard } from "@/contexts/MarketingDashboardContext"
+import { resolveBlockDisplaySettings } from "@/lib/interface/block-display-settings"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 function isUuidLike(value: string | null | undefined): value is string {
@@ -59,6 +60,7 @@ export default function ListBlock({
   const marketingDashboardStyle = useMarketingDashboard()
   const { toast } = useToast()
   const { config } = block
+  const displaySettings = resolveBlockDisplaySettings(block.type, config)
   const configContentKey = config ? JSON.stringify(config) : ''
   const stableBlockConfig = useMemo(() => config ?? {}, [configContentKey])
   const cascadeContext = useMemo(
@@ -574,6 +576,9 @@ export default function ListBlock({
         rowHeight={rowHeight}
         cascadeContext={cascadeContext}
         marketingDashboardStyle={marketingDashboardStyle}
+        recordLimit={displaySettings.recordLimit}
+        displayMode={displaySettings.displayMode}
+        overflowBehaviour={displaySettings.overflowBehaviour}
       />
       </div>
     </div>

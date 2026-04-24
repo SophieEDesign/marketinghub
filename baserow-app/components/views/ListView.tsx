@@ -34,6 +34,7 @@ import { useRealtimeTable } from "@/lib/realtime/useRealtimeTable"
 import { cn } from "@/lib/utils"
 import { resolveContentIcon } from "@/lib/ui/content-icons"
 import { BLOCK_EMBED_CLASSNAME, Panel } from "@/components/layout/ui-system"
+import type { BlockOverflowBehaviour } from "@/lib/interface/block-display-settings"
 
 // PostgREST expects unquoted identifiers in order clauses; see `lib/supabase/postgrest`.
 
@@ -88,6 +89,9 @@ interface ListViewProps {
   onModalLayoutSave?: (fieldLayout: import("@/lib/interface/field-layout-utils").FieldLayoutItem[]) => void
   /** Marketing Dashboard: softer cards / list rows */
   marketingDashboardStyle?: boolean
+  recordLimit?: number
+  displayMode?: "fit" | "fixed"
+  overflowBehaviour?: BlockOverflowBehaviour
 }
 
 export default function ListView({
@@ -124,6 +128,9 @@ export default function ListView({
   blockConfig,
   onModalLayoutSave,
   marketingDashboardStyle = false,
+  recordLimit = 20,
+  displayMode = "fit",
+  overflowBehaviour = "view_all",
 }: ListViewProps) {
   const router = useRouter()
   const { openRecord } = useRecordPanel()
@@ -145,6 +152,7 @@ export default function ListView({
   )
   const [groupValueLabelMaps, setGroupValueLabelMaps] = useState<Record<string, Record<string, string>>>({})
   const [userDisplayNames, setUserDisplayNames] = useState<Map<string, string>>(new Map())
+  const [isShowingAll, setIsShowingAll] = useState(false)
 
   // Create flow: open modal first; only insert on Save inside modal.
   const { openRecordModal } = useRecordModal()
@@ -235,6 +243,10 @@ export default function ListView({
   useEffect(() => {
     setCurrentFilters(filters)
   }, [filtersKey, filters])
+
+  useEffect(() => {
+    setIsShowingAll(false)
+  }, [tableId, viewId, recordLimit, reloadKey, filtersKey, currentFiltersKey])
 
   // Load rows
   useEffect(() => {
@@ -331,7 +343,7 @@ export default function ListView({
       }
 
       // Explicit limit so we don't rely on Supabase default (often 20–30); show all rows up to a safe cap
-      const ROWS_LIMIT = 2000
+      const ROWS_LIMIT = isShowingAll ? 2000 : Math.max(5, recordLimit + 1)
       query = query.limit(ROWS_LIMIT)
 
       const { data, error } = await query
@@ -1191,7 +1203,9 @@ export default function ListView({
   }
 
   // Render ungrouped list
-  const rowsToRender = filteredRows
+  const hasMoreRows = !isShowingAll && filteredRows.length > recordLimit
+  const rowsToRender = hasMoreRows ? filteredRows.slice(0, recordLimit) : filteredRows
+  const allowInternalScroll = displayMode === "fixed" && overflowBehaviour === "scroll"
 
   if (rowsToRender.length === 0) {
     return (
@@ -1228,7 +1242,9 @@ export default function ListView({
         className={
             marketingDashboardStyle
             ? "h-[360px] max-h-[360px] min-h-0 min-w-0 overflow-y-auto overflow-x-hidden"
-            : onHeightChange
+            : allowInternalScroll
+            ? "flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden"
+            : onHeightChange || displayMode === "fit"
             ? "min-h-0 min-w-0 overflow-visible overflow-x-hidden"
             : "flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden"
         }
@@ -1267,6 +1283,13 @@ export default function ListView({
           </div>
         </Panel>
       </div>
+      {hasMoreRows && overflowBehaviour === "view_all" && (
+        <div className="mt-2 flex justify-end">
+          <Button type="button" size="sm" variant="outline" onClick={() => setIsShowingAll(true)}>
+            View all
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

@@ -61,6 +61,9 @@ interface GalleryViewProps {
   onModalLayoutSave?: (fieldLayout: import("@/lib/interface/field-layout-utils").FieldLayoutItem[]) => void
   /** Marketing Dashboard: rounded cards, softer borders, status pill styling */
   marketingDashboardStyle?: boolean
+  recordLimit?: number
+  displayMode?: "fit" | "fixed"
+  overflowBehaviour?: "view_all" | "scroll" | "paginate"
 }
 
 export default function GalleryView({
@@ -87,12 +90,16 @@ export default function GalleryView({
   onRecordDeleted,
   onModalLayoutSave,
   marketingDashboardStyle = false,
+  recordLimit = 12,
+  displayMode = "fit",
+  overflowBehaviour = "view_all",
 }: GalleryViewProps) {
   const { openRecord } = useRecordPanel()
   const [rows, setRows] = useState<TableRow[]>([])
   const [loading, setLoading] = useState(true)
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
+  const [isShowingAll, setIsShowingAll] = useState(false)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set())
   const [groupValueLabelMaps, setGroupValueLabelMaps] = useState<Record<string, Record<string, string>>>({})
   // Ref for measuring content height
@@ -360,6 +367,13 @@ export default function GalleryView({
     return rows.filter((r) => ids.has(r.id))
   }, [rows, tableFields, searchQuery, safeFieldIds])
 
+  const hasMoreRows = !isShowingAll && filteredRows.length > recordLimit
+  const visibleRows = hasMoreRows ? filteredRows.slice(0, recordLimit) : filteredRows
+
+  useEffect(() => {
+    setIsShowingAll(false)
+  }, [tableId, viewId, recordLimit, reloadKey, searchQuery])
+
   // Resolve grouping labels for linked record fields (link_to_table).
   useEffect(() => {
     let cancelled = false
@@ -382,7 +396,7 @@ export default function GalleryView({
 
       const linkField = fieldObj as LinkedField
       const ids = new Set<string>()
-      for (const r of Array.isArray(filteredRows) ? filteredRows : []) {
+      for (const r of Array.isArray(visibleRows) ? visibleRows : []) {
         const fieldValue = getLinkedFieldValueFromRow(r as { data?: Record<string, unknown> }, linkField)
         for (const id of linkedValueToIds(fieldValue)) ids.add(id)
       }
@@ -405,14 +419,14 @@ export default function GalleryView({
     return () => {
       cancelled = true
     }
-  }, [effectiveGroupByField, filteredRows, tableFields])
+  }, [effectiveGroupByField, visibleRows, tableFields])
 
   type GalleryGroupItem = Record<string, any> & { __row: TableRow; __rowId: string }
 
   const groupedRows = useMemo((): GroupedNode<GalleryGroupItem>[] | null => {
     if (!effectiveGroupByRules || effectiveGroupByRules.length === 0) return null
     const safeFields = (Array.isArray(tableFields) ? tableFields : []).filter(Boolean) as TableField[]
-    const items: GalleryGroupItem[] = filteredRows.map((r) => ({
+    const items: GalleryGroupItem[] = visibleRows.map((r) => ({
       ...(r.data || {}),
       __row: r,
       __rowId: String(r.id),
@@ -423,7 +437,7 @@ export default function GalleryView({
       valueLabelMaps: groupValueLabelMaps,
     })
     return rootGroups
-  }, [effectiveGroupByRules, filteredRows, tableFields, groupValueLabelMaps])
+  }, [effectiveGroupByRules, visibleRows, tableFields, groupValueLabelMaps])
 
   // When grouping, allow "start collapsed" behavior (default: collapsed).
   // This is intentionally applied only on initial load / when the groupBy field changes / when the setting flips,
@@ -758,11 +772,15 @@ export default function GalleryView({
     )
   }
 
+  const allowInternalScroll = displayMode === "fixed" && overflowBehaviour === "scroll"
+
   return (
     <div
       ref={contentRef}
       className={cn(
-        "w-full h-full min-h-0 max-h-full overflow-y-auto overflow-x-hidden overscroll-contain",
+        allowInternalScroll
+          ? "w-full h-full min-h-0 max-h-full overflow-y-auto overflow-x-hidden overscroll-contain"
+          : "w-full h-full min-h-0 overflow-visible overflow-x-hidden",
         marketingDashboardStyle ? "bg-background" : "bg-gray-50"
       )}
     >
@@ -890,7 +908,14 @@ export default function GalleryView({
         </div>
       ) : (
         <div className="w-full min-w-0 p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredRows.map((row) => renderCard(row, String(row.id)))}
+          {visibleRows.map((row) => renderCard(row, String(row.id)))}
+        </div>
+      )}
+      {hasMoreRows && overflowBehaviour === "view_all" && (
+        <div className="px-6 pb-4 flex justify-end">
+          <Button type="button" size="sm" variant="outline" onClick={() => setIsShowingAll(true)}>
+            View all
+          </Button>
         </div>
       )}
     </div>

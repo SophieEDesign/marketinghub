@@ -121,6 +121,12 @@ export interface BlockConfig {
   visibility_rules?: VisibilityRule[]
   // Table snapshot
   row_limit?: number
+  /** Unified display model for data blocks. */
+  display_mode?: 'fit' | 'fixed'
+  /** Unified record limit for data blocks (defaults to 20 when missing). */
+  record_limit?: number
+  /** Behaviour when records exceed record_limit. */
+  overflow_behaviour?: 'view_all' | 'scroll' | 'paginate'
   highlight_rules?: HighlightRule[]
   // Action block
   action_type?: 'navigate' | 'create_record' | 'redirect'
