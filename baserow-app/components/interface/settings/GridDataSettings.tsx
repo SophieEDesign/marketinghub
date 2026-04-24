@@ -984,6 +984,97 @@ export default function GridDataSettings({
           </div>
         </>
       )}
+
+      {/* Shared card display settings (Gallery + Kanban + card-style list variants) */}
+      {(currentViewType === 'gallery' || currentViewType === 'kanban' || currentViewType === 'list') && (
+        <div className="space-y-3 pt-2 border-t border-gray-200">
+          <Label className="text-sm font-semibold">Card display</Label>
+
+          <div className="space-y-2">
+            <Label>Image display</Label>
+            <Select
+              value={(config as any).card_image_display || "show_if_available"}
+              onValueChange={(value) => onUpdate({ card_image_display: value } as any)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="show_if_available">Show image if available</SelectItem>
+                <SelectItem value="placeholder">Show icon placeholder if no image</SelectItem>
+                <SelectItem value="hide_when_empty">Hide image area if no image</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Text behaviour</Label>
+            <Select
+              value={(config as any).card_text_behaviour || "wrap"}
+              onValueChange={(value) => onUpdate({ card_text_behaviour: value } as any)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="wrap">Wrap (default)</SelectItem>
+                <SelectItem value="truncate_1">Truncate after 1 line</SelectItem>
+                <SelectItem value="truncate_2">Truncate after 2 lines</SelectItem>
+                <SelectItem value="truncate_3">Truncate after 3 lines</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Card height</Label>
+            <Select
+              value={(config as any).card_height_mode || "fit"}
+              onValueChange={(value) => onUpdate({ card_height_mode: value } as any)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="fit">Fit to data</SelectItem>
+                <SelectItem value="fixed">Fixed height</SelectItem>
+              </SelectContent>
+            </Select>
+            {(config as any).card_height_mode === "fixed" && (
+              <Input
+                type="number"
+                min={120}
+                value={Number((config as any).card_fixed_height_px || 180)}
+                onChange={(e) => {
+                  const parsed = Number(e.target.value)
+                  if (Number.isFinite(parsed) && parsed >= 120) onUpdate({ card_fixed_height_px: Math.floor(parsed) } as any)
+                }}
+              />
+            )}
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>Show field labels</Label>
+              <p className="text-xs text-gray-500">Hidden by default for cleaner cards.</p>
+            </div>
+            <Switch
+              checked={Boolean((config as any).card_show_labels ?? false)}
+              onCheckedChange={(checked) => onUpdate({ card_show_labels: checked } as any)}
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>Show empty fields</Label>
+              <p className="text-xs text-gray-500">Hide empty values by default.</p>
+            </div>
+            <Switch
+              checked={Boolean((config as any).card_show_empty_fields ?? false)}
+              onCheckedChange={(checked) => onUpdate({ card_show_empty_fields: checked } as any)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

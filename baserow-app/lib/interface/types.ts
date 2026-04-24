@@ -127,6 +127,13 @@ export interface BlockConfig {
   record_limit?: number
   /** Behaviour when records exceed record_limit. */
   overflow_behaviour?: 'view_all' | 'scroll' | 'paginate'
+  /** Shared card rendering settings for card-based blocks. */
+  card_image_display?: 'show_if_available' | 'placeholder' | 'hide_when_empty'
+  card_show_labels?: boolean
+  card_show_empty_fields?: boolean
+  card_text_behaviour?: 'wrap' | 'truncate_1' | 'truncate_2' | 'truncate_3'
+  card_height_mode?: 'fit' | 'fixed'
+  card_fixed_height_px?: number
   highlight_rules?: HighlightRule[]
   // Action block
   action_type?: 'navigate' | 'create_record' | 'redirect'

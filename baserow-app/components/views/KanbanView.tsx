@@ -11,7 +11,6 @@ import type { TableRow } from "@/types/database"
 import type { TableField } from "@/types/fields"
 import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
-import { CellFactory } from "@/components/grid/CellFactory"
 import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
 import { isAbortError } from "@/lib/api/error-handling"
 import { getOptionValueToLabelMap } from "@/lib/fields/select-options"
@@ -21,6 +20,7 @@ import { evaluateHighlightRules, getFormattingStyle } from "@/lib/conditional-fo
 import { getLinkedFieldValueFromRow, linkedValueToIds, resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
 import type { LinkedField } from "@/types/fields"
 import { getFieldDisplayName } from "@/lib/fields/display"
+import RecordCard from "@/components/views/cards/RecordCard"
 
 function normalizeKanbanGroupKey(value: unknown): string {
   if (value == null) return "Uncategorized"
@@ -101,6 +101,12 @@ function KanbanView({
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
   const [groupValueLabelMaps, setGroupValueLabelMaps] = useState<Record<string, Record<string, string>>>({})
+  const cardImageDisplay = ((blockConfig as any)?.card_image_display || "show_if_available") as "show_if_available" | "placeholder" | "hide_when_empty"
+  const cardShowLabels = Boolean((blockConfig as any)?.card_show_labels ?? showFieldLabels ?? false)
+  const cardShowEmptyFields = Boolean((blockConfig as any)?.card_show_empty_fields ?? false)
+  const cardTextBehaviour = ((blockConfig as any)?.card_text_behaviour || "wrap") as "wrap" | "truncate_1" | "truncate_2" | "truncate_3"
+  const cardHeightMode = ((blockConfig as any)?.card_height_mode || "fit") as "fit" | "fixed"
+  const cardFixedHeightPx = Number((blockConfig as any)?.card_fixed_height_px || 0)
 
   // IMPORTANT: config may provide field IDs or display names; row data keys are field NAMES (supabase columns).
   const groupingFieldName = useMemo(() => {
@@ -360,23 +366,6 @@ function KanbanView({
     )
   }, [blockConfig, cascadeContext, modalFields, onRecordClick, openRecord, supabaseTableName, tableId, interfaceMode, onRecordDeleted, onModalLayoutSave, tableFields, loadRows])
 
-  const handleCellSave = useCallback(async (rowId: string, fieldName: string, value: any) => {
-    if (!supabaseTableName) return
-    const { error } = await supabase
-      .from(supabaseTableName)
-      .update({ [fieldName]: value })
-      .eq("id", rowId)
-    if (error) throw error
-
-    setRows((prev) =>
-      prev.map((r) =>
-        String(r.id) === String(rowId)
-          ? { ...r, data: { ...(r.data || {}), [fieldName]: value } }
-          : r
-      )
-    )
-  }, [supabaseTableName])
-
   const handleCreateInGroup = useCallback(async (groupName: string) => {
     if (!showAddRecord || !canCreateRecord) return
     if (!supabaseTableName || !tableId) return
@@ -535,129 +524,30 @@ function KanbanView({
                   ? getFormattingStyle(matchingRule)
                   : {}
                 
-                return (() => {
-                  // Compact density: title + 1 field
-                  const cardFieldIds = (Array.isArray(fieldIds) ? fieldIds : [])
-                    .filter((fid) => fid !== groupingFieldId)
-                    .slice(0, 2)
-                  let cardFields = cardFieldIds
-                    .map((fieldId) => (Array.isArray(tableFields) ? tableFields : []).find(
-                      (f: any) => f?.name === fieldId || f?.id === fieldId
-                    ) as TableField | undefined)
-                    .filter((f): f is TableField => !!f)
-                  // If image field is configured and has data but not in cardFields, insert after first field
-                  if (cardImage && imageFieldName && !cardFields.some((f) => f.name === imageFieldName || f.id === imageFieldName)) {
-                    const imgField = (Array.isArray(tableFields) ? tableFields : []).find(
-                      (f: any) => f && (f.name === imageFieldName || f.id === imageFieldName)
-                    ) as TableField | undefined
-                    if (imgField) {
-                      cardFields = [cardFields[0], imgField, ...cardFields.slice(1)].filter(Boolean)
-                    }
-                  }
-                  const data = row.data || {}
-                  const FIELD_ROW_HEIGHT = 32
-                  const LONG_TEXT_ROW_HEIGHT = 48
-                  const IMAGE_ROW_HEIGHT = 112
-
-                  return (
-                <CardContainer
-                  key={row.id}
-                  density="compact"
-                  selected={selectedCardId === String(row.id)}
-                  styleOverrides={{ ...borderColor, ...rowFormattingStyle }}
-                  className="cursor-default"
-                  onClick={() => setSelectedCardId(String(row.id))}
-                  onDoubleClick={() => row.id != null && handleOpenRecord(String(row.id))}
-                >
-                  <div className="min-w-0">
-                    <div className="flex flex-col gap-1 min-w-0">
-                      {cardFields.map((fieldObj, idx) => {
-                        const isFirst = idx === 0
-                        const isVirtual = fieldObj.type === "formula" || fieldObj.type === "lookup"
-                        const isImageField = imageField && (fieldObj.name === imageField || fieldObj.id === imageField)
-                        const isLongText = fieldObj.type === "long_text"
-                        const imgSrc = isImageField ? cardImage : null
-                        const rowH = imgSrc ? (fitImageSize ? undefined : IMAGE_ROW_HEIGHT) : (isLongText ? LONG_TEXT_ROW_HEIGHT : FIELD_ROW_HEIGHT)
-
-                        if (isImageField && imgSrc) {
-                          return (
-                            <div
-                              key={fieldObj.id ?? fieldObj.name}
-                              className="w-full min-w-0"
-                              onClick={(e) => e.stopPropagation()}
-                              onDoubleClick={(e) => e.stopPropagation()}
-                            >
-                              {showFieldLabels && (
-                                <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-0.5">
-                                  {getFieldDisplayName(fieldObj)}
-                                </div>
-                              )}
-                              <div
-                                className={`w-full min-w-0 rounded overflow-hidden bg-gray-100 ${!fitImageSize ? "flex-shrink-0" : ""}`}
-                                style={!fitImageSize ? { height: IMAGE_ROW_HEIGHT } : undefined}
-                              >
-                                <img
-                                  src={imgSrc}
-                                  alt=""
-                                  className={`w-full ${fitImageSize ? "h-auto object-contain" : "h-28 object-cover"}`}
-                                  onError={(e) => {
-                                    (e.target as HTMLImageElement).style.display = "none"
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          )
-                        }
-
-                        return (
-                          <div
-                            key={fieldObj.id ?? fieldObj.name}
-                            className={`flex flex-col gap-0.5 min-w-0 ${isFirst ? "font-semibold text-sm text-gray-900" : "text-xs text-gray-600"}`}
-                            style={{ minHeight: rowH }}
-                            onClick={(e) => e.stopPropagation()}
-                            onDoubleClick={(e) => e.stopPropagation()}
-                          >
-                            {showFieldLabels && (
-                              <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wide shrink-0">
-                                {getFieldDisplayName(fieldObj)}
-                              </div>
-                            )}
-                            <div className={`flex items-center gap-1.5 min-w-0 flex-1`}>
-                            <div className={`flex-1 min-w-0 overflow-hidden ${isLongText ? "line-clamp-2 text-gray-600" : isFirst ? "truncate font-medium" : "truncate text-gray-600"}`}>
-                              <CellFactory
-                                field={fieldObj}
-                                value={data[fieldObj.name]}
-                                rowId={String(row.id)}
-                                tableName={supabaseTableName || ""}
-                                editable={!fieldObj.options?.read_only && !isVirtual && !!supabaseTableName}
-                                wrapText={wrapText}
-                                rowHeight={rowH}
-                                onSave={(value) => handleCellSave(String(row.id), fieldObj.name, value)}
-                              />
-                            </div>
-                            {isFirst && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  if (row.id != null) handleOpenRecord(String(row.id))
-                                }}
-                                className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
-                                title="Open record"
-                                aria-label="Open record"
-                              >
-                                <ChevronRight className="h-4 w-4" />
-                              </button>
-                            )}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
+                const cardFieldIds = (Array.isArray(fieldIds) ? fieldIds : [])
+                  .filter((fid) => fid !== groupingFieldId)
+                const primaryField = cardFieldIds[0]
+                const secondaryFields = cardFieldIds.slice(1, 5)
+                return (
+                  <div key={row.id} style={{ ...rowFormattingStyle }}>
+                    <RecordCard
+                      recordId={String(row.id)}
+                      rowData={row.data || {}}
+                      fields={tableFields as TableField[]}
+                      primaryFieldName={primaryField}
+                      secondaryFieldNames={secondaryFields}
+                      imageFieldName={imageFieldName}
+                      imageDisplayMode={cardImageDisplay}
+                      showFieldLabels={cardShowLabels}
+                      showEmptyFields={cardShowEmptyFields}
+                      textBehaviour={cardTextBehaviour}
+                      fixedHeightPx={cardHeightMode === "fixed" && cardFixedHeightPx > 0 ? cardFixedHeightPx : null}
+                      selected={selectedCardId === String(row.id)}
+                      borderColor={cardColor}
+                      onOpen={handleOpenRecord}
+                    />
                   </div>
-                </CardContainer>
-                  );
-                })();
+                )
               })}
               <Button
                 variant="ghost"
