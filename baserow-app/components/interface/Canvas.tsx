@@ -2011,17 +2011,12 @@ export default function Canvas({
                 })
               }
               
-              // Use layout parameter (has current resized position)
-              const resizedBlock = layout.find(l => l.i === blockId)
-              if (!resizedBlock) {
-                currentlyResizingBlockIdRef.current = null
-                return
-              }
-              
-              // CRITICAL: Ensure block stays within grid bounds after resize
-              // During resize, preserve X position unless block would overflow
-              const blockX = resizedBlock.x || 0
-              const blockW = resizedBlock.w || 4
+              // CRITICAL: Commit from `newItem` (authoritative final size from RGL),
+              // not from `layout` array, which can lag by one frame and cause snap-back.
+              // This is the source of truth at resize commit point.
+              const blockX = newItem.x || 0
+              const blockW = newItem.w || 4
+              const blockY = newItem.y || 0
               
               // Preserve X position during resize - only clamp width if it would overflow
               let clampedX = blockX
@@ -2055,12 +2050,13 @@ export default function Canvas({
               // Check if height changed and apply reflow
               const heightIncreased = newHeight > previousHeight
               
-              // Update layout with clamped bounds - only update the resized block
+              // Update layout with committed bounds from newItem - only update resized block.
               let finalLayout = layout.map(item => {
                 if (item.i === blockId) {
                   return { 
                     ...item, 
                     x: clampedX, 
+                    y: blockY,
                     w: clampedW, 
                     h: newHeight,
                   }
