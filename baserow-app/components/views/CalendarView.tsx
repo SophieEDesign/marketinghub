@@ -263,7 +263,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
   const [loadedTableFields, setLoadedTableFields] = useState<TableField[]>(tableFields || [])
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
   const { openRecordModal } = useRecordModal()
-  const { openRecord: openRecordPanel } = useRecordPanel()
+  const { openRecord: openRecordPanel, state: recordPanelState } = useRecordPanel()
   const [linkedValueLabelMaps, setLinkedValueLabelMaps] = useState<Record<string, Record<string, string>>>({})
   const prevCalendarEventsSignatureRef = useRef<string>("")
   const prevCalendarEventsRef = useRef<EventInput[]>([])
@@ -1866,6 +1866,16 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
 
       if (!allowOpenRecord) return
 
+      // Prevent accidental mode-switch while a create panel is open.
+      // Without this guard, clicking an existing event can replace the create form
+      // and look like the new record was "not saved".
+      if (recordPanelState.isOpen && recordPanelState.recordId === null) {
+        const shouldSwitch = window.confirm(
+          "You have a new record open. Open this existing record instead?"
+        )
+        if (!shouldSwitch) return
+      }
+
       if (onRecordClick) {
         setSelectedEventId(recordIdString || null)
         onRecordClick(recordIdString)
@@ -1878,7 +1888,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
         openRecordPanel(
           resolvedTableId,
           recordIdString,
-          supabaseTableName ?? "",
+          supabaseTableName ?? null,
           modalFieldsParam,
           bc?.modal_layout,
           cascadeContext ?? undefined,
@@ -1891,7 +1901,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
         )
       })
     },
-    [allowOpenRecord, modalFields, onRecordClick, openRecordPanel, resolvedTableId, loadedTableFields, supabaseTableName, interfaceMode, onModalLayoutSave, cascadeContext]
+    [allowOpenRecord, modalFields, onRecordClick, openRecordPanel, recordPanelState.isOpen, recordPanelState.recordId, resolvedTableId, loadedTableFields, supabaseTableName, interfaceMode, onModalLayoutSave, cascadeContext]
   )
   const handleEventClickRef = useRef(handleEventClickImpl)
   handleEventClickRef.current = handleEventClickImpl

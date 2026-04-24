@@ -21,7 +21,7 @@ interface RecordPanelState {
   fieldLayout?: FieldLayoutItem[]
   onLayoutSave?: (layout: FieldLayoutItem[]) => void | Promise<void>
   tableFields?: TableField[]
-  history: Array<{ tableId: string; recordId: string; tableName: string }> // For breadcrumb navigation
+  history: Array<{ tableId: string; recordId: string; tableName: string | null }> // For breadcrumb navigation
   /** When provided, RecordPanel enforces canEditRecords/canDeleteRecords from cascade. */
   cascadeContext?: RecordEditorCascadeContext | null
   /** Interface mode: 'view' | 'edit'. When 'edit', RecordPanel opens in edit mode (Airtable-style). */
@@ -38,11 +38,11 @@ interface RecordPanelState {
 
 interface RecordPanelContextType {
   state: RecordPanelState
-  openRecord: (tableId: string, recordId: string, tableName: string, modalFields?: string[], modalLayout?: BlockConfig["modal_layout"], cascadeContext?: RecordEditorCascadeContext | null, interfaceMode?: "view" | "edit", onRecordDeleted?: () => void, onRecordUpdated?: () => void, fieldLayout?: FieldLayoutItem[], onLayoutSave?: (layout: FieldLayoutItem[]) => void | Promise<void>, tableFields?: TableField[]) => void
+  openRecord: (tableId: string, recordId: string, tableName: string | null, modalFields?: string[], modalLayout?: BlockConfig["modal_layout"], cascadeContext?: RecordEditorCascadeContext | null, interfaceMode?: "view" | "edit", onRecordDeleted?: () => void, onRecordUpdated?: () => void, fieldLayout?: FieldLayoutItem[], onLayoutSave?: (layout: FieldLayoutItem[]) => void | Promise<void>, tableFields?: TableField[]) => void
   /** Open panel in create mode (same UI as edit). */
   openRecordForCreate: (params: {
     tableId: string
-    tableName: string
+    tableName: string | null
     tableFields?: TableField[]
     modalFields?: string[]
     modalLayout?: BlockConfig["modal_layout"]
@@ -56,7 +56,7 @@ interface RecordPanelContextType {
   setWidth: (width: number) => void
   togglePin: () => void
   toggleFullscreen: () => void
-  navigateToLinkedRecord: (tableId: string, recordId: string, tableName: string, interfaceMode?: 'view' | 'edit') => void
+  navigateToLinkedRecord: (tableId: string, recordId: string, tableName: string | null, interfaceMode?: 'view' | 'edit') => void
   goBack: () => void
   /** Set interface mode for RecordPanel (called by InterfaceBuilder when edit mode changes). */
   setInterfaceMode: (interfaceMode: 'view' | 'edit') => void
@@ -87,7 +87,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
   const openRecord = useCallback((
     tableId: string,
     recordId: string,
-    tableName: string,
+    tableName: string | null,
     modalFields?: string[],
     modalLayout?: BlockConfig["modal_layout"],
     cascadeContext?: RecordEditorCascadeContext | null,
@@ -157,7 +157,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
     }))
   }, [])
 
-  const navigateToLinkedRecord = useCallback((tableId: string, recordId: string, tableName: string, interfaceMode?: 'view' | 'edit') => {
+  const navigateToLinkedRecord = useCallback((tableId: string, recordId: string, tableName: string | null, interfaceMode?: 'view' | 'edit') => {
     setState((prev) => ({
       ...prev,
       tableId,
@@ -171,7 +171,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
 
   const openRecordForCreate = useCallback((params: {
     tableId: string
-    tableName: string
+    tableName: string | null
     tableFields?: TableField[]
     modalFields?: string[]
     modalLayout?: BlockConfig["modal_layout"]

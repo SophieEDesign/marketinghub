@@ -37,6 +37,10 @@ export default function RecordPanel() {
   const callerWantsEdit = state.interfaceMode === "edit"
   const pageEditWithLayout = isEdit() && state.onLayoutSave
   const interfaceMode = callerWantsEdit || pageEditWithLayout ? "edit" : "view"
+  const calendarOrigin =
+    ((state.cascadeContext?.blockConfig as any)?.view_type === "calendar") ||
+    ((state.cascadeContext?.blockConfig as any)?.calendar_start_field != null) ||
+    ((state.cascadeContext?.blockConfig as any)?.calendar_date_field != null)
 
   const handleCopyLink = useCallback(() => {
     if (!state.recordId) return
@@ -61,7 +65,7 @@ export default function RecordPanel() {
 
   // Desktop edit mode keeps the shell as a stable 3-region layout (sidebar, canvas, settings).
   // Record panel overlays in edit mode to avoid starving center width with multiple fixed side columns.
-  const useOverlayLayout = isMobile || isEdit()
+  const useOverlayLayout = isMobile || isEdit() || calendarOrigin
   const panelWidth = state.isFullscreen ? "100%" : `${state.width}px`
   // In edit mode, always show Back so user can close (X is hidden). Otherwise show when we can go to previous record.
   const canGoBack = state.isFullscreen || state.history.length > 1 || isEdit()

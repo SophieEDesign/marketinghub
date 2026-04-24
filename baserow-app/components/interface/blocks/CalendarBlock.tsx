@@ -64,12 +64,24 @@ function CalendarBlock({
   }
   // #endregion
   // Memoize so GridBlock (and CalendarView/RecordModal) don't get new props every render.
-  // CRITICAL: Extract config values to prevent JSON.stringify from causing re-renders
-  // JSON.stringify creates a new string every render even if config hasn't changed
+  // Include modal/layout-related config to avoid stale RecordPanel props that can cause
+  // UI flicker (edited layout reverting to basic then back).
   const configSignature = useMemo(() => {
     const cfg = block.config || {}
-    return `${block.id}-${cfg.view_type || ''}-${cfg.table_id || ''}-${cfg.start_date_field || ''}-${cfg.end_date_field || ''}-${(cfg as any).calendar_start_field || ''}-${(cfg as any).calendar_end_field || ''}`
-  }, [block.id, block.config?.view_type, block.config?.table_id, block.config?.start_date_field, block.config?.end_date_field, (block.config as any)?.calendar_start_field, (block.config as any)?.calendar_end_field])
+    return JSON.stringify({
+      view_type: cfg.view_type || "",
+      table_id: cfg.table_id || "",
+      start_date_field: cfg.start_date_field || "",
+      end_date_field: cfg.end_date_field || "",
+      calendar_start_field: (cfg as any).calendar_start_field || "",
+      calendar_end_field: (cfg as any).calendar_end_field || "",
+      modal_fields: (cfg as any).modal_fields || null,
+      modal_layout: (cfg as any).modal_layout || null,
+      field_layout: (cfg as any).field_layout || null,
+      permissions: (cfg as any).permissions || null,
+      appearance: (cfg as any).appearance || null,
+    })
+  }, [block.config])
   // #region HOOK CHECK - After useMemo configSignature
   if (process.env.NODE_ENV === 'development') {
     console.log('[HOOK CHECK]', 'CalendarBlock after useMemo configSignature')

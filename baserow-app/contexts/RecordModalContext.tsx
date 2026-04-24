@@ -51,7 +51,7 @@ export function RecordModalProvider({ children }: { children: ReactNode }) {
 
   const openRecordModal = useCallback(
     (openState: RecordModalOpenState) => {
-      const tableName = openState.supabaseTableName ?? openState.tableId
+      const tableName = openState.supabaseTableName ?? null
       if (openState.recordId) {
         openRecord(
           openState.tableId,
