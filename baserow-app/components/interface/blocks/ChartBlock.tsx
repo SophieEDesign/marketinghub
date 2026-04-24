@@ -30,6 +30,7 @@ import {
 } from "recharts"
 import { BarChart3 } from "lucide-react"
 import { useTheme } from "@/contexts/ThemeContext"
+import BlockHeader from "@/components/interface/blocks/shared/BlockHeader"
 import {
   DEFAULT_CHART_COLORS_LIGHT,
   SCHEME_PALETTES,
@@ -1025,15 +1026,7 @@ export default function ChartBlock({
       style={blockStyle}
     >
       {showTitle && (
-        <div
-          className="shrink-0 mb-4 pb-2 border-b border-border"
-          style={{
-            backgroundColor: appearance.header_background,
-            color: appearance.header_text_color || appearance.title_color,
-          }}
-        >
-          <h3 className="text-lg font-semibold">{title}</h3>
-        </div>
+        <BlockHeader title={title} className="shrink-0 mb-2" />
       )}
       {/* Recharts needs a non-zero height. When block height is smaller than chart needs, overflow-auto allows scroll. */}
       <div className="flex-1 min-h-0 min-w-0 overflow-auto">
@@ -1042,7 +1035,7 @@ export default function ChartBlock({
         </ResponsiveContainer>
       </div>
       {clickThrough && !isEditing && (
-        <div className="text-xs text-gray-400 text-center mt-2">
+        <div className="text-xs text-gray-400 text-center mt-1.5">
           Click chart to view records
         </div>
       )}

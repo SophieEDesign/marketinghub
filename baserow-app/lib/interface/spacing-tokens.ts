@@ -11,7 +11,7 @@
 export const BLOCK_CONTENT_PADDING = 'p-4'
 
 /** Header bar horizontal and vertical padding (Tailwind classes). */
-export const BLOCK_HEADER_PADDING = 'px-4 py-3'
+export const BLOCK_HEADER_PADDING = 'px-3 py-2'
 
 /** Optional: standard gap between form fields or list items (for future use). */
 export const FORM_FIELD_GAP = 'space-y-4'

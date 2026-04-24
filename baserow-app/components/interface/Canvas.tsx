@@ -2432,13 +2432,13 @@ export default function Canvas({
                 {/* Drag Handle - Hidden for full-page (no drag); visible for grid blocks */}
                 {!isFullPageMode && (
                 <div
-                  className={`absolute top-2 left-2 z-20 drag-handle transition-all duration-200 ${
+                  className={`absolute top-1.5 left-1.5 z-20 drag-handle transition-all duration-200 ${
                     (selectedBlockId === block.id || (selectedBlockIds && selectedBlockIds.has(block.id))) ? "opacity-100 scale-100" : "opacity-30 group-hover:opacity-100 scale-95 group-hover:scale-100"
                   }`}
                 >
                   <button
                     type="button"
-                    className="cursor-grab active:cursor-grabbing p-2 bg-white/95 backdrop-blur-sm border border-gray-300 rounded-md shadow-sm hover:bg-white hover:border-blue-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 touch-none transition-all duration-150 min-w-[32px] min-h-[32px] flex items-center justify-center"
+                    className="cursor-grab active:cursor-grabbing p-1.5 bg-white/95 backdrop-blur-sm border border-gray-300 rounded-md shadow-sm hover:bg-white hover:border-blue-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 touch-none transition-all duration-150 min-w-[30px] min-h-[30px] flex items-center justify-center"
                     title="Drag to move (or use arrow keys)"
                     aria-label="Drag to move block"
                     onMouseDown={(e) => {
@@ -2467,7 +2467,7 @@ export default function Canvas({
                 )}
 
                 {/* Block Toolbar - Only visible on hover */}
-                <div className={`absolute top-2 right-2 z-20 flex items-center gap-1.5 transition-all duration-200 ${
+                <div className={`absolute top-1.5 right-1.5 z-20 flex items-center gap-1 transition-all duration-200 ${
                   (selectedBlockId === block.id || (selectedBlockIds && selectedBlockIds.has(block.id))) ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                 }`}>
                   {/* Settings - opens block settings panel (critical for TextBlock which can't be selected by clicking editor) */}
@@ -2478,7 +2478,7 @@ export default function Canvas({
                         e.preventDefault()
                         onBlockClick(block.id)
                       }}
-                      className="p-1.5 rounded-md shadow-sm bg-white text-gray-600 border border-gray-300 hover:bg-gray-50 hover:border-blue-400 transition-all duration-150"
+                      className="h-7 w-7 p-0 rounded-md shadow-sm bg-white text-gray-600 border border-gray-300 hover:bg-gray-50 hover:border-blue-400 transition-all duration-150 inline-flex items-center justify-center"
                       title="Block settings"
                       aria-label="Block settings"
                     >
@@ -2497,7 +2497,7 @@ export default function Canvas({
                             e.preventDefault()
                             onBlockDuplicate(block.id)
                           }}
-                          className="p-1.5 rounded-md shadow-sm bg-white text-gray-600 border border-gray-300 hover:bg-gray-50 hover:border-gray-400 transition-all duration-150"
+                          className="h-7 w-7 p-0 rounded-md shadow-sm bg-white text-gray-600 border border-gray-300 hover:bg-gray-50 hover:border-gray-400 transition-all duration-150 inline-flex items-center justify-center"
                           title="Duplicate block (Cmd+D)"
                           aria-label="Duplicate block"
                         >
@@ -2512,7 +2512,7 @@ export default function Canvas({
                           e.preventDefault()
                           onBlockDelete(block.id)
                         }}
-                        className="p-1.5 rounded-md shadow-sm bg-white text-red-600 border border-red-300 hover:bg-red-50 hover:border-red-400 transition-all duration-150"
+                        className="h-7 w-7 p-0 rounded-md shadow-sm bg-white text-red-600 border border-red-300 hover:bg-red-50 hover:border-red-400 transition-all duration-150 inline-flex items-center justify-center"
                         title="Delete block (Del)"
                         aria-label="Delete block"
                       >
@@ -2527,7 +2527,7 @@ export default function Canvas({
 
             {/* Lock Indicator - Always mount; visibility toggled by isEditing and locked */}
             <div
-              className={`absolute top-10 left-2 z-10 flex items-center gap-1 px-2 py-1 bg-yellow-100 border border-yellow-300 rounded text-xs text-yellow-800 ${
+              className={`absolute top-8 left-1.5 z-10 flex items-center gap-1 px-1.5 py-0.5 bg-yellow-100 border border-yellow-300 rounded text-[11px] text-yellow-800 ${
                 isEditing && block.config?.locked ? "" : "invisible pointer-events-none"
               }`}
               aria-hidden={!(isEditing && block.config?.locked)}

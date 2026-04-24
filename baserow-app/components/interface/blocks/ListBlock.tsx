@@ -26,6 +26,7 @@ import type { FieldLayoutItem } from "@/lib/interface/field-layout-utils"
 import { getVisibleFieldsForCard } from "@/lib/interface/field-layout-helpers"
 import { useMarketingDashboard } from "@/contexts/MarketingDashboardContext"
 import { resolveBlockDisplaySettings } from "@/lib/interface/block-display-settings"
+import BlockHeader from "@/components/interface/blocks/shared/BlockHeader"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 function isUuidLike(value: string | null | undefined): value is string {
@@ -499,19 +500,9 @@ export default function ListBlock({
   return (
     <div className="h-full w-full flex flex-col min-h-0" style={blockStyle}>
       {showHeader && (
-        <div
-          className="mb-2 flex-shrink-0 flex items-center justify-between gap-2"
-          style={{
-            backgroundColor: appearance.header_background,
-            color: appearance.header_text_color || appearance.title_color,
-          }}
-        >
-          <div className="min-w-0 flex-1">
-            {((appearance.showTitle ?? (appearance as any).show_title) !== false && (appearance.title || (isEditing ? config.title : table?.name))) && (
-              <h3 className="text-lg font-semibold text-gray-900 truncate">{appearance.title || (isEditing ? config.title : table?.name)}</h3>
-            )}
-          </div>
-          {showAddRecord && (
+        <BlockHeader
+          title={((appearance.showTitle ?? (appearance as any).show_title) !== false && (appearance.title || (isEditing ? config.title : table?.name))) ? (appearance.title || (isEditing ? config.title : table?.name)) : undefined}
+          actions={showAddRecord ? (
             <Button
               type="button"
               size="sm"
@@ -519,12 +510,13 @@ export default function ListBlock({
               onClick={handleOpenCreateModal}
               disabled={!canCreateRecord || isLoading || !table || !tableId}
               title={!canCreateRecord ? 'Adding records is disabled for this block' : 'Add a new record'}
+              className="h-8 px-2.5 text-xs"
             >
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="h-4 w-4 mr-1.5" />
               Add record
             </Button>
-          )}
-        </div>
+          ) : null}
+        />
       )}
 
       {/* Quick filters (session-only; never saved to the view) */}

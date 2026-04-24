@@ -9,6 +9,7 @@ import type { FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import { useMarketingDashboard } from "@/contexts/MarketingDashboardContext"
 import { resolveKpiIcon } from "@/lib/ui/content-icons"
+import BlockHeader from "@/components/interface/blocks/shared/BlockHeader"
 
 interface KPIBlockProps {
   block: PageBlock
@@ -262,22 +263,10 @@ export default function KPIBlock({
         />
       )}
       {showTitle && (
-        <div
-          className={cn("border-b border-border", marketingDashboardStyle ? "mb-2 pb-1.5" : "mb-4 pb-2")}
-          style={{
-            backgroundColor: appearance.header_background,
-            color: appearance.header_text_color || textColor,
-          }}
-        >
-          <h3
-            className={cn(
-              "text-lg font-semibold",
-              !appearance.header_text_color && !textColor && "text-foreground"
-            )}
-          >
-            {displayLabel}
-          </h3>
-        </div>
+        <BlockHeader
+          title={displayLabel}
+          className={cn(marketingDashboardStyle ? "mb-1.5" : "mb-2", !appearance.header_text_color && !textColor && "text-foreground")}
+        />
       )}
       <div className="flex-1 flex items-center">
         {KpiIcon ? (

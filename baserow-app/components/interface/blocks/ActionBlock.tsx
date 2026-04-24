@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import type { PageBlock } from "@/lib/interface/types"
 import { Button } from "@/components/ui/button"
 import { ExternalLink, Plus, ArrowRight } from "lucide-react"
+import BlockHeader from "@/components/interface/blocks/shared/BlockHeader"
 import {
   Dialog,
   DialogContent,
@@ -107,20 +108,12 @@ export default function ActionBlock({ block, isEditing = false }: ActionBlockPro
     <>
       <div className="h-full w-full overflow-hidden flex flex-col items-center justify-center" style={blockStyle}>
         {showTitle && (
-          <div
-            className="mb-4 pb-2 border-b w-full text-center"
-            style={{
-              backgroundColor: appearance.header_background,
-              color: appearance.header_text_color || appearance.title_color,
-            }}
-          >
-            <h3 className="text-lg font-semibold">{title}</h3>
-          </div>
+          <BlockHeader title={title} className="w-full" />
         )}
         <Button
           onClick={handleClick}
           disabled={isEditing}
-          className="flex items-center gap-2"
+          className="flex h-8 items-center gap-1.5 px-3 text-xs"
           style={buttonStyle}
         >
           {getIcon()}

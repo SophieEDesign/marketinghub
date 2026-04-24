@@ -40,6 +40,7 @@ import type { FieldLayoutItem } from "@/lib/interface/field-layout-utils"
 import { buildRecordContextFilters } from "@/lib/interface/record-context-filters"
 import { cn } from "@/lib/utils"
 import { resolveBlockDisplaySettings } from "@/lib/interface/block-display-settings"
+import BlockHeader from "@/components/interface/blocks/shared/BlockHeader"
 
 interface GridBlockProps {
   block: PageBlock
@@ -1325,21 +1326,9 @@ export default function GridBlock({
       {!wrapperHasAppearanceSettings &&
         (((appearance.showTitle ?? (appearance as any).show_title) !== false && blockTitle) ||
           showAddRecord) && (
-          <div
-            className="mb-4 pb-2 border-b flex flex-wrap items-center justify-between gap-3"
-            style={{
-              backgroundColor: appearance.header_background,
-              color: appearance.header_text_color || appearance.title_color,
-            }}
-          >
-            <div className="min-w-0 flex-1">
-              {((appearance.showTitle ?? (appearance as any).show_title) !== false && blockTitle) && (
-                <h3 className="text-lg font-semibold truncate">
-                  {blockTitle}
-                </h3>
-              )}
-            </div>
-            {showAddRecord && (
+          <BlockHeader
+            title={((appearance.showTitle ?? (appearance as any).show_title) !== false && blockTitle) ? blockTitle : undefined}
+            actions={showAddRecord ? (
               <Button
                 type="button"
                 size="sm"
@@ -1347,13 +1336,14 @@ export default function GridBlock({
                 onClick={handleAddRecord}
                 disabled={isAddRecordDisabled}
                 title={!canCreateRecord ? 'Adding records is disabled for this block' : 'Add a new record'}
-                className="shrink-0"
+                className="h-8 px-2.5 text-xs"
               >
-                <Plus className="h-4 w-4 mr-2" />
+                <Plus className="h-4 w-4 mr-1.5" />
                 Add record
               </Button>
-            )}
-          </div>
+            ) : null}
+            className="border-border/80"
+          />
         )}
 
       {(() => {
@@ -1367,8 +1357,8 @@ export default function GridBlock({
 
         return (
           <div className={cn("flex w-full min-w-0 flex-col border-b border-gray-200/80 bg-white", marketingDashboardStyle && "border-border/40 bg-muted/10")}>
-            <div className="flex h-12 min-w-0 items-center justify-between gap-2 px-4 py-3">
-              <h3 className="truncate text-sm font-semibold text-foreground">{calendarTitle}</h3>
+            <div className="flex h-10 min-w-0 items-center justify-between gap-2 px-3 py-1.5">
+              <h3 className="truncate text-base font-semibold text-foreground">{calendarTitle}</h3>
               <div className="flex items-center gap-2">
                 {showAddRecord && canCreateRecord && (
                   <Button
@@ -1378,18 +1368,18 @@ export default function GridBlock({
                     onClick={handleAddRecord}
                     disabled={isAddRecordDisabled}
                     title="Add a new record"
-                    className="h-8 w-8"
+                    className="h-7 w-7"
                     aria-label="Add record"
                   >
-                    <Plus className="h-3.5 w-3.5" />
+                    <Plus className="h-4 w-4" />
                   </Button>
                 )}
-                <Button type="button" size="sm" variant="outline" className="h-8 px-3">
+                <Button type="button" size="sm" variant="outline" className="h-7 px-2.5 text-xs">
                   {hasActiveQuickFilters ? "Filtered" : "Filter"}
                 </Button>
               </div>
             </div>
-            <div className={`flex min-w-0 flex-wrap items-center gap-2 px-4 pb-2 ${headerCompact ? "pt-0" : "pt-1"}`}>
+            <div className={`flex min-w-0 flex-wrap items-center gap-1.5 px-3 pb-1.5 ${headerCompact ? "pt-0" : "pt-0.5"}`}>
               {showQuickFilters && (
                 <QuickFilterBar
                   storageKey={`mh:quickFilters:${pageId || "page"}:${block.id}`}
@@ -1416,7 +1406,7 @@ export default function GridBlock({
 
       {/* New appearance wrapper active: it renders the title header. Keep Add record available without duplicating the title. */}
       {wrapperHasAppearanceSettings && showAddRecord && viewType !== "calendar" && (
-        <div className="mb-3 flex flex-wrap justify-end gap-2">
+        <div className="mb-2 flex flex-wrap justify-end gap-1.5">
           <Button
             type="button"
             size="sm"
@@ -1424,8 +1414,9 @@ export default function GridBlock({
             onClick={handleAddRecord}
             disabled={isAddRecordDisabled}
             title={!canCreateRecord ? 'Adding records is disabled for this block' : 'Add a new record'}
+            className="h-8 px-2.5 text-xs"
           >
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus className="h-4 w-4 mr-1.5" />
             Add record
           </Button>
         </div>

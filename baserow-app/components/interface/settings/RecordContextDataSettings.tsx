@@ -165,7 +165,7 @@ export default function RecordContextDataSettings({
           <Select
             value={displayMode}
             onValueChange={(value: DisplayMode) =>
-              onUpdate({ displayMode: value, display_mode: value })
+              onUpdate({ displayMode: value, display_mode: value } as any)
             }
           >
             <SelectTrigger>

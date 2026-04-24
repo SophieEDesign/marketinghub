@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import type { PageBlock } from "@/lib/interface/types"
 import { ExternalLink, File, FileText, Image, Video, Music, Archive } from "lucide-react"
+import BlockHeader from "@/components/interface/blocks/shared/BlockHeader"
 
 interface LinkPreviewBlockProps {
   block: PageBlock
@@ -196,15 +197,7 @@ export default function LinkPreviewBlock({ block, isEditing = false }: LinkPrevi
       onClick={handleClick}
     >
       {showTitle && (
-        <div
-          className="mb-4 pb-2 border-b"
-          style={{
-            backgroundColor: appearance.header_background,
-            color: appearance.header_text_color || appearance.title_color,
-          }}
-        >
-          <h3 className="text-lg font-semibold">{displayTitle}</h3>
-        </div>
+        <BlockHeader title={displayTitle} />
       )}
       <div className="flex-1 flex flex-col items-center justify-center p-4">
         <div className="text-center w-full">
@@ -213,7 +206,7 @@ export default function LinkPreviewBlock({ block, isEditing = false }: LinkPrevi
               {metadata.icon}
             </div>
           )}
-          <h4 className="text-lg font-semibold mb-2">{metadata?.fileName || displayTitle}</h4>
+          <h4 className="text-base font-semibold mb-1.5">{metadata?.fileName || displayTitle}</h4>
           {metadata?.provider && (
             <p className="text-sm text-gray-500 mb-1">{metadata.provider}</p>
           )}
@@ -224,7 +217,7 @@ export default function LinkPreviewBlock({ block, isEditing = false }: LinkPrevi
             <p className="text-xs text-gray-400 mt-2 uppercase">{metadata.fileType}</p>
           )}
           {!isEditing && (
-            <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-400">
+            <div className="mt-2.5 flex items-center justify-center gap-1.5 text-xs text-gray-400">
               <span>Click to open</span>
               <ExternalLink className="h-3 w-3" />
             </div>
