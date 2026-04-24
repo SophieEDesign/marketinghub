@@ -985,8 +985,8 @@ export default function GridDataSettings({
         </>
       )}
 
-      {/* Shared card display settings (Gallery + Kanban + card-style list variants) */}
-      {(currentViewType === 'gallery' || currentViewType === 'kanban' || currentViewType === 'list') && (
+      {/* Shared card display settings (Gallery + Kanban). List uses table rows and does not consume card_* settings. */}
+      {(currentViewType === 'gallery' || currentViewType === 'kanban') && (
         <div className="space-y-3 pt-2 border-t border-gray-200">
           <Label className="text-sm font-semibold">Card display</Label>
 

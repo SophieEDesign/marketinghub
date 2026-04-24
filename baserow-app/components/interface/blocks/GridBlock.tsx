@@ -163,7 +163,7 @@ export default function GridBlock({
   }
   // #endregion
   // Track base height (collapsed state) to calculate deltas
-  const baseHeightRef = useRef<number | null>(null)
+  const lastReportedDeltaPxRef = useRef<number | null>(null)
   // #region HOOK CHECK - After useRef baseHeightRef
   if (process.env.NODE_ENV === 'development') {
     console.log('[HOOK CHECK]', 'GridBlock after useRef baseHeightRef')
@@ -175,7 +175,7 @@ export default function GridBlock({
     console.log('[HOOK CHECK]', 'GridBlock before useRef previousHeightRef')
   }
   // #endregion
-  const previousHeightRef = useRef<number | null>(null)
+  const previousMeasuredHeightPxRef = useRef<number | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
   // #region HOOK CHECK - After useRef previousHeightRef
   if (process.env.NODE_ENV === 'development') {
@@ -191,42 +191,29 @@ export default function GridBlock({
   // Convert total height from GridView to ephemeral delta
   const handleHeightChange = useCallback((totalHeightGridUnits: number) => {
     if (!onEphemeralHeightDelta) return
-    
-    // Convert grid units back to pixels for delta calculation
+
+    // Canvas expects an absolute overflow delta in px (>= 0), not a per-event delta change.
     const totalHeightPx = totalHeightGridUnits * rowHeight
-    
-    // Track minimum height as base (when most collapsed)
-    if (baseHeightRef.current === null) {
-      baseHeightRef.current = totalHeightPx
-      previousHeightRef.current = totalHeightPx
-      return // First measurement, no delta yet
+    const baseHeightPx = Math.max(2, block.h || 4) * rowHeight
+    const deltaPx = Math.max(0, totalHeightPx - baseHeightPx)
+
+    const lastMeasured = previousMeasuredHeightPxRef.current
+    const lastDelta = lastReportedDeltaPxRef.current
+    const heightChanged = lastMeasured === null || Math.abs(totalHeightPx - lastMeasured) > 1
+    const deltaChanged = lastDelta === null || Math.abs(deltaPx - lastDelta) > 1
+    if (heightChanged && deltaChanged) {
+      onEphemeralHeightDelta(block.id, deltaPx)
+      lastReportedDeltaPxRef.current = deltaPx
     }
-    
-    // Update base if current is lower (more collapsed)
-    baseHeightRef.current = Math.min(baseHeightRef.current, totalHeightPx)
-    
-    // Calculate delta from base (ephemeral expansion)
-    const deltaPx = totalHeightPx - baseHeightRef.current
-    
-    // Only report if height actually changed
-    if (previousHeightRef.current !== null && Math.abs(totalHeightPx - previousHeightRef.current) > 1) {
-      // Calculate previous delta
-      const previousDelta = (previousHeightRef.current || baseHeightRef.current) - baseHeightRef.current
-      const deltaChange = deltaPx - previousDelta
-      
-      // Report delta change (positive = expanding, negative = collapsing)
-      if (Math.abs(deltaChange) > 1) {
-        onEphemeralHeightDelta(block.id, deltaChange)
-      }
-    }
-    
-    previousHeightRef.current = totalHeightPx
+
+    previousMeasuredHeightPxRef.current = totalHeightPx
   }, [onEphemeralHeightDelta, block.id, rowHeight])
 
   useEffect(() => {
     if (!onEphemeralHeightDelta) return
 
     if (!isFitMode) {
+      lastReportedDeltaPxRef.current = 0
       onEphemeralHeightDelta(block.id, 0)
       return
     }
@@ -238,7 +225,11 @@ export default function GridBlock({
       const measuredPx = Math.max(element.scrollHeight || 0, element.clientHeight || 0)
       const baseHeightPx = Math.max(2, block.h || 4) * rowHeight
       const deltaPx = Math.max(0, measuredPx - baseHeightPx)
-      onEphemeralHeightDelta(block.id, deltaPx)
+      const previousDelta = lastReportedDeltaPxRef.current
+      if (previousDelta === null || Math.abs(previousDelta - deltaPx) > 1) {
+        onEphemeralHeightDelta(block.id, deltaPx)
+        lastReportedDeltaPxRef.current = deltaPx
+      }
     }
 
     measureAndReport()

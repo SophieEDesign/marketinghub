@@ -291,13 +291,13 @@ export default function Canvas({
     return () => devLog('[Canvas] Unmounting')
   }, [])
   
-  // CRITICAL: Convert pixels to grid units (React Grid Layout height includes margins)
-  // This ensures height values from content measurement are correctly converted
-  const toGridH = useCallback((px: number): number => {
+  // Convert overflow delta px to extra grid rows.
+  // Unlike persistent block height, delta must be allowed to be 0.
+  const toGridDeltaH = useCallback((px: number): number => {
     const rowHeight = layoutSettings?.rowHeight || 30
     const marginY = (layoutSettings?.margin || [10, 10])[1]
-    // RGL height includes margins between rows. This is the practical conversion:
-    return Math.max(2, Math.ceil((px + marginY) / (rowHeight + marginY)))
+    if (!Number.isFinite(px) || px <= 0) return 0
+    return Math.ceil(px / (rowHeight + marginY))
   }, [layoutSettings?.rowHeight, layoutSettings?.margin])
   
   // Helper to notify parent of layout changes (user actions only)
@@ -359,7 +359,7 @@ export default function Canvas({
    * Note: pushBlocksDown and compactLayoutVertically are defined later but are stable useCallbacks
    */
   const applyEphemeralHeightDelta = useCallback((blockId: string, deltaPx: number) => {
-    const deltaH = toGridH(deltaPx) // Convert to grid units
+    const deltaH = toGridDeltaH(deltaPx) // Convert absolute overflow to extra rows
     
     // Update ephemeral deltas and get previous delta in one operation
     let previousDelta = 0
@@ -411,7 +411,7 @@ export default function Canvas({
       }
       return currentLayout
     })
-  }, [toGridH, blocks])
+  }, [toGridDeltaH, blocks])
   
   /**
    * Handler for ephemeral height delta callback from blocks

@@ -681,6 +681,7 @@
 /* Planning Calendar polish: match dashboard panel system */
 .calendar-embed .fc {
   height: 100%;
+  min-height: 0;
   font-size: 0.875rem;
 }
 
@@ -753,9 +754,12 @@
 
 .calendar-embed .fc .fc-view-harness {
   margin-top: 0.45rem;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .calendar-embed .fc .fc-scrollgrid {
+  height: 100%;
   border: 1px solid hsl(var(--border) / 0.6);
   border-radius: 0.75rem;
   overflow: hidden;
@@ -780,7 +784,12 @@
 }
 
 .calendar-embed .fc .fc-daygrid-day-frame {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
   padding: 0.14rem 0.16rem;
+  overflow: hidden;
 }
 
 .calendar-embed .fc .fc-daygrid-day-number {
@@ -791,6 +800,10 @@
 }
 
 .calendar-embed .fc .fc-daygrid-day-events {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   margin-top: 0.1rem;
 }
 
@@ -804,4 +817,30 @@
   color: hsl(var(--accent-link));
   font-size: 0.7rem;
   font-weight: 500;
+}
+
+.calendar-embed .fc .fc-daygrid-body > table > tbody {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: var(--calendar-grid-rows, repeat(6, 1fr));
+}
+
+.calendar-embed .fc .fc-daygrid-body > table > tbody > tr {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  min-height: 0;
+}
+
+.calendar-embed[data-density="compact"] .fc .fc-daygrid-day-frame {
+  padding: 0.08rem 0.1rem;
+}
+
+.calendar-embed[data-density="compact"] .fc .fc-daygrid-day-number {
+  font-size: 0.68rem;
+  padding: 0.1rem 0.16rem;
+}
+
+.calendar-embed[data-density="spacious"] .fc .fc-daygrid-day-frame {
+  padding: 0.18rem 0.22rem;
 }

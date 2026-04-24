@@ -1587,31 +1587,33 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
     if (v === 4 || v === 8) return v
     return 6
   }, [(blockConfig as any)?.visible_week_span])
+  const weekCount = visibleWeekSpan
+  const calendarDensity = useMemo(() => {
+    if (weekCount === 8) return "compact"
+    if (weekCount === 4) return "spacious"
+    return "normal"
+  }, [weekCount])
 
   // Custom views for 4, 6, or 8 weeks (Airtable-style)
   // dateAlignment: 'week' ensures each view starts on a week boundary (Monday with firstDay: 1)
-  // aspectRatio: smaller = taller rows; larger = shorter rows. 4 weeks fills page; 8 weeks uses compact rows.
   const calendarViews = useMemo(
     () => ({
       dayGridWeek4: {
         type: "dayGrid" as const,
         duration: { weeks: 4 },
         dateAlignment: "week" as const,
-        aspectRatio: 0.85,
         buttonText: "4 weeks",
       },
       dayGridWeek6: {
         type: "dayGrid" as const,
         duration: { weeks: 6 },
         dateAlignment: "week" as const,
-        aspectRatio: 1.0,
         buttonText: "6 weeks",
       },
       dayGridWeek8: {
         type: "dayGrid" as const,
         duration: { weeks: 8 },
         dateAlignment: "week" as const,
-        aspectRatio: 1.4,
         buttonText: "8 weeks",
       },
     }),
@@ -2094,14 +2096,22 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
   }
 
   return (
-    <Panel className={`${BLOCK_EMBED_CLASSNAME} flex flex-col min-w-0 w-full`}>
+    <Panel className={`${BLOCK_EMBED_CLASSNAME} flex h-full min-h-0 flex-col min-w-0 w-full`}>
       {renderAnchorControls()}
       <div
         ref={scrollContainerRef}
-        className="calendar-embed flex flex-col flex-1 min-w-0 w-full p-0 bg-background"
+        className="calendar-embed flex flex-1 min-h-0 flex-col min-w-0 w-full p-0 bg-background"
+        style={
+          {
+            "--calendar-week-count": String(weekCount),
+            "--calendar-grid-rows": `repeat(${weekCount}, 1fr)`,
+          } as React.CSSProperties
+        }
+        data-week-count={weekCount}
+        data-density={calendarDensity}
       >
         {mounted ? (
-          <div className="flex-1 min-w-0 w-full px-2 pb-2 md:px-3 md:pb-3">
+          <div className="flex-1 min-h-0 min-w-0 w-full px-2 pb-2 md:px-3 md:pb-3">
           <MemoizedFullCalendar
             ref={fullCalendarRef as React.LegacyRef<React.ComponentRef<typeof FullCalendar>>}
             key={calendarStableKey}
@@ -2113,15 +2123,14 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
             initialView={calendarInitialView}
             initialDate={calendarInitialDate}
             views={calendarViews}
-            height="auto"
-            contentHeight="auto"
-            aspectRatio={1.6}
+            height="100%"
+            contentHeight="100%"
             expandRows={true}
             dayMaxEvents={2}
             moreLinkClick="popover"
             eventDisplay="block"
             eventClassNames={calendarEventClassNames}
-            dayCellClassNames="hover:bg-muted/20 transition-colors min-h-[100px]"
+            dayCellClassNames="hover:bg-muted/20 transition-colors"
             dayHeaderClassNames="text-[11px] font-medium text-muted-foreground py-1"
             eventTextColor="#1f2937"
             eventBorderColor="transparent"
