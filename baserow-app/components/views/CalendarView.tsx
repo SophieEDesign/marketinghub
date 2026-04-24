@@ -1587,12 +1587,11 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
     if (v === 4 || v === 8) return v
     return 6
   }, [(blockConfig as any)?.visible_week_span])
-  const weekCount = visibleWeekSpan
   const calendarDensity = useMemo(() => {
-    if (weekCount === 8) return "compact"
-    if (weekCount === 4) return "spacious"
+    if (visibleWeekSpan === 8) return "compact"
+    if (visibleWeekSpan === 4) return "spacious"
     return "normal"
-  }, [weekCount])
+  }, [visibleWeekSpan])
 
   // Custom views for 4, 6, or 8 weeks (Airtable-style)
   // dateAlignment: 'week' ensures each view starts on a week boundary (Monday with firstDay: 1)
@@ -2101,13 +2100,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
       <div
         ref={scrollContainerRef}
         className="calendar-embed flex flex-1 min-h-0 flex-col min-w-0 w-full p-0 bg-background"
-        style={
-          {
-            "--calendar-week-count": String(weekCount),
-            "--calendar-grid-rows": `repeat(${weekCount}, 1fr)`,
-          } as React.CSSProperties
-        }
-        data-week-count={weekCount}
+        data-week-count={visibleWeekSpan}
         data-density={calendarDensity}
       >
         {mounted ? (

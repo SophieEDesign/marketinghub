@@ -819,19 +819,6 @@
   font-weight: 500;
 }
 
-.calendar-embed .fc .fc-daygrid-body > table > tbody {
-  display: grid;
-  height: 100%;
-  min-height: 0;
-  grid-template-rows: var(--calendar-grid-rows, repeat(6, 1fr));
-}
-
-.calendar-embed .fc .fc-daygrid-body > table > tbody > tr {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  min-height: 0;
-}
-
 .calendar-embed[data-density="compact"] .fc .fc-daygrid-day-frame {
   padding: 0.08rem 0.1rem;
 }
