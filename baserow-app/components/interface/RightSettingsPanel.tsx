@@ -175,7 +175,10 @@ export default function RightSettingsPanel() {
       </PanelHeader>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 bg-background/60">
+      <div
+        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain bg-card"
+        style={{ scrollbarGutter: "auto" }}
+      >
         {!selectedContext && !(recordPanelState.isOpen && recordPanelState.recordId) && (
           <div className="p-4 text-sm text-muted-foreground space-y-2">
             <p>{hasInterfacePageContext ? "Select an element to configure." : "No selection"}</p>

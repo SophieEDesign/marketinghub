@@ -669,7 +669,7 @@ export default function RecordEditor({
       )}
 
       {/* Content stacks naturally so section headers + fields push comments down; parent scrolls */}
-      <div className="flex-shrink-0 flex flex-col overflow-visible px-6">
+      <div className="flex-shrink-0 flex flex-col overflow-visible pl-6 pr-0">
         {hasDraftToRestore && (
           <div className="mb-4 flex items-center justify-between gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
             <span>You have an unsaved draft. Restore it?</span>
@@ -687,7 +687,7 @@ export default function RecordEditor({
       </div>
 
       {mode === "modal" && showComments && recordId && !loading && formData && Object.keys(formData).length > 0 && (
-        <div className="border-t border-dashed border-gray-200 px-6 py-4 flex-shrink-0">
+        <div className="border-t border-dashed border-gray-200 pl-6 pr-0 py-4 flex-shrink-0">
           <RecordComments tableId={tableId} recordId={recordId} canAddComment={effectiveEditable} />
         </div>
       )}
@@ -699,10 +699,10 @@ export default function RecordEditor({
               {renderExtraContent}
             </div>
           )}
-          <div className="border-t border-dashed border-gray-200 px-6 py-4 flex-shrink-0">
+          <div className="border-t border-dashed border-gray-200 pl-6 pr-0 py-4 flex-shrink-0">
             <RecordActivity record={formData} tableId={tableId} />
           </div>
-          <div className="border-t border-dashed border-gray-200 px-6 py-4 flex-shrink-0">
+          <div className="border-t border-dashed border-gray-200 pl-6 pr-0 py-4 flex-shrink-0">
             <RecordComments tableId={tableId} recordId={recordId} canAddComment={effectiveEditable} />
           </div>
         </>
