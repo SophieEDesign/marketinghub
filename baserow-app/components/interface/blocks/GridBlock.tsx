@@ -107,6 +107,9 @@ export default function GridBlock({
     () => (stableBlockConfig ? { blockConfig: stableBlockConfig } : undefined),
     [stableBlockConfig]
   )
+  // CRITICAL: For calendar blocks, always use 'calendar' so sibling structure stays stable and CalendarView does not remount.
+  // If we fall back to 'grid' when config is briefly undefined, React sees a different tree and unmounts CalendarView.
+  const viewType: ViewType = block.type === 'calendar' ? 'calendar' : (config?.view_type || 'grid')
 
   // #region HOOK CHECK - Before useRecordPanel
   if (process.env.NODE_ENV === 'development') {
@@ -272,10 +275,6 @@ export default function GridBlock({
     console.log('[HOOK CHECK]', 'GridBlock after useMemo viewUuid')
   }
   // #endregion
-  
-  // CRITICAL: For calendar blocks, always use 'calendar' so sibling structure stays stable and CalendarView does not remount.
-  // If we fall back to 'grid' when config is briefly undefined, React sees a different tree and unmounts CalendarView.
-  const viewType: ViewType = block.type === 'calendar' ? 'calendar' : (config?.view_type || 'grid')
   
   // DEBUG_LIST: Log tableId resolution
   // CRITICAL: Use useState to prevent hydration mismatch - localStorage access must happen after mount

@@ -226,7 +226,7 @@ export default function GridDataSettings({
         </div>
 
         <div className="space-y-2">
-          <Label>Record limit</Label>
+          <Label>Records shown</Label>
           <div className="grid grid-cols-2 gap-2">
             {[5, 10, 20, 50].map((n) => (
               <Button

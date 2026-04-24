@@ -30,6 +30,21 @@ export default function CommonAppearanceSettings({
   fields = [],
 }: CommonAppearanceSettingsProps) {
   const appearance = config.appearance || {}
+  const showTitle = appearance.showTitle !== false && (appearance as any).show_title !== false
+  const viewType = ((config as any)?.view_type || blockType || "") as string
+  const canUseColourByField = (() => {
+    // Show only for block/view types that have a visual color-field consumer.
+    // Keep legacy compatibility reads in renderers unchanged; this only controls UI visibility.
+    const supportedViewTypes = new Set([
+      "grid",
+      "list",
+      "gallery",
+      "calendar",
+      "kanban",
+      "timeline",
+    ])
+    return supportedViewTypes.has(viewType)
+  })()
   
   // Get single-select and multi-select fields for color field selector
   const selectFields = fields.filter(f => 
@@ -44,157 +59,13 @@ export default function CommonAppearanceSettings({
 
   return (
     <div className="space-y-6">
-      {/* Container Style Section */}
+      {/* Header */}
       <div className="space-y-4">
         <div>
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Container Style</h3>
-          <p className="text-xs text-gray-500 mb-4">Control how this block appears on the page</p>
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">Header</h3>
+          <p className="text-xs text-gray-500 mb-4">Control the block title</p>
         </div>
 
-        {/* Background */}
-        <div className="space-y-2">
-          <Label>Background</Label>
-          <Select
-            value={appearance.background || 'none'}
-            onValueChange={(value) =>
-              onUpdate({ background: value as 'none' | 'subtle' | 'tinted' | 'emphasised' })
-            }
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">None</SelectItem>
-              <SelectItem value="subtle">Subtle (light grey)</SelectItem>
-              <SelectItem value="tinted">Tinted (theme colors)</SelectItem>
-              <SelectItem value="emphasised">Emphasised (strong color)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Border */}
-        <div className="space-y-2">
-          <Label>Border</Label>
-          <Select
-            value={appearance.border || 'none'}
-            onValueChange={(value) =>
-              onUpdate({ border: value as 'none' | 'outline' | 'card' })
-            }
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">None</SelectItem>
-              <SelectItem value="outline">Soft outline</SelectItem>
-              <SelectItem value="card">Card</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Corner Radius */}
-        <div className="space-y-2">
-          <Label>Corner radius</Label>
-          <Select
-            value={appearance.radius || 'square'}
-            onValueChange={(value) =>
-              onUpdate({ radius: value as 'square' | 'rounded' })
-            }
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="square">Square</SelectItem>
-              <SelectItem value="rounded">Rounded</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Shadow */}
-        <div className="space-y-2">
-          <Label>Shadow</Label>
-          <Select
-            value={appearance.shadow || 'none'}
-            onValueChange={(value) =>
-              onUpdate({ shadow: value as 'none' | 'subtle' | 'card' })
-            }
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">None</SelectItem>
-              <SelectItem value="subtle">Subtle</SelectItem>
-              <SelectItem value="card">Card</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* Spacing Section */}
-      <div className="space-y-4">
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Spacing</h3>
-          <p className="text-xs text-gray-500 mb-4">Control spacing inside and around the block</p>
-        </div>
-
-        {/* Padding */}
-        <div className="space-y-2">
-          <Label>Padding</Label>
-          <Select
-            value={
-              typeof appearance.padding === 'string' 
-                ? appearance.padding 
-                : appearance.padding === undefined 
-                ? 'normal' 
-                : 'normal' // Default to 'normal' if it's a number (legacy)
-            }
-            onValueChange={(value) =>
-              onUpdate({ padding: value as 'compact' | 'normal' | 'spacious' })
-            }
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="compact">Compact</SelectItem>
-              <SelectItem value="normal">Normal</SelectItem>
-              <SelectItem value="spacious">Spacious</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Margin */}
-        <div className="space-y-2">
-          <Label>Margin (top/bottom)</Label>
-          <Select
-            value={appearance.margin || 'none'}
-            onValueChange={(value) =>
-              onUpdate({ margin: value as 'none' | 'small' | 'normal' | 'large' })
-            }
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">None</SelectItem>
-              <SelectItem value="small">Small</SelectItem>
-              <SelectItem value="normal">Normal</SelectItem>
-              <SelectItem value="large">Large</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* Header / Title Section */}
-      <div className="space-y-4">
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Header / Title</h3>
-          <p className="text-xs text-gray-500 mb-4">Customize the block title appearance</p>
-        </div>
-
-        {/* Title Text */}
         <div className="space-y-2">
           <Label>Title</Label>
           <Input
@@ -205,18 +76,16 @@ export default function CommonAppearanceSettings({
           />
         </div>
 
-        {/* Show Title */}
         <div className="flex items-center justify-between">
           <Label htmlFor="show-title">Show title</Label>
           <Switch
             id="show-title"
-            checked={appearance.showTitle !== false}
-            onCheckedChange={(checked) => onUpdate({ showTitle: checked })}
+            checked={showTitle}
+            onCheckedChange={(checked) => onUpdate({ showTitle: checked, show_title: checked } as any)}
           />
         </div>
 
-        {/* Title Size */}
-        {appearance.showTitle !== false && (
+        {showTitle && (
           <>
             <div className="space-y-2">
               <Label>Title size</Label>
@@ -237,7 +106,6 @@ export default function CommonAppearanceSettings({
               </Select>
             </div>
 
-            {/* Title Alignment */}
             <div className="space-y-2">
               <Label>Title alignment</Label>
               <Select
@@ -256,7 +124,6 @@ export default function CommonAppearanceSettings({
               </Select>
             </div>
 
-            {/* Divider */}
             <div className="flex items-center justify-between">
               <Label htmlFor="show-divider">Divider below title</Label>
               <Switch
@@ -269,14 +136,13 @@ export default function CommonAppearanceSettings({
         )}
       </div>
 
-      {/* Colour Accents Section */}
+      {/* Colour */}
       <div className="space-y-4">
         <div>
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Colour accent</h3>
-          <p className="text-xs text-gray-500 mb-4">Add a subtle colour accent to the block</p>
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">Colour</h3>
+          <p className="text-xs text-gray-500 mb-4">Colour settings for this block</p>
         </div>
 
-        {/* Accent Color Swatches */}
         <div className="space-y-2">
           <Label>Accent colour</Label>
           <div className="grid grid-cols-4 gap-2">
@@ -309,23 +175,18 @@ export default function CommonAppearanceSettings({
       </div>
 
       {/* Color Field Section - Only for data blocks with table_id */}
-      {config.table_id && selectFields.length > 0 && (
+      {canUseColourByField && config.table_id && selectFields.length > 0 && (
         <div className="space-y-4">
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Data Colors</h3>
-            <p className="text-xs text-gray-500 mb-4">Use field values to color rows, cards, or events</p>
-          </div>
-
           {/* Color Field */}
           <div className="space-y-2">
-            <Label>Color field</Label>
+            <Label>Colour by field</Label>
             <div className="relative">
               <Select
                 value={appearance.color_field || "__none__"}
                 onValueChange={(value) => onUpdate({ color_field: value === "__none__" ? undefined : value })}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select color field..." />
+                  <SelectValue placeholder="Select field..." />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">None</SelectItem>
@@ -347,11 +208,137 @@ export default function CommonAppearanceSettings({
               )}
             </div>
             <p className="text-xs text-gray-500">
-              Use colors from single-select or multi-select field choices. Colors will be applied to rows, cards, or events.
+              Uses single-select or multi-select options to colour rows, cards, or events.
             </p>
           </div>
         </div>
       )}
+
+      <details className="group rounded-md border border-gray-200 p-3" open={false}>
+        <summary className="cursor-pointer list-none text-sm font-semibold text-gray-900">
+          Advanced appearance
+        </summary>
+        <div className="mt-3 space-y-4">
+          <div className="space-y-2">
+            <Label>Background</Label>
+            <Select
+              value={appearance.background || 'none'}
+              onValueChange={(value) =>
+                onUpdate({ background: value as 'none' | 'subtle' | 'tinted' | 'emphasised' })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="subtle">Subtle</SelectItem>
+                <SelectItem value="tinted">Tinted</SelectItem>
+                <SelectItem value="emphasised">Emphasised</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Border</Label>
+            <Select
+              value={appearance.border || 'none'}
+              onValueChange={(value) =>
+                onUpdate({ border: value as 'none' | 'outline' | 'card' })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="outline">Soft outline</SelectItem>
+                <SelectItem value="card">Card</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Corner radius</Label>
+            <Select
+              value={appearance.radius || 'square'}
+              onValueChange={(value) =>
+                onUpdate({ radius: value as 'square' | 'rounded' })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="square">Square</SelectItem>
+                <SelectItem value="rounded">Rounded</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Shadow</Label>
+            <Select
+              value={appearance.shadow || 'none'}
+              onValueChange={(value) =>
+                onUpdate({ shadow: value as 'none' | 'subtle' | 'card' })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="subtle">Subtle</SelectItem>
+                <SelectItem value="card">Card</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Padding</Label>
+            <Select
+              value={
+                typeof appearance.padding === 'string'
+                  ? appearance.padding
+                  : 'normal'
+              }
+              onValueChange={(value) =>
+                onUpdate({ padding: value as 'compact' | 'normal' | 'spacious' })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="compact">Compact</SelectItem>
+                <SelectItem value="normal">Normal</SelectItem>
+                <SelectItem value="spacious">Spacious</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Margin (top/bottom)</Label>
+            <Select
+              value={appearance.margin || 'none'}
+              onValueChange={(value) =>
+                onUpdate({ margin: value as 'none' | 'small' | 'normal' | 'large' })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="small">Small</SelectItem>
+                <SelectItem value="normal">Normal</SelectItem>
+                <SelectItem value="large">Large</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </details>
     </div>
   )
 }

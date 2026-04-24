@@ -54,9 +54,6 @@ export default function GridAppearanceSettings({
     }
   }
 
-  const selectFields = fields.filter(
-    (f) => f.type === "single_select" || f.type === "multi_select"
-  )
   const imageFields = fields.filter(
     (f) => f.type === "attachment" || f.type === "url"
   )
@@ -65,9 +62,14 @@ export default function GridAppearanceSettings({
 
   return (
     <div className="space-y-4">
-      {/* Row height - all view types */}
+      <div>
+        <h3 className="text-sm font-semibold text-gray-900 mb-1">Display</h3>
+        <p className="text-xs text-gray-500 mb-3">How records are shown</p>
+      </div>
+
+      {/* Density - all view types */}
       <div className="space-y-2">
-        <Label>Row height</Label>
+        <Label>Density</Label>
         <Select
           value={appearance.row_height || "standard"}
           onValueChange={(value) => onUpdate({ row_height: value })}
@@ -122,7 +124,7 @@ export default function GridAppearanceSettings({
         </>
       )}
 
-      {/* GALLERY: image field, fit image size, title field, rows per page, display field names, color, show label */}
+      {/* GALLERY: image field, fit image size, title field, records shown */}
       {viewType === "gallery" && (
         <>
           <div className="space-y-2">
@@ -176,7 +178,7 @@ export default function GridAppearanceSettings({
             </div>
           )}
           <div className="space-y-2">
-            <Label>Rows per page</Label>
+            <Label>Records shown</Label>
             <Select
               value={String(appearance.gallery_rows_per_page || "12")}
               onValueChange={(v) =>
@@ -275,7 +277,7 @@ export default function GridAppearanceSettings({
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Preview field count</Label>
+            <Label>Event fields shown</Label>
             <Select
               value={String((appearance as any).calendar_preview_field_count ?? "3")}
               onValueChange={(v) =>
@@ -309,39 +311,7 @@ export default function GridAppearanceSettings({
         </div>
       )}
 
-      {/* Color - all view types */}
-      <div className="border-t pt-4 space-y-2">
-        <Label>Color</Label>
-        <Select
-          value={appearance.color_field || "__none__"}
-          onValueChange={(v) => onUpdate({ color_field: v === "__none__" ? undefined : v })}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select color field..." />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__none__">None</SelectItem>
-            {selectFields.map((f) => (
-              <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <p className="text-xs text-gray-500">
-          Use colors from single-select field. Applied to rows, cards, or events.
-        </p>
-      </div>
-
-      {/* Show label - all (block title/labels) */}
-      <div className="flex items-center justify-between">
-        <Label htmlFor="show-label">Show label</Label>
-        <Switch
-          id="show-label"
-          checked={appearance.showTitle !== false && (appearance as any).show_title !== false}
-          onCheckedChange={(c) =>
-            onUpdate({ showTitle: c, show_title: c } as any)
-          }
-        />
-      </div>
+      {/* Colour by field + title controls are consolidated in CommonAppearanceSettings */}
     </div>
   )
 }

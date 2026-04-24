@@ -21,6 +21,8 @@ import { getLinkedFieldValueFromRow, linkedValueToIds, resolveLinkedFieldDisplay
 import type { LinkedField } from "@/types/fields"
 import { getFieldDisplayName } from "@/lib/fields/display"
 import RecordCard from "@/components/views/cards/RecordCard"
+import { cn } from "@/lib/utils"
+import { normalizeSelectOptionsForUi } from "@/lib/fields/select-options"
 
 function normalizeKanbanGroupKey(value: unknown): string {
   if (value == null) return "Uncategorized"
@@ -472,9 +474,9 @@ function KanbanView({
     if (!groupingField || (groupingField.type !== "single_select" && groupingField.type !== "multi_select")) {
       return existing
     }
-    const options = normalizeSelectOptionsForUi(groupingField.type, groupingField.options)
-    const optionKeys = options
-      .map((o) => normalizeKanbanGroupKey(o.value ?? o.label))
+    const { selectOptions } = normalizeSelectOptionsForUi(groupingField.type, groupingField.options)
+    const optionKeys = selectOptions
+      .map((o) => normalizeKanbanGroupKey(o.label))
       .filter(Boolean)
     return Array.from(new Set([...optionKeys, ...existing]))
   }, [groupedRowsLimited, blockConfig, groupingField])
