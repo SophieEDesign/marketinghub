@@ -103,7 +103,7 @@ export default function BlockAppearanceWrapper({
             ? 'overflow-visible'
             : // For content-sized blocks, avoid internal flex grow; let content drive height.
               sizing === 'content'
-              ? 'overflow-hidden'
+              ? 'overflow-visible'
               : 'flex-1 min-h-0',
           BLOCK_CONTENT_PADDING
         )}

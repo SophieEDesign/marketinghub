@@ -96,6 +96,7 @@ export default function GridBlock({
   
   const { config } = block
   const displaySettings = resolveBlockDisplaySettings(block.type, config)
+  const isFitMode = displaySettings.displayMode === "fit"
 
   // CRITICAL: block.config is often a new object each render (from CalendarBlock/BlockRenderer).
   // Passing unstable blockConfig to CalendarView → blockConfigRef changes → handleEventClick deps
@@ -172,6 +173,7 @@ export default function GridBlock({
   }
   // #endregion
   const previousHeightRef = useRef<number | null>(null)
+  const containerRef = useRef<HTMLDivElement | null>(null)
   // #region HOOK CHECK - After useRef previousHeightRef
   if (process.env.NODE_ENV === 'development') {
     console.log('[HOOK CHECK]', 'GridBlock after useRef previousHeightRef')
@@ -217,6 +219,34 @@ export default function GridBlock({
     
     previousHeightRef.current = totalHeightPx
   }, [onEphemeralHeightDelta, block.id, rowHeight])
+
+  useEffect(() => {
+    if (!onEphemeralHeightDelta) return
+
+    if (!isFitMode) {
+      onEphemeralHeightDelta(block.id, 0)
+      return
+    }
+
+    if (!containerRef.current) return
+    const element = containerRef.current
+
+    const measureAndReport = () => {
+      const measuredPx = Math.max(element.scrollHeight || 0, element.clientHeight || 0)
+      const baseHeightPx = Math.max(2, block.h || 4) * rowHeight
+      const deltaPx = Math.max(0, measuredPx - baseHeightPx)
+      onEphemeralHeightDelta(block.id, deltaPx)
+    }
+
+    measureAndReport()
+
+    if (typeof ResizeObserver === "undefined") return
+    const observer = new ResizeObserver(() => {
+      measureAndReport()
+    })
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [onEphemeralHeightDelta, isFitMode, block.id, block.h, rowHeight, configContentKey, viewType])
   // #region HOOK CHECK - After useCallback handleHeightChange
   if (process.env.NODE_ENV === 'development') {
     console.log('[HOOK CHECK]', 'GridBlock after useCallback handleHeightChange')
@@ -975,6 +1005,9 @@ export default function GridBlock({
             interfaceMode={interfaceMode}
             onRecordDeleted={() => setRefreshKey((k) => k + 1)}
             onModalLayoutSave={onModalLayoutSave ?? undefined}
+            displayMode={displaySettings.displayMode}
+            overflowBehaviour={displaySettings.overflowBehaviour}
+            recordLimit={displaySettings.recordLimit}
           />
         )
       }
@@ -1181,6 +1214,7 @@ export default function GridBlock({
             reloadKey={refreshKey}
             onHeightChange={canAutoSizeListHeight ? handleHeightChange : undefined}
             rowHeight={rowHeight}
+            colorField={appearance.color_field}
             cascadeContext={cascadeContext}
             interfaceMode={interfaceMode}
             onRecordDeleted={() => setRefreshKey((k) => k + 1)}
@@ -1257,8 +1291,8 @@ export default function GridBlock({
           groupBy: !!effectiveGroupBy && (!!config.group_by_field || !!config.group_by || !!(config as any).group_by_rules), // GroupBy from block config (including nested groups)
         }
 
-        // Only pass onHeightChange when grouping is active
-        const isGrouped = !!effectiveGroupBy
+        // In fit mode, always report measured content height so layout can reflow.
+        const shouldReportHeight = displaySettings.displayMode === "fit" || !!effectiveGroupBy
 
         return (
           <GridViewWrapper
@@ -1299,7 +1333,7 @@ export default function GridBlock({
             }}
             hideEmptyState={hideEmptyState}
             blockLevelSettings={blockLevelSettings}
-            onHeightChange={isGrouped ? handleHeightChange : undefined}
+            onHeightChange={shouldReportHeight ? handleHeightChange : undefined}
             rowHeightPixels={rowHeight}
             onModalLayoutSave={onModalLayoutSave}
             canEditLayout={canEditLayout}
@@ -1321,27 +1355,51 @@ export default function GridBlock({
   }
 
   return (
-    <div className={`h-full w-full max-w-full min-h-0 min-w-0 flex flex-col ${(isGridWithPushDown || viewType === "calendar" || !allowInternalScroll) ? 'overflow-visible' : 'overflow-hidden'}`} style={blockStyle}>
+    <div
+      ref={containerRef}
+      className={cn(
+        isFitMode ? "h-auto" : "h-full",
+        "w-full max-w-full min-h-0 min-w-0 flex flex-col",
+        (isGridWithPushDown || viewType === "calendar" || !allowInternalScroll) ? "overflow-visible" : "overflow-hidden"
+      )}
+      style={blockStyle}
+    >
       {/* Legacy header (title + optional add record) - only when appearance wrapper is not active */}
       {!wrapperHasAppearanceSettings &&
         (((appearance.showTitle ?? (appearance as any).show_title) !== false && blockTitle) ||
           showAddRecord) && (
           <BlockHeader
             title={((appearance.showTitle ?? (appearance as any).show_title) !== false && blockTitle) ? blockTitle : undefined}
-            actions={showAddRecord ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={handleAddRecord}
-                disabled={isAddRecordDisabled}
-                title={!canCreateRecord ? 'Adding records is disabled for this block' : 'Add a new record'}
-                className="h-8 px-2.5 text-xs"
-              >
-                <Plus className="h-4 w-4 mr-1.5" />
-                Add record
-              </Button>
-            ) : null}
+            actions={
+              <>
+                {showQuickFilters && viewType !== "calendar" && (
+                  <QuickFilterBar
+                    storageKey={`mh:quickFilters:${pageId || "page"}:${block.id}`}
+                    tableFields={safeTableFields}
+                    viewDefaultFilters={viewDefaultFilters}
+                    onChange={setUserQuickFilters}
+                    compact
+                    extraCompact
+                    showFilteredIconOnly
+                    iconOnly
+                  />
+                )}
+                {showAddRecord && (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    onClick={handleAddRecord}
+                    disabled={isAddRecordDisabled}
+                    title={!canCreateRecord ? 'Adding records is disabled for this block' : 'Add a new record'}
+                    className="h-7 w-7"
+                    aria-label="Add record"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                )}
+              </>
+            }
             className="border-border/80"
           />
         )}
@@ -1406,36 +1464,42 @@ export default function GridBlock({
 
       {/* New appearance wrapper active: it renders the title header. Keep Add record available without duplicating the title. */}
       {wrapperHasAppearanceSettings && showAddRecord && viewType !== "calendar" && (
-        <div className="mb-2 flex flex-wrap justify-end gap-1.5">
+        <div className="mb-1.5 flex flex-wrap justify-end gap-1.5">
+          {showQuickFilters && (
+            <QuickFilterBar
+              storageKey={`mh:quickFilters:${pageId || "page"}:${block.id}`}
+              tableFields={safeTableFields}
+              viewDefaultFilters={viewDefaultFilters}
+              onChange={setUserQuickFilters}
+              compact
+              extraCompact
+              showFilteredIconOnly
+              iconOnly
+            />
+          )}
           <Button
             type="button"
-            size="sm"
+            size="icon"
             variant="outline"
             onClick={handleAddRecord}
             disabled={isAddRecordDisabled}
             title={!canCreateRecord ? 'Adding records is disabled for this block' : 'Add a new record'}
-            className="h-8 px-2.5 text-xs"
+            className="h-7 w-7"
+            aria-label="Add record"
           >
-            <Plus className="h-4 w-4 mr-1.5" />
-            Add record
+            <Plus className="h-4 w-4" />
           </Button>
         </div>
-      )}
-
-      {/* Airtable-style quick filters (session-only; never saved to the view) */}
-      {showQuickFilters && viewType !== "calendar" && (
-        <QuickFilterBar
-          storageKey={`mh:quickFilters:${pageId || "page"}:${block.id}`}
-          tableFields={safeTableFields}
-          viewDefaultFilters={viewDefaultFilters}
-          onChange={setUserQuickFilters}
-        />
       )}
 
       {/* Single scroll container: GridView/CalendarView owns scroll; flex so child can flex-1. Calendar needs overflow-hidden so child controls scroll. */}
       {/* Non-full-page calendar must not force viewport min-height inside a fixed grid item, or lower content gets clipped. */}
       {/* When grid uses push-down (grouping), overflow-visible so content can grow and flow to page scroll. */}
-      <div className={`flex flex-col min-w-0 w-full min-h-0 flex-1 ${(isGridWithPushDown || marketingDashboardStyle || viewType === "calendar" || !allowInternalScroll) ? 'overflow-visible' : 'overflow-hidden'}`}>
+      <div className={cn(
+        isFitMode ? "h-auto" : "flex-1",
+        "flex flex-col min-w-0 w-full min-h-0",
+        (isGridWithPushDown || marketingDashboardStyle || viewType === "calendar" || !allowInternalScroll) ? "overflow-visible" : "overflow-hidden"
+      )}>
         {renderView()}
       </div>
     </div>

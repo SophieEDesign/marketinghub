@@ -105,6 +105,9 @@ export default function GalleryView({
   const cardTextBehaviour = ((blockConfig as any)?.card_text_behaviour || "wrap") as "wrap" | "truncate_1" | "truncate_2" | "truncate_3"
   const cardHeightMode = ((blockConfig as any)?.card_height_mode || "fit") as "fit" | "fixed"
   const cardFixedHeightPx = Number((blockConfig as any)?.card_fixed_height_px || 0)
+  const galleryRowsPerPage = Number((blockConfig as any)?.appearance?.gallery_rows_per_page || 0)
+  const effectiveRecordLimit =
+    Number.isFinite(galleryRowsPerPage) && galleryRowsPerPage > 0 ? galleryRowsPerPage : recordLimit
   // Ref for measuring content height
   const contentRef = useRef<HTMLDivElement>(null)
   const lastLoadRequestKeyRef = useRef<string | null>(null)
@@ -370,12 +373,12 @@ export default function GalleryView({
     return rows.filter((r) => ids.has(r.id))
   }, [rows, tableFields, searchQuery, safeFieldIds])
 
-  const hasMoreRows = !isShowingAll && filteredRows.length > recordLimit
-  const visibleRows = hasMoreRows ? filteredRows.slice(0, recordLimit) : filteredRows
+  const hasMoreRows = !isShowingAll && filteredRows.length > effectiveRecordLimit
+  const visibleRows = hasMoreRows ? filteredRows.slice(0, effectiveRecordLimit) : filteredRows
 
   useEffect(() => {
     setIsShowingAll(false)
-  }, [tableId, viewId, recordLimit, reloadKey, searchQuery])
+  }, [tableId, viewId, effectiveRecordLimit, reloadKey, searchQuery])
 
   // Resolve grouping labels for linked record fields (link_to_table).
   useEffect(() => {
@@ -654,12 +657,12 @@ export default function GalleryView({
       className={cn(
         allowInternalScroll
           ? "w-full h-full min-h-0 max-h-full overflow-y-auto overflow-x-hidden overscroll-contain"
-          : "w-full h-full min-h-0 overflow-visible overflow-x-hidden",
+          : "w-full min-h-0 overflow-visible overflow-x-hidden",
         marketingDashboardStyle ? "bg-background" : "bg-gray-50"
       )}
     >
       {Array.isArray(groupedRows) && groupedRows.length > 0 ? (
-        <div className="p-6 space-y-6">
+        <div className="p-3 space-y-4">
           {groupedRows.map((group) => {
             const isCollapsed = collapsedGroups.has(group.pathKey)
             const items = Array.isArray(group.items) ? group.items : []

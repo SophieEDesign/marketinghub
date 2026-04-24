@@ -2879,8 +2879,9 @@ export default function GridView({
       return
     }
     
+    const shouldMeasureForFit = displayMode === "fit"
     const isGrouped = effectiveGroupRules.length > 0
-    if (!isGrouped) {
+    if (!shouldMeasureForFit && !isGrouped) {
       baseHeightRef.current = null
       previousHeightRef.current = null
       return // No grouping, no ephemeral expansion
@@ -2916,7 +2917,7 @@ export default function GridView({
     }, 100)
 
     return () => clearTimeout(timeoutId)
-  }, [collapsedGroups, effectiveGroupRules.length, groupBy, onHeightChange, rowHeightPixels])
+  }, [collapsedGroups, effectiveGroupRules.length, groupBy, onHeightChange, rowHeightPixels, displayMode])
 
   // CRITICAL: Defensive guards - ensure we have required data before rendering
   // These checks happen AFTER all hooks are called (React rules compliance)
@@ -3116,7 +3117,7 @@ export default function GridView({
   return (
     <div 
       ref={contentRef}
-      className="w-full h-full flex flex-col relative min-h-0 min-w-0" 
+      className={cn(displayMode === "fit" ? "h-auto" : "h-full", "w-full flex flex-col relative min-h-0 min-w-0")} 
       style={{ paddingBottom: isEditing ? '60px' : '0' }}
     >
       {/* Toolbar - Only show builder controls in edit mode */}

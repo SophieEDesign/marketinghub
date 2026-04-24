@@ -107,6 +107,8 @@ export interface QuickFilterBarProps {
   extraCompact?: boolean
   /** When true, show compact filtered-state icon instead of text badge/reset button */
   showFilteredIconOnly?: boolean
+  /** When true, render a single compact filter icon control (no inline pills). */
+  iconOnly?: boolean
 }
 
 export default function QuickFilterBar({
@@ -117,6 +119,7 @@ export default function QuickFilterBar({
   compact = false,
   extraCompact = false,
   showFilteredIconOnly = false,
+  iconOnly = false,
 }: QuickFilterBarProps) {
   const quickableFields = useMemo(() => getQuickableFields(tableFields), [tableFields])
 
@@ -213,6 +216,84 @@ export default function QuickFilterBar({
 
   if (quickableFields.length === 0) {
     return null
+  }
+
+  if (iconOnly) {
+    const activeCount = toFilterConfigs(items).length
+    const iconButtonClass = [
+      "relative inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors",
+      activeCount > 0
+        ? "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"
+        : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50",
+    ].join(" ")
+
+    return (
+      <div className="flex items-center gap-1">
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className={iconButtonClass}
+              aria-label="Filters"
+              title={activeCount > 0 ? `${activeCount} active filter${activeCount === 1 ? "" : "s"}` : "Add filter"}
+            >
+              <Filter className="h-4 w-4" />
+              {activeCount > 0 && (
+                <span className="absolute -top-1 -right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-semibold text-white">
+                  {activeCount}
+                </span>
+              )}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-64 p-2">
+            <div className="flex items-center justify-between px-1 py-1">
+              <span className="text-xs font-medium text-gray-700">Filters</span>
+              {activeCount > 0 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-[11px]"
+                  onClick={() => setItems(baseline)}
+                >
+                  Reset
+                </Button>
+              )}
+            </div>
+            {activeCount > 0 && (
+              <div className="mb-1 space-y-1 px-1">
+                {toFilterConfigs(items).map((f) => (
+                  <div key={`${f.field}-${String(f.value)}`} className="truncate text-[11px] text-gray-600">
+                    {f.field} {f.operator} {String(f.value ?? "")}
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="max-h-56 overflow-auto">
+              {addableFields.length > 0 ? (
+                addableFields.map((f) => (
+                  <button
+                    key={f.name}
+                    type="button"
+                    className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-gray-50"
+                    onClick={() => {
+                      setItems((prev) => [
+                        ...prev,
+                        { field: f.name, operator: "equal", value: undefined },
+                      ])
+                    }}
+                  >
+                    Add {getFieldDisplayName(f)}
+                  </button>
+                ))
+              ) : (
+                <div className="px-2 py-2 text-[11px] text-gray-500">All quick filters already added.</div>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
+    )
   }
 
   const pillClass = extraCompact

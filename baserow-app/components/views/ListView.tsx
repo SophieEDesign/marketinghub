@@ -153,6 +153,13 @@ export default function ListView({
   const [groupValueLabelMaps, setGroupValueLabelMaps] = useState<Record<string, Record<string, string>>>({})
   const [userDisplayNames, setUserDisplayNames] = useState<Map<string, string>>(new Map())
   const [isShowingAll, setIsShowingAll] = useState(false)
+  const listRowHeightSetting = (blockConfig as any)?.appearance?.row_height || "standard"
+  const listCellPaddingClass =
+    listRowHeightSetting === "compact"
+      ? "py-1.5"
+      : listRowHeightSetting === "comfortable"
+        ? "py-3"
+        : "py-2"
 
   // Create flow: open modal first; only insert on Save inside modal.
   const { openRecordModal } = useRecordModal()
@@ -914,13 +921,13 @@ export default function ListView({
             key={col.key}
             className={cn(
               "px-3 text-sm text-foreground align-top",
-              marketingDashboardStyle ? "py-2 text-foreground/90" : "py-2"
+              marketingDashboardStyle ? `${listCellPaddingClass} text-foreground/90` : listCellPaddingClass
             )}
           >
             {renderCellValue(col)}
           </td>
         ))}
-        <td className={cn("px-3 text-right align-top w-12", marketingDashboardStyle ? "py-2" : "py-2")}>
+        <td className={cn("px-3 text-right align-top w-12", listCellPaddingClass)}>
           <button
             type="button"
             onClick={(e) => {
@@ -962,7 +969,7 @@ export default function ListView({
   // Render grouped (nested) or ungrouped
   if (flattenedGroups && flattenedGroups.length > 0) {
     return (
-      <div ref={contentRef} className={`${BLOCK_EMBED_CLASSNAME} h-full flex flex-col`}>
+      <div ref={contentRef} className={cn(BLOCK_EMBED_CLASSNAME, displayMode === "fit" ? "h-auto" : "h-full", "flex flex-col")}>
         {/* Toolbar */}
         <div className={cn("flex-shrink-0 flex flex-wrap items-center gap-1.5 px-3 border-b bg-background", marketingDashboardStyle ? "py-2 border-border/35" : "py-2.5 border-border/55")}>
           <Button
@@ -1007,7 +1014,7 @@ export default function ListView({
           className={
             marketingDashboardStyle
               ? "h-[360px] max-h-[360px] min-h-0 min-w-0 overflow-y-auto overflow-x-hidden"
-              : onHeightChange
+            : (displayMode === "fit" || onHeightChange)
               ? "min-h-0 min-w-0 overflow-visible"
               : "flex-1 min-h-0 min-w-0 overflow-y-auto"
           }
@@ -1209,7 +1216,7 @@ export default function ListView({
 
   if (rowsToRender.length === 0) {
     return (
-      <div ref={contentRef} className="h-full flex flex-col">
+      <div ref={contentRef} className={cn(displayMode === "fit" ? "h-auto" : "h-full", "flex flex-col")}>
         <div className="flex-1 flex items-center justify-center p-4">
           <EmptyState
             icon={<Database className="h-12 w-12" />}
@@ -1237,7 +1244,7 @@ export default function ListView({
   }
 
   return (
-    <div ref={contentRef} className={`${BLOCK_EMBED_CLASSNAME} h-full flex flex-col`}>
+    <div ref={contentRef} className={cn(BLOCK_EMBED_CLASSNAME, displayMode === "fit" ? "h-auto" : "h-full", "flex flex-col")}>
       <div
         className={
             marketingDashboardStyle
@@ -1267,8 +1274,8 @@ export default function ListView({
                     className={cn(
                       "px-3 text-left text-xs font-medium uppercase whitespace-normal break-words",
                       marketingDashboardStyle
-                        ? "py-2 tracking-[0.07em] text-muted-foreground/90 bg-muted/25"
-                        : "py-2 text-gray-600 tracking-wider bg-gray-50"
+                        ? `${listCellPaddingClass} tracking-[0.07em] text-muted-foreground/90 bg-muted/25`
+                        : `${listCellPaddingClass} text-gray-600 tracking-wider bg-gray-50`
                     )}
                   >
                     {getFieldDisplayName(col.field)}

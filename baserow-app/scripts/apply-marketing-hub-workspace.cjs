@@ -540,72 +540,42 @@ function buildThemeWorkspaceBlocks(ctx) {
   )
 
   let y = 0
-  blocks.push(section("Theme Workspace", "Planning view: current themes first, then the content flowing under each theme", y, 2))
-  y += 2
-
-  const themeVisible = [themeName, themeStatus, themeSummary].filter(Boolean).slice(0, 3)
   blocks.push({
-    type: "grid",
+    type: "html",
     position_x: 0,
     position_y: y,
     width: 12,
-    height: 7,
+    height: 2,
     config: {
-      title: `Quarterly Themes (${currentYear})`,
-      table_id: ctx.quarterlyThemes.id,
-      view_type: "gallery",
-      row_limit: 6,
-      list_title_field: themeName,
-      visible_fields: themeVisible,
-      ...(themeStatus ? { pill_fields: [themeStatus] } : {}),
-      filters: themeCurrentYearFilters,
-      appearance: { showTitle: true, border: "none" },
+      title: "",
+      html: `<div class="rounded-card-lg border border-border/60 bg-card px-5 py-4 shadow-sm"><h2 class="text-xl font-semibold tracking-tight text-foreground">Theme Workspace</h2><p class="mt-1 text-sm text-muted-foreground">Plan quarterly themes and track content aligned to each theme.</p></div>`,
     },
   })
-  y += 8
+  y += 3
 
-  const contentVisible = [contentDisplayField, contentStatus, contentDate, contentTheme].filter(Boolean)
-  blocks.push({
-    type: "grid",
-    position_x: 0,
-    position_y: y,
-    width: 12,
-    height: 8,
-    config: {
-      title: "Content by Theme",
-      table_id: ctx.content.id,
-      view_type: "list",
-      row_limit: 8,
-      list_title_field: contentDisplayField,
-      visible_fields: contentVisible,
-      ...(contentStatus ? { pill_fields: [contentStatus] } : {}),
-      ...(contentTheme ? { group_by_field: contentTheme } : {}),
-      filters: compactFilters(contentFields, [
-        { field: contentDisplayField, operator: "is_not_empty", value: "" },
-        ...(contentTheme ? [{ field: contentTheme, operator: "is_not_empty", value: "" }] : []),
-        ...(contentDate
-          ? [{ field: contentDate, operator: "date_next_days", value: 60 }]
-          : contentStatus
-          ? [{ field: contentStatus, operator: "is_any_of", value: ["In Progress", "Planned", "Scheduled", "Active", "Draft"] }]
-          : []),
-      ]),
-      ...(contentDate ? { sorts: [{ field: contentDate, direction: "asc" }] } : {}),
-      appearance: { showTitle: true, border: "none" },
-    },
-  })
-  y += 9
-
-  blocks.push(section("Planning Snapshot", "Quick indicators for volume and upcoming work under current themes", y, 2))
-  y += 2
   blocks.push({
     type: "kpi",
     position_x: 0,
     position_y: y,
-    width: 6,
+    width: 3,
     height: 3,
     config: {
-      title: "Content items per theme",
-      kpi_label: "Theme-linked",
+      title: "Themes this year",
+      kpi_label: "Active themes",
+      table_id: ctx.quarterlyThemes.id,
+      kpi_aggregate: "count",
+      filters: themeCurrentYearFilters,
+    },
+  })
+  blocks.push({
+    type: "kpi",
+    position_x: 3,
+    position_y: y,
+    width: 3,
+    height: 3,
+    config: {
+      title: "Theme-linked content",
+      kpi_label: "Content items",
       table_id: ctx.content.id,
       kpi_aggregate: "count",
       filters: compactFilters(contentFields, [
@@ -618,18 +588,128 @@ function buildThemeWorkspaceBlocks(ctx) {
     type: "kpi",
     position_x: 6,
     position_y: y,
-    width: 6,
+    width: 3,
     height: 3,
     config: {
-      title: "Upcoming content",
-      kpi_label: "Next 60d",
+      title: "In progress",
+      kpi_label: "Content items",
       table_id: ctx.content.id,
       kpi_aggregate: "count",
+      filters: compactFilters(contentFields, [
+        { field: contentDisplayField, operator: "is_not_empty", value: "" },
+        ...(contentStatus ? [{ field: contentStatus, operator: "is_any_of", value: ["In Progress", "In progress"] }] : []),
+      ]),
+    },
+  })
+  blocks.push({
+    type: "kpi",
+    position_x: 9,
+    position_y: y,
+    width: 3,
+    height: 3,
+    config: {
+      title: "Due soon",
+      kpi_label: "Next 30 days",
+      table_id: ctx.content.id,
+      kpi_aggregate: "count",
+      filters: compactFilters(contentFields, [
+        { field: contentDisplayField, operator: "is_not_empty", value: "" },
+        ...(contentDate ? [{ field: contentDate, operator: "date_next_days", value: 30 }] : []),
+      ]),
+    },
+  })
+  y += 4
+
+  const themeVisible = [themeName, themeStatus, themeSummary].filter(Boolean).slice(0, 3)
+  blocks.push({
+    type: "grid",
+    position_x: 0,
+    position_y: y,
+    width: 8,
+    height: 7,
+    config: {
+      title: `Quarterly Themes (${currentYear})`,
+      table_id: ctx.quarterlyThemes.id,
+      view_type: "gallery",
+      row_limit: 4,
+      list_title_field: themeName,
+      visible_fields: themeVisible,
+      ...(themeStatus ? { pill_fields: [themeStatus] } : {}),
+      filters: themeCurrentYearFilters,
+      appearance: { showTitle: true, border: "none", compact: true, padding: "compact" },
+    },
+  })
+
+  blocks.push({
+    type: "grid",
+    position_x: 8,
+    position_y: y,
+    width: 4,
+    height: 7,
+    config: {
+      title: "Upcoming Content",
+      table_id: ctx.content.id,
+      view_type: "list",
+      row_limit: 6,
+      list_title_field: contentDisplayField,
+      visible_fields: [contentDisplayField, contentTheme, contentDate].filter(Boolean),
+      list_meta_fields: [contentTheme, contentDate].filter(Boolean),
+      filters: compactFilters(contentFields, [
+        { field: contentDisplayField, operator: "is_not_empty", value: "" },
+        ...(contentTheme ? [{ field: contentTheme, operator: "is_not_empty", value: "" }] : []),
+        ...(contentDate ? [{ field: contentDate, operator: "date_next_days", value: 30 }] : []),
+      ]),
+      ...(contentDate ? { sorts: [{ field: contentDate, direction: "asc" }] } : {}),
+      appearance: { showTitle: true, border: "none", compact: true, padding: "compact", showDivider: true },
+    },
+  })
+  y += 8
+
+  const contentVisible = [contentDisplayField, contentStatus, contentDate, contentTheme].filter(Boolean)
+  blocks.push({
+    type: "grid",
+    position_x: 0,
+    position_y: y,
+    width: 8,
+    height: 7,
+    config: {
+      title: "Content by Theme",
+      table_id: ctx.content.id,
+      view_type: "list",
+      row_limit: 10,
+      list_title_field: contentDisplayField,
+      visible_fields: contentVisible,
+      ...(contentStatus ? { pill_fields: [contentStatus] } : {}),
+      ...(contentTheme ? { group_by_field: contentTheme } : {}),
       filters: compactFilters(contentFields, [
         { field: contentDisplayField, operator: "is_not_empty", value: "" },
         ...(contentTheme ? [{ field: contentTheme, operator: "is_not_empty", value: "" }] : []),
         ...(contentDate ? [{ field: contentDate, operator: "date_next_days", value: 60 }] : []),
       ]),
+      ...(contentDate ? { sorts: [{ field: contentDate, direction: "asc" }] } : {}),
+      appearance: { showTitle: true, border: "none", compact: true, padding: "compact", showDivider: true },
+    },
+  })
+  blocks.push({
+    type: "grid",
+    position_x: 8,
+    position_y: y,
+    width: 4,
+    height: 7,
+    config: {
+      title: "Theme Calendar",
+      table_id: ctx.content.id,
+      view_type: "calendar",
+      calendar_date_field: contentDate,
+      visible_week_span: 4,
+      default_date_range_preset: "thisMonth",
+      visible_fields: [contentDisplayField, contentDate].filter(Boolean),
+      filters: compactFilters(contentFields, [
+        { field: contentDisplayField, operator: "is_not_empty", value: "" },
+        ...(contentTheme ? [{ field: contentTheme, operator: "is_not_empty", value: "" }] : []),
+        ...(contentDate ? [{ field: contentDate, operator: "date_next_days", value: 60 }] : []),
+      ]),
+      appearance: { showTitle: true, border: "none", compact: true, event_density: "compact" },
     },
   })
 
@@ -645,18 +725,29 @@ function buildCampaignWorkspaceBlocks(ctx) {
   const campaignTheme = pickFieldName(campaignFields, [/quarterly_theme/i, /^theme$/i], null)
   const campaignContent = pickFieldName(campaignFields, [/^content$/i, /content_link/i], null)
   const contentName = pickFieldName(contentFields, [/content_name/i, /^name$/i], "content_name")
+  const contentStatus = pickFieldName(contentFields, [/^status$/i, /state/i], null)
   const contentDate = pickFieldName(contentFields, [/^date$/i, /publish_date/i], "date")
   const contentCampaign = pickFieldName(contentFields, [/campaigns?/i], null)
 
   const blocks = []
   let y = 0
-  blocks.push(section("Campaign Archive", "Reference view for historical and secondary campaign context", y, 2))
-  y += 2
+  blocks.push({
+    type: "html",
+    position_x: 0,
+    position_y: y,
+    width: 12,
+    height: 2,
+    config: {
+      title: "",
+      html: `<div class="rounded-card-lg border border-border/60 bg-card px-5 py-4 shadow-sm"><h2 class="text-xl font-semibold tracking-tight text-foreground">Campaign Archive</h2><p class="mt-1 text-sm text-muted-foreground">Review campaign performance context and connected content history.</p></div>`,
+    },
+  })
+  y += 3
   blocks.push({
     type: "kpi",
     position_x: 0,
     position_y: y,
-    width: 4,
+    width: 3,
     height: 3,
     config: {
       title: "Active campaigns",
@@ -671,12 +762,12 @@ function buildCampaignWorkspaceBlocks(ctx) {
   })
   blocks.push({
     type: "kpi",
-    position_x: 4,
+    position_x: 3,
     position_y: y,
-    width: 4,
+    width: 3,
     height: 3,
     config: {
-      title: "Content linked",
+      title: "Linked content",
       kpi_label: "With content",
       table_id: ctx.campaigns.id,
       kpi_aggregate: "count",
@@ -685,9 +776,9 @@ function buildCampaignWorkspaceBlocks(ctx) {
   })
   blocks.push({
     type: "kpi",
-    position_x: 8,
+    position_x: 6,
     position_y: y,
-    width: 4,
+    width: 3,
     height: 3,
     config: {
       title: "Upcoming items",
@@ -697,7 +788,24 @@ function buildCampaignWorkspaceBlocks(ctx) {
       filters: compactFilters(contentFields, [{ field: contentDate, operator: "date_next_days", value: 30 }]),
     },
   })
-  y += 3
+  blocks.push({
+    type: "kpi",
+    position_x: 9,
+    position_y: y,
+    width: 3,
+    height: 3,
+    config: {
+      title: "Needs review",
+      kpi_label: "Awaiting approval",
+      table_id: ctx.content.id,
+      kpi_aggregate: "count",
+      filters: compactFilters(contentFields, [
+        { field: contentName, operator: "is_not_empty", value: "" },
+        ...(contentStatus ? [{ field: contentStatus, operator: "is_any_of", value: ["Sent for Approval", "Awaiting approval", "Waiting for approval"] }] : []),
+      ]),
+    },
+  })
+  y += 4
 
   const campaignVisible = [campaignName, campaignStatus].filter(Boolean)
   if (campaignTheme) campaignVisible.push(campaignTheme)
@@ -706,17 +814,17 @@ function buildCampaignWorkspaceBlocks(ctx) {
     position_x: 0,
     position_y: y,
     width: 12,
-    height: 8,
+    height: 7,
     config: {
       title: "Past Campaigns",
       table_id: ctx.campaigns.id,
       view_type: "list",
-      row_limit: 10,
+      row_limit: 8,
       list_title_field: campaignName,
       visible_fields: campaignVisible,
       pill_fields: campaignStatus ? [campaignStatus] : [],
       ...(campaignStatus ? { group_by_field: campaignStatus } : {}),
-      appearance: { showTitle: true, border: "none" },
+      appearance: { showTitle: true, border: "none", compact: true, padding: "compact", showDivider: true },
     },
   })
   y += 8
@@ -727,7 +835,7 @@ function buildCampaignWorkspaceBlocks(ctx) {
     type: "grid",
     position_x: 0,
     position_y: y,
-    width: 12,
+    width: 8,
     height: 6,
     config: {
       title: "Related Content",
@@ -741,7 +849,28 @@ function buildCampaignWorkspaceBlocks(ctx) {
         { field: contentDate, operator: "date_next_days", value: 60 },
       ]),
       sorts: [{ field: contentDate, direction: "asc" }],
-      appearance: { showTitle: true, border: "none" },
+      appearance: { showTitle: true, border: "none", compact: true, padding: "compact", showDivider: true },
+    },
+  })
+  blocks.push({
+    type: "grid",
+    position_x: 8,
+    position_y: y,
+    width: 4,
+    height: 6,
+    config: {
+      title: "Campaign Calendar",
+      table_id: ctx.content.id,
+      view_type: "calendar",
+      calendar_date_field: contentDate,
+      visible_week_span: 4,
+      default_date_range_preset: "thisMonth",
+      visible_fields: [contentName, contentDate].filter(Boolean),
+      filters: compactFilters(contentFields, [
+        { field: contentName, operator: "is_not_empty", value: "" },
+        ...(contentDate ? [{ field: contentDate, operator: "date_next_days", value: 60 }] : []),
+      ]),
+      appearance: { showTitle: true, border: "none", compact: true, event_density: "compact" },
     },
   })
 

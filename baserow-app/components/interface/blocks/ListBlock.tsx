@@ -27,6 +27,7 @@ import { getVisibleFieldsForCard } from "@/lib/interface/field-layout-helpers"
 import { useMarketingDashboard } from "@/contexts/MarketingDashboardContext"
 import { resolveBlockDisplaySettings } from "@/lib/interface/block-display-settings"
 import BlockHeader from "@/components/interface/blocks/shared/BlockHeader"
+import { cn } from "@/lib/utils"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 function isUuidLike(value: string | null | undefined): value is string {
@@ -62,6 +63,7 @@ export default function ListBlock({
   const { toast } = useToast()
   const { config } = block
   const displaySettings = resolveBlockDisplaySettings(block.type, config)
+  const isFitMode = displaySettings.displayMode === "fit"
   const configContentKey = config ? JSON.stringify(config) : ''
   const stableBlockConfig = useMemo(() => config ?? {}, [configContentKey])
   const cascadeContext = useMemo(
@@ -72,6 +74,7 @@ export default function ListBlock({
   // Track base height (collapsed state) to calculate deltas
   const baseHeightRef = useRef<number | null>(null)
   const previousHeightRef = useRef<number | null>(null)
+  const containerRef = useRef<HTMLDivElement | null>(null)
   
   // Convert total height to ephemeral delta
   const handleHeightChange = useCallback((totalHeightGridUnits: number) => {
@@ -99,6 +102,34 @@ export default function ListBlock({
     
     previousHeightRef.current = totalHeightPx
   }, [onEphemeralHeightDelta, block.id, rowHeight])
+
+  useEffect(() => {
+    if (!onEphemeralHeightDelta) return
+
+    if (!isFitMode) {
+      onEphemeralHeightDelta(block.id, 0)
+      return
+    }
+
+    if (!containerRef.current) return
+    const element = containerRef.current
+
+    const measureAndReport = () => {
+      const measuredPx = Math.max(element.scrollHeight || 0, element.clientHeight || 0)
+      const baseHeightPx = Math.max(2, block.h || 4) * rowHeight
+      const deltaPx = Math.max(0, measuredPx - baseHeightPx)
+      onEphemeralHeightDelta(block.id, deltaPx)
+    }
+
+    measureAndReport()
+
+    if (typeof ResizeObserver === "undefined") return
+    const observer = new ResizeObserver(() => {
+      measureAndReport()
+    })
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [onEphemeralHeightDelta, isFitMode, block.id, block.h, rowHeight, configContentKey])
   const tableId = config?.table_id || pageTableId || (config as any)?.base_table || null
   // RULE: Views are currently not used; ignore view_id unless explicitly enabled.
   const viewId = VIEWS_ENABLED ? config?.view_id : null
@@ -498,7 +529,7 @@ export default function ListBlock({
   const showHeader = ((appearance.showTitle ?? (appearance as any).show_title) !== false && (appearance.title || (isEditing ? config.title : table?.name))) || showAddRecord
 
   return (
-    <div className="h-full w-full flex flex-col min-h-0" style={blockStyle}>
+    <div ref={containerRef} className={cn(isFitMode ? "h-auto" : "h-full", "w-full flex flex-col min-h-0")} style={blockStyle}>
       {showHeader && (
         <BlockHeader
           title={((appearance.showTitle ?? (appearance as any).show_title) !== false && (appearance.title || (isEditing ? config.title : table?.name))) ? (appearance.title || (isEditing ? config.title : table?.name)) : undefined}
@@ -533,7 +564,7 @@ export default function ListBlock({
         </div>
       )}
 
-      <div className="flex-1 min-h-0 min-w-0">
+      <div className={cn(isFitMode ? "h-auto" : "flex-1", "min-h-0 min-w-0")}>
         <ListView
         highlightRules={config.highlight_rules}
         colorField={colorField || undefined}

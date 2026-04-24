@@ -1365,7 +1365,12 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
                   })
                   .filter((x): x is { field: TableField; value: unknown } => Boolean(x))
 
-                return items.slice(0, 3)
+                const rawPreviewLimit = Number((blockConfig as any)?.appearance?.calendar_preview_field_count)
+                const previewLimit =
+                  Number.isFinite(rawPreviewLimit) && rawPreviewLimit > 0
+                    ? Math.min(Math.floor(rawPreviewLimit), 10)
+                    : 3
+                return items.slice(0, previewLimit)
               })(),
             },
           }

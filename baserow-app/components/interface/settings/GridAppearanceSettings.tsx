@@ -107,27 +107,9 @@ export default function GridAppearanceSettings({
         </>
       )}
 
-      {/* GRID: wrap headers, field color, field descriptions, show label */}
+      {/* GRID: keep only controls with active render consumers */}
       {viewType === "grid" && (
         <>
-          <div className="flex items-center justify-between">
-            <Label htmlFor="wrap-headers">Wrap headers</Label>
-            <Switch
-              id="wrap-headers"
-              checked={(appearance as any).wrap_headers || false}
-              onCheckedChange={(checked) => onUpdate({ wrap_headers: checked } as any)}
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <Label htmlFor="grid-field-descriptions">Field descriptions</Label>
-            <Switch
-              id="grid-field-descriptions"
-              checked={(appearance as any).show_field_descriptions || false}
-              onCheckedChange={(checked) =>
-                onUpdate({ show_field_descriptions: checked } as any)
-              }
-            />
-          </div>
           <div className="border-t pt-4">
             <ConditionalFormattingEditor
               rules={config.highlight_rules || []}
@@ -196,8 +178,8 @@ export default function GridAppearanceSettings({
           <div className="space-y-2">
             <Label>Rows per page</Label>
             <Select
-value={String(appearance.gallery_rows_per_page || "12")}
-            onValueChange={(v) =>
+              value={String(appearance.gallery_rows_per_page || "12")}
+              onValueChange={(v) =>
                 onUpdate({ gallery_rows_per_page: v === "12" ? undefined : parseInt(v, 10) })
               }
             >
@@ -211,15 +193,6 @@ value={String(appearance.gallery_rows_per_page || "12")}
                 <SelectItem value="48">48</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-          <div className="flex items-center justify-between">
-            <Label>Display field names</Label>
-            <Switch
-              checked={(appearance as any).gallery_display_field_names !== false}
-              onCheckedChange={(c) =>
-                onUpdate({ gallery_display_field_names: c } as any)
-              }
-            />
           </div>
         </>
       )}
@@ -304,17 +277,17 @@ value={String(appearance.gallery_rows_per_page || "12")}
           <div className="space-y-2">
             <Label>Preview field count</Label>
             <Select
-              value={String((appearance as any).calendar_preview_field_count ?? "10")}
+              value={String((appearance as any).calendar_preview_field_count ?? "3")}
               onValueChange={(v) =>
-                onUpdate({ calendar_preview_field_count: v === "10" ? undefined : parseInt(v, 10) } as any)
+                onUpdate({ calendar_preview_field_count: v === "3" ? undefined : parseInt(v, 10) } as any)
               }
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {[3, 5, 10, 15, 20].map((n) => (
-                  <SelectItem key={n} value={String(n)}>{n} visible fields</SelectItem>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <SelectItem key={n} value={String(n)}>{n} fields per event</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -322,26 +295,7 @@ value={String(appearance.gallery_rows_per_page || "12")}
         </>
       )}
 
-      {/* TIMELINE: layout only (compact cards use fixed height; colour in Color section below) */}
-      {viewType === "timeline" && (
-        <div className="space-y-2">
-          <Label>Layout</Label>
-          <Select
-            value={(appearance as any).timeline_layout || "stacked"}
-            onValueChange={(v) =>
-              onUpdate({ timeline_layout: v as "stacked" | "lanes" } as any)
-            }
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="stacked">Stacked</SelectItem>
-              <SelectItem value="lanes">Lanes</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      )}
+      {/* TIMELINE: timeline_layout is hidden until render support exists */}
 
       {/* Grid-only: wrap cell text (legacy) */}
       {viewType === "grid" && (

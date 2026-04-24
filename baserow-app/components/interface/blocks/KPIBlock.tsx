@@ -28,6 +28,34 @@ interface ComparisonData {
   trend: 'up' | 'down' | 'neutral'
 }
 
+function formatKpiValue(value: number, format: string, aggregate: string): string {
+  if (format === "compact") {
+    return new Intl.NumberFormat(undefined, {
+      notation: "compact",
+      maximumFractionDigits: aggregate === "avg" ? 1 : 0,
+    }).format(value)
+  }
+  if (format === "decimal") {
+    return new Intl.NumberFormat(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value)
+  }
+  if (format === "percent") {
+    return `${new Intl.NumberFormat(undefined, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(value)}%`
+  }
+  if (aggregate === "avg") {
+    return new Intl.NumberFormat(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value)
+  }
+  return value.toLocaleString()
+}
+
 export default function KPIBlock({
   block,
   isEditing = false,
@@ -197,8 +225,10 @@ export default function KPIBlock({
   const displayLabel = appearance.title || label
   const showTitle = appearance.show_title !== false && displayLabel && displayLabel !== label
 
+  const numberFormat = appearance.number_format || "standard"
+  const showTrend = appearance.show_trend !== false
   const displayValue = value !== null 
-    ? (aggregate === "avg" ? value.toFixed(2) : value.toLocaleString())
+    ? formatKpiValue(value, numberFormat, aggregate)
     : "—"
 
   const isClickable = clickThrough && !isEditing
@@ -309,7 +339,7 @@ export default function KPIBlock({
           </p>
           
           {/* Comparison indicator */}
-          {!isEditorialKpi && comparisonData && comparisonData.change !== null && (
+          {!isEditorialKpi && showTrend && comparisonData && comparisonData.change !== null && (
             <div className={`flex items-center gap-1 text-xs mb-0.5 ${getAlignmentClass().includes('text-center') ? 'justify-center' : getAlignmentClass().includes('text-left') ? 'justify-start' : 'justify-end'}`}>
               {comparisonData.trend === 'up' ? (
                 <TrendingUp className="h-4 w-4 text-green-600" />

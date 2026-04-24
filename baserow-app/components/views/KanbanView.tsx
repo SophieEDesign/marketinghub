@@ -67,6 +67,9 @@ interface KanbanViewProps {
   onRecordDeleted?: () => void
   /** Callback to save field layout when user edits modal layout in right panel. */
   onModalLayoutSave?: (fieldLayout: import("@/lib/interface/field-layout-utils").FieldLayoutItem[]) => void
+  displayMode?: 'fit' | 'fixed'
+  overflowBehaviour?: 'view_all' | 'scroll' | 'paginate'
+  recordLimit?: number
 }
 
 function KanbanView({ 
@@ -92,6 +95,9 @@ function KanbanView({
   interfaceMode = 'view',
   onRecordDeleted,
   onModalLayoutSave,
+  displayMode = 'fit',
+  overflowBehaviour = 'view_all',
+  recordLimit = 20,
 }: KanbanViewProps) {
   // All hooks must be at the top level, before any conditional returns
   const router = useRouter()
@@ -450,7 +456,28 @@ function KanbanView({
   }
 
   const groupedRows = groupRowsByField()
-  const groups = Object.keys(groupedRows)
+  const groupedRowsLimited = useMemo(() => {
+    const hasLimit = Number.isFinite(recordLimit) && recordLimit > 0
+    if (!hasLimit) return groupedRows
+    const out: Record<string, TableRow[]> = {}
+    for (const [group, rowsInGroup] of Object.entries(groupedRows)) {
+      out[group] = rowsInGroup.slice(0, recordLimit)
+    }
+    return out
+  }, [groupedRows, recordLimit])
+  const groups = useMemo(() => {
+    const existing = Object.keys(groupedRowsLimited)
+    const hideEmptyStacks = Boolean((blockConfig as any)?.appearance?.kanban_hide_empty_stacks)
+    if (hideEmptyStacks) return existing
+    if (!groupingField || (groupingField.type !== "single_select" && groupingField.type !== "multi_select")) {
+      return existing
+    }
+    const options = normalizeSelectOptionsForUi(groupingField.type, groupingField.options)
+    const optionKeys = options
+      .map((o) => normalizeKanbanGroupKey(o.value ?? o.label))
+      .filter(Boolean)
+    return Array.from(new Set([...optionKeys, ...existing]))
+  }, [groupedRowsLimited, blockConfig, groupingField])
 
   // Empty state for search
   if (searchQuery && filteredRows.length === 0) {
@@ -483,9 +510,11 @@ function KanbanView({
     )
   }
 
+  const allowInternalScroll = displayMode === "fixed" && overflowBehaviour === "scroll"
+
   return (
-    <div className="w-full h-full min-w-0 min-h-0 flex flex-col overflow-hidden bg-gray-50">
-      <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden snap-x snap-proximity">
+    <div className={cn("w-full min-w-0 min-h-0 flex flex-col bg-gray-50", allowInternalScroll ? "h-full overflow-hidden" : "h-auto overflow-visible")}>
+      <div className={cn("min-h-0 overflow-x-auto snap-x snap-proximity", allowInternalScroll ? "flex-1 overflow-y-hidden" : "overflow-y-visible")}>
         <div className="flex gap-4 min-w-max p-4">
         {groups.map((groupName) => {
           const displayName =
@@ -506,10 +535,10 @@ function KanbanView({
               ) : (
                 <h3 className="text-sm font-semibold text-gray-900 truncate min-w-0">{displayName}</h3>
               )}
-              <span className="text-xs text-gray-500">{groupedRows[groupName].length} items</span>
+              <span className="text-xs text-gray-500">{(groupedRows[groupName] || []).length} items</span>
             </div>
-            <div className="flex-1 min-h-0 overflow-y-auto space-y-2">
-              {groupedRows[groupName].map((row) => {
+            <div className={cn("space-y-2", allowInternalScroll ? "flex-1 min-h-0 overflow-y-auto" : "overflow-visible")}>
+              {(groupedRowsLimited[groupName] || []).map((row) => {
                 const cardColor = getCardColor(row)
                 const cardImage = getCardImage(row)
                 const borderColor = cardColor ? { borderLeftColor: cardColor, borderLeftWidth: '4px' } : {}
