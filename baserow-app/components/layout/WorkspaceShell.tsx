@@ -244,7 +244,7 @@ function ShellContent({
                     isAdmin={userRole === "admin"}
                   />
                 )}
-                <main className="flex flex-col flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden">
+                <main className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
                   {children}
                 </main>
               </div>
@@ -256,7 +256,7 @@ function ShellContent({
         rightPanel={
           isPanelVisible ? (
             <div
-              className="flex flex-col min-h-0 shrink-0 grow-0 overflow-hidden"
+              className="flex flex-col min-h-0 flex-shrink-0 overflow-hidden"
               style={{
                 width: `${SHELL_RIGHT_SETTINGS_WIDTH_PX}px`,
                 minWidth: `${SHELL_RIGHT_SETTINGS_WIDTH_PX}px`,

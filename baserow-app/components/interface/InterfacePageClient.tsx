@@ -79,7 +79,7 @@ function InterfacePageContent({
     )
   }
   return (
-    <div className={`min-h-0 min-w-0 w-full flex flex-col ${BLOCK_EMBED_CLASSNAME}`}>
+    <div className={`min-h-0 min-w-0 w-full max-w-full flex flex-col ${BLOCK_EMBED_CLASSNAME}`}>
       <InterfaceBuilder
         page={(interfaceBuilderPage ?? fallbackPage) as any}
         initialBlocks={memoizedBlocks}
@@ -1362,7 +1362,7 @@ function InterfacePageClientInternal({
   }
 
   return (
-    <div className="relative flex w-full flex-1 min-h-0 min-w-0 flex-col overflow-hidden">
+    <div className="relative flex w-full flex-1 min-h-0 min-w-0 max-w-full flex-col overflow-hidden">
       {/* Loading overlay: single scroll surface; do not unmount tree */}
       {loading && !hasPage && (
         <div className="absolute inset-0 flex items-center justify-center z-20 bg-background">
@@ -1441,7 +1441,7 @@ function InterfacePageClientInternal({
 
       {/* Interface scroll area - single vertical scroll container for interface content */}
       <div
-        className="flex flex-1 min-h-0 min-w-0 flex-col"
+        className="flex-1 min-h-0 min-w-0 max-w-full overflow-hidden flex flex-col"
       >
         {/* When suppressMainScroll: use flex-1 min-h-0 so content fills viewport (full-page/calendar). Otherwise content grows for scroll. */}
         {/* min-h-[100vh] when we have blocks ensures content exceeds viewport so scrollbar appears */}
