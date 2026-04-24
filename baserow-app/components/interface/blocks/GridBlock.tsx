@@ -1308,7 +1308,7 @@ export default function GridBlock({
   }
 
   return (
-    <div className={`h-full w-full max-w-full min-h-0 min-w-0 flex flex-col ${isGridWithPushDown ? 'overflow-visible' : 'overflow-hidden'}`} style={blockStyle}>
+    <div className={`h-full w-full max-w-full min-h-0 min-w-0 flex flex-col ${(isGridWithPushDown || viewType === "calendar") ? 'overflow-visible' : 'overflow-hidden'}`} style={blockStyle}>
       {/* Legacy header (title + optional add record) - only when appearance wrapper is not active */}
       {!wrapperHasAppearanceSettings &&
         (((appearance.showTitle ?? (appearance as any).show_title) !== false && blockTitle) ||
@@ -1348,19 +1348,35 @@ export default function GridBlock({
         const showUnifiedCalendarHeader = viewType === "calendar"
         if (!showUnifiedCalendarHeader) return null
         const hasAnyDateField = (safeTableFields || []).some((f) => f && f.type === "date")
-        // Compact toolbar for all calendar blocks (full-page and normal)
         const compactBar = true
-
         const headerCompact = isFullPage
+        const hasActiveQuickFilters = userQuickFilters.length > 0
+        const calendarTitle = (blockTitle || "Planning Calendar").trim()
+
         return (
-          <div
-            className={cn(
-              "flex flex-wrap items-center gap-1.5 flex-shrink-0 min-h-0 min-w-0",
-              marketingDashboardStyle ? "border-b border-border/40 bg-muted/10 py-1 px-2.5" : "border-b border-gray-200/80 bg-white",
-              !marketingDashboardStyle && (headerCompact ? "py-1.5 px-3" : "py-2.5 px-4")
-            )}
-          >
-            <div className={`flex items-center gap-2 flex-1 min-w-0 flex-wrap ${headerCompact ? "gap-2" : "gap-3"}`}>
+          <div className={cn("flex w-full min-w-0 flex-col border-b border-gray-200/80 bg-white", marketingDashboardStyle && "border-border/40 bg-muted/10")}>
+            <div className="flex h-12 min-w-0 items-center justify-between gap-2 px-4 py-3">
+              <h3 className="truncate text-sm font-semibold text-foreground">{calendarTitle}</h3>
+              <div className="flex items-center gap-2">
+                {showAddRecord && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleAddRecord}
+                    disabled={isAddRecordDisabled}
+                    title={!canCreateRecord ? "Adding records is disabled for this block" : "Add a new record"}
+                    className="h-8 px-3"
+                  >
+                    <Plus className="mr-1.5 h-3.5 w-3.5" />
+                    Add record
+                  </Button>
+                )}
+                <Button type="button" size="sm" variant="outline" className="h-8 px-3">
+                  {hasActiveQuickFilters ? "Filtered" : "Filter"}
+                </Button>
+              </div>
+            </div>
+            <div className={`flex min-w-0 flex-wrap items-center gap-2 px-4 pb-2 ${headerCompact ? "pt-0" : "pt-1"}`}>
               {showQuickFilters && (
                 <QuickFilterBar
                   storageKey={`mh:quickFilters:${pageId || "page"}:${block.id}`}
@@ -1371,9 +1387,7 @@ export default function GridBlock({
                   extraCompact={headerCompact}
                 />
               )}
-              {showQuickFilters && hasAnyDateField && (
-                <div className={`bg-gray-200 flex-shrink-0 ${headerCompact ? "h-3.5 w-px" : "h-5 w-px"}`} aria-hidden />
-              )}
+              {showQuickFilters && hasAnyDateField && <div className="h-4 w-px flex-shrink-0 bg-gray-200" aria-hidden />}
               {hasAnyDateField && (
                 <CalendarAnchorControls
                   onScrollToDate={(date) => calendarScrollRef.current?.scrollToDate(date)}
@@ -1383,20 +1397,6 @@ export default function GridBlock({
                 />
               )}
             </div>
-            {showAddRecord && (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={handleAddRecord}
-                disabled={isAddRecordDisabled}
-                title={!canCreateRecord ? "Adding records is disabled for this block" : "Add a new record"}
-                className={`text-xs flex-shrink-0 ${headerCompact ? "h-6.5 px-2" : "h-8"}`}
-              >
-                <Plus className={`mr-1.5 ${headerCompact ? "h-3 w-3" : "h-3.5 w-3"}`} />
-                Add record
-              </Button>
-            )}
           </div>
         )
       })()}
@@ -1431,7 +1431,7 @@ export default function GridBlock({
       {/* Single scroll container: GridView/CalendarView owns scroll; flex so child can flex-1. Calendar needs overflow-hidden so child controls scroll. */}
       {/* Non-full-page calendar must not force viewport min-height inside a fixed grid item, or lower content gets clipped. */}
       {/* When grid uses push-down (grouping), overflow-visible so content can grow and flow to page scroll. */}
-      <div className={`flex-1 min-h-0 min-w-0 max-w-full flex flex-col ${(isGridWithPushDown || marketingDashboardStyle) ? 'overflow-visible' : 'overflow-hidden'}`}>
+      <div className={`flex flex-col min-w-0 w-full min-h-0 flex-1 ${(isGridWithPushDown || marketingDashboardStyle || viewType === "calendar") ? 'overflow-visible' : 'overflow-hidden'}`}>
         {renderView()}
       </div>
     </div>

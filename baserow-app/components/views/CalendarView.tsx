@@ -244,16 +244,18 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
   }, [mounted, containerWidth, requestCalendarResize])
 
   useEffect(() => {
-    if (!mounted) return
-    const onWindowResize = () => requestCalendarResize()
-    const onLayoutResize = () => requestCalendarResize()
-    window.addEventListener("resize", onWindowResize)
-    window.addEventListener("app:layout-resize", onLayoutResize)
-    return () => {
-      window.removeEventListener("resize", onWindowResize)
-      window.removeEventListener("app:layout-resize", onLayoutResize)
+    const handleResize = () => {
+      fullCalendarRef.current?.getApi?.()?.updateSize()
     }
-  }, [mounted, requestCalendarResize])
+
+    window.addEventListener("resize", handleResize)
+    window.addEventListener("app:layout-resize", handleResize)
+
+    return () => {
+      window.removeEventListener("resize", handleResize)
+      window.removeEventListener("app:layout-resize", handleResize)
+    }
+  }, [])
 
   // CRITICAL: Initialize resolvedTableId from prop immediately (don't wait for useEffect)
   const [resolvedTableId, setResolvedTableId] = useState<string>(tableId || '')
@@ -1639,7 +1641,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
 
   const calendarEventClassNames = useCallback(
     (arg: EventContentArg) => [
-      "hover:opacity-80 transition-opacity rounded-md",
+      "hover:opacity-80 transition-opacity rounded-lg",
       allowOpenRecord ? "cursor-pointer" : "",
       selectedEventId === String(arg.event.id) ? "ring-1 ring-blue-400/40" : "",
     ],
@@ -1743,7 +1745,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
       }).slice(0, maxPills)
 
     return (
-      <div className="flex items-start gap-1 h-full min-h-[2.5rem] min-w-0 px-1 py-0.5 overflow-hidden" title={fullTooltip}>
+      <div className="flex items-center gap-1 h-8 min-h-8 min-w-0 rounded-lg px-2 py-0.5 overflow-hidden" title={fullTooltip}>
         {image && (
           <div
             className={`flex-shrink-0 w-4 h-4 rounded overflow-hidden bg-gray-100 mt-0.5 ${
@@ -1964,7 +1966,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
   // Handle missing tableId gracefully - show setup state
   if (!resolvedTableId || resolvedTableId.trim() === '') {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4">
+      <div className="flex flex-col items-center justify-center min-h-[220px] text-muted-foreground p-4">
         <div className="text-sm mb-2 text-center font-medium text-foreground">
           Calendar view requires a table connection.
         </div>
@@ -1979,7 +1981,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
   // Use resolvedDateFieldId instead of dateFieldId prop to check all sources
   if (!resolvedDateFieldId || !isValidDateField) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4">
+      <div className="flex flex-col items-center justify-center min-h-[220px] text-muted-foreground p-4">
         <div className="text-sm mb-2 text-center font-medium text-foreground">
           Calendar view requires a date field.
         </div>
@@ -1996,7 +1998,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
   // Empty state for search
   if (searchQuery && filteredRows.length === 0 && rows.length > 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+      <div className="flex flex-col items-center justify-center min-h-[220px] text-muted-foreground">
         <div className="text-sm mb-2">No records match your search</div>
         <button
           onClick={() => {
@@ -2016,16 +2018,22 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
   // Empty state for no data
   if (!loading && rows.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4">
-        <div className="text-sm mb-2 text-center font-medium text-foreground">
-          No records found
-        </div>
+      <div className="flex flex-col items-center justify-center min-h-[260px] rounded-xl border border-dashed border-border/60 bg-muted/20 p-6 text-muted-foreground">
+        <CalendarIcon className="mb-3 h-6 w-6 text-muted-foreground/70" />
+        <div className="text-sm mb-1 text-center font-medium text-foreground">No events planned</div>
         <div className="text-xs text-muted-foreground/80 text-center">
-          {filters.length > 0 
-            ? "Try adjusting your filters to see more records."
-            : "Add records to this table to see them in the calendar."
-          }
+          {filters.length > 0 ? "Try adjusting your filters to see more records." : "Add a record to get started."}
         </div>
+        {canCreateRecord && (
+          <Button
+            type="button"
+            size="sm"
+            className="mt-4 h-8"
+            onClick={() => handleDateClick({ dateStr: format(new Date(), "yyyy-MM-dd") })}
+          >
+            + Add record
+          </Button>
+        )}
       </div>
     )
   }
@@ -2048,7 +2056,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
     }
     
     return (
-      <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4">
+      <div className="flex flex-col items-center justify-center min-h-[220px] text-muted-foreground p-4">
         <div className="text-sm mb-2 text-center font-medium text-foreground">
           No records with dates to display
         </div>
@@ -2081,16 +2089,14 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
   }
 
   return (
-    <Panel className={`${BLOCK_EMBED_CLASSNAME} h-full flex flex-col overflow-hidden`}>
+    <Panel className={`${BLOCK_EMBED_CLASSNAME} flex flex-col min-w-0 w-full`}>
       {renderAnchorControls()}
-      {/* Scroll container: overflow-auto for single scroll; flex flex-col + min-h-0 for height propagation to FullCalendar */}
       <div
         ref={scrollContainerRef}
-        className="calendar-embed flex-1 min-h-0 min-w-0 max-w-full overflow-x-hidden overflow-y-visible p-0 bg-background flex flex-col"
+        className="calendar-embed flex flex-col flex-1 min-w-0 w-full p-0 bg-background"
       >
-        {/* Wrapper: min-h-0 allows flex child to receive constrained height; FullCalendar height="100%" fills it */}
         {mounted ? (
-          <div className="flex-1 min-h-0 min-w-0 w-full max-w-full px-2 pb-2 md:px-3 md:pb-3">
+          <div className="flex-1 min-w-0 w-full px-2 pb-2 md:px-3 md:pb-3">
           <MemoizedFullCalendar
             ref={fullCalendarRef as React.LegacyRef<React.ComponentRef<typeof FullCalendar>>}
             key={calendarStableKey}
@@ -2103,12 +2109,14 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
             initialDate={calendarInitialDate}
             views={calendarViews}
             height="auto"
+            contentHeight="auto"
+            aspectRatio={1.6}
             expandRows={true}
             dayMaxEvents={2}
             moreLinkClick="popover"
             eventDisplay="block"
             eventClassNames={calendarEventClassNames}
-            dayCellClassNames="hover:bg-muted/20 transition-colors min-h-[3.25rem]"
+            dayCellClassNames="hover:bg-muted/20 transition-colors min-h-[100px]"
             dayHeaderClassNames="text-[11px] font-medium text-muted-foreground py-1"
             eventTextColor="#1f2937"
             eventBorderColor="transparent"

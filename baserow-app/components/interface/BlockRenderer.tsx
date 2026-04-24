@@ -644,7 +644,7 @@ export default function BlockRenderer({
     <ErrorBoundary resetKeys={[block.id]}>
       <div className="relative h-full w-full min-w-0 min-h-0">
         {/* Filter indicator - always mount, visibility toggled by isEditing for mount stability */}
-        {filterBlockSources.length > 0 && (
+        {filterBlockSources.length > 0 && block.type !== "kpi" && (
           <div
             className={`absolute top-2 right-2 z-10 ${isEditing ? "invisible pointer-events-none" : ""}`}
             aria-hidden={isEditing}

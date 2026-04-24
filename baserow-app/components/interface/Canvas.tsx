@@ -191,6 +191,8 @@ export default function Canvas({
   const gridLayout = useMemo(() => {
     if (!blocks || blocks.length === 0) return []
     const cols = layoutSettings?.cols || 12
+    const blockTypeById = new Map(blocks.map((b) => [b.id, b.type]))
+    const minWidthForBlock = (blockId: string) => (blockTypeById.get(blockId) === "kpi" ? 3 : 2)
     // Full-page mode: single full-width item (grid always used; full-page content rendered inside)
     if (isFullPageMode && fullPageBlock) {
       // Calendar: use dynamic h to fill viewport (Airtable-style). Others: fixed h.
@@ -206,7 +208,7 @@ export default function Canvas({
         y: 0,
         w: cols,
         h: dynamicH,
-        minW: 2,
+        minW: minWidthForBlock(fullPageBlock.id),
         minH: 2,
         maxW: cols,
       }]
@@ -216,12 +218,13 @@ export default function Canvas({
         const deltaH = ephemeralDeltas.get(item.i) || 0
         const effectiveH = (item.h || 4) + deltaH
         const itemX = item.x || 0
+        const itemMinW = minWidthForBlock(item.i)
         const itemMaxW = cols - itemX
         return {
           ...item,
           h: effectiveH,
-          maxW: Math.max(2, itemMaxW),
-          minW: 2,
+          maxW: Math.max(itemMinW, itemMaxW),
+          minW: itemMinW,
           minH: 2,
         }
       })
@@ -236,27 +239,29 @@ export default function Canvas({
         height: (block as any).height ?? block.h ?? null,
       })
       if (!mapped) {
+        const itemMinW = minWidthForBlock(block.id)
         return {
           i: block.id,
           x: 0,
           y: 0,
           w: 4,
           h: 4,
-          minW: 2,
+          minW: itemMinW,
           minH: 2,
           maxW: cols,
         }
       }
       const maxW = cols - (mapped.x || 0)
+      const itemMinW = minWidthForBlock(block.id)
       return {
         i: block.id,
         x: mapped.x,
         y: mapped.y,
         w: mapped.w,
         h: mapped.h || 4,
-        minW: 2,
+        minW: itemMinW,
         minH: 2,
-        maxW: Math.max(2, maxW),
+        maxW: Math.max(itemMinW, maxW),
       }
     })
   }, [blocks, layout, ephemeralDeltas, layoutSettings?.cols, layoutSettings?.rowHeight, layoutSettings?.margin, isFullPageMode, fullPageBlock, isFullPageCalendar, fullPageCalendarContainerHeight])
@@ -621,6 +626,7 @@ export default function Canvas({
       }
       // Hydrate from blocks prop - always use persistent h from DB
       const newLayout: Layout[] = blocks.map((block) => {
+        const blockMinW = block.type === "kpi" ? 3 : 2
         const layout = dbBlockToPageBlock({
           id: block.id,
           position_x: block.x,
@@ -639,7 +645,7 @@ export default function Canvas({
             y: 0,
             w: 4,
             h: 4,
-            minW: 2,
+            minW: blockMinW,
             minH: 2,
             maxW: cols, // Prevent blocks from exceeding grid width
           }
@@ -654,9 +660,9 @@ export default function Canvas({
           y: layout.y,
           w: layout.w,
           h: layout.h || 4, // Always use persistent h from DB
-          minW: 2,
+          minW: blockMinW,
           minH: 2,
-          maxW: Math.max(2, maxW), // Ensure maxW is at least minW
+          maxW: Math.max(blockMinW, maxW), // Ensure maxW is at least minW
         }
       })
       

@@ -4,7 +4,7 @@ import type { CSSProperties } from "react"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import type { PageBlock } from "@/lib/interface/types"
-import { TrendingUp, TrendingDown, ArrowRight, Filter } from "lucide-react"
+import { TrendingUp, TrendingDown, ArrowRight } from "lucide-react"
 import type { FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import { useMarketingDashboard } from "@/contexts/MarketingDashboardContext"
@@ -37,6 +37,7 @@ export default function KPIBlock({
 }: KPIBlockProps) {
   const router = useRouter()
   const marketingDashboardStyle = useMarketingDashboard()
+  const isEditorialKpi = Boolean(marketingDashboardStyle)
   const { config } = block
   // KPI block MUST have table_id configured - no fallback to page table
   const tableId = config?.table_id
@@ -163,6 +164,7 @@ export default function KPIBlock({
 
   // Get border radius
   const getBorderRadius = () => {
+    if (isEditorialKpi) return "14px"
     if (appearance.border_radius !== undefined) return `${appearance.border_radius}px`
     if (appearance.radius === 'rounded') return '8px'
     return '8px' // Default rounded
@@ -170,7 +172,7 @@ export default function KPIBlock({
 
   // Get padding
   const getPadding = () => {
-    if (marketingDashboardStyle) return '10px'
+    if (isEditorialKpi) return "18px"
     if (typeof appearance.padding === 'number') return `${appearance.padding}px`
     if (appearance.padding === 'compact') return '12px'
     if (appearance.padding === 'spacious') return '24px'
@@ -202,7 +204,7 @@ export default function KPIBlock({
 
   // Get value size class
   const getValueSizeClass = () => {
-    if (marketingDashboardStyle) return "text-[1.45rem]"
+    if (isEditorialKpi) return "text-4xl"
     switch (appearance.value_size) {
       case 'small': return 'text-2xl'
       case 'medium': return 'text-3xl'
@@ -230,30 +232,31 @@ export default function KPIBlock({
 
   const marketingCardStyle: CSSProperties | undefined = marketingDashboardStyle
     ? {
-        borderColor: "rgba(203, 213, 225, 0.48)",
+        borderColor: "rgba(0,0,0,0.06)",
         borderWidth: "1px",
-        backgroundColor: "rgba(248, 250, 252, 0.9)",
+        backgroundColor: "#ffffff",
+        boxShadow: "0 1px 2px rgba(16,24,40,0.04), 0 4px 12px rgba(16,24,40,0.04)",
       }
     : undefined
 
   return (
     <div
       className={cn(
-        "relative flex h-full w-full max-w-full min-w-0 flex-col overflow-hidden rounded-card",
+        "relative flex h-full w-full max-w-full min-w-0 flex-col rounded-card",
         !hideChromeBorder && "border border-border",
         useCardShell && !appearance.border_color && (marketingDashboardStyle ? "bg-background shadow-none" : "bg-card shadow-card"),
         isClickable &&
           "cursor-pointer transition-shadow duration-200 hover:shadow-card-hover",
-        marketingDashboardStyle && "px-0"
+        isEditorialKpi && "min-h-[100px] overflow-visible"
       )}
       style={{ ...blockStyle, ...marketingCardStyle }}
       onClick={handleClick}
     >
-      {useCardShell && (
+      {(useCardShell || isEditorialKpi) && (
         <div
           className={cn(
             "pointer-events-none absolute bottom-0 left-4 right-4 h-0.5 rounded-full bg-gradient-to-r from-chart-1 via-chart-3 to-chart-5",
-            marketingDashboardStyle ? "opacity-45" : "opacity-70"
+            isEditorialKpi ? "opacity-35" : "opacity-70"
           )}
           aria-hidden
         />
@@ -285,38 +288,30 @@ export default function KPIBlock({
         <div className={`flex-1 flex flex-col justify-center ${getAlignmentClass()}`}>
           <div className={`w-full ${getAlignmentClass().includes('text-center') ? 'text-center' : getAlignmentClass().includes('text-left') ? 'text-left' : 'text-right'}`}>
           {!showTitle && (
-            <div className={`flex items-center gap-1.5 ${marketingDashboardStyle ? "mb-1.5" : "mb-3"} ${getAlignmentClass().includes('text-center') ? 'justify-center' : getAlignmentClass().includes('text-left') ? 'justify-start' : 'justify-end'}`}>
-              {marketingDashboardStyle && (
+            <div className={`flex items-center gap-1.5 ${isEditorialKpi ? "mb-2" : "mb-3"} ${getAlignmentClass().includes('text-center') ? 'justify-center' : getAlignmentClass().includes('text-left') ? 'justify-start' : 'justify-end'}`}>
+              {isEditorialKpi && (
                 <span
-                  className="inline-flex h-4.5 w-4.5 items-center justify-center rounded-full bg-muted/70"
+                  className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-muted/50"
                   aria-hidden
                 >
-                  <span className="h-1.5 w-1.5 rounded-full bg-accent-link/70" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-violet-400/60" />
                 </span>
               )}
               <p
                 className={cn(
-                  marketingDashboardStyle ? "text-[10px] font-medium tracking-[0.06em] uppercase text-muted-foreground/90" : "text-sm font-medium",
+                  isEditorialKpi ? "text-xs font-medium tracking-wide uppercase text-gray-500 whitespace-nowrap truncate" : "text-sm font-medium",
                   !textColor && "text-muted-foreground"
                 )}
                 style={textColor ? { color: textColor } : undefined}
               >
                 {displayLabel}
               </p>
-              {hasFilters && isEditing && (
-                <div className="group relative">
-                  <Filter className="h-3 w-3 text-blue-600" />
-                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                    This KPI is filtered ({blockFilters.length} filter{blockFilters.length !== 1 ? 's' : ''})
-                  </div>
-                </div>
-              )}
             </div>
           )}
           <p
             className={cn(
               getValueSizeClass(),
-              marketingDashboardStyle ? "font-semibold mb-1 tracking-tight text-foreground leading-tight" : "font-bold mb-2 tracking-tight",
+              isEditorialKpi ? "font-semibold mb-0 tracking-tight text-gray-900 leading-tight whitespace-nowrap" : "font-bold mb-2 tracking-tight",
               !textColor && "text-foreground"
             )}
             style={textColor ? { color: textColor } : undefined}
@@ -325,7 +320,7 @@ export default function KPIBlock({
           </p>
           
           {/* Comparison indicator */}
-          {comparisonData && comparisonData.change !== null && (
+          {!isEditorialKpi && comparisonData && comparisonData.change !== null && (
             <div className={`flex items-center gap-1 text-xs mb-0.5 ${getAlignmentClass().includes('text-center') ? 'justify-center' : getAlignmentClass().includes('text-left') ? 'justify-start' : 'justify-end'}`}>
               {comparisonData.trend === 'up' ? (
                 <TrendingUp className="h-4 w-4 text-green-600" />
@@ -344,7 +339,7 @@ export default function KPIBlock({
           )}
 
           {/* Target comparison */}
-          {target !== undefined && target !== null && value !== null && (
+          {!isEditorialKpi && target !== undefined && target !== null && value !== null && (
             <div
               className={cn("text-xs mt-1", !textColor && "text-muted-foreground")}
               style={textColor ? { color: textColor, opacity: marketingDashboardStyle ? 0.72 : 0.85 } : undefined}
@@ -358,7 +353,7 @@ export default function KPIBlock({
             </div>
           )}
 
-          {aggregate !== "count" && field && (
+          {!isEditorialKpi && aggregate !== "count" && field && (
             <p
               className={cn("text-xs mt-1", !textColor && "text-muted-foreground", marketingDashboardStyle ? "opacity-75" : "opacity-90")}
               style={textColor ? { color: textColor, opacity: marketingDashboardStyle ? 0.65 : 0.75 } : undefined}
@@ -368,7 +363,7 @@ export default function KPIBlock({
           )}
 
           {/* Click-through hint */}
-          {isClickable && (
+          {!isEditorialKpi && isClickable && (
             <div
               className={cn(
                 "mt-1.5 flex items-center gap-1 text-xs text-muted-foreground",

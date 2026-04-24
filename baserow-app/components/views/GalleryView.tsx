@@ -9,7 +9,7 @@ import { filterRowsBySearch } from "@/lib/search/filterRows"
 import { applyFiltersToQuery, stripFilterBlockFilters, type FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import { resolveChoiceColor, normalizeHexColor, getTextColorForBackground, SEMANTIC_COLORS } from "@/lib/field-colors"
-import { ChevronDown, ChevronRight, Settings, Image, Database } from "lucide-react"
+import { ChevronDown, ChevronRight, Image as ImageIcon, Database } from "lucide-react"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { CellFactory } from "@/components/grid/CellFactory"
 import { buildGroupTree } from "@/lib/grouping/groupTree"
@@ -539,6 +539,21 @@ export default function GalleryView({
       ) as TableField | undefined
       const titleValue = titleFieldObj ? row.data?.[titleFieldObj.name] : row.data?.[titleField]
       const HeaderIcon = resolveContentIcon(row.data || {})
+      const VisualIcon = HeaderIcon || ImageIcon
+      const subtitleFieldName = secondaryFields[0]
+      const subtitleFieldObj = subtitleFieldName
+        ? ((Array.isArray(tableFields) ? tableFields : []).find(
+            (f: any) => f?.name === subtitleFieldName || f?.id === subtitleFieldName
+          ) as TableField | undefined)
+        : undefined
+      const subtitleValue = subtitleFieldName
+        ? row.data?.[subtitleFieldObj?.name || subtitleFieldName]
+        : null
+      const subtitleText =
+        subtitleValue !== null && subtitleValue !== undefined && String(subtitleValue).trim() !== ""
+          ? String(subtitleValue)
+          : null
+      const detailFields = subtitleText ? secondaryFields.slice(1) : secondaryFields
 
       // Evaluate conditional formatting rules
       const matchingRule = highlightRules && highlightRules.length > 0
@@ -554,34 +569,41 @@ export default function GalleryView({
         <Card
           key={reactKey}
           className={cn(
-            "hover:shadow-md transition-shadow bg-white overflow-hidden cursor-default",
+            "w-full min-w-0 h-full min-h-[188px] hover:shadow-md transition-shadow bg-white border border-black/5 overflow-hidden cursor-default",
             marketingDashboardStyle
-              ? "marketing-card border-border/50 rounded-card-lg"
-              : "border-gray-200 rounded-lg",
+              ? "marketing-card rounded-card-lg"
+              : "rounded-xl",
             selectedCardId === String(row.id) ? "ring-1 ring-blue-400/40 bg-blue-50/30" : ""
           )}
           style={{ ...borderColor, ...rowFormattingStyle }}
           onClick={() => setSelectedCardId(String(row.id))}
           onDoubleClick={() => handleOpenRecord(String(row.id))}
         >
-          {cardImage && (
-            <div className={`w-full ${fitImageSize ? "h-auto" : "h-40"} bg-gray-100`}>
-              <img
-                src={cardImage}
-                alt=""
-                className={`w-full ${fitImageSize ? "h-auto object-contain" : "h-40 object-cover"}`}
-                onError={(e) => {
-                  ;(e.target as HTMLImageElement).style.display = "none"
-                }}
-              />
-            </div>
-          )}
-          <CardContent className="p-4 space-y-2">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0 flex-1 flex items-center gap-1.5">
-                {HeaderIcon ? <HeaderIcon className="h-4 w-4 shrink-0 opacity-70 text-gray-500" aria-hidden /> : null}
+          <CardContent className="h-full p-4 md:p-5">
+            <div className="h-full flex items-center justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="mb-3 flex justify-center">
+                  <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-black/5 bg-slate-100/80">
+                    {cardImage ? (
+                      <img
+                        src={cardImage}
+                        alt=""
+                        className={cn(
+                          "h-full w-full",
+                          fitImageSize ? "object-contain" : "object-cover"
+                        )}
+                        onError={(e) => {
+                          ;(e.currentTarget as HTMLImageElement).classList.add("hidden")
+                        }}
+                      />
+                    ) : null}
+                    <div className={cn("absolute inset-0 flex items-center justify-center", cardImage ? "pointer-events-none" : "")}>
+                      <VisualIcon className="h-4 w-4 text-slate-500/80" aria-hidden />
+                    </div>
+                  </div>
+                </div>
                 <div
-                  className="min-w-0 text-sm font-semibold text-gray-900 truncate whitespace-nowrap"
+                  className="min-w-0 text-sm font-semibold text-gray-900 whitespace-normal break-words"
                   onDoubleClick={(e) => e.stopPropagation()}
                 >
                   {titleFieldObj ? (
@@ -597,17 +619,22 @@ export default function GalleryView({
                         !!supabaseTableName
                       }
                       wrapText={true}
-                      rowHeight={32}
+                      rowHeight={36}
                       onSave={(value) => handleCellSave(String(row.id), titleFieldObj.name, value)}
                     />
                   ) : (
-                    <span>
+                    <span className="whitespace-normal break-words">
                       {titleValue !== undefined && titleValue !== null && String(titleValue).trim() !== ""
                         ? String(titleValue)
                         : "Untitled"}
                     </span>
                   )}
                 </div>
+                {subtitleText ? (
+                  <div className="mt-2 inline-flex max-w-full whitespace-normal break-words rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
+                    {subtitleText}
+                  </div>
+                ) : null}
               </div>
               <button
                 type="button"
@@ -615,15 +642,15 @@ export default function GalleryView({
                   e.stopPropagation()
                   handleOpenRecord(String(row.id))
                 }}
-                className="w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors flex-shrink-0"
+                className="h-8 w-8 flex items-center justify-center rounded-md text-gray-400/70 hover:text-blue-600 hover:bg-blue-50/60 transition-colors flex-shrink-0 self-center"
                 title="Open record"
                 aria-label="Open record"
               >
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-4 w-4 opacity-70" />
               </button>
             </div>
-            <div className="space-y-1">
-              {secondaryFields.map((fieldName) => {
+            <div className="mt-3 space-y-1.5">
+              {detailFields.map((fieldName) => {
                 const fieldObj = (Array.isArray(tableFields) ? tableFields : []).find(
                   (f: any) => f.name === fieldName || f.id === fieldName
                 ) as TableField | undefined
@@ -636,9 +663,9 @@ export default function GalleryView({
                   (fieldValue !== null && fieldValue !== undefined && String(fieldValue).trim() !== "")
                 const pillCls = statusPill ? getMarketingStatusPillClassNames(fieldValue) : null
                 return (
-                  <div key={fieldName} className="text-xs text-gray-700">
+                  <div key={fieldName} className="text-xs text-gray-700 min-w-0">
                     <span className="text-gray-500 font-medium">{label}:</span>{" "}
-                    <span className="text-gray-900" onDoubleClick={(e) => e.stopPropagation()}>
+                    <span className="text-gray-900 whitespace-normal break-words" onDoubleClick={(e) => e.stopPropagation()}>
                       {statusPill && pillCls ? (
                         <span
                           className={cn(
@@ -847,7 +874,7 @@ export default function GalleryView({
                 </button>
 
                 {!isCollapsed && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  <div className="w-full min-w-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {items.map((item) => renderCard(item.__row, `${group.pathKey}:${item.__rowId}`))}
                   </div>
                 )}
@@ -856,7 +883,7 @@ export default function GalleryView({
           })}
         </div>
       ) : (
-        <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="w-full min-w-0 p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredRows.map((row) => renderCard(row, String(row.id)))}
         </div>
       )}

@@ -988,10 +988,10 @@ export default function ListView({
           )}
         </div>
 
-        {/* Grouped Content - when onHeightChange: overflow-visible so content grows and pushes blocks down; else overflow-y-auto for scroll */}
+        {/* Grouped Content - keep internal scroll unless explicit dynamic-height mode is enabled */}
         <div
           className={
-            onHeightChange || marketingDashboardStyle
+            onHeightChange
               ? "min-h-0 min-w-0 overflow-visible"
               : "flex-1 min-h-0 min-w-0 overflow-y-auto"
           }
@@ -1007,17 +1007,17 @@ export default function ListView({
             <div className="w-full max-w-full min-w-0 overflow-x-auto">
             <table className="w-full border-collapse">
               {!marketingDashboardStyle && (
-                <thead>
+                <thead className="sticky top-0 z-10 bg-white">
                   <tr className="border-b border-gray-200 bg-gray-50">
                     {tableColumns.map((col) => (
                       <th
                         key={col.key}
-                        className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                        className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider bg-gray-50 whitespace-normal break-words"
                       >
                         {getFieldDisplayName(col.field)}
                       </th>
                     ))}
-                    <th className="px-3 py-2.5 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider w-12" />
+                    <th className="px-3 py-2.5 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider w-12 bg-gray-50" />
                   </tr>
                 </thead>
               )}
@@ -1222,7 +1222,7 @@ export default function ListView({
     <div ref={contentRef} className={`${BLOCK_EMBED_CLASSNAME} h-full flex flex-col`}>
       <div
         className={
-            onHeightChange || marketingDashboardStyle
+            onHeightChange
             ? "min-h-0 min-w-0 overflow-visible overflow-x-hidden"
             : "flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden"
         }
@@ -1237,16 +1237,16 @@ export default function ListView({
         >
           <div className="w-full max-w-full min-w-0 overflow-x-auto">
           <table className="w-full border-collapse">
-            <thead>
+            <thead className="sticky top-0 z-10 bg-white">
               <tr className={cn("border-b", marketingDashboardStyle ? "border-border/30 bg-muted/25" : "border-gray-200 bg-gray-50")}>
                 {tableColumns.map((col) => (
                   <th
                     key={col.key}
                     className={cn(
-                      "px-3 text-left text-xs font-medium uppercase",
+                      "px-3 text-left text-xs font-medium uppercase whitespace-normal break-words",
                       marketingDashboardStyle
-                        ? "py-2 tracking-[0.07em] text-muted-foreground/90"
-                        : "py-2 text-gray-600 tracking-wider"
+                        ? "py-2 tracking-[0.07em] text-muted-foreground/90 bg-muted/25"
+                        : "py-2 text-gray-600 tracking-wider bg-gray-50"
                     )}
                   >
                     {getFieldDisplayName(col.field)}
