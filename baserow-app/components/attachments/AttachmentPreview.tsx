@@ -58,6 +58,51 @@ export default function AttachmentPreview({
 }: AttachmentPreviewProps) {
   const [previewIndex, setPreviewIndex] = useState<number | null>(null)
   const [failedImages, setFailedImages] = useState<Set<number>>(new Set())
+  const [removingIndex, setRemovingIndex] = useState<number | null>(null)
+
+  const canRemove = editable && !!onDelete
+
+  const handleRemoveClick = async (e: React.MouseEvent, index: number) => {
+    e.stopPropagation()
+    if (!onDelete || removingIndex !== null) return
+    setRemovingIndex(index)
+    try {
+      await onDelete(index)
+    } finally {
+      setRemovingIndex(null)
+    }
+  }
+
+  const renderRemoveButton = (index: number, position: 'corner' | 'inline' = 'corner') => {
+    if (!canRemove) return null
+    const isRemoving = removingIndex === index
+    if (position === 'inline') {
+      return (
+        <button
+          type="button"
+          onClick={(e) => handleRemoveClick(e, index)}
+          disabled={isRemoving}
+          className="flex-shrink-0 p-1 rounded-full text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-50"
+          aria-label="Remove attachment"
+          title="Remove"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )
+    }
+    return (
+      <button
+        type="button"
+        onClick={(e) => handleRemoveClick(e, index)}
+        disabled={isRemoving}
+        className="absolute top-1 right-1 z-10 p-0.5 rounded-full bg-white/90 text-gray-600 shadow-sm opacity-0 group-hover:opacity-100 hover:bg-red-500 hover:text-white transition-all disabled:opacity-50"
+        aria-label="Remove attachment"
+        title="Remove"
+      >
+        <X className="h-3 w-3" />
+      </button>
+    )
+  }
 
   const visibleAttachments = useMemo(() => {
     return attachments.slice(0, maxVisible)
@@ -187,6 +232,7 @@ export default function AttachmentPreview({
                   <p className="mt-2 text-sm text-gray-600">{firstAttachment.name}</p>
                 </div>
               )}
+              {renderRemoveButton(0)}
             </div>
           )}
 
@@ -199,7 +245,7 @@ export default function AttachmentPreview({
                 return (
                   <div
                     key={actualIndex}
-                    className="relative aspect-square rounded overflow-hidden bg-gray-100 cursor-pointer hover:opacity-80 transition-opacity"
+                    className="relative group aspect-square rounded overflow-hidden bg-gray-100 cursor-pointer hover:opacity-80 transition-opacity"
                     onClick={() => handleAttachmentClick(actualIndex)}
                   >
                     {isImg ? (
@@ -217,6 +263,7 @@ export default function AttachmentPreview({
                         {getFileTypeIcon(attachment)}
                       </div>
                     )}
+                    {renderRemoveButton(actualIndex)}
                   </div>
                 )
               })}
@@ -280,6 +327,7 @@ export default function AttachmentPreview({
                   +{attachments.length - 1} more
                 </div>
               )}
+              {renderRemoveButton(0)}
             </div>
           )}
         </div>
@@ -328,6 +376,7 @@ export default function AttachmentPreview({
                     </span>
                   </div>
                 )}
+                {renderRemoveButton(index)}
               </div>
             )
           })}
@@ -390,6 +439,7 @@ export default function AttachmentPreview({
                   {formatFileSize(attachment.size)}
                 </div>
               </div>
+              {renderRemoveButton(index, 'inline')}
             </div>
             )
           })}
@@ -423,7 +473,7 @@ export default function AttachmentPreview({
             <div
               key={index}
               className={cn(
-                "relative rounded overflow-hidden bg-gray-100 flex-shrink-0 cursor-pointer transition-transform hover:scale-105",
+                "relative group rounded overflow-hidden bg-gray-100 flex-shrink-0 cursor-pointer transition-transform hover:scale-105",
                 sizeConfig.thumbnail
               )}
               onClick={() => handleAttachmentClick(index)}
@@ -447,6 +497,7 @@ export default function AttachmentPreview({
                   </span>
                 </div>
               )}
+              {renderRemoveButton(index)}
             </div>
           )
         })}
