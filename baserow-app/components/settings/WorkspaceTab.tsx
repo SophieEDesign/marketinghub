@@ -10,6 +10,9 @@ import { createClient } from '@/lib/supabase/client'
 import { IconPicker } from '@/components/ui/icon-picker'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatDateTimeUK } from '@/lib/utils'
+import { TimeoutError, withTimeout } from '@/lib/with-timeout'
+
+const SETTINGS_LOAD_TIMEOUT_MS = 15_000
 
 export default function SettingsWorkspaceTab() {
   const [workspaceName, setWorkspaceName] = useState('Marketing Hub')
@@ -17,7 +20,7 @@ export default function SettingsWorkspaceTab() {
   const [workspaceSlug, setWorkspaceSlug] = useState('marketing-hub')
   const [createdAt, setCreatedAt] = useState<string>('')
   const [ownerEmail, setOwnerEmail] = useState<string>('')
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [originalName, setOriginalName] = useState('Marketing Hub')
@@ -33,94 +36,109 @@ export default function SettingsWorkspaceTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  function applyDefaultPageSetting(
+    settings: { default_interface_id?: string | null } | null,
+    settingsError: { code?: string; message?: string } | null
+  ) {
+    if (settingsError) {
+      if (
+        settingsError.code === '42P01' ||
+        settingsError.code === '42703' ||
+        settingsError.message?.includes('column') ||
+        settingsError.message?.includes('does not exist') ||
+        settingsError.message?.includes('relation')
+      ) {
+        setDefaultPageId('__none__')
+        setOriginalDefaultPageId('__none__')
+      } else {
+        console.warn('Error loading default page setting:', settingsError)
+        setDefaultPageId('__none__')
+        setOriginalDefaultPageId('__none__')
+      }
+      return
+    }
+
+    if (settings?.default_interface_id) {
+      setDefaultPageId(settings.default_interface_id)
+      setOriginalDefaultPageId(settings.default_interface_id)
+    } else {
+      setDefaultPageId('__none__')
+      setOriginalDefaultPageId('__none__')
+    }
+  }
+
   async function loadWorkspace() {
     setLoading(true)
+    setMessage(null)
     try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      // Try to get workspace from workspaces table
-      // Use maybeSingle() to handle missing table gracefully (returns null instead of error)
-      const { data, error } = await supabase
-        .from('workspaces')
-        .select('name, icon, created_at, created_by')
-        .limit(1)
-        .maybeSingle()
+      await withTimeout(
+        (async () => {
+          const supabase = createClient()
+          // getSession reads local cookies — avoids a slow/hanging auth server round-trip on mount
+          const {
+            data: { session },
+          } = await supabase.auth.getSession()
+          const user = session?.user
 
-      if (!error && data) {
-        const name = data.name || 'Marketing Hub'
-        const icon = data.icon || '📊'
-        setWorkspaceName(name)
-        setWorkspaceIcon(icon)
-        setOriginalName(name)
-        setOriginalIcon(icon)
-        setCreatedAt(data.created_at || '')
-        
-        // Generate slug from name
-        const slug = name
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-|-$/g, '')
-        setWorkspaceSlug(slug)
+          const [workspaceResult, settingsResult] = await Promise.all([
+            supabase
+              .from('workspaces')
+              .select('name, icon, created_at, created_by')
+              .limit(1)
+              .maybeSingle(),
+            supabase
+              .from('workspace_settings')
+              .select('default_interface_id')
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle(),
+          ])
 
-        // Load owner email - use current user email for now
-        // (admin.getUserById requires admin privileges, so we'll use current user)
-        if (user?.email) {
-          setOwnerEmail(user.email)
-        }
-      } else {
-        // If table doesn't exist or no workspace found, use defaults
-        if (user?.email) {
-          setOwnerEmail(user.email)
-        }
-        setCreatedAt(new Date().toISOString())
-      }
+          const { data, error } = workspaceResult
 
-      // Load default page setting from workspace_settings
-      try {
-        const { data: settings, error: settingsError } = await supabase
-          .from('workspace_settings')
-          .select('default_interface_id')
-          // Single-workspace app: choose most recently created settings row if duplicates exist
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
+          if (!error && data) {
+            const name = data.name || 'Marketing Hub'
+            const icon = data.icon || '📊'
+            setWorkspaceName(name)
+            setWorkspaceIcon(icon)
+            setOriginalName(name)
+            setOriginalIcon(icon)
+            setCreatedAt(data.created_at || '')
 
-        if (settingsError) {
-          // Treat only schema-missing errors as "no setting"
-          // NOTE: PGRST116 is NOT "column missing" here; it's usually "0 rows" or "multiple rows"
-          if (settingsError.code === '42P01' || settingsError.code === '42703' ||
-              settingsError.message?.includes('column') || settingsError.message?.includes('does not exist') ||
-              settingsError.message?.includes('relation')) {
-            setDefaultPageId("__none__")
-            setOriginalDefaultPageId("__none__")
+            const slug = name
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-')
+              .replace(/^-|-$/g, '')
+            setWorkspaceSlug(slug)
+
+            if (user?.email) {
+              setOwnerEmail(user.email)
+            }
           } else {
-            // Other errors - log but don't fail
-            console.warn('Error loading default page setting:', settingsError)
-            setDefaultPageId("__none__")
-            setOriginalDefaultPageId("__none__")
+            if (user?.email) {
+              setOwnerEmail(user.email)
+            }
+            setCreatedAt(new Date().toISOString())
           }
-        } else if (settings?.default_interface_id) {
-          // A specific page is set as default
-          setDefaultPageId(settings.default_interface_id)
-          setOriginalDefaultPageId(settings.default_interface_id)
-        } else {
-          // No default set (null or undefined), use "__none__" placeholder for "None (use first available)"
-          setDefaultPageId("__none__")
-          setOriginalDefaultPageId("__none__")
-        }
-      } catch (error: any) {
-        // Ignore schema-missing errors (expected in some setups)
-        if (error?.code !== '42P01' && error?.code !== '42703' &&
-            !error?.message?.includes('column') && !error?.message?.includes('does not exist') &&
-            !error?.message?.includes('relation')) {
-          console.warn('Error loading default page setting:', error)
-        }
-        setDefaultPageId("__none__")
-        setOriginalDefaultPageId("__none__")
-      }
+
+          applyDefaultPageSetting(settingsResult.data, settingsResult.error)
+        })(),
+        SETTINGS_LOAD_TIMEOUT_MS,
+        'Loading workspace settings timed out'
+      )
     } catch (error) {
-      console.error('Error loading workspace:', error)
+      if (error instanceof TimeoutError) {
+        setMessage({
+          type: 'error',
+          text: 'Workspace settings took too long to load. Check your connection and refresh the page.',
+        })
+      } else {
+        console.error('Error loading workspace:', error)
+        setMessage({
+          type: 'error',
+          text: 'Could not load workspace settings. Please refresh and try again.',
+        })
+      }
     } finally {
       setLoading(false)
     }
@@ -129,6 +147,8 @@ export default function SettingsWorkspaceTab() {
   async function loadInterfacePages() {
     setLoadingPages(true)
     try {
+      await withTimeout(
+        (async () => {
       const supabase = createClient()
       
       // Load interface pages from interface_pages table (new system)
@@ -154,7 +174,6 @@ export default function SettingsWorkspaceTab() {
       if (!interfacePagesError && interfacePagesData) {
         console.log('Loaded', interfacePagesData.length, 'interface pages from interface_pages table')
         setInterfacePages(interfacePagesData)
-        setLoadingPages(false)
         return
       }
 
@@ -175,8 +194,16 @@ export default function SettingsWorkspaceTab() {
         console.warn('No interface pages found in either table')
         setInterfacePages([])
       }
+        })(),
+        SETTINGS_LOAD_TIMEOUT_MS,
+        'Loading interface pages timed out'
+      )
     } catch (error) {
-      console.error('Exception loading interface pages:', error)
+      if (error instanceof TimeoutError) {
+        console.warn('Interface pages load timed out')
+      } else {
+        console.error('Exception loading interface pages:', error)
+      }
       setInterfacePages([])
     } finally {
       setLoadingPages(false)

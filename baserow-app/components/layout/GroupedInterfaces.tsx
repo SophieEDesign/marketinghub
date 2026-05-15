@@ -829,7 +829,7 @@ export default function GroupedInterfaces({
         style={style} 
         className={`group ${isOver && canDrag ? 'bg-blue-50 border-l-2 border-blue-400' : ''} ${isDragging ? 'pointer-events-none' : ''}`}
       >
-        <div className="flex items-center gap-1 px-2 py-1 hover:bg-black/10 rounded">
+        <div className="flex items-center gap-1 px-2 py-1 hover:bg-black/10 rounded min-w-0">
           {canDrag ? (
             <button
               {...attributes}
@@ -846,20 +846,20 @@ export default function GroupedInterfaces({
           )}
           <button
             onClick={() => toggleGroup(group.id)}
-            className="flex-1 flex items-center gap-1 px-1 py-0.5 text-xs font-semibold uppercase tracking-wider hover:bg-black/10 rounded"
+            className="flex-1 flex items-center gap-1 px-1 py-0.5 text-xs font-semibold uppercase tracking-wider hover:bg-black/10 rounded min-w-0"
             style={{ color: sidebarTextColor }}
           >
             {isCollapsed ? (
-              <ChevronRight className="h-3 w-3" style={{ color: sidebarTextColor }} />
+              <ChevronRight className="h-3 w-3 flex-shrink-0" style={{ color: sidebarTextColor }} />
             ) : (
-              <ChevronDown className="h-3 w-3" style={{ color: sidebarTextColor }} />
+              <ChevronDown className="h-3 w-3 flex-shrink-0" style={{ color: sidebarTextColor }} />
             )}
             {group.icon ? (
-              <span style={{ color: sidebarTextColor }}>
+              <span className="flex-shrink-0" style={{ color: sidebarTextColor }}>
                 {renderIconByName(group.icon, "h-3 w-3")}
               </span>
             ) : (
-              <Folder className="h-3 w-3" style={{ color: sidebarTextColor }} />
+              <Folder className="h-3 w-3 flex-shrink-0" style={{ color: sidebarTextColor }} />
             )}
             {editingGroupId === group.id ? (
               <Input
@@ -882,13 +882,13 @@ export default function GroupedInterfaces({
                 draggable={false}
               />
             ) : (
-              <span className="truncate">{group.name}</span>
+              <span className="truncate min-w-0 flex-1 text-left">{group.name}</span>
             )}
           </button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
               <button 
-                className="p-0.5 hover:bg-black/20 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                className="p-0.5 hover:bg-black/20 rounded opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
                 disabled={isDragging || isRenaming}
                 onMouseDown={(e) => e.stopPropagation()}
               >
@@ -1008,7 +1008,7 @@ export default function GroupedInterfaces({
           isHidden && "opacity-60"
         )}
       >
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 min-w-0">
           {canDrag ? (
             <button
               {...attributes}
@@ -1040,7 +1040,7 @@ export default function GroupedInterfaces({
                   handleCancelEditPage()
                 }
               }}
-              className="flex-1 h-7 text-sm px-2 py-0"
+              className="flex-1 min-w-0 h-7 text-sm px-2 py-0"
               autoFocus
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
@@ -1050,7 +1050,7 @@ export default function GroupedInterfaces({
           ) : (
             <a
               href={`/pages/${targetPageId}`}
-              className="flex-1 flex items-center gap-2 px-2 py-1.5 rounded transition-colors hover:bg-black/10"
+              className="flex-1 flex items-center gap-2 px-2 py-1.5 rounded transition-colors hover:bg-black/10 min-w-0"
               style={isActive ? { 
                 backgroundColor: primaryColor + '15', 
                 color: primaryColor 
@@ -1069,7 +1069,7 @@ export default function GroupedInterfaces({
               }}
             >
               <Layers className="h-4 w-4 flex-shrink-0" style={{ color: isActive ? primaryColor : sidebarTextColor }} />
-              <span className={cn("text-sm truncate", isHidden && "italic text-muted-foreground")}>
+              <span className={cn("text-sm truncate min-w-0 flex-1", isHidden && "italic text-muted-foreground")}>
                 {page.name}
                 {isHidden ? " (Hidden)" : ""}
               </span>
@@ -1078,7 +1078,7 @@ export default function GroupedInterfaces({
             <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
               <button 
-                className="p-0.5 hover:bg-black/20 rounded opacity-0 group-hover/page:opacity-100 transition-opacity"
+                className="p-0.5 hover:bg-black/20 rounded opacity-0 group-hover/page:opacity-100 transition-opacity flex-shrink-0"
                 disabled={isDragging || isRenaming}
                 onMouseDown={(e) => e.stopPropagation()}
               >

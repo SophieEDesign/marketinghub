@@ -9,6 +9,7 @@ import { SidebarModeProvider } from "@/contexts/SidebarModeContext"
 import { EditModeProvider } from "@/contexts/EditModeContext"
 import { UIModeProvider } from "@/contexts/UIModeContext"
 import { getInterfaces, getInterfaceCategories, resolveLandingPage, type Interface, type InterfaceCategory } from "@/lib/interfaces"
+import { withTimeout } from "@/lib/with-timeout"
 import WorkspaceShell from "./WorkspaceShell"
 import DynamicFavicon from "./DynamicFavicon"
 import type { View } from "@/types/database"
@@ -468,7 +469,11 @@ export default async function WorkspaceShellWrapper({
       timestamp: Date.now(),
     })
     // #endregion
-    const resolvedLanding = await resolveLandingPage()
+    const resolvedLanding = await withTimeout(
+      resolveLandingPage(),
+      12_000,
+      "resolveLandingPage timed out"
+    )
     // #region agent log
     hotPathError("[agent-debug]", {
       sessionId: "909a6f",
