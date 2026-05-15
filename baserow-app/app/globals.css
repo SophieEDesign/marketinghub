@@ -24,10 +24,14 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
     --radius: 0.5rem;
-    /* Marketing workspace: calm hierarchy (Linear / Notion-inspired) */
-    --radius-card: 0.875rem;
-    --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.05), 0 1px 1px -1px rgb(15 23 42 / 0.04);
-    --shadow-card-hover: 0 6px 14px -8px rgb(15 23 42 / 0.18), 0 2px 4px -2px rgb(15 23 42 / 0.1);
+    /* Surface system: 16px cards, 20px heroes, 12px inner UI */
+    --radius-card: 1rem;
+    --radius-hero: 1.25rem;
+    --radius-inner: 0.75rem;
+    /* Elevation: level 1 default, level 2 hover, level 3 hero/active */
+    --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 0 0 1px rgb(15 23 42 / 0.03);
+    --shadow-card-hover: 0 4px 12px -4px rgb(15 23 42 / 0.1), 0 2px 4px -2px rgb(15 23 42 / 0.06);
+    --shadow-elevated: 0 8px 20px -6px rgb(15 23 42 / 0.12), 0 2px 6px -2px rgb(15 23 42 / 0.06);
     --accent-hue: 238;
     /* Light mode: indigo link */
     --accent-link: 238 76% 58%;
@@ -89,7 +93,7 @@
 
 @layer base {
   .marketing-dashboard-shell {
-    --section-gap: 1.4rem;
+    --section-gap: 1.125rem;
   }
   .marketing-dashboard-shell .react-grid-layout {
     width: 100% !important;
@@ -104,16 +108,7 @@
     max-width: 100%;
   }
 
-  /* Dashboard density pass: tighter spacing while keeping structure intact */
-  [data-marketing-dashboard] .rounded-card-lg,
-  [data-marketing-dashboard] .rounded-card {
-    border-radius: 0.7rem;
-  }
-
-  [data-marketing-dashboard] .marketing-card {
-    padding: 0.625rem;
-  }
-
+  /* Canvas density: typography + tables only (radius unified globally) */
   [data-marketing-dashboard] h2,
   [data-marketing-dashboard] h3 {
     line-height: 1.2;
@@ -146,16 +141,106 @@
 }
 
 @layer base {
+  /* Unified surface card — one card language (alias: marketing-card) */
+  .surface-card,
   .marketing-card {
     border-radius: var(--radius-card);
     box-shadow: var(--shadow-card);
-    border-color: hsl(var(--border) / 0.48);
-    background-color: hsl(var(--background) / 0.95);
-    transition: box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+    border: 1px solid hsl(var(--border) / 0.45);
+    background-color: hsl(var(--card));
+    transition:
+      box-shadow 0.2s ease-out,
+      border-color 0.2s ease-out,
+      background-color 0.2s ease-out;
   }
+  .surface-card-interactive:hover,
   .marketing-card:hover {
     box-shadow: var(--shadow-card-hover);
-    border-color: hsl(var(--border) / 0.62);
+    border-color: hsl(var(--border) / 0.58);
+  }
+
+  .panel-shell {
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+    border: 1px solid hsl(var(--border) / 0.45);
+    background-color: hsl(var(--card));
+    transition:
+      box-shadow 0.2s ease-out,
+      border-color 0.2s ease-out,
+      background-color 0.2s ease-out;
+  }
+
+  .panel-shell-interactive {
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+    border: 1px solid hsl(var(--border) / 0.45);
+    background-color: hsl(var(--card));
+    transition:
+      box-shadow 0.2s ease-out,
+      border-color 0.2s ease-out,
+      background-color 0.2s ease-out;
+  }
+  .panel-shell-interactive:hover {
+    box-shadow: var(--shadow-card-hover);
+    border-color: hsl(var(--border) / 0.58);
+  }
+
+  .surface-elevated {
+    border-radius: var(--radius-hero);
+    box-shadow: var(--shadow-elevated);
+    border: 1px solid hsl(var(--border) / 0.4);
+    background-color: hsl(var(--card));
+  }
+
+  /* 2px accent edges via inset shadow */
+  .accent-edge-top {
+    box-shadow: inset 0 2px 0 0 var(--accent-color, hsl(var(--accent-link)));
+  }
+  .accent-edge-left {
+    box-shadow: inset 2px 0 0 0 var(--accent-color, hsl(var(--accent-link)));
+  }
+
+  .accent-tint-wash {
+    background-image: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--accent-color, hsl(var(--accent-link))) 8%, transparent),
+      transparent 3rem
+    );
+  }
+
+  /* KPI preset accents (2px left, muted) */
+  .accent-preset-sky {
+    box-shadow: inset 2px 0 0 0 rgb(14 165 233 / 0.45);
+  }
+  .accent-preset-emerald {
+    box-shadow: inset 2px 0 0 0 rgb(16 185 129 / 0.45);
+  }
+  .accent-preset-amber {
+    box-shadow: inset 2px 0 0 0 rgb(245 158 11 / 0.45);
+  }
+  .accent-preset-violet {
+    box-shadow: inset 2px 0 0 0 rgb(139 92 246 / 0.45);
+  }
+}
+
+@layer components {
+  .text-page-title {
+    @apply text-xl font-semibold tracking-tight text-foreground md:text-2xl;
+  }
+  .text-section-title {
+    @apply text-sm font-semibold text-foreground;
+  }
+  .text-card-title {
+    @apply text-sm font-semibold leading-snug text-foreground;
+  }
+  .text-label {
+    @apply text-[11px] font-medium uppercase tracking-wide text-muted-foreground;
+  }
+  .text-meta {
+    @apply text-xs text-muted-foreground;
+  }
+  .text-empty {
+    @apply text-sm text-muted-foreground/80;
   }
 }
 
@@ -830,4 +915,62 @@
 
 .calendar-embed[data-density="spacious"] .fc .fc-daygrid-day-frame {
   padding: 0.18rem 0.22rem;
+}
+
+/* Content planning hero calendar — primary surface, softer grid */
+.calendar-embed--hero .fc {
+  --fc-border-color: hsl(var(--border) / 0.35);
+  --fc-page-bg-color: transparent;
+  --fc-neutral-bg-color: hsl(var(--muted) / 0.25);
+}
+
+.calendar-embed--hero .fc .fc-scrollgrid {
+  border-color: hsl(var(--border) / 0.45);
+}
+
+.calendar-embed--hero .fc .fc-scrollgrid-section > * {
+  border-color: hsl(var(--border) / 0.35);
+}
+
+.calendar-embed--hero .fc .fc-col-header-cell {
+  background: hsl(var(--muted) / 0.25);
+  border-color: hsl(var(--border) / 0.4);
+}
+
+.calendar-embed--hero .fc .fc-button {
+  height: 26px;
+  border-color: hsl(var(--border) / 0.5);
+}
+
+.calendar-embed--hero .fc .fc-button-primary:not(:disabled).fc-button-active,
+.calendar-embed--hero .fc .fc-button-primary:not(:disabled):active {
+  background: hsl(var(--muted) / 0.8);
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--border) / 0.55);
+}
+
+.calendar-embed--hero .fc-event {
+  border-radius: 8px;
+  border-width: 0 0 0 3px;
+  margin-bottom: 2px;
+}
+
+.calendar-embed--hero .fc-daygrid-event {
+  white-space: normal;
+}
+
+.calendar-embed--hero .fc .fc-daygrid-day-frame {
+  min-height: 5.5rem;
+}
+
+.calendar-embed--hero[data-density="compact"] .fc .fc-daygrid-day-frame {
+  min-height: 4.5rem;
+}
+
+.calendar-embed--hero[data-density="spacious"] .fc .fc-daygrid-day-frame {
+  min-height: 7rem;
+}
+
+.calendar-embed--hero .fc .fc-view-harness {
+  padding: 0.25rem 0.5rem 0.5rem;
 }

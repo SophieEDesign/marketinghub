@@ -25,32 +25,32 @@ export function getAccentColor(
   const colorMap: Record<string, Record<string, string>> = {
     grey: {
       bg: emphasised ? 'bg-gray-100' : 'bg-gray-50',
-      border: 'border-l-4 border-gray-400',
+      border: 'border-l-2 border-gray-400/50',
       text: 'text-gray-700',
     },
     blue: {
       bg: emphasised ? 'bg-blue-100' : 'bg-blue-50',
-      border: 'border-l-4 border-blue-500',
+      border: 'border-l-2 border-blue-400/55',
       text: 'text-blue-700',
     },
     green: {
       bg: emphasised ? 'bg-green-100' : 'bg-green-50',
-      border: 'border-l-4 border-green-500',
+      border: 'border-l-2 border-green-400/55',
       text: 'text-green-700',
     },
     yellow: {
       bg: emphasised ? 'bg-yellow-100' : 'bg-yellow-50',
-      border: 'border-l-4 border-yellow-500',
+      border: 'border-l-2 border-yellow-400/55',
       text: 'text-yellow-700',
     },
     red: {
       bg: emphasised ? 'bg-red-100' : 'bg-red-50',
-      border: 'border-l-4 border-red-500',
+      border: 'border-l-2 border-red-400/55',
       text: 'text-red-700',
     },
     purple: {
       bg: emphasised ? 'bg-purple-100' : 'bg-purple-50',
-      border: 'border-l-4 border-purple-500',
+      border: 'border-l-2 border-purple-400/55',
       text: 'text-purple-700',
     },
   }
@@ -64,12 +64,12 @@ export function getAccentColor(
 export function getTitleSizeClass(size: AppearanceConfig['titleSize'] = 'medium'): string {
   switch (size) {
     case 'small':
-      return 'text-sm'
+      return 'text-xs'
     case 'large':
-      return 'text-xl'
+      return 'text-base'
     case 'medium':
     default:
-      return 'text-base'
+      return 'text-sm'
   }
 }
 

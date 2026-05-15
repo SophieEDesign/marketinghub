@@ -1,11 +1,12 @@
 "use client"
 
-import { Card, CardContent } from "@/components/ui/card"
 import { ChevronRight, Image as ImageIcon } from "lucide-react"
+import AccentCard from "@/components/interface/primitives/AccentCard"
 import type { TableField } from "@/types/fields"
 import { formatDateUK } from "@/lib/utils"
 import { renderPills } from "@/lib/ui/pills"
 import { cn } from "@/lib/utils"
+import { TEXT_CARD_TITLE } from "@/lib/interface/typography-tokens"
 import type { ReactNode } from "react"
 
 type ImageDisplayMode = "show_if_available" | "placeholder" | "hide_when_empty"
@@ -52,7 +53,7 @@ function formatValue(field: TableField, value: any): ReactNode {
 
   if (field.type === "checkbox") {
     return (
-      <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700">
+      <span className="inline-flex rounded-full bg-muted/60 px-2 py-0.5 text-[11px] text-foreground/80">
         {value ? "Yes" : "No"}
       </span>
     )
@@ -105,58 +106,65 @@ export default function RecordCard({
     (imageDisplayMode === "hide_when_empty" && !!imageUrl)
 
   return (
-    <Card
-      className={cn("w-full rounded-xl border border-black/5 bg-white shadow-sm", selected && "ring-1 ring-blue-400/40")}
+    <AccentCard
+      density="compact"
+      accentColor={borderColor}
+      accentPosition={borderColor ? "left" : "none"}
+      selected={selected}
+      interactive
+      className="w-full max-w-none"
       style={{
-        borderLeftColor: borderColor ?? undefined,
-        borderLeftWidth: borderColor ? "3px" : undefined,
         minHeight: 120,
         height: fixedHeightPx && fixedHeightPx > 0 ? fixedHeightPx : undefined,
       }}
       onDoubleClick={() => onOpen(recordId)}
     >
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            {showImageArea && (
-              <div className="mb-2 h-10 w-10 overflow-hidden rounded-lg border border-black/5 bg-slate-100">
-                {imageUrl ? <img src={imageUrl} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center"><ImageIcon className="h-4 w-4 text-slate-500" /></div>}
-              </div>
-            )}
-
-            <div className={cn("text-sm font-semibold text-slate-900", textClampClass(textBehaviour), textBehaviour === "wrap" && "line-clamp-2")}>
-              {isEmptyValue(primaryValue) ? "Untitled" : String(primaryValue)}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          {showImageArea && (
+            <div className="mb-2 h-10 w-10 overflow-hidden rounded-inner border border-border/40 bg-muted/40">
+              {imageUrl ? (
+                <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <span className="flex h-full w-full items-center justify-center">
+                  <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                </span>
+              )}
             </div>
+          )}
 
-            <div className="mt-2 space-y-1.5">
-              {secondaryFields.map((field) => {
-                const value = rowData[field.name]
-                if (!showEmptyFields && isEmptyValue(value)) return null
-                return (
-                  <div key={field.id || field.name} className="min-w-0 text-xs text-slate-700">
-                    {showFieldLabels && <span className="mr-1 text-slate-500">{field.name}:</span>}
-                    <span className={cn("min-w-0", textBehaviour === "wrap" ? "whitespace-normal break-words" : textClampClass(textBehaviour))}>
-                      {formatValue(field, value)}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
+          <p className={cn(TEXT_CARD_TITLE, textClampClass(textBehaviour), textBehaviour === "wrap" && "line-clamp-2")}>
+            {isEmptyValue(primaryValue) ? "Untitled" : String(primaryValue)}
+          </p>
+
+          <div className="mt-1.5 space-y-1">
+            {secondaryFields.map((field) => {
+              const value = rowData[field.name]
+              if (!showEmptyFields && isEmptyValue(value)) return null
+              return (
+                <div key={field.id || field.name} className="min-w-0 text-xs text-muted-foreground">
+                  {showFieldLabels && <span className="mr-1 text-muted-foreground/80">{field.name}:</span>}
+                  <span className={cn("min-w-0", textBehaviour === "wrap" ? "whitespace-normal break-words" : textClampClass(textBehaviour))}>
+                    {formatValue(field, value)}
+                  </span>
+                </div>
+              )
+            })}
           </div>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              onOpen(recordId)
-            }}
-            className="h-7 w-7 shrink-0 rounded text-slate-400 hover:bg-blue-50 hover:text-blue-600"
-            aria-label="Open record"
-            title="Open record"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
         </div>
-      </CardContent>
-    </Card>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onOpen(recordId)
+          }}
+          className="h-7 w-7 shrink-0 rounded-inner text-muted-foreground hover:bg-muted/60 hover:text-foreground ring-accent-focus"
+          aria-label="Open record"
+          title="Open record"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    </AccentCard>
   )
 }

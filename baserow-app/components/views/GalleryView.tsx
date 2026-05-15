@@ -567,7 +567,7 @@ export default function GalleryView({
       return (
         <div
           key={reactKey}
-          className={cn(marketingDashboardStyle && "marketing-card")}
+          className={cn(marketingDashboardStyle && "surface-card")}
           style={{ ...rowFormattingStyle }}
         >
           <RecordCard
@@ -619,7 +619,8 @@ export default function GalleryView({
   if (!supabaseTableName) {
     return (
       <EmptyState
-        icon={<Database className="h-12 w-12" />}
+        variant={marketingDashboardStyle ? "compact" : "default"}
+        icon={<Database className={marketingDashboardStyle ? "h-8 w-8" : "h-12 w-12"} />}
         title="Table connection required"
         description="Gallery view needs to be connected to a table to display records."
         action={onOpenSettings ? {
@@ -637,7 +638,8 @@ export default function GalleryView({
   if (filteredRows.length === 0) {
     return (
       <EmptyState
-        icon={<Database className="h-12 w-12" />}
+        variant={marketingDashboardStyle ? "compact" : "default"}
+        icon={<Database className={marketingDashboardStyle ? "h-8 w-8" : "h-12 w-12"} />}
         title={marketingDashboardStyle ? "Nothing to review yet" : "No records found"}
         description={filters.length > 0 
           ? "No records match your current filters. Try widening your filter criteria."

@@ -11,10 +11,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import AccentCard from "@/components/interface/primitives/AccentCard"
+import DashboardEmpty from "@/components/interface/primitives/DashboardEmpty"
+import DashboardPanel from "@/components/interface/primitives/DashboardPanel"
 import { useRecordModal } from "@/contexts/RecordModalContext"
 import { useThemeOverviewData } from "@/hooks/useThemeOverviewData"
 import { quarterLabel, type ThemeOverviewCard } from "@/lib/marketing/theme-overview"
+import { DASHBOARD_PAGE_GAP } from "@/lib/interface/spacing-tokens"
+import { TEXT_CARD_TITLE, TEXT_LABEL, TEXT_PAGE_TITLE } from "@/lib/interface/typography-tokens"
 import { cn } from "@/lib/utils"
+
+const PROMPT_PREVIEW_COUNT = 3
 
 interface ThemeOverviewDashboardProps {
   canEdit?: boolean
@@ -23,15 +30,21 @@ interface ThemeOverviewDashboardProps {
 function ThemeCardHeader({ card }: { card: ThemeOverviewCard }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-2">
-      <h3 className="text-base font-semibold text-foreground leading-snug pr-2">{card.name}</h3>
-      <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+      <h3 className={cn(TEXT_CARD_TITLE, "pr-2")}>{card.name}</h3>
+      <div className="flex flex-wrap items-center gap-1 shrink-0">
         {card.quarterLabel ? (
-          <Badge variant="outline" className="text-[11px] font-medium px-2 py-0">
+          <Badge
+            variant="outline"
+            className="h-5 px-1.5 text-[10px] font-medium border-border/60"
+          >
             {card.quarterLabel}
           </Badge>
         ) : null}
         {card.isCurrentQuarter ? (
-          <Badge className="text-[11px] font-medium px-2 py-0 bg-accent-link/90 hover:bg-accent-link/90">
+          <Badge
+            variant="outline"
+            className="h-5 px-1.5 text-[10px] font-medium border-accent-link/25 bg-accent-link/10 text-accent-link"
+          >
             Active
           </Badge>
         ) : null}
@@ -55,27 +68,30 @@ function ThemeCard({
   onOpenPrompt: (id: string) => void
   onAddPrompt: (themeId: string) => void
 }) {
+  const visiblePrompts = card.prompts.slice(0, PROMPT_PREVIEW_COUNT)
+  const moreCount = card.prompts.length - visiblePrompts.length
+
   return (
-    <article
+    <AccentCard
+      accentColor={card.accentColor}
+      accentPosition="left"
+      density="compact"
       className={cn(
-        "flex flex-col rounded-card-lg border bg-card shadow-card transition-shadow",
-        isSecondary ? "border-border/50 opacity-[0.92]" : "border-border/60",
-        card.isCurrentQuarter && !isSecondary && "ring-2 ring-accent-link/25 shadow-md"
+        "flex flex-col h-full p-0 overflow-hidden",
+        isSecondary && "opacity-[0.94]",
+        card.isCurrentQuarter && !isSecondary && "ring-1 ring-accent-link/20 shadow-card-hover"
       )}
-      style={{ borderLeftWidth: 4, borderLeftColor: card.accentColor }}
     >
       <button
         type="button"
         onClick={() => onOpenTheme(card.id)}
-        className="flex flex-col gap-2 p-4 text-left hover:bg-muted/30 rounded-t-card-lg transition-colors w-full"
+        className="flex flex-col gap-2 p-3 text-left hover:bg-muted/25 transition-colors w-full rounded-t-card"
       >
         <ThemeCardHeader card={card} />
         {card.coreTitle && card.coreTitle !== card.name ? (
           <div>
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-0.5">
-              Core focus
-            </p>
-            <p className="text-sm font-medium text-foreground leading-snug whitespace-pre-wrap">
+            <p className={TEXT_LABEL}>Core focus</p>
+            <p className="text-sm font-medium text-foreground leading-snug whitespace-pre-wrap mt-0.5">
               {card.coreTitle}
             </p>
           </div>
@@ -87,34 +103,43 @@ function ThemeCard({
         ) : null}
       </button>
 
-      <div className="border-t border-border/40 px-4 py-3 mt-auto">
-        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-2">
-          Content prompts
-        </p>
+      <div className="border-t border-border/40 px-3 py-2.5 mt-auto min-h-[4.5rem]">
+        <p className={cn(TEXT_LABEL, "mb-1.5")}>Content prompts</p>
         {card.prompts.length > 0 ? (
-          <ul className="flex flex-col gap-1.5">
-            {card.prompts.map((prompt) => (
+          <ul className="flex flex-col gap-1">
+            {visiblePrompts.map((prompt) => (
               <li key={prompt.id}>
                 <button
                   type="button"
                   onClick={() => onOpenPrompt(prompt.id)}
-                  className="w-full text-left text-sm text-foreground/90 rounded-md px-2.5 py-1.5 bg-muted/40 hover:bg-muted/70 transition-colors"
+                  className="w-full text-left text-sm text-foreground/90 rounded-inner px-2 py-1 bg-muted/35 hover:bg-muted/55 transition-colors"
                 >
-                  <span className="inline-block w-1.5 h-1.5 rounded-full mr-2 align-middle bg-foreground/40" />
+                  <span className="inline-block w-1 h-1 rounded-full mr-2 align-middle bg-foreground/35" />
                   {prompt.label}
                 </button>
               </li>
             ))}
+            {moreCount > 0 ? (
+              <li>
+                <button
+                  type="button"
+                  onClick={() => onOpenTheme(card.id)}
+                  className="text-xs text-accent-link hover:underline px-2 py-0.5"
+                >
+                  +{moreCount} more
+                </button>
+              </li>
+            ) : null}
           </ul>
         ) : (
-          <p className="text-sm text-muted-foreground">No prompts added yet</p>
+          <DashboardEmpty title="No prompts yet" variant="inline" />
         )}
         {canEdit ? (
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            className="mt-2 h-8 px-2 text-xs text-accent-link hover:text-accent-link"
+            className="mt-1.5 h-7 px-2 text-xs text-accent-link hover:text-accent-link"
             onClick={() => onAddPrompt(card.id)}
           >
             <Plus className="h-3.5 w-3.5 mr-1" />
@@ -122,7 +147,7 @@ function ThemeCard({
           </Button>
         ) : null}
       </div>
-    </article>
+    </AccentCard>
   )
 }
 
@@ -138,22 +163,32 @@ function ActiveThemeHero({
   onOpenTheme: (id: string) => void
 }) {
   return (
-    <button
-      type="button"
+    <AccentCard
+      elevated
+      tintWash
+      interactive
+      accentColor={card.accentColor}
+      accentPosition="top"
+      density="comfortable"
+      className="w-full text-left"
       onClick={() => onOpenTheme(card.id)}
-      className="w-full text-left rounded-card-lg border border-border/60 bg-card shadow-card p-5 hover:bg-muted/20 transition-colors"
-      style={{ borderTopWidth: 4, borderTopColor: card.accentColor }}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault()
+          onOpenTheme(card.id)
+        }
+      }}
     >
       <ThemeCardHeader card={card} />
-      <p className="mt-2 text-xs text-muted-foreground">
+      <p className="text-meta mt-1.5">
         Current quarter · {quarterLabel(currentQuarter as 1 | 2 | 3 | 4)} {year}
       </p>
       {card.coreTitle && card.coreTitle !== card.name ? (
-        <div className="mt-3">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-0.5">
-            Core focus
-          </p>
-          <p className="text-lg font-semibold text-foreground leading-snug whitespace-pre-wrap">
+        <div className="mt-2.5">
+          <p className={TEXT_LABEL}>Core focus</p>
+          <p className="text-base font-semibold text-foreground leading-snug whitespace-pre-wrap mt-0.5">
             {card.coreTitle}
           </p>
         </div>
@@ -163,7 +198,7 @@ function ActiveThemeHero({
           {card.description}
         </p>
       ) : null}
-    </button>
+    </AccentCard>
   )
 }
 
@@ -218,7 +253,7 @@ export default function ThemeOverviewDashboard({ canEdit = false }: ThemeOvervie
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-16">
+      <div className="flex items-center justify-center py-12">
         <LoadingSpinner size="lg" text="Loading themes…" />
       </div>
     )
@@ -226,24 +261,24 @@ export default function ThemeOverviewDashboard({ canEdit = false }: ThemeOvervie
 
   if (error) {
     return (
-      <div className="rounded-card-lg border border-destructive/30 bg-destructive/5 px-4 py-6 text-sm text-destructive">
-        {error}
-      </div>
+      <DashboardPanel className="border-destructive/30 bg-destructive/5">
+        <p className="p-3 text-sm text-destructive">{error}</p>
+      </DashboardPanel>
     )
   }
 
   return (
-    <div className="flex flex-col gap-5 md:gap-6 min-w-0">
+    <div className={cn("flex flex-col min-w-0", DASHBOARD_PAGE_GAP)}>
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">Theme overview</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
+          <h1 className={TEXT_PAGE_TITLE}>Theme overview</h1>
+          <p className="text-meta mt-0.5">
             Quarterly themes, core focus, and content prompts for the year
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
-            <SelectTrigger className="w-[120px] h-9 text-sm" aria-label="Planning year">
+            <SelectTrigger className="w-[120px] h-8 text-sm" aria-label="Planning year">
               <SelectValue placeholder="Year" />
             </SelectTrigger>
             <SelectContent>
@@ -254,7 +289,7 @@ export default function ThemeOverviewDashboard({ canEdit = false }: ThemeOvervie
               ))}
             </SelectContent>
           </Select>
-          <Badge variant="secondary" className="h-9 px-3 text-sm font-medium rounded-md">
+          <Badge variant="secondary" className="h-8 px-2.5 text-xs font-medium rounded-inner">
             {quarterLabel(currentQuarter)} · Current quarter
           </Badge>
         </div>
@@ -268,22 +303,23 @@ export default function ThemeOverviewDashboard({ canEdit = false }: ThemeOvervie
           onOpenTheme={openTheme}
         />
       ) : (
-        <div className="rounded-card-lg border border-dashed border-border/60 bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
-          No theme is set for {quarterLabel(currentQuarter)} {selectedYear}. Add or link a quarterly
-          theme for this period.
-        </div>
+        <DashboardEmpty
+          variant="compact"
+          title={`No theme is set for ${quarterLabel(currentQuarter)} ${selectedYear}.`}
+          description="Add or link a quarterly theme for this period."
+        />
       )}
 
       <section>
-        <h2 className="text-sm font-semibold text-foreground mb-3">
-          Annual themes · {selectedYear}
-        </h2>
+        <h2 className="text-section-title mb-2.5">Annual themes · {selectedYear}</h2>
         {cards.length === 0 ? (
-          <div className="rounded-card-lg border border-dashed border-border/60 bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
-            No themes found for {selectedYear}. Create quarterly themes in your Themes table.
-          </div>
+          <DashboardEmpty
+            variant="compact"
+            title={`No themes found for ${selectedYear}.`}
+            description="Create quarterly themes in your Themes table."
+          />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-x-4 gap-y-3 items-stretch">
             {cards.map((card) => (
               <ThemeCard
                 key={card.id}
@@ -300,9 +336,8 @@ export default function ThemeOverviewDashboard({ canEdit = false }: ThemeOvervie
       </section>
 
       {!fields?.contentTheme ? (
-        <p className="text-xs text-muted-foreground/80">
+        <p className="text-xs text-muted-foreground/75">
           Content prompts need a link field from Content to Quarterly Themes (e.g. quarterly_theme).
-          Prompts cannot be grouped until that field exists.
         </p>
       ) : null}
     </div>

@@ -1219,8 +1219,9 @@ export default function ListView({
       <div ref={contentRef} className={cn(displayMode === "fit" ? "h-auto" : "h-full", "flex flex-col")}>
         <div className="flex-1 flex items-center justify-center p-4">
           <EmptyState
-            icon={<Database className="h-12 w-12" />}
-            title={marketingDashboardStyle ? "No marketing records yet" : "No records found"}
+            variant={marketingDashboardStyle ? "compact" : "default"}
+            icon={<Database className={marketingDashboardStyle ? "h-8 w-8" : "h-12 w-12"} />}
+            title={marketingDashboardStyle ? "No records yet" : "No records found"}
             description={searchQuery 
               ? "No records match your search query. Try adjusting your search or clear it to see all records."
               : filters.length > 0

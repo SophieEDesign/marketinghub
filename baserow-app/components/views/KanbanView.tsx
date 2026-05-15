@@ -446,7 +446,8 @@ function KanbanView({
   if (!groupingFieldName) {
     return (
       <EmptyState
-        icon={<Columns className="h-12 w-12" />}
+        variant="compact"
+        icon={<Columns className="h-8 w-8" />}
         title="Grouping field required"
         description="Kanban view needs a grouping field to organize cards into columns. Configure the grouping field in block settings."
         action={onOpenSettings ? {
@@ -485,7 +486,8 @@ function KanbanView({
   if (searchQuery && filteredRows.length === 0) {
     return (
       <EmptyState
-        icon={<Columns className="h-12 w-12" />}
+        variant="compact"
+        icon={<Columns className="h-8 w-8" />}
         title="No records match your search"
         description="Try adjusting your search query or clear it to see all records."
         action={{
@@ -505,7 +507,8 @@ function KanbanView({
   if (filteredRows.length === 0 && !searchQuery) {
     return (
       <EmptyState
-        icon={<Columns className="h-12 w-12" />}
+        variant="compact"
+        icon={<Columns className="h-8 w-8" />}
         title="No records yet"
         description="This table doesn't have any records. Create your first record to get started with the Kanban board."
       />

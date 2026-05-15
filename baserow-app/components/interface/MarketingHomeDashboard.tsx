@@ -18,18 +18,16 @@ import {
   getWeekDayStrip,
   resolveHeroFromTheme,
 } from "@/lib/marketing/marketing-home"
+import DashboardPanel from "@/components/interface/primitives/DashboardPanel"
+import DashboardEmpty from "@/components/interface/primitives/DashboardEmpty"
+import MetricCard from "@/components/interface/primitives/MetricCard"
+import { DASHBOARD_PAGE_GAP } from "@/lib/interface/spacing-tokens"
+import { TEXT_LABEL, TEXT_PAGE_TITLE } from "@/lib/interface/typography-tokens"
 import { cn } from "@/lib/utils"
 
 interface MarketingHomeDashboardProps {
   canEdit?: boolean
 }
-
-const KPI_ACCENTS = [
-  "border-l-sky-500/70",
-  "border-l-emerald-500/70",
-  "border-l-amber-500/70",
-  "border-l-violet-500/70",
-] as const
 
 const PIPELINE_STAGES = [
   { key: "ideas" as const, label: "Ideas" },
@@ -38,35 +36,6 @@ const PIPELINE_STAGES = [
   { key: "scheduled" as const, label: "Scheduled" },
   { key: "published" as const, label: "Published" },
 ]
-
-function KpiCard({
-  label,
-  value,
-  accentClass,
-  hint,
-}: {
-  label: string
-  value: number
-  accentClass: string
-  hint?: string
-}) {
-  return (
-    <div
-      className={cn(
-        "flex flex-col justify-between rounded-card border border-border/55 bg-card px-3.5 py-3 shadow-sm min-h-[88px] border-l-[3px]",
-        accentClass
-      )}
-    >
-      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground leading-tight">
-        {label}
-      </p>
-      <p className="text-2xl font-semibold tabular-nums text-foreground mt-1">{value}</p>
-      {hint ? (
-        <p className="text-[11px] text-muted-foreground/90 mt-1 leading-snug">{hint}</p>
-      ) : null}
-    </div>
-  )
-}
 
 function StatusPill({ status, color }: { status: string | null; color?: string }) {
   if (!status) return <span className="text-xs text-muted-foreground">—</span>
@@ -77,39 +46,6 @@ function StatusPill({ status, color }: { status: string | null; color?: string }
     >
       {status}
     </span>
-  )
-}
-
-function ScrollPanel({
-  title,
-  subtitle,
-  children,
-  className,
-  maxHeight = "max-h-[320px]",
-}: {
-  title: string
-  subtitle?: string
-  children: ReactNode
-  className?: string
-  maxHeight?: string
-}) {
-  return (
-    <section
-      className={cn(
-        "rounded-card-lg border border-border/60 bg-card shadow-sm flex flex-col min-h-0 min-w-0",
-        className
-      )}
-    >
-      <div className="px-3.5 pt-3 pb-2 border-b border-border/40 shrink-0">
-        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
-        {subtitle ? (
-          <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{subtitle}</p>
-        ) : null}
-      </div>
-      <div className={cn("flex-1 min-h-0 overflow-y-auto overscroll-contain px-2 py-2", maxHeight)}>
-        {children}
-      </div>
-    </section>
   )
 }
 
@@ -239,20 +175,18 @@ export default function MarketingHomeDashboard({ canEdit: _canEdit = false }: Ma
   const accentColor = themeData.activeCard?.accentColor ?? "#6366f1"
 
   return (
-    <div className="flex flex-col gap-4 md:gap-5 min-w-0 pb-2">
-      <div
-        className="rounded-card-lg border border-border/60 bg-card shadow-card overflow-hidden"
-        style={{ borderTopWidth: 4, borderTopColor: accentColor }}
+    <div className={cn("flex flex-col min-w-0 pb-2", DASHBOARD_PAGE_GAP)}>
+      <DashboardPanel
+        elevated
+        accentColor={accentColor}
+        accentPosition="top"
+        className="accent-tint-wash overflow-hidden"
+        bodyClassName="px-3 py-3 sm:px-4 sm:py-4"
       >
-        <div className="px-4 py-4 sm:px-5 sm:py-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Current quarter
-              </p>
-              <h1 className="text-2xl font-semibold tracking-tight text-foreground mt-0.5">
-                {hero.quarterYear}
-              </h1>
+              <p className={TEXT_LABEL}>Current quarter</p>
+              <h1 className={cn(TEXT_PAGE_TITLE, "mt-0.5")}>{hero.quarterYear}</h1>
             </div>
             {themeData.activeCard ? (
               <Badge
@@ -306,51 +240,42 @@ export default function MarketingHomeDashboard({ canEdit: _canEdit = false }: Ma
               ))}
             </ul>
           ) : null}
-        </div>
-      </div>
+      </DashboardPanel>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard label="Upcoming content" value={kpis.upcomingContent} accentClass={KPI_ACCENTS[0]} />
-        <KpiCard
-          label="Scheduled this week"
-          value={kpis.scheduledThisWeek}
-          accentClass={KPI_ACCENTS[1]}
-        />
-        <KpiCard
+        <MetricCard label="Upcoming content" value={kpis.upcomingContent} accentIndex={0} />
+        <MetricCard label="Scheduled this week" value={kpis.scheduledThisWeek} accentIndex={1} />
+        <MetricCard
           label="Overdue items"
           value={kpis.overdueItems}
-          accentClass={KPI_ACCENTS[2]}
+          accentIndex={2}
           hint={kpis.overdueItems > 0 ? "Needs attention" : undefined}
         />
-        <KpiCard label="Active campaigns" value={kpis.activeCampaigns} accentClass={KPI_ACCENTS[3]} />
+        <MetricCard label="Active campaigns" value={kpis.activeCampaigns} accentIndex={3} />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 md:gap-5">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-3 md:gap-4">
         <div className="xl:col-span-5 flex flex-col min-h-0">
-          <section
-            className="rounded-card-lg border border-border/60 bg-card shadow-sm flex flex-col h-full min-h-[240px]"
-            style={{ borderLeftWidth: 4, borderLeftColor: accentColor }}
+          <DashboardPanel
+            title="Current core focus"
+            subtitle="Strategy for this quarter"
+            accentColor={accentColor}
+            accentPosition="left"
+            scrollBody
+            className="h-full min-h-[220px]"
+            bodyClassName="px-3 py-3 flex flex-col gap-2.5 min-h-0"
           >
-            <div className="px-4 py-3 border-b border-border/40">
-              <h2 className="text-sm font-semibold text-foreground">Current core focus</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Strategy for this quarter</p>
-            </div>
-            <div className="flex-1 px-4 py-3 flex flex-col gap-3 min-h-0 overflow-y-auto">
               {themeData.activeCard ? (
                 <>
                   <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-1">
-                      Quarterly theme
-                    </p>
+                    <p className={cn(TEXT_LABEL, "mb-1")}>Quarterly theme</p>
                     <p className="text-base font-semibold text-foreground leading-snug break-words">
                       {themeData.activeCard.name}
                     </p>
                   </div>
                   {hero.messaging ? (
                     <div>
-                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-1">
-                        Messaging direction
-                      </p>
+                      <p className={cn(TEXT_LABEL, "mb-1")}>Messaging direction</p>
                       <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap break-words">
                         {hero.messaging}
                       </p>
@@ -358,9 +283,7 @@ export default function MarketingHomeDashboard({ canEdit: _canEdit = false }: Ma
                   ) : null}
                   {themeData.activeCard.prompts.length > 0 ? (
                     <div>
-                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-2">
-                        Active prompts
-                      </p>
+                      <p className={cn(TEXT_LABEL, "mb-1.5")}>Active prompts</p>
                       <ul className="space-y-1.5">
                         {themeData.activeCard.prompts.slice(0, 5).map((p) => (
                           <li key={p.id}>
@@ -376,15 +299,17 @@ export default function MarketingHomeDashboard({ canEdit: _canEdit = false }: Ma
                       </ul>
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">
-                      Link content to this theme to surface prompts and priorities here.
-                    </p>
+                <DashboardEmpty
+                  variant="inline"
+                  title="Link content to this theme to surface prompts here."
+                />
                   )}
                 </>
               ) : (
-                <p className="text-sm text-muted-foreground">
-                  No quarterly theme is active for the current period. Set one in Theme Workspace.
-                </p>
+                <DashboardEmpty
+                  variant="inline"
+                  title="No quarterly theme is active. Set one in Theme Workspace."
+                />
               )}
               <button
                 type="button"
@@ -395,19 +320,20 @@ export default function MarketingHomeDashboard({ canEdit: _canEdit = false }: Ma
                 View theme
                 <ArrowUpRight className="h-3.5 w-3.5" />
               </button>
-            </div>
-          </section>
+          </DashboardPanel>
         </div>
 
         <div className="xl:col-span-7 min-h-0">
-          <ScrollPanel
+          <DashboardPanel
             title="Upcoming content"
             subtitle="Next scheduled items across all types"
-            maxHeight="max-h-[min(360px,50vh)]"
+            scrollBody
+            maxBodyHeight="max-h-[min(360px,50vh)]"
             className="h-full"
+            bodyClassName="px-2 py-1.5"
           >
             {upcoming.length === 0 ? (
-              <p className="text-sm text-muted-foreground px-2 py-4">Nothing scheduled ahead.</p>
+              <DashboardEmpty variant="inline" title="Nothing scheduled ahead." className="px-2 py-3" />
             ) : (
               <ul className="divide-y divide-border/30">
                 {upcoming.map((item) => (
@@ -417,14 +343,16 @@ export default function MarketingHomeDashboard({ canEdit: _canEdit = false }: Ma
                 ))}
               </ul>
             )}
-          </ScrollPanel>
+          </DashboardPanel>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-5">
-        <section className="rounded-card-lg border border-border/60 bg-card shadow-sm px-4 py-3.5">
-          <h2 className="text-sm font-semibold text-foreground">Social media snapshot</h2>
-          <p className="text-xs text-muted-foreground mt-0.5 mb-3">Operational posting cadence</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
+        <DashboardPanel
+          title="Social media snapshot"
+          subtitle="Operational posting cadence"
+          bodyClassName="px-3 py-3"
+        >
           <div className="grid grid-cols-3 gap-2 mb-3">
             <div className="rounded-md bg-muted/35 px-2.5 py-2 text-center">
               <p className="text-lg font-semibold tabular-nums">{social.scheduledThisWeek}</p>
@@ -471,13 +399,13 @@ export default function MarketingHomeDashboard({ canEdit: _canEdit = false }: Ma
               </div>
             ))}
           </div>
-        </section>
+        </DashboardPanel>
 
-        <section className="rounded-card-lg border border-border/60 bg-card shadow-sm px-4 py-3.5">
-          <h2 className="text-sm font-semibold text-foreground">Content pipeline</h2>
-          <p className="text-xs text-muted-foreground mt-0.5 mb-3">
-            {pipelineTotal} items across workflow stages
-          </p>
+        <DashboardPanel
+          title="Content pipeline"
+          subtitle={`${pipelineTotal} items across workflow stages`}
+          bodyClassName="px-3 py-3"
+        >
           <div className="flex flex-wrap gap-2">
             {PIPELINE_STAGES.map((stage) => {
               const count = pipeline[stage.key]
@@ -501,7 +429,7 @@ export default function MarketingHomeDashboard({ canEdit: _canEdit = false }: Ma
               )
             })}
           </div>
-        </section>
+        </DashboardPanel>
       </div>
     </div>
   )

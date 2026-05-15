@@ -96,9 +96,11 @@ function InterfacePageContent({
   }
   if (showContentPlanning) {
     return (
-      <div className={`min-h-0 min-w-0 w-full max-w-full flex flex-col ${BLOCK_EMBED_CLASSNAME}`}>
-        <ContentPlanningDashboard canEdit={!isViewer} />
-      </div>
+      <MarketingDashboardLayout>
+        <div className={`min-h-0 min-w-0 w-full max-w-full flex flex-col ${BLOCK_EMBED_CLASSNAME}`}>
+          <ContentPlanningDashboard canEdit={!isViewer} />
+        </div>
+      </MarketingDashboardLayout>
     )
   }
   if (useRecordReviewLayout && hasPage) {

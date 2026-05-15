@@ -1,20 +1,21 @@
 "use client"
 
 import { forwardRef } from "react"
+import AccentCard, { type AccentCardProps } from "@/components/interface/primitives/AccentCard"
+import { cn } from "@/lib/utils"
 
 export type CardDensity = "comfortable" | "compact" | "ultra"
 
-export interface CardContainerProps extends React.HTMLAttributes<HTMLDivElement> {
-  /** Density level: comfortable (title + 2 fields + tags), compact (title + 1 field), ultra (title only) */
+export interface CardContainerProps extends Omit<AccentCardProps, "density"> {
   density?: CardDensity
-  /** Optional inline styles (e.g. border color from color field) */
   styleOverrides?: React.CSSProperties
-  /** When true, card is selected (e.g. ring highlight) */
-  selected?: boolean
 }
 
-const baseClasses =
-  "marketing-card bg-card rounded-card-lg border border-border/55 shadow-card px-3 py-2 text-xs min-w-0 overflow-hidden max-w-[260px] transition-all"
+const densityMap: Record<CardDensity, AccentCardProps["density"]> = {
+  comfortable: "comfortable",
+  compact: "compact",
+  ultra: "tight",
+}
 
 const CardContainer = forwardRef<HTMLDivElement, CardContainerProps>(
   (
@@ -24,21 +25,23 @@ const CardContainer = forwardRef<HTMLDivElement, CardContainerProps>(
       selected = false,
       className = "",
       children,
+      interactive = true,
       ...rest
     },
     ref
   ) => {
-    const selectedClasses = selected ? "ring-1 ring-accent-link/35 bg-muted/35 border-border/70" : "hover:border-border/70 hover:shadow-card-hover"
     return (
-      <div
+      <AccentCard
         ref={ref}
-        className={`${baseClasses} ${selectedClasses} ${className}`.trim()}
+        density={densityMap[density]}
+        selected={selected}
+        interactive={interactive}
+        className={cn("text-xs max-w-[260px]", className)}
         style={styleOverrides}
-        data-card-density={density}
         {...rest}
       >
         {children}
-      </div>
+      </AccentCard>
     )
   }
 )

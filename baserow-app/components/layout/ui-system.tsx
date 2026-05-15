@@ -2,7 +2,14 @@
 
 import * as React from "react"
 import { cn } from "@/lib/utils"
-import { APP_BAR_PADDING_Y, APP_PAGE_PADDING_X } from "@/lib/interface/spacing-tokens"
+import {
+  APP_BAR_PADDING_Y,
+  APP_PAGE_PADDING_X,
+  MARKETING_FILTER_STRIP,
+  MARKETING_INSIGHT_CARD,
+  MARKETING_PANEL_PRIMARY,
+  MARKETING_PANEL_SECONDARY,
+} from "@/lib/interface/spacing-tokens"
 
 export const PANEL_DESKTOP_WIDTH = 360
 export const BLOCK_EMBED_CLASSNAME = "w-full min-w-0 min-h-0 max-w-full"
@@ -139,6 +146,72 @@ export function SplitLayout({
       <div className="xl:col-span-1 min-h-0 min-w-0">{right}</div>
     </div>
   )
+}
+
+export function MarketingPanelPrimary({
+  children,
+  className,
+}: {
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <section className={cn(MARKETING_PANEL_PRIMARY, "flex flex-col min-h-0 min-w-0", className)}>
+      {children}
+    </section>
+  )
+}
+
+export function MarketingPanelSecondary({
+  title,
+  children,
+  className,
+  bodyClassName,
+}: {
+  title: string
+  children: React.ReactNode
+  className?: string
+  bodyClassName?: string
+}) {
+  return (
+    <section className={cn(MARKETING_PANEL_SECONDARY, "flex flex-col min-h-0 min-w-0", className)}>
+      <h3 className="text-[11px] font-medium text-muted-foreground px-2.5 pt-2 pb-1 shrink-0">
+        {title}
+      </h3>
+      <div className={cn("flex-1 min-h-0 overflow-y-auto px-2 pb-2", bodyClassName)}>
+        {children}
+      </div>
+    </section>
+  )
+}
+
+export function MarketingInsightCard({
+  title,
+  children,
+  className,
+}: {
+  title?: string
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <div className={cn(MARKETING_INSIGHT_CARD, "px-2.5 py-2 min-w-0", className)}>
+      {title ? (
+        <p className="text-[11px] font-medium text-muted-foreground mb-1.5">{title}</p>
+      ) : null}
+      {children}
+    </div>
+  )
+}
+
+export function MarketingFilterStrip({
+  children,
+  className,
+}: {
+  children: React.ReactNode
+  className?: string
+}) {
+  return <div className={cn(MARKETING_FILTER_STRIP, className)}>{children}</div>
 }
 
 export function AppPageHeader({

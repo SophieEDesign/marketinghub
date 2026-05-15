@@ -253,15 +253,9 @@ export default function AirtableSidebar({
     opacity: 0.65,
   }
 
-  const activeTextColor = getReadableTextColor(primaryColor)
   const navActiveStyle = (active: boolean): CSSProperties => ({
-    color: active ? activeTextColor : sidebarTextColor,
-    ...(active
-      ? {
-          backgroundColor: primaryColor,
-          boxShadow: "none",
-        }
-      : {}),
+    color: active ? primaryColor : sidebarTextColor,
+    ...(active ? { backgroundColor: "rgba(0, 0, 0, 0.06)" } : {}),
   })
 
   if (isMobile && !isOpen) {

@@ -193,7 +193,7 @@ export default function KPIBlock({
 
   // Get border radius
   const getBorderRadius = () => {
-    if (isEditorialKpi) return "14px"
+    if (isEditorialKpi) return "var(--radius-card)"
     if (appearance.border_radius !== undefined) return `${appearance.border_radius}px`
     if (appearance.radius === 'rounded') return '8px'
     return '8px' // Default rounded
@@ -201,7 +201,7 @@ export default function KPIBlock({
 
   // Get padding
   const getPadding = () => {
-    if (isEditorialKpi) return "18px"
+    if (isEditorialKpi) return "12px"
     if (typeof appearance.padding === 'number') return `${appearance.padding}px`
     if (appearance.padding === 'compact') return '12px'
     if (appearance.padding === 'spacious') return '24px'
@@ -261,26 +261,17 @@ export default function KPIBlock({
     appearance.border === "none" ||
     (typeof appearance.border_width === "number" && appearance.border_width === 0)
 
-  const marketingCardStyle: CSSProperties | undefined = marketingDashboardStyle
-    ? {
-        borderColor: "rgba(0,0,0,0.06)",
-        borderWidth: "1px",
-        backgroundColor: "#ffffff",
-        boxShadow: "0 1px 2px rgba(16,24,40,0.04), 0 4px 12px rgba(16,24,40,0.04)",
-      }
-    : undefined
-
   return (
     <div
       className={cn(
-        "relative flex h-full w-full max-w-full min-w-0 flex-col rounded-card",
-        !hideChromeBorder && "border border-border",
-        useCardShell && !appearance.border_color && (marketingDashboardStyle ? "bg-background shadow-none" : "bg-card shadow-card"),
+        "relative flex h-full w-full max-w-full min-w-0 flex-col rounded-card surface-card",
+        !hideChromeBorder && !marketingDashboardStyle && "border border-border",
+        useCardShell && !appearance.border_color && "bg-card shadow-card",
         isClickable &&
           "cursor-pointer transition-shadow duration-200 hover:shadow-card-hover",
         isEditorialKpi && "min-h-[100px] overflow-visible"
       )}
-      style={{ ...blockStyle, ...marketingCardStyle }}
+      style={blockStyle}
       onClick={handleClick}
     >
       {(useCardShell || isEditorialKpi) && (
