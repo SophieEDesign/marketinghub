@@ -72,7 +72,7 @@ export default function AssetCard({
   onPreview,
   onOpen,
 }: AssetCardProps) {
-  const kind = asset.link?.fileKind ?? "file"
+  const kind: DriveFileKind = asset.link?.fileKind ?? "file"
   const Icon = KIND_ICONS[kind] ?? File
   const sourceLabel = asset.link?.providerLabel ?? asset.type ?? "Resource"
   const gradient = PREVIEW_GRADIENTS[previewGradientIndex(asset.id)]
@@ -129,7 +129,7 @@ export default function AssetCard({
             </span>
           </div>
         )}
-        <motionlessPreviewOverlay />
+        <PreviewOverlay />
         <div className="absolute bottom-2 left-2 right-2 flex items-end justify-between gap-2">
           <SourceBadge label={sourceLabel} />
           {kind === "presentation" || kind === "video" ? (
@@ -158,7 +158,7 @@ export default function AssetCard({
         </div>
 
         {asset.tags.length > 0 && !isCarousel ? (
-          <motionlessTagRow tags={asset.tags} />
+          <TagRow tags={asset.tags} />
         ) : null}
 
         {(asset.updatedLabel || asset.owner) && (
@@ -179,13 +179,13 @@ export default function AssetCard({
   )
 }
 
-function motionlessPreviewOverlay() {
+function PreviewOverlay() {
   return (
     <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
   )
 }
 
-function motionlessTagRow({ tags }: { tags: string[] }) {
+function TagRow({ tags }: { tags: string[] }) {
   return (
     <div className="flex flex-wrap gap-1 mt-2">
       {tags.slice(0, 2).map((tag) => (

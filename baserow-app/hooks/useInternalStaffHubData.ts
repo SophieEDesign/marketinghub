@@ -10,8 +10,9 @@ import {
   type InternalStaffTableIds,
   type StaffHubAsset,
 } from "@/lib/marketing/internal-staff-hub"
+import type { FieldOptions } from "@/types/fields"
 
-type FieldRow = { name: string; type?: string; options?: unknown }
+type FieldRow = { name: string; type?: string; options?: FieldOptions }
 
 interface UseInternalStaffHubDataResult {
   loading: boolean

@@ -128,7 +128,7 @@ export default function InternalStaffHubDashboard({
 
       <EditableDashboardRegion id="hero" label="Hero">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 md:gap-4">
-          <motionlessHeroCard
+          <HeroCard
             heroSearch={heroSearch}
             setHeroSearch={setHeroSearch}
             canEdit={canEdit}
@@ -144,7 +144,7 @@ export default function InternalStaffHubDashboard({
               }
             }}
           />
-          <motionlessQuickAccessCol quickAccess={quickAccess} onOpen={openAsset} />
+          <QuickAccessCol quickAccess={quickAccess} onOpen={openAsset} />
         </div>
       </EditableDashboardRegion>
 
@@ -210,7 +210,7 @@ export default function InternalStaffHubDashboard({
           density="compact"
           bodyClassName="px-3 pb-4 pt-0"
         >
-          <motionlessFilterBar
+          <AssetsFilterBar
             filters={filters}
             setFilters={setFilters}
             filterOptions={filterOptions}
@@ -257,7 +257,7 @@ export default function InternalStaffHubDashboard({
   )
 }
 
-function motionlessHeroCard({
+function HeroCard({
   heroSearch,
   setHeroSearch,
   canEdit,
@@ -287,7 +287,7 @@ function motionlessHeroCard({
             Your visual library for brand assets, decks, templates and team resources — including
             the {GENERAL_GALLERY_FOLDER.title} on Google Drive.
           </p>
-          <motionlessHeroActions
+          <HeroActions
             heroSearch={heroSearch}
             setHeroSearch={setHeroSearch}
             canEdit={canEdit}
@@ -309,15 +309,15 @@ function HeroIllustration() {
     >
       <div className="relative w-full aspect-square max-w-[180px]">
         <div className="absolute inset-4 rounded-card-lg bg-violet-200/40 rotate-6 shadow-card" />
-        <motionlessIllustrationCard
+        <IllustrationCard
           className="absolute top-2 right-0 w-16 h-20 rounded-md bg-card shadow-card border border-border/40 flex items-center justify-center"
           icon={FolderOpen}
         />
-        <motionlessIllustrationCard
+        <IllustrationCard
           className="absolute bottom-4 left-0 w-20 h-14 rounded-md bg-card shadow-card border border-border/40 flex items-center justify-center"
           icon={ImageIcon}
         />
-        <motionlessIllustrationCard
+        <IllustrationCard
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-28 rounded-md bg-card shadow-elevated border border-border/50 flex items-center justify-center"
           icon={LayoutGrid}
         />
@@ -326,7 +326,7 @@ function HeroIllustration() {
   )
 }
 
-function motionlessIllustrationCard({
+function IllustrationCard({
   className,
   icon: Icon,
 }: {
@@ -340,7 +340,7 @@ function motionlessIllustrationCard({
   )
 }
 
-function motionlessQuickAccessCol({
+function QuickAccessCol({
   quickAccess,
   onOpen,
 }: {
@@ -354,7 +354,7 @@ function motionlessQuickAccessCol({
   )
 }
 
-function motionlessFilterBar({
+function AssetsFilterBar({
   filters,
   setFilters,
   filterOptions,
@@ -458,7 +458,7 @@ function motionlessFilterBar({
   )
 }
 
-function motionlessHeroActions({
+function HeroActions({
   heroSearch,
   setHeroSearch,
   canEdit,

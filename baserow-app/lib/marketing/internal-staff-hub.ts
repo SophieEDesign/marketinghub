@@ -4,7 +4,11 @@
 
 import { formatDistanceToNow, parseISO, isValid } from "date-fns"
 import { pickFieldName, formatDisplayValue } from "@/lib/marketing/theme-overview"
-import { buildDriveFolderOpenUrl, parseDriveLink } from "@/lib/marketing/drive-link"
+import {
+  buildDriveFolderOpenUrl,
+  parseDriveLink,
+  type ParsedDriveLink,
+} from "@/lib/marketing/drive-link"
 import type { FieldOptions } from "@/types/fields"
 
 type FieldRow = { name: string; type?: string; options?: FieldOptions }

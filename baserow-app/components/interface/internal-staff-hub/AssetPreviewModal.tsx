@@ -35,7 +35,7 @@ export default function AssetPreviewModal({ asset, onClose }: AssetPreviewModalP
         aria-modal
         aria-labelledby="asset-preview-title"
       >
-        <motionlessDialogPanel
+        <PreviewDialogPanel
           asset={asset}
           link={link}
           canEmbed={canEmbed}
@@ -49,7 +49,7 @@ export default function AssetPreviewModal({ asset, onClose }: AssetPreviewModalP
   )
 }
 
-function motionlessDialogPanel({
+function PreviewDialogPanel({
   asset,
   link,
   canEmbed,
@@ -117,7 +117,7 @@ function motionlessDialogPanel({
             />
           </div>
         ) : (
-          <motionlessEmptyPreview providerLabel={link?.providerLabel} openUrl={openUrl} />
+          <EmptyPreview providerLabel={link?.providerLabel} openUrl={openUrl} />
         )}
       </div>
 
@@ -148,7 +148,7 @@ function motionlessDialogPanel({
   )
 }
 
-function motionlessEmptyPreview({
+function EmptyPreview({
   providerLabel,
   openUrl,
 }: {
