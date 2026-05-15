@@ -769,7 +769,7 @@ async function main() {
     group_id: publicGroup,
     order_index: 1,
     saved_view_id: ctx.anchors.resources,
-    config: { layout_style: "marketing_dashboard" },
+    config: { layout_style: "internal_staff_hub" },
   })
 
   await applyPageBlocksAdditive(homePageId, buildMarketingHomeBlocks(ctx))

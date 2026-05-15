@@ -33,6 +33,7 @@ import { shouldApplyResolvedTableId } from "@/lib/immediate-phase/guards"
 import { isContentPlanningPage } from "@/lib/marketing/content-planning"
 import { isMarketingHomePage } from "@/lib/marketing/marketing-home"
 import { isThemeOverviewPage } from "@/lib/marketing/theme-overview"
+import { isInternalStaffHubPage } from "@/lib/marketing/internal-staff-hub"
 import MarketingDashboardLayout from "@/components/interface/MarketingDashboardLayout"
 import { DashboardEditChromeProvider } from "@/components/interface/EditableDashboardRegion"
 // Lazy load InterfaceBuilder for dashboard/overview pages
@@ -42,6 +43,9 @@ const RecordReviewPage = dynamic(() => import("./RecordReviewPage"), { ssr: fals
 const ThemeOverviewDashboard = dynamic(() => import("./ThemeOverviewDashboard"), { ssr: false })
 const ContentPlanningDashboard = dynamic(() => import("./ContentPlanningDashboard"), { ssr: false })
 const MarketingHomeDashboard = dynamic(() => import("./MarketingHomeDashboard"), { ssr: false })
+const InternalStaffHubDashboard = dynamic(() => import("./InternalStaffHubDashboard"), {
+  ssr: false,
+})
 
 /** Single stable wrapper for page content - avoids conditional tree swapping at InterfacePageClient level */
 function InterfacePageContent({
@@ -61,6 +65,7 @@ function InterfacePageContent({
   showThemeOverview,
   showContentPlanning,
   showMarketingHome,
+  showInternalStaffHub,
 }: {
   useRecordReviewLayout: boolean
   hasPage: boolean
@@ -78,7 +83,19 @@ function InterfacePageContent({
   showThemeOverview: boolean
   showContentPlanning: boolean
   showMarketingHome: boolean
+  showInternalStaffHub: boolean
 }) {
+  if (showInternalStaffHub) {
+    return (
+      <MarketingDashboardLayout>
+        <DashboardEditChromeProvider>
+          <div className={`min-h-0 min-w-0 w-full max-w-full flex flex-col ${BLOCK_EMBED_CLASSNAME}`}>
+            <InternalStaffHubDashboard canEdit={!isViewer} />
+          </div>
+        </DashboardEditChromeProvider>
+      </MarketingDashboardLayout>
+    )
+  }
   if (showMarketingHome) {
     return (
       <MarketingDashboardLayout>
@@ -204,15 +221,18 @@ function InterfacePageClientInternal({
       cfg?.layout_style === "theme_overview" ||
       cfg?.layout_style === "content_planning" ||
       isThemeOverviewPage(page) ||
-      isContentPlanningPage(page)
+      isContentPlanningPage(page) ||
+      isInternalStaffHubPage(page)
     )
   }, [page?.name, page?.config, marketingHome])
 
   const themeOverview = useMemo(() => isThemeOverviewPage(page), [page?.name, page?.config])
   const contentPlanning = useMemo(() => isContentPlanningPage(page), [page?.name, page?.config])
+  const internalStaffHub = useMemo(() => isInternalStaffHubPage(page), [page?.name, page?.config])
 
   /** Bespoke marketing dashboards — same UI in view and edit; skip canvas-only edit padding */
-  const isBespokeMarketingPage = marketingHome || themeOverview || contentPlanning
+  const isBespokeMarketingPage =
+    marketingHome || themeOverview || contentPlanning || internalStaffHub
   
   // Track previous pageId to reset blocks when page changes
   // CRITICAL: Use ref to track actual pageId changes, not effect dependencies
@@ -1529,6 +1549,7 @@ function InterfacePageClientInternal({
             showThemeOverview={themeOverview}
             showContentPlanning={contentPlanning}
             showMarketingHome={marketingHome}
+            showInternalStaffHub={internalStaffHub}
           />
           {blocksLoading && (
             <div className="absolute inset-0 bg-white/60 flex items-center justify-center z-10 pointer-events-none">
