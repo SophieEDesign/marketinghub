@@ -14,6 +14,9 @@ import {
   type ContentPlanningItem,
   type ContentPlanningTableIds,
 } from "@/lib/marketing/content-planning"
+import type { FieldOptions } from "@/types/fields"
+
+type PlanningFieldRow = { name: string; type?: string; options?: FieldOptions }
 
 interface UseContentPlanningDataResult {
   loading: boolean
@@ -35,8 +38,8 @@ export function useContentPlanningData(): UseContentPlanningDataResult {
   const [error, setError] = useState<string | null>(null)
   const [tableIds, setTableIds] = useState<ContentPlanningTableIds | null>(null)
   const [fields, setFields] = useState<ContentPlanningFieldMap | null>(null)
-  const [contentFields, setContentFields] = useState<{ name: string; type?: string; options?: unknown }[]>([])
-  const [themeFields, setThemeFields] = useState<{ name: string; type?: string; options?: unknown }[]>([])
+  const [contentFields, setContentFields] = useState<PlanningFieldRow[]>([])
+  const [themeFields, setThemeFields] = useState<PlanningFieldRow[]>([])
   const [contentRows, setContentRows] = useState<Record<string, unknown>[]>([])
   const [themeRows, setThemeRows] = useState<Record<string, unknown>[]>([])
   const [campaignRows, setCampaignRows] = useState<Record<string, unknown>[]>([])
@@ -139,8 +142,8 @@ export function useContentPlanningData(): UseContentPlanningDataResult {
 
         setTableIds(ids)
         setFields(fieldMap)
-        setContentFields(contentFieldRows)
-        setThemeFields(themeFieldRows)
+        setContentFields(contentFieldRows as PlanningFieldRow[])
+        setThemeFields(themeFieldRows as PlanningFieldRow[])
         setThemeRows(themeData)
         setContentRows((contentRes.data || []) as Record<string, unknown>[])
         setCampaignRows((campaignsRes.data || []) as Record<string, unknown>[])
