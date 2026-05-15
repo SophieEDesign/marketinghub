@@ -1024,7 +1024,7 @@ export default function ListView({
               "w-full",
               marketingDashboardStyle
                 ? "marketing-card border-border/40 rounded-card-lg shadow-card bg-white"
-                : "border-gray-200 rounded-lg bg-white"
+                : "surface-card rounded-card-lg border-border/40 bg-card"
             )}
           >
             <div className="w-full max-w-full min-w-0 overflow-x-auto">
@@ -1262,7 +1262,7 @@ export default function ListView({
             "w-full",
             marketingDashboardStyle
               ? "marketing-card border-border/40 rounded-card-lg shadow-card bg-white"
-              : "border-gray-200 rounded-lg bg-white"
+              : "surface-card rounded-card-lg border-border/40 bg-card"
           )}
         >
           <div className="w-full max-w-full min-w-0 overflow-x-auto">

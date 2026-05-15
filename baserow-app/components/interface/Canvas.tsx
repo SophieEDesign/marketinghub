@@ -51,6 +51,11 @@ import { usePageAggregates } from "@/lib/dashboard/usePageAggregates"
 import { useCanvasPageFiltersResolver } from "@/components/interface/canvas/useCanvasPageFiltersResolver"
 import { useCanvasTopFieldBlockIds } from "@/components/interface/canvas/useCanvasTopFieldBlockIds"
 import { Settings2 } from "lucide-react"
+import {
+  builderBlockFrameClassName,
+  BUILDER_CHROME_DRAG_HANDLE,
+} from "@/components/interface/primitives/BuilderBlockFrame"
+import { cn } from "@/lib/utils"
 
 const ResponsiveGridLayout = withResizeObserverWidthProvider(Responsive)
 
@@ -2368,23 +2373,14 @@ export default function Canvas({
             return (
               <div
                 key={block.id}
-                className={`block-container relative ${
-                  isEditing
-                    ? `group bg-white border-2 border-dashed border-gray-200 hover:border-gray-300 rounded-lg shadow-sm hover:shadow-md ${
-                        selectedBlockId === block.id
-                          ? "ring-2 ring-blue-500 border-blue-500 shadow-lg"
-                          : ""
-                      } ${
-                        activeSnapTargets?.highlightedBlocks?.includes(block.id)
-                          ? "ring-2 ring-blue-400 border-blue-400 shadow-md"
-                          : ""
-                      } ${
-                        keyboardMoveHighlight === block.id
-                          ? "ring-2 ring-green-400 border-green-400 shadow-lg"
-                          : ""
-                      }`
-                    : "bg-transparent border-0 shadow-none"
-                }`}
+                className={builderBlockFrameClassName({
+                  isEditing,
+                  isSelected: selectedBlockId === block.id,
+                  isSnapHighlighted: Boolean(
+                    activeSnapTargets?.highlightedBlocks?.includes(block.id)
+                  ),
+                  isKeyboardHighlighted: keyboardMoveHighlight === block.id,
+                })}
                 onClick={(e) => {
                   // Only allow selection in edit mode, and not if clicking:
                   // - buttons
@@ -2438,7 +2434,10 @@ export default function Canvas({
                 >
                   <button
                     type="button"
-                    className="cursor-grab active:cursor-grabbing p-1.5 bg-white/95 backdrop-blur-sm border border-gray-300 rounded-md shadow-sm hover:bg-white hover:border-blue-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 touch-none transition-all duration-150 min-w-[30px] min-h-[30px] flex items-center justify-center"
+                    className={cn(
+                      "cursor-grab active:cursor-grabbing touch-none transition-all duration-150 min-w-[30px] min-h-[30px] flex items-center justify-center",
+                      BUILDER_CHROME_DRAG_HANDLE
+                    )}
                     title="Drag to move (or use arrow keys)"
                     aria-label="Drag to move block"
                     onMouseDown={(e) => {

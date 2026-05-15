@@ -7,9 +7,8 @@ import {
   APP_PAGE_PADDING_X,
   MARKETING_FILTER_STRIP,
   MARKETING_INSIGHT_CARD,
-  MARKETING_PANEL_PRIMARY,
-  MARKETING_PANEL_SECONDARY,
 } from "@/lib/interface/spacing-tokens"
+import PanelShell from "@/components/interface/primitives/PanelShell"
 
 export const PANEL_DESKTOP_WIDTH = 360
 export const BLOCK_EMBED_CLASSNAME = "w-full min-w-0 min-h-0 max-w-full"
@@ -55,7 +54,7 @@ export function CanvasContainer({
       className={cn(
         BLOCK_EMBED_CLASSNAME,
         "mx-auto flex flex-col flex-1",
-        scrollOwner === "self" ? "overflow-y-auto overscroll-contain" : "overflow-visible",
+        scrollOwner === "self" ? "overflow-y-auto overscroll-contain app-scrollable" : "overflow-visible",
         fullBleed ? "max-w-none px-0" : "max-w-7xl px-4 md:px-6 py-4 md:py-6 gap-4 md:gap-6",
         className
       )}
@@ -75,7 +74,7 @@ export function Panel({
   return (
     <section
       className={cn(
-        "rounded-xl border border-border bg-card text-card-foreground shadow-sm",
+        "panel-shell rounded-card text-card-foreground",
         "flex flex-col min-h-0 min-w-0",
         className
       )}
@@ -112,7 +111,7 @@ export function AppCard({
   children: React.ReactNode
   className?: string
 }) {
-  return <div className={cn("rounded-xl border border-border bg-card shadow-sm", className)}>{children}</div>
+  return <div className={cn("surface-card rounded-card", className)}>{children}</div>
 }
 
 export function GridLayout({
@@ -156,9 +155,9 @@ export function MarketingPanelPrimary({
   className?: string
 }) {
   return (
-    <section className={cn(MARKETING_PANEL_PRIMARY, "flex flex-col min-h-0 min-w-0", className)}>
+    <PanelShell variant="primary" className={className}>
       {children}
-    </section>
+    </PanelShell>
   )
 }
 
@@ -174,14 +173,15 @@ export function MarketingPanelSecondary({
   bodyClassName?: string
 }) {
   return (
-    <section className={cn(MARKETING_PANEL_SECONDARY, "flex flex-col min-h-0 min-w-0", className)}>
-      <h3 className="text-[11px] font-medium text-muted-foreground px-2.5 pt-2 pb-1 shrink-0">
-        {title}
-      </h3>
-      <div className={cn("flex-1 min-h-0 overflow-y-auto px-2 pb-2", bodyClassName)}>
-        {children}
-      </div>
-    </section>
+    <PanelShell
+      variant="secondary"
+      title={title}
+      className={className}
+      scrollBody
+      bodyClassName={cn("px-2 pb-2", bodyClassName)}
+    >
+      {children}
+    </PanelShell>
   )
 }
 

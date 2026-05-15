@@ -660,7 +660,7 @@ export default function GalleryView({
         allowInternalScroll
           ? "w-full h-full min-h-0 max-h-full overflow-y-auto overflow-x-hidden overscroll-contain"
           : "w-full min-h-0 overflow-visible overflow-x-hidden",
-        marketingDashboardStyle ? "bg-background" : "bg-gray-50"
+        "bg-background"
       )}
     >
       {Array.isArray(groupedRows) && groupedRows.length > 0 ? (

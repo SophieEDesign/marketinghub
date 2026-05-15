@@ -518,7 +518,7 @@ function KanbanView({
   const allowInternalScroll = displayMode === "fixed" && overflowBehaviour === "scroll"
 
   return (
-    <div className={cn("w-full min-w-0 min-h-0 flex flex-col bg-gray-50", allowInternalScroll ? "h-full overflow-hidden" : "h-auto overflow-visible")}>
+    <div className={cn("w-full min-w-0 min-h-0 flex flex-col bg-background", allowInternalScroll ? "h-full overflow-hidden" : "h-auto overflow-visible")}>
       <div className={cn("min-h-0 overflow-x-auto snap-x snap-proximity", allowInternalScroll ? "flex-1 overflow-y-hidden" : "overflow-y-visible")}>
         <div className="flex gap-4 min-w-max p-4">
         {groups.map((groupName) => {
@@ -528,7 +528,7 @@ function KanbanView({
             groupName
           const headerColor = getColumnHeaderColor(groupName)
           return (
-          <div key={groupName} className="w-[280px] flex-shrink-0 flex flex-col gap-2 p-2 rounded-xl bg-gray-50 snap-start">
+          <div key={groupName} className="w-[280px] flex-shrink-0 flex flex-col gap-2 p-2 rounded-card-lg bg-muted/20 border border-border/30 snap-start">
             <div className="flex items-center gap-2 flex-wrap shrink-0">
               {headerColor ? (
                 <span

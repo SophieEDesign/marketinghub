@@ -1,5 +1,16 @@
 /**
  * Shared spacing/layout tokens — single source for blocks, panels, and density.
+ *
+ * SURFACE_TOKEN_CONTRACT (canonical — do not add parallel radius/shadow stacks):
+ * | Role            | Radius              | Shadow                          | CSS class        |
+ * |-----------------|---------------------|---------------------------------|------------------|
+ * | Card            | rounded-card        | shadow-card (+ hover utility)   | .surface-card    |
+ * | Panel           | rounded-card-lg     | shadow-card                     | .panel-shell     |
+ * | Hero / elevated | rounded-card-lg     | shadow-elevated                 | .surface-elevated|
+ * | Inner nested    | rounded-inner       | none                            | —                |
+ *
+ * --section-gap (globals) applies under .marketing-dashboard-shell only.
+ * APP_SECTION_GAP is the React/Tailwind rhythm for dashboard grids.
  */
 
 export type SurfaceDensity = "comfortable" | "compact" | "tight"
@@ -82,7 +93,26 @@ export const MARKETING_PANEL_PRIMARY =
 
 /** Secondary rail panels (sidebar lists). */
 export const MARKETING_PANEL_SECONDARY =
-  "rounded-lg border border-border/30 bg-muted/15 shadow-none"
+  "rounded-inner border border-border/30 bg-muted/15 shadow-none"
+
+/** Edit-mode block frame — builder chrome only (view mode uses transparent wrapper). */
+export const BUILDER_CHROME_FRAME_BASE =
+  "group bg-card border-2 border-dashed border-border/60 hover:border-border rounded-card shadow-card hover:shadow-card-hover"
+
+export const BUILDER_CHROME_FRAME_SELECTED =
+  "ring-2 ring-accent-link/50 border-accent-link/60 shadow-elevated"
+
+export const BUILDER_CHROME_FRAME_SNAP =
+  "ring-2 ring-accent-link/35 border-accent-link/40 shadow-card-hover"
+
+export const BUILDER_CHROME_FRAME_KEYBOARD =
+  "ring-2 ring-chart-2/50 border-chart-2/40 shadow-elevated"
+
+export const BUILDER_CHROME_FRAME_VIEW =
+  "bg-transparent border-0 shadow-none"
+
+export const BUILDER_CHROME_DRAG_HANDLE =
+  "p-1.5 bg-card/95 backdrop-blur-sm border border-border rounded-inner shadow-card hover:border-accent-link/50 hover:shadow-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-link/40 focus-visible:ring-offset-2"
 
 /** Lightweight insight / gap callouts. */
 export const MARKETING_INSIGHT_CARD =

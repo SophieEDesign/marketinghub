@@ -24,9 +24,9 @@ export function getAccentColor(
 
   const colorMap: Record<string, Record<string, string>> = {
     grey: {
-      bg: emphasised ? 'bg-gray-100' : 'bg-gray-50',
-      border: 'border-l-2 border-gray-400/50',
-      text: 'text-gray-700',
+      bg: emphasised ? 'bg-muted' : 'bg-muted/50',
+      border: 'border-l-2 border-border',
+      text: 'text-muted-foreground',
     },
     blue: {
       bg: emphasised ? 'bg-blue-100' : 'bg-blue-50',
@@ -91,10 +91,10 @@ export function getTitleAlignClass(align: AppearanceConfig['titleAlign'] = 'left
  */
 export function getHeaderBarClasses(appearance?: AppearanceConfig): string {
   if (!appearance || !appearance.accent || appearance.accent === 'none') {
-    return 'bg-gray-50 border-b border-gray-200'
+    return 'bg-muted/30 border-b border-border/60'
   }
 
   const accentBg = getAccentColor(appearance.accent, 'bg')
-  return cn('border-b border-gray-200', accentBg)
+  return cn('border-b border-border/60', accentBg)
 }
 
