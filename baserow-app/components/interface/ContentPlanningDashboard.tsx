@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import { format } from "date-fns"
 import { ChevronRight, Palette, Plus, Search } from "lucide-react"
 import ContentPlanningCalendar from "@/components/interface/ContentPlanningCalendar"
+import { EditableDashboardRegion } from "@/components/interface/EditableDashboardRegion"
 import {
   MarketingFilterStrip,
   MarketingInsightCard,
@@ -194,13 +195,16 @@ export default function ContentPlanningDashboard({ canEdit = false }: ContentPla
 
   return (
     <div className="flex flex-col gap-3 md:gap-4 min-w-0 pb-4">
+      <EditableDashboardRegion id="page-header" label="Page header">
       <header className="flex flex-col gap-0.5">
         <h1 className="text-lg font-medium tracking-tight text-foreground">Content Planning</h1>
         <p className="text-sm text-muted-foreground">
           Plan, schedule and track upcoming marketing content.
         </p>
       </header>
+      </EditableDashboardRegion>
 
+      <EditableDashboardRegion id="filter-strip" label="Filters">
       <MarketingFilterStrip>
         <div className="relative flex-1 min-w-[200px] max-w-md order-first">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -319,16 +323,20 @@ export default function ContentPlanningDashboard({ canEdit = false }: ContentPla
           </Button>
         ) : null}
       </MarketingFilterStrip>
+      </EditableDashboardRegion>
 
       <div className="flex flex-col xl:flex-row gap-3 min-h-0">
         <div className="flex-1 min-w-0 flex flex-col gap-2 min-h-0">
+          <EditableDashboardRegion id="calendar" label="Content calendar">
           <ContentPlanningCalendar
             events={calendarEvents}
             viewMode={calendarView}
             onViewModeChange={setCalendarView}
             onEventClick={(id) => openContent(id)}
           />
+          </EditableDashboardRegion>
 
+          <EditableDashboardRegion id="upcoming-list" label="Upcoming content">
           <MarketingPanelSecondary title="Upcoming content" className="max-h-[200px] shrink-0">
             <ul className="divide-y divide-border/25">
               {upcomingList.length === 0 ? (
@@ -361,9 +369,11 @@ export default function ContentPlanningDashboard({ canEdit = false }: ContentPla
               )}
             </ul>
           </MarketingPanelSecondary>
+          </EditableDashboardRegion>
         </div>
 
         <aside className="w-full xl:w-[260px] shrink-0 flex flex-col gap-2 xl:max-h-[calc(100vh-12rem)]">
+          <EditableDashboardRegion id="deadlines" label="Upcoming deadlines">
           <MarketingPanelSecondary title="Upcoming deadlines" className="max-h-[180px]">
             <ul className="flex flex-col gap-0.5">
               {deadlines.length === 0 ? (
@@ -392,7 +402,9 @@ export default function ContentPlanningDashboard({ canEdit = false }: ContentPla
               )}
             </ul>
           </MarketingPanelSecondary>
+          </EditableDashboardRegion>
 
+          <EditableDashboardRegion id="campaigns" label="Upcoming campaigns">
           <MarketingPanelSecondary title="Upcoming campaigns" className="max-h-[200px]">
             <ul className="flex flex-col gap-0.5">
               {campaignCards.length === 0 ? (
@@ -422,8 +434,10 @@ export default function ContentPlanningDashboard({ canEdit = false }: ContentPla
               )}
             </ul>
           </MarketingPanelSecondary>
+          </EditableDashboardRegion>
 
           {visibleGaps.length > 0 ? (
+            <EditableDashboardRegion id="content-gaps" label="Content gaps">
             <MarketingInsightCard title="Content gaps">
               <ul className="flex flex-col gap-1.5">
                 {visibleGaps.map((gap) => (
@@ -442,6 +456,7 @@ export default function ContentPlanningDashboard({ canEdit = false }: ContentPla
                 ))}
               </ul>
             </MarketingInsightCard>
+            </EditableDashboardRegion>
           ) : null}
         </aside>
       </div>

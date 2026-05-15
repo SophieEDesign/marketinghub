@@ -34,6 +34,7 @@ import { isContentPlanningPage } from "@/lib/marketing/content-planning"
 import { isMarketingHomePage } from "@/lib/marketing/marketing-home"
 import { isThemeOverviewPage } from "@/lib/marketing/theme-overview"
 import MarketingDashboardLayout from "@/components/interface/MarketingDashboardLayout"
+import { DashboardEditChromeProvider } from "@/components/interface/EditableDashboardRegion"
 // Lazy load InterfaceBuilder for dashboard/overview pages
 const InterfaceBuilder = dynamic(() => import("./InterfaceBuilder"), { ssr: false })
 // Lazy load RecordReviewPage for record_review pages
@@ -81,25 +82,31 @@ function InterfacePageContent({
   if (showMarketingHome) {
     return (
       <MarketingDashboardLayout>
-        <div className={`min-h-0 min-w-0 w-full max-w-full flex flex-col ${BLOCK_EMBED_CLASSNAME}`}>
-          <MarketingHomeDashboard canEdit={!isViewer} />
-        </div>
+        <DashboardEditChromeProvider>
+          <div className={`min-h-0 min-w-0 w-full max-w-full flex flex-col ${BLOCK_EMBED_CLASSNAME}`}>
+            <MarketingHomeDashboard canEdit={!isViewer} />
+          </div>
+        </DashboardEditChromeProvider>
       </MarketingDashboardLayout>
     )
   }
   if (showThemeOverview) {
     return (
-      <div className={`min-h-0 min-w-0 w-full max-w-full flex flex-col ${BLOCK_EMBED_CLASSNAME}`}>
-        <ThemeOverviewDashboard canEdit={!isViewer} />
-      </div>
+      <DashboardEditChromeProvider>
+        <div className={`min-h-0 min-w-0 w-full max-w-full flex flex-col ${BLOCK_EMBED_CLASSNAME}`}>
+          <ThemeOverviewDashboard canEdit={!isViewer} />
+        </div>
+      </DashboardEditChromeProvider>
     )
   }
   if (showContentPlanning) {
     return (
       <MarketingDashboardLayout>
-        <div className={`min-h-0 min-w-0 w-full max-w-full flex flex-col ${BLOCK_EMBED_CLASSNAME}`}>
-          <ContentPlanningDashboard canEdit={!isViewer} />
-        </div>
+        <DashboardEditChromeProvider>
+          <div className={`min-h-0 min-w-0 w-full max-w-full flex flex-col ${BLOCK_EMBED_CLASSNAME}`}>
+            <ContentPlanningDashboard canEdit={!isViewer} />
+          </div>
+        </DashboardEditChromeProvider>
       </MarketingDashboardLayout>
     )
   }
@@ -203,6 +210,9 @@ function InterfacePageClientInternal({
 
   const themeOverview = useMemo(() => isThemeOverviewPage(page), [page?.name, page?.config])
   const contentPlanning = useMemo(() => isContentPlanningPage(page), [page?.name, page?.config])
+
+  /** Bespoke marketing dashboards — same UI in view and edit; skip canvas-only edit padding */
+  const isBespokeMarketingPage = marketingHome || themeOverview || contentPlanning
   
   // Track previous pageId to reset blocks when page changes
   // CRITICAL: Use ref to track actual pageId changes, not effect dependencies
@@ -1500,7 +1510,7 @@ function InterfacePageClientInternal({
         <CanvasContainer
           scrollOwner={suppressMainScroll ? "parent" : "self"}
           fullBleed
-          className={`relative ${suppressMainScroll ? "flex-1 min-h-0" : "min-h-full"} ${isEditMode ? "pb-48" : ""}`}
+          className={`relative ${suppressMainScroll ? "flex-1 min-h-0" : "min-h-full"} ${isEditMode && !isBespokeMarketingPage ? "pb-48" : ""}`}
         >
           <InterfacePageContent
             useRecordReviewLayout={useRecordReviewLayout}
@@ -1516,9 +1526,9 @@ function InterfacePageClientInternal({
             recordContext={recordContext}
             setRecordContext={setRecordContext}
             marketingDashboard={marketingDashboard}
-            showThemeOverview={themeOverview && !isEditMode}
-            showContentPlanning={contentPlanning && !isEditMode}
-            showMarketingHome={marketingHome && !isEditMode}
+            showThemeOverview={themeOverview}
+            showContentPlanning={contentPlanning}
+            showMarketingHome={marketingHome}
           />
           {blocksLoading && (
             <div className="absolute inset-0 bg-white/60 flex items-center justify-center z-10 pointer-events-none">

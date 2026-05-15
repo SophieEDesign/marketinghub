@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { EditableDashboardRegion } from "@/components/interface/EditableDashboardRegion"
 import AccentCard from "@/components/interface/primitives/AccentCard"
 import DashboardEmpty from "@/components/interface/primitives/DashboardEmpty"
 import DashboardPanel from "@/components/interface/primitives/DashboardPanel"
@@ -269,6 +270,7 @@ export default function ThemeOverviewDashboard({ canEdit = false }: ThemeOvervie
 
   return (
     <div className={cn("flex flex-col min-w-0", DASHBOARD_PAGE_GAP)}>
+      <EditableDashboardRegion id="page-header" label="Page header">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className={TEXT_PAGE_TITLE}>Theme overview</h1>
@@ -294,7 +296,9 @@ export default function ThemeOverviewDashboard({ canEdit = false }: ThemeOvervie
           </Badge>
         </div>
       </header>
+      </EditableDashboardRegion>
 
+      <EditableDashboardRegion id="active-theme" label="Active theme">
       {activeCard ? (
         <ActiveThemeHero
           card={activeCard}
@@ -309,7 +313,9 @@ export default function ThemeOverviewDashboard({ canEdit = false }: ThemeOvervie
           description="Add or link a quarterly theme for this period."
         />
       )}
+      </EditableDashboardRegion>
 
+      <EditableDashboardRegion id="annual-themes" label="Annual themes">
       <section>
         <h2 className="text-section-title mb-2.5">Annual themes · {selectedYear}</h2>
         {cards.length === 0 ? (
@@ -334,6 +340,7 @@ export default function ThemeOverviewDashboard({ canEdit = false }: ThemeOvervie
           </div>
         )}
       </section>
+      </EditableDashboardRegion>
 
       {!fields?.contentTheme ? (
         <p className="text-xs text-muted-foreground/75">

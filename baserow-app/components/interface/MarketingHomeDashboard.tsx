@@ -18,6 +18,7 @@ import {
   getWeekDayStrip,
   resolveHeroFromTheme,
 } from "@/lib/marketing/marketing-home"
+import { EditableDashboardRegion } from "@/components/interface/EditableDashboardRegion"
 import DashboardPanel from "@/components/interface/primitives/DashboardPanel"
 import DashboardEmpty from "@/components/interface/primitives/DashboardEmpty"
 import MetricCard from "@/components/interface/primitives/MetricCard"
@@ -176,6 +177,7 @@ export default function MarketingHomeDashboard({ canEdit: _canEdit = false }: Ma
 
   return (
     <div className={cn("flex flex-col min-w-0 pb-2", DASHBOARD_PAGE_GAP)}>
+      <EditableDashboardRegion id="hero-quarter" label="Current quarter">
       <DashboardPanel
         elevated
         accentColor={accentColor}
@@ -241,7 +243,9 @@ export default function MarketingHomeDashboard({ canEdit: _canEdit = false }: Ma
             </ul>
           ) : null}
       </DashboardPanel>
+      </EditableDashboardRegion>
 
+      <EditableDashboardRegion id="kpi-row" label="Key metrics">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <MetricCard label="Upcoming content" value={kpis.upcomingContent} accentIndex={0} />
         <MetricCard label="Scheduled this week" value={kpis.scheduledThisWeek} accentIndex={1} />
@@ -253,9 +257,10 @@ export default function MarketingHomeDashboard({ canEdit: _canEdit = false }: Ma
         />
         <MetricCard label="Active campaigns" value={kpis.activeCampaigns} accentIndex={3} />
       </div>
+      </EditableDashboardRegion>
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-3 md:gap-4">
-        <div className="xl:col-span-5 flex flex-col min-h-0">
+        <EditableDashboardRegion id="core-focus" label="Current core focus" className="xl:col-span-5 flex flex-col min-h-0">
           <DashboardPanel
             title="Current core focus"
             subtitle="Strategy for this quarter"
@@ -321,9 +326,9 @@ export default function MarketingHomeDashboard({ canEdit: _canEdit = false }: Ma
                 <ArrowUpRight className="h-3.5 w-3.5" />
               </button>
           </DashboardPanel>
-        </div>
+        </EditableDashboardRegion>
 
-        <div className="xl:col-span-7 min-h-0">
+        <EditableDashboardRegion id="upcoming-content" label="Upcoming content" className="xl:col-span-7 min-h-0">
           <DashboardPanel
             title="Upcoming content"
             subtitle="Next scheduled items across all types"
@@ -344,10 +349,11 @@ export default function MarketingHomeDashboard({ canEdit: _canEdit = false }: Ma
               </ul>
             )}
           </DashboardPanel>
-        </div>
+        </EditableDashboardRegion>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
+        <EditableDashboardRegion id="social-snapshot" label="Social media snapshot">
         <DashboardPanel
           title="Social media snapshot"
           subtitle="Operational posting cadence"
@@ -400,7 +406,9 @@ export default function MarketingHomeDashboard({ canEdit: _canEdit = false }: Ma
             ))}
           </div>
         </DashboardPanel>
+        </EditableDashboardRegion>
 
+        <EditableDashboardRegion id="content-pipeline" label="Content pipeline">
         <DashboardPanel
           title="Content pipeline"
           subtitle={`${pipelineTotal} items across workflow stages`}
@@ -430,6 +438,7 @@ export default function MarketingHomeDashboard({ canEdit: _canEdit = false }: Ma
             })}
           </div>
         </DashboardPanel>
+        </EditableDashboardRegion>
       </div>
     </div>
   )
