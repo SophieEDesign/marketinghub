@@ -14,14 +14,28 @@ export default async function MarketingHomePage() {
 
   const pages = await getAllInterfacePages()
 
-  const exactMarketingHome = pages.find((p) => normalizeName(p.name) === "marketing home")
-  if (exactMarketingHome) {
-    redirect(`/pages/${exactMarketingHome.id}`)
+  const marketingHomeByStyle = pages.find(
+    (p) =>
+      (p.config as { layout_style?: string } | undefined)?.layout_style === "marketing_home"
+  )
+  if (marketingHomeByStyle) {
+    redirect(`/pages/${marketingHomeByStyle.id}`)
+  }
+
+  const dashboardPage = pages.find((p) => normalizeName(p.name) === "dashboard")
+  if (dashboardPage) {
+    redirect(`/pages/${dashboardPage.id}`)
+  }
+
+  const legacyMarketingHome = pages.find((p) => normalizeName(p.name) === "marketing home")
+  if (legacyMarketingHome) {
+    redirect(`/pages/${legacyMarketingHome.id}`)
   }
 
   const marketingDashboardByStyle = pages.find(
     (p) =>
-      (p.config as { layout_style?: string } | undefined)?.layout_style === "marketing_dashboard"
+      (p.config as { layout_style?: string } | undefined)?.layout_style === "marketing_dashboard" &&
+      normalizeName(p.name) === "marketing dashboard"
   )
   if (marketingDashboardByStyle) {
     redirect(`/pages/${marketingDashboardByStyle.id}`)

@@ -1,11 +1,11 @@
-/**
+﻿/**
  * Applies a curated Marketing Hub workspace structure using existing data model.
  *
  * Goals:
  * - Keep schema unchanged
  * - Reuse interface pages + view_blocks + record modal behavior
  * - Enforce hierarchy:
- *   Marketing Home -> Theme Workspace -> Campaign Workspace -> Content Planning
+ *   Dashboard -> Theme Workspace -> Content Planning
  * - Enforce per-page structure:
  *   one primary block + one supporting block + one compact summary strip
  *
@@ -167,14 +167,17 @@ async function upsertPage({ name, aliases = [], page_type, group_id, order_index
     .select("id, name")
     .in("name", lookupNames)
     .eq("is_archived", false)
-    .limit(1)
   if (eErr) throw new Error(`Page lookup failed for ${name}: ${eErr.message}`)
-  const existing = existingRows?.[0] || null
+  const byName = new Map((existingRows || []).map((row) => [row.name, row]))
+  const existing =
+    byName.get(name) ||
+    (aliases || []).map((alias) => byName.get(alias)).find(Boolean) ||
+    null
 
   if (existing?.id) {
     const { data: updated, error: uErr } = await supabase
       .from("interface_pages")
-      .update({ page_type, group_id, order_index, saved_view_id, config, is_admin_only: false })
+      .update({ name, page_type, group_id, order_index, saved_view_id, config, is_admin_only: false })
       .eq("id", existing.id)
       .select("id")
       .single()
@@ -260,253 +263,16 @@ async function applyPageBlocksAdditive(pageId, blocks) {
   }
 }
 
-function buildMarketingHomeBlocks(ctx) {
-  const themeFields = ctx.fieldsByTable.get(ctx.quarterlyThemes.id) || []
-  const contentFields = ctx.fieldsByTable.get(ctx.content.id) || []
-
-  const themeName = pickFieldName(themeFields, [/^name$/i, /theme/i], "name")
-  const themeStatus = pickFieldName(themeFields, [/^status$/i, /state/i], null)
-  const themeSummary = pickFieldName(themeFields, [/summary/i, /description/i, /brief/i, /notes?/i], null)
-  const themeYear = pickFieldName(themeFields, [/^year$/i, /fiscal_year/i, /planning_year/i], null)
-  const themeDate = pickFieldName(themeFields, [/start_date/i, /date/i, /period_start/i, /from_date/i], null)
-  const contentName = pickFieldName(contentFields, [/content_name/i, /^name$/i], "content_name")
-  const contentDate = pickFieldName(contentFields, [/^date$/i, /publish_date/i, /due_date/i], "date")
-  const contentStatus = pickFieldName(contentFields, [/^status$/i, /state/i], null)
-  const contentTheme = pickFieldName(contentFields, [/quarterly_theme/i, /^theme$/i], null)
-
-  const blocks = []
-  const now = new Date()
-  const currentYear = now.getFullYear()
-  const yearStart = `${currentYear}-01-01`
-  const yearEnd = `${currentYear}-12-31`
-  const themeCurrentYearFilters = compactFilters(
-    themeFields,
-    themeYear
-      ? [
-          { field: themeName, operator: "is_not_empty", value: "" },
-          { field: themeYear, operator: "is_any_of", value: [String(currentYear), currentYear] },
-        ]
-      : themeDate
-      ? [
-          { field: themeName, operator: "is_not_empty", value: "" },
-          { field: themeDate, operator: "date_range", value: { start: yearStart, end: yearEnd } },
-        ]
-      : [{ field: themeName, operator: "is_not_empty", value: "" }]
-  )
-  const baseContentFilters = compactFilters(contentFields, [
-    { field: contentName, operator: "is_not_empty", value: "" },
-    ...(contentDate ? [{ field: contentDate, operator: "is_not_empty", value: "" }] : []),
-  ])
-
-  let y = 0
-  blocks.push({
-    type: "html",
-    position_x: 0,
-    position_y: y,
-    width: 12,
-    height: 2,
-    config: {
-      title: "",
-      html: `<div class="rounded-card-lg border border-border/60 bg-card px-5 py-4 shadow-sm"><div class="flex items-start justify-between gap-4"><div><h2 class="text-xl font-semibold tracking-tight text-foreground">Good morning, {{user_first_name}} 👋</h2><p class="mt-1 text-sm text-muted-foreground">Here&apos;s what&apos;s happening in marketing.</p></div><div class="text-xs text-muted-foreground">Use the Year filter block to scope this page.</div></div></div>`,
-    },
-  })
-  y += 3
-
-  blocks.push({
-    type: "filter",
-    position_x: 9,
-    position_y: 0,
-    width: 3,
-    height: 2,
-    config: {
-      title: "Year",
-      table_id: ctx.content.id,
-      target_blocks: "all",
-      allowed_fields: contentDate ? [contentDate] : [],
-      compact_year: true,
-      // Default to current year; users can change from the filter block UI.
-      filter_tree: contentDate
-        ? {
-            operator: "AND",
-            children: [
-              {
-                field_id: contentDate,
-                operator: "date_range",
-                value: { start: yearStart, end: yearEnd },
-              },
-            ],
-          }
-        : null,
-      default_filters: contentDate
-        ? {
-            operator: "AND",
-            children: [
-              {
-                field_id: contentDate,
-                operator: "date_range",
-                value: { start: yearStart, end: yearEnd },
-              },
-            ],
-          }
-        : null,
-      filters: contentDate
-        ? [{ field: contentDate, operator: "date_range", value: yearStart, value2: yearEnd }]
-        : [],
-      appearance: { title: "Year", show_title: true, background_color: "#ffffff", border_color: "#e5e7eb", border_width: 1, border_radius: 10, padding: 8 },
-    },
-  })
-
-  blocks.push({
-    type: "kpi",
-    position_x: 0,
-    position_y: y,
-    width: 3,
-    height: 3,
-    config: {
-      title: "Themes this year",
-      kpi_label: "Active themes",
-      table_id: ctx.quarterlyThemes.id,
-      kpi_aggregate: "count",
-      filters: themeCurrentYearFilters,
-    },
-  })
-  blocks.push({
-    type: "kpi",
-    position_x: 3,
-    position_y: y,
-    width: 3,
-    height: 3,
-    config: {
-      title: "Due this week",
-      kpi_label: "Content items",
-      table_id: ctx.content.id,
-      kpi_aggregate: "count",
-      filters: compactFilters(contentFields, [...baseContentFilters, ...(contentDate ? [{ field: contentDate, operator: "date_next_days", value: 7 }] : [])]),
-    },
-  })
-  blocks.push({
-    type: "kpi",
-    position_x: 6,
-    position_y: y,
-    width: 3,
-    height: 3,
-    config: {
-      title: "In progress",
-      kpi_label: "Content items",
-      table_id: ctx.content.id,
-      kpi_aggregate: "count",
-      filters: compactFilters(contentFields, [...baseContentFilters, ...(contentStatus ? [{ field: contentStatus, operator: "is_any_of", value: ["In Progress", "In progress"] }] : [])]),
-    },
-  })
-  blocks.push({
-    type: "kpi",
-    position_x: 9,
-    position_y: y,
-    width: 3,
-    height: 3,
-    config: {
-      title: "Awaiting approval",
-      kpi_label: "Content items",
-      table_id: ctx.content.id,
-      kpi_aggregate: "count",
-      filters: compactFilters(
-        contentFields,
-        [...baseContentFilters, ...(contentStatus ? [{ field: contentStatus, operator: "is_any_of", value: ["Sent for Approval", "Awaiting approval", "Waiting for approval"] }] : [])]
-      ),
-    },
-  })
-  y += 4
-
-  const themeVisible = [themeName, themeSummary].filter(Boolean).slice(0, 2)
-  blocks.push({
-    type: "grid",
-    position_x: 0,
-    position_y: y,
-    width: 8,
-    height: 7,
-    config: {
-      title: "This Year's Themes",
-      table_id: ctx.quarterlyThemes.id,
-      view_type: "gallery",
-      row_limit: 4,
-      list_title_field: themeName,
-      visible_fields: themeVisible,
-      ...(themeStatus ? { pill_fields: [themeStatus] } : {}),
-      filters: themeCurrentYearFilters,
-      appearance: { showTitle: true, border: "none", compact: true, padding: "compact" },
-    },
-  })
-  blocks.push({
-    type: "grid",
-    position_x: 8,
-    position_y: y,
-    width: 4,
-    height: 7,
-    config: {
-      title: "Upcoming Content",
-      table_id: ctx.content.id,
-      view_type: "list",
-      row_limit: 5,
-      list_title_field: contentName,
-      visible_fields: [contentName, contentTheme, contentDate].filter(Boolean),
-      list_meta_fields: [contentTheme, contentDate].filter(Boolean),
-      filters: compactFilters(contentFields, [...baseContentFilters, ...(contentDate ? [{ field: contentDate, operator: "date_next_days", value: 30 }] : [])]),
-      sorts: [...(contentDate ? [{ field: contentDate, direction: "asc" }] : [])],
-      appearance: { showTitle: true, border: "none", compact: true, padding: "compact" },
-    },
-  })
-  y += 8
-
-  blocks.push({
-    type: "grid",
-    position_x: 0,
-    position_y: y,
-    width: 8,
-    height: 7,
-    config: {
-      title: "What's in Progress",
-      table_id: ctx.content.id,
-      view_type: "list",
-      row_limit: 8,
-      list_title_field: contentName,
-      visible_fields: [contentName, contentStatus, contentTheme, contentDate].filter(Boolean),
-      ...(contentStatus ? { pill_fields: [contentStatus] } : {}),
-      list_meta_fields: [contentTheme, contentDate].filter(Boolean),
-      filters: compactFilters(
-        contentFields,
-        [...baseContentFilters, ...(contentStatus ? [{ field: contentStatus, operator: "is_any_of", value: ["In Progress", "In progress", "Sent for Approval", "Awaiting approval", "Todo", "To do"] }] : [])]
-      ),
-      sorts: [...(contentDate ? [{ field: contentDate, direction: "asc" }] : [])],
-      appearance: { showTitle: true, border: "none", compact: true, padding: "compact" },
-    },
-  })
-  blocks.push({
-    type: "grid",
-    position_x: 8,
-    position_y: y,
-    width: 4,
-    height: 7,
-    config: {
-      title: "Planning Calendar",
-      table_id: ctx.content.id,
-      view_type: "calendar",
-      calendar_date_field: contentDate,
-      default_date_range_preset: "thisMonth",
-      visible_week_span: 4,
-      visible_fields: [contentName, contentDate].filter(Boolean),
-      filters: compactFilters(contentFields, [...baseContentFilters]),
-      sorts: [...(contentDate ? [{ field: contentDate, direction: "asc" }] : [])],
-      appearance: { showTitle: true, border: "none", compact: true, event_density: "compact" },
-    },
-  })
-
-  return blocks
+/** Rendered by MarketingHomeDashboard (layout_style: marketing_home) - no grid blocks. */
+function buildMarketingHomeBlocks(_ctx) {
+  return []
 }
 
-/** Rendered by ThemeOverviewDashboard (layout_style: theme_overview) — no grid blocks. */
+/** Rendered by ThemeOverviewDashboard (layout_style: theme_overview) - no grid blocks. */
 function buildThemeWorkspaceBlocks(_ctx) {
   return []
 }
+
 
 function buildCampaignWorkspaceBlocks(ctx) {
   const campaignFields = ctx.fieldsByTable.get(ctx.campaigns.id) || []
@@ -669,7 +435,7 @@ function buildCampaignWorkspaceBlocks(ctx) {
   return blocks
 }
 
-/** Rendered by ContentPlanningDashboard (layout_style: content_planning) — no grid blocks. */
+/** Rendered by ContentPlanningDashboard (layout_style: content_planning) â€” no grid blocks. */
 function buildContentPlanningBlocks(_ctx) {
   return []
 }
@@ -930,8 +696,33 @@ async function applyVisibilityCuration() {
   }
 }
 
+async function archiveDeprecatedPages() {
+  const deprecatedNames = [
+    "Campaign Archive",
+    "Campaign Workspace",
+    "Campaign Dashboard",
+    "Marketing Dashboard (Theme-led)",
+    "Marketing Dashboard",
+  ]
+  const { data: pages, error } = await supabase
+    .from("interface_pages")
+    .select("id, name")
+    .in("name", deprecatedNames)
+    .eq("is_archived", false)
+  if (error) throw new Error(`Failed loading deprecated pages: ${error.message}`)
+  for (const page of pages || []) {
+    await supabase
+      .from("interface_pages")
+      .update({ is_archived: true, is_hidden: true, is_admin_only: true })
+      .eq("id", page.id)
+  }
+  if ((pages || []).length > 0) {
+    console.log(`Archived deprecated pages: ${(pages || []).map((p) => p.name).join(", ")}`)
+  }
+}
+
 async function applyMarketingNavPriority(pageIds) {
-  const orderedIds = [pageIds.home, pageIds.theme, pageIds.content, pageIds.campaign, pageIds.internalStaff].filter(Boolean)
+  const orderedIds = [pageIds.home, pageIds.theme, pageIds.content, pageIds.internalStaff].filter(Boolean)
   for (let i = 0; i < orderedIds.length; i += 1) {
     await supabase.from("interface_pages").update({ order_index: i, is_admin_only: false }).eq("id", orderedIds[i])
   }
@@ -948,12 +739,13 @@ async function main() {
   }
 
   const homePageId = await upsertPage({
-    name: "Marketing Home",
+    name: "Dashboard",
+    aliases: ["Marketing Home", "Marketing Dashboard"],
     page_type: "content",
     group_id: publicGroup,
     order_index: 0,
     saved_view_id: ctx.anchors.home,
-    config: { layout_style: "marketing_dashboard" },
+    config: { layout_style: "marketing_home" },
   })
   const themePageId = await upsertPage({
     name: "Theme Workspace",
@@ -962,15 +754,6 @@ async function main() {
     order_index: 2,
     saved_view_id: ctx.anchors.theme,
     config: { layout_style: "theme_overview" },
-  })
-  const campaignPageId = await upsertPage({
-    name: "Campaign Archive",
-    aliases: ["Campaign Workspace"],
-    page_type: "content",
-    group_id: publicGroup,
-    order_index: 3,
-    saved_view_id: ctx.anchors.campaigns,
-    config: { layout_style: "marketing_dashboard" },
   })
   const contentPageId = await upsertPage({
     name: "Content Planning",
@@ -991,23 +774,21 @@ async function main() {
 
   await applyPageBlocksAdditive(homePageId, buildMarketingHomeBlocks(ctx))
   await applyPageBlocksAdditive(themePageId, buildThemeWorkspaceBlocks(ctx))
-  await applyPageBlocksAdditive(campaignPageId, buildCampaignWorkspaceBlocks(ctx))
   await applyPageBlocksAdditive(contentPageId, buildContentPlanningBlocks(ctx))
   await applyPageBlocksAdditive(internalStaffPageId, buildInternalStaffBlocks(ctx))
 
+  await archiveDeprecatedPages()
   await applyMarketingNavPriority({
     home: homePageId,
     internalStaff: internalStaffPageId,
     theme: themePageId,
-    campaign: campaignPageId,
     content: contentPageId,
   })
   await applyVisibilityCuration()
 
   console.log("Marketing Hub workspace applied successfully.")
-  console.log(`Marketing Home: /pages/${homePageId}`)
+  console.log(`Dashboard: /pages/${homePageId}`)
   console.log(`Theme Workspace: /pages/${themePageId}`)
-  console.log(`Campaign Archive: /pages/${campaignPageId}`)
   console.log(`Content Planning: /pages/${contentPageId}`)
   console.log(`Internal Staff Hub: /pages/${internalStaffPageId}`)
 }

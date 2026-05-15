@@ -31,13 +31,16 @@ import { CanvasContainer, BLOCK_EMBED_CLASSNAME } from "@/components/layout/ui-s
 import { AppPageHeader } from "@/components/layout/ui-system"
 import { shouldApplyResolvedTableId } from "@/lib/immediate-phase/guards"
 import { isContentPlanningPage } from "@/lib/marketing/content-planning"
+import { isMarketingHomePage } from "@/lib/marketing/marketing-home"
 import { isThemeOverviewPage } from "@/lib/marketing/theme-overview"
+import MarketingDashboardLayout from "@/components/interface/MarketingDashboardLayout"
 // Lazy load InterfaceBuilder for dashboard/overview pages
 const InterfaceBuilder = dynamic(() => import("./InterfaceBuilder"), { ssr: false })
 // Lazy load RecordReviewPage for record_review pages
 const RecordReviewPage = dynamic(() => import("./RecordReviewPage"), { ssr: false })
 const ThemeOverviewDashboard = dynamic(() => import("./ThemeOverviewDashboard"), { ssr: false })
 const ContentPlanningDashboard = dynamic(() => import("./ContentPlanningDashboard"), { ssr: false })
+const MarketingHomeDashboard = dynamic(() => import("./MarketingHomeDashboard"), { ssr: false })
 
 /** Single stable wrapper for page content - avoids conditional tree swapping at InterfacePageClient level */
 function InterfacePageContent({
@@ -56,6 +59,7 @@ function InterfacePageContent({
   marketingDashboard,
   showThemeOverview,
   showContentPlanning,
+  showMarketingHome,
 }: {
   useRecordReviewLayout: boolean
   hasPage: boolean
@@ -72,7 +76,17 @@ function InterfacePageContent({
   marketingDashboard: boolean
   showThemeOverview: boolean
   showContentPlanning: boolean
+  showMarketingHome: boolean
 }) {
+  if (showMarketingHome) {
+    return (
+      <MarketingDashboardLayout>
+        <div className={`min-h-0 min-w-0 w-full max-w-full flex flex-col ${BLOCK_EMBED_CLASSNAME}`}>
+          <MarketingHomeDashboard canEdit={!isViewer} />
+        </div>
+      </MarketingDashboardLayout>
+    )
+  }
   if (showThemeOverview) {
     return (
       <div className={`min-h-0 min-w-0 w-full max-w-full flex flex-col ${BLOCK_EMBED_CLASSNAME}`}>
@@ -169,10 +183,13 @@ function InterfacePageClientInternal({
   const [recordContext, setRecordContext] = useState<RecordContext>(null)
 
   /** Marketing Dashboard page: calmer shell, search hint, card styling (name or config.layout_style). */
+  const marketingHome = useMemo(() => isMarketingHomePage(page), [page?.name, page?.config])
+
   const marketingDashboard = useMemo(() => {
     if (!page) return false
     const cfg = page.config as { layout_style?: string } | undefined
     return (
+      marketingHome ||
       page.name === "Marketing Dashboard" ||
       cfg?.layout_style === "marketing_dashboard" ||
       cfg?.layout_style === "theme_overview" ||
@@ -180,7 +197,7 @@ function InterfacePageClientInternal({
       isThemeOverviewPage(page) ||
       isContentPlanningPage(page)
     )
-  }, [page?.name, page?.config])
+  }, [page?.name, page?.config, marketingHome])
 
   const themeOverview = useMemo(() => isThemeOverviewPage(page), [page?.name, page?.config])
   const contentPlanning = useMemo(() => isContentPlanningPage(page), [page?.name, page?.config])
@@ -1499,6 +1516,7 @@ function InterfacePageClientInternal({
             marketingDashboard={marketingDashboard}
             showThemeOverview={themeOverview && !isEditMode}
             showContentPlanning={contentPlanning && !isEditMode}
+            showMarketingHome={marketingHome && !isEditMode}
           />
           {blocksLoading && (
             <div className="absolute inset-0 bg-white/60 flex items-center justify-center z-10 pointer-events-none">
