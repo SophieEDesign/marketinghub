@@ -30,10 +30,12 @@ import { useRealtimeViewBlocks } from "@/lib/realtime/useRealtimeViewBlocks"
 import { CanvasContainer, BLOCK_EMBED_CLASSNAME } from "@/components/layout/ui-system"
 import { AppPageHeader } from "@/components/layout/ui-system"
 import { shouldApplyResolvedTableId } from "@/lib/immediate-phase/guards"
+import { isThemeOverviewPage } from "@/lib/marketing/theme-overview"
 // Lazy load InterfaceBuilder for dashboard/overview pages
 const InterfaceBuilder = dynamic(() => import("./InterfaceBuilder"), { ssr: false })
 // Lazy load RecordReviewPage for record_review pages
 const RecordReviewPage = dynamic(() => import("./RecordReviewPage"), { ssr: false })
+const ThemeOverviewDashboard = dynamic(() => import("./ThemeOverviewDashboard"), { ssr: false })
 
 /** Single stable wrapper for page content - avoids conditional tree swapping at InterfacePageClient level */
 function InterfacePageContent({
@@ -50,6 +52,7 @@ function InterfacePageContent({
   recordContext,
   setRecordContext,
   marketingDashboard,
+  showThemeOverview,
 }: {
   useRecordReviewLayout: boolean
   hasPage: boolean
@@ -64,7 +67,15 @@ function InterfacePageContent({
   recordContext: RecordContext
   setRecordContext: (ctx: RecordContext) => void
   marketingDashboard: boolean
+  showThemeOverview: boolean
 }) {
+  if (showThemeOverview) {
+    return (
+      <div className={`min-h-0 min-w-0 w-full max-w-full flex flex-col ${BLOCK_EMBED_CLASSNAME}`}>
+        <ThemeOverviewDashboard canEdit={!isViewer} />
+      </div>
+    )
+  }
   if (useRecordReviewLayout && hasPage) {
     return (
       <RecordReviewPage
@@ -150,8 +161,15 @@ function InterfacePageClientInternal({
   const marketingDashboard = useMemo(() => {
     if (!page) return false
     const cfg = page.config as { layout_style?: string } | undefined
-    return page.name === "Marketing Dashboard" || cfg?.layout_style === "marketing_dashboard"
+    return (
+      page.name === "Marketing Dashboard" ||
+      cfg?.layout_style === "marketing_dashboard" ||
+      cfg?.layout_style === "theme_overview" ||
+      isThemeOverviewPage(page)
+    )
   }, [page?.name, page?.config])
+
+  const themeOverview = useMemo(() => isThemeOverviewPage(page), [page?.name, page?.config])
   
   // Track previous pageId to reset blocks when page changes
   // CRITICAL: Use ref to track actual pageId changes, not effect dependencies
@@ -1465,6 +1483,7 @@ function InterfacePageClientInternal({
             recordContext={recordContext}
             setRecordContext={setRecordContext}
             marketingDashboard={marketingDashboard}
+            showThemeOverview={themeOverview && !isEditMode}
           />
           {blocksLoading && (
             <div className="absolute inset-0 bg-white/60 flex items-center justify-center z-10 pointer-events-none">
