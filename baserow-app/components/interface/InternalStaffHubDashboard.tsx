@@ -31,6 +31,8 @@ import {
 import { useRecordModal } from "@/contexts/RecordModalContext"
 import { useInternalStaffHubData } from "@/hooks/useInternalStaffHubData"
 import {
+  buildGeneralGalleryAsset,
+  GENERAL_GALLERY_FOLDER,
   HUB_CATEGORIES,
   countByCategory,
   filterStaffHubAssets,
@@ -130,6 +132,7 @@ export default function InternalStaffHubDashboard({
             heroSearch={heroSearch}
             setHeroSearch={setHeroSearch}
             canEdit={canEdit}
+            onBrowseGallery={() => setPreviewAsset(buildGeneralGalleryAsset())}
             onUpload={() => {
               if (tableIds) {
                 openRecordModal({
@@ -258,11 +261,13 @@ function motionlessHeroCard({
   heroSearch,
   setHeroSearch,
   canEdit,
+  onBrowseGallery,
   onUpload,
 }: {
   heroSearch: string
   setHeroSearch: (v: string) => void
   canEdit: boolean
+  onBrowseGallery: () => void
   onUpload: () => void
 }) {
   return (
@@ -279,26 +284,16 @@ function motionlessHeroCard({
             Internal Creative Hub
           </h2>
           <p className="text-sm text-muted-foreground mt-2 max-w-md leading-relaxed">
-            Your visual library for brand assets, decks, templates and team resources — organised
-            and easy to browse.
+            Your visual library for brand assets, decks, templates and team resources — including
+            the {GENERAL_GALLERY_FOLDER.title} on Google Drive.
           </p>
-          <div className="mt-4 flex flex-col sm:flex-row gap-2 max-w-md">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                value={heroSearch}
-                onChange={(e) => setHeroSearch(e.target.value)}
-                placeholder="Search assets, decks, templates…"
-                className="pl-9 h-10 bg-background/80 border-border/50 shadow-sm"
-              />
-            </div>
-            {canEdit ? (
-              <Button type="button" size="default" className="shrink-0 gap-1.5" onClick={onUpload}>
-                <Upload className="h-4 w-4" />
-                Upload
-              </Button>
-            ) : null}
-          </div>
+          <motionlessHeroActions
+            heroSearch={heroSearch}
+            setHeroSearch={setHeroSearch}
+            canEdit={canEdit}
+            onBrowseGallery={onBrowseGallery}
+            onUpload={onUpload}
+          />
         </div>
         <HeroIllustration />
       </div>
@@ -459,6 +454,49 @@ function motionlessFilterBar({
           <List className="h-4 w-4" />
         </button>
       </div>
+    </div>
+  )
+}
+
+function motionlessHeroActions({
+  heroSearch,
+  setHeroSearch,
+  canEdit,
+  onBrowseGallery,
+  onUpload,
+}: {
+  heroSearch: string
+  setHeroSearch: (v: string) => void
+  canEdit: boolean
+  onBrowseGallery: () => void
+  onUpload: () => void
+}) {
+  return (
+    <div className="mt-4 flex flex-col sm:flex-row flex-wrap gap-2 max-w-xl">
+      <div className="relative flex-1 min-w-[200px]">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          value={heroSearch}
+          onChange={(e) => setHeroSearch(e.target.value)}
+          placeholder="Search assets, decks, templates…"
+          className="pl-9 h-10 bg-background/80 border-border/50 shadow-sm"
+        />
+      </div>
+      <Button
+        type="button"
+        variant="secondary"
+        className="shrink-0 gap-1.5 border-border/50"
+        onClick={onBrowseGallery}
+      >
+        <FolderOpen className="h-4 w-4" />
+        {GENERAL_GALLERY_FOLDER.title}
+      </Button>
+      {canEdit ? (
+        <Button type="button" size="default" className="shrink-0 gap-1.5" onClick={onUpload}>
+          <Upload className="h-4 w-4" />
+          Upload
+        </Button>
+      ) : null}
     </div>
   )
 }

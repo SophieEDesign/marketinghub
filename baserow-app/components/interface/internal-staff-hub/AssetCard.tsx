@@ -223,7 +223,7 @@ function AssetCardMenu({
         {asset.link?.openUrl ? (
           <DropdownMenuItem onClick={onOpen}>Open in Drive</DropdownMenuItem>
         ) : null}
-        {asset.link?.openUrl ? (
+        {asset.link?.openUrl && asset.link.fileKind !== "folder" ? (
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>

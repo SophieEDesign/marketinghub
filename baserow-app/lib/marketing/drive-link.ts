@@ -118,8 +118,15 @@ function buildThumbnailUrl(fileId: string | null, kind: DriveFileKind): string |
   return null
 }
 
-function buildEmbedUrl(url: string, fileId: string | null, provider: DriveProvider): string | null {
+function buildEmbedUrl(
+  fileId: string | null,
+  provider: DriveProvider,
+  fileKind: DriveFileKind
+): string | null {
   if (!fileId) return null
+  if (fileKind === "folder") {
+    return `https://drive.google.com/embeddedfolderview?id=${fileId}#grid`
+  }
   if (provider === "google_slides")
     return `https://docs.google.com/presentation/d/${fileId}/embed?start=false&loop=false`
   if (provider === "google_docs")
@@ -129,6 +136,11 @@ function buildEmbedUrl(url: string, fileId: string | null, provider: DriveProvid
   if (provider === "google_drive")
     return `https://drive.google.com/file/d/${fileId}/preview`
   return null
+}
+
+/** Canonical open URL for a Drive folder (no tracking params). */
+export function buildDriveFolderOpenUrl(folderId: string): string {
+  return `https://drive.google.com/drive/folders/${folderId}`
 }
 
 export function parseDriveLink(url: string | null | undefined): ParsedDriveLink | null {
@@ -143,6 +155,8 @@ export function parseDriveLink(url: string | null | undefined): ParsedDriveLink 
   const provider = detectProvider(raw)
   const fileId = extractDriveFileId(raw)
   const fileKind = detectFileKind(raw, provider)
+  const openUrl =
+    fileKind === "folder" && fileId ? buildDriveFolderOpenUrl(fileId) : raw
 
   return {
     url: raw,
@@ -152,8 +166,8 @@ export function parseDriveLink(url: string | null | undefined): ParsedDriveLink 
     fileKind,
     fileKindLabel: KIND_LABELS[fileKind],
     thumbnailUrl: buildThumbnailUrl(fileId, fileKind),
-    embedUrl: buildEmbedUrl(raw, fileId, provider),
-    openUrl: raw,
+    embedUrl: buildEmbedUrl(fileId, provider, fileKind),
+    openUrl,
   }
 }
 

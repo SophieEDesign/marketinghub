@@ -4,7 +4,7 @@
 
 import { formatDistanceToNow, parseISO, isValid } from "date-fns"
 import { pickFieldName, formatDisplayValue } from "@/lib/marketing/theme-overview"
-import { parseDriveLink } from "@/lib/marketing/drive-link"
+import { buildDriveFolderOpenUrl, parseDriveLink } from "@/lib/marketing/drive-link"
 import type { FieldOptions } from "@/types/fields"
 
 type FieldRow = { name: string; type?: string; options?: FieldOptions }
@@ -63,7 +63,24 @@ export const HUB_CATEGORIES: HubCategoryDef[] = [
   },
 ]
 
+/** Peters & May marketing photography — Drive folder (subfolders: Catamaran, Commercial, Racing, etc.). */
+export const GENERAL_GALLERY_FOLDER = {
+  folderId: "1-pHl-DXNlOPC4LuWneYmHB-fzHscofyS",
+  title: "General Gallery",
+  description:
+    "High-res photography and video — Catamaran, Commercial, Racing, Superyacht, Liner and more.",
+  url: buildDriveFolderOpenUrl("1-pHl-DXNlOPC4LuWneYmHB-fzHscofyS"),
+} as const
+
 export const QUICK_ACCESS_DEFS = [
+  {
+    id: "general-gallery",
+    label: GENERAL_GALLERY_FOLDER.title,
+    patterns: [/general\s*gallery/i, /photo\s*gallery/i, /image\s*library/i],
+    fallbackUrl: GENERAL_GALLERY_FOLDER.url,
+    category: "graphics" as HubCategoryId,
+    description: GENERAL_GALLERY_FOLDER.description,
+  },
   { id: "brand-guidelines", label: "Brand Guidelines", patterns: [/brand\s*guideline/i, /^brand\s*guide/i] },
   { id: "logo-pack", label: "Logo Pack", patterns: [/logo\s*pack/i, /logo\s*kit/i, /logos?$/i] },
   { id: "company-presentation", label: "Company Presentation", patterns: [/company\s*present/i, /corporate\s*deck/i] },
@@ -242,27 +259,90 @@ export function buildStaffHubAssets(
     .filter((a) => a.id && a.title)
 }
 
+type QuickAccessDef = (typeof QUICK_ACCESS_DEFS)[number]
+
+function findQuickAccessMatch(assets: StaffHubAsset[], def: QuickAccessDef): StaffHubAsset | undefined {
+  const folderId =
+    "fallbackUrl" in def && def.fallbackUrl
+      ? parseDriveLink(def.fallbackUrl)?.fileId
+      : null
+  return assets.find(
+    (a) =>
+      def.patterns.some((p) => p.test(a.title)) ||
+      (folderId != null && a.link?.fileId === folderId)
+  )
+}
+
+function buildFeaturedQuickAccessAsset(def: QuickAccessDef): StaffHubAsset | null {
+  if (!("fallbackUrl" in def) || !def.fallbackUrl) return null
+  const link = parseDriveLink(def.fallbackUrl)
+  if (!link) return null
+  const category = ("category" in def && def.category) || "other"
+  const categoryLabel =
+    HUB_CATEGORIES.find((c) => c.id === category)?.label ?? "Quick access"
+  return {
+    id: `featured-${def.id}`,
+    title: def.label,
+    description: ("description" in def && def.description) || null,
+    type: "Google Drive folder",
+    category,
+    categoryLabel,
+    tags: ["gallery", "photography"],
+    link,
+    updatedAt: null,
+    updatedLabel: null,
+    owner: null,
+    ownerInitials: "PM",
+    previewUrl: null,
+  }
+}
+
+export function buildGeneralGalleryAsset(): StaffHubAsset {
+  const def = QUICK_ACCESS_DEFS[0]
+  return (
+    buildFeaturedQuickAccessAsset(def) ?? {
+      id: "featured-general-gallery",
+      title: GENERAL_GALLERY_FOLDER.title,
+      description: GENERAL_GALLERY_FOLDER.description,
+      type: "Google Drive folder",
+      category: "graphics",
+      categoryLabel: "Graphics & Media",
+      tags: ["gallery"],
+      link: parseDriveLink(GENERAL_GALLERY_FOLDER.url),
+      updatedAt: null,
+      updatedLabel: null,
+      owner: null,
+      ownerInitials: "PM",
+      previewUrl: null,
+    }
+  )
+}
+
 export function resolveQuickAccessAssets(assets: StaffHubAsset[]): StaffHubAsset[] {
   const result: StaffHubAsset[] = []
   for (const def of QUICK_ACCESS_DEFS) {
-    const hit = assets.find((a) => def.patterns.some((p) => p.test(a.title)))
+    const hit = findQuickAccessMatch(assets, def)
     if (hit) result.push(hit)
     else {
-      result.push({
-        id: `placeholder-${def.id}`,
-        title: def.label,
-        description: null,
-        type: null,
-        category: "other",
-        categoryLabel: "Quick access",
-        tags: [],
-        link: null,
-        updatedAt: null,
-        updatedLabel: null,
-        owner: null,
-        ownerInitials: "?",
-        previewUrl: null,
-      })
+      const featured = buildFeaturedQuickAccessAsset(def)
+      if (featured) result.push(featured)
+      else {
+        result.push({
+          id: `placeholder-${def.id}`,
+          title: def.label,
+          description: null,
+          type: null,
+          category: "other",
+          categoryLabel: "Quick access",
+          tags: [],
+          link: null,
+          updatedAt: null,
+          updatedLabel: null,
+          owner: null,
+          ownerInitials: "?",
+          previewUrl: null,
+        })
+      }
     }
   }
   return result

@@ -15,6 +15,7 @@ export default function AssetPreviewModal({ asset, onClose }: AssetPreviewModalP
 
   const link = asset.link
   const canEmbed = Boolean(link?.embedUrl)
+  const isFolder = link?.fileKind === "folder"
   const openUrl = link?.openUrl
   const driveLabel =
     link?.provider === "google_drive" || link?.provider?.startsWith("google")
@@ -38,6 +39,7 @@ export default function AssetPreviewModal({ asset, onClose }: AssetPreviewModalP
           asset={asset}
           link={link}
           canEmbed={canEmbed}
+          isFolder={isFolder}
           openUrl={openUrl}
           driveLabel={driveLabel}
           onClose={onClose}
@@ -51,6 +53,7 @@ function motionlessDialogPanel({
   asset,
   link,
   canEmbed,
+  isFolder,
   openUrl,
   driveLabel,
   onClose,
@@ -58,6 +61,7 @@ function motionlessDialogPanel({
   asset: StaffHubAsset
   link: StaffHubAsset["link"]
   canEmbed: boolean
+  isFolder: boolean
   openUrl: string | undefined
   driveLabel: string
   onClose: () => void
@@ -97,7 +101,10 @@ function motionlessDialogPanel({
           <iframe
             src={link.embedUrl}
             title={asset.title}
-            className="w-full h-[min(60vh,520px)] border-0 bg-background"
+            className={cn(
+              "w-full border-0 bg-background",
+              isFolder ? "h-[min(72vh,640px)]" : "h-[min(60vh,520px)]"
+            )}
             allow="autoplay"
           />
         ) : asset.previewUrl ? (
@@ -120,12 +127,14 @@ function motionlessDialogPanel({
         </Button>
         {openUrl ? (
           <>
-            <Button type="button" variant="outline" size="sm" asChild>
-              <a href={openUrl} target="_blank" rel="noopener noreferrer">
-                <Download className="h-3.5 w-3.5 mr-1.5" />
-                Download
-              </a>
-            </Button>
+            {!isFolder ? (
+              <Button type="button" variant="outline" size="sm" asChild>
+                <a href={openUrl} target="_blank" rel="noopener noreferrer">
+                  <Download className="h-3.5 w-3.5 mr-1.5" />
+                  Download
+                </a>
+              </Button>
+            ) : null}
             <Button type="button" size="sm" asChild>
               <a href={openUrl} target="_blank" rel="noopener noreferrer">
                 <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
