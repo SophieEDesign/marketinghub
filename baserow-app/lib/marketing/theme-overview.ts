@@ -3,6 +3,7 @@
  * Uses flexible field-name matching so it works across schema variants.
  */
 
+import { isUuidLikeDisplayValue } from "@/lib/marketing/enrich-theme-rows"
 import { normalizeHexColor, resolveChoiceColor, SEMANTIC_COLORS } from "@/lib/field-colors"
 import type { FieldOptions } from "@/types/fields"
 
@@ -73,15 +74,28 @@ export function resolveThemeOverviewFields(
   themeFields: FieldRow[],
   contentFields: FieldRow[]
 ): ThemeOverviewFieldMap {
-  const themeName = pickFieldName(themeFields, [/^name$/i, /theme_name/i, /title/i], "name") || "name"
+  const themeName =
+    pickFieldName(themeFields, [/^name$/i, /theme_name/i, /^title$/i, /^theme$/i, /label/i], null) ||
+    "name"
+  const themeNameMeta = themeFields.find((f) => f.name === themeName)
+  const coreFromLookup = pickFieldName(
+    themeFields,
+    [/core_title/i, /core_theme/i, /key_focus/i, /business_focus/i, /headline/i],
+    null
+  )
+  // When `name` is a link to Core Theme, a lookup column (e.g. core_title) holds the pulled label.
+  const coreTitle =
+    themeNameMeta?.type === "link_to_table" && coreFromLookup && coreFromLookup !== themeName
+      ? coreFromLookup
+      : pickFieldName(
+          themeFields,
+          [/core_title/i, /core_theme/i, /key_focus/i, /business_focus/i, /focus/i, /headline/i],
+          null
+        )
   return {
     themeName,
     quarter: pickFieldName(themeFields, [/^quarter$/i, /fiscal_quarter/i, /qtr/i], null),
-    coreTitle: pickFieldName(
-      themeFields,
-      [/core_title/i, /core_theme/i, /key_focus/i, /business_focus/i, /focus/i, /headline/i],
-      null
-    ),
+    coreTitle,
     description: pickFieldName(
       themeFields,
       [/summary/i, /description/i, /brief/i, /notes?/i, /key_message/i],
@@ -162,6 +176,39 @@ export function extractYearFromRow(
   return null
 }
 
+/** Card title: first non-empty candidate (name is often blank while core_title holds the label). */
+export function resolveThemeDisplayName(
+  row: Record<string, unknown>,
+  fields: ThemeOverviewFieldMap,
+  themeFields: FieldRow[]
+): string {
+  const themeNameMeta = themeFields.find((f) => f.name === fields.themeName)
+  const nameIsLink = themeNameMeta?.type === "link_to_table"
+
+  const candidateKeys = [
+    // Lookup pull of core theme label (populated by enrichThemeRowsForDisplay)
+    fields.coreTitle,
+    ...(nameIsLink ? [] : [fields.themeName]),
+    fields.themeName,
+    pickFieldName(themeFields, [/core_title/i], null),
+    pickFieldName(themeFields, [/^theme$/i, /theme_name/i, /label/i], null),
+    fields.quarter,
+  ].filter(Boolean) as string[]
+
+  const seen = new Set<string>()
+  for (const key of candidateKeys) {
+    if (seen.has(key)) continue
+    seen.add(key)
+    const text = formatDisplayValue(row[key])
+    if (text && !isUuidLikeDisplayValue(text)) return text
+  }
+
+  const quarter = fields.quarter ? parseQuarterFromValue(row[fields.quarter]) : null
+  if (quarter != null) return quarterLabel(quarter)
+
+  return "Untitled theme"
+}
+
 export function formatDisplayValue(value: unknown): string | null {
   if (value == null || value === "") return null
   if (Array.isArray(value)) {
@@ -174,7 +221,9 @@ export function formatDisplayValue(value: unknown): string | null {
     if (typeof o.name === "string") return o.name
     if (typeof o.value === "string") return o.value
   }
-  return String(value).trim() || null
+  const text = String(value).trim() || null
+  if (text && isUuidLikeDisplayValue(text)) return null
+  return text
 }
 
 function quarterAccentColor(quarter: QuarterNum | null, index: number): string {
@@ -255,10 +304,10 @@ export function buildThemeCards(params: {
 
   const cards: ThemeOverviewCard[] = themesForYear.map((row, index) => {
     const id = String(row.id)
-    const name = formatDisplayValue(row[fields.themeName]) || "Untitled theme"
+    const coreTitle = fields.coreTitle ? formatDisplayValue(row[fields.coreTitle]) : null
+    const name = resolveThemeDisplayName(row, fields, themeFields)
     const quarterRaw = fields.quarter ? row[fields.quarter] : null
     const quarter = parseQuarterFromValue(quarterRaw, name)
-    const coreTitle = fields.coreTitle ? formatDisplayValue(row[fields.coreTitle]) : null
     const description = fields.description ? formatDisplayValue(row[fields.description]) : null
     const qLabel =
       formatDisplayValue(quarterRaw) || (quarter != null ? quarterLabel(quarter) : null)

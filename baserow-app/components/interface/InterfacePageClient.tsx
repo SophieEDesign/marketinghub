@@ -30,12 +30,14 @@ import { useRealtimeViewBlocks } from "@/lib/realtime/useRealtimeViewBlocks"
 import { CanvasContainer, BLOCK_EMBED_CLASSNAME } from "@/components/layout/ui-system"
 import { AppPageHeader } from "@/components/layout/ui-system"
 import { shouldApplyResolvedTableId } from "@/lib/immediate-phase/guards"
+import { isContentPlanningPage } from "@/lib/marketing/content-planning"
 import { isThemeOverviewPage } from "@/lib/marketing/theme-overview"
 // Lazy load InterfaceBuilder for dashboard/overview pages
 const InterfaceBuilder = dynamic(() => import("./InterfaceBuilder"), { ssr: false })
 // Lazy load RecordReviewPage for record_review pages
 const RecordReviewPage = dynamic(() => import("./RecordReviewPage"), { ssr: false })
 const ThemeOverviewDashboard = dynamic(() => import("./ThemeOverviewDashboard"), { ssr: false })
+const ContentPlanningDashboard = dynamic(() => import("./ContentPlanningDashboard"), { ssr: false })
 
 /** Single stable wrapper for page content - avoids conditional tree swapping at InterfacePageClient level */
 function InterfacePageContent({
@@ -53,6 +55,7 @@ function InterfacePageContent({
   setRecordContext,
   marketingDashboard,
   showThemeOverview,
+  showContentPlanning,
 }: {
   useRecordReviewLayout: boolean
   hasPage: boolean
@@ -68,11 +71,19 @@ function InterfacePageContent({
   setRecordContext: (ctx: RecordContext) => void
   marketingDashboard: boolean
   showThemeOverview: boolean
+  showContentPlanning: boolean
 }) {
   if (showThemeOverview) {
     return (
       <div className={`min-h-0 min-w-0 w-full max-w-full flex flex-col ${BLOCK_EMBED_CLASSNAME}`}>
         <ThemeOverviewDashboard canEdit={!isViewer} />
+      </div>
+    )
+  }
+  if (showContentPlanning) {
+    return (
+      <div className={`min-h-0 min-w-0 w-full max-w-full flex flex-col ${BLOCK_EMBED_CLASSNAME}`}>
+        <ContentPlanningDashboard canEdit={!isViewer} />
       </div>
     )
   }
@@ -165,11 +176,14 @@ function InterfacePageClientInternal({
       page.name === "Marketing Dashboard" ||
       cfg?.layout_style === "marketing_dashboard" ||
       cfg?.layout_style === "theme_overview" ||
-      isThemeOverviewPage(page)
+      cfg?.layout_style === "content_planning" ||
+      isThemeOverviewPage(page) ||
+      isContentPlanningPage(page)
     )
   }, [page?.name, page?.config])
 
   const themeOverview = useMemo(() => isThemeOverviewPage(page), [page?.name, page?.config])
+  const contentPlanning = useMemo(() => isContentPlanningPage(page), [page?.name, page?.config])
   
   // Track previous pageId to reset blocks when page changes
   // CRITICAL: Use ref to track actual pageId changes, not effect dependencies
@@ -1484,6 +1498,7 @@ function InterfacePageClientInternal({
             setRecordContext={setRecordContext}
             marketingDashboard={marketingDashboard}
             showThemeOverview={themeOverview && !isEditMode}
+            showContentPlanning={contentPlanning && !isEditMode}
           />
           {blocksLoading && (
             <div className="absolute inset-0 bg-white/60 flex items-center justify-center z-10 pointer-events-none">

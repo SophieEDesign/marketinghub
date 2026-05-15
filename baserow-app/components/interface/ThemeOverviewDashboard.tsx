@@ -70,7 +70,7 @@ function ThemeCard({
         className="flex flex-col gap-2 p-4 text-left hover:bg-muted/30 rounded-t-card-lg transition-colors w-full"
       >
         <ThemeCardHeader card={card} />
-        {card.coreTitle ? (
+        {card.coreTitle && card.coreTitle !== card.name ? (
           <div>
             <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-0.5">
               Core focus
@@ -148,7 +148,7 @@ function ActiveThemeHero({
       <p className="mt-2 text-xs text-muted-foreground">
         Current quarter · {quarterLabel(currentQuarter as 1 | 2 | 3 | 4)} {year}
       </p>
-      {card.coreTitle ? (
+      {card.coreTitle && card.coreTitle !== card.name ? (
         <div className="mt-3">
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-0.5">
             Core focus

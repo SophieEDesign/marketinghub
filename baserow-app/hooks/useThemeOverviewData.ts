@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { enrichThemeRowsForDisplay } from "@/lib/marketing/enrich-theme-rows"
 import {
   buildThemeCards,
   collectAvailableYears,
@@ -84,7 +85,7 @@ export function useThemeOverviewData(): UseThemeOverviewDataResult {
 
         const { data: fieldRows, error: fieldsErr } = await supabase
           .from("table_fields")
-          .select("table_id, name, type, options")
+          .select("id, table_id, name, type, options")
           .in("table_id", [quarterlyThemes.id, content.id])
 
         if (fieldsErr) throw new Error(fieldsErr.message)
@@ -110,12 +111,20 @@ export function useThemeOverviewData(): UseThemeOverviewDataResult {
         if (themesRes.error) throw new Error(themesRes.error.message)
         if (contentRes.error) throw new Error(contentRes.error.message)
 
+        const themeData = [...((themesRes.data || []) as Record<string, unknown>[])]
+        await enrichThemeRowsForDisplay(
+          quarterlyThemes.id,
+          quarterlyThemes.supabase_table,
+          themeFieldRows,
+          themeData
+        )
+
         if (cancelled) return
 
         setTableIds(ids)
         setFields(fieldMap)
         setThemeFields(themeFieldRows)
-        setThemeRows((themesRes.data || []) as Record<string, unknown>[])
+        setThemeRows(themeData)
         setContentRows((contentRes.data || []) as Record<string, unknown>[])
       } catch (e) {
         if (!cancelled) {

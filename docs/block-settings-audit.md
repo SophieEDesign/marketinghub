@@ -33,21 +33,180 @@ Guardrail applied:
 
 ## Saved-config evidence (existing blocks)
 
-Source: live `view_blocks.config` sampling from current project data and key frequency queries.
+### How this section was built
 
-Observed legacy keys still present in saved blocks:
-- Top-level: `row_limit` (27 blocks), `display_mode` (1), `image_field` (2), `list_image_field` (2), `title_field` (3), `list_title_field` (28).
-- Appearance: `appearance.showTitle` (35), `appearance.show_title` (1), `appearance.row_height` (6), `appearance.color_field` (15), `appearance.image_field` (3), `appearance.kanban_hide_empty_stacks` (2).
+| Source | Purpose |
+|---|---|
+| Live `view_blocks.config` key-frequency queries (prior audit pass) | Count how often each key appears across saved blocks |
+| Seed scripts (`baserow-app/scripts/seed-marketing-dashboard.cjs`, workspace apply scripts) | Representative JSON shapes written to `view_blocks` in this repo |
+| `supabase/migrations/normalize_existing_blocks.sql` | Documents which keys migrations expect and backfill |
 
-Representative saved-config examples (abridged):
-- `grid` block with list view stores `row_limit`, `view_type: "list"`, `list_title_field`, and `appearance.color_field`.
-- `record_context` stores both `displayMode` and `display_mode`, plus `list_*` fields and `image_field`.
-- `text` stores `content_json` plus legacy `text_content`.
-- `link_preview` stores both `url` and `link_url`, plus `link_description`.
-- `timeline` stores `date_from`/`date_to` plus `start_date_field`/`end_date_field`, plus `timeline_*` aliases.
+**Guardrail:** A key with zero render consumers is **not** automatically safe to remove. Check the classification table below.
 
-Compatibility conclusion:
-- Legacy keys are actively present in current saved configs; they should be migrated/deprecated deliberately, not removed abruptly.
+### Key frequency in saved configs (prior live sample)
+
+Top-level keys (block count using key at least once):
+
+| Config key | Blocks (approx.) | Typical block types |
+|---|---:|---|
+| `row_limit` | 27 | `grid` with `view_type: list/gallery` |
+| `list_title_field` | 28 | `grid` (`view_type: list`) |
+| `title_field` | 3 | list/legacy aliases |
+| `image_field` / `list_image_field` | 2 each | list/media |
+| `display_mode` | 1 | data blocks |
+
+`appearance.*` keys:
+
+| Appearance key | Blocks (approx.) |
+|---|---:|
+| `appearance.showTitle` | 35 |
+| `appearance.color_field` | 15 |
+| `appearance.row_height` | 6 |
+| `appearance.image_field` | 3 |
+| `appearance.kanban_hide_empty_stacks` | 2 |
+| `appearance.show_title` | 1 |
+
+Keys observed in UI/settings but **rare or absent** in saved configs at audit time (still risky to delete from code—users may set them on next save):
+
+- `appearance.gallery_rows_per_page`, `appearance.gallery_display_field_names`
+- `appearance.calendar_preview_field_count`, `appearance.timeline_layout`
+- `appearance.number_format`, `appearance.show_trend`
+- `appearance.wrap_headers`, `appearance.show_field_descriptions`
+- `card_show_labels` (top-level; defaults in `BLOCK_REGISTRY` but not always persisted until toggled)
+
+### Classification: unused vs legacy-in-saved vs active
+
+| Key / pattern | In saved configs? | Consumed by render? | Verdict |
+|---|---|---|---|
+| `record_limit` | Often via `row_limit` only | Yes (with `row_limit` fallback) | **Active + legacy alias** — keep both reads |
+| `row_limit` | Yes (common) | Yes (fallback) | **Legacy compatibility required** |
+| `appearance.showTitle` / `show_title` | Yes | Yes | **Active + duplicate write paths** |
+| `appearance.color_field` | Yes | Yes (grid-family views) | **Active** |
+| `list_title_field` | Yes | Yes | **Active** |
+| `content_json` + `text_content` | Mixed | Yes (`content_json` primary, legacy read) | **Legacy read required** |
+| `url` + `link_url` | Mixed | Yes | **Legacy read required** |
+| `displayMode` + `display_mode` | Rare pairs | Yes (record context) | **Legacy pair** |
+| `appearance.gallery_display_field_names` | Rare/absent | Was no-op at audit | **Hide/wire** — not safe to strip readers |
+| `appearance.wrap_headers` | Rare/absent | Was no-op at audit | Same |
+| `group_by` / `group_by_field` / `group_by_rules` | Yes | Yes | **Active + layered** |
+
+### Representative saved-config JSON (from seed / production-shaped data)
+
+**Grid block — gallery view** (`type: grid`, `view_type: gallery`):
+
+```json
+{
+  "title": "Themes",
+  "table_id": "<uuid>",
+  "view_type": "gallery",
+  "row_limit": 12,
+  "visible_fields": ["Name", "Notes"],
+  "appearance": {
+    "showTitle": true,
+    "border": "none"
+  }
+}
+```
+
+**Grid block — list view** (`type: grid`, `view_type: list` — e.g. “Upcoming Content”, “Campaigns”):
+
+```json
+{
+  "title": "Upcoming Content",
+  "table_id": "<uuid>",
+  "view_type": "list",
+  "row_limit": 10,
+  "list_title_field": "Content Name",
+  "visible_fields": ["Content Name", "Campaign", "Date"],
+  "sorts": [{ "field": "Date", "direction": "asc" }],
+  "filters": [{ "field": "Date", "operator": "date_next_days", "value": 45 }],
+  "appearance": { "showTitle": true, "border": "none" }
+}
+```
+
+**Grid block — list with grouping** (Campaigns seed):
+
+```json
+{
+  "title": "Campaigns",
+  "table_id": "<uuid>",
+  "view_type": "list",
+  "row_limit": 16,
+  "list_title_field": "Campaign Name",
+  "pill_fields": ["Status"],
+  "group_by_field": "Theme",
+  "visible_fields": ["Campaign Name", "Status", "Theme"],
+  "appearance": { "showTitle": true, "border": "none" }
+}
+```
+
+**Record context** (legacy dual display-mode keys — pattern from live samples):
+
+```json
+{
+  "displayMode": "list",
+  "display_mode": "list",
+  "list_title_field": "Name",
+  "list_image_field": "Photo",
+  "image_field": "Photo"
+}
+```
+
+**Text block** (canonical + legacy content):
+
+```json
+{
+  "content_json": { "type": "doc", "content": [] },
+  "text_content": "<p>Legacy HTML</p>"
+}
+```
+
+**Link preview** (dual URL keys):
+
+```json
+{
+  "url": "https://example.com",
+  "link_url": "https://example.com",
+  "link_description": "Optional description"
+}
+```
+
+**Timeline** (date + alias fields often coexisting):
+
+```json
+{
+  "view_type": "timeline",
+  "date_from": "Start Date",
+  "date_to": "End Date",
+  "start_date_field": "Start Date",
+  "end_date_field": "End Date",
+  "timeline_title_field": "Name",
+  "timeline_compact_mode": false,
+  "appearance": { "color_field": "Status" }
+}
+```
+
+### Compatibility conclusion
+
+- Legacy keys are actively present in saved `view_blocks.config` records (especially `row_limit`, `list_title_field`, `appearance.showTitle`).
+- Migrations such as `normalize_existing_blocks.sql` only **add** missing defaults; they do not remove legacy keys.
+- Deprecation requires: (1) config migration, (2) retained fallback reads for at least one release, (3) telemetry on residual legacy keys.
+
+## Post-audit implementation status (Apr 2026)
+
+Phases 1–3 of the refactor plan were implemented after this audit. The inventory table below reflects **audit-time** render status. These items were subsequently wired or hidden in UI:
+
+| Setting (audit: no-op) | Post Phase 1–3 |
+|---|---|
+| `appearance.gallery_rows_per_page` | Wired in `GalleryView` |
+| `appearance.calendar_preview_field_count` | Wired in `CalendarView` |
+| `appearance.kanban_hide_empty_stacks` | Wired in `KanbanView` |
+| `appearance.number_format`, `appearance.show_trend` | Wired in `KPIBlock` |
+| `appearance.wrap_headers`, `appearance.show_field_descriptions`, `appearance.gallery_display_field_names`, `appearance.timeline_layout` | Hidden in settings UI |
+| `appearance.row_height` (list) | Wired for list row padding |
+| Duplicate colour controls | Consolidated to “Colour by field” in common settings |
+
+Re-run render tracing before treating any row in the inventory table as current production behavior.
 
 ## Settings inventory table
 
