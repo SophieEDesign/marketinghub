@@ -177,7 +177,16 @@ async function upsertPage({ name, aliases = [], page_type, group_id, order_index
   if (existing?.id) {
     const { data: updated, error: uErr } = await supabase
       .from("interface_pages")
-      .update({ name, page_type, group_id, order_index, saved_view_id, config, is_admin_only: false })
+      .update({
+        name,
+        page_type,
+        group_id,
+        order_index,
+        saved_view_id,
+        config,
+        is_admin_only: false,
+        is_hidden: false,
+      })
       .eq("id", existing.id)
       .select("id")
       .single()
@@ -200,6 +209,7 @@ async function upsertPage({ name, aliases = [], page_type, group_id, order_index
       form_config_id: null,
       record_config_id: null,
       is_admin_only: false,
+      is_hidden: false,
     })
     .select("id")
     .single()

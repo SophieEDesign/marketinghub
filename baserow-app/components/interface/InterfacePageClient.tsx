@@ -66,12 +66,14 @@ function InterfacePageContent({
   showContentPlanning,
   showMarketingHome,
   showInternalStaffHub,
+  isAdmin,
 }: {
   useRecordReviewLayout: boolean
   hasPage: boolean
   page: InterfacePage | null
   memoizedBlocks: any[]
   isViewer: boolean
+  isAdmin: boolean
   onRecordViewLayoutSave?: (fieldLayout: FieldLayoutItem[]) => Promise<void>
   onRecordViewPageConfigSave?: (updates: Record<string, unknown>) => Promise<void>
   interfaceBuilderPage: InterfacePage | null | undefined
@@ -90,7 +92,7 @@ function InterfacePageContent({
       <MarketingDashboardLayout>
         <DashboardEditChromeProvider>
           <div className={`min-h-0 min-w-0 w-full max-w-full flex flex-col ${BLOCK_EMBED_CLASSNAME}`}>
-            <InternalStaffHubDashboard canEdit={!isViewer} />
+            <InternalStaffHubDashboard canEdit={isAdmin && !isViewer} />
           </div>
         </DashboardEditChromeProvider>
       </MarketingDashboardLayout>
@@ -1550,6 +1552,7 @@ function InterfacePageClientInternal({
             showContentPlanning={contentPlanning}
             showMarketingHome={marketingHome}
             showInternalStaffHub={internalStaffHub}
+            isAdmin={isAdmin}
           />
           {blocksLoading && (
             <div className="absolute inset-0 bg-white/60 flex items-center justify-center z-10 pointer-events-none">
