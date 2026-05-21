@@ -11,6 +11,7 @@ import { IconPicker } from '@/components/ui/icon-picker'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatDateTimeUK } from '@/lib/utils'
 import { TimeoutError, withTimeout } from '@/lib/with-timeout'
+import { debugLog } from '@/lib/debug'
 
 const SETTINGS_LOAD_TIMEOUT_MS = 15_000
 
@@ -172,7 +173,7 @@ export default function SettingsWorkspaceTab() {
       }
 
       if (!interfacePagesError && interfacePagesData) {
-        console.log('Loaded', interfacePagesData.length, 'interface pages from interface_pages table')
+        debugLog('Loaded', interfacePagesData.length, 'interface pages from interface_pages table')
         setInterfacePages(interfacePagesData)
         return
       }
@@ -188,7 +189,7 @@ export default function SettingsWorkspaceTab() {
         console.error('Error loading interface pages from views table:', viewsError)
         setInterfacePages([])
       } else if (viewsData) {
-        console.log('Loaded', viewsData.length, 'interface pages from views table (fallback)')
+        debugLog('Loaded', viewsData.length, 'interface pages from views table (fallback)')
         setInterfacePages(viewsData)
       } else {
         console.warn('No interface pages found in either table')
@@ -259,7 +260,7 @@ export default function SettingsWorkspaceTab() {
         // Convert "__none__" to null for database storage
         const defaultInterfaceId = defaultPageId === "__none__" ? null : (defaultPageId || null)
         
-        console.log('[WorkspaceTab] Saving default page:', { 
+        debugLog('[WorkspaceTab] Saving default page:', { 
           defaultPageId, 
           defaultInterfaceId,
           convertingToNull: defaultPageId === "__none__"
@@ -315,7 +316,7 @@ export default function SettingsWorkspaceTab() {
             }
           }
           
-          console.log('[WorkspaceTab] Updating existing workspace_settings row:', existingSettings.id, 'with workspace_id:', workspaceId)
+          debugLog('[WorkspaceTab] Updating existing workspace_settings row:', existingSettings.id, 'with workspace_id:', workspaceId)
           const updateData: any = {
             default_interface_id: defaultInterfaceId,
             updated_at: new Date().toISOString(),
@@ -341,7 +342,7 @@ export default function SettingsWorkspaceTab() {
             throw updateError
           } else if (updatedRows && updatedRows.length > 0) {
             const updatedData = updatedRows[0]
-            console.log('[WorkspaceTab] Successfully updated default_interface_id:', {
+            debugLog('[WorkspaceTab] Successfully updated default_interface_id:', {
               saved: updatedData?.default_interface_id,
               expected: defaultInterfaceId
             })
@@ -393,7 +394,7 @@ export default function SettingsWorkspaceTab() {
             throw new Error('No workspace found. Please create a workspace first.')
           }
           
-          console.log('[WorkspaceTab] No existing row, inserting new workspace_settings with workspace_id:', workspaceId)
+          debugLog('[WorkspaceTab] No existing row, inserting new workspace_settings with workspace_id:', workspaceId)
           const { data: insertedRows, error: insertError } = await supabase
             .from('workspace_settings')
             .insert({
@@ -412,7 +413,7 @@ export default function SettingsWorkspaceTab() {
             throw insertError
           } else if (insertedRows && insertedRows.length > 0) {
             const insertedData = insertedRows[0]
-            console.log('[WorkspaceTab] Successfully inserted workspace_settings:', {
+            debugLog('[WorkspaceTab] Successfully inserted workspace_settings:', {
               id: insertedData?.id,
               default_interface_id: insertedData?.default_interface_id,
               expected: defaultInterfaceId
@@ -433,7 +434,7 @@ export default function SettingsWorkspaceTab() {
             .maybeSingle()
           
           if (!verifyError && verifyData) {
-            console.log('[WorkspaceTab] Verified save - default_interface_id in DB:', verifyData.default_interface_id)
+            debugLog('[WorkspaceTab] Verified save - default_interface_id in DB:', verifyData.default_interface_id)
             if (verifyData.default_interface_id !== defaultInterfaceId) {
               console.warn('[WorkspaceTab] WARNING: Saved value does not match!', {
                 expected: defaultInterfaceId,
@@ -450,7 +451,7 @@ export default function SettingsWorkspaceTab() {
         if (settingsError?.code === '42P01' || settingsError?.code === '42703' ||
             settingsError?.message?.includes('column') || settingsError?.message?.includes('does not exist') ||
             settingsError?.message?.includes('relation')) {
-          console.log('[WorkspaceTab] workspace_settings schema missing; cannot save default page')
+          debugLog('[WorkspaceTab] workspace_settings schema missing; cannot save default page')
         } else if (settingsError?.code === '23503') {
           // Foreign key constraint violation - the page ID doesn't exist in interface_pages
           console.error('[WorkspaceTab] Foreign key constraint violation - page ID not found:', {

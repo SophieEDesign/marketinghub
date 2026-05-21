@@ -5,28 +5,12 @@ import { getInterfacePage, querySqlView } from "@/lib/interface/pages"
 import { isRecordReviewPage } from "@/lib/interface/page-types"
 import WorkspaceShellWrapper from "@/components/layout/WorkspaceShellWrapper"
 import InterfacePageClient from "@/components/interface/InterfacePageClient"
+import { fetchPageBlocksForPage } from "@/lib/pages/fetch-page-blocks"
+import { containsBigInt, sanitizeForClient } from "@/lib/serialization/sanitize-for-client"
+import type { PageBlock } from "@/lib/interface/types"
 
 const isDev = process.env.NODE_ENV === 'development'
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-function containsBigInt(value: unknown, seen = new WeakSet<object>()): boolean {
-  if (typeof value === "bigint") return true
-  if (value == null) return false
-  if (typeof value !== "object") return false
-  const obj = value as object
-  if (seen.has(obj)) return false
-  seen.add(obj)
-  if (Array.isArray(value)) {
-    return value.some((entry) => containsBigInt(entry, seen))
-  }
-  return Object.values(value as Record<string, unknown>).some((entry) => containsBigInt(entry, seen))
-}
-
-function sanitizeForClient<T>(value: T): T {
-  return JSON.parse(
-    JSON.stringify(value, (_key, current) => (typeof current === "bigint" ? current.toString() : current))
-  ) as T
-}
 
 export default async function PagePage({
   params,
@@ -47,6 +31,7 @@ export default async function PagePage({
   let page = await getInterfacePage(pageId)
   let pageName = "Interface Page"
   let initialData: any[] = []
+  let initialBlocks: PageBlock[] = []
 
   if (isDev) {
     console.log('[Page Render] Loading page:', { pageId, found: !!page })
@@ -118,6 +103,14 @@ export default async function PagePage({
           }
         }
       }
+
+      try {
+        initialBlocks = await fetchPageBlocksForPage(pageId)
+      } catch (error) {
+        if (isDev) {
+          console.warn('[Page Render] Error prefetching blocks (client will retry):', error)
+        }
+      }
     }
   }
 
@@ -147,6 +140,7 @@ export default async function PagePage({
         pageId={pageId}
         initialPage={safeInitialPage}
         initialData={safeInitialData}
+        initialBlocks={initialBlocks}
         isAdmin={admin}
       />
     </WorkspaceShellWrapper>

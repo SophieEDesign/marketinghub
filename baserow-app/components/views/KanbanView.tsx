@@ -23,6 +23,12 @@ import { getFieldDisplayName } from "@/lib/fields/display"
 import RecordCard from "@/components/views/cards/RecordCard"
 import { cn } from "@/lib/utils"
 import { normalizeSelectOptionsForUi } from "@/lib/fields/select-options"
+import {
+  applySoftDeleteFilter,
+  fetchPhysicalColumns,
+  filterConfigsToQueryableColumns,
+  hasPhysicalColumnName,
+} from "@/lib/supabase/physical-columns"
 
 function normalizeKanbanGroupKey(value: unknown): string {
   if (value == null) return "Uncategorized"
@@ -309,16 +315,19 @@ function KanbanView({
       }
       setSupabaseTableName(table.supabase_table)
 
-      // Load rows from the actual table (not table_rows); exclude soft-deleted records
-      let query = supabase
-        .from(table.supabase_table)
-        .select("*")
-        .is("deleted_at", null)
+      const physicalColumns = await fetchPhysicalColumns(supabase, table.supabase_table)
+      const safeFields = Array.isArray(tableFields) ? tableFields : []
+      const queryableFilters = filterConfigsToQueryableColumns(filters, safeFields, physicalColumns)
 
-      query = applyFiltersToQuery(query, filters, tableFields as any)
+      let query = supabase.from(table.supabase_table).select("*")
+      query = applySoftDeleteFilter(query, physicalColumns)
 
-      const { data, error } = await query
-        .order("created_at", { ascending: false })
+      if (queryableFilters.length > 0) {
+        query = applyFiltersToQuery(query, queryableFilters, safeFields as any)
+      }
+
+      const orderCol = hasPhysicalColumnName(physicalColumns, 'created_at') ? 'created_at' : 'id'
+      const { data, error } = await query.order(orderCol, { ascending: false })
 
       if (error) {
         if (!isAbortError(error)) {
@@ -413,7 +422,7 @@ function KanbanView({
     }
   }, [showAddRecord, canCreateRecord, supabaseTableName, tableId, groupingFieldName, handleOpenRecord])
 
-  function groupRowsByField() {
+  const groupedRows = useMemo(() => {
     const groups: Record<string, TableRow[]> = {}
     const isLinkField = groupingField?.type === "link_to_table"
     filteredRows.forEach((row) => {
@@ -436,7 +445,31 @@ function KanbanView({
       })
     })
     return groups
-  }
+  }, [filteredRows, groupingField, groupingFieldName])
+
+  const groupedRowsLimited = useMemo(() => {
+    const hasLimit = Number.isFinite(recordLimit) && recordLimit > 0
+    if (!hasLimit) return groupedRows
+    const out: Record<string, TableRow[]> = {}
+    for (const [group, rowsInGroup] of Object.entries(groupedRows)) {
+      out[group] = rowsInGroup.slice(0, recordLimit)
+    }
+    return out
+  }, [groupedRows, recordLimit])
+
+  const groups = useMemo(() => {
+    const existing = Object.keys(groupedRowsLimited)
+    const hideEmptyStacks = Boolean((blockConfig as any)?.appearance?.kanban_hide_empty_stacks)
+    if (hideEmptyStacks) return existing
+    if (!groupingField || (groupingField.type !== "single_select" && groupingField.type !== "multi_select")) {
+      return existing
+    }
+    const { selectOptions } = normalizeSelectOptionsForUi(groupingField.type, groupingField.options)
+    const optionKeys = selectOptions
+      .map((o) => normalizeKanbanGroupKey(o.label))
+      .filter(Boolean)
+    return Array.from(new Set([...optionKeys, ...existing]))
+  }, [groupedRowsLimited, blockConfig, groupingField])
 
   if (loading) {
     return <div className="p-4">Loading...</div>
@@ -457,30 +490,6 @@ function KanbanView({
       />
     )
   }
-
-  const groupedRows = groupRowsByField()
-  const groupedRowsLimited = useMemo(() => {
-    const hasLimit = Number.isFinite(recordLimit) && recordLimit > 0
-    if (!hasLimit) return groupedRows
-    const out: Record<string, TableRow[]> = {}
-    for (const [group, rowsInGroup] of Object.entries(groupedRows)) {
-      out[group] = rowsInGroup.slice(0, recordLimit)
-    }
-    return out
-  }, [groupedRows, recordLimit])
-  const groups = useMemo(() => {
-    const existing = Object.keys(groupedRowsLimited)
-    const hideEmptyStacks = Boolean((blockConfig as any)?.appearance?.kanban_hide_empty_stacks)
-    if (hideEmptyStacks) return existing
-    if (!groupingField || (groupingField.type !== "single_select" && groupingField.type !== "multi_select")) {
-      return existing
-    }
-    const { selectOptions } = normalizeSelectOptionsForUi(groupingField.type, groupingField.options)
-    const optionKeys = selectOptions
-      .map((o) => normalizeKanbanGroupKey(o.label))
-      .filter(Boolean)
-    return Array.from(new Set([...optionKeys, ...existing]))
-  }, [groupedRowsLimited, blockConfig, groupingField])
 
   // Empty state for search
   if (searchQuery && filteredRows.length === 0) {

@@ -426,6 +426,20 @@ export async function resolveLinkedFieldDisplayMap(
   return out
 }
 
+/** Resolve display maps for multiple link fields in parallel (avoids sequential N+1 across fields). */
+export async function resolveLinkedFieldDisplayMapsBatch(
+  items: Array<{ field: LinkedField; ids: string[]; key?: string }>
+): Promise<Map<string, Map<string, string>>> {
+  const entries = await Promise.all(
+    items.map(async (item) => {
+      const key = item.key ?? item.field.id ?? item.field.name
+      const map = await resolveLinkedFieldDisplayMap(item.field, item.ids)
+      return [key, map] as const
+    })
+  )
+  return new Map(entries)
+}
+
 /**
  * Resolve pasted text to linked field record IDs
  * 

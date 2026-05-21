@@ -42,7 +42,7 @@ import type { GroupRule } from '@/lib/grouping/types'
 import { normalizeUuid } from '@/lib/utils/ids'
 import { isAbortError } from '@/lib/api/error-handling'
 import type { LinkedField } from '@/types/fields'
-import { getLinkedFieldValueFromRow, linkedValueToIds, resolveLinkedFieldDisplayMap } from '@/lib/dataView/linkedFields'
+import { getLinkedFieldValueFromRow, linkedValueToIds, resolveLinkedFieldDisplayMapsBatch } from '@/lib/dataView/linkedFields'
 import FillHandle from './FillHandle'
 import CellContextMenu from './CellContextMenu'
 import { formatCellValue } from '@/lib/dataView/clipboard'
@@ -991,17 +991,23 @@ export default function AirtableGridView({
         return
       }
 
+      const batchItems = groupedLinkFields
+        .map((f) => {
+          const ids = new Set<string>()
+          for (const row of asArray<GridRow>(filteredRows)) {
+            const fieldValue = getLinkedFieldValueFromRow(row, f)
+            for (const id of linkedValueToIds(fieldValue)) ids.add(id)
+          }
+          return { field: f, ids: Array.from(ids), key: f.name }
+        })
+        .filter((item) => item.ids.length > 0)
+
+      const maps = await resolveLinkedFieldDisplayMapsBatch(batchItems)
       const next: Record<string, Record<string, string>> = {}
       for (const f of groupedLinkFields) {
-        const ids = new Set<string>()
-        for (const row of asArray<GridRow>(filteredRows)) {
-          const fieldValue = getLinkedFieldValueFromRow(row, f)
-          for (const id of linkedValueToIds(fieldValue)) ids.add(id)
-        }
-        if (ids.size === 0) continue
-        const map = await resolveLinkedFieldDisplayMap(f, Array.from(ids))
+        const map = maps.get(f.name)
+        if (!map) continue
         next[f.name] = Object.fromEntries(map.entries())
-        // Also key by field id for callers who group by id.
         next[(f as any).id] = next[f.name]
       }
 
@@ -1941,14 +1947,11 @@ export default function AirtableGridView({
                   data-group-level={item.level || 0}
                   onClick={(e) => {
                     const target = e.target as HTMLElement
-                    // Contract: single click selects the row ONLY (never opens a record).
-                    // Ignore clicks originating from cells/editors/open button/checkbox.
+                    // REG-001/003: row background click does not bulk-select; checkboxes only.
                     if (target.closest('[data-grid-open="true"]')) return
                     if (target.closest('[data-grid-cell="true"]')) return
                     if (target.closest('.cell-editor')) return
                     if (target.closest('input[type="checkbox"]')) return
-
-                    handleRowSelect(row.id, rowIndex, e)
                     setSelectedColumnId(null)
                     setSelectedCell(null)
                   }}

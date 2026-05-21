@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button"
 import BulkEditModal from "./BulkEditModal"
 import type { TableField } from "@/types/fields"
 
+/** REG-001: bulk bar and bulk edit only when this many rows are checkbox-selected */
+export const BULK_ACTION_MIN_SELECTED_COUNT = 2
+
 interface BulkActionBarProps {
   selectedCount: number
   tableName: string
@@ -30,7 +33,7 @@ export default function BulkActionBar({
   const canEdit = userRole === "admin" || userRole === "editor"
   const canDelete = userRole === "admin"
 
-  if (selectedCount === 0) return null
+  if (selectedCount < BULK_ACTION_MIN_SELECTED_COUNT) return null
 
   return (
     <>

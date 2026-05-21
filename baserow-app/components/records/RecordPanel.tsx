@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { createPortal } from "react-dom"
 import RecordEditor from "./RecordEditor"
 import { useIsMobile } from "@/hooks/useResponsive"
+import { resolveRecordEditMode } from "@/lib/interface/resolve-record-edit-mode"
 
 const MIN_WIDTH = 320
 const MAX_WIDTH = 1200
@@ -33,10 +34,12 @@ export default function RecordPanel() {
   const resizeCleanupRef = useRef<null | (() => void)>(null)
 
   const active = Boolean(state.isOpen && state.tableId)
-  // Layout editing: prefer caller's interfaceMode when explicitly passed; otherwise use isEdit() && onLayoutSave (Airtable-style)
-  const callerWantsEdit = state.interfaceMode === "edit"
-  const pageEditWithLayout = isEdit() && state.onLayoutSave
-  const interfaceMode = callerWantsEdit || pageEditWithLayout ? "edit" : "view"
+  const interfaceMode = resolveRecordEditMode({
+    interfaceMode: state.interfaceMode,
+    pageLayoutEditActive: isEdit() && Boolean(state.onLayoutSave),
+  })
+    ? "edit"
+    : "view"
   const calendarOrigin =
     ((state.cascadeContext?.blockConfig as any)?.view_type === "calendar") ||
     ((state.cascadeContext?.blockConfig as any)?.calendar_start_field != null) ||

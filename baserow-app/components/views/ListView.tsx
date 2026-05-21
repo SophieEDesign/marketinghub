@@ -20,11 +20,18 @@ import { useRecordModal } from "@/contexts/RecordModalContext"
 import GroupDialog from "@/components/grid/GroupDialog"
 import FilterDialog from "@/components/grid/FilterDialog"
 import { toPostgrestColumn } from "@/lib/supabase/postgrest"
+import {
+  applySoftDeleteFilter,
+  fetchPhysicalColumns,
+  filterConfigsToQueryableColumns,
+  hasPhysicalColumnName,
+} from "@/lib/supabase/physical-columns"
 import { buildGroupTree, flattenGroupTree } from "@/lib/grouping/groupTree"
 import type { GroupRule } from "@/lib/grouping/types"
 import { isAbortError } from "@/lib/api/error-handling"
+import { ViewErrorBoundary } from "@/components/ViewErrorBoundary"
 import type { LinkedField } from "@/types/fields"
-import { getLinkedFieldValueFromRow, linkedValueToIds, resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
+import { getLinkedFieldValueFromRow, linkedValueToIds, resolveLinkedFieldDisplayMapsBatch } from "@/lib/dataView/linkedFields"
 import { normalizeUuid } from "@/lib/utils/ids"
 import { isUserField, getUserDisplayNames } from "@/lib/users/userDisplay"
 import type { HighlightRule } from "@/lib/interface/types"
@@ -94,7 +101,7 @@ interface ListViewProps {
   overflowBehaviour?: BlockOverflowBehaviour
 }
 
-export default function ListView({
+function ListViewInner({
   tableId,
   viewId,
   supabaseTableName,
@@ -312,20 +319,21 @@ export default function ListView({
 
     try {
       const supabase = createClient()
-      let query = supabase
-        .from(supabaseTableName)
-        .select("*")
-        .is('deleted_at', null)
+      const physicalColumns = await fetchPhysicalColumns(supabase, supabaseTableName)
+      const safeFields = Array.isArray(tableFields) ? tableFields : []
+      const queryableFilters = filterConfigsToQueryableColumns(currentFilters, safeFields, physicalColumns)
 
-      // Apply filters using shared unified filter engine (includes date operators)
-      if (currentFilters.length > 0) {
-        const normalizedFields = tableFields.map((f) => ({
+      let query = supabase.from(supabaseTableName).select("*")
+      query = applySoftDeleteFilter(query, physicalColumns)
+
+      if (queryableFilters.length > 0) {
+        const normalizedFields = safeFields.map((f) => ({
           name: f.name,
           type: f.type,
           id: f.id,
           options: (f as any).options,
         }))
-        query = applyFiltersToQuery(query, currentFilters, normalizedFields)
+        query = applyFiltersToQuery(query, queryableFilters, normalizedFields)
       }
 
       // Check if we need client-side sorting (for select fields that sort by sort_index)
@@ -346,7 +354,8 @@ export default function ListView({
           query = query.order(col, { ascending: sort.direction === 'asc' })
         })
       } else if (sorts.length === 0) {
-        query = query.order('created_at', { ascending: false })
+        const defaultOrder = hasPhysicalColumnName(physicalColumns, 'created_at') ? 'created_at' : 'id'
+        query = query.order(defaultOrder, { ascending: false })
       }
 
       // Explicit limit so we don't rely on Supabase default (often 20–30); show all rows up to a safe cap
@@ -478,15 +487,22 @@ export default function ListView({
         return
       }
 
+      const batchItems = groupedLinkFields
+        .map((f) => {
+          const ids = new Set<string>()
+          for (const row of Array.isArray(filteredRows) ? filteredRows : []) {
+            const fieldValue = getLinkedFieldValueFromRow(row as Record<string, unknown>, f)
+            for (const id of linkedValueToIds(fieldValue)) ids.add(id)
+          }
+          return { field: f, ids: Array.from(ids), key: f.name }
+        })
+        .filter((item) => item.ids.length > 0)
+
+      const maps = await resolveLinkedFieldDisplayMapsBatch(batchItems)
       const next: Record<string, Record<string, string>> = {}
       for (const f of groupedLinkFields) {
-        const ids = new Set<string>()
-        for (const row of Array.isArray(filteredRows) ? filteredRows : []) {
-          const fieldValue = getLinkedFieldValueFromRow(row as Record<string, unknown>, f)
-          for (const id of linkedValueToIds(fieldValue)) ids.add(id)
-        }
-        if (ids.size === 0) continue
-        const map = await resolveLinkedFieldDisplayMap(f, Array.from(ids))
+        const map = maps.get(f.name)
+        if (!map) continue
         next[f.name] = Object.fromEntries(map.entries())
         next[(f as any).id] = next[f.name]
       }
@@ -1302,3 +1318,10 @@ export default function ListView({
   )
 }
 
+export default function ListView(props: React.ComponentProps<typeof ListViewInner>) {
+  return (
+    <ViewErrorBoundary resetKeys={[props.tableId, props.viewId]} label="List">
+      <ListViewInner {...props} />
+    </ViewErrorBoundary>
+  )
+}

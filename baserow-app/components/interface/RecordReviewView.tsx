@@ -12,6 +12,7 @@
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { ViewErrorBoundary } from '@/components/ViewErrorBoundary'
 import { useRouter } from 'next/navigation'
 import { Search, ChevronUp, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -46,7 +47,7 @@ interface RecordReviewViewProps {
   isLoading?: boolean // Loading state for data
 }
 
-export default function RecordReviewView({ page, data, config, blocks = [], pageTableId, isLoading = false }: RecordReviewViewProps) {
+function RecordReviewViewInner({ page, data, config, blocks = [], pageTableId, isLoading = false }: RecordReviewViewProps) {
   const router = useRouter()
   // CRITICAL: Use useState to prevent hydration mismatch - localStorage access must happen after mount
   const [recordDebugEnabled, setRecordDebugEnabled] = useState(false)
@@ -1116,6 +1117,14 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
         )}
       </div>
     </div>
+  )
+}
+
+export default function RecordReviewView(props: RecordReviewViewProps) {
+  return (
+    <ViewErrorBoundary resetKeys={[props.page?.id]} label="Record review">
+      <RecordReviewViewInner {...props} />
+    </ViewErrorBoundary>
   )
 }
 

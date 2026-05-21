@@ -39,6 +39,7 @@ import { createClient } from "@/lib/supabase/client"
 import type { FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import { debugLog, debugError } from "@/lib/debug"
+import { ViewErrorBoundary } from "@/components/ViewErrorBoundary"
 
 function isBlockEligibleForFullPage(block: PageBlock): boolean {
   if (!block.config?.is_full_page) return false
@@ -65,9 +66,11 @@ interface InterfaceBuilderProps {
   editableFieldNames?: string[] // Field-level editable list (for field blocks)
   /** Marketing Dashboard: calmer layout, search hint, card styling context */
   marketingDashboard?: boolean
+  /** Mirror builder block state to InterfacePageClient (blocks owner when builder mounted). */
+  onBlocksMirror?: (blocks: PageBlock[]) => void
 }
 
-export default function InterfaceBuilder({
+function InterfaceBuilderInner({
   page,
   initialBlocks,
   isViewer = false,
@@ -83,10 +86,13 @@ export default function InterfaceBuilder({
   pageEditable,
   editableFieldNames = [],
   marketingDashboard = false,
+  onBlocksMirror,
 }: InterfaceBuilderProps) {
   const { primaryColor } = useBranding()
   const { toast } = useToast()
   const [blocks, setBlocks] = useState<PageBlock[]>(initialBlocks)
+  const onBlocksMirrorRef = useRef(onBlocksMirror)
+  onBlocksMirrorRef.current = onBlocksMirror
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle")
   
   // Context-driven editing: Edit/View toggle from sidebar menu controls block editing
@@ -213,6 +219,10 @@ export default function InterfaceBuilder({
     // Live state takes precedence after first load
     // This prevents the "edit vs publish" drift issue
   }, [page.id, initialBlocks?.length, blocks.length])
+
+  useEffect(() => {
+    onBlocksMirrorRef.current?.(blocks)
+  }, [blocks])
 
   const {
     selectedBlockId,
@@ -1908,5 +1918,13 @@ export default function InterfaceBuilder({
         />
       )}
     </div>
+  )
+}
+
+export default function InterfaceBuilder(props: React.ComponentProps<typeof InterfaceBuilderInner>) {
+  return (
+    <ViewErrorBoundary resetKeys={[props.page?.id]} label="Page builder">
+      <InterfaceBuilderInner {...props} />
+    </ViewErrorBoundary>
   )
 }

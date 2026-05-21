@@ -72,18 +72,7 @@ export default async function HomePage({
   try {
     const { pageId: rawPageId, reason } = await resolveLandingPage()
     const pageId = normalizePageId(rawPageId)
-    // #region agent log
-    console.error("[agent-debug]", {
-      sessionId: "909a6f",
-      runId: "initial",
-      hypothesisId: "H15",
-      location: "app/page.tsx:resolveLandingPage:normalized",
-      message: "Normalized resolved landing page id in root redirect",
-      data: { rawType: typeof rawPageId, normalizedPageId: pageId, reason },
-      timestamp: Date.now(),
-    })
-    // #endregion
-    
+
     if (isDev) {
       console.log(`[Default Page] resolveLandingPage returned:`, { 
         pageId, 

@@ -14,6 +14,7 @@ import {
 import { getTableFields } from '@/lib/fields/schema'
 import { isTableNotFoundError, createErrorResponse, type ApiError } from '@/lib/api/error-handling'
 import type { TableField, FieldType, FieldOptions } from '@/types/fields'
+import { debugLog } from '@/lib/debug'
 
 const SYSTEM_FIELD_NAMES = new Set(['created_at', 'created_by', 'updated_at', 'updated_by'])
 function isSystemFieldName(name: string) {
@@ -1332,8 +1333,8 @@ export async function DELETE(
 
     if (userIsAdmin) {
       // For admins, use admin client directly (bypasses RLS)
-      console.log('[Field Delete] User is admin, using admin client to bypass RLS...')
-      console.log('[Field Delete] Field ID:', fieldId, 'Field name:', field?.name)
+      debugLog('[Field Delete] User is admin, using admin client to bypass RLS...')
+      debugLog('[Field Delete] Field ID:', fieldId, 'Field name:', field?.name)
       
       // Check if it's a system field first (triggers will block these)
       if (field && isSystemFieldName(field.name)) {
@@ -1352,7 +1353,7 @@ export async function DELETE(
           .eq('id', fieldId)
           .select('id')
         
-        console.log('[Field Delete] Admin client result:', {
+        debugLog('[Field Delete] Admin client result:', {
           data: adminResult.data,
           error: adminResult.error,
           dataLength: adminResult.data?.length || 0
@@ -1372,7 +1373,7 @@ export async function DELETE(
           // Successfully deleted
           deletedRows = adminResult.data
           deleteError = null
-          console.log('[Field Delete] Successfully deleted via admin client')
+          debugLog('[Field Delete] Successfully deleted via admin client')
         } else {
           // Admin client returned 0 rows - try SQL as fallback
           console.warn('[Field Delete] Admin client returned 0 rows, trying SQL fallback...')
@@ -1406,7 +1407,7 @@ export async function DELETE(
                   .eq('id', fieldId)
                   .maybeSingle()
                 
-                console.log('[Field Delete] SQL verification:', {
+                debugLog('[Field Delete] SQL verification:', {
                   fieldExists: !!verifyResult.data,
                   fieldName: verifyResult.data?.name,
                   error: verifyResult.error
@@ -1415,7 +1416,7 @@ export async function DELETE(
                 if (!verifyResult.data) {
                   deletedRows = [{ id: fieldId }]
                   deleteError = null
-                  console.log('[Field Delete] Successfully deleted via SQL fallback')
+                  debugLog('[Field Delete] Successfully deleted via SQL fallback')
                 } else {
                   console.error('[Field Delete] SQL executed but field still exists:', verifyResult.data)
                   deleteError = new Error(`Field deletion failed: SQL executed but field still exists (${verifyResult.data.name}). This indicates a trigger or constraint is blocking the deletion.`)
@@ -1438,7 +1439,7 @@ export async function DELETE(
       }
     } else {
       // For non-admins, try regular client (respects RLS)
-      console.log('[Field Delete] User is not admin, using regular client (respects RLS)...')
+      debugLog('[Field Delete] User is not admin, using regular client (respects RLS)...')
       const result = await supabase
         .from('table_fields')
         .delete()
@@ -1450,7 +1451,7 @@ export async function DELETE(
       
       // If delete failed with 0 rows (RLS blocking), provide helpful error
       if ((!deletedRows || deletedRows.length === 0) && !deleteError) {
-        console.log('[Field Delete] Regular client delete returned 0 rows - RLS may be blocking')
+        debugLog('[Field Delete] Regular client delete returned 0 rows - RLS may be blocking')
       }
     }
 

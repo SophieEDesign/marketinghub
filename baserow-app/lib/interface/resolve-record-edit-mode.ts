@@ -4,27 +4,27 @@
  * Rules:
  * - interfaceMode === 'edit' → ALWAYS true (absolute)
  * - else if initialEditMode === true → true
+ * - else if pageLayoutEditActive → true (UIMode edit + layout save handler on panel)
  * - else → false
- * 
- * NO EXCEPTIONS. NO OVERRIDES.
  */
 export function resolveRecordEditMode({
   interfaceMode,
   initialEditMode,
+  pageLayoutEditActive,
 }: {
   interfaceMode?: 'view' | 'edit'
   initialEditMode?: boolean
+  /** UIMode page edit with record layout save (RecordPanel). */
+  pageLayoutEditActive?: boolean
 }): boolean {
-  // Rule 1: interfaceMode === 'edit' is ABSOLUTE
   if (interfaceMode === 'edit') {
     return true
   }
-  
-  // Rule 2: initialEditMode can force edit mode
   if (initialEditMode === true) {
     return true
   }
-  
-  // Rule 3: Default to false
+  if (pageLayoutEditActive === true) {
+    return true
+  }
   return false
 }

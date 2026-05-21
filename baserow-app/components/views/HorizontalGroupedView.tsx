@@ -9,6 +9,12 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { buildGroupTree } from "@/lib/grouping/groupTree"
 import type { GroupRule } from "@/lib/grouping/types"
 import { toPostgrestColumn } from "@/lib/supabase/postgrest"
+import {
+  applySoftDeleteFilter,
+  fetchPhysicalColumns,
+  filterConfigsToQueryableColumns,
+  hasPhysicalColumnName,
+} from "@/lib/supabase/physical-columns"
 import { normalizeUuid } from "@/lib/utils/ids"
 import { getLinkedFieldValueFromRow, linkedValueToIds, resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
 import type { LinkedField } from "@/types/fields"
@@ -103,27 +109,31 @@ export default function HorizontalGroupedView({
       setLoading(true)
       try {
         const supabase = createClient()
-        let query = supabase
-          .from(supabaseTableName)
-          .select("*")
-          .is("deleted_at", null)
-
-        // Apply filter tree first (supports groups/OR), then apply remaining flat filters
-        const normalizedFields = (Array.isArray(tableFields) ? tableFields : []).map((f: any) => ({
+        const physicalColumns = await fetchPhysicalColumns(supabase, supabaseTableName)
+        const safeFields = Array.isArray(tableFields) ? tableFields : []
+        const normalizedFields = safeFields.map((f: any) => ({
           name: f.name || f.field_name || f.id || f.field_id,
           id: f.id || f.field_id,
           type: f.type || f.field_type,
           options: f.options || f.field_options,
         }))
-        
+
+        let query = supabase.from(supabaseTableName).select("*")
+        query = applySoftDeleteFilter(query, physicalColumns)
+
+        const baseFilters = filterTree ? stripFilterBlockFilters(filters || []) : (filters || [])
+        const queryableBaseFilters = filterConfigsToQueryableColumns(
+          baseFilters,
+          safeFields,
+          physicalColumns
+        )
+
         if (filterTree) {
           query = applyFiltersToQuery(query, filterTree, normalizedFields)
         }
-        
-        // Apply remaining filters (after stripping filter block filters if filterTree exists)
-        const baseFilters = filterTree ? stripFilterBlockFilters(filters || []) : (filters || [])
-        if (baseFilters.length > 0) {
-          query = applyFiltersToQuery(query, baseFilters, normalizedFields)
+
+        if (queryableBaseFilters.length > 0) {
+          query = applyFiltersToQuery(query, queryableBaseFilters, normalizedFields)
         }
 
         // Apply sorts
@@ -137,8 +147,8 @@ export default function HorizontalGroupedView({
             }
           }
         } else {
-          // Default sort by created_at
-          query = query.order('created_at', { ascending: false })
+          const defaultOrder = hasPhysicalColumnName(physicalColumns, 'created_at') ? 'created_at' : 'id'
+          query = query.order(defaultOrder, { ascending: false })
         }
 
         // Explicit limit so we don't rely on Supabase default (often 20–30); show all rows up to a safe cap

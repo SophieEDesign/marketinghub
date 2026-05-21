@@ -1,0 +1,23 @@
+---
+description: PRs touching grid, interface, or record flows must verify regression invariants
+globs:
+  - baserow-app/components/grid/**
+  - baserow-app/components/interface/**
+  - baserow-app/components/records/**
+  - baserow-app/contexts/Record*.tsx
+  - baserow-app/contexts/UIModeContext.tsx
+---
+
+# Regression checklist (required)
+
+Before merging changes under the globs above:
+
+1. Read [REGRESSION_RISK_AUDIT_2026-05.md](../../docs/audits/REGRESSION_RISK_AUDIT_2026-05.md)
+2. List verified REG-ids in the PR (e.g. `REG-001, REG-004`)
+3. Run `npm test` from `baserow-app/`
+
+## Quick rules
+
+- **REG-001:** Bulk action bar only when 2+ checkbox-selected rows in core data (`BULK_ACTION_MIN_SELECTED_COUNT`)
+- **REG-003:** Do not call bulk `handleRowSelect` from row background click — checkbox column only
+- **REG-004:** Content overlays use `md:left-64` on desktop so sidebar stays clickable

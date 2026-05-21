@@ -14,6 +14,8 @@ import WorkspaceShell from "./WorkspaceShell"
 import DynamicFavicon from "./DynamicFavicon"
 import type { View } from "@/types/database"
 import type { Automation } from "@/types/database"
+import { containsBigInt, sanitizeForClient } from "@/lib/serialization/sanitize-for-client"
+import { cache } from "react"
 
 interface WorkspaceShellWrapperProps {
   children: React.ReactNode
@@ -34,25 +36,6 @@ function hotPathError(message: string, payload: Record<string, unknown>) {
   console.error(message, payload)
 }
 
-function containsBigInt(value: unknown, seen = new WeakSet<object>()): boolean {
-  if (typeof value === "bigint") return true
-  if (value == null) return false
-  if (typeof value !== "object") return false
-  const obj = value as object
-  if (seen.has(obj)) return false
-  seen.add(obj)
-  if (Array.isArray(value)) {
-    return value.some((entry) => containsBigInt(entry, seen))
-  }
-  return Object.values(value as Record<string, unknown>).some((entry) => containsBigInt(entry, seen))
-}
-
-function sanitizeForClient<T>(value: T): T {
-  return JSON.parse(
-    JSON.stringify(value, (_key, current) => (typeof current === "bigint" ? current.toString() : current))
-  ) as T
-}
-
 const MARKETING_CORE_PAGE_ORDER = [
   "Dashboard",
   "Theme Workspace",
@@ -70,6 +53,42 @@ function getNavPriority(name: string, isAdminOnly: boolean): number {
   return 200
 }
 
+/** Per-request cache for expensive shell nav fetches (tables + views + role). */
+const loadShellCoreNav = cache(async () => {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) {
+    redirect("/login")
+  }
+
+  const [tables, userRole, brandingSettings, admin] = await Promise.all([
+    getTables().catch((error) => {
+      if (process.env.NODE_ENV === "development") {
+        console.error("[WorkspaceShellWrapper] Error loading tables:", error)
+      }
+      return []
+    }),
+    getUserRole(),
+    getWorkspaceSettings().catch(() => null),
+    isAdmin(),
+  ])
+
+  const viewsByTable: Record<string, View[]> = {}
+  await Promise.all(
+    tables.map(async (table) => {
+      try {
+        viewsByTable[table.id] = (await getViews(table.id).catch(() => [])) || []
+      } catch {
+        viewsByTable[table.id] = []
+      }
+    })
+  )
+
+  return { supabase, tables, userRole, brandingSettings, userIsAdmin: admin, admin, viewsByTable }
+})
+
 export default async function WorkspaceShellWrapper({
   children,
   title,
@@ -77,137 +96,8 @@ export default async function WorkspaceShellWrapper({
   hideRecordPanel = false,
 }: WorkspaceShellWrapperProps) {
   try {
-    // #region agent log
-    hotPathInfo("[agent-debug]", {
-      sessionId: "909a6f",
-      runId: "initial",
-      hypothesisId: "H11",
-      location: "components/layout/WorkspaceShellWrapper.tsx:entry",
-      message: "Entered WorkspaceShellWrapper",
-      data: { hasTitle: Boolean(title), hideTopbar, hideRecordPanel },
-      timestamp: Date.now(),
-    })
-    // #endregion
-  // #region agent log
-  hotPathError("[agent-debug]", {
-    sessionId: "909a6f",
-    runId: "initial",
-    hypothesisId: "H12",
-    location: "components/layout/WorkspaceShellWrapper.tsx:post-entry",
-    message: "Reached immediately after shell entry",
-    data: { hasTitle: Boolean(title) },
-    timestamp: Date.now(),
-  })
-  // #endregion
-  const supabase = await createClient()
-  // #region agent log
-  hotPathError("[agent-debug]", {
-    sessionId: "909a6f",
-    runId: "initial",
-    hypothesisId: "H13",
-    location: "components/layout/WorkspaceShellWrapper.tsx:after-createClient",
-    message: "createClient completed in shell wrapper",
-    data: { hasSupabase: Boolean(supabase) },
-    timestamp: Date.now(),
-  })
-  // #endregion
-  
-  // Check authentication - redirect to login if not authenticated
-  const { data: { user } } = await supabase.auth.getUser()
-  // #region agent log
-  hotPathError("[agent-debug]", {
-    sessionId: "909a6f",
-    runId: "initial",
-    hypothesisId: "H13",
-    location: "components/layout/WorkspaceShellWrapper.tsx:after-getUser",
-    message: "auth.getUser completed in shell wrapper",
-    data: { hasUser: Boolean(user) },
-    timestamp: Date.now(),
-  })
-  // #endregion
-  if (!user) {
-    // Note: For better redirect preservation, the login page should be accessed
-    // with ?next=/desired-path parameter. This component redirects to /login
-    // and the login page will handle the redirect after authentication.
-    redirect('/login')
-  }
-  
-  // Fetch all data in parallel using existing functions from baserow-app/lib/crud
-  const [tables, userRole, brandingSettings] = await Promise.all([
-    getTables().catch((error) => {
-      // Log error but don't crash the app (only in development)
-      if (process.env.NODE_ENV === 'development') {
-        console.error('[WorkspaceShellWrapper] Error loading tables:', error)
-      }
-      return []
-    }),
-    getUserRole(),
-    getWorkspaceSettings().catch(() => null),
-  ])
-  // #region agent log
-  hotPathError("[agent-debug]", {
-    sessionId: "909a6f",
-    runId: "initial",
-    hypothesisId: "H13",
-    location: "components/layout/WorkspaceShellWrapper.tsx:after-initial-parallel",
-    message: "Initial parallel data load completed",
-    data: { tablesCount: tables.length, hasUserRole: Boolean(userRole), hasBranding: Boolean(brandingSettings) },
-    timestamp: Date.now(),
-  })
-  // #endregion
-  
-  const userIsAdmin = await isAdmin()
-  // #region agent log
-  hotPathError("[agent-debug]", {
-    sessionId: "909a6f",
-    runId: "initial",
-    hypothesisId: "H13",
-    location: "components/layout/WorkspaceShellWrapper.tsx:after-isAdmin-userIsAdmin",
-    message: "Resolved userIsAdmin in shell wrapper",
-    data: { userIsAdmin },
-    timestamp: Date.now(),
-  })
-  // #endregion
-
-  // Fetch views for all tables using existing getViews function
-  // Handle errors gracefully - tables may not have views yet
-  const viewsByTable: Record<string, View[]> = {}
-  await Promise.all(
-    tables.map(async (table) => {
-      try {
-        const tableViews = await getViews(table.id).catch(() => [])
-        viewsByTable[table.id] = tableViews || []
-      } catch (error) {
-        // Table may not have views yet - this is normal
-        viewsByTable[table.id] = []
-      }
-    })
-  )
-  // #region agent log
-  hotPathError("[agent-debug]", {
-    sessionId: "909a6f",
-    runId: "initial",
-    hypothesisId: "H13",
-    location: "components/layout/WorkspaceShellWrapper.tsx:after-viewsByTable",
-    message: "Loaded viewsByTable in shell wrapper",
-    data: { tableCount: tables.length, viewsTableKeys: Object.keys(viewsByTable).length },
-    timestamp: Date.now(),
-  })
-  // #endregion
-
-  // Check if user is admin for filtering
-  const admin = await isAdmin()
-  // #region agent log
-  hotPathError("[agent-debug]", {
-    sessionId: "909a6f",
-    runId: "initial",
-    hypothesisId: "H13",
-    location: "components/layout/WorkspaceShellWrapper.tsx:after-isAdmin-admin",
-    message: "Resolved admin flag in shell wrapper",
-    data: { admin },
-    timestamp: Date.now(),
-  })
-  // #endregion
+  const { supabase, tables, userRole, brandingSettings, userIsAdmin, admin, viewsByTable } =
+    await loadShellCoreNav()
   
   // Fetch interface groups
   let interfaceGroups: any[] = []
@@ -447,90 +337,17 @@ export default async function WorkspaceShellWrapper({
   // Resolve default page for "Back to home" link - never link to abstract / route
   let defaultPageId: string | null = null
   try {
-    // #region agent log
-    hotPathInfo("[agent-debug]", {
-      sessionId: "909a6f",
-      runId: "initial",
-      hypothesisId: "H11",
-      location: "components/layout/WorkspaceShellWrapper.tsx:resolveLandingPage:start",
-      message: "Resolving landing page for shell links",
-      data: { interfacePageCount: interfacePages.length },
-      timestamp: Date.now(),
-    })
-    // #endregion
-    // #region agent log
-    hotPathError("[agent-debug]", {
-      sessionId: "909a6f",
-      runId: "initial",
-      hypothesisId: "H21",
-      location: "components/layout/WorkspaceShellWrapper.tsx:resolveLandingPage:before-await",
-      message: "About to await resolveLandingPage in shell wrapper",
-      data: {},
-      timestamp: Date.now(),
-    })
-    // #endregion
+
     const resolvedLanding = await withTimeout(
       resolveLandingPage(),
       12_000,
       "resolveLandingPage timed out"
     )
-    // #region agent log
-    hotPathError("[agent-debug]", {
-      sessionId: "909a6f",
-      runId: "initial",
-      hypothesisId: "H21",
-      location: "components/layout/WorkspaceShellWrapper.tsx:resolveLandingPage:after-await",
-      message: "resolveLandingPage returned in shell wrapper",
-      data: {
-        hasResult: Boolean(resolvedLanding),
-        resultType: typeof resolvedLanding,
-        pageIdType: typeof (resolvedLanding as any)?.pageId,
-      },
-      timestamp: Date.now(),
-    })
-    // #endregion
     const resolvedPageId = (resolvedLanding as any)?.pageId
     defaultPageId = typeof resolvedPageId === "string" ? resolvedPageId : null
     if (resolvedPageId != null && typeof resolvedPageId !== "string") {
-      // #region agent log
-      hotPathError("[agent-debug]", {
-        sessionId: "909a6f",
-        runId: "initial",
-        hypothesisId: "H21",
-        location: "components/layout/WorkspaceShellWrapper.tsx:resolveLandingPage:non-string-pageId",
-        message: "resolveLandingPage returned non-string pageId; using null fallback",
-        data: { resolvedPageIdType: typeof resolvedPageId },
-        timestamp: Date.now(),
-      })
-      // #endregion
     }
-    // #region agent log
-    hotPathInfo("[agent-debug]", {
-      sessionId: "909a6f",
-      runId: "initial",
-      hypothesisId: "H11",
-      location: "components/layout/WorkspaceShellWrapper.tsx:resolveLandingPage:success",
-      message: "Resolved landing page for shell links",
-      data: { defaultPageId },
-      timestamp: Date.now(),
-    })
-    // #endregion
   } catch (error) {
-    // #region agent log
-    hotPathError("[agent-debug]", {
-      sessionId: "909a6f",
-      runId: "initial",
-      hypothesisId: "H21",
-      location: "components/layout/WorkspaceShellWrapper.tsx:resolveLandingPage:catch",
-      message: "resolveLandingPage failed in shell wrapper",
-      data: {
-        errorMessage: error instanceof Error ? error.message : String(error),
-        errorName: error instanceof Error ? error.name : typeof error,
-        hasStack: Boolean(error instanceof Error && error.stack),
-      },
-      timestamp: Date.now(),
-    })
-    // #endregion
     // Fallback: first accessible interface page
     if (interfacePages.length > 0) {
       defaultPageId = interfacePages[0].id
@@ -542,29 +359,7 @@ export default async function WorkspaceShellWrapper({
       ? (interfacePages.find((p: { id: string }) => p.id === defaultPageId)?.name as string | undefined) ??
         null
       : null
-  // #region agent log
-  hotPathError("[agent-debug]", {
-    sessionId: "909a6f",
-    runId: "initial",
-    hypothesisId: "H13",
-    location: "components/layout/WorkspaceShellWrapper.tsx:after-landingPageTitle",
-    message: "Computed landingPageTitle in shell wrapper",
-    data: { defaultPageId, landingPageTitle, interfacePagesCount: interfacePages.length },
-    timestamp: Date.now(),
-  })
-  // #endregion
 
-  // #region agent log
-  hotPathInfo("[agent-debug]", {
-    sessionId: "909a6f",
-    runId: "initial",
-    hypothesisId: "H11",
-    location: "components/layout/WorkspaceShellWrapper.tsx:pre-return",
-    message: "WorkspaceShellWrapper reached return",
-    data: { defaultPageId, landingPageTitle, tablesCount: tables.length },
-    timestamp: Date.now(),
-  })
-  // #endregion
 
   const shellPayloadHasBigInt = containsBigInt({
     tables,
@@ -573,24 +368,6 @@ export default async function WorkspaceShellWrapper({
     interfaceGroups,
     dashboards,
   })
-  // #region agent log
-  hotPathError("[agent-debug]", {
-    sessionId: "909a6f",
-    runId: "initial",
-    hypothesisId: "H23",
-    location: "components/layout/WorkspaceShellWrapper.tsx:shell-props-summary",
-    message: "Prepared WorkspaceShell props before SSR handoff",
-    data: {
-      tablesCount: tables.length,
-      viewsTableKeys: Object.keys(viewsByTable).length,
-      interfacePagesCount: interfacePages.length,
-      interfaceGroupsCount: interfaceGroups.length,
-      dashboardsCount: dashboards.length,
-      hasBigInt: shellPayloadHasBigInt,
-    },
-    timestamp: Date.now(),
-  })
-  // #endregion
 
   let safeTables = tables
   let safeViewsByTable = viewsByTable
@@ -599,17 +376,6 @@ export default async function WorkspaceShellWrapper({
   let safeDashboards = dashboards
 
   if (shellPayloadHasBigInt) {
-    // #region agent log
-    hotPathError("[agent-debug]", {
-      sessionId: "909a6f",
-      runId: "initial",
-      hypothesisId: "H23",
-      location: "components/layout/WorkspaceShellWrapper.tsx:shell-props-sanitize",
-      message: "Detected BigInt in WorkspaceShell props; sanitizing payload",
-      data: {},
-      timestamp: Date.now(),
-    })
-    // #endregion
     safeTables = sanitizeForClient(tables)
     safeViewsByTable = sanitizeForClient(viewsByTable)
     safeInterfacePages = sanitizeForClient(interfacePages)
@@ -631,31 +397,7 @@ export default async function WorkspaceShellWrapper({
       defaultPageId,
       landingPageTitle,
     })
-    // #region agent log
-    hotPathError("[agent-debug]", {
-      sessionId: "909a6f",
-      runId: "initial",
-      hypothesisId: "H23",
-      location: "components/layout/WorkspaceShellWrapper.tsx:shell-props-serializable",
-      message: "WorkspaceShell props passed JSON serialization preflight",
-      data: {},
-      timestamp: Date.now(),
-    })
-    // #endregion
   } catch (serializeError) {
-    // #region agent log
-    hotPathError("[agent-debug]", {
-      sessionId: "909a6f",
-      runId: "initial",
-      hypothesisId: "H23",
-      location: "components/layout/WorkspaceShellWrapper.tsx:shell-props-serialize-fail",
-      message: "WorkspaceShell props failed JSON serialization preflight",
-      data: {
-        errorMessage: serializeError instanceof Error ? serializeError.message : String(serializeError),
-      },
-      timestamp: Date.now(),
-    })
-    // #endregion
     throw serializeError
   }
 
@@ -688,21 +430,6 @@ export default async function WorkspaceShellWrapper({
       </BrandingProvider>
     )
   } catch (error) {
-    // #region agent log
-    hotPathError("[agent-debug]", {
-      sessionId: "909a6f",
-      runId: "initial",
-      hypothesisId: "H17",
-      location: "components/layout/WorkspaceShellWrapper.tsx:outer-catch",
-      message: "Unhandled exception in workspace shell wrapper",
-      data: {
-        errorMessage: error instanceof Error ? error.message : String(error),
-        errorName: error instanceof Error ? error.name : typeof error,
-        hasStack: Boolean(error instanceof Error && error.stack),
-      },
-      timestamp: Date.now(),
-    })
-    // #endregion
     throw error
   }
 }

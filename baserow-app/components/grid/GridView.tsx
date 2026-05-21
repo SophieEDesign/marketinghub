@@ -32,6 +32,12 @@ import { SkeletonLoader } from "@/components/ui/SkeletonLoader"
 import EmptyTableState from "@/components/empty-states/EmptyTableState"
 import { computeFormulaFields } from "@/lib/formulas/computeFormulaFields"
 import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
+import {
+  applySoftDeleteFilter,
+  fetchPhysicalColumns,
+  filterConfigsToQueryableColumns,
+  filterViewFiltersToQueryableColumns,
+} from "@/lib/supabase/physical-columns"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import { asArray } from "@/lib/utils/asArray"
 import { sortRowsByFieldType, shouldUseClientSideSorting } from "@/lib/sorting/fieldTypeAwareSort"
@@ -62,8 +68,9 @@ import type { GroupRule } from "@/lib/grouping/types"
 import { isAbortError } from "@/lib/api/error-handling"
 import { normalizeUuid } from "@/lib/utils/ids"
 import type { LinkedField } from "@/types/fields"
-import { getLinkedFieldValueFromRow, linkedValueToIds, resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
+import { getLinkedFieldValueFromRow, linkedValueToIds, resolveLinkedFieldDisplayMapsBatch } from "@/lib/dataView/linkedFields"
 import { debugLog, debugWarn, debugError } from "@/lib/interface/debug-flags"
+import { ViewErrorBoundary } from "@/components/ViewErrorBoundary"
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
 import { cn } from "@/lib/utils"
 import {
@@ -81,7 +88,7 @@ interface BlockPermissions {
   allowOpenRecord?: boolean
 }
 
-interface GridViewProps {
+export interface GridViewProps {
   tableId: string
   viewId: string
   supabaseTableName: string
@@ -550,7 +557,7 @@ function DraggableColumnHeader({
   )
 }
 
-export default function GridView({
+function GridViewInner({
   tableId,
   viewId,
   supabaseTableName,
@@ -1582,10 +1589,16 @@ export default function GridView({
         ? '*'
         : buildSelectClause(selectClause.split(','), { includeId: getRowIdColumn(), fallback: '*' })
 
-      let query = supabase
-        .from(supabaseTableName)
-        .select(safeSelectClause || '*')
-        .is('deleted_at', null)
+      const physicalColumns = await fetchPhysicalColumns(supabase, supabaseTableName)
+      const queryableFilters = filterConfigsToQueryableColumns(safeFilters, safeTableFields, physicalColumns)
+      const queryableViewFilters = filterViewFiltersToQueryableColumns(
+        safeViewFilters,
+        safeTableFields,
+        physicalColumns
+      )
+
+      let query = supabase.from(supabaseTableName).select(safeSelectClause || '*')
+      query = applySoftDeleteFilter(query, physicalColumns)
 
       // Apply filter-block tree first (supports groups/OR).
       if (filterTree) {
@@ -1593,19 +1606,16 @@ export default function GridView({
         query = applyFiltersToQuery(query, filterTree, normalizedFields)
       }
 
-      // Use standardized filters if provided, otherwise fall back to viewFilters format
-      if (safeFilters.length > 0) {
-        // Convert tableFields to format expected by applyFiltersToQuery
-        const normalizedFields = safeTableFields.map(f => ({ name: f.name, type: f.type }))
-        query = applyFiltersToQuery(query, safeFilters, normalizedFields)
-      } else if (safeViewFilters.length > 0) {
-        // Legacy: Convert viewFilters format to FilterConfig format
-        const legacyFilters: FilterConfig[] = safeViewFilters.map(f => ({
+      if (queryableFilters.length > 0) {
+        const normalizedFields = safeTableFields.map((f) => ({ name: f.name, type: f.type }))
+        query = applyFiltersToQuery(query, queryableFilters, normalizedFields)
+      } else if (queryableViewFilters.length > 0) {
+        const legacyFilters: FilterConfig[] = queryableViewFilters.map((f) => ({
           field: f.field_name,
           operator: f.operator as FilterConfig['operator'],
           value: f.value,
         }))
-        const normalizedFields = safeTableFields.map(f => ({ name: f.name, type: f.type }))
+        const normalizedFields = safeTableFields.map((f) => ({ name: f.name, type: f.type }))
         query = applyFiltersToQuery(query, legacyFilters, normalizedFields)
       }
 
@@ -1822,6 +1832,18 @@ export default function GridView({
               : safeViewSorts
 
           let retryQuery = supabase.from(supabaseTableName).select('*')
+          retryQuery = applySoftDeleteFilter(
+            retryQuery,
+            physicalColumns ??
+              (physicalColumnsLower
+                ? new Set(Array.from(physicalColumnsLower))
+                : null)
+          )
+
+          if (filterTree && !missingColumn) {
+            const normalizedFields = safeTableFields.map((f) => ({ name: f.name, type: f.type }))
+            retryQuery = applyFiltersToQuery(retryQuery, filterTree, normalizedFields)
+          }
 
           if (filteredRetryFilters.length > 0) {
             const normalizedFields = safeTableFields.map(f => ({ name: f.name, type: f.type }))
@@ -2781,15 +2803,22 @@ export default function GridView({
         return
       }
 
+      const batchItems = groupedLinkFields
+        .map((f) => {
+          const ids = new Set<string>()
+          for (const row of asArray<Record<string, any>>(filteredRows)) {
+            const fieldValue = getLinkedFieldValueFromRow(row, f)
+            for (const id of linkedValueToIds(fieldValue)) ids.add(id)
+          }
+          return { field: f, ids: Array.from(ids), key: f.name }
+        })
+        .filter((item) => item.ids.length > 0)
+
+      const maps = await resolveLinkedFieldDisplayMapsBatch(batchItems)
       const next: Record<string, Record<string, string>> = {}
       for (const f of groupedLinkFields) {
-        const ids = new Set<string>()
-        for (const row of asArray<Record<string, any>>(filteredRows)) {
-          const fieldValue = getLinkedFieldValueFromRow(row, f)
-          for (const id of linkedValueToIds(fieldValue)) ids.add(id)
-        }
-        if (ids.size === 0) continue
-        const map = await resolveLinkedFieldDisplayMap(f, Array.from(ids))
+        const map = maps.get(f.name)
+        if (!map) continue
         next[f.name] = Object.fromEntries(map.entries())
         next[(f as any).id] = next[f.name]
       }
@@ -4021,3 +4050,10 @@ export default function GridView({
   )
 }
 
+export default function GridView(props: GridViewProps) {
+  return (
+    <ViewErrorBoundary resetKeys={[props.tableId, props.viewId]} label="Grid">
+      <GridViewInner {...props} />
+    </ViewErrorBoundary>
+  )
+}

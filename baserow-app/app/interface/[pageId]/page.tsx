@@ -11,17 +11,6 @@ export default async function InterfacePage({
 }) {
   const resolvedParams = await params
   const pageId = typeof resolvedParams?.pageId === "string" ? resolvedParams.pageId : null
-  // #region agent log
-  console.error("[agent-debug]", {
-    sessionId: "909a6f",
-    runId: "initial",
-    hypothesisId: "H15",
-    location: "app/interface/[pageId]/page.tsx:redirect",
-    message: "Legacy interface route redirect evaluated",
-    data: { hasPageId: Boolean(pageId), pageIdType: typeof resolvedParams?.pageId },
-    timestamp: Date.now(),
-  })
-  // #endregion
   if (!pageId) {
     redirect("/")
   }

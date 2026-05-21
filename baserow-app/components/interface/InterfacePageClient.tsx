@@ -21,11 +21,25 @@ import { useSelectionContext } from "@/contexts/SelectionContext"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { VIEWS_ENABLED } from "@/lib/featureFlags"
 import { toPostgrestColumn } from "@/lib/supabase/postgrest"
+import {
+  applySoftDeleteFilter,
+  applyFiltersToQuery,
+  type FilterConfig,
+} from "@/lib/interface/filters"
+import {
+  fetchPhysicalColumns,
+  filterSortsToQueryableColumns,
+  filterViewFiltersToQueryableColumns,
+  hasPhysicalColumnName,
+} from "@/lib/supabase/physical-columns"
 import { normalizeUuid } from "@/lib/utils/ids"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 import { isAbortError } from "@/lib/api/error-handling"
 import PageActionsRegistrar from "./PageActionsRegistrar"
 import { debugLog, debugWarn, debugError } from "@/lib/debug"
+import { blockLayoutSignature } from "@/lib/interface/block-config-signature"
+import { ErrorBoundary } from "@/components/interface/ErrorBoundary"
+import type { PageBlock } from "@/lib/interface/types"
 import { useRealtimeViewBlocks } from "@/lib/realtime/useRealtimeViewBlocks"
 import { CanvasContainer, BLOCK_EMBED_CLASSNAME } from "@/components/layout/ui-system"
 import { AppPageHeader } from "@/components/layout/ui-system"
@@ -67,6 +81,7 @@ function InterfacePageContent({
   showMarketingHome,
   showInternalStaffHub,
   isAdmin,
+  onBlocksMirror,
 }: {
   useRecordReviewLayout: boolean
   hasPage: boolean
@@ -86,6 +101,8 @@ function InterfacePageContent({
   showContentPlanning: boolean
   showMarketingHome: boolean
   showInternalStaffHub: boolean
+  /** When InterfaceBuilder is mounted it owns blocks; mirror updates to parent for loadBlocks/sync (REG-005). */
+  onBlocksMirror?: (blocks: PageBlock[]) => void
 }) {
   if (showInternalStaffHub) {
     return (
@@ -153,6 +170,7 @@ function InterfacePageContent({
         recordId={recordContext?.recordId ?? null}
         recordTableId={recordContext?.tableId ?? null}
         onRecordContextChange={setRecordContext}
+        onBlocksMirror={onBlocksMirror}
         mode="view"
         marketingDashboard={marketingDashboard}
       />
@@ -166,6 +184,7 @@ interface InterfacePageClientProps {
   pageId: string
   initialPage?: InterfacePage
   initialData?: any[]
+  initialBlocks?: PageBlock[]
   isAdmin?: boolean
 }
 
@@ -174,6 +193,7 @@ function InterfacePageClientInternal({
   pageId, 
   initialPage,
   initialData = [],
+  initialBlocks = [],
   isAdmin = false
 }: InterfacePageClientProps) {
   const searchParams = useSearchParams()
@@ -201,7 +221,7 @@ function InterfacePageClientInternal({
   const { state: recordPanelState } = useRecordPanel()
   const isRecordViewOpen = recordPanelState.isOpen
 
-  const [blocks, setBlocks] = useState<any[]>([])
+  const [blocks, setBlocks] = useState<PageBlock[]>(initialBlocks)
   const [blocksLoading, setBlocksLoading] = useState(false)
   const [dataLoading, setDataLoading] = useState(false)
   const [pageTableId, setPageTableId] = useState<string | null>(null)
@@ -244,7 +264,10 @@ function InterfacePageClientInternal({
   
   // CRITICAL: Track if blocks have been loaded to prevent overwrites
   // Track both the loaded state and the pageId to ensure we reset when page changes
-  const blocksLoadedRef = useRef<{ pageId: string | null; loaded: boolean }>({ pageId: null, loaded: false })
+  const blocksLoadedRef = useRef<{ pageId: string | null; loaded: boolean }>({
+    pageId: initialBlocks.length > 0 ? pageId : null,
+    loaded: initialBlocks.length > 0,
+  })
   
   // CRITICAL: Track if loadBlocks is currently executing to prevent concurrent calls
   const blocksLoadingRef = useRef<boolean>(false)
@@ -372,16 +395,18 @@ function InterfacePageClientInternal({
       ? selectedContext.blockId
       : undefined
   // handlePageUpdate changes when page loads (page?.id, page?.source_view) - must not be in sync effect deps
+  const loadPageRef = useRef<() => Promise<void>>(async () => {})
+  const loadBlocksRef = useRef<(forceReload?: boolean, signal?: AbortSignal) => Promise<void>>(async () => {})
+  const loadSqlViewDataRef = useRef<() => void>(() => {})
+
   const handlePageUpdate = useCallback(async () => {
     pageLoadedRef.current = false
     if (pageId) {
       blocksLoadedRef.current = { pageId, loaded: false }
     }
-    await Promise.all([loadPage(), loadBlocks(true)])
-    if (page?.source_view) {
-      loadSqlViewData()
-    }
-  }, [pageId, page?.id, page?.source_view])
+    await Promise.all([loadPageRef.current(), loadBlocksRef.current(true)])
+    loadSqlViewDataRef.current()
+  }, [pageId])
 
   const handlePageUpdateRef = useRef(handlePageUpdate)
   useEffect(() => {
@@ -539,7 +564,7 @@ function InterfacePageClientInternal({
             loadListViewData()
             // Force reload blocks to pick up any changes in view configuration
             if (blocksLoadedRef.current.pageId === pageId) {
-              loadBlocks(true) // forceReload = true
+              loadBlocksRef.current(true)
             }
           } else if (!previousUpdatedAt) {
             // First check - just store the timestamp
@@ -591,15 +616,14 @@ function InterfacePageClientInternal({
 
     const needsPage = !initialPageRef.current && !pageLoadedRef.current && !loading
     Promise.all([
-      needsPage ? loadPage() : Promise.resolve(),
-      loadBlocks(false, signal),
+      needsPage ? loadPageRef.current() : Promise.resolve(),
+      loadBlocksRef.current(false, signal),
     ]).catch(() => {})
 
     return () => {
       abortController.abort()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadPage/loadBlocks intentionally excluded; only pageId should trigger
-  }, [pageId])
+  }, [pageId, loading])
 
   // CRITICAL: Mode changes must NEVER trigger block reloads
   // Edit mode is a capability flag only - it controls drag/resize/settings, not block state
@@ -851,60 +875,47 @@ function InterfacePageClientInternal({
       const filters = filtersRes.data || []
       const sorts = sortsRes.data || []
 
-      // Build query - use 'any' type to avoid deep type inference issues (exclude soft-deleted)
-      let query: any = supabase
-        .from(table.supabase_table)
-        .select('*')
-        .is('deleted_at', null)
-        .limit(1000)
+      const { data: tableFieldsData } = await supabase
+        .from('table_fields')
+        .select('id, name, type, options')
+        .eq('table_id', view.table_id)
 
-      // Apply filters
-      for (const filter of filters) {
-        const fieldName = filter.field_name || filter.field_id
-        if (!fieldName || !filter.operator) continue
+      const tableFields = tableFieldsData || []
+      const physicalColumns = await fetchPhysicalColumns(supabase, table.supabase_table)
+      const queryableFilters = filterViewFiltersToQueryableColumns(filters, tableFields, physicalColumns)
+      const queryableSorts = filterSortsToQueryableColumns(sorts, tableFields, physicalColumns)
 
-        switch (filter.operator) {
-          case 'equal':
-            query = query.eq(fieldName, filter.value)
-            break
-          case 'not_equal':
-            query = query.neq(fieldName, filter.value)
-            break
-          case 'contains':
-            query = query.ilike(fieldName, `%${filter.value}%`)
-            break
-          case 'not_contains':
-            query = query.not('ilike', fieldName, `%${filter.value}%`)
-            break
-          case 'is_empty':
-            query = query.is(fieldName, null)
-            break
-          case 'is_not_empty':
-            query = query.not('is', fieldName, null)
-            break
-          case 'greater_than':
-            query = query.gt(fieldName, filter.value)
-            break
-          case 'less_than':
-            query = query.lt(fieldName, filter.value)
-            break
-        }
+      let query: any = supabase.from(table.supabase_table).select('*').limit(1000)
+      query = applySoftDeleteFilter(query, physicalColumns)
+
+      if (queryableFilters.length > 0) {
+        const filterConfigs: FilterConfig[] = queryableFilters.map((f) => ({
+          field: String(f.field_name || f.field_id || ''),
+          operator: f.operator as FilterConfig['operator'],
+          value: f.value,
+        }))
+        const normalizedFields = tableFields.map((f) => ({
+          name: f.name,
+          type: f.type,
+          id: f.id,
+          options: (f as { options?: unknown }).options,
+        }))
+        query = applyFiltersToQuery(query, filterConfigs, normalizedFields)
       }
 
-      // Apply sorts
-      if (sorts.length > 0) {
-        for (const sort of sorts) {
+      if (queryableSorts.length > 0) {
+        for (const sort of queryableSorts) {
           const fieldName = sort.field_name || sort.field_id
           if (!fieldName) continue
           const ascending = sort.direction === 'asc' || sort.order_direction === 'asc'
-          const col = toPostgrestColumn(fieldName)
+          const col = toPostgrestColumn(String(fieldName))
           if (col) {
             query = query.order(col, { ascending })
           }
         }
       } else {
-        // Default sort by created_at descending
-        query = query.order('created_at', { ascending: false })
+        const defaultOrder = hasPhysicalColumnName(physicalColumns, 'created_at') ? 'created_at' : 'id'
+        query = query.order(defaultOrder, { ascending: false })
       }
 
       const { data: tableData, error: tableDataError } = await query
@@ -1068,7 +1079,7 @@ function InterfacePageClientInternal({
             oldBlock.y !== newBlock.y ||
             oldBlock.w !== newBlock.w ||
             oldBlock.h !== newBlock.h ||
-            JSON.stringify(oldBlock.config) !== JSON.stringify(newBlock.config)
+            blockLayoutSignature(oldBlock) !== blockLayoutSignature(newBlock)
           ) {
             blockContentChanged = true
             break
@@ -1130,8 +1141,16 @@ function InterfacePageClientInternal({
   // Reloading blocks on edit mode entry causes layout resets
   // Blocks are already loaded in the useEffect above based on page/page_type
 
+  loadPageRef.current = loadPage
+  loadBlocksRef.current = loadBlocks
+  loadSqlViewDataRef.current = loadSqlViewData
+
+  const handleBlocksMirror = useCallback((nextBlocks: PageBlock[]) => {
+    setBlocks(nextBlocks)
+  }, [])
+
   // Realtime: when another user adds/edits/deletes blocks, reload from API
-  useRealtimeViewBlocks(pageId, () => loadBlocks(true))
+  useRealtimeViewBlocks(pageId, () => loadBlocksRef.current(true))
 
   const handleGridToggle = () => {
     setIsGridMode(!isGridMode)
@@ -1553,6 +1572,7 @@ function InterfacePageClientInternal({
             showMarketingHome={marketingHome}
             showInternalStaffHub={internalStaffHub}
             isAdmin={isAdmin}
+            onBlocksMirror={handleBlocksMirror}
           />
           {blocksLoading && (
             <div className="absolute inset-0 bg-white/60 flex items-center justify-center z-10 pointer-events-none">
@@ -1572,7 +1592,26 @@ function InterfacePageClientInternal({
 export default function InterfacePageClient(props: InterfacePageClientProps) {
   return (
     <Suspense fallback={<div className="h-screen flex items-center justify-center"><LoadingSpinner size="lg" text="Loading page..." /></div>}>
-      <InterfacePageClientInternal {...props} />
+      <ErrorBoundary
+        resetKeys={[props.pageId]}
+        fallback={
+          <div className="h-full flex items-center justify-center p-8">
+            <div className="text-center max-w-md">
+              <p className="text-sm font-medium text-red-800 mb-1">Page failed to load</p>
+              <p className="text-xs text-red-600 mb-4">Try refreshing. If the problem persists, contact support.</p>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="px-3 py-1.5 text-xs font-medium text-red-800 bg-red-100 rounded hover:bg-red-200"
+              >
+                Refresh page
+              </button>
+            </div>
+          </div>
+        }
+      >
+        <InterfacePageClientInternal {...props} />
+      </ErrorBoundary>
     </Suspense>
   )
 }

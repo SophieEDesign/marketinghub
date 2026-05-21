@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 /**
+ * Legacy pages API — prefer `/api/interface-pages` for new work.
+ * @see docs/architecture/API_ROUTES.md
+ *
  * POST /api/pages - Create a new page
  */
 export async function POST(request: NextRequest) {
