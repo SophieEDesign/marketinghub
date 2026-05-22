@@ -88,33 +88,33 @@ export function buildResourceHubItems(
   fields: MediaFieldMap,
   mediaTableId: string
 ): MockResource[] {
-  return rows
-    .map((row) => {
-      const title = formatDisplayValue(row[fields.name])
-      if (!title?.trim()) return null
-      const url = fields.documentLink ? formatDisplayValue(row[fields.documentLink]) : null
-      const fileType = fileTypeFromUrl(url)
-      const status = fields.status ? formatDisplayValue(row[fields.status]) : null
-      const updatedRaw = fields.updatedAt ? row[fields.updatedAt] : row.updated_at
-      let updatedAt: string | undefined
-      if (updatedRaw) {
-        const d = new Date(String(updatedRaw))
-        if (!isNaN(d.getTime())) updatedAt = format(d, "d MMM yyyy")
-      }
+  const items: MockResource[] = []
+  for (const row of rows) {
+    const title = formatDisplayValue(row[fields.name])
+    if (!title?.trim()) continue
+    const url = fields.documentLink ? formatDisplayValue(row[fields.documentLink]) : null
+    const fileType = fileTypeFromUrl(url)
+    const status = fields.status ? formatDisplayValue(row[fields.status]) : null
+    const updatedRaw = fields.updatedAt ? row[fields.updatedAt] : row.updated_at
+    let updatedAt: string | undefined
+    if (updatedRaw) {
+      const d = new Date(String(updatedRaw))
+      if (!isNaN(d.getTime())) updatedAt = format(d, "d MMM yyyy")
+    }
 
-      return {
-        id: String(row.id),
-        title,
-        category: categoryFromRow(status, fileType),
-        fileType,
-        url: url ?? undefined,
-        description: fields.notes ? formatDisplayValue(row[fields.notes]) ?? undefined : undefined,
-        updatedAt,
-        owner: fields.assignee ? formatDisplayValue(row[fields.assignee]) ?? undefined : undefined,
-        isInternalOnly: true,
-        tags: status ? [status] : undefined,
-        usage: `table:${mediaTableId}`,
-      } satisfies MockResource
+    items.push({
+      id: String(row.id),
+      title,
+      category: categoryFromRow(status, fileType),
+      fileType,
+      url: url ?? undefined,
+      description: fields.notes ? formatDisplayValue(row[fields.notes]) ?? undefined : undefined,
+      updatedAt,
+      owner: fields.assignee ? formatDisplayValue(row[fields.assignee]) ?? undefined : undefined,
+      isInternalOnly: true,
+      tags: status ? [status] : undefined,
+      usage: `table:${mediaTableId}`,
     })
-    .filter((r): r is MockResource => r != null)
+  }
+  return items
 }

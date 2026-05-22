@@ -14,15 +14,15 @@ interface LoginBrandPanelProps {
 export default function LoginBrandPanel({
   brandName,
   logoUrl,
-  heading = "Welcome back 👋",
-  subtext = "Sign in to continue to your marketing command centre.",
+  heading = "Welcome to your Marketing Hub",
+  subtext,
   className,
 }: LoginBrandPanelProps) {
   return (
     <div
       className={cn(
         "relative flex flex-col justify-center overflow-hidden px-8 py-10 md:px-10 md:py-12",
-        "bg-gradient-to-br from-[#1e1b4b] via-[#312e81] to-[#4c1d95]",
+        "bg-gradient-to-br from-[#1e3a5f] via-[#243f6b] to-[#0f2744]",
         className
       )}
     >
@@ -31,11 +31,11 @@ export default function LoginBrandPanel({
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute -bottom-20 -left-10 h-48 w-48 rounded-full bg-purple-400/20 blur-2xl"
+        className="pointer-events-none absolute -bottom-20 -left-10 h-48 w-48 rounded-full bg-sky-400/15 blur-2xl"
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute bottom-1/4 right-1/4 h-32 w-32 rounded-full bg-indigo-300/15 blur-xl"
+        className="pointer-events-none absolute bottom-1/4 right-1/4 h-32 w-32 rounded-full bg-blue-300/10 blur-xl"
         aria-hidden
       />
 
@@ -59,7 +59,9 @@ export default function LoginBrandPanel({
           <span className="text-lg font-semibold tracking-tight text-white">{brandName}</span>
         </div>
         <h1 className="text-2xl font-semibold tracking-tight text-white md:text-3xl">{heading}</h1>
-        <p className="mt-3 max-w-sm text-sm leading-relaxed text-white/75">{subtext}</p>
+        {subtext ? (
+          <p className="mt-3 max-w-sm text-sm leading-relaxed text-white/75">{subtext}</p>
+        ) : null}
       </div>
     </div>
   )

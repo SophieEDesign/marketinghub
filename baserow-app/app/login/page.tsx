@@ -14,7 +14,7 @@ import {
 import ThemeToggle from "@/components/layout/ThemeToggle"
 import LoginLayout from "@/components/shell/LoginLayout"
 
-const DEFAULT_PRIMARY = "#6D4AFF"
+const DEFAULT_PRIMARY = "#1e3a5f"
 
 function LoginForm() {
   const [email, setEmail] = useState("")
@@ -130,7 +130,11 @@ function LoginForm() {
 
   if (checkingAuth) {
     return (
-      <LoginLayout brandName={brandName} logoUrl={logoUrl}>
+      <LoginLayout
+        brandName={brandName}
+        logoUrl={logoUrl}
+        brandHeading="Welcome to your Marketing Hub"
+      >
         <div className="text-center text-muted-foreground py-8">Loading...</div>
       </LoginLayout>
     )
@@ -141,7 +145,11 @@ function LoginForm() {
       <div className="absolute top-4 right-4 z-10">
         <ThemeToggle />
       </div>
-      <LoginLayout brandName={brandName} logoUrl={logoUrl}>
+      <LoginLayout
+        brandName={brandName}
+        logoUrl={logoUrl}
+        brandHeading="Welcome to your Marketing Hub"
+      >
         <div>
           <h2 className="text-xl font-semibold tracking-tight text-foreground">
             Sign in to your account
@@ -275,7 +283,10 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <LoginLayout brandName="Marketing Hub">
+        <LoginLayout
+          brandName="Marketing Hub"
+          brandHeading="Welcome to your Marketing Hub"
+        >
           <div className="text-center text-muted-foreground py-8">Loading...</div>
         </LoginLayout>
       }

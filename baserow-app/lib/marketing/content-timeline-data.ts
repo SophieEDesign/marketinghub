@@ -53,13 +53,13 @@ export function mapContentStatusToTimelineStatus(
 ): ContentTimelineStatus {
   if (!status) return "planned"
   const s = status.trim().toLowerCase()
-  if (/draft|idea|todo|to do/i.test(s)) return "draft"
-  if (/review|awaiting|pending/i.test(s)) return "needs-review"
+  if (/draft|idea|todo|to do/i.test(s)) return "idea"
+  if (/review|awaiting|pending/i.test(s)) return "awaiting-approval"
   if (/approv/i.test(s)) return "approved"
   if (/schedul|planned|ready/i.test(s)) return "scheduled"
   if (/publish|complete|done|live|posted/i.test(s)) return "published"
   if (/update|refresh/i.test(s)) return "needs-update"
-  if (/progress|wip/i.test(s)) return "draft"
+  if (/progress|wip/i.test(s)) return "in-progress"
   return "planned"
 }
 
@@ -73,14 +73,14 @@ function mapChannel(
     if (first.includes("linkedin")) return "linkedin"
     if (first.includes("instagram")) return "instagram"
     if (first.includes("facebook")) return "facebook"
-    if (first.includes("twitter") || first === "x") return "twitter"
+    if (first.includes("twitter") || first === "x") return "pr"
     if (first.includes("email") || first.includes("mail")) return "email"
     if (first.includes("website") || first.includes("web")) return "website"
-    if (first.includes("print")) return "print"
+    if (first.includes("print")) return "internal"
   }
   if (row.linkedin) return "linkedin"
   if (row.instagram) return "instagram"
-  return "other"
+  return "internal"
 }
 
 function deriveAssetStatus(row: Record<string, unknown>, imagesField: string | null): string | undefined {
@@ -131,7 +131,9 @@ export function buildContentTimelineItems(params: {
     const title = planning?.title ?? formatDisplayValue(row[fields.contentName]) ?? ""
     if (!title.trim()) continue
 
-    const contentType = planning?.contentType ?? formatDisplayValue(row[fields.contentType])
+    const contentType =
+      planning?.contentType ??
+      (fields.contentType ? formatDisplayValue(row[fields.contentType]) : null)
     if (excludeEventTypes && contentType && EVENT_TYPE_PATTERN.test(contentType)) {
       continue
     }
@@ -169,7 +171,9 @@ export function buildContentTimelineItems(params: {
         .filter(Boolean)
         .join(", ") || undefined
 
-    const statusRaw = planning?.status ?? formatDisplayValue(row[fields.contentStatus])
+    const statusRaw =
+      planning?.status ??
+      (fields.contentStatus ? formatDisplayValue(row[fields.contentStatus]) : null)
     const themeLabel = planning?.themeLabel?.trim() || "Unassigned"
     const division =
       (divisionField ? formatDisplayValue(row[divisionField]) : null) ??

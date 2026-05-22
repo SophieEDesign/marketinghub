@@ -2,6 +2,21 @@ import { createClient } from "@/lib/supabase/server"
 import { dbBlockToPageBlock } from "@/lib/interface/layout-mapping"
 import type { PageBlock } from "@/lib/interface/types"
 
+type ViewBlockRow = {
+  id: string
+  page_id: string | null
+  view_id: string | null
+  type: string
+  position_x: number | null
+  position_y: number | null
+  width: number | null
+  height: number | null
+  config: Record<string, unknown> | null
+  order_index: number | null
+  created_at: string | null
+  updated_at: string | null
+}
+
 /**
  * Server-side load of blocks for an interface page (same logic as GET /api/pages/[pageId]/blocks).
  */
@@ -74,7 +89,8 @@ export async function fetchPageBlocksForPage(pageId: string): Promise<PageBlock[
   }
 
   const pageBlocks: PageBlock[] = []
-  for (const block of data || []) {
+  const rows = (data ?? []) as ViewBlockRow[]
+  for (const block of rows) {
     try {
       const layout = dbBlockToPageBlock({
         id: block.id,
