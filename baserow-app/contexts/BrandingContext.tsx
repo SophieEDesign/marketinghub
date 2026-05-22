@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useEffect, ReactNode } from 'react'
-import { normalizeSidebarTextColor, type WorkspaceSettings } from '@/lib/branding'
+import { normalizeSidebarTextColor, type WorkspaceSettings } from '@/lib/branding-utils'
 
 interface BrandingContextType {
   settings: WorkspaceSettings | null
