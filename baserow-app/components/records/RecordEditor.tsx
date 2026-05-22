@@ -452,7 +452,8 @@ export default function RecordEditor({
         resolvedFieldLayout.length > 0 &&
         (hasColumnMetadata || isEditingLayout)
       return (
-        <div className="space-y-4 py-4">
+        <div className="px-4 py-3 space-y-3">
+          <div className="rounded-card-lg border border-border/35 bg-card overflow-hidden divide-y divide-border/25">
           <RecordFields
             fields={isEditingLayout ? layoutModeFields : visibleFields}
             formData={formData}
@@ -475,6 +476,7 @@ export default function RecordEditor({
             selectedFieldId={selectedContext?.type === "field" ? selectedContext.fieldId : null}
             forceStackedLayout={!useGridLayout}
           />
+          </div>
         </div>
       )
     }

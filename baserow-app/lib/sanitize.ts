@@ -57,3 +57,12 @@ export function sanitizeHtmlBlock(html: string): string {
   if (typeof html !== "string" || !html.trim()) return ""
   return DOMPurify.sanitize(html, HTML_BLOCK_CONFIG) as string
 }
+
+/** Strip tags for previews and summaries (asset descriptions, etc.). */
+export function plainTextFromHtml(html: string): string {
+  if (typeof html !== "string" || !html.trim()) return ""
+  if (!html.includes("<")) return html.trim()
+  return (DOMPurify.sanitize(html, { ALLOWED_TAGS: [] }) as string)
+    .replace(/\s+/g, " ")
+    .trim()
+}

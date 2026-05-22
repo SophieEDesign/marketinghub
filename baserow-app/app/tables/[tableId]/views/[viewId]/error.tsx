@@ -14,28 +14,28 @@ export default function ViewError({
   }, [error])
 
   return (
-    <div className="min-h-[60vh] flex flex-col items-center justify-center p-8 bg-slate-50">
+    <div className="min-h-[60vh] flex flex-col items-center justify-center p-8 bg-background">
       <div className="max-w-md text-center space-y-4">
-        <h1 className="text-lg font-semibold text-slate-800">
-          View error
+        <h1 className="text-page-title text-foreground">
+          Something went wrong
         </h1>
-        <p className="text-sm text-slate-600">
-          This view encountered an error. Please try again or navigate to another view.
+        <p className="text-sm text-muted-foreground">
+          This view could not load. Try again or return to Marketing Home.
         </p>
         <div className="flex gap-3 justify-center">
           <button
             type="button"
             onClick={() => reset()}
-            className="px-4 py-2 text-sm font-medium text-white bg-slate-800 rounded-md hover:bg-slate-700"
+            className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-inner hover:opacity-90"
           >
             Try again
           </button>
           <button
             type="button"
-            onClick={() => (window.location.href = "/tables")}
-            className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-200 rounded-md hover:bg-slate-300"
+            onClick={() => (window.location.href = "/")}
+            className="px-4 py-2 text-sm font-medium text-foreground border border-border rounded-inner hover:bg-muted/50"
           >
-            Back to tables
+            Marketing Home
           </button>
         </div>
         {process.env.NODE_ENV === "development" && (

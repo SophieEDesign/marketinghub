@@ -112,15 +112,13 @@ export default function ContentPlanningDashboard({ canEdit = false }: ContentPla
   const [year, setYear] = useState(() => new Date().getFullYear())
   const [quarter, setQuarter] = useState<QuarterNum | "all">(getCurrentQuarter())
   const [contentTypes, setContentTypes] = useState<string[]>([])
-  const [divisions, setDivisions] = useState<string[]>([])
-  const [statuses, setStatuses] = useState<string[]>([])
   const [search, setSearch] = useState("")
   const [colorMode, setColorMode] = useState<ContentColorMode>("theme")
   const [calendarView, setCalendarView] = useState<CalendarViewMode>("month")
 
   const filters: ContentPlanningFilters = useMemo(
-    () => ({ year, quarter, contentTypes, divisions, statuses, search }),
-    [year, quarter, contentTypes, divisions, statuses, search]
+    () => ({ year, quarter, contentTypes, divisions: [], statuses: [], search }),
+    [year, quarter, contentTypes, search]
   )
 
   const filteredItems = useMemo(
@@ -197,9 +195,9 @@ export default function ContentPlanningDashboard({ canEdit = false }: ContentPla
     <div className="flex flex-col gap-3 md:gap-4 min-w-0 pb-4">
       <EditableDashboardRegion id="page-header" label="Page header">
       <header className="flex flex-col gap-0.5">
-        <h1 className="text-lg font-medium tracking-tight text-foreground">Content Planning</h1>
-        <p className="text-sm text-muted-foreground">
-          Plan, schedule and track upcoming marketing content.
+        <h1 className="text-page-title text-foreground">Content Planning</h1>
+        <p className="text-meta text-muted-foreground">
+          Calendar-first view of scheduled content, campaigns and deadlines.
         </p>
       </header>
       </EditableDashboardRegion>
@@ -253,21 +251,6 @@ export default function ContentPlanningDashboard({ canEdit = false }: ContentPla
           onChange={setContentTypes}
           placeholder="All types"
         />
-        <FilterMultiSelect
-          label="Team"
-          options={filterOptions.divisions}
-          values={divisions}
-          onChange={setDivisions}
-          placeholder="All teams"
-        />
-        <FilterMultiSelect
-          label="Status"
-          options={filterOptions.statuses}
-          values={statuses}
-          onChange={setStatuses}
-          placeholder="All statuses"
-        />
-
         <Popover>
           <PopoverTrigger asChild>
             <Button
@@ -325,8 +308,8 @@ export default function ContentPlanningDashboard({ canEdit = false }: ContentPla
       </MarketingFilterStrip>
       </EditableDashboardRegion>
 
-      <div className="flex flex-col xl:flex-row gap-3 min-h-0">
-        <div className="flex-1 min-w-0 flex flex-col gap-2 min-h-0">
+      <div className="flex flex-col xl:flex-row gap-3 min-h-0 xl:items-start">
+        <div className="flex-1 min-w-0 flex flex-col gap-2 min-h-0 xl:min-w-[68%]">
           <EditableDashboardRegion id="calendar" label="Content calendar">
           <ContentPlanningCalendar
             events={calendarEvents}
@@ -337,7 +320,7 @@ export default function ContentPlanningDashboard({ canEdit = false }: ContentPla
           </EditableDashboardRegion>
 
           <EditableDashboardRegion id="upcoming-list" label="Upcoming content">
-          <MarketingPanelSecondary title="Upcoming content" className="max-h-[200px] shrink-0">
+          <MarketingPanelSecondary title="Upcoming content" className="max-h-[160px] shrink-0 border-border/30 shadow-none">
             <ul className="divide-y divide-border/25">
               {upcomingList.length === 0 ? (
                 <li className="py-3 text-[11px] text-muted-foreground text-center">
@@ -372,7 +355,7 @@ export default function ContentPlanningDashboard({ canEdit = false }: ContentPla
           </EditableDashboardRegion>
         </div>
 
-        <aside className="w-full xl:w-[260px] shrink-0 flex flex-col gap-2 xl:max-h-[calc(100vh-12rem)]">
+        <aside className="w-full xl:w-[220px] shrink-0 flex flex-col gap-2 xl:max-h-[calc(100vh-12rem)] opacity-95">
           <EditableDashboardRegion id="deadlines" label="Upcoming deadlines">
           <MarketingPanelSecondary title="Upcoming deadlines" className="max-h-[180px]">
             <ul className="flex flex-col gap-0.5">

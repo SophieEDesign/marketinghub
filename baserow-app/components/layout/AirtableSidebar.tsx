@@ -110,7 +110,7 @@ export default function AirtableSidebar({
   onClose,
   defaultPageId = null,
   landingPageTitle = null,
-  coreDataSectionTitle = "Data & tables",
+  coreDataSectionTitle = "Data & tables · Admin",
   autoCompact = false,
   onAutoCompactDismiss,
 }: AirtableSidebarProps) {
@@ -128,6 +128,8 @@ export default function AirtableSidebar({
   const [isMounted, setIsMounted] = useState(false)
 
   const [adminSectionOpen, setAdminSectionOpen] = useState(false)
+  /** Data & tables collapsed by default — marketing workspace first */
+  const [dataTablesOpen, setDataTablesOpen] = useState(false)
   const [adminPrefsMounted, setAdminPrefsMounted] = useState(false)
 
   useEffect(() => {
@@ -159,6 +161,8 @@ export default function AirtableSidebar({
     if (match) {
       const tableId = match[1]
       setExpandedTables((prev) => new Set(prev).add(tableId))
+      setDataTablesOpen(true)
+      setAdminSectionOpen(true)
     }
   }, [pathname])
 
@@ -254,8 +258,9 @@ export default function AirtableSidebar({
   }
 
   const navActiveStyle = (active: boolean): CSSProperties => ({
-    color: active ? primaryColor : sidebarTextColor,
-    ...(active ? { backgroundColor: "rgba(0, 0, 0, 0.06)" } : {}),
+    color: sidebarTextColor,
+    opacity: active ? 1 : 0.88,
+    ...(active ? { backgroundColor: "rgba(255, 255, 255, 0.14)" } : {}),
   })
 
   if (isMobile && !isOpen) {
@@ -312,7 +317,7 @@ export default function AirtableSidebar({
         data-sidebar
         data-tour="sidebar"
         className={cn(
-          "flex flex-col h-screen shadow-sm transition-transform duration-300 flex-shrink-0",
+          "flex flex-col h-screen border-r border-black/10 transition-transform duration-300 flex-shrink-0",
           isMobile ? "fixed left-0 top-0 z-50 w-64" : "relative w-64",
           isMobile && !isOpen && "-translate-x-full"
         )}
@@ -391,7 +396,7 @@ export default function AirtableSidebar({
                 className={cn(
                   "relative flex items-center gap-2 rounded-lg py-2.5 pl-3 pr-3 text-sm font-medium transition-colors",
                   "hover:bg-black/[0.06]",
-                  isHomeActive && "bg-black/[0.07]"
+                  isHomeActive && "font-medium"
                 )}
                 style={navActiveStyle(isHomeActive)}
                 onClick={(e) => {
@@ -457,18 +462,18 @@ export default function AirtableSidebar({
                     <div className="rounded-lg px-1 pb-1">
                       <button
                         type="button"
-                        onClick={() => toggleSection("core-data")}
-                        className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-medium rounded-lg hover:bg-black/[0.06] transition-colors"
-                        style={{ color: sidebarTextColor, opacity: 0.92 }}
+                        onClick={() => setDataTablesOpen((o) => !o)}
+                        className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-medium rounded-lg hover:bg-white/10 transition-colors"
+                        style={{ color: sidebarTextColor, opacity: 0.85 }}
                       >
                         <span>{coreDataSectionTitle}</span>
-                        {expandedSections.has("core-data") ? (
+                        {dataTablesOpen ? (
                           <ChevronDown className="h-3 w-3 flex-shrink-0 opacity-80" />
                         ) : (
                           <ChevronRight className="h-3 w-3 flex-shrink-0 opacity-80" />
                         )}
                       </button>
-                      {expandedSections.has("core-data") && (
+                      {dataTablesOpen && (
                         <div className="space-y-0.5 px-1 pt-0.5">
                           {tables.map((table) => {
                             const isTableActive = pathname.includes(`/tables/${table.id}`)
@@ -511,7 +516,7 @@ export default function AirtableSidebar({
                                     href={targetPath}
                                     className={cn(
                                       "flex items-center gap-2 px-1.5 py-2 rounded-lg transition-colors hover:bg-black/[0.06] flex-1 min-w-0 text-sm",
-                                      isTableActive && "bg-black/[0.07] font-medium"
+                                      isTableActive && "font-medium"
                                     )}
                                     style={navActiveStyle(isTableActive)}
                                     onClick={(e) => {
@@ -562,7 +567,7 @@ export default function AirtableSidebar({
                                           href={viewPath}
                                           className={cn(
                                             "flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors hover:bg-black/[0.06] text-sm",
-                                            isViewActive && "bg-black/[0.07] font-medium"
+                                            isViewActive && "font-medium"
                                           )}
                                           style={navActiveStyle(isViewActive)}
                                           onClick={(e) => {
@@ -598,7 +603,7 @@ export default function AirtableSidebar({
                       href="/settings"
                       className={cn(
                         "relative flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm hover:bg-black/[0.06]",
-                        isSettings && "bg-black/[0.07] font-medium"
+                        isSettings && "font-medium"
                       )}
                       style={navActiveStyle(isSettings)}
                       onClick={() => {

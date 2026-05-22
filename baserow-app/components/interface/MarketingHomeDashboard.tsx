@@ -111,7 +111,7 @@ export default function MarketingHomeDashboard({ canEdit: _canEdit = false }: Ma
   }, [contentData.allItems, contentData.campaignRows, contentData.fields])
 
   const upcoming = useMemo(
-    () => getUpcomingForHome(contentData.allItems, 10),
+    () => getUpcomingForHome(contentData.allItems, 5),
     [contentData.allItems]
   )
 
@@ -228,7 +228,7 @@ export default function MarketingHomeDashboard({ canEdit: _canEdit = false }: Ma
 
           {hero.prompts.length > 0 ? (
             <ul className="mt-3 flex flex-col gap-1.5">
-              {hero.prompts.map((p) => (
+              {hero.prompts.slice(0, 3).map((p) => (
                 <li key={p.id}>
                   <button
                     type="button"
@@ -259,98 +259,27 @@ export default function MarketingHomeDashboard({ canEdit: _canEdit = false }: Ma
       </div>
       </EditableDashboardRegion>
 
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-3 md:gap-4">
-        <EditableDashboardRegion id="core-focus" label="Current core focus" className="xl:col-span-5 flex flex-col min-h-0">
-          <DashboardPanel
-            title="Current core focus"
-            subtitle="Strategy for this quarter"
-            accentColor={accentColor}
-            accentPosition="left"
-            scrollBody
-            className="h-full min-h-[220px]"
-            bodyClassName="px-3 py-3 flex flex-col gap-2.5 min-h-0"
-          >
-              {themeData.activeCard ? (
-                <>
-                  <div>
-                    <p className={cn(TEXT_LABEL, "mb-1")}>Quarterly theme</p>
-                    <p className="text-base font-semibold text-foreground leading-snug break-words">
-                      {themeData.activeCard.name}
-                    </p>
-                  </div>
-                  {hero.messaging ? (
-                    <div>
-                      <p className={cn(TEXT_LABEL, "mb-1")}>Messaging direction</p>
-                      <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap break-words">
-                        {hero.messaging}
-                      </p>
-                    </div>
-                  ) : null}
-                  {themeData.activeCard.prompts.length > 0 ? (
-                    <div>
-                      <p className={cn(TEXT_LABEL, "mb-1.5")}>Active prompts</p>
-                      <ul className="space-y-1.5">
-                        {themeData.activeCard.prompts.slice(0, 5).map((p) => (
-                          <li key={p.id}>
-                            <button
-                              type="button"
-                              onClick={() => openContent(p.id)}
-                              className="text-sm text-left w-full rounded-md bg-muted/35 px-2.5 py-1.5 hover:bg-muted/60 transition-colors break-words"
-                            >
-                              {p.label}
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : (
-                <DashboardEmpty
-                  variant="inline"
-                  title="Link content to this theme to surface prompts here."
-                />
-                  )}
-                </>
-              ) : (
-                <DashboardEmpty
-                  variant="inline"
-                  title="No quarterly theme is active. Set one in Theme Workspace."
-                />
-              )}
-              <button
-                type="button"
-                onClick={openTheme}
-                disabled={!themeData.activeCard}
-                className="mt-auto self-start inline-flex items-center gap-1 text-xs font-medium text-accent-link hover:underline disabled:opacity-50"
-              >
-                View theme
-                <ArrowUpRight className="h-3.5 w-3.5" />
-              </button>
-          </DashboardPanel>
-        </EditableDashboardRegion>
-
-        <EditableDashboardRegion id="upcoming-content" label="Upcoming content" className="xl:col-span-7 min-h-0">
-          <DashboardPanel
-            title="Upcoming content"
-            subtitle="Next scheduled items across all types"
-            scrollBody
-            maxBodyHeight="max-h-[min(360px,50vh)]"
-            className="h-full"
-            bodyClassName="px-2 py-1.5"
-          >
-            {upcoming.length === 0 ? (
-              <DashboardEmpty variant="inline" title="Nothing scheduled ahead." className="px-2 py-3" />
-            ) : (
-              <ul className="divide-y divide-border/30">
-                {upcoming.map((item) => (
-                  <li key={item.id}>
-                    <UpcomingRow item={item} onOpen={openContent} />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </DashboardPanel>
-        </EditableDashboardRegion>
-      </div>
+      <EditableDashboardRegion id="upcoming-content" label="Upcoming content">
+        <DashboardPanel
+          title="Upcoming content"
+          subtitle="Next scheduled across all types"
+          scrollBody
+          maxBodyHeight="max-h-[min(280px,40vh)]"
+          bodyClassName="px-2 py-1.5"
+        >
+          {upcoming.length === 0 ? (
+            <DashboardEmpty variant="inline" title="Nothing scheduled ahead." className="px-2 py-3" />
+          ) : (
+            <ul className="divide-y divide-border/25">
+              {upcoming.map((item) => (
+                <li key={item.id}>
+                  <UpcomingRow item={item} onOpen={openContent} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </DashboardPanel>
+      </EditableDashboardRegion>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
         <EditableDashboardRegion id="social-snapshot" label="Social media snapshot">

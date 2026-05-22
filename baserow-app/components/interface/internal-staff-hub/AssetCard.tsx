@@ -91,8 +91,8 @@ export default function AssetCard({
   return (
     <article
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-card-lg border border-border/45 bg-card shadow-card",
-        "transition-all duration-200 hover:shadow-card-hover hover:border-border/70",
+        "group relative flex flex-col overflow-hidden rounded-card-lg border border-border/40 bg-card",
+        "transition-colors duration-150 hover:border-border/60",
         isList && "flex-row sm:flex-col",
         isCarousel && "w-[220px] shrink-0 sm:w-[240px]"
       )}

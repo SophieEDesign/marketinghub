@@ -18,6 +18,19 @@ import type { FieldOptions } from "@/types/fields"
 
 type PlanningFieldRow = { name: string; type?: string; options?: FieldOptions }
 
+function mapToPlanningFieldRow(row: {
+  name: string
+  type?: string
+  options?: unknown
+  id?: string
+}): PlanningFieldRow {
+  return {
+    name: row.name,
+    type: row.type,
+    options: row.options as FieldOptions | undefined,
+  }
+}
+
 interface UseContentPlanningDataResult {
   loading: boolean
   error: string | null
@@ -99,9 +112,15 @@ export function useContentPlanningData(): UseContentPlanningDataResult {
 
         if (fieldsErr) throw new Error(fieldsErr.message)
 
-        const contentFieldRows = fieldRows?.filter((f) => f.table_id === content.id) || []
-        const campaignFieldRows = fieldRows?.filter((f) => f.table_id === campaigns.id) || []
-        const themeFieldRows = fieldRows?.filter((f) => f.table_id === quarterlyThemes.id) || []
+        const contentFieldRows = (fieldRows?.filter((f) => f.table_id === content.id) || []).map(
+          mapToPlanningFieldRow
+        )
+        const campaignFieldRows = (fieldRows?.filter((f) => f.table_id === campaigns.id) || []).map(
+          mapToPlanningFieldRow
+        )
+        const themeFieldRows = (fieldRows?.filter((f) => f.table_id === quarterlyThemes.id) || []).map(
+          mapToPlanningFieldRow
+        )
         const fieldMap = resolveContentPlanningFields(
           contentFieldRows,
           campaignFieldRows,
@@ -142,8 +161,8 @@ export function useContentPlanningData(): UseContentPlanningDataResult {
 
         setTableIds(ids)
         setFields(fieldMap)
-        setContentFields(contentFieldRows as PlanningFieldRow[])
-        setThemeFields(themeFieldRows as PlanningFieldRow[])
+        setContentFields(contentFieldRows)
+        setThemeFields(themeFieldRows)
         setThemeRows(themeData)
         setContentRows((contentRes.data || []) as Record<string, unknown>[])
         setCampaignRows((campaignsRes.data || []) as Record<string, unknown>[])

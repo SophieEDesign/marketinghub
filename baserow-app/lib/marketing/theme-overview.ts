@@ -223,7 +223,13 @@ export function formatDisplayValue(value: unknown): string | null {
   }
   const text = String(value).trim() || null
   if (text && isUuidLikeDisplayValue(text)) return null
-  return text
+  if (!text) return null
+  const statusKey = text.toLowerCase().replace(/\s+/g, " ")
+  const STATUS_ALIASES: Record<string, string> = {
+    "to do": "To-do",
+    todo: "To-do",
+  }
+  return STATUS_ALIASES[statusKey] ?? text
 }
 
 function quarterAccentColor(quarter: QuarterNum | null, index: number): string {

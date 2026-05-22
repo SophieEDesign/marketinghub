@@ -60,7 +60,7 @@ export default function MarketingDashboardLayout({ children }: MarketingDashboar
       >
         <div className="mx-auto flex w-full max-w-none min-h-0 min-w-0 flex-col gap-4 md:gap-5 lg:gap-6">
         {!bannerDismissed ? (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border/45 bg-background/90 px-3.5 py-2.5 text-sm text-muted-foreground shadow-card sm:flex-nowrap">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border/30 bg-muted/20 px-3 py-2 text-sm text-muted-foreground sm:flex-nowrap">
             <div className="flex items-center gap-2 min-w-0">
               <div className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted/70 text-accent-link">
                 <Search className="h-3.5 w-3.5" aria-hidden />

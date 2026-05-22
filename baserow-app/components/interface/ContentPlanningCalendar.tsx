@@ -156,7 +156,7 @@ export default function ContentPlanningCalendar({
 
   return (
     <MarketingPanelPrimary
-      className={cn("overflow-hidden min-h-[min(70vh,560px)] flex-1", className)}
+      className={cn("overflow-hidden min-h-[min(72vh,620px)] flex-1 shadow-none", className)}
     >
       <div
         className="calendar-embed calendar-embed--hero h-full min-h-0"

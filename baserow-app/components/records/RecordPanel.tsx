@@ -121,7 +121,7 @@ export default function RecordPanel() {
           useOverlayLayout
             ? "fixed right-0 top-0 h-full z-50"
             : "flex-shrink-0 border-l border-border"
-        } bg-card shadow-xl flex flex-col transition-all duration-300 ease-out`}
+        } bg-card border-border/50 flex flex-col transition-all duration-300 ease-out`}
         style={{
           width: state.isOpen ? panelWidth : "0px",
           minWidth: !useOverlayLayout && state.isOpen ? `${state.width}px` : undefined,
@@ -165,15 +165,15 @@ export default function RecordPanel() {
           />
         )}
 
-        <div className="h-10 border-b border-border flex items-center justify-between px-4 bg-card flex-shrink-0">
+        <div className="h-11 border-b border-border/40 flex items-center justify-between px-4 bg-muted/20 flex-shrink-0">
           <div className="flex items-center gap-2">
             {canGoBack && (
               <button
                 onClick={handleBack}
-                className="p-1.5 hover:bg-gray-100 rounded transition-colors"
+                className="p-1.5 hover:bg-muted rounded-inner transition-colors"
                 title={state.history.length <= 1 && isEdit() ? "Close" : "Go back"}
               >
-                <ChevronLeft className="h-4 w-4 text-gray-600" />
+                <ChevronLeft className="h-4 w-4 text-muted-foreground" />
               </button>
             )}
           </div>
@@ -181,10 +181,10 @@ export default function RecordPanel() {
             {state.recordId && (
               <button
                 onClick={handleCopyLink}
-                className="p-1.5 hover:bg-gray-100 rounded transition-colors"
+                className="p-1.5 hover:bg-muted rounded-inner transition-colors"
                 title="Copy link"
               >
-                <Link2 className="h-4 w-4 text-gray-600" />
+                <Link2 className="h-4 w-4 text-muted-foreground" />
               </button>
             )}
             <button
@@ -197,7 +197,7 @@ export default function RecordPanel() {
               {state.isPinned ? (
                 <Pin className="h-4 w-4" />
               ) : (
-                <PinOff className="h-4 w-4 text-gray-600" />
+                <PinOff className="h-4 w-4 text-muted-foreground" />
               )}
             </button>
             <button
@@ -206,25 +206,25 @@ export default function RecordPanel() {
               title={state.isFullscreen ? "Exit fullscreen" : "Fullscreen"}
             >
               {state.isFullscreen ? (
-                <Minimize2 className="h-4 w-4 text-gray-600" />
+                <Minimize2 className="h-4 w-4 text-muted-foreground" />
               ) : (
-                <Maximize2 className="h-4 w-4 text-gray-600" />
+                <Maximize2 className="h-4 w-4 text-muted-foreground" />
               )}
             </button>
             {!state.isPinned && !isEdit() && (
               <button
                 onClick={closeRecord}
-                className="p-1.5 hover:bg-gray-100 rounded transition-colors"
+                className="p-1.5 hover:bg-muted rounded-inner transition-colors"
                 title="Close"
               >
-                <X className="h-4 w-4 text-gray-600" />
+                <X className="h-4 w-4 text-muted-foreground" />
               </button>
             )}
           </div>
         </div>
 
         {/* Body: single column - RecordEditor only. Settings in shell RightSettingsPanel. */}
-        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col bg-background">
           <RecordEditor
             recordId={state.recordId}
             tableId={state.tableId ?? ""}

@@ -930,14 +930,15 @@ export default function GroupedInterfaces({
     const className = cn(
       "relative flex items-center rounded-lg py-2 pr-3 text-sm transition-colors",
       level > 0 ? "pl-10" : "pl-3",
-      "hover:bg-black/[0.06]",
-      isActive && "bg-black/[0.07] font-medium"
+      "hover:bg-white/10",
+      isActive && "bg-white/14 font-medium"
     )
     const style: CSSProperties = {
-      color: isActive ? primaryColor : sidebarTextColor,
+      color: sidebarTextColor,
+      opacity: isActive ? 1 : 0.9,
       ...(isActive
         ? {
-            boxShadow: `inset 3px 0 0 0 ${primaryColor}`,
+            boxShadow: "inset 3px 0 0 0 rgba(255,255,255,0.55)",
           }
         : {}),
     }

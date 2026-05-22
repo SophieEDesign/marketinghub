@@ -80,7 +80,7 @@ function ThemeCard({
       className={cn(
         "flex flex-col h-full p-0 overflow-hidden",
         isSecondary && "opacity-[0.94]",
-        card.isCurrentQuarter && !isSecondary && "ring-1 ring-accent-link/20 shadow-card-hover"
+        card.isCurrentQuarter && !isSecondary && "ring-2 ring-accent-link/35 shadow-none"
       )}
     >
       <button
@@ -273,9 +273,9 @@ export default function ThemeOverviewDashboard({ canEdit = false }: ThemeOvervie
       <EditableDashboardRegion id="page-header" label="Page header">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className={TEXT_PAGE_TITLE}>Theme overview</h1>
+          <h1 className={TEXT_PAGE_TITLE}>Theme Workspace</h1>
           <p className="text-meta mt-0.5">
-            Quarterly themes, core focus, and content prompts for the year
+            Strategic themes and prompts for {selectedYear} — focus on the current quarter.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

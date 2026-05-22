@@ -66,23 +66,14 @@ export default function InternalStaffHubDashboard({
   })
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [previewAsset, setPreviewAsset] = useState<StaffHubAsset | null>(null)
-  const [heroSearch, setHeroSearch] = useState("")
 
   const categoryCounts = useMemo(() => countByCategory(assets), [assets])
   const quickAccess = useMemo(() => resolveQuickAccessAssets(assets), [assets])
   const recent = useMemo(() => getRecentUploads(assets, 8), [assets])
 
-  const mergedFilters = useMemo(
-    () => ({
-      ...filters,
-      search: filters.search.trim() || heroSearch.trim(),
-    }),
-    [filters, heroSearch]
-  )
-
   const filteredAssets = useMemo(
-    () => filterStaffHubAssets(assets, mergedFilters),
-    [assets, mergedFilters]
+    () => filterStaffHubAssets(assets, filters),
+    [assets, filters]
   )
 
   const openAsset = (asset: StaffHubAsset) => {
@@ -129,8 +120,8 @@ export default function InternalStaffHubDashboard({
       <EditableDashboardRegion id="hero" label="Hero">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 md:gap-4">
           <HeroCard
-            heroSearch={heroSearch}
-            setHeroSearch={setHeroSearch}
+            search={filters.search}
+            onSearchChange={(v) => setFilters((f) => ({ ...f, search: v }))}
             canEdit={canEdit}
             onBrowseGallery={() => setPreviewAsset(buildGeneralGalleryAsset())}
             onUpload={() => {
@@ -225,7 +216,7 @@ export default function InternalStaffHubDashboard({
               className="mt-4"
             />
           ) : viewMode === "grid" ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 mt-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 mt-4">
               {filteredAssets.map((asset) => (
                 <AssetCard
                   key={asset.id}
@@ -258,14 +249,14 @@ export default function InternalStaffHubDashboard({
 }
 
 function HeroCard({
-  heroSearch,
-  setHeroSearch,
+  search,
+  onSearchChange,
   canEdit,
   onBrowseGallery,
   onUpload,
 }: {
-  heroSearch: string
-  setHeroSearch: (v: string) => void
+  search: string
+  onSearchChange: (v: string) => void
   canEdit: boolean
   onBrowseGallery: () => void
   onUpload: () => void
@@ -288,8 +279,8 @@ function HeroCard({
             the {GENERAL_GALLERY_FOLDER.title} on Google Drive.
           </p>
           <HeroActions
-            heroSearch={heroSearch}
-            setHeroSearch={setHeroSearch}
+            search={search}
+            onSearchChange={onSearchChange}
             canEdit={canEdit}
             onBrowseGallery={onBrowseGallery}
             onUpload={onUpload}
@@ -369,15 +360,6 @@ function AssetsFilterBar({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-border/30">
-      <div className="relative flex-1 min-w-[160px] max-w-xs">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-        <Input
-          value={filters.search}
-          onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
-          placeholder="Search…"
-          className={cn(FILTER_CONTROL, "pl-8")}
-        />
-      </div>
       <Select
         value={filters.type}
         onValueChange={(v) => setFilters((f) => ({ ...f, type: v }))}
@@ -459,14 +441,14 @@ function AssetsFilterBar({
 }
 
 function HeroActions({
-  heroSearch,
-  setHeroSearch,
+  search,
+  onSearchChange,
   canEdit,
   onBrowseGallery,
   onUpload,
 }: {
-  heroSearch: string
-  setHeroSearch: (v: string) => void
+  search: string
+  onSearchChange: (v: string) => void
   canEdit: boolean
   onBrowseGallery: () => void
   onUpload: () => void
@@ -476,10 +458,10 @@ function HeroActions({
       <div className="relative flex-1 min-w-[200px]">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          value={heroSearch}
-          onChange={(e) => setHeroSearch(e.target.value)}
+          value={search}
+          onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Search assets, decks, templates…"
-          className="pl-9 h-10 bg-background/80 border-border/50 shadow-sm"
+          className="pl-9 h-10 bg-background/80 border-border/50"
         />
       </div>
       <Button

@@ -3,6 +3,7 @@
 import { Download, ExternalLink, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { StaffHubAsset } from "@/lib/marketing/internal-staff-hub"
+import { plainTextFromHtml, sanitizeRichText } from "@/lib/sanitize"
 import { cn } from "@/lib/utils"
 
 interface AssetPreviewModalProps {
@@ -83,7 +84,7 @@ function PreviewDialogPanel({
             {link?.providerLabel ?? "Resource"} · {link?.fileKindLabel ?? asset.type ?? "File"}
           </p>
           {asset.description ? (
-            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{asset.description}</p>
+            <AssetDescription description={asset.description} />
           ) : null}
         </div>
         <button
@@ -146,6 +147,23 @@ function PreviewDialogPanel({
       </div>
     </div>
   )
+}
+
+function AssetDescription({ description }: { description: string }) {
+  const isHtml = description.includes("<")
+  if (isHtml) {
+    const safe = sanitizeRichText(description)
+    if (!safe) return null
+    return (
+      <div
+        className="rich-text-view text-sm text-muted-foreground mt-1 line-clamp-3 max-w-prose"
+        dangerouslySetInnerHTML={{ __html: safe }}
+      />
+    )
+  }
+  const plain = plainTextFromHtml(description)
+  if (!plain) return null
+  return <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{plain}</p>
 }
 
 function EmptyPreview({
