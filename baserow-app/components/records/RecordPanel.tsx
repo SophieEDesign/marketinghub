@@ -109,7 +109,7 @@ export default function RecordPanel() {
     <>
       {useOverlayLayout && !state.isPinned && state.isOpen && (
         <div
-          className="fixed inset-0 md:left-64 bg-black/20 z-40 transition-opacity"
+          className="fixed inset-0 md:left-sidebar bg-black/20 z-40 transition-opacity"
           aria-hidden="true"
         />
       )}

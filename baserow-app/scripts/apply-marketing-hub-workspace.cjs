@@ -273,9 +273,110 @@ async function applyPageBlocksAdditive(pageId, blocks) {
   }
 }
 
-/** Rendered by MarketingHomeDashboard (layout_style: marketing_home) - no grid blocks. */
+/** Marketing Home dashboard — Interface Builder blocks (layout_style: marketing_home). */
 function buildMarketingHomeBlocks(_ctx) {
-  return []
+  const blocks = []
+  let y = 0
+
+  blocks.push({
+    type: "html",
+    position_x: 0,
+    position_y: y,
+    width: 12,
+    height: 2,
+    config: {
+      title: "Marketing Hub Header",
+      html: `<div class="px-1 py-2"><h1 class="text-2xl font-bold tracking-tight text-[#111827] md:text-3xl">Marketing Hub</h1><p class="mt-1 text-sm text-[#6B7280]">Plan campaigns, content, resources and activity from one shared workspace.</p></div>`,
+    },
+  })
+  y += 3
+
+  blocks.push({
+    type: "kpi_summary",
+    position_x: 0,
+    position_y: y,
+    width: 12,
+    height: 3,
+    config: {
+      title: "Marketing Hub KPIs",
+    },
+  })
+  y += 4
+
+  blocks.push({
+    type: "content_theme",
+    position_x: 0,
+    position_y: y,
+    width: 8,
+    height: 14,
+    config: {
+      title: "Content Themes",
+      content_theme_subtitle:
+        "Strategic themes and content focus areas for the quarter.",
+      content_theme_year: 2026,
+      content_theme_quarter: "Q2",
+      content_theme_show_filters: true,
+      content_theme_show_view_toggle: true,
+      content_theme_show_footer: true,
+      content_theme_card_density: "comfortable",
+      content_theme_highlight_current_quarter: true,
+      content_theme_max_themes: 4,
+      content_theme_view_mode: "grid",
+    },
+  })
+  blocks.push({
+    type: "internal_resource_hub",
+    position_x: 8,
+    position_y: y,
+    width: 4,
+    height: 14,
+    config: {
+      title: "Internal Resource Hub",
+      resource_hub_subtitle: "Logos, documents, templates and internal assets.",
+      resource_hub_layout_mode: "list",
+      resource_hub_use_dashboard_mock: true,
+      resource_hub_show_search: false,
+      resource_hub_show_recent: false,
+      resource_hub_show_upload: false,
+    },
+  })
+  y += 15
+
+  blocks.push({
+    type: "content_timeline",
+    position_x: 0,
+    position_y: y,
+    width: 8,
+    height: 11,
+    config: {
+      title: "Content Timeline",
+      content_timeline_subtitle: "Plan and track key content and campaigns.",
+      content_timeline_default_view: "month",
+      content_timeline_group_by: "theme",
+      content_timeline_preset: "marketing_home",
+      content_timeline_show_filters: true,
+      content_timeline_show_status_badges: false,
+      content_timeline_show_owner_initials: false,
+      content_timeline_enable_detail_panel: false,
+      content_timeline_compact_mode: true,
+      content_timeline_show_footer_link: true,
+      content_timeline_footer_link_label: "View full calendar →",
+      appearance: { showTitle: false },
+    },
+  })
+  blocks.push({
+    type: "html",
+    position_x: 8,
+    position_y: y,
+    width: 4,
+    height: 11,
+    config: {
+      title: "Upcoming Events (placeholder)",
+      html: `<div class="flex h-full min-h-[280px] flex-col rounded-xl border border-dashed border-[#E6E6EF] bg-[#F8F8FC]/50 p-5"><div class="flex items-center gap-2 text-[#111827]"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-[#6D4AFF]" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg><h2 class="text-base font-semibold">Upcoming Events</h2></div><p class="mt-3 text-xs font-medium uppercase tracking-wide text-[#6B7280]">Future block: Event Calendar</p><p class="mt-2 text-sm text-[#6B7280]">This block will show upcoming events, boat shows, attendance and planning.</p><div class="mt-auto flex flex-1 items-center justify-center py-8"><div class="rounded-full bg-[#F3F0FF] p-4 text-[#6D4AFF] opacity-60"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg></div></div></div>`,
+    },
+  })
+
+  return blocks
 }
 
 /** Rendered by ThemeOverviewDashboard (layout_style: theme_overview) - no grid blocks. */
@@ -452,6 +553,11 @@ function buildContentPlanningBlocks(_ctx) {
 
 /** Rendered by SocialMediaCalendarDashboard (layout_style: social_media_calendar) — no grid blocks. */
 function buildSocialMediaCalendarBlocks(_ctx) {
+  return []
+}
+
+/** Rendered by EventCalendarDashboard (layout_style: event_calendar) — no grid blocks. */
+function buildEventCalendarBlocks(_ctx) {
   return []
 }
 
@@ -739,10 +845,11 @@ async function archiveDeprecatedPages() {
 async function applyMarketingNavPriority(pageIds) {
   const orderedIds = [
     pageIds.home,
-    pageIds.internalStaff,
     pageIds.theme,
-    pageIds.social,
     pageIds.content,
+    pageIds.eventCalendar,
+    pageIds.social,
+    pageIds.internalStaff,
   ].filter(Boolean)
   for (let i = 0; i < orderedIds.length; i += 1) {
     await supabase.from("interface_pages").update({ order_index: i, is_admin_only: false }).eq("id", orderedIds[i])
@@ -793,6 +900,15 @@ async function main() {
     saved_view_id: ctx.anchors.content,
     config: { layout_style: "social_media_calendar" },
   })
+  const eventCalendarPageId = await upsertPage({
+    name: "Event Calendar",
+    aliases: ["Events Calendar", "Marketing Events"],
+    page_type: "content",
+    group_id: publicGroup,
+    order_index: 5,
+    saved_view_id: ctx.anchors.content,
+    config: { layout_style: "event_calendar" },
+  })
   const internalStaffPageId = await upsertPage({
     name: "Internal Staff Hub",
     page_type: "content",
@@ -806,6 +922,7 @@ async function main() {
   await applyPageBlocksAdditive(themePageId, buildThemeWorkspaceBlocks(ctx))
   await applyPageBlocksAdditive(contentPageId, buildContentPlanningBlocks(ctx))
   await applyPageBlocksAdditive(socialCalendarPageId, buildSocialMediaCalendarBlocks(ctx))
+  await applyPageBlocksAdditive(eventCalendarPageId, buildEventCalendarBlocks(ctx))
   await applyPageBlocksAdditive(internalStaffPageId, buildInternalStaffBlocks(ctx))
 
   await archiveDeprecatedPages()
@@ -815,6 +932,7 @@ async function main() {
     theme: themePageId,
     social: socialCalendarPageId,
     content: contentPageId,
+    eventCalendar: eventCalendarPageId,
   })
   await applyVisibilityCuration()
 
@@ -823,6 +941,7 @@ async function main() {
   console.log(`Theme Workspace: /pages/${themePageId}`)
   console.log(`Content Planning: /pages/${contentPageId}`)
   console.log(`Social Media Calendar: /pages/${socialCalendarPageId}`)
+  console.log(`Event Calendar: /pages/${eventCalendarPageId}`)
   console.log(`Internal Staff Hub: /pages/${internalStaffPageId}`)
 }
 

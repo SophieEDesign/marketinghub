@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { cn } from "@/lib/utils"
+import AppHeader from "@/components/shell/AppHeader"
 import {
   APP_BAR_PADDING_Y,
   APP_PAGE_PADDING_X,
@@ -55,7 +56,7 @@ export function CanvasContainer({
         BLOCK_EMBED_CLASSNAME,
         "mx-auto flex flex-col flex-1",
         scrollOwner === "self" ? "overflow-y-auto overscroll-contain app-scrollable" : "overflow-visible",
-        fullBleed ? "max-w-none px-0" : "max-w-7xl px-4 md:px-6 py-4 md:py-6 gap-4 md:gap-6",
+        fullBleed ? "max-w-none px-0" : "max-w-7xl px-4 md:px-6 py-6 md:py-8 gap-6",
         className
       )}
     >
@@ -226,21 +227,28 @@ export function AppPageHeader({
   className?: string
 }) {
   return (
-    <header
-      className={cn(
-        "flex-shrink-0 border-b border-border/60 bg-background/95 backdrop-blur-sm",
-        APP_PAGE_PADDING_X,
-        APP_BAR_PADDING_Y,
-        className
-      )}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 flex-1 items-center gap-3">
-          <h1 className="truncate text-base font-semibold tracking-tight text-foreground md:text-lg">{title}</h1>
-          {meta ? <div className="text-xs text-muted-foreground">{meta}</div> : null}
+    <div className={cn("flex-shrink-0 flex flex-col", className)}>
+      <AppHeader
+        showSearch
+        leftSlot={
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <div className="min-w-0 text-base font-semibold tracking-tight text-foreground md:text-lg">
+              {title}
+            </div>
+            {meta ? <div className="hidden sm:block text-xs text-muted-foreground shrink-0">{meta}</div> : null}
+          </div>
+        }
+      />
+      {actions ? (
+        <div
+          className={cn(
+            "flex items-center justify-end gap-2 border-b border-hub-border bg-white/80 px-4 py-1.5 md:px-6",
+            APP_PAGE_PADDING_X
+          )}
+        >
+          {actions}
         </div>
-        {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
-      </div>
-    </header>
+      ) : null}
+    </div>
   )
 }

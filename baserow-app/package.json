@@ -49,6 +49,7 @@
     "@fullcalendar/core": "^6.1.10",
     "@fullcalendar/daygrid": "^6.1.10",
     "@fullcalendar/interaction": "^6.1.10",
+    "@fullcalendar/timegrid": "^6.1.10",
     "@fullcalendar/react": "^6.1.10",
     "dayjs": "^1.11.10",
     "zod": "^3.22.4",

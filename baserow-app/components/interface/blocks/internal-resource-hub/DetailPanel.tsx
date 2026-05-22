@@ -1,0 +1,215 @@
+"use client"
+
+import {
+  Download,
+  ExternalLink,
+  Link,
+  Star,
+  MoreHorizontal,
+  FileText,
+  Image,
+  Calendar,
+  User,
+  Tag,
+} from "lucide-react"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { cn } from "@/lib/utils"
+import {
+  categoryLabel,
+  getFileTypeBadgeClasses,
+  type MockResource,
+} from "./types"
+
+interface DetailPanelProps {
+  resource: MockResource | null
+  isFavourite: boolean
+  isEditing?: boolean
+  onToggleFavourite: () => void
+  onDownload: () => void
+  onViewFull: () => void
+  onCopyLink: () => void
+  className?: string
+}
+
+function MetaRow({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ElementType
+  label: string
+  value: string
+}) {
+  return (
+    <div className="flex items-start gap-2.5 text-sm">
+      <Icon className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
+      <div className="min-w-0 flex-1">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="font-medium text-foreground/90 break-words">{value}</p>
+      </div>
+    </div>
+  )
+}
+
+export default function DetailPanel({
+  resource,
+  isFavourite,
+  isEditing,
+  onToggleFavourite,
+  onDownload,
+  onViewFull,
+  onCopyLink,
+  className,
+}: DetailPanelProps) {
+  if (!resource) {
+    return (
+      <aside
+        className={cn(
+          "flex w-full shrink-0 flex-col items-center justify-center border-t border-border/60 bg-muted/5 p-6 text-center md:w-[300px] md:border-l md:border-t-0",
+          className
+        )}
+      >
+        <p className="text-sm text-muted-foreground">
+          Select a resource to view details
+        </p>
+      </aside>
+    )
+  }
+
+  return (
+    <aside
+      className={cn(
+        "flex w-full shrink-0 flex-col border-t border-border/60 bg-background md:w-[300px] md:border-l md:border-t-0",
+        className
+      )}
+    >
+      <div className="flex items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
+        <span
+          className={cn(
+            "rounded-md px-2 py-0.5 text-xs font-semibold uppercase",
+            getFileTypeBadgeClasses(resource.fileType)
+          )}
+        >
+          {resource.fileType}
+        </span>
+        <div className="flex items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={onToggleFavourite}
+            aria-label={isFavourite ? "Remove favourite" : "Add favourite"}
+          >
+            <Star
+              className={cn(
+                "h-4 w-4",
+                isFavourite ? "fill-amber-400 text-amber-400" : "text-muted-foreground"
+              )}
+            />
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="ghost" size="icon" className="h-8 w-8">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {isEditing ? (
+                <>
+                  <DropdownMenuItem disabled>Rename (coming soon)</DropdownMenuItem>
+                  <DropdownMenuItem disabled>Move category (coming soon)</DropdownMenuItem>
+                  <DropdownMenuItem disabled className="text-destructive">
+                    Delete (coming soon)
+                  </DropdownMenuItem>
+                </>
+              ) : (
+                <DropdownMenuItem disabled>More actions</DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        <div>
+          <h3 className="text-base font-bold text-[#1e3a5f] break-words">{resource.title}</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {resource.description ?? categoryLabel(resource.category)}
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          <MetaRow icon={FileText} label="File type" value={resource.fileType} />
+          {resource.dimensions && (
+            <MetaRow icon={Image} label="Dimensions" value={resource.dimensions} />
+          )}
+          {resource.fileSize && (
+            <MetaRow icon={FileText} label="File size" value={resource.fileSize} />
+          )}
+          {resource.addedAt && (
+            <MetaRow icon={Calendar} label="Added" value={resource.addedAt} />
+          )}
+          {resource.updatedAt && (
+            <MetaRow icon={Calendar} label="Updated" value={resource.updatedAt} />
+          )}
+          {resource.usage && (
+            <MetaRow icon={FileText} label="Usage" value={resource.usage} />
+          )}
+          {resource.owner && (
+            <MetaRow icon={User} label="Uploaded by" value={resource.owner} />
+          )}
+          {resource.tags && resource.tags.length > 0 && (
+            <div className="flex items-start gap-2.5 text-sm">
+              <Tag className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
+              <div>
+                <p className="text-xs text-muted-foreground mb-1.5">Tags</p>
+                <div className="flex flex-wrap gap-1">
+                  {resource.tags.map((t) => (
+                    <span
+                      key={t}
+                      className="rounded-md bg-muted px-2 py-0.5 text-xs text-foreground/80"
+                    >
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="shrink-0 space-y-2 border-t border-border/60 p-4">
+        <Button type="button" className="w-full gap-2" onClick={onDownload}>
+          <Download className="h-4 w-4" />
+          Download
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full gap-2 border-border/60"
+          onClick={onViewFull}
+        >
+          <ExternalLink className="h-4 w-4" />
+          View full size
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full gap-2 border-border/60"
+          onClick={onCopyLink}
+        >
+          <Link className="h-4 w-4" />
+          Copy link
+        </Button>
+      </div>
+    </aside>
+  )
+}

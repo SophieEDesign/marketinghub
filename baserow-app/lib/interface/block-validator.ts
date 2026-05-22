@@ -102,8 +102,14 @@ export function isBlockConfigComplete(
     return true
   }
 
-  // Content theme block always renders with mock data
-  if (blockType === 'content_theme') {
+  // Content theme / timeline / upcoming summary blocks always render with mock data
+  if (
+    blockType === 'content_theme' ||
+    blockType === 'content_timeline' ||
+    blockType === 'upcoming_summary' ||
+    blockType === 'kpi_summary' ||
+    blockType === 'internal_resource_hub'
+  ) {
     return true
   }
 

@@ -21,6 +21,10 @@ import {
   List,
   Hash,
   Lightbulb,
+  LayoutGrid,
+  LayoutTimeline,
+  FolderOpen,
+  CalendarClock,
 } from "lucide-react"
 import { BLOCK_REGISTRY } from "@/lib/interface/registry"
 import type { BlockType } from "@/lib/interface/types"
@@ -38,6 +42,7 @@ export const blockPickerIconMap: Record<BlockType, React.ElementType> = {
   record_context: List,
   chart: BarChart3,
   kpi: TrendingUp,
+  kpi_summary: LayoutGrid,
   text: Type,
   html: Code,
   image: Image,
@@ -58,6 +63,9 @@ export const blockPickerIconMap: Record<BlockType, React.ElementType> = {
   number: Hash,
   horizontal_grouped: Columns,
   content_theme: Lightbulb,
+  content_timeline: LayoutTimeline,
+  internal_resource_hub: FolderOpen,
+  upcoming_summary: CalendarClock,
 }
 
 interface BlockPickerPanelProps {

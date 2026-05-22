@@ -216,6 +216,10 @@ export function assertBlockConfig(
     case 'filter':
     case 'divider':
     case 'content_theme':
+    case 'upcoming_summary':
+    case 'content_timeline':
+    case 'internal_resource_hub':
+    case 'kpi_summary':
       // These blocks don't require config
       return { valid: true }
 

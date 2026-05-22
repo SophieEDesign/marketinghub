@@ -1,5 +1,6 @@
 "use client"
 
+import type { ReactNode } from "react"
 import type { PageBlock } from "@/lib/interface/types"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -99,7 +100,7 @@ function HeaderButton({
   className,
   disabled,
 }: {
-  children: React.ReactNode
+  children: ReactNode
   className?: string
   disabled?: boolean
 }) {

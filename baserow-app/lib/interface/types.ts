@@ -7,6 +7,7 @@ export type BlockType =
   | 'record'
   | 'chart'
   | 'kpi'
+  | 'kpi_summary'
   | 'text'
   | 'html'
   | 'image'
@@ -28,6 +29,21 @@ export type BlockType =
   | 'horizontal_grouped'
   | 'record_context'
   | 'content_theme'
+  | 'content_timeline'
+  | 'internal_resource_hub'
+  | 'upcoming_summary'
+
+export type UpcomingSummarySectionId =
+  | 'deadlines'
+  | 'campaigns'
+  | 'events'
+  | 'approval'
+  | 'blockers'
+  | 'published'
+
+export type UpcomingSummaryLayout = 'stacked' | 'two_column' | 'compact'
+
+export type UpcomingSummaryDateRange = 'this_week' | 'next_30_days' | 'this_quarter'
 
 export type BlockSizing = 'content' | 'fill'
 
@@ -333,6 +349,49 @@ export interface BlockConfig {
   content_theme_highlight_current_quarter?: boolean
   content_theme_max_themes?: number
   content_theme_view_mode?: 'grid' | 'list' | 'compact'
+  // Content Timeline block
+  content_timeline_subtitle?: string
+  content_timeline_default_view?: 'month' | 'quarter' | 'year'
+  content_timeline_group_by?: 'theme' | 'channel' | 'status' | 'owner'
+  content_timeline_default_theme_filter?: string
+  content_timeline_show_filters?: boolean
+  content_timeline_show_status_badges?: boolean
+  content_timeline_show_owner_initials?: boolean
+  content_timeline_enable_detail_panel?: boolean
+  content_timeline_compact_mode?: boolean
+  content_timeline_preset?: 'marketing_home' | 'default'
+  content_timeline_show_footer_link?: boolean
+  content_timeline_footer_link_label?: string
+  // KPI Summary block (mock metrics until Supabase wiring)
+  kpi_summary_cards?: Array<{
+    id: string
+    label: string
+    value: string
+    trend: string
+    trend_direction: 'up' | 'down' | 'neutral'
+    icon: string
+    accent: 'purple' | 'blue' | 'red'
+  }>
+  // Internal Resource Hub block
+  resource_hub_subtitle?: string
+  resource_hub_default_category?: string
+  resource_hub_show_search?: boolean
+  resource_hub_show_recent?: boolean
+  resource_hub_show_upload?: boolean
+  resource_hub_layout_mode?: 'gallery' | 'preview' | 'list'
+  resource_hub_use_dashboard_mock?: boolean
+  resource_hub_internal_notice?: string
+  // Upcoming Summary block
+  upcoming_summary_subtitle?: string
+  upcoming_summary_sections?: UpcomingSummarySectionId[]
+  upcoming_summary_max_items?: number
+  upcoming_summary_layout?: UpcomingSummaryLayout
+  upcoming_summary_date_range?: UpcomingSummaryDateRange
+  upcoming_summary_show_counts?: boolean
+  upcoming_summary_show_dates?: boolean
+  upcoming_summary_show_owners?: boolean
+  upcoming_summary_show_view_all?: boolean
+  upcoming_summary_group_campaigns_by_status?: boolean
   // List block specific config (at root level for backward compatibility)
   list_title_field?: string
   list_subtitle_fields?: string[]

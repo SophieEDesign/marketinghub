@@ -39,6 +39,7 @@ import { renderIconByName } from "@/components/ui/lucide-icon-picker"
 import { createClient } from "@/lib/supabase/client"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
+import { sidebarNavItemClassName } from "@/components/shell/SidebarNavItem"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -928,26 +929,14 @@ export default function GroupedInterfaces({
     const isActive = currentPageId === targetPageId
 
     const className = cn(
-      "relative flex items-center rounded-lg py-2 pr-3 text-sm transition-colors",
-      level > 0 ? "pl-10" : "pl-3",
-      "hover:bg-white/10",
-      isActive && "bg-white/14 font-medium"
+      sidebarNavItemClassName(isActive),
+      level > 0 && "pl-8"
     )
-    const style: CSSProperties = {
-      color: sidebarTextColor,
-      opacity: isActive ? 1 : 0.9,
-      ...(isActive
-        ? {
-            boxShadow: "inset 3px 0 0 0 rgba(255,255,255,0.55)",
-          }
-        : {}),
-    }
 
     return (
       <a
         href={targetPath}
         className={className}
-        style={style}
         onClick={(e) => {
           if (isActive) {
             e.preventDefault()

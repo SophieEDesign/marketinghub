@@ -35,6 +35,10 @@ import ButtonAppearanceSettings from "./ButtonAppearanceSettings"
 import HorizontalGroupedDataSettings from "./HorizontalGroupedDataSettings"
 import RecordContextDataSettings from "./RecordContextDataSettings"
 import ContentThemeDataSettings from "./ContentThemeDataSettings"
+import UpcomingSummaryDataSettings from "./UpcomingSummaryDataSettings"
+import InternalResourceHubDataSettings from "./InternalResourceHubDataSettings"
+import ContentTimelineDataSettings from "./ContentTimelineDataSettings"
+import KPISummaryDataSettings from "./KPISummaryDataSettings"
 import CommonAppearanceSettings from "./CommonAppearanceSettings"
 
 export type DataSettingsCtx = {
@@ -72,6 +76,7 @@ type AppearanceRenderer = (ctx: AppearanceSettingsCtx) => ReactNode
  */
 const DATA_SETTINGS_RENDERERS: Partial<Record<BlockType, DataRenderer>> = {
   kpi: (ctx) => <KPIDataSettings {...ctx} />,
+  kpi_summary: (ctx) => <KPISummaryDataSettings {...ctx} />,
   chart: (ctx) => <ChartDataSettings {...ctx} />,
   text: (ctx) => <TextDataSettings {...ctx} />,
   action: (ctx) => <ActionDataSettings {...ctx} />,
@@ -104,6 +109,9 @@ const DATA_SETTINGS_RENDERERS: Partial<Record<BlockType, DataRenderer>> = {
   horizontal_grouped: (ctx) => <HorizontalGroupedDataSettings {...ctx} />,
   record_context: (ctx) => <RecordContextDataSettings {...ctx} />,
   content_theme: (ctx) => <ContentThemeDataSettings {...ctx} />,
+  upcoming_summary: (ctx) => <UpcomingSummaryDataSettings {...ctx} />,
+  content_timeline: (ctx) => <ContentTimelineDataSettings {...ctx} />,
+  internal_resource_hub: (ctx) => <InternalResourceHubDataSettings {...ctx} />,
 }
 
 const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRenderer>> = {
@@ -117,6 +125,14 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
         fields={ctx.fields}
       />
     </>
+  ),
+  kpi_summary: (ctx) => (
+    <CommonAppearanceSettings
+      config={ctx.config}
+      onUpdate={ctx.onUpdateAppearance}
+      blockType={ctx.blockType}
+      fields={ctx.fields}
+    />
   ),
   chart: (ctx) => (
     <>
@@ -177,6 +193,36 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
     </>
   ),
   content_theme: (ctx) => (
+    <>
+      <CommonAppearanceSettings
+        config={ctx.config}
+        onUpdate={ctx.onUpdateAppearance}
+        blockType={ctx.blockType}
+        fields={ctx.fields}
+      />
+    </>
+  ),
+  upcoming_summary: (ctx) => (
+    <>
+      <CommonAppearanceSettings
+        config={ctx.config}
+        onUpdate={ctx.onUpdateAppearance}
+        blockType={ctx.blockType}
+        fields={ctx.fields}
+      />
+    </>
+  ),
+  content_timeline: (ctx) => (
+    <>
+      <CommonAppearanceSettings
+        config={ctx.config}
+        onUpdate={ctx.onUpdateAppearance}
+        blockType={ctx.blockType}
+        fields={ctx.fields}
+      />
+    </>
+  ),
+  internal_resource_hub: (ctx) => (
     <>
       <CommonAppearanceSettings
         config={ctx.config}

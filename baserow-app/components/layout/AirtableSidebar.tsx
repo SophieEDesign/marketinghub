@@ -1,8 +1,11 @@
 "use client"
 
-import { useState, useEffect, useRef, type CSSProperties, type MouseEvent } from "react"
+import { useState, useEffect, useRef, type MouseEvent } from "react"
+import Image from "next/image"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
+import SidebarNavItem, { sidebarNavItemClassName } from "@/components/shell/SidebarNavItem"
+import SidebarInviteCard from "@/components/shell/SidebarInviteCard"
 import PageCreationWizard from "@/components/interface/PageCreationWizard"
 import GroupedInterfaces from "./GroupedInterfaces"
 import {
@@ -66,40 +69,6 @@ interface AirtableSidebarProps {
   onAutoCompactDismiss?: () => void
 }
 
-function getReadableTextColor(backgroundColor: string): string {
-  const trimmed = backgroundColor.trim()
-
-  const hexMatch = trimmed.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/)
-  if (hexMatch) {
-    const hex = hexMatch[1]
-    const normalized =
-      hex.length === 3
-        ? hex
-            .split("")
-            .map((c) => c + c)
-            .join("")
-        : hex
-    const r = parseInt(normalized.slice(0, 2), 16)
-    const g = parseInt(normalized.slice(2, 4), 16)
-    const b = parseInt(normalized.slice(4, 6), 16)
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-    return luminance > 0.6 ? "#111827" : "#FFFFFF"
-  }
-
-  const rgbMatch = trimmed.match(
-    /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*[\d.]+\s*)?\)$/
-  )
-  if (rgbMatch) {
-    const r = Math.min(255, Number(rgbMatch[1]))
-    const g = Math.min(255, Number(rgbMatch[2]))
-    const b = Math.min(255, Number(rgbMatch[3]))
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-    return luminance > 0.6 ? "#111827" : "#FFFFFF"
-  }
-
-  return "#FFFFFF"
-}
-
 export default function AirtableSidebar({
   interfacePages = [],
   interfaceGroups = [],
@@ -116,7 +85,7 @@ export default function AirtableSidebar({
 }: AirtableSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const { primaryColor, sidebarColor, sidebarTextColor } = useBranding()
+  const { brandName, logoUrl, primaryColor } = useBranding()
   const { pageActions } = usePageActions()
   const { isEditing: isSidebarEditMode, enter: enterSidebarEdit, exit: exitSidebarEdit } =
     useSidebarEditMode()
@@ -252,32 +221,18 @@ export default function AirtableSidebar({
     })
   }
 
-  const sectionLabelStyle: CSSProperties = {
-    color: sidebarTextColor,
-    opacity: 0.65,
-  }
-
-  const navActiveStyle = (active: boolean): CSSProperties => ({
-    color: sidebarTextColor,
-    opacity: active ? 1 : 0.88,
-    ...(active ? { backgroundColor: "rgba(255, 255, 255, 0.14)" } : {}),
-  })
-
   if (isMobile && !isOpen) {
     return null
   }
 
   if (!isMobile && isCollapsed) {
     return (
-      <div
-        className="w-12 border-r border-border/50 flex flex-col items-center py-2 gap-2 flex-shrink-0"
-        style={{ backgroundColor: sidebarColor }}
-      >
+      <div className="w-12 border-r border-hub-border bg-white flex flex-col items-center py-2 gap-2 flex-shrink-0">
         <BaseDropdown
           variant="sidebar"
           collapsed
-          className="flex items-center justify-center p-2 min-w-0 w-full bg-transparent hover:bg-black/[0.06] border-0 shadow-none"
-          triggerStyle={{ color: sidebarTextColor }}
+          className="flex items-center justify-center p-2 min-w-0 w-full bg-transparent hover:bg-muted/60 border-0 shadow-none"
+          triggerStyle={{ color: "inherit" }}
           onOpenPageSettings={pageActions?.onOpenPageSettings}
           onEnterEdit={pageActions?.onEnterEdit}
           onExitEdit={pageActions?.onExitEdit}
@@ -287,12 +242,11 @@ export default function AirtableSidebar({
         <button
           type="button"
           onClick={expandFromRail}
-          className="p-2 hover:bg-black/[0.06] rounded-lg transition-colors"
-          style={{ color: sidebarTextColor }}
+          className="p-2 hover:bg-muted/60 rounded-lg transition-colors text-muted-foreground"
           title="Expand sidebar"
           aria-label="Expand sidebar"
         >
-          <ChevronRight className="h-4 w-4" style={{ color: sidebarTextColor }} />
+          <ChevronRight className="h-4 w-4" />
         </button>
       </div>
     )
@@ -317,60 +271,67 @@ export default function AirtableSidebar({
         data-sidebar
         data-tour="sidebar"
         className={cn(
-          "flex flex-col h-screen border-r border-black/10 transition-transform duration-300 flex-shrink-0",
-          isMobile ? "fixed left-0 top-0 z-50 w-64" : "relative w-64",
+          "flex flex-col h-screen border-r border-hub-border bg-white transition-transform duration-300 flex-shrink-0",
+          isMobile ? "fixed left-0 top-0 z-50 w-[260px]" : "relative w-[260px]",
           isMobile && !isOpen && "-translate-x-full"
         )}
-        style={{ backgroundColor: sidebarColor }}
       >
-        <div className="px-4 py-3 border-b border-border/50 flex items-center justify-between">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
+        <div className="px-4 py-3 border-b border-hub-border flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            {logoUrl ? (
+              <div className="relative h-8 w-8 shrink-0">
+                <Image src={logoUrl} alt={brandName} fill className="object-contain" unoptimized />
+              </div>
+            ) : (
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-hub-nav-active text-xs font-bold text-hub-primary">
+                MH
+              </div>
+            )}
+            <span className="truncate text-sm font-semibold text-foreground">{brandName}</span>
+          </div>
+          <div className="flex items-center gap-0.5 flex-shrink-0">
             <BaseDropdown
               variant="sidebar"
-              className="flex items-center gap-2 font-semibold h-auto py-1 px-0 bg-transparent hover:bg-black/[0.06] border-0 shadow-none text-left min-w-0"
-              triggerStyle={{ color: sidebarTextColor }}
+              className="sr-only"
+              triggerStyle={{ color: "inherit" }}
               onOpenPageSettings={pageActions?.onOpenPageSettings}
               onEnterEdit={pageActions?.onEnterEdit}
               onExitEdit={pageActions?.onExitEdit}
               isEditing={pageActions?.isEditing}
               defaultPageId={defaultPageId}
             />
-          </div>
-          <div className="flex items-center gap-1 flex-shrink-0">
             <button
               type="button"
               onClick={() => {
                 if (isMobile && onClose) onClose()
                 else collapseToRail()
               }}
-              className="p-1 hover:bg-black/[0.06] rounded-lg transition-colors"
-              style={{ color: sidebarTextColor }}
+              className="p-1.5 hover:bg-muted/60 rounded-lg transition-colors text-muted-foreground"
               title={isMobile ? "Close sidebar" : "Collapse sidebar"}
               aria-label={isMobile ? "Close sidebar" : "Collapse sidebar"}
             >
-              <X className="h-4 w-4" style={{ color: sidebarTextColor }} />
+              <X className="h-4 w-4" />
             </button>
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto">
           <div className="px-4 pt-3 pb-1">
-            <div className="text-xs font-medium tracking-wide" style={sectionLabelStyle}>
+            <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
               Workspace
             </div>
           </div>
 
           {isAdmin && (
-            <div className="flex-shrink-0 px-3 pb-2 flex items-center border-b border-border/50">
+            <div className="flex-shrink-0 px-3 pb-2 flex items-center">
               <button
                 type="button"
                 onClick={() => (isEditMode ? exitSidebarEdit() : enterSidebarEdit())}
                 className={cn(
-                  "flex items-center gap-2 px-2 py-1.5 text-xs font-medium rounded-lg transition-colors",
-                  "hover:bg-black/[0.06]",
-                  isEditMode && "bg-black/[0.1]"
+                  "flex items-center gap-2 px-2 py-1.5 text-xs font-medium rounded-lg transition-colors text-muted-foreground",
+                  "hover:bg-muted/60 hover:text-foreground",
+                  isEditMode && "bg-hub-nav-active text-hub-primary"
                 )}
-                style={{ color: sidebarTextColor }}
                 title={isEditMode ? "Finish organising the sidebar" : "Reorder pages and sections"}
                 aria-label={isEditMode ? "Done organising sidebar" : "Organise sidebar"}
               >
@@ -391,14 +352,10 @@ export default function AirtableSidebar({
 
           <div className="px-2 pt-2 pb-1 space-y-1">
             {homeHref && (
-              <a
+              <SidebarNavItem
                 href={homeHref}
-                className={cn(
-                  "relative flex items-center gap-2 rounded-lg py-2.5 pl-3 pr-3 text-sm font-medium transition-colors",
-                  "hover:bg-black/[0.06]",
-                  isHomeActive && "font-medium"
-                )}
-                style={navActiveStyle(isHomeActive)}
+                active={isHomeActive}
+                icon={<Home className="h-4 w-4" />}
                 onClick={(e) => {
                   if (isHomeActive) {
                     e.preventDefault()
@@ -406,9 +363,8 @@ export default function AirtableSidebar({
                   }
                 }}
               >
-                <Home className="h-4 w-4 flex-shrink-0 opacity-90" />
-                <span className="truncate">{landingPageTitle ?? "Home"}</span>
-              </a>
+                {landingPageTitle ?? "Home"}
+              </SidebarNavItem>
             )}
           </div>
 
@@ -424,13 +380,10 @@ export default function AirtableSidebar({
             />
           </div>
 
-          <RecentsFavoritesSection primaryColor={primaryColor} sidebarTextColor={sidebarTextColor} />
+          <RecentsFavoritesSection primaryColor={primaryColor} />
 
           {process.env.NODE_ENV === "development" && (
-            <div
-              className="px-3 py-1 text-xs opacity-70 border-t border-border/50"
-              style={{ color: sidebarTextColor }}
-            >
+            <div className="px-3 py-1 text-xs text-muted-foreground border-t border-hub-border">
               Debug: tables.length = {tables.length}
               {tables.length > 0 && (
                 <div className="mt-1">Tables: {tables.map((t) => t.name).join(", ")}</div>
@@ -439,13 +392,12 @@ export default function AirtableSidebar({
           )}
 
           {showAdministration && (
-            <div className="mt-1 border-t border-border/50 py-2">
+            <div className="mt-2 border-t border-hub-border py-2">
               <div className="px-3 mb-1">
                 <button
                   type="button"
                   onClick={() => setAdminSectionOpen((o) => !o)}
-                  className="w-full flex items-center justify-between px-2 py-2 text-xs font-medium rounded-lg hover:bg-black/[0.06] transition-colors"
-                  style={{ color: sidebarTextColor }}
+                  className="w-full flex items-center justify-between px-2 py-2 text-xs font-medium rounded-lg text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
                 >
                   <span>Administration</span>
                   {adminSectionOpen ? (
@@ -463,8 +415,7 @@ export default function AirtableSidebar({
                       <button
                         type="button"
                         onClick={() => setDataTablesOpen((o) => !o)}
-                        className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-medium rounded-lg hover:bg-white/10 transition-colors"
-                        style={{ color: sidebarTextColor, opacity: 0.85 }}
+                        className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-medium rounded-lg text-muted-foreground hover:bg-muted/60 transition-colors"
                       >
                         <span>{coreDataSectionTitle}</span>
                         {dataTablesOpen ? (
@@ -498,8 +449,7 @@ export default function AirtableSidebar({
                                   <button
                                     type="button"
                                     onClick={toggleTableExpanded}
-                                    className="p-0.5 rounded-lg hover:bg-black/[0.06] shrink-0"
-                                    style={{ color: sidebarTextColor }}
+                                    className="p-0.5 rounded-lg hover:bg-muted/60 shrink-0 text-muted-foreground"
                                     aria-label={isTableExpanded ? "Collapse views" : "Expand views"}
                                   >
                                     {tableViews.length > 0 ? (
@@ -515,10 +465,9 @@ export default function AirtableSidebar({
                                   <Link
                                     href={targetPath}
                                     className={cn(
-                                      "flex items-center gap-2 px-1.5 py-2 rounded-lg transition-colors hover:bg-black/[0.06] flex-1 min-w-0 text-sm",
-                                      isTableActive && "font-medium"
+                                      sidebarNavItemClassName(isTableActive),
+                                      "flex-1 min-w-0 px-2"
                                     )}
-                                    style={navActiveStyle(isTableActive)}
                                     onClick={(e) => {
                                       const isCurrentlyActive = pathname === targetPath
                                       if (isCurrentlyActive) {
@@ -565,11 +514,7 @@ export default function AirtableSidebar({
                                         <Link
                                           key={view.id}
                                           href={viewPath}
-                                          className={cn(
-                                            "flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors hover:bg-black/[0.06] text-sm",
-                                            isViewActive && "font-medium"
-                                          )}
-                                          style={navActiveStyle(isViewActive)}
+                                          className={cn(sidebarNavItemClassName(isViewActive), "text-sm py-1.5")}
                                           onClick={(e) => {
                                             if (isViewActive) return
                                             const startPath = pathname
@@ -601,11 +546,7 @@ export default function AirtableSidebar({
                   <div className="px-2 pt-0.5">
                     <Link
                       href="/settings"
-                      className={cn(
-                        "relative flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm hover:bg-black/[0.06]",
-                        isSettings && "font-medium"
-                      )}
-                      style={navActiveStyle(isSettings)}
+                      className={sidebarNavItemClassName(isSettings)}
                       onClick={() => {
                         if (isSettings) return
                         const startPath = pathname
@@ -627,6 +568,10 @@ export default function AirtableSidebar({
               )}
             </div>
           )}
+        </div>
+
+        <div className="flex-shrink-0 p-3 border-t border-hub-border">
+          <SidebarInviteCard />
         </div>
 
         <PageCreationWizard

@@ -196,7 +196,7 @@ function ShellContent({
   }, [isEditMode, isPanelVisible, hasBlockLevelSelection])
 
   return (
-    <div className="flex flex-col h-screen min-h-[100dvh] bg-background overflow-hidden">
+    <div className="flex flex-col h-screen min-h-[100dvh] bg-canvas overflow-hidden">
       {!hideTopbar && <OnboardingTour />}
       {/* Edit mode banner - full app width at top, above sidebar and content */}
       <EditModeBanner />

@@ -30,7 +30,18 @@ const config = {
       '2xl': '1536px',
     },
     extend: {
+      spacing: {
+        sidebar: "var(--shell-sidebar-width)",
+      },
       colors: {
+        hub: {
+          canvas: "#F8F8FC",
+          border: "#E6E6EF",
+          primary: "#6D4AFF",
+          "nav-active": "#F3F0FF",
+          navy: "#111827",
+          muted: "#6B7280",
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

@@ -101,6 +101,15 @@ export interface LinkPreviewBlockConfig extends BaseBlockConfig {
 // Content Theme Block Config (planning block; mock data until Supabase wiring)
 export type ContentThemeBlockConfig = BaseBlockConfig
 
+// Content Timeline Block Config (planning block; mock data until Supabase wiring)
+export type ContentTimelineBlockConfig = BaseBlockConfig
+
+// Internal Resource Hub Block Config (mock data until Supabase/storage wiring)
+export type InternalResourceHubBlockConfig = BaseBlockConfig
+
+// KPI Summary Block Config (mock metrics until Supabase wiring)
+export type KpiSummaryBlockConfig = BaseBlockConfig
+
 // Filter Block Config
 // Note: table_id, target_blocks, allowed_fields, allowed_operators, filters are already in BlockConfig
 export type FilterBlockConfig = BaseBlockConfig
@@ -138,6 +147,9 @@ export type BlockConfigUnion =
   | (ActionBlockConfig & { _type: 'action' })
   | (LinkPreviewBlockConfig & { _type: 'link_preview' })
   | (ContentThemeBlockConfig & { _type: 'content_theme' })
+  | (ContentTimelineBlockConfig & { _type: 'content_timeline' })
+  | (InternalResourceHubBlockConfig & { _type: 'internal_resource_hub' })
+  | (KpiSummaryBlockConfig & { _type: 'kpi_summary' })
   | (FilterBlockConfig & { _type: 'filter' })
   | (RecordContextBlockConfig & { _type: 'record_context' })
   | (FieldSectionBlockConfig & { _type: 'field_section' })
@@ -145,7 +157,7 @@ export type BlockConfigUnion =
 /** Block types that have typed config in BlockConfigUnion (for drift detection). */
 export const BLOCK_CONFIG_UNION_TYPES = [
   'grid', 'form', 'record', 'chart', 'kpi', 'text', 'html', 'image', 'gallery',
-  'divider', 'button', 'action', 'link_preview', 'content_theme', 'filter', 'record_context', 'field_section',
+  'divider', 'button', 'action', 'link_preview', 'content_theme', 'content_timeline', 'internal_resource_hub', 'kpi_summary', 'filter', 'record_context', 'field_section',
 ] as const
 
 /**
@@ -364,6 +376,22 @@ export function validateBlockConfig(
 
     case 'content_theme':
       // Content theme block uses mock data; no required fields
+      break
+
+    case 'upcoming_summary':
+      // Upcoming summary block uses mock data; no required fields
+      break
+
+    case 'content_timeline':
+      // Content timeline block uses mock data; no required fields
+      break
+
+    case 'internal_resource_hub':
+      // Internal resource hub uses mock data; no required fields
+      break
+
+    case 'kpi_summary':
+      // KPI summary uses mock data; no required fields
       break
 
     // divider, button, link_preview have no required fields

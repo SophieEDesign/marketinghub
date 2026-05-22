@@ -4,41 +4,44 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Marketing Hub shell palette */
+    --background: 240 33% 98%;
+    --foreground: 221 39% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 221 39% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --popover-foreground: 221 39% 11%;
+    --primary: 252 100% 65%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 252 100% 97%;
+    --secondary-foreground: 221 39% 11%;
+    --muted: 240 20% 96%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 252 100% 97%;
+    --accent-foreground: 252 70% 55%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 240 14% 92%;
+    --input: 240 14% 92%;
+    --ring: 252 100% 65%;
     --radius: 0.5rem;
-    /* Surface system: 16px cards, 20px heroes, 12px inner UI */
+    /* Surface system */
     --radius-card: 1rem;
     --radius-hero: 1.25rem;
     --radius-inner: 0.75rem;
-    /* Elevation: level 1 default, level 2 hover, level 3 hero/active */
-    --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 0 0 1px rgb(15 23 42 / 0.03);
-    --shadow-card-hover: 0 4px 12px -4px rgb(15 23 42 / 0.1), 0 2px 4px -2px rgb(15 23 42 / 0.06);
-    --shadow-elevated: 0 8px 20px -6px rgb(15 23 42 / 0.12), 0 2px 6px -2px rgb(15 23 42 / 0.06);
-    --accent-hue: 238;
-    /* Light mode: indigo link */
-    --accent-link: 238 76% 58%;
+    --shadow-card: 0 1px 3px 0 rgb(17 24 39 / 0.04), 0 1px 2px -1px rgb(17 24 39 / 0.03);
+    --shadow-card-hover: 0 4px 14px -4px rgb(109 74 255 / 0.12), 0 2px 6px -2px rgb(17 24 39 / 0.05);
+    --shadow-elevated: 0 12px 32px -8px rgb(17 24 39 / 0.1), 0 4px 12px -4px rgb(17 24 39 / 0.06);
+    --accent-hue: 252;
+    --accent-link: 252 100% 65%;
     --section-gap: 2rem;
-    /* App canvas: subtle tint behind main content (tables, interface pages) */
-    --canvas: 220 14% 97%;
-    --canvas-muted: 220 13% 94%;
+    --canvas: 240 33% 98%;
+    --canvas-muted: 240 20% 96%;
+    /* Shell-specific tokens */
+    --hub-sidebar: 0 0% 100%;
+    --hub-nav-active: 252 100% 97%;
+    --hub-nav-active-fg: 252 70% 55%;
+    --shell-sidebar-width: 260px;
     /* Chart series (HSL components for hsl(var(--chart-N))) */
     --chart-1: 262 83% 58%;
     --chart-2: 173 58% 42%;
@@ -88,6 +91,12 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .shell-sidebar-offset {
+    @apply md:left-sidebar;
   }
 }
 
@@ -905,4 +914,41 @@
 
 .calendar-embed[data-density="spacious"] .fc .fc-daygrid-day-frame {
   padding: 0.18rem 0.22rem;
+}
+
+/* Event Calendar — spanning bars and pastel event cards */
+.calendar-embed--events .fc-event {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.calendar-embed--events .fc-daygrid-event {
+  margin-top: 2px;
+  border-radius: 0.5rem;
+}
+
+.calendar-embed--events .fc-daygrid-block-event .fc-event-main {
+  padding: 0;
+}
+
+.calendar-embed--events .fc .fc-day-today {
+  background-color: hsl(var(--accent-link) / 0.06);
+}
+
+.calendar-embed--events .fc .fc-day-today .fc-daygrid-day-number {
+  background-color: hsl(var(--accent-link));
+  color: white;
+  border-radius: 9999px;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0.1rem;
+}
+
+.calendar-embed--events .fc-timegrid-event {
+  border-radius: 0.4rem;
+  border-left-width: 3px !important;
 }

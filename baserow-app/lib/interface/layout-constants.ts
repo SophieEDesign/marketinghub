@@ -1,2 +1,2 @@
-export const SHELL_SIDEBAR_WIDTH_PX = 256
+export const SHELL_SIDEBAR_WIDTH_PX = 260
 export const SHELL_RIGHT_SETTINGS_WIDTH_PX = 360

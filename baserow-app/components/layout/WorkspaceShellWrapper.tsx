@@ -36,7 +36,14 @@ function hotPathError(message: string, payload: Record<string, unknown>) {
   console.error(message, payload)
 }
 
-const MARKETING_CORE_PAGE_ORDER = ["Dashboard"] as const
+const MARKETING_CORE_PAGE_ORDER = [
+  "Dashboard",
+  "Theme Workspace",
+  "Content Planning",
+  "Event Calendar",
+  "Social Media Calendar",
+  "Internal Staff Hub",
+] as const
 const QUIET_PAGE_HINTS = ["test", "admin", "debug", "raw", "seed", "tmp"]
 
 function getNavPriority(name: string, isAdminOnly: boolean): number {

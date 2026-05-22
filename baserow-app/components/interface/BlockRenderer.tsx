@@ -19,11 +19,14 @@ import ButtonBlock from "./blocks/ButtonBlock"
 import ActionBlock from "./blocks/ActionBlock"
 import LinkPreviewBlock from "./blocks/LinkPreviewBlock"
 import HtmlBlock from "./blocks/HtmlBlock"
+import InternalResourceHubBlock from "./blocks/InternalResourceHubBlock"
 import FilterBlock from "./blocks/FilterBlock"
 import FieldBlock from "./blocks/FieldBlock"
 import FieldSectionBlock from "./blocks/FieldSectionBlock"
 import NumberBlock from "./blocks/NumberBlock"
 import ContentThemeBlock from "./blocks/ContentThemeBlock"
+import UpcomingSummaryBlock from "./blocks/UpcomingSummaryBlock"
+import KPISummaryBlock from "./blocks/KPISummaryBlock"
 import { ErrorBoundary } from "./ErrorBoundary"
 import LazyBlockWrapper from "./LazyBlockWrapper"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
@@ -102,6 +105,10 @@ const GalleryBlock = dynamic(() => import("./blocks/GalleryBlock"), {
   loading: () => <BlockLoadingPlaceholder />,
 })
 const HorizontalGroupedBlock = dynamic(() => import("./blocks/HorizontalGroupedBlock"), {
+  ssr: false,
+  loading: () => <BlockLoadingPlaceholder />,
+})
+const ContentTimelineBlock = dynamic(() => import("./blocks/ContentTimelineBlock"), {
   ssr: false,
   loading: () => <BlockLoadingPlaceholder />,
 })
@@ -378,6 +385,9 @@ export default function BlockRenderer({
         // CRITICAL: Pass pre-fetched aggregate data to prevent duplicate requests
         return <KPIBlock block={safeBlock} isEditing={canEdit} pageId={pageId} filters={filters} filterTree={filterTree} aggregateData={aggregateData} />
 
+      case "kpi_summary":
+        return <KPISummaryBlock block={safeBlock} isEditing={canEdit} />
+
       case "filter":
         // Filter block emits filter state via context
         return <FilterBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} onUpdate={onUpdate} allBlocks={allBlocks} />
@@ -622,6 +632,29 @@ export default function BlockRenderer({
 
       case "content_theme":
         return <ContentThemeBlock block={safeBlock} isEditing={canEdit} />
+
+      case "upcoming_summary":
+        return <UpcomingSummaryBlock block={safeBlock} isEditing={canEdit} />
+
+      case "content_timeline":
+        return (
+          <LazyBlockWrapper enabled={true}>
+            <ContentTimelineBlock
+              block={safeBlock}
+              isEditing={canEdit}
+              interfaceMode={interfaceMode}
+            />
+          </LazyBlockWrapper>
+        )
+
+      case "internal_resource_hub":
+        return (
+          <InternalResourceHubBlock
+            block={safeBlock}
+            isEditing={canEdit}
+            onUpdate={onUpdate ? (u) => handleUpdate(u) : undefined}
+          />
+        )
 
       default:
         return (

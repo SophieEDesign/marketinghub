@@ -1206,7 +1206,7 @@ function ListViewInner({
           </>
         ) : (groupDialogOpen || filterDialogOpen) && (
           // Simple dialog for when there's no viewId
-          <div className="fixed inset-0 md:left-64 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="fixed inset-0 md:left-sidebar bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 max-w-md">
               <h3 className="text-lg font-semibold mb-2">
                 {groupDialogOpen ? 'Grouping Settings' : 'Filter Settings'}
