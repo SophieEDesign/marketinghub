@@ -21,17 +21,15 @@ import { useSelectionContext } from "@/contexts/SelectionContext"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { VIEWS_ENABLED } from "@/lib/featureFlags"
 import { toPostgrestColumn } from "@/lib/supabase/postgrest"
+import { applyFiltersToQuery, type FilterConfig } from "@/lib/interface/filters"
 import {
   applySoftDeleteFilter,
-  applyFiltersToQuery,
-  type FilterConfig,
-} from "@/lib/interface/filters"
-import {
   fetchPhysicalColumns,
   filterSortsToQueryableColumns,
   filterViewFiltersToQueryableColumns,
   hasPhysicalColumnName,
 } from "@/lib/supabase/physical-columns"
+import type { TableField } from "@/types/fields"
 import { normalizeUuid } from "@/lib/utils/ids"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 import { isAbortError } from "@/lib/api/error-handling"
@@ -880,7 +878,7 @@ function InterfacePageClientInternal({
         .select('id, name, type, options')
         .eq('table_id', view.table_id)
 
-      const tableFields = tableFieldsData || []
+      const tableFields = (tableFieldsData || []) as TableField[]
       const physicalColumns = await fetchPhysicalColumns(supabase, table.supabase_table)
       const queryableFilters = filterViewFiltersToQueryableColumns(filters, tableFields, physicalColumns)
       const queryableSorts = filterSortsToQueryableColumns(sorts, tableFields, physicalColumns)
