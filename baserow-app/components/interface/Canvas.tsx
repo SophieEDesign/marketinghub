@@ -59,6 +59,26 @@ import { cn } from "@/lib/utils"
 
 const ResponsiveGridLayout = withResizeObserverWidthProvider(Responsive)
 
+/** Typing surfaces where block selection should not steal focus (TextBlock, etc.). */
+const BLOCK_EDIT_TYPING_SELECTOR =
+  '.ql-editor, textarea, [contenteditable="true"], .ql-toolbar, [role="textbox"], .ql-container, .ql-snow'
+
+/**
+ * In edit mode, select the parent block on canvas click.
+ * Uses capture so child stopPropagation (marketing rows, timeline bars, etc.) cannot block selection.
+ */
+function shouldSelectBlockInEditMode(target: HTMLElement): boolean {
+  const isTypingArea =
+    target.closest(BLOCK_EDIT_TYPING_SELECTOR) ||
+    (target instanceof HTMLInputElement &&
+      target.type !== "checkbox" &&
+      target.type !== "radio")
+  if (isTypingArea && !target.closest("[data-block-selectable]")) {
+    return false
+  }
+  return true
+}
+
 interface CanvasProps {
   blocks: PageBlock[]
   isEditing: boolean
@@ -2381,45 +2401,16 @@ export default function Canvas({
                   ),
                   isKeyboardHighlighted: keyboardMoveHighlight === block.id,
                 })}
-                onClick={(e) => {
-                  // Only allow selection in edit mode, and not if clicking:
-                  // - buttons
-                  // - inside editor content (quill, textarea, input)
-                  // - inside any interactive element
-                  // - inside text block editor (prevent settings panel from opening while typing)
-                  // CRITICAL: Settings panel should ONLY open when clicking the settings icon, not on block selection
-                  if (isEditing) {
-                    const target = e.target as HTMLElement
-                    const isEditorContent = target.closest('.ql-editor') || 
-                                           target.closest('textarea') || 
-                                           target.closest('input') ||
-                                           target.closest('[contenteditable="true"]') ||
-                                           target.closest('button') ||
-                                           target.closest('.ql-toolbar') ||
-                                           target.closest('[role="textbox"]') ||
-                                           target.closest('.ql-container') ||
-                                           target.closest('.ql-snow') ||
-                                           target.closest('.fc-event') ||
-                                           target.closest('.fc-daygrid-event') ||
-                                           target.closest('.fc-daygrid-day') ||
-                                           target.closest('[data-timeline-event]')
-                    // Field blocks: allow selection when clicking anywhere on content (except typing areas)
-                    const isSelectableBlockContent = target.closest('[data-block-selectable]')
-                    const isTypingArea = target.closest('input') || target.closest('textarea') || target.closest('[contenteditable="true"]')
-                    const allowSelection = !isEditorContent || (isSelectableBlockContent && !isTypingArea)
-                    
-                    // Only select block if not clicking editor content (or if in selectable block content and not typing)
-                    // This prevents settings panel from opening when clicking inside text blocks
-                    if (allowSelection) {
-                      e.stopPropagation() // Prevent canvas click (page settings) from firing
-                      // Support multi-select with Cmd/Ctrl or Shift
-                      if (onBlockSelect) {
-                        const addToSelection = e.metaKey || e.ctrlKey || e.shiftKey
-                        onBlockSelect(block.id, addToSelection)
-                      } else {
-                        onBlockClick?.(block.id)
-                      }
-                    }
+                onClickCapture={(e) => {
+                  if (!isEditing) return
+                  const target = e.target as HTMLElement
+                  if (!shouldSelectBlockInEditMode(target)) return
+                  e.stopPropagation()
+                  if (onBlockSelect) {
+                    const addToSelection = e.metaKey || e.ctrlKey || e.shiftKey
+                    onBlockSelect(block.id, addToSelection)
+                  } else {
+                    onBlockClick?.(block.id)
                   }
                 }}
               >

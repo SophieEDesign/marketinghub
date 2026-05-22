@@ -6,6 +6,7 @@ import { useUndoRedo } from "@/hooks/useUndoRedo"
 import { Save, Eye, Edit2, Plus, Trash2, Settings, MoreVertical, Undo2, Redo2 } from "lucide-react"
 import { useBranding } from "@/contexts/BrandingContext"
 import { useBlockEditMode, useEditMode } from "@/contexts/EditModeContext"
+import { useUIMode } from "@/contexts/UIModeContext"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { useSelectionContext } from "@/contexts/SelectionContext"
 import { FilterStateProvider } from "@/lib/interface/filter-state"
@@ -97,6 +98,7 @@ function InterfaceBuilderInner({
   
   // Context-driven editing: Edit/View toggle from sidebar menu controls block editing
   const { isEditing: isBlockEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(page.id)
+  const { enterEditPages } = useUIMode()
   const { setBlocksDirty } = useEditMode()
   const { selectedContext, setSelectedContext } = useSelectionContext()
   const { setData: setRightPanelData } = useRightSettingsPanelData()
@@ -1224,9 +1226,10 @@ function InterfaceBuilderInner({
       // Only if not in viewer mode
       if (!isViewer && !effectiveIsEditing) {
         enterBlockEdit()
+        enterEditPages(page.id)
       }
     },
-    [handleBlockUpdate, isViewer, effectiveIsEditing, enterBlockEdit]
+    [handleBlockUpdate, isViewer, effectiveIsEditing, enterBlockEdit, enterEditPages, page.id]
   )
 
   const handlePageUpdate = useCallback(async () => {
@@ -1248,23 +1251,38 @@ function InterfaceBuilderInner({
   // CRITICAL: Skip redundant updates when block and blocks ref unchanged to prevent render loops
   const lastRightPanelSyncRef = useRef<{ blockId: string; blocksRef: PageBlock[] } | null>(null)
   useEffect(() => {
-    if (effectiveIsEditing && selectedContext?.type === 'block' && selectedBlock) {
-      const prev = lastRightPanelSyncRef.current
-      if (prev?.blockId === selectedBlock.id && prev?.blocksRef === blocks) return
-      lastRightPanelSyncRef.current = { blockId: selectedBlock.id, blocksRef: blocks }
-      setRightPanelData({
-        blocks,
-        selectedBlock,
-        onBlockSave: handleSaveSettings,
-        onBlockMoveToTop: handleMoveBlockToTop,
-        onBlockMoveToBottom: handleMoveBlockToBottom,
-        onBlockLock: handleLockBlock,
-        pageTableId,
-      })
-    } else {
+    const isBlockContext =
+      selectedContext?.type === "block" &&
+      selectedContext.blockId === selectedBlock?.id
+    if (!effectiveIsEditing || !selectedBlock || !isBlockContext) {
       lastRightPanelSyncRef.current = null
+      return
     }
-  }, [effectiveIsEditing, selectedContext?.type, selectedBlock, blocks, pageTableId, setRightPanelData, handleSaveSettings, handleMoveBlockToTop, handleMoveBlockToBottom, handleLockBlock])
+    const prev = lastRightPanelSyncRef.current
+    if (prev?.blockId === selectedBlock.id && prev?.blocksRef === blocks) return
+    lastRightPanelSyncRef.current = { blockId: selectedBlock.id, blocksRef: blocks }
+    setRightPanelData({
+      blocks,
+      selectedBlock,
+      onBlockSave: handleSaveSettings,
+      onBlockMoveToTop: handleMoveBlockToTop,
+      onBlockMoveToBottom: handleMoveBlockToBottom,
+      onBlockLock: handleLockBlock,
+      pageTableId,
+    })
+  }, [
+    effectiveIsEditing,
+    selectedBlock,
+    selectedContext?.type,
+    selectedContext?.type === "block" ? selectedContext.blockId : undefined,
+    blocks,
+    pageTableId,
+    setRightPanelData,
+    handleSaveSettings,
+    handleMoveBlockToTop,
+    handleMoveBlockToBottom,
+    handleLockBlock,
+  ])
 
   // Apply undo/redo layout changes
   useEffect(() => {

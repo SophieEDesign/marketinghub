@@ -379,9 +379,12 @@ function InterfacePageClientInternal({
       updates.blocks = blocks
       updates.selectedBlock = null
     } else {
-      // Block selected: InterfaceBuilder owns blocks, selectedBlock, onBlockSave - don't overwrite with our blocks.
-      // Our blocks are stale after settings save (InterfaceBuilder updates optimistically; we only update on loadBlocks).
-      // By not passing blocks/selectedBlock, the merge keeps InterfaceBuilder's fresh values from its sync.
+      // InterfaceBuilder owns blocks/onBlockSave after first sync; provide a fallback selectedBlock so the
+      // panel is not stuck on "Loading block settings…" before builder sync runs.
+      const fallbackBlock = blocks.find((b) => b.id === selectedBlockIdForPanel) ?? null
+      if (fallbackBlock) {
+        updates.selectedBlock = fallbackBlock
+      }
     }
     setRightPanelData(updates)
   }, [page?.id, page, pageTableId, blocks, selectedContext?.type, selectedBlockIdForPanel, isEditing, setRightPanelData, stableHandlePageUpdate])

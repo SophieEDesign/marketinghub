@@ -258,6 +258,16 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
       />
     </>
   ),
+  things_to_do: (ctx) => (
+    <>
+      <CommonAppearanceSettings
+        config={ctx.config}
+        onUpdate={ctx.onUpdateAppearance}
+        blockType={ctx.blockType}
+        fields={ctx.fields}
+      />
+    </>
+  ),
   form: (ctx) => (
     <>
       <FormAppearanceSettings config={ctx.config} onUpdate={ctx.onUpdateAppearance} />
