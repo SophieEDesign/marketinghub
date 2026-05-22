@@ -827,6 +827,49 @@ async function applyVisibilityCuration() {
   }
 }
 
+/** When multiple active pages share a hub name, archive extras (keep most keyed blocks, then oldest). */
+async function archiveDuplicateHubPages(names) {
+  for (const name of names) {
+    const { data: pages, error } = await supabase
+      .from("interface_pages")
+      .select("id, name, created_at")
+      .eq("name", name)
+      .eq("is_archived", false)
+    if (error) throw new Error(`Duplicate page lookup failed for ${name}: ${error.message}`)
+    if (!pages || pages.length <= 1) continue
+
+    const withCounts = await Promise.all(
+      pages.map(async (page) => {
+        const { count, error: countError } = await supabase
+          .from("view_blocks")
+          .select("id", { count: "exact", head: true })
+          .eq("page_id", page.id)
+          .eq("is_archived", false)
+          .not("config->>provisioning_key", "is", null)
+        if (countError) throw new Error(`Block count failed for ${page.id}: ${countError.message}`)
+        return { ...page, keyed: count || 0 }
+      })
+    )
+    withCounts.sort((a, b) => b.keyed - a.keyed || new Date(a.created_at) - new Date(b.created_at))
+    const [, ...duplicates] = withCounts
+    for (const dup of duplicates) {
+      const { data: row } = await supabase.from("interface_pages").select("config").eq("id", dup.id).single()
+      const config = { ...(row?.config || {}) }
+      delete config.is_home
+      await supabase
+        .from("interface_pages")
+        .update({
+          is_archived: true,
+          is_hidden: true,
+          is_admin_only: true,
+          config,
+        })
+        .eq("id", dup.id)
+      console.log(`Archived duplicate page: ${name} (${dup.id})`)
+    }
+  }
+}
+
 async function archiveDeprecatedPages() {
   const deprecatedNames = [
     "Campaign Archive",
@@ -874,6 +917,8 @@ async function main() {
   if (!publicGroup) {
     throw new Error("Could not resolve required interface groups")
   }
+
+  await archiveDuplicateHubPages(["Marketing Home"])
 
   const homePageId = await upsertPage({
     name: "Marketing Home",

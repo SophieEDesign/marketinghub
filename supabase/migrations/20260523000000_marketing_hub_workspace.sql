@@ -14,7 +14,16 @@ AS $$
   FROM public.interface_pages ip
   WHERE COALESCE(ip.is_archived, false) = false
     AND ip.name = ANY (p_names)
-  ORDER BY array_position(p_names, ip.name)
+  ORDER BY
+    array_position(p_names, ip.name),
+    (
+      SELECT COUNT(*)
+      FROM public.view_blocks vb
+      WHERE vb.page_id = ip.id
+        AND COALESCE(vb.is_archived, false) = false
+        AND vb.config->>'provisioning_key' IS NOT NULL
+    ) DESC,
+    ip.created_at ASC
   LIMIT 1;
 $$;
 
@@ -173,7 +182,63 @@ WHERE COALESCE(src.is_archived, false) = false
     SELECT 1 FROM public.interface_pages ip
     WHERE ip.name = 'Things To Do' AND COALESCE(ip.is_archived, false) = false
   )
+  LIMIT 1;
+
+-- Social Calendar page (create when missing)
+INSERT INTO public.interface_pages (
+  name, page_type, group_id, order_index, config, saved_view_id,
+  dashboard_layout_id, form_config_id, record_config_id,
+  is_admin_only, is_hidden, is_archived
+)
+SELECT
+  'Social Calendar',
+  'content',
+  src.group_id,
+  5,
+  '{}'::jsonb,
+  src.saved_view_id,
+  NULL, NULL, NULL,
+  false, false, false
+FROM public.interface_pages src
+WHERE COALESCE(src.is_archived, false) = false
+  AND src.name = 'Content Planning'
+  AND NOT EXISTS (
+    SELECT 1 FROM public.interface_pages ip
+    WHERE COALESCE(ip.is_archived, false) = false
+      AND ip.name IN ('Social Calendar', 'Social Media Calendar', 'Social Media')
+  )
 LIMIT 1;
+
+-- Archive duplicate active pages with the same hub name (keep best-provisioned / oldest)
+WITH ranked AS (
+  SELECT
+    ip.id,
+    ROW_NUMBER() OVER (
+      PARTITION BY ip.name
+      ORDER BY
+        (
+          SELECT COUNT(*)
+          FROM public.view_blocks vb
+          WHERE vb.page_id = ip.id
+            AND COALESCE(vb.is_archived, false) = false
+            AND vb.config->>'provisioning_key' IS NOT NULL
+        ) DESC,
+        ip.created_at ASC
+    ) AS rn
+  FROM public.interface_pages ip
+  WHERE COALESCE(ip.is_archived, false) = false
+    AND ip.name IN ('Marketing Home')
+)
+UPDATE public.interface_pages ip
+SET
+  is_archived = true,
+  is_hidden = true,
+  is_admin_only = true,
+  updated_at = now(),
+  config = COALESCE(ip.config, '{}'::jsonb) - 'is_home'
+FROM ranked r
+WHERE ip.id = r.id
+  AND r.rn > 1;
 
 -- Sidebar order
 DO $$
