@@ -4,6 +4,10 @@
 
 The user invitation system allows admins to invite users via email. When a user accepts the invitation, they are automatically created with the specified role.
 
+**Access requests:** Users can submit a request at `/signup` (linked from the login page). Requests are stored in `signup_requests` until an admin approves them in **Settings → Users**. Approval sends the same Supabase invite email as **Invite User**.
+
+**Supabase dashboard:** Turn **off** “Allow new users to sign up” under Authentication → Providers → Email. Public signup would bypass the approval queue; the app uses invite-only auth via the Admin API.
+
 ## Setup Requirements
 
 ### 1. Environment Variables

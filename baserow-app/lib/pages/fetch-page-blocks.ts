@@ -89,7 +89,8 @@ export async function fetchPageBlocksForPage(pageId: string): Promise<PageBlock[
   }
 
   const pageBlocks: PageBlock[] = []
-  const rows = (data ?? []) as ViewBlockRow[]
+  // Supabase types dynamic .select(column list) as GenericStringError[]; runtime rows match ViewBlockRow.
+  const rows = (data ?? []) as unknown as ViewBlockRow[]
   for (const block of rows) {
     try {
       const layout = dbBlockToPageBlock({

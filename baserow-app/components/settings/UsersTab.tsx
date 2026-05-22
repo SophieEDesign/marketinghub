@@ -48,9 +48,21 @@ interface User {
   needs_password_reset?: boolean // True for users without passwords (e.g., added via SQL)
 }
 
+interface SignupRequest {
+  id: string
+  email: string
+  name: string | null
+  status: string
+  requested_at: string
+}
+
 export default function UsersTab() {
   const [users, setUsers] = useState<User[]>([])
+  const [signupRequests, setSignupRequests] = useState<SignupRequest[]>([])
   const [loading, setLoading] = useState(true)
+  const [approveRoles, setApproveRoles] = useState<Record<string, 'admin' | 'member'>>({})
+  const [approvingRequestId, setApprovingRequestId] = useState<string | null>(null)
+  const [rejectingRequestId, setRejectingRequestId] = useState<string | null>(null)
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [deactivateDialogOpen, setDeactivateDialogOpen] = useState(false)
@@ -80,7 +92,72 @@ export default function UsersTab() {
 
   useEffect(() => {
     loadUsers()
+    loadSignupRequests()
   }, [])
+
+  async function loadSignupRequests() {
+    try {
+      const response = await fetch('/api/signup-requests?status=pending')
+      if (response.ok) {
+        const data = await response.json()
+        const requests = Array.isArray(data?.requests) ? data.requests : []
+        setSignupRequests(requests)
+        setApproveRoles((prev) => {
+          const next = { ...prev }
+          for (const r of requests) {
+            if (!next[r.id]) next[r.id] = 'member'
+          }
+          return next
+        })
+      }
+    } catch (error) {
+      console.error('Error loading access requests:', error)
+    }
+  }
+
+  async function handleApproveRequest(request: SignupRequest) {
+    const role = approveRoles[request.id] || 'member'
+    setApprovingRequestId(request.id)
+    try {
+      const response = await fetch(`/api/signup-requests/${request.id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to approve request')
+      }
+      alert(data.message || `Invitation sent to ${request.email}`)
+      loadSignupRequests()
+      loadUsers()
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to approve request'
+      alert(message)
+    } finally {
+      setApprovingRequestId(null)
+    }
+  }
+
+  async function handleRejectRequest(request: SignupRequest) {
+    if (!confirm(`Reject access request from ${request.email}?`)) return
+    setRejectingRequestId(request.id)
+    try {
+      const response = await fetch(`/api/signup-requests/${request.id}/reject`, {
+        method: 'POST',
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to reject request')
+      }
+      loadSignupRequests()
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to reject request'
+      alert(message)
+    } finally {
+      setRejectingRequestId(null)
+    }
+  }
 
   async function loadUsers() {
     setLoading(true)
@@ -480,6 +557,87 @@ export default function UsersTab() {
 
   return (
     <>
+      {signupRequests.length > 0 && (
+        <Card className="mb-6 border-amber-200 bg-amber-50/30">
+          <CardHeader>
+            <CardTitle>Access requests</CardTitle>
+            <CardDescription>
+              People who requested access — approve to send a Supabase invite email
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border bg-card">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Requested</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {signupRequests.map((request) => (
+                    <TableRow key={request.id}>
+                      <TableCell className="font-medium">{request.name || '—'}</TableCell>
+                      <TableCell>{request.email}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {formatDateUK(request.requested_at)}
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={approveRoles[request.id] || 'member'}
+                          onValueChange={(value) =>
+                            setApproveRoles((prev) => ({
+                              ...prev,
+                              [request.id]: value as 'admin' | 'member',
+                            }))
+                          }
+                        >
+                          <SelectTrigger className="w-28">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="member">Member</SelectItem>
+                            <SelectItem value="admin">Admin</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleApproveRequest(request)}
+                            disabled={
+                              approvingRequestId === request.id ||
+                              rejectingRequestId === request.id
+                            }
+                          >
+                            {approvingRequestId === request.id ? 'Sending…' : 'Approve'}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleRejectRequest(request)}
+                            disabled={
+                              approvingRequestId === request.id ||
+                              rejectingRequestId === request.id
+                            }
+                          >
+                            {rejectingRequestId === request.id ? '…' : 'Reject'}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">

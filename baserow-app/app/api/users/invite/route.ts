@@ -3,6 +3,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { isAdmin } from '@/lib/roles'
 import { getAuthRateLimiter } from '@/lib/rate-limit'
 import { getRequestIp } from '@/lib/request-ip'
+import { inviteUserByEmail } from '@/lib/users/invite-user'
+import type { InviteRole } from '@/lib/users/invite-user'
 
 const MAX_BODY_SIZE = 1024 * 10 // 10KB
 
@@ -89,108 +91,47 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    // Get the base URL for the redirect link
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
-      'http://localhost:3000'
-
-    // Invite user via Supabase Auth Admin API
-    // Build user metadata - only include default_interface if it has a valid value
-    const userMetadata: { role: string; default_interface?: string } = {
-      role: role,
-    }
-    
-    if (default_interface && default_interface !== '__none__') {
-      userMetadata.default_interface = default_interface
-    }
-    
-    const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
+    const inviteResult = await inviteUserByEmail(
+      adminClient,
       email.trim(),
-      {
-        data: userMetadata,
-        redirectTo: `${baseUrl}/auth/callback`,
-      }
+      role as InviteRole,
+      { default_interface }
     )
 
-    if (inviteError) {
-      console.error('Supabase invite error:', inviteError)
-      
-      // Handle specific error cases
-      if (inviteError.message?.includes('already registered') || inviteError.message?.includes('already exists')) {
+    if (!inviteResult.ok) {
+      const errorMessage = inviteResult.error || ''
+      if (errorMessage.includes('already exists')) {
         return NextResponse.json(
           { error: 'A user with this email already exists' },
           { status: 400 }
         )
       }
-      
-      // Handle invalid API key error
-      const errorMessage = inviteError.message || ''
-      const errorCode = (inviteError as any)?.code || (inviteError as any)?.status || ''
-      
-      // Check for authentication/authorization errors
       if (
         errorMessage.includes('Invalid API key') ||
         errorMessage.includes('JWT') ||
-        (errorMessage.includes('invalid') && errorMessage.includes('key')) ||
-        errorMessage.includes('unauthorized') ||
-        errorMessage.includes('401') ||
-        errorCode === '401' ||
-        errorCode === 'PGRST301' ||
-        errorMessage.includes('service_role')
+        errorMessage.includes('service_role') ||
+        errorMessage.includes('unauthorized')
       ) {
-        // Log the actual error for debugging (server-side only)
-        console.error('Supabase API error details:', {
-          message: errorMessage,
-          code: errorCode,
-          error: inviteError
-        })
-        
         return NextResponse.json(
-          { 
-            error: 'Server configuration error: Invalid service role key. Please verify SUPABASE_SERVICE_ROLE_KEY is correct.',
-            details: 'To fix this: 1) Go to your Supabase project → Settings → API, 2) Copy the "service_role" key (NOT the anon key), 3) Ensure the key matches your Supabase project URL, 4) Add it to Vercel project settings → Environment Variables as SUPABASE_SERVICE_ROLE_KEY, 5) Redeploy your application. If the key is correct, verify it matches the project URL in NEXT_PUBLIC_SUPABASE_URL.',
-            debug: process.env.NODE_ENV === 'development' ? {
-              hasKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-              keyLength: process.env.SUPABASE_SERVICE_ROLE_KEY?.length || 0,
-              supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
-              errorMessage,
-              errorCode
-            } : undefined
+          {
+            error:
+              'Server configuration error: Invalid service role key. Please verify SUPABASE_SERVICE_ROLE_KEY is correct.',
+            details:
+              'Copy the service_role key from Supabase → Settings → API and set SUPABASE_SERVICE_ROLE_KEY on your deployment.',
           },
           { status: 500 }
         )
       }
-
       return NextResponse.json(
-        { error: inviteError.message || 'Failed to send invitation' },
+        { error: inviteResult.error || 'Failed to send invitation' },
         { status: 500 }
       )
     }
 
-    // Note: Profile will be created automatically when user accepts invitation
-    // via the auth callback route, which reads role from user_metadata
-    // If user already exists, we can create profile now using admin client to bypass RLS
-    if (inviteData?.user?.id) {
-      const { error: profileError } = await adminClient
-        .from('profiles')
-        .upsert({
-          user_id: inviteData.user.id,
-          role: role,
-        }, {
-          onConflict: 'user_id',
-        })
-
-      if (profileError) {
-        console.error('Error creating profile:', profileError)
-        // Don't fail the request if profile creation fails - user can still sign in
-      }
-    }
-
-    return NextResponse.json({ 
+    return NextResponse.json({
       message: 'User invitation sent successfully',
       email: email.trim(),
       role,
-      user: inviteData?.user,
     })
   } catch (error: any) {
     console.error('Error inviting user:', error)

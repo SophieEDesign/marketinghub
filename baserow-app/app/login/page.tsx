@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, Suspense } from "react"
+import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
@@ -271,7 +272,9 @@ function LoginForm() {
 
           <p className="mt-6 text-center text-xs text-muted-foreground">
             Don&apos;t have an account?{" "}
-            <span className="text-hub-primary font-medium">Contact your admin</span>
+            <Link href="/signup" className="text-hub-primary font-medium hover:underline">
+              Request access
+            </Link>
           </p>
         </div>
       </LoginLayout>

@@ -31,6 +31,7 @@ function isPublicRoute(pathname: string): boolean {
   const publicRoutes = [
     '/',                    // Root - redirects to login if not authenticated
     '/login',               // Login page
+    '/signup',              // Request access (no self-service Supabase signup)
     '/auth',                // All auth routes (callback, setup-password, etc.)
     '/public',              // Public routes
   ];
@@ -61,12 +62,17 @@ function isProtectedRoute(pathname: string): boolean {
 /**
  * Check if an API route is public
  */
-function isPublicApiRoute(pathname: string): boolean {
+function isPublicApiRoute(pathname: string, method: string): boolean {
   const publicApiRoutes = [
     '/api/workspace-settings',         // Allow unauthenticated access for branding on login page
     '/api/auth',                       // Auth-related APIs (if any)
     '/api/automations/run-scheduled',  // Cron endpoint - auth via CRON_SECRET bearer token only
   ];
+
+  // Submit access request only (GET/list requires admin session)
+  if (pathname === '/api/signup-requests' && method === 'POST') {
+    return true;
+  }
 
   if (publicApiRoutes.some(route => matchesRoute(pathname, route))) {
     return true;
@@ -91,7 +97,7 @@ function isProtectedApiRoute(pathname: string): boolean {
   if (!pathname.startsWith('/api/')) return false;
   
   // If it's a public API route, it's not protected
-  if (isPublicApiRoute(pathname)) return false;
+  if (isPublicApiRoute(pathname, 'GET')) return false;
   
   // All other API routes are protected by default
   // This includes:
@@ -168,7 +174,7 @@ export async function middleware(req: NextRequest) {
   }
 
   // Check if API route is public
-  if (pathname.startsWith('/api/') && isPublicApiRoute(pathname)) {
+  if (pathname.startsWith('/api/') && isPublicApiRoute(pathname, req.method)) {
     return NextResponse.next();
   }
 
