@@ -20,3 +20,27 @@ export function sanitizeForClient<T>(value: T): T {
     )
   ) as T
 }
+
+/**
+ * Ensure a value is safe to pass from Server Components to client children (RSC payload).
+ * Always round-trips through JSON to strip bigint and other non-serializable values.
+ */
+export function prepareForRscPayload<T>(value: T): T {
+  try {
+    return sanitizeForClient(value)
+  } catch (error) {
+    console.error("[prepareForRscPayload] Serialization failed:", error)
+    return sanitizeForClient(null) as T
+  }
+}
+
+/** Returns true if value can be JSON.stringify'd for SSR handoff. */
+export function assertJsonSerializable(value: unknown, label: string): boolean {
+  try {
+    JSON.stringify(value)
+    return true
+  } catch (error) {
+    console.error(`[assertJsonSerializable] ${label} failed:`, error)
+    return false
+  }
+}

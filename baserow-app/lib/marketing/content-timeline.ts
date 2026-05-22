@@ -79,6 +79,9 @@ export interface ContentTimelineItem {
   assetStatus?: string
   approvalStatus?: string
   colour?: string
+  /** Set when item is loaded from Supabase Content table (RecordModal). */
+  recordTableId?: string
+  recordSupabaseTable?: string
 }
 
 export interface ContentTimelineFilters {

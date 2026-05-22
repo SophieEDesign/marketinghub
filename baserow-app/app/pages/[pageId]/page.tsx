@@ -6,7 +6,7 @@ import { isRecordReviewPage } from "@/lib/interface/page-types"
 import WorkspaceShellWrapper from "@/components/layout/WorkspaceShellWrapper"
 import InterfacePageClient from "@/components/interface/InterfacePageClient"
 import { fetchPageBlocksForPage } from "@/lib/pages/fetch-page-blocks"
-import { containsBigInt, sanitizeForClient } from "@/lib/serialization/sanitize-for-client"
+import { prepareForRscPayload } from "@/lib/serialization/sanitize-for-client"
 import type { PageBlock } from "@/lib/interface/types"
 
 const isDev = process.env.NODE_ENV === 'development'
@@ -124,15 +124,9 @@ export default async function PagePage({
     console.log('[Page Render] Rendering page:', { pageId, pageName, hasData: initialData.length > 0 })
   }
 
-  const initialDataHasBigInt = containsBigInt(initialData)
-  const initialPageHasBigInt = containsBigInt(page ?? null)
-  let safeInitialData = initialData
-  let safeInitialPage = page || undefined
-
-  if (initialDataHasBigInt || initialPageHasBigInt) {
-    safeInitialData = sanitizeForClient(initialData)
-    safeInitialPage = sanitizeForClient(page || undefined)
-  }
+  const safeInitialData = prepareForRscPayload(initialData)
+  const safeInitialPage = page ? prepareForRscPayload(page) : undefined
+  const safeInitialBlocks = prepareForRscPayload(initialBlocks)
 
   return (
     <WorkspaceShellWrapper title={pageName} hideTopbar={true} hideRecordPanel={hideRecordPanel}>
@@ -140,7 +134,7 @@ export default async function PagePage({
         pageId={pageId}
         initialPage={safeInitialPage}
         initialData={safeInitialData}
-        initialBlocks={initialBlocks}
+        initialBlocks={safeInitialBlocks}
         isAdmin={admin}
       />
     </WorkspaceShellWrapper>

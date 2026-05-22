@@ -18,7 +18,10 @@ import {
   type ThingsToDoSort,
   type ThingsToDoView,
 } from "@/lib/marketing/things-to-do"
+import { useThingsToDoData } from "@/hooks/useThingsToDoData"
+import { useRecordModal } from "@/contexts/RecordModalContext"
 import DashboardEmpty from "@/components/interface/primitives/DashboardEmpty"
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { ThingsToDoDetailPanel } from "@/components/interface/things-to-do/ThingsToDoDetailPanel"
@@ -40,6 +43,8 @@ export default function ThingsToDoBlock({
   isEditing = false,
 }: ThingsToDoBlockProps) {
   const { config } = block
+  const { openRecordModal } = useRecordModal()
+  const { loading, error, fromLiveData, items: liveItems, reload } = useThingsToDoData()
 
   const title = config?.title || "Things To Do"
   const subtitle =
@@ -55,8 +60,11 @@ export default function ThingsToDoBlock({
   const dateRange = (config?.things_to_do_date_range || "next_30_days") as ThingsToDoDateRange
   const defaultGrouping = (config?.things_to_do_default_grouping ||
     "due-date") as ThingsToDoGrouping
+  const forceMock = config?.things_to_do_use_mock === true
 
   const mockItems = getThingsToDoMockItems()
+  const useLive = fromLiveData && liveItems.length > 0 && !forceMock
+  const sourceItems = useLive ? liveItems : mockItems
 
   const [view, setView] = useState<ThingsToDoView>(defaultView)
   const [filters, setFilters] = useState<ThingsToDoFilters>(EMPTY_THINGS_TO_DO_FILTERS)
@@ -70,12 +78,12 @@ export default function ThingsToDoBlock({
     Record<string, ThingsToDoChecklistItem[]>
   >({})
 
-  const filterOptions = useMemo(() => collectFilterOptions(mockItems), [mockItems])
+  const filterOptions = useMemo(() => collectFilterOptions(sourceItems), [sourceItems])
 
   const filtered = useMemo(() => {
-    let items = filterThingsToDoItems(mockItems, filters, searchQuery, dateRange, statusChip)
+    let items = filterThingsToDoItems(sourceItems, filters, searchQuery, dateRange, statusChip)
     return sortThingsToDoItems(items, sortBy)
-  }, [mockItems, filters, searchQuery, dateRange, statusChip, sortBy])
+  }, [sourceItems, filters, searchQuery, dateRange, statusChip, sortBy])
 
   const stats = useMemo(() => computeThingsToDoStats(filtered), [filtered])
 
@@ -98,8 +106,8 @@ export default function ThingsToDoBlock({
   }, [filtered, defaultGrouping, maxItems])
 
   const selectedItem = useMemo(
-    () => mockItems.find((i) => i.id === selectedId) ?? null,
-    [mockItems, selectedId]
+    () => sourceItems.find((i) => i.id === selectedId) ?? null,
+    [sourceItems, selectedId]
   )
 
   const selectedChecklist = useMemo(() => {
@@ -140,10 +148,37 @@ export default function ThingsToDoBlock({
     })
   }, [])
 
+  const handleOpenRecord = useCallback(() => {
+    if (!selectedItem?.recordTableId || !selectedItem.recordSupabaseTable) return
+    openRecordModal({
+      tableId: selectedItem.recordTableId,
+      recordId: selectedItem.id,
+      supabaseTableName: selectedItem.recordSupabaseTable,
+      onRecordUpdated: () => reload(),
+    })
+  }, [selectedItem, openRecordModal, reload])
+
   const showDetail = enableDetailPanel && selectedItem != null
 
+  if (loading && !useLive) {
+    return (
+      <div className="flex h-full min-h-[200px] items-center justify-center rounded-2xl border border-border/40 bg-background">
+        <LoadingSpinner size="lg" text="Loading things to do…" />
+      </div>
+    )
+  }
+
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border/40 bg-background shadow-sm">
+    <div
+      data-block-selectable
+      className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border/40 bg-background shadow-sm"
+    >
+      {error && !useLive ? (
+        <p className="shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">
+          Showing sample tasks ({error})
+        </p>
+      ) : null}
+
       <ThingsToDoHeader
         title={title}
         subtitle={subtitle}
@@ -220,6 +255,9 @@ export default function ThingsToDoBlock({
                     checklist={selectedChecklist}
                     onClose={() => setSelectedId(null)}
                     onChecklistToggle={handleChecklistToggle}
+                    onOpenRecord={
+                      selectedItem.recordTableId ? handleOpenRecord : undefined
+                    }
                   />
                 ) : null}
               </div>

@@ -98,13 +98,20 @@ function InterfaceBuilderInner({
   
   // Context-driven editing: Edit/View toggle from sidebar menu controls block editing
   const { isEditing: isBlockEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(page.id)
-  const { enterEditPages } = useUIMode()
+  const { enterEditPages, isEdit: isUiEdit } = useUIMode()
   const { setBlocksDirty } = useEditMode()
   const { selectedContext, setSelectedContext } = useSelectionContext()
   const { setData: setRightPanelData } = useRightSettingsPanelData()
-  
-  // Edit mode: URL viewer forces view; otherwise use block edit mode from sidebar menu
-  const effectiveIsEditing = !isViewer && isBlockEditing
+
+  // Page layout edit: block scope OR UIMode editPages for this page (panel can show from UIMode alone)
+  const isUiPageEdit = isUiEdit(page.id)
+  const effectiveIsEditing = !isViewer && (isBlockEditing || isUiPageEdit)
+
+  // Keep block scope aligned when shell is in editPages for this page
+  useEffect(() => {
+    if (isViewer || !isUiPageEdit || isBlockEditing) return
+    enterBlockEdit()
+  }, [isViewer, isUiPageEdit, isBlockEditing, enterBlockEdit])
   
   // Interface mode: single source of truth for edit state (Airtable-style)
   // When interface is in edit mode, all record modals must open in edit mode

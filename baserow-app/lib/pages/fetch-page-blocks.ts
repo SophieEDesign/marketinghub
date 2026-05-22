@@ -65,30 +65,46 @@ export async function fetchPageBlocksForPage(pageId: string): Promise<PageBlock[
   }
 
   if (error) {
-    throw error
+    console.error("[fetchPageBlocksForPage] Query failed:", {
+      pageId,
+      message: error.message,
+      code: error.code,
+    })
+    return []
   }
 
-  return (data || []).map((block: any) => {
-    const layout = dbBlockToPageBlock({
-      id: block.id,
-      position_x: block.position_x,
-      position_y: block.position_y,
-      width: block.width,
-      height: block.height,
-    })
+  const pageBlocks: PageBlock[] = []
+  for (const block of data || []) {
+    try {
+      const layout = dbBlockToPageBlock({
+        id: block.id,
+        position_x: block.position_x,
+        position_y: block.position_y,
+        width: block.width,
+        height: block.height,
+      })
 
-    return {
-      id: block.id,
-      page_id: block.page_id || block.view_id || pageId,
-      type: block.type,
-      x: layout?.x ?? 0,
-      y: layout?.y ?? 0,
-      w: layout?.w ?? 4,
-      h: layout?.h ?? 4,
-      config: block.config || {},
-      order_index: block.order_index ?? 0,
-      created_at: block.created_at,
-      updated_at: block.updated_at,
-    } as PageBlock
-  })
+      pageBlocks.push({
+        id: block.id,
+        page_id: block.page_id || block.view_id || pageId,
+        type: block.type,
+        x: layout?.x ?? 0,
+        y: layout?.y ?? 0,
+        w: layout?.w ?? 4,
+        h: layout?.h ?? 4,
+        config: block.config || {},
+        order_index: block.order_index ?? 0,
+        created_at: block.created_at,
+        updated_at: block.updated_at,
+      } as PageBlock)
+    } catch (layoutError) {
+      console.warn("[fetchPageBlocksForPage] Skipping block with invalid layout:", {
+        pageId,
+        blockId: block.id,
+        error: layoutError instanceof Error ? layoutError.message : layoutError,
+      })
+    }
+  }
+
+  return pageBlocks
 }

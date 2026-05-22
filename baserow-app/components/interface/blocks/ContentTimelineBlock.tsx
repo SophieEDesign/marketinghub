@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { parseISO } from "date-fns"
 import type { PageBlock } from "@/lib/interface/types"
 import {
@@ -14,7 +14,10 @@ import {
   type ContentTimelineGroupBy,
   type ContentTimelineView,
 } from "@/lib/marketing/content-timeline"
+import { useContentTimelineData } from "@/hooks/useContentTimelineData"
+import { useRecordModal } from "@/contexts/RecordModalContext"
 import DashboardEmpty from "@/components/interface/primitives/DashboardEmpty"
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 import { ContentTimelineDetailPanel } from "@/components/interface/content-timeline/ContentTimelineDetailPanel"
 import { ContentTimelineFilterBar } from "@/components/interface/content-timeline/ContentTimelineFilterBar"
 import { ContentTimelineGrid } from "@/components/interface/content-timeline/ContentTimelineGrid"
@@ -43,6 +46,15 @@ export default function ContentTimelineBlock({
   interfaceMode = "view",
 }: ContentTimelineBlockProps) {
   const { config } = block
+  const { openRecordModal } = useRecordModal()
+  const {
+    loading,
+    error,
+    fromLiveData,
+    items: liveItems,
+    reload,
+  } = useContentTimelineData({ excludeEventTypes: true })
+
   const title = config?.title || "Content Timeline"
   const subtitle =
     config?.content_timeline_subtitle ||
@@ -57,15 +69,17 @@ export default function ContentTimelineBlock({
   const configCompact = config?.content_timeline_compact_mode === true
   const preset = config?.content_timeline_preset
   const isMarketingHomePreset = preset === "marketing_home"
+  const forceMock = config?.content_timeline_use_mock === true
   const mockItems = getContentTimelineMockItems(preset)
   const showFooterLink = config?.content_timeline_show_footer_link !== false
   const footerLabel =
     config?.content_timeline_footer_link_label || "View full calendar →"
 
+  const useLive = fromLiveData && liveItems.length > 0 && !forceMock
+  const allItems = useLive ? liveItems : mockItems
+
   const [view, setView] = useState<ContentTimelineView>(defaultView)
-  const [anchorDate, setAnchorDate] = useState(() =>
-    parseISO(isMarketingHomePreset ? "2025-05-14T12:00:00" : "2025-05-21T12:00:00")
-  )
+  const [anchorDate, setAnchorDate] = useState(() => new Date())
   const [compact, setCompact] = useState(configCompact)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [filters, setFilters] = useState<ContentTimelineFilters>(() => ({
@@ -75,23 +89,29 @@ export default function ContentTimelineBlock({
       : [],
   }))
 
+  useEffect(() => {
+    if (!isMarketingHomePreset && !useLive) {
+      setAnchorDate(parseISO("2025-05-21T12:00:00"))
+    }
+  }, [isMarketingHomePreset, useLive])
+
   const showAddButton = isEditing || interfaceMode === "edit"
 
   const filterOptions = useMemo(
-    () => collectFilterOptions(mockItems),
-    [mockItems]
+    () => collectFilterOptions(allItems),
+    [allItems]
   )
 
   const visibleItems = useMemo(() => {
-    const inView = mockItems.filter((item) =>
+    const inView = allItems.filter((item) =>
       itemOverlapsView(item, view, anchorDate)
     )
     return filterContentTimelineItems(inView, filters)
-  }, [mockItems, view, anchorDate, filters])
+  }, [allItems, view, anchorDate, filters])
 
   const selectedItem = useMemo(
-    () => mockItems.find((i) => i.id === selectedId) ?? null,
-    [mockItems, selectedId]
+    () => allItems.find((i) => i.id === selectedId) ?? null,
+    [allItems, selectedId]
   )
 
   const periodLabel = formatPeriodLabel(view, anchorDate)
@@ -104,20 +124,57 @@ export default function ContentTimelineBlock({
     setFilters({ ...EMPTY_FILTERS })
   }
 
+  const handleOpenRecord = (recordId: string) => {
+    const item = allItems.find((i) => i.id === recordId)
+    if (!item?.recordTableId || !item.recordSupabaseTable) return
+    openRecordModal({
+      tableId: item.recordTableId,
+      recordId,
+      supabaseTableName: item.recordSupabaseTable,
+      onRecordUpdated: () => reload(),
+    })
+  }
+
+  const handleAddContent = () => {
+    const first = liveItems[0]
+    if (!first?.recordTableId || !first.recordSupabaseTable) return
+    openRecordModal({
+      tableId: first.recordTableId,
+      recordId: null,
+      supabaseTableName: first.recordSupabaseTable,
+      onRecordUpdated: () => reload(),
+    })
+  }
+
+  if (loading && !useLive) {
+    return (
+      <div className="flex h-full min-h-[200px] items-center justify-center rounded-2xl border border-border/40 bg-background">
+        <LoadingSpinner size="lg" text="Loading content timeline…" />
+      </div>
+    )
+  }
+
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border/40 bg-background shadow-sm">
+    <div
+      data-block-selectable
+      className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border/40 bg-background shadow-sm"
+    >
+      {error && !useLive ? (
+        <p className="shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">
+          Showing sample timeline ({error})
+        </p>
+      ) : null}
+
       <ContentTimelineHeader
         title={title}
         subtitle={subtitle}
         periodLabel={periodLabel}
         view={view}
-        showAddButton={showAddButton}
+        showAddButton={showAddButton && useLive}
         onViewChange={setView}
         onPrevPeriod={() => setAnchorDate((d) => shiftAnchorDate(view, d, -1))}
         onNextPeriod={() => setAnchorDate((d) => shiftAnchorDate(view, d, 1))}
-        onAddContent={() => {
-          // TODO: support permissions for who can add/edit content.
-        }}
+        onAddContent={handleAddContent}
       />
 
       {showFilters && (
@@ -158,7 +215,13 @@ export default function ContentTimelineBlock({
         </div>
 
         {enableDetailPanel && selectedItem && (
-          <ContentTimelineDetailPanel item={selectedItem} onClose={() => setSelectedId(null)} />
+          <ContentTimelineDetailPanel
+            item={selectedItem}
+            onClose={() => setSelectedId(null)}
+            onOpenRecord={
+              selectedItem.recordTableId ? () => handleOpenRecord(selectedItem.id) : undefined
+            }
+          />
         )}
       </div>
 

@@ -110,6 +110,9 @@ export interface ThingsToDoItem {
   channel?: string
   checklist?: ThingsToDoChecklistItem[]
   commentsCount?: number
+  /** Content table row — open in RecordModal */
+  recordTableId?: string
+  recordSupabaseTable?: string
 }
 
 export interface ThingsToDoFilters {

@@ -25,7 +25,7 @@ export default function PageActionsRegistrar({
   const { registerPageActions, unregisterPageActions } = usePageActions()
   const { isEditing: isPageEditing, exit: exitPageEdit } = usePageEditMode(pageId)
   const { isEditing: isBlockEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(pageId)
-  const { enterEditPages, exitEditPages } = useUIMode()
+  const { enterEditPages, exitEditPages, isEdit: isUiEdit } = useUIMode()
   const { setSelectedContext } = useSelectionContext()
 
   const onOpenPageSettings = useCallback(() => {
@@ -55,13 +55,13 @@ export default function PageActionsRegistrar({
       onOpenPageSettings,
       onEnterEdit,
       onExitEdit,
-      isEditing: isPageEditing || isBlockEditing,
+      isEditing: isPageEditing || isBlockEditing || isUiEdit(pageId),
     })
 
     return () => {
       unregisterPageActions()
     }
-  }, [pageId, isAdmin, isViewer, isPageEditing, isBlockEditing, onOpenPageSettings, onEnterEdit, onExitEdit, registerPageActions, unregisterPageActions])
+  }, [pageId, isAdmin, isViewer, isPageEditing, isBlockEditing, isUiEdit, onOpenPageSettings, onEnterEdit, onExitEdit, registerPageActions, unregisterPageActions])
 
   return null
 }

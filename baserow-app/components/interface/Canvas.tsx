@@ -2390,32 +2390,47 @@ export default function Canvas({
               layoutItem: layout.find(l => l.i === block.id),
             })
 
+            const selectThisBlock = (e: { target: EventTarget | null; metaKey: boolean; ctrlKey: boolean; shiftKey: boolean }) => {
+              if (!isEditing) return
+              const target = e.target as HTMLElement
+              if (!shouldSelectBlockInEditMode(target)) return
+              if (onBlockSelect) {
+                const addToSelection = e.metaKey || e.ctrlKey || e.shiftKey
+                onBlockSelect(block.id, addToSelection)
+              } else {
+                onBlockClick?.(block.id)
+              }
+            }
+
             return (
               <div
                 key={block.id}
-                className={builderBlockFrameClassName({
-                  isEditing,
-                  isSelected: selectedBlockId === block.id,
-                  isSnapHighlighted: Boolean(
-                    activeSnapTargets?.highlightedBlocks?.includes(block.id)
-                  ),
-                  isKeyboardHighlighted: keyboardMoveHighlight === block.id,
-                })}
-                onClickCapture={(e) => {
+                className={cn(
+                  builderBlockFrameClassName({
+                    isEditing,
+                    isSelected: selectedBlockId === block.id,
+                    isSnapHighlighted: Boolean(
+                      activeSnapTargets?.highlightedBlocks?.includes(block.id)
+                    ),
+                    isKeyboardHighlighted: keyboardMoveHighlight === block.id,
+                  }),
+                  "h-full w-full min-h-0 flex flex-col"
+                )}
+                onMouseDownCapture={(e) => {
+                  // Capture runs before child stopPropagation — required for marketing blocks (buttons, rows, timeline bars)
+                  selectThisBlock(e)
+                }}
+                onClick={(e) => {
                   if (!isEditing) return
-                  const target = e.target as HTMLElement
-                  if (!shouldSelectBlockInEditMode(target)) return
+                  // Bubble: prevent empty-canvas handler from switching to page settings
                   e.stopPropagation()
-                  if (onBlockSelect) {
-                    const addToSelection = e.metaKey || e.ctrlKey || e.shiftKey
-                    onBlockSelect(block.id, addToSelection)
-                  } else {
-                    onBlockClick?.(block.id)
-                  }
                 }}
               >
             {/* Edit Mode Controls - Always mount for stability; visibility toggled by isEditing */}
-            <div className={isEditing ? "" : "invisible pointer-events-none"}>
+            <div
+              data-block-chrome
+              className={isEditing ? "" : "invisible pointer-events-none"}
+            >
                 {/* Drag Handle - Hidden for full-page (no drag); visible for grid blocks */}
                 {!isFullPageMode && (
                 <div

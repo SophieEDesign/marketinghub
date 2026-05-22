@@ -176,6 +176,7 @@ async function validatePageAccess(pageId: string, userIsAdmin: boolean): Promise
     .from('interface_pages')
     .select('id, is_admin_only')
     .eq('id', pageId)
+    .eq('is_archived', false)
     .maybeSingle()
   
   if (isDev) {
@@ -268,6 +269,7 @@ async function getAccessibleInterfacePages(): Promise<Interface[]> {
   let pagesQuery = supabase
     .from('interface_pages')
     .select('id, name, group_id, created_at, updated_at, is_admin_only')
+    .eq('is_archived', false)
     .order('order_index', { ascending: true })
     .order('created_at', { ascending: false })
   
@@ -475,6 +477,7 @@ export async function resolveLandingPage(): Promise<{ pageId: string | null; rea
     const { data: anyPages } = await supabase
       .from('interface_pages')
       .select('id')
+      .eq('is_archived', false)
       .order('order_index', { ascending: true })
       .order('created_at', { ascending: true })
       .limit(1)

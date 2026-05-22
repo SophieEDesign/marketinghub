@@ -26,7 +26,7 @@ export default function ContentTimelineDataSettings({
     <div className="space-y-4">
       <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
         <p className="text-sm text-blue-800">
-          Timeline data uses mock items until connected to the Content table.
+          Timeline loads from the Content table (rows with dates). Enable mock in block config only for demos.
         </p>
       </div>
 

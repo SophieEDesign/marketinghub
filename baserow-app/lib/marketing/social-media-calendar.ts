@@ -169,7 +169,8 @@ export function resolveSocialCalendarFields(
     campaignContent: pickFieldName(campaignFields, [/^content$/i, /content_link/i], null),
     campaignTheme: pickFieldName(campaignFields, [/quarterly_theme/i, /^theme$/i], null),
     themeName:
-      pickFieldName(themeFields, [/^name$/i, /theme_name/i, /^title$/i], null) || "name",
+      pickFieldName(themeFields, [/^name$/i, /^theme$/i, /theme_name/i, /^title$/i], null) ||
+      "theme",
     themeQuarter: pickFieldName(themeFields, [/^quarter$/i, /fiscal_quarter/i], null),
     themeYear: pickFieldName(themeFields, [/^year$/i, /fiscal_year/i], null),
     themeColor: pickFieldName(themeFields, [/theme_colou?r/i, /^colou?r$/i, /accent/i], null),

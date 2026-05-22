@@ -22,6 +22,7 @@ import { ContentTimelineStatusBadge } from "./ContentTimelineStatusBadge"
 interface ContentTimelineDetailPanelProps {
   item: ContentTimelineItem
   onClose: () => void
+  onOpenRecord?: () => void
 }
 
 function MetaRow({ label, children }: { label: string; children: ReactNode }) {
@@ -33,16 +34,20 @@ function MetaRow({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-export function ContentTimelineDetailPanel({ item, onClose }: ContentTimelineDetailPanelProps) {
+export function ContentTimelineDetailPanel({
+  item,
+  onClose,
+  onOpenRecord,
+}: ContentTimelineDetailPanelProps) {
   const theme = getThemeStyles(item.theme)
   const endDate = item.endDate ?? item.publishDate
 
   const handleOpenRecord = () => {
-    // TODO: support opening the existing RecordEditor / RecordModal.
+    onOpenRecord?.()
   }
 
   const handleEdit = () => {
-    // TODO: support opening the existing RecordEditor / RecordModal.
+    onOpenRecord?.()
   }
 
   const handleDuplicate = () => {
@@ -111,7 +116,13 @@ export function ContentTimelineDetailPanel({ item, onClose }: ContentTimelineDet
       </div>
 
       <div className="shrink-0 space-y-2 border-t border-border/40 p-4">
-        <Button type="button" className="w-full gap-2" size="sm" onClick={handleOpenRecord}>
+        <Button
+          type="button"
+          className="w-full gap-2"
+          size="sm"
+          onClick={handleOpenRecord}
+          disabled={!onOpenRecord}
+        >
           <ExternalLink className="h-4 w-4" />
           Open record
         </Button>

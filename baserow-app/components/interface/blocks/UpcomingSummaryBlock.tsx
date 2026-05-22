@@ -555,6 +555,7 @@ export default function UpcomingSummaryBlock({
 
   return (
     <div
+      data-block-selectable
       className={cn(
         "h-full min-h-0 overflow-auto rounded-2xl border border-[#E6E6EF] bg-white shadow-sm",
         isEditing && "pointer-events-auto"

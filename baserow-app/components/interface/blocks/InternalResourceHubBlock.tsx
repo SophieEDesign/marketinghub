@@ -9,6 +9,8 @@
 
 import { useCallback, useMemo, useState } from "react"
 import type { PageBlock } from "@/lib/interface/types"
+import { useResourceHubData } from "@/hooks/useResourceHubData"
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 import HubHeader from "./internal-resource-hub/HubHeader"
 import CategorySidebar from "./internal-resource-hub/CategorySidebar"
 import CategoryPills from "./internal-resource-hub/CategoryPills"
@@ -55,7 +57,8 @@ export default function InternalResourceHubBlock({
     config.resource_hub_show_upload !== false && isEditing
   const layoutMode = config.resource_hub_layout_mode || "gallery"
   const isListLayout = layoutMode === "list"
-  const useDashboardMock = config.resource_hub_use_dashboard_mock === true
+  const preferMock = config.resource_hub_use_dashboard_mock === true
+  const { loading, error, fromLiveData, resources: liveResources } = useResourceHubData()
 
   const [category, setCategory] = useState<CategoryFilter>(() =>
     parseDefaultCategory(config.resource_hub_default_category)
@@ -64,7 +67,14 @@ export default function InternalResourceHubBlock({
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [favourites, setFavourites] = useState<Set<string>>(() => new Set())
 
-  const resources = useDashboardMock ? MARKETING_HOME_MOCK_RESOURCES : MOCK_RESOURCES
+  const useLive = !preferMock && fromLiveData && liveResources.length > 0
+  const resources = useLive
+    ? liveResources
+    : preferMock
+      ? MARKETING_HOME_MOCK_RESOURCES
+      : liveResources.length > 0
+        ? liveResources
+        : MOCK_RESOURCES
   const counts = useMemo(() => countByCategory(resources), [resources])
   const filtered = useMemo(
     () => filterResources(resources, category, searchQuery),
@@ -104,9 +114,34 @@ export default function InternalResourceHubBlock({
     config.resource_hub_internal_notice ||
     "For internal use only. Please follow brand guidelines in all communications."
 
+  const openResourceUrl = useCallback(
+    (id: string) => {
+      const r = resources.find((x) => x.id === id)
+      if (r?.url) window.open(r.url, "_blank", "noopener,noreferrer")
+      else mockAction(`Open resource: ${id}`)
+    },
+    [resources]
+  )
+
+  if (loading && !useLive && !preferMock) {
+    return (
+      <div className="flex h-full min-h-[200px] items-center justify-center rounded-xl border border-border/40 bg-background">
+        <LoadingSpinner size="lg" text="Loading resources…" />
+      </div>
+    )
+  }
+
   if (isListLayout) {
     return (
-      <div className="flex h-full min-h-[320px] w-full min-w-0 flex-col overflow-hidden rounded-xl border border-[#E6E6EF] bg-white shadow-sm">
+      <div
+        data-block-selectable
+        className="flex h-full min-h-[320px] w-full min-w-0 flex-col overflow-hidden rounded-xl border border-[#E6E6EF] bg-white shadow-sm"
+      >
+        {error && !useLive ? (
+          <p className="shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">
+            Showing sample resources ({error})
+          </p>
+        ) : null}
         <ResourceListHeader
           title={title}
           subtitle={subtitle}
@@ -114,7 +149,7 @@ export default function InternalResourceHubBlock({
         />
         <ResourceList
           resources={resources}
-          onSelect={(id) => mockAction(`Open resource: ${id}`)}
+          onSelect={openResourceUrl}
           onAddResource={() => mockAction("Add resource")}
         />
       </div>
@@ -122,7 +157,15 @@ export default function InternalResourceHubBlock({
   }
 
   return (
-    <div className="flex h-full min-h-[400px] w-full min-w-0 flex-col overflow-hidden rounded-card-lg border border-border/60 bg-background shadow-card">
+    <div
+      data-block-selectable
+      className="flex h-full min-h-[400px] w-full min-w-0 flex-col overflow-hidden rounded-card-lg border border-border/60 bg-background shadow-card"
+    >
+      {error && !useLive ? (
+        <p className="shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">
+          Showing sample resources ({error})
+        </p>
+      ) : null}
       <HubHeader
         title={title}
         subtitle={subtitle}
@@ -175,8 +218,11 @@ export default function InternalResourceHubBlock({
           isFavourite={selectedId ? favourites.has(selectedId) : false}
           isEditing={isEditing}
           onToggleFavourite={toggleFavourite}
-          onDownload={() => mockAction(`Download: ${selected?.title}`)}
-          onViewFull={() => mockAction(`View full: ${selected?.title}`)}
+          onDownload={() => {
+            if (selected?.url) window.open(selected.url, "_blank", "noopener,noreferrer")
+            else mockAction(`Download: ${selected?.title}`)
+          }}
+          onViewFull={() => openResourceUrl(selectedId!)}
           onCopyLink={() => mockAction(`Copy link: ${selected?.title}`)}
           className={showPreview ? undefined : "hidden md:flex"}
         />

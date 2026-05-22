@@ -14,7 +14,10 @@ import WorkspaceShell from "./WorkspaceShell"
 import DynamicFavicon from "./DynamicFavicon"
 import type { View } from "@/types/database"
 import type { Automation } from "@/types/database"
-import { containsBigInt, sanitizeForClient } from "@/lib/serialization/sanitize-for-client"
+import {
+  assertJsonSerializable,
+  prepareForRscPayload,
+} from "@/lib/serialization/sanitize-for-client"
 import { cache } from "react"
 
 interface WorkspaceShellWrapperProps {
@@ -193,7 +196,7 @@ export default async function WorkspaceShellWrapper({
     let newPagesQuery = supabase
       .from('interface_pages')
       .select('id, name, page_type, group_id, order_index, created_at, updated_at, created_by, is_admin_only, is_hidden')
-      .is('is_archived', false)
+      .or('is_archived.is.null,is_archived.eq.false')
       .order('order_index', { ascending: true })
       .order('created_at', { ascending: false })
     
@@ -364,30 +367,14 @@ export default async function WorkspaceShellWrapper({
       : null
 
 
-  const shellPayloadHasBigInt = containsBigInt({
-    tables,
-    viewsByTable,
-    interfacePages,
-    interfaceGroups,
-    dashboards,
-  })
+  const safeTables = prepareForRscPayload(tables)
+  const safeViewsByTable = prepareForRscPayload(viewsByTable)
+  const safeInterfacePages = prepareForRscPayload(interfacePages)
+  const safeInterfaceGroups = prepareForRscPayload(interfaceGroups)
+  const safeDashboards = prepareForRscPayload(dashboards)
 
-  let safeTables = tables
-  let safeViewsByTable = viewsByTable
-  let safeInterfacePages = interfacePages
-  let safeInterfaceGroups = interfaceGroups
-  let safeDashboards = dashboards
-
-  if (shellPayloadHasBigInt) {
-    safeTables = sanitizeForClient(tables)
-    safeViewsByTable = sanitizeForClient(viewsByTable)
-    safeInterfacePages = sanitizeForClient(interfacePages)
-    safeInterfaceGroups = sanitizeForClient(interfaceGroups)
-    safeDashboards = sanitizeForClient(dashboards)
-  }
-
-  try {
-    JSON.stringify({
+  assertJsonSerializable(
+    {
       title: title ?? null,
       tables: safeTables,
       views: safeViewsByTable,
@@ -399,10 +386,9 @@ export default async function WorkspaceShellWrapper({
       hideRecordPanel,
       defaultPageId,
       landingPageTitle,
-    })
-  } catch (serializeError) {
-    throw serializeError
-  }
+    },
+    "WorkspaceShellWrapper"
+  )
 
     return (
       <BrandingProvider settings={brandingSettings}>
@@ -433,6 +419,7 @@ export default async function WorkspaceShellWrapper({
       </BrandingProvider>
     )
   } catch (error) {
+    console.error("[WorkspaceShellWrapper] Render failed:", error)
     throw error
   }
 }

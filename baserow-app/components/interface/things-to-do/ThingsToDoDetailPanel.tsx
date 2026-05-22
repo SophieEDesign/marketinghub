@@ -38,6 +38,7 @@ interface ThingsToDoDetailPanelProps {
   checklist: ThingsToDoChecklistItem[]
   onClose: () => void
   onChecklistToggle: (checklistId: string, completed: boolean) => void
+  onOpenRecord?: () => void
 }
 
 function MetaRow({ label, children }: { label: string; children: ReactNode }) {
@@ -54,13 +55,13 @@ export function ThingsToDoDetailPanel({
   checklist,
   onClose,
   onChecklistToggle,
+  onOpenRecord,
 }: ThingsToDoDetailPanelProps) {
   const group = assignRowGroup(item)
   const isOverdue = group === "overdue"
 
   const handleOpenRecord = () => {
-    // TODO: open existing RecordModal / RecordEditor for linked records.
-    debugLog(`[ThingsToDo] Open record: ${item.id}`)
+    onOpenRecord?.()
   }
 
   const handleMarkApproved = () => {

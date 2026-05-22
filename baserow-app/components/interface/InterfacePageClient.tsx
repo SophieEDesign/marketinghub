@@ -169,7 +169,7 @@ function InterfacePageClientInternal({
   const { isEditing: isBlockEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(pageId)
   const { blocksDirty } = useEditMode()
   const { enterEditPages, exitEditPages, isEdit } = useUIMode()
-  const isEditMode = isEdit()
+  const isEditMode = isEdit(pageId)
   const { selectedContext, setSelectedContext } = useSelectionContext()
   const { setData: setRightPanelData } = useRightSettingsPanelData()
   const { state: recordPanelState } = useRecordPanel()
@@ -241,8 +241,8 @@ function InterfacePageClientInternal({
   const savedViewUpdatedAtRef = useRef<string | null>(null)
   const viewCheckIntervalRef = useRef<NodeJS.Timeout | null>(null)
   
-  // Determine if we're in edit mode (page or block editing)
-  const isEditing = isPageEditing || isBlockEditing
+  // Determine if we're in edit mode (page, block, or UIMode editPages for this page)
+  const isEditing = isPageEditing || isBlockEditing || isEditMode
 
   // Auto-open Right Settings Panel with Page Settings when entering Edit Mode
   const prevIsEditingRef = useRef(isEditing)
@@ -304,7 +304,7 @@ function InterfacePageClientInternal({
       }
       setPage(null)
       setBlocks([])
-      setLoading(false)
+      setLoading(true)
       pageLoadedRef.current = false
       initialPageRef.current = null // so loadPage() runs for the new page
       blocksLoadedRef.current = { pageId: null, loaded: false }
@@ -553,7 +553,7 @@ function InterfacePageClientInternal({
     const abortController = new AbortController()
     const signal = abortController.signal
 
-    const needsPage = !initialPageRef.current && !pageLoadedRef.current && !loading
+    const needsPage = !initialPageRef.current && !pageLoadedRef.current
     Promise.all([
       needsPage ? loadPageRef.current() : Promise.resolve(),
       loadBlocksRef.current(false, signal),
@@ -562,7 +562,7 @@ function InterfacePageClientInternal({
     return () => {
       abortController.abort()
     }
-  }, [pageId, loading])
+  }, [pageId])
 
   // CRITICAL: Mode changes must NEVER trigger block reloads
   // Edit mode is a capability flag only - it controls drag/resize/settings, not block state
@@ -571,8 +571,8 @@ function InterfacePageClientInternal({
 
   async function loadPage() {
     // CRITICAL: Only load if not already loaded (prevent overwriting initial data)
-    if (pageLoadedRef.current || loading) return
-    
+    if (pageLoadedRef.current) return
+
     setLoading(true)
     try {
       const res = await fetch(`/api/interface-pages/${pageId}`)

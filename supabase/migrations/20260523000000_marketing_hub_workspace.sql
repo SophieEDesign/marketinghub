@@ -286,7 +286,7 @@ BEGIN
   PERFORM public.marketing_hub_upsert_block(v_page, 'home_todo', 'things_to_do', 8, 5, 4, 4,
     '{"title":"Things To Do","things_to_do_subtitle":"Content actions that need attention.","things_to_do_compact_mode":true,"things_to_do_max_items":5,"things_to_do_show_stats":true,"things_to_do_show_filters":false,"appearance":{"showTitle":true}}'::jsonb, 3);
   PERFORM public.marketing_hub_upsert_block(v_page, 'home_resources', 'internal_resource_hub', 8, 9, 4, 4,
-    '{"title":"Latest Resources","resource_hub_subtitle":"Logos, documents, templates and internal assets.","resource_hub_layout_mode":"list","resource_hub_use_dashboard_mock":true}'::jsonb, 4);
+    '{"title":"Latest Resources","resource_hub_subtitle":"Logos, documents, templates and internal assets.","resource_hub_layout_mode":"list","resource_hub_use_dashboard_mock":false}'::jsonb, 4);
   PERFORM public.marketing_hub_upsert_block(v_page, 'home_timeline', 'content_timeline', 0, 13, 8, 8,
     '{"title":"Content Timeline","content_timeline_preset":"marketing_home","content_timeline_default_view":"month","content_timeline_group_by":"theme","content_timeline_show_filters":true,"content_timeline_enable_detail_panel":true}'::jsonb, 5);
   PERFORM public.marketing_hub_upsert_block(v_page, 'home_events', 'event_calendar', 8, 13, 4, 8,
@@ -340,7 +340,7 @@ BEGIN
   PERFORM public.marketing_hub_upsert_block(v_page, 'resources_intro', 'html', 0, 0, 12, 2,
     '{"title":"Resource Hub intro","html":"<div class=\"px-1 py-2\"><h1 class=\"text-2xl font-bold tracking-tight text-[#111827] md:text-3xl\">Resource Hub</h1><p class=\"mt-1 text-sm text-[#6B7280]\">Find logos, documents, media, templates and internal assets.</p></div>"}'::jsonb, 0);
   PERFORM public.marketing_hub_upsert_block(v_page, 'resources_hub', 'internal_resource_hub', 0, 2, 12, 8,
-    '{"title":"Internal Resource Hub","resource_hub_layout_mode":"list","resource_hub_use_dashboard_mock":true,"resource_hub_show_search":true,"resource_hub_show_recent":true}'::jsonb, 1);
+    '{"title":"Internal Resource Hub","resource_hub_layout_mode":"list","resource_hub_use_dashboard_mock":false,"resource_hub_show_search":true,"resource_hub_show_recent":true}'::jsonb, 1);
   PERFORM public.marketing_hub_upsert_block(v_page, 'resources_actions', 'things_to_do', 0, 10, 4, 6,
     '{"title":"Resource Actions","things_to_do_compact_mode":true,"things_to_do_max_items":5,"things_to_do_show_stats":true}'::jsonb, 2);
   PERFORM public.marketing_hub_archive_orphan_blocks(v_page, v_keys);
@@ -366,7 +366,7 @@ BEGIN
   PERFORM public.marketing_hub_upsert_block(v_page, 'events_calendar', 'event_calendar', 0, 2, 12, 10,
     '{"title":"Event Calendar","event_calendar_default_view":"month","event_calendar_show_toolbar":true,"event_calendar_show_metrics":true,"event_calendar_show_filters":true,"event_calendar_show_attendance_controls":true,"event_calendar_show_schedule":true,"event_calendar_show_resources":true}'::jsonb, 1);
   PERFORM public.marketing_hub_upsert_block(v_page, 'events_resources', 'internal_resource_hub', 0, 12, 6, 6,
-    '{"title":"Event Resources","resource_hub_layout_mode":"list","resource_hub_use_dashboard_mock":true}'::jsonb, 2);
+    '{"title":"Event Resources","resource_hub_layout_mode":"list","resource_hub_use_dashboard_mock":false}'::jsonb, 2);
   PERFORM public.marketing_hub_upsert_block(v_page, 'events_actions', 'things_to_do', 6, 12, 6, 6,
     '{"title":"Event Actions","things_to_do_compact_mode":true,"things_to_do_max_items":5,"things_to_do_show_stats":true}'::jsonb, 3);
   PERFORM public.marketing_hub_archive_orphan_blocks(v_page, v_keys);

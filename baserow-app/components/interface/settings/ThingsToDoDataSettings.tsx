@@ -25,8 +25,7 @@ export default function ThingsToDoDataSettings({
     <div className="space-y-4">
       <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
         <p className="text-sm text-blue-800">
-          Work queue data uses mock items until connected to tasks and linked Marketing Hub
-          tables.
+          Work queue loads actionable rows from the Content table (tasks, reviews, due dates). Falls back to samples if loading fails.
         </p>
       </div>
 
