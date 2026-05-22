@@ -1,7 +1,11 @@
 "use client"
 
-import type { ThingsToDoRowGroupSection, ThingsToDoItem } from "@/lib/marketing/things-to-do"
-import { getRowGroupClasses } from "@/lib/marketing/things-to-do"
+import type {
+  ThingsToDoRowGroup,
+  ThingsToDoRowGroupSection,
+  ThingsToDoItem,
+} from "@/lib/marketing/things-to-do"
+import { getRowGroupClasses, isThingsToDoRowGroup } from "@/lib/marketing/things-to-do"
 import { cn } from "@/lib/utils"
 import { ThingsToDoRow } from "./ThingsToDoRow"
 
@@ -33,9 +37,14 @@ export function ThingsToDoGroupedList({
   return (
     <div className="flex-1 overflow-y-auto">
       {sections.map((section) => {
-        const { dot, section: sectionBg } = getRowGroupClasses(section.key)
+        const { dot, section: sectionBg } = isThingsToDoRowGroup(String(section.key))
+          ? getRowGroupClasses(section.key as ThingsToDoRowGroup)
+          : {
+              dot: "bg-muted-foreground/60",
+              section: "bg-muted/40",
+            }
         return (
-          <section key={section.key} className="mb-1">
+          <section key={String(section.key)} className="mb-1">
             <div
               className={cn(
                 "sticky top-0 z-[1] flex items-center gap-2 px-4 py-2 text-xs font-semibold text-foreground",

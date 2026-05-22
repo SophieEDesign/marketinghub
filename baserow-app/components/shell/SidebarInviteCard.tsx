@@ -1,5 +1,7 @@
 "use client"
 
+// TODO: wire team invite flow (settings/members) when ready; hidden from sidebar until then.
+
 import { ChevronRight, UserPlus } from "lucide-react"
 import { cn } from "@/lib/utils"
 

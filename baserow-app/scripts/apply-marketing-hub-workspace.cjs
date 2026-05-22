@@ -12,10 +12,9 @@ const fs = require("fs")
 const path = require("path")
 const { createClient } = require("@supabase/supabase-js")
 
-function loadEnvLocal() {
-  const envPath = path.join(__dirname, "..", ".env.local")
-  if (!fs.existsSync(envPath)) return
-  const text = fs.readFileSync(envPath, "utf8")
+function parseEnvFile(filePath) {
+  if (!fs.existsSync(filePath)) return
+  const text = fs.readFileSync(filePath, "utf8")
   for (const line of text.split("\n")) {
     const trimmed = line.trim()
     if (!trimmed || trimmed.startsWith("#")) continue
@@ -30,12 +29,30 @@ function loadEnvLocal() {
   }
 }
 
+function loadEnvLocal() {
+  const candidates = [
+    path.join(__dirname, "..", ".env.local"),
+    path.join(__dirname, "..", ".env"),
+    path.join(__dirname, "..", "..", ".env.local"),
+    path.join(__dirname, "..", "..", ".env"),
+  ]
+  for (const envPath of candidates) {
+    parseEnvFile(envPath)
+  }
+}
+
 loadEnvLocal()
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 if (!supabaseUrl || !supabaseServiceKey) {
   console.error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY")
+  console.error("")
+  console.error("Create baserow-app/.env.local from .env.example, then run:")
+  console.error("  npm run apply:marketing-hub")
+  console.error("")
+  console.error("Or apply via Supabase CLI:")
+  console.error("  supabase db push   (includes migration 20260523000000_marketing_hub_workspace.sql)")
   process.exit(1)
 }
 

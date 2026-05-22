@@ -9,8 +9,9 @@ import {
   EMPTY_THINGS_TO_DO_FILTERS,
   filterThingsToDoItems,
   getThingsToDoMockItems,
-  groupItemsByDueSection,
+  groupThingsToDoItems,
   sortThingsToDoItems,
+  type ThingsToDoGrouping,
   type ThingsToDoChecklistItem,
   type ThingsToDoDateRange,
   type ThingsToDoFilters,
@@ -52,6 +53,8 @@ export default function ThingsToDoBlock({
   const compact = config?.things_to_do_compact_mode === true
   const maxItems = config?.things_to_do_max_items
   const dateRange = (config?.things_to_do_date_range || "next_30_days") as ThingsToDoDateRange
+  const defaultGrouping = (config?.things_to_do_default_grouping ||
+    "due-date") as ThingsToDoGrouping
 
   const mockItems = getThingsToDoMockItems()
 
@@ -71,15 +74,28 @@ export default function ThingsToDoBlock({
 
   const filtered = useMemo(() => {
     let items = filterThingsToDoItems(mockItems, filters, searchQuery, dateRange, statusChip)
-    items = sortThingsToDoItems(items, sortBy)
-    if (maxItems != null && maxItems > 0) {
-      items = items.slice(0, maxItems)
-    }
-    return items
-  }, [mockItems, filters, searchQuery, dateRange, statusChip, sortBy, maxItems])
+    return sortThingsToDoItems(items, sortBy)
+  }, [mockItems, filters, searchQuery, dateRange, statusChip, sortBy])
 
   const stats = useMemo(() => computeThingsToDoStats(filtered), [filtered])
-  const sections = useMemo(() => groupItemsByDueSection(filtered), [filtered])
+
+  const sections = useMemo(() => {
+    let grouped = groupThingsToDoItems(filtered, defaultGrouping)
+    if (maxItems != null && maxItems > 0) {
+      let remaining = maxItems
+      grouped = grouped
+        .map((section) => {
+          if (remaining <= 0) {
+            return { ...section, items: [], count: 0 }
+          }
+          const items = section.items.slice(0, remaining)
+          remaining -= items.length
+          return { ...section, items, count: items.length }
+        })
+        .filter((s) => s.items.length > 0)
+    }
+    return grouped
+  }, [filtered, defaultGrouping, maxItems])
 
   const selectedItem = useMemo(
     () => mockItems.find((i) => i.id === selectedId) ?? null,

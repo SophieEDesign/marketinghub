@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
+import { debugLog } from "@/lib/debug"
 import {
   ThingsToDoPriorityBadge,
   ThingsToDoStatusBadge,
@@ -49,6 +50,7 @@ export function ThingsToDoRow({
     <div
       role="button"
       tabIndex={0}
+      aria-label={`View task: ${item.title}`}
       onClick={onSelect}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -136,12 +138,12 @@ export function ThingsToDoRow({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem
-              onClick={() => console.info(`[ThingsToDo] Open: ${item.title}`)}
+              onClick={() => debugLog(`[ThingsToDo] Open: ${item.title}`)}
             >
               Open record
             </DropdownMenuItem>
             <DropdownMenuItem
-              onClick={() => console.info(`[ThingsToDo] Copy link: ${item.id}`)}
+              onClick={() => debugLog(`[ThingsToDo] Copy link: ${item.id}`)}
             >
               Copy link
             </DropdownMenuItem>

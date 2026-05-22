@@ -50,7 +50,7 @@ export function ContentTimelineGrid({
     <div className="min-h-0 min-w-0 overflow-auto">
       <div
         className="relative"
-        style={{ minWidth: GROUP_COL_WIDTH + MIN_TIMELINE_WIDTH }}
+        style={{ minWidth: `min(100%, ${GROUP_COL_WIDTH + MIN_TIMELINE_WIDTH}px)` }}
       >
         {/* Sticky header */}
         <div className="sticky top-0 z-20 flex border-b border-border/50 bg-background/95 backdrop-blur-sm">

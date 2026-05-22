@@ -930,7 +930,7 @@ export default function GroupedInterfaces({
 
     const className = cn(
       sidebarNavItemClassName(isActive),
-      level > 0 && "pl-8"
+      level > 0 && "pl-6"
     )
 
     return (
@@ -1040,11 +1040,10 @@ export default function GroupedInterfaces({
           ) : (
             <a
               href={`/pages/${targetPageId}`}
-              className="flex-1 flex items-center gap-2 px-2 py-1.5 rounded transition-colors hover:bg-black/10 min-w-0"
-              style={isActive ? { 
-                backgroundColor: primaryColor + '15', 
-                color: primaryColor 
-              } : { color: sidebarTextColor }}
+              className={cn(
+                "flex-1 flex items-center gap-2 min-w-0 rounded-lg px-2 py-1.5 transition-colors",
+                sidebarNavItemClassName(isActive)
+              )}
               onClick={(e) => {
                 if (editMode && isDraggingRef.current && activeId) {
                   e.preventDefault()
@@ -1058,7 +1057,12 @@ export default function GroupedInterfaces({
                 // Let default <a> navigation run for non-active - full page load
               }}
             >
-              <Layers className="h-4 w-4 flex-shrink-0" style={{ color: isActive ? primaryColor : sidebarTextColor }} />
+              <Layers
+                className={cn(
+                  "h-4 w-4 flex-shrink-0",
+                  isActive ? "text-foreground" : "text-muted-foreground"
+                )}
+              />
               <span className={cn("text-sm truncate min-w-0 flex-1", isHidden && "italic text-muted-foreground")}>
                 {page.name}
                 {isHidden ? " (Hidden)" : ""}
@@ -1103,13 +1107,20 @@ export default function GroupedInterfaces({
     "uncategorized",
   ]
 
+  const browseShowFlatPages =
+    sortedGroups.length === 1 &&
+    Boolean(sortedGroups[0]?.is_system) &&
+    (sortedGroups[0].name === "Ungrouped" ||
+      sortedGroups[0].id === "ungrouped-system-virtual" ||
+      sortedGroups[0].id === ungroupedGroupId)
+
   // Render based on mode
   if (!editMode) {
     // Browse mode - clean navigation UI
-    // If no groups exist but pages do, show pages directly
-    if (sortedGroups.length === 0 && pagesForDisplay.length > 0) {
+    // Flat list when there are no sections, or only the system ungrouped bucket
+    if ((sortedGroups.length === 0 || browseShowFlatPages) && pagesForDisplay.length > 0) {
       return (
-        <div className="space-y-0.5 px-1">
+        <div className="flex flex-col gap-0.5 px-1">
           {pagesForDisplay.map((page) => (
             <NavigationPage key={page.id} page={page} level={0} />
           ))}
@@ -1118,13 +1129,13 @@ export default function GroupedInterfaces({
     }
     
     return (
-      <div className="space-y-0.5 px-1">
+      <div className="flex flex-col gap-0.5 px-1">
         {sortedGroups.map((group) => {
           const isCollapsed = collapsedGroups.has(group.id)
           const groupPages = pagesByGroup[group.id] || []
           
           return (
-            <div key={group.id} className="py-0.5">
+            <div key={group.id}>
               <button
                 onClick={(e) => {
                   e.preventDefault()
@@ -1132,29 +1143,28 @@ export default function GroupedInterfaces({
                   toggleGroup(group.id)
                 }}
                 className={cn(
-                  "w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors",
-                  "hover:bg-black/[0.06]"
+                  "w-full flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors",
+                  "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                 )}
-                style={{ color: sidebarTextColor }}
               >
                 {group.icon ? (
-                  <span style={{ color: sidebarTextColor }}>
+                  <span className="text-muted-foreground">
                     {renderIconByName(group.icon, "h-4 w-4")}
                   </span>
                 ) : (
-                  <Folder className="h-4 w-4 flex-shrink-0" style={{ color: sidebarTextColor }} />
+                  <Folder className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
                 )}
-                <span className="flex-1 text-left truncate text-sm font-semibold">
+                <span className="flex-1 text-left truncate text-sm font-semibold text-foreground">
                   {browseGroupLabel(group)}
                 </span>
                 {isCollapsed ? (
-                  <ChevronRight className="h-4 w-4 flex-shrink-0 opacity-70" style={{ color: sidebarTextColor }} />
+                  <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
                 ) : (
-                  <ChevronDown className="h-4 w-4 flex-shrink-0 opacity-70" style={{ color: sidebarTextColor }} />
+                  <ChevronDown className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
                 )}
               </button>
               {!isCollapsed && (
-                <div className="mt-0.5 space-y-0.5">
+                <div className="flex flex-col gap-0.5">
                   {groupPages.map((page) => (
                     <NavigationPage key={page.id} page={page} level={1} />
                   ))}

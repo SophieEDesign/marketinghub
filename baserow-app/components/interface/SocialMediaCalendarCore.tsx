@@ -250,13 +250,11 @@ export function SocialMediaCalendarCore({
 
   if (error) {
     return (
-      <div
-        className={cn(
-          "rounded-card-lg border border-destructive/30 bg-destructive/5 px-4 py-6 text-sm text-destructive",
-          className
-        )}
-      >
-        {error}
+      <div className={cn("flex flex-col items-center gap-4 py-12 text-center", className)}>
+        <DashboardEmpty title="Could not load social calendar" description={error} variant="default" />
+        <Button type="button" variant="outline" size="sm" onClick={() => reload()}>
+          Retry
+        </Button>
       </div>
     )
   }

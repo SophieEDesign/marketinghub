@@ -3,11 +3,14 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 
+/** Nav link styles for the white Marketing Hub sidebar (readable in light + dark app theme). */
 export const sidebarNavItemClassName = (active: boolean) =>
   cn(
-    "relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150",
-    "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-    active && "bg-hub-nav-active text-hub-primary hover:bg-hub-nav-active hover:text-hub-primary"
+    "relative flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors duration-150",
+    !active &&
+      "text-muted-foreground hover:bg-muted/50 hover:text-foreground dark:!text-muted-foreground dark:hover:!text-foreground",
+    active &&
+      "bg-blue-50 text-foreground font-medium hover:bg-blue-50 hover:text-foreground dark:!bg-blue-50 dark:!text-foreground dark:hover:!bg-blue-50 dark:hover:!text-foreground"
   )
 
 interface SidebarNavItemProps {

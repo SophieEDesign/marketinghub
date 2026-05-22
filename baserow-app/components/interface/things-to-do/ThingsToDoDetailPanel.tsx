@@ -26,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
+import { debugLog } from "@/lib/debug"
 import {
   ThingsToDoPriorityBadge,
   ThingsToDoStatusBadge,
@@ -59,23 +60,23 @@ export function ThingsToDoDetailPanel({
 
   const handleOpenRecord = () => {
     // TODO: open existing RecordModal / RecordEditor for linked records.
-    console.info(`[ThingsToDo] Open record: ${item.id}`)
+    debugLog(`[ThingsToDo] Open record: ${item.id}`)
   }
 
   const handleMarkApproved = () => {
-    console.info(`[ThingsToDo] Mark approved: ${item.id}`)
+    debugLog(`[ThingsToDo] Mark approved: ${item.id}`)
   }
 
   const handleMarkDone = () => {
-    console.info(`[ThingsToDo] Mark done: ${item.id}`)
+    debugLog(`[ThingsToDo] Mark done: ${item.id}`)
   }
 
   const handleRequestChanges = () => {
-    console.info(`[ThingsToDo] Request changes: ${item.id}`)
+    debugLog(`[ThingsToDo] Request changes: ${item.id}`)
   }
 
   const handleCopyLink = () => {
-    console.info(`[ThingsToDo] Copy link: ${item.id}`)
+    debugLog(`[ThingsToDo] Copy link: ${item.id}`)
   }
 
   return (

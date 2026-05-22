@@ -134,10 +134,15 @@ export interface ThingsToDoStats {
 }
 
 export interface ThingsToDoRowGroupSection {
-  key: ThingsToDoRowGroup
+  /** Due-date row group key, or arbitrary key for status/campaign/priority sections */
+  key: ThingsToDoRowGroup | string
   label: string
   count: number
   items: ThingsToDoItem[]
+}
+
+export function isThingsToDoRowGroup(key: string): key is ThingsToDoRowGroup {
+  return (ROW_GROUP_ORDER as readonly string[]).includes(key)
 }
 
 export const THINGS_TO_DO_TYPES: { value: ThingsToDoItemType; label: string }[] = [
@@ -520,6 +525,87 @@ export function groupItemsByDueSection(
       items: groupItems,
     }
   }).filter((s) => s.items.length > 0)
+}
+
+function groupItemsByStatus(items: ThingsToDoItem[]): ThingsToDoRowGroupSection[] {
+  const order = THINGS_TO_DO_STATUSES.map((s) => s.value)
+  const buckets = new Map<string, ThingsToDoItem[]>()
+  for (const item of items) {
+    const k = item.status
+    buckets.set(k, [...(buckets.get(k) ?? []), item])
+  }
+  return order
+    .filter((status) => buckets.has(status))
+    .map((status) => {
+      const groupItems = buckets.get(status) ?? []
+      return {
+        key: status,
+        label: getStatusLabel(status),
+        count: groupItems.length,
+        items: groupItems,
+      }
+    })
+}
+
+function groupItemsByCampaign(items: ThingsToDoItem[]): ThingsToDoRowGroupSection[] {
+  const map = new Map<string, ThingsToDoItem[]>()
+  for (const item of items) {
+    const id = item.campaign?.id ?? "__none__"
+    map.set(id, [...(map.get(id) ?? []), item])
+  }
+  const sections: ThingsToDoRowGroupSection[] = []
+  for (const [id, groupItems] of map) {
+    const label =
+      id === "__none__" ? "No campaign" : groupItems[0]?.campaign?.title ?? "Campaign"
+    sections.push({
+      key: id,
+      label,
+      count: groupItems.length,
+      items: groupItems,
+    })
+  }
+  return sections.sort((a, b) => {
+    if (a.key === "__none__") return 1
+    if (b.key === "__none__") return -1
+    return a.label.localeCompare(b.label)
+  })
+}
+
+function groupItemsByPriority(items: ThingsToDoItem[]): ThingsToDoRowGroupSection[] {
+  const order = THINGS_TO_DO_PRIORITIES.map((p) => p.value)
+  const buckets = new Map<ThingsToDoPriority, ThingsToDoItem[]>()
+  for (const item of items) {
+    buckets.set(item.priority, [...(buckets.get(item.priority) ?? []), item])
+  }
+  return order
+    .filter((p) => buckets.has(p))
+    .map((priority) => {
+      const groupItems = buckets.get(priority) ?? []
+      return {
+        key: priority,
+        label: getPriorityLabel(priority),
+        count: groupItems.length,
+        items: groupItems,
+      }
+    })
+}
+
+export function groupThingsToDoItems(
+  items: ThingsToDoItem[],
+  grouping: ThingsToDoGrouping,
+  now = new Date()
+): ThingsToDoRowGroupSection[] {
+  switch (grouping) {
+    case "status":
+      return groupItemsByStatus(items)
+    case "campaign":
+      return groupItemsByCampaign(items)
+    case "priority":
+      return groupItemsByPriority(items)
+    case "due-date":
+    default:
+      return groupItemsByDueSection(items, now)
+  }
 }
 
 export function collectFilterOptions(items: ThingsToDoItem[]) {

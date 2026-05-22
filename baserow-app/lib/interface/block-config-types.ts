@@ -113,6 +113,9 @@ export type KpiSummaryBlockConfig = BaseBlockConfig
 // Things To Do Block Config (mock data until Supabase wiring)
 export type ThingsToDoBlockConfig = BaseBlockConfig
 
+// Upcoming Summary Block Config (mock data until Supabase wiring)
+export type UpcomingSummaryBlockConfig = BaseBlockConfig
+
 // Filter Block Config
 // Note: table_id, target_blocks, allowed_fields, allowed_operators, filters are already in BlockConfig
 export type FilterBlockConfig = BaseBlockConfig
@@ -154,6 +157,7 @@ export type BlockConfigUnion =
   | (InternalResourceHubBlockConfig & { _type: 'internal_resource_hub' })
   | (KpiSummaryBlockConfig & { _type: 'kpi_summary' })
   | (ThingsToDoBlockConfig & { _type: 'things_to_do' })
+  | (UpcomingSummaryBlockConfig & { _type: 'upcoming_summary' })
   | (FilterBlockConfig & { _type: 'filter' })
   | (RecordContextBlockConfig & { _type: 'record_context' })
   | (FieldSectionBlockConfig & { _type: 'field_section' })
@@ -161,7 +165,7 @@ export type BlockConfigUnion =
 /** Block types that have typed config in BlockConfigUnion (for drift detection). */
 export const BLOCK_CONFIG_UNION_TYPES = [
   'grid', 'form', 'record', 'chart', 'kpi', 'text', 'html', 'image', 'gallery',
-  'divider', 'button', 'action', 'link_preview', 'content_theme', 'content_timeline', 'internal_resource_hub', 'kpi_summary', 'things_to_do', 'filter', 'record_context', 'field_section',
+  'divider', 'button', 'action', 'link_preview', 'content_theme', 'content_timeline', 'internal_resource_hub', 'kpi_summary', 'things_to_do', 'upcoming_summary', 'filter', 'record_context', 'field_section',
 ] as const
 
 /**

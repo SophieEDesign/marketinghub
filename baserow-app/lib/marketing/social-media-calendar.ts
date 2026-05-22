@@ -483,7 +483,7 @@ export function filterSocialCalendarItems(
   items: SocialCalendarItem[],
   filters: SocialCalendarFilters
 ): SocialCalendarItem[] {
-  const baseFiltered = filterContentItems(items, filters)
+  const baseFiltered = filterContentItems<SocialCalendarItem>(items, filters)
 
   return baseFiltered.filter((item) => {
     if (filters.platforms.length) {

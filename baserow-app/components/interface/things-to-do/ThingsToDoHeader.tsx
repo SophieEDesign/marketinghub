@@ -4,6 +4,7 @@ import { CheckSquare, Plus } from "lucide-react"
 import type { ThingsToDoStats } from "@/lib/marketing/things-to-do"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { debugLog } from "@/lib/debug"
 
 interface ThingsToDoHeaderProps {
   title: string
@@ -34,7 +35,7 @@ export function ThingsToDoHeader({
 }: ThingsToDoHeaderProps) {
   const handleAdd = () => {
     // TODO: connect work items to a Marketing Hub tasks/actions table.
-    console.info("[ThingsToDo] Add item")
+    debugLog("[ThingsToDo] Add item")
   }
 
   return (

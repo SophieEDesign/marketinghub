@@ -5,7 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import SidebarNavItem, { sidebarNavItemClassName } from "@/components/shell/SidebarNavItem"
-import SidebarInviteCard from "@/components/shell/SidebarInviteCard"
+// TODO: wire SidebarInviteCard to team invite flow when ready.
 import PageCreationWizard from "@/components/interface/PageCreationWizard"
 import GroupedInterfaces from "./GroupedInterfaces"
 import {
@@ -269,6 +269,7 @@ export default function AirtableSidebar({
 
       <div
         data-sidebar
+        data-sidebar-appearance="light"
         data-tour="sidebar"
         className={cn(
           "flex flex-col h-screen border-r border-hub-border bg-white transition-transform duration-300 flex-shrink-0",
@@ -368,7 +369,7 @@ export default function AirtableSidebar({
             )}
           </div>
 
-          <div className="py-1">
+          <div className="py-0.5">
             <GroupedInterfaces
               interfacePages={interfacePages}
               interfaceGroups={interfaceGroups}
@@ -570,9 +571,6 @@ export default function AirtableSidebar({
           )}
         </div>
 
-        <div className="flex-shrink-0 p-3 border-t border-hub-border">
-          <SidebarInviteCard />
-        </div>
 
         <PageCreationWizard
           open={newPageModalOpen}

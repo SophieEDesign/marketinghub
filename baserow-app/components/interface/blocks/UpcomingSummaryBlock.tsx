@@ -7,7 +7,6 @@ import {
   Calendar,
   CalendarClock,
   CheckCircle,
-  ChevronDown,
   ChevronRight,
   Clock,
   ExternalLink,
@@ -34,6 +33,10 @@ import {
   MOCK_DEADLINES,
   MOCK_EVENTS,
   MOCK_PUBLISHED,
+  filterCampaignsByRange,
+  filterDeadlinesByRange,
+  filterEventsByRange,
+  filterPublishedByRange,
   getVisibleSections,
   sliceItems,
   sortCampaignsByStatus,
@@ -102,30 +105,39 @@ function StatusPill({ label, className }: { label: string; className?: string })
   )
 }
 
+/** Set true when RecordModal / table links are wired */
+const UPCOMING_SUMMARY_LINKS_ENABLED = false
+
 function ItemRow({
   children,
   onClick,
-  isEditing,
   isCompact,
   showChevron,
+  interactive = UPCOMING_SUMMARY_LINKS_ENABLED,
 }: {
   children: React.ReactNode
   onClick?: () => void
-  isEditing?: boolean
   isCompact?: boolean
   showChevron?: boolean
+  interactive?: boolean
 }) {
+  const rowClass = cn(
+    "flex w-full items-center gap-2 rounded-lg text-left",
+    isCompact ? "px-1.5 py-1.5" : "px-2 py-2",
+    interactive && "group cursor-pointer transition-colors hover:bg-[#F8F8FC]"
+  )
+
+  if (!interactive) {
+    return (
+      <li>
+        <div className={rowClass}>{children}</div>
+      </li>
+    )
+  }
+
   return (
     <li>
-      <button
-        type="button"
-        disabled={isEditing}
-        onClick={onClick}
-        className={cn(
-          "group flex w-full items-center gap-2 rounded-lg text-left transition-colors hover:bg-[#F8F8FC] disabled:opacity-60",
-          isCompact ? "px-1.5 py-1.5" : "px-2 py-2"
-        )}
-      >
+      <button type="button" onClick={onClick} className={cn(rowClass, "group")}>
         {children}
         {showChevron ? (
           <ChevronRight
@@ -176,10 +188,53 @@ export default function UpcomingSummaryBlock({
       ? "grid grid-cols-1 gap-3"
       : "grid grid-cols-1 gap-3 md:grid-cols-2"
 
-  const campaigns = useMemo(() => {
-    const list = groupCampaigns ? sortCampaignsByStatus(MOCK_CAMPAIGNS) : MOCK_CAMPAIGNS
+  const deadlinesInRange = useMemo(
+    () => filterDeadlinesByRange(MOCK_DEADLINES, dateRange),
+    [dateRange]
+  )
+  const deadlinesVisible = useMemo(
+    () => sliceItems(deadlinesInRange, maxItems),
+    [deadlinesInRange, maxItems]
+  )
+
+  const campaignsInRange = useMemo(
+    () => filterCampaignsByRange(MOCK_CAMPAIGNS, dateRange),
+    [dateRange]
+  )
+  const campaignsVisible = useMemo(() => {
+    const list = groupCampaigns
+      ? sortCampaignsByStatus(campaignsInRange)
+      : campaignsInRange
     return sliceItems(list, maxItems)
-  }, [groupCampaigns, maxItems])
+  }, [groupCampaigns, campaignsInRange, maxItems])
+
+  const eventsInRange = useMemo(
+    () => filterEventsByRange(MOCK_EVENTS, dateRange),
+    [dateRange]
+  )
+  const eventsVisible = useMemo(
+    () => sliceItems(eventsInRange, maxItems),
+    [eventsInRange, maxItems]
+  )
+
+  const approvalVisible = useMemo(
+    () => sliceItems(MOCK_APPROVAL, maxItems),
+    [maxItems]
+  )
+
+  const blockersVisible = useMemo(
+    () => sliceItems(MOCK_BLOCKERS, maxItems),
+    [maxItems]
+  )
+
+  const publishedInRange = useMemo(
+    () => filterPublishedByRange(MOCK_PUBLISHED, dateRange),
+    [dateRange]
+  )
+  const publishedVisible = useMemo(
+    () => sliceItems(publishedInRange, maxItems),
+    [publishedInRange, maxItems]
+  )
 
   const handleItemClick = useCallback(
     (_itemId: string, _section: UpcomingSummarySectionId) => {
@@ -215,7 +270,6 @@ export default function UpcomingSummaryBlock({
     return (
       <ItemRow
         key={item.id}
-        isEditing={isEditing}
         isCompact={isCompact}
         onClick={() => handleItemClick(item.id, "deadlines")}
       >
@@ -252,7 +306,6 @@ export default function UpcomingSummaryBlock({
     return (
       <ItemRow
         key={item.id}
-        isEditing={isEditing}
         isCompact={isCompact}
         showChevron
         onClick={() => handleItemClick(item.id, "campaigns")}
@@ -279,7 +332,6 @@ export default function UpcomingSummaryBlock({
   const renderEvent = (item: EventItem) => (
     <ItemRow
       key={item.id}
-      isEditing={isEditing}
       isCompact={isCompact}
       showChevron
       onClick={() => handleItemClick(item.id, "events")}
@@ -308,7 +360,6 @@ export default function UpcomingSummaryBlock({
   const renderApproval = (item: ApprovalItem) => (
     <ItemRow
       key={item.id}
-      isEditing={isEditing}
       isCompact={isCompact}
       onClick={() => handleItemClick(item.id, "approval")}
     >
@@ -329,7 +380,6 @@ export default function UpcomingSummaryBlock({
   const renderBlocker = (item: BlockerItem) => (
     <ItemRow
       key={item.id}
-      isEditing={isEditing}
       isCompact={isCompact}
       onClick={() => handleItemClick(item.id, "blockers")}
     >
@@ -347,7 +397,6 @@ export default function UpcomingSummaryBlock({
   const renderPublished = (item: PublishedItem) => (
     <ItemRow
       key={item.id}
-      isEditing={isEditing}
       isCompact={isCompact}
       onClick={() => handleItemClick(item.id, "published")}
     >
@@ -376,16 +425,19 @@ export default function UpcomingSummaryBlock({
         iconClass="text-red-600"
         title="Upcoming deadlines"
         subtitle="Content due soon"
-        countLabel={showCounts ? `${MOCK_DEADLINES.length} due` : undefined}
+        countLabel={
+          showCounts
+            ? `${deadlinesVisible.length}${deadlinesInRange.length !== deadlinesVisible.length ? ` of ${deadlinesInRange.length}` : ""} due`
+            : undefined
+        }
         countBadgeClass="bg-red-100 text-red-700"
         showCounts={showCounts}
-        showViewAll={showViewAll}
+        showViewAll={showViewAll && UPCOMING_SUMMARY_LINKS_ENABLED}
         viewAllLabel="View all deadlines"
-        isEditing={isEditing}
         isCompact={isCompact}
         onViewAll={() => handleViewAll("deadlines")}
       >
-        {sliceItems(MOCK_DEADLINES, maxItems).map(renderDeadline)}
+        {deadlinesVisible.map(renderDeadline)}
       </UpcomingSummarySectionCard>
     ) : null,
     campaigns: visibleSections.includes("campaigns") ? (
@@ -396,16 +448,19 @@ export default function UpcomingSummaryBlock({
         iconClass="text-purple-600"
         title="Upcoming campaigns"
         subtitle="Active and planned campaigns"
-        countLabel={showCounts ? `${MOCK_CAMPAIGNS.length} campaigns` : undefined}
+        countLabel={
+          showCounts
+            ? `${campaignsVisible.length}${campaignsInRange.length !== campaignsVisible.length ? ` of ${campaignsInRange.length}` : ""} campaigns`
+            : undefined
+        }
         countBadgeClass="bg-purple-100 text-purple-700"
         showCounts={showCounts}
-        showViewAll={showViewAll}
+        showViewAll={showViewAll && UPCOMING_SUMMARY_LINKS_ENABLED}
         viewAllLabel="View all campaigns"
-        isEditing={isEditing}
         isCompact={isCompact}
         onViewAll={() => handleViewAll("campaigns")}
       >
-        {campaigns.map(renderCampaign)}
+        {campaignsVisible.map(renderCampaign)}
       </UpcomingSummarySectionCard>
     ) : null,
     events: visibleSections.includes("events") ? (
@@ -416,16 +471,19 @@ export default function UpcomingSummaryBlock({
         iconClass="text-emerald-600"
         title="Upcoming events"
         subtitle="Shows and industry events"
-        countLabel={showCounts ? `${MOCK_EVENTS.length} events` : undefined}
+        countLabel={
+          showCounts
+            ? `${eventsVisible.length}${eventsInRange.length !== eventsVisible.length ? ` of ${eventsInRange.length}` : ""} events`
+            : undefined
+        }
         countBadgeClass="bg-emerald-100 text-emerald-700"
         showCounts={showCounts}
-        showViewAll={showViewAll}
+        showViewAll={showViewAll && UPCOMING_SUMMARY_LINKS_ENABLED}
         viewAllLabel="View all events"
-        isEditing={isEditing}
         isCompact={isCompact}
         onViewAll={() => handleViewAll("events")}
       >
-        {sliceItems(MOCK_EVENTS, maxItems).map(renderEvent)}
+        {eventsVisible.map(renderEvent)}
       </UpcomingSummarySectionCard>
     ) : null,
     approval: visibleSections.includes("approval") ? (
@@ -436,16 +494,15 @@ export default function UpcomingSummaryBlock({
         iconClass="text-orange-600"
         title="Awaiting approval"
         subtitle="Content waiting for sign-off"
-        countLabel={showCounts ? `${MOCK_APPROVAL.length} items` : undefined}
+        countLabel={showCounts ? `${approvalVisible.length} items` : undefined}
         countBadgeClass="bg-orange-100 text-orange-700"
         showCounts={showCounts}
-        showViewAll={showViewAll}
+        showViewAll={showViewAll && UPCOMING_SUMMARY_LINKS_ENABLED}
         viewAllLabel="View all approvals"
-        isEditing={isEditing}
         isCompact={isCompact}
         onViewAll={() => handleViewAll("approval")}
       >
-        {sliceItems(MOCK_APPROVAL, maxItems).map(renderApproval)}
+        {approvalVisible.map(renderApproval)}
       </UpcomingSummarySectionCard>
     ) : null,
     blockers: visibleSections.includes("blockers") ? (
@@ -456,16 +513,15 @@ export default function UpcomingSummaryBlock({
         iconClass="text-red-600"
         title="Blockers / missing items"
         subtitle="Items needing attention"
-        countLabel={showCounts ? `${MOCK_BLOCKERS.length} issues` : undefined}
+        countLabel={showCounts ? `${blockersVisible.length} issues` : undefined}
         countBadgeClass="bg-red-100 text-red-700"
         showCounts={showCounts}
-        showViewAll={showViewAll}
+        showViewAll={showViewAll && UPCOMING_SUMMARY_LINKS_ENABLED}
         viewAllLabel="View all blockers"
-        isEditing={isEditing}
         isCompact={isCompact}
         onViewAll={() => handleViewAll("blockers")}
       >
-        {sliceItems(MOCK_BLOCKERS, maxItems).map(renderBlocker)}
+        {blockersVisible.map(renderBlocker)}
       </UpcomingSummarySectionCard>
     ) : null,
     published: visibleSections.includes("published") ? (
@@ -476,16 +532,19 @@ export default function UpcomingSummaryBlock({
         iconClass="text-emerald-600"
         title="Recently published"
         subtitle="Latest completed content"
-        countLabel={showCounts ? `${MOCK_PUBLISHED.length} items` : undefined}
+        countLabel={
+          showCounts
+            ? `${publishedVisible.length}${publishedInRange.length !== publishedVisible.length ? ` of ${publishedInRange.length}` : ""} items`
+            : undefined
+        }
         countBadgeClass="bg-emerald-100 text-emerald-700"
         showCounts={showCounts}
-        showViewAll={showViewAll}
+        showViewAll={showViewAll && UPCOMING_SUMMARY_LINKS_ENABLED}
         viewAllLabel="View all published"
-        isEditing={isEditing}
         isCompact={isCompact}
         onViewAll={() => handleViewAll("published")}
       >
-        {sliceItems(MOCK_PUBLISHED, maxItems).map(renderPublished)}
+        {publishedVisible.map(renderPublished)}
       </UpcomingSummarySectionCard>
     ) : null,
   }
@@ -527,24 +586,23 @@ export default function UpcomingSummaryBlock({
             </div>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <button
-              type="button"
-              disabled={isEditing}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[#E6E6EF] bg-white px-2.5 py-1.5 text-xs font-medium text-[#111827] shadow-sm transition-colors hover:bg-[#F8F8FC] disabled:opacity-60"
+            <span
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#E6E6EF] bg-white px-2.5 py-1.5 text-xs font-medium text-[#111827] shadow-sm"
+              title="Date range from block settings"
             >
               <Calendar className="h-3.5 w-3.5 text-[#6B7280]" aria-hidden />
               {DATE_RANGE_LABELS[dateRange]}
-              <ChevronDown className="h-3 w-3 text-[#6B7280]" aria-hidden />
-            </button>
-            <button
-              type="button"
-              disabled={isEditing}
-              onClick={handleViewAllActivity}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[#E6E6EF] bg-white px-2.5 py-1.5 text-xs font-medium text-[#111827] shadow-sm transition-colors hover:bg-[#F8F8FC] disabled:opacity-60"
-            >
-              View all activity
-              <ExternalLink className="h-3 w-3 text-[#6B7280]" aria-hidden />
-            </button>
+            </span>
+            {UPCOMING_SUMMARY_LINKS_ENABLED ? (
+              <button
+                type="button"
+                onClick={handleViewAllActivity}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[#E6E6EF] bg-white px-2.5 py-1.5 text-xs font-medium text-[#111827] shadow-sm transition-colors hover:bg-[#F8F8FC]"
+              >
+                View all activity
+                <ExternalLink className="h-3 w-3 text-[#6B7280]" aria-hidden />
+              </button>
+            ) : null}
           </div>
         </div>
 

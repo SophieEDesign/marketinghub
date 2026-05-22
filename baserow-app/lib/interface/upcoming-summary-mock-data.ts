@@ -2,6 +2,17 @@
  * Mock data for Upcoming Summary Block (self-contained until Supabase wiring).
  */
 
+import {
+  addDays,
+  endOfDay,
+  endOfQuarter,
+  endOfWeek,
+  isWithinInterval,
+  parseISO,
+  startOfDay,
+  startOfQuarter,
+  startOfWeek,
+} from 'date-fns'
 import type { BlockConfig } from '@/lib/interface/types'
 import type {
   UpcomingSummaryDateRange,
@@ -358,8 +369,68 @@ export function getVisibleSections(config: BlockConfig): UpcomingSummarySectionI
 }
 
 export function sliceItems<T>(items: T[], max: number): T[] {
-  const limit = Math.max(3, Math.min(6, max || 5))
+  const limit = Math.max(1, Math.min(20, max || 5))
   return items.slice(0, limit)
+}
+
+function parseMockDate(iso: string): Date {
+  return startOfDay(parseISO(iso.length === 10 ? `${iso}T12:00:00` : iso))
+}
+
+export function upcomingSummaryDateInterval(
+  range: UpcomingSummaryDateRange,
+  now = new Date()
+): { start: Date; end: Date } {
+  const today = startOfDay(now)
+  if (range === 'this_week') {
+    return {
+      start: startOfWeek(today, { weekStartsOn: 1 }),
+      end: endOfWeek(today, { weekStartsOn: 1 }),
+    }
+  }
+  if (range === 'next_30_days') {
+    return { start: today, end: endOfDay(addDays(today, 30)) }
+  }
+  return { start: startOfQuarter(today), end: endOfQuarter(today) }
+}
+
+function dateInRange(iso: string | undefined, range: UpcomingSummaryDateRange, now: Date): boolean {
+  if (!iso) return true
+  const d = parseMockDate(iso)
+  const { start, end } = upcomingSummaryDateInterval(range, now)
+  return isWithinInterval(d, { start, end })
+}
+
+export function filterDeadlinesByRange(
+  items: DeadlineItem[],
+  range: UpcomingSummaryDateRange,
+  now = new Date()
+): DeadlineItem[] {
+  return items.filter((item) => dateInRange(item.dueDate, range, now))
+}
+
+export function filterCampaignsByRange(
+  items: CampaignItem[],
+  range: UpcomingSummaryDateRange,
+  now = new Date()
+): CampaignItem[] {
+  return items.filter((item) => !item.startDate || dateInRange(item.startDate, range, now))
+}
+
+export function filterEventsByRange(
+  items: EventItem[],
+  range: UpcomingSummaryDateRange,
+  now = new Date()
+): EventItem[] {
+  return items.filter((item) => dateInRange(item.startDate, range, now))
+}
+
+export function filterPublishedByRange(
+  items: PublishedItem[],
+  range: UpcomingSummaryDateRange,
+  now = new Date()
+): PublishedItem[] {
+  return items.filter((item) => dateInRange(item.publishedDate, range, now))
 }
 
 export function sortCampaignsByStatus(items: CampaignItem[]): CampaignItem[] {

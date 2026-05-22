@@ -28,6 +28,7 @@ import {
   parseDefaultCategory,
 } from "./internal-resource-hub/utils"
 import type { CategoryFilter } from "./internal-resource-hub/types"
+import { debugLog } from "@/lib/debug"
 
 interface InternalResourceHubBlockProps {
   block: PageBlock
@@ -36,9 +37,7 @@ interface InternalResourceHubBlockProps {
 }
 
 function mockAction(label: string) {
-  if (typeof window !== "undefined") {
-    console.info(`[InternalResourceHub] ${label}`)
-  }
+  debugLog(`[InternalResourceHub] ${label}`)
 }
 
 export default function InternalResourceHubBlock({

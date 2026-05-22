@@ -245,17 +245,22 @@
 }
 
 /* Sidebar: use theme in dark mode (inline style from branding overrides otherwise) */
-.dark [data-sidebar] {
+.dark [data-sidebar]:not([data-sidebar-appearance="light"]) {
   background-color: hsl(var(--sidebar-bg, 222.2 47% 11%)) !important;
   color: hsl(var(--sidebar-foreground, 210 40% 98%)) !important;
 }
-.dark [data-sidebar] a,
-.dark [data-sidebar] button,
-.dark [data-sidebar] [style*="color"] {
+.dark [data-sidebar]:not([data-sidebar-appearance="light"]) a,
+.dark [data-sidebar]:not([data-sidebar-appearance="light"]) button,
+.dark [data-sidebar]:not([data-sidebar-appearance="light"]) [style*="color"] {
   color: hsl(var(--sidebar-foreground, 210 40% 98%)) !important;
 }
-.dark [data-sidebar] .border-black\/10 {
+.dark [data-sidebar]:not([data-sidebar-appearance="light"]) .border-black\/10 {
   border-color: hsl(var(--border)) !important;
+}
+/* White sidebar: keep Tailwind text utilities (interface titles, admin, invite) */
+.dark [data-sidebar][data-sidebar-appearance="light"] a,
+.dark [data-sidebar][data-sidebar-appearance="light"] button {
+  color: unset !important;
 }
 
 /* TipTap Editor Styles - REAL EDITOR (not a renderer) */

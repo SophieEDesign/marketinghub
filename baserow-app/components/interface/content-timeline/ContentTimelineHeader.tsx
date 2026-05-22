@@ -61,11 +61,16 @@ export function ContentTimelineHeader({
             </Button>
           </div>
 
-          <div className="flex rounded-lg border border-border/50 bg-muted/20 p-0.5">
+          <div
+            className="flex rounded-lg border border-border/50 bg-muted/20 p-0.5"
+            role="group"
+            aria-label="Timeline period"
+          >
             {VIEW_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
                 type="button"
+                aria-pressed={view === opt.value}
                 onClick={() => onViewChange(opt.value)}
                 className={cn(
                   "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",

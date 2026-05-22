@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { addMonths, addWeeks, subMonths, subWeeks } from "date-fns"
-import { Filter, Plus, Search } from "lucide-react"
+import { Plus, Search } from "lucide-react"
 import EventCalendarView from "@/components/interface/EventCalendarView"
 import EventCalendarToolbar from "@/components/interface/EventCalendarToolbar"
 import EventDetailPanel, { EventDetailPanelOverlay } from "@/components/interface/EventDetailPanel"
@@ -11,7 +11,6 @@ import EventEmptyState from "@/components/interface/EventEmptyState"
 import DashboardEmpty from "@/components/interface/primitives/DashboardEmpty"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useRecordModal } from "@/contexts/RecordModalContext"
 import { useEventCalendarData } from "@/hooks/useEventCalendarData"
 import {
@@ -266,21 +265,6 @@ export function EventCalendarCore({
                 <Plus className="h-4 w-4" aria-hidden />
                 Add event
               </Button>
-            ) : null}
-            {settings.showFilters ? (
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button type="button" variant="outline" size="sm" className="h-9 gap-1.5">
-                    <Filter className="h-4 w-4" aria-hidden />
-                    Filters
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80" align="end">
-                  <p className="text-xs text-muted-foreground mb-2">
-                    Use toolbar filters for type, location, and status.
-                  </p>
-                </PopoverContent>
-              </Popover>
             ) : null}
             {settings.showSearch ? (
               <div className="relative">
