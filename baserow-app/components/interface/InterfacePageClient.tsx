@@ -42,22 +42,10 @@ import { useRealtimeViewBlocks } from "@/lib/realtime/useRealtimeViewBlocks"
 import { CanvasContainer, BLOCK_EMBED_CLASSNAME } from "@/components/layout/ui-system"
 import { AppPageHeader } from "@/components/layout/ui-system"
 import { shouldApplyResolvedTableId } from "@/lib/immediate-phase/guards"
-import { isContentPlanningPage } from "@/lib/marketing/content-planning"
-import { isMarketingHomePage } from "@/lib/marketing/marketing-home"
-import { isThemeOverviewPage } from "@/lib/marketing/theme-overview"
-import { isInternalStaffHubPage } from "@/lib/marketing/internal-staff-hub"
-import MarketingDashboardLayout from "@/components/interface/MarketingDashboardLayout"
-import { DashboardEditChromeProvider } from "@/components/interface/EditableDashboardRegion"
 // Lazy load InterfaceBuilder for dashboard/overview pages
 const InterfaceBuilder = dynamic(() => import("./InterfaceBuilder"), { ssr: false })
 // Lazy load RecordReviewPage for record_review pages
 const RecordReviewPage = dynamic(() => import("./RecordReviewPage"), { ssr: false })
-const ThemeOverviewDashboard = dynamic(() => import("./ThemeOverviewDashboard"), { ssr: false })
-const ContentPlanningDashboard = dynamic(() => import("./ContentPlanningDashboard"), { ssr: false })
-const MarketingHomeDashboard = dynamic(() => import("./MarketingHomeDashboard"), { ssr: false })
-const InternalStaffHubDashboard = dynamic(() => import("./InternalStaffHubDashboard"), {
-  ssr: false,
-})
 
 /** Single stable wrapper for page content - avoids conditional tree swapping at InterfacePageClient level */
 function InterfacePageContent({
@@ -74,11 +62,6 @@ function InterfacePageContent({
   recordContext,
   setRecordContext,
   marketingDashboard,
-  showThemeOverview,
-  showContentPlanning,
-  showMarketingHome,
-  showInternalStaffHub,
-  isAdmin,
   onBlocksMirror,
 }: {
   useRecordReviewLayout: boolean
@@ -86,7 +69,6 @@ function InterfacePageContent({
   page: InterfacePage | null
   memoizedBlocks: any[]
   isViewer: boolean
-  isAdmin: boolean
   onRecordViewLayoutSave?: (fieldLayout: FieldLayoutItem[]) => Promise<void>
   onRecordViewPageConfigSave?: (updates: Record<string, unknown>) => Promise<void>
   interfaceBuilderPage: InterfacePage | null | undefined
@@ -95,55 +77,9 @@ function InterfacePageContent({
   recordContext: RecordContext
   setRecordContext: (ctx: RecordContext) => void
   marketingDashboard: boolean
-  showThemeOverview: boolean
-  showContentPlanning: boolean
-  showMarketingHome: boolean
-  showInternalStaffHub: boolean
   /** When InterfaceBuilder is mounted it owns blocks; mirror updates to parent for loadBlocks/sync (REG-005). */
   onBlocksMirror?: (blocks: PageBlock[]) => void
 }) {
-  if (showInternalStaffHub) {
-    return (
-      <MarketingDashboardLayout>
-        <DashboardEditChromeProvider>
-          <div className={`min-h-0 min-w-0 w-full max-w-full flex flex-col ${BLOCK_EMBED_CLASSNAME}`}>
-            <InternalStaffHubDashboard canEdit={isAdmin && !isViewer} />
-          </div>
-        </DashboardEditChromeProvider>
-      </MarketingDashboardLayout>
-    )
-  }
-  if (showMarketingHome) {
-    return (
-      <MarketingDashboardLayout>
-        <DashboardEditChromeProvider>
-          <div className={`min-h-0 min-w-0 w-full max-w-full flex flex-col ${BLOCK_EMBED_CLASSNAME}`}>
-            <MarketingHomeDashboard canEdit={!isViewer} />
-          </div>
-        </DashboardEditChromeProvider>
-      </MarketingDashboardLayout>
-    )
-  }
-  if (showThemeOverview) {
-    return (
-      <DashboardEditChromeProvider>
-        <div className={`min-h-0 min-w-0 w-full max-w-full flex flex-col ${BLOCK_EMBED_CLASSNAME}`}>
-          <ThemeOverviewDashboard canEdit={!isViewer} />
-        </div>
-      </DashboardEditChromeProvider>
-    )
-  }
-  if (showContentPlanning) {
-    return (
-      <MarketingDashboardLayout>
-        <DashboardEditChromeProvider>
-          <div className={`min-h-0 min-w-0 w-full max-w-full flex flex-col ${BLOCK_EMBED_CLASSNAME}`}>
-            <ContentPlanningDashboard canEdit={!isViewer} />
-          </div>
-        </DashboardEditChromeProvider>
-      </MarketingDashboardLayout>
-    )
-  }
   if (useRecordReviewLayout && hasPage) {
     return (
       <RecordReviewPage
@@ -228,32 +164,13 @@ function InterfacePageClientInternal({
   // Content pages only: ephemeral record context (never persisted). Not used for record_review/record_view.
   const [recordContext, setRecordContext] = useState<RecordContext>(null)
 
-  /** Marketing Dashboard page: calmer shell, search hint, card styling (name or config.layout_style). */
-  const marketingHome = useMemo(() => isMarketingHomePage(page), [page?.name, page?.config])
-
+  /** Marketing Dashboard shell: calmer spacing and block styling (name or config.layout_style). */
   const marketingDashboard = useMemo(() => {
     if (!page) return false
     const cfg = page.config as { layout_style?: string } | undefined
-    return (
-      marketingHome ||
-      page.name === "Marketing Dashboard" ||
-      cfg?.layout_style === "marketing_dashboard" ||
-      cfg?.layout_style === "theme_overview" ||
-      cfg?.layout_style === "content_planning" ||
-      isThemeOverviewPage(page) ||
-      isContentPlanningPage(page) ||
-      isInternalStaffHubPage(page)
-    )
-  }, [page?.name, page?.config, marketingHome])
+    return page.name === "Marketing Dashboard" || cfg?.layout_style === "marketing_dashboard"
+  }, [page?.name, page?.config])
 
-  const themeOverview = useMemo(() => isThemeOverviewPage(page), [page?.name, page?.config])
-  const contentPlanning = useMemo(() => isContentPlanningPage(page), [page?.name, page?.config])
-  const internalStaffHub = useMemo(() => isInternalStaffHubPage(page), [page?.name, page?.config])
-
-  /** Bespoke marketing dashboards — same UI in view and edit; skip canvas-only edit padding */
-  const isBespokeMarketingPage =
-    marketingHome || themeOverview || contentPlanning || internalStaffHub
-  
   // Track previous pageId to reset blocks when page changes
   // CRITICAL: Use ref to track actual pageId changes, not effect dependencies
   const previousPageIdRef = useRef<string | null>(null)
@@ -1549,7 +1466,7 @@ function InterfacePageClientInternal({
         <CanvasContainer
           scrollOwner={suppressMainScroll ? "parent" : "self"}
           fullBleed
-          className={`relative ${suppressMainScroll ? "flex-1 min-h-0" : "min-h-full"} ${isEditMode && !isBespokeMarketingPage ? "pb-48" : ""}`}
+          className={`relative ${suppressMainScroll ? "flex-1 min-h-0" : "min-h-full"} ${isEditMode ? "pb-48" : ""}`}
         >
           <InterfacePageContent
             useRecordReviewLayout={useRecordReviewLayout}
@@ -1565,11 +1482,6 @@ function InterfacePageClientInternal({
             recordContext={recordContext}
             setRecordContext={setRecordContext}
             marketingDashboard={marketingDashboard}
-            showThemeOverview={themeOverview}
-            showContentPlanning={contentPlanning}
-            showMarketingHome={marketingHome}
-            showInternalStaffHub={internalStaffHub}
-            isAdmin={isAdmin}
             onBlocksMirror={handleBlocksMirror}
           />
           {blocksLoading && (

@@ -23,6 +23,7 @@ import FilterBlock from "./blocks/FilterBlock"
 import FieldBlock from "./blocks/FieldBlock"
 import FieldSectionBlock from "./blocks/FieldSectionBlock"
 import NumberBlock from "./blocks/NumberBlock"
+import ContentThemeBlock from "./blocks/ContentThemeBlock"
 import { ErrorBoundary } from "./ErrorBoundary"
 import LazyBlockWrapper from "./LazyBlockWrapper"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
@@ -618,6 +619,9 @@ export default function BlockRenderer({
       case "number":
         // Number block - displays a single number field value
         return <NumberBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} recordId={recordId} />
+
+      case "content_theme":
+        return <ContentThemeBlock block={safeBlock} isEditing={canEdit} />
 
       default:
         return (

@@ -20,6 +20,7 @@ import {
   GitBranch,
   List,
   Hash,
+  Lightbulb,
 } from "lucide-react"
 import { BLOCK_REGISTRY } from "@/lib/interface/registry"
 import type { BlockType } from "@/lib/interface/types"
@@ -56,6 +57,7 @@ export const blockPickerIconMap: Record<BlockType, React.ElementType> = {
   list: List,
   number: Hash,
   horizontal_grouped: Columns,
+  content_theme: Lightbulb,
 }
 
 interface BlockPickerPanelProps {

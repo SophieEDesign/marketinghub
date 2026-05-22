@@ -41,6 +41,7 @@ const BLOCK_TYPE_CATEGORY: Record<BlockType, BlockCategoryId> = {
   image: "content",
   gallery: "content",
   link_preview: "content",
+  content_theme: "content",
   button: "content",
   action: "content",
   divider: "layout",

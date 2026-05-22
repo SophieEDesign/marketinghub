@@ -215,6 +215,7 @@ export function assertBlockConfig(
 
     case 'filter':
     case 'divider':
+    case 'content_theme':
       // These blocks don't require config
       return { valid: true }
 

@@ -27,6 +27,7 @@ export type BlockType =
   | 'number'
   | 'horizontal_grouped'
   | 'record_context'
+  | 'content_theme'
 
 export type BlockSizing = 'content' | 'fill'
 
@@ -321,6 +322,17 @@ export interface BlockConfig {
   timeline_title_field?: string // Field for card title
   timeline_tag_field?: string // Optional single tag field (max 1 pill)
   timeline_compact_mode?: boolean // When true: 28px cards; when false: 40px
+  // Content Theme block
+  content_theme_subtitle?: string
+  content_theme_year?: number
+  content_theme_quarter?: string
+  content_theme_show_filters?: boolean
+  content_theme_show_view_toggle?: boolean
+  content_theme_show_footer?: boolean
+  content_theme_card_density?: 'comfortable' | 'compact'
+  content_theme_highlight_current_quarter?: boolean
+  content_theme_max_themes?: number
+  content_theme_view_mode?: 'grid' | 'list' | 'compact'
   // List block specific config (at root level for backward compatibility)
   list_title_field?: string
   list_subtitle_fields?: string[]

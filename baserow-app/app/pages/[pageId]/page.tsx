@@ -1,11 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { isAdmin } from "@/lib/roles"
-import { getAllInterfacePages, getInterfacePage, querySqlView } from "@/lib/interface/pages"
-import {
-  findPageIdByLayoutStyle,
-  isPostCalendarOverviewPage,
-} from "@/lib/marketing/page-redirects"
+import { getInterfacePage, querySqlView } from "@/lib/interface/pages"
 import { isRecordReviewPage } from "@/lib/interface/page-types"
 import WorkspaceShellWrapper from "@/components/layout/WorkspaceShellWrapper"
 import InterfacePageClient from "@/components/interface/InterfacePageClient"
@@ -89,14 +85,6 @@ export default async function PagePage({
       pageName = page.name || "Interface Page"
       if (isDev) {
         console.log('[Page Render] ✓ Page found in interface_pages:', pageId)
-      }
-
-      if (isPostCalendarOverviewPage(page)) {
-        const allPages = await getAllInterfacePages()
-        const planningId = findPageIdByLayoutStyle(allPages, "content_planning")
-        if (planningId && planningId !== pageId) {
-          redirect(`/pages/${planningId}`)
-        }
       }
 
       // Load initial data from SQL view if source_view is set

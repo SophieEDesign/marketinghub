@@ -450,6 +450,11 @@ function buildContentPlanningBlocks(_ctx) {
   return []
 }
 
+/** Rendered by SocialMediaCalendarDashboard (layout_style: social_media_calendar) — no grid blocks. */
+function buildSocialMediaCalendarBlocks(_ctx) {
+  return []
+}
+
 function buildInternalStaffBlocks(ctx) {
   const resourceTable = ctx.resources || ctx.content
   const resourceFields = ctx.fieldsByTable.get(resourceTable.id) || []
@@ -732,7 +737,13 @@ async function archiveDeprecatedPages() {
 }
 
 async function applyMarketingNavPriority(pageIds) {
-  const orderedIds = [pageIds.home, pageIds.theme, pageIds.content, pageIds.internalStaff].filter(Boolean)
+  const orderedIds = [
+    pageIds.home,
+    pageIds.internalStaff,
+    pageIds.theme,
+    pageIds.social,
+    pageIds.content,
+  ].filter(Boolean)
   for (let i = 0; i < orderedIds.length; i += 1) {
     await supabase.from("interface_pages").update({ order_index: i, is_admin_only: false }).eq("id", orderedIds[i])
   }
@@ -773,6 +784,15 @@ async function main() {
     saved_view_id: ctx.anchors.content,
     config: { layout_style: "content_planning" },
   })
+  const socialCalendarPageId = await upsertPage({
+    name: "Social Media Calendar",
+    aliases: ["Social Calendar", "Social Media"],
+    page_type: "content",
+    group_id: publicGroup,
+    order_index: 3,
+    saved_view_id: ctx.anchors.content,
+    config: { layout_style: "social_media_calendar" },
+  })
   const internalStaffPageId = await upsertPage({
     name: "Internal Staff Hub",
     page_type: "content",
@@ -785,6 +805,7 @@ async function main() {
   await applyPageBlocksAdditive(homePageId, buildMarketingHomeBlocks(ctx))
   await applyPageBlocksAdditive(themePageId, buildThemeWorkspaceBlocks(ctx))
   await applyPageBlocksAdditive(contentPageId, buildContentPlanningBlocks(ctx))
+  await applyPageBlocksAdditive(socialCalendarPageId, buildSocialMediaCalendarBlocks(ctx))
   await applyPageBlocksAdditive(internalStaffPageId, buildInternalStaffBlocks(ctx))
 
   await archiveDeprecatedPages()
@@ -792,6 +813,7 @@ async function main() {
     home: homePageId,
     internalStaff: internalStaffPageId,
     theme: themePageId,
+    social: socialCalendarPageId,
     content: contentPageId,
   })
   await applyVisibilityCuration()
@@ -800,6 +822,7 @@ async function main() {
   console.log(`Dashboard: /pages/${homePageId}`)
   console.log(`Theme Workspace: /pages/${themePageId}`)
   console.log(`Content Planning: /pages/${contentPageId}`)
+  console.log(`Social Media Calendar: /pages/${socialCalendarPageId}`)
   console.log(`Internal Staff Hub: /pages/${internalStaffPageId}`)
 }
 

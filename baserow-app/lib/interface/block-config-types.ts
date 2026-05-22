@@ -98,6 +98,9 @@ export interface LinkPreviewBlockConfig extends BaseBlockConfig {
   // Note: link_title, link_description are already in BlockConfig
 }
 
+// Content Theme Block Config (planning block; mock data until Supabase wiring)
+export type ContentThemeBlockConfig = BaseBlockConfig
+
 // Filter Block Config
 // Note: table_id, target_blocks, allowed_fields, allowed_operators, filters are already in BlockConfig
 export type FilterBlockConfig = BaseBlockConfig
@@ -134,6 +137,7 @@ export type BlockConfigUnion =
   | (ButtonBlockConfig & { _type: 'button' })
   | (ActionBlockConfig & { _type: 'action' })
   | (LinkPreviewBlockConfig & { _type: 'link_preview' })
+  | (ContentThemeBlockConfig & { _type: 'content_theme' })
   | (FilterBlockConfig & { _type: 'filter' })
   | (RecordContextBlockConfig & { _type: 'record_context' })
   | (FieldSectionBlockConfig & { _type: 'field_section' })
@@ -141,7 +145,7 @@ export type BlockConfigUnion =
 /** Block types that have typed config in BlockConfigUnion (for drift detection). */
 export const BLOCK_CONFIG_UNION_TYPES = [
   'grid', 'form', 'record', 'chart', 'kpi', 'text', 'html', 'image', 'gallery',
-  'divider', 'button', 'action', 'link_preview', 'filter', 'record_context', 'field_section',
+  'divider', 'button', 'action', 'link_preview', 'content_theme', 'filter', 'record_context', 'field_section',
 ] as const
 
 /**
@@ -356,6 +360,10 @@ export function validateBlockConfig(
       if (!resolveLegacyTableId(config)) {
         errors.push('Record context block requires table_id')
       }
+      break
+
+    case 'content_theme':
+      // Content theme block uses mock data; no required fields
       break
 
     // divider, button, link_preview have no required fields

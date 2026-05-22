@@ -102,6 +102,11 @@ export function isBlockConfigComplete(
     return true
   }
 
+  // Content theme block always renders with mock data
+  if (blockType === 'content_theme') {
+    return true
+  }
+
   const validation = validateBlockConfig(blockType, config)
   return validation.valid
 }
