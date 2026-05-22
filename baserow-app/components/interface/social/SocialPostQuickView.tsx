@@ -2,7 +2,7 @@
 
 import { ImageIcon, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { PanelShell } from "@/components/interface/primitives/PanelShell"
+import PanelShell from "@/components/interface/primitives/PanelShell"
 import { PlatformIconRow } from "@/components/interface/social/PlatformIcon"
 import { SocialStatusPill } from "@/components/interface/social/SocialStatusPill"
 import {

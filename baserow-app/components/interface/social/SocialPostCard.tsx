@@ -1,7 +1,7 @@
 "use client"
 
 import { ImageIcon } from "lucide-react"
-import { AccentCard } from "@/components/interface/primitives/AccentCard"
+import AccentCard from "@/components/interface/primitives/AccentCard"
 import { PlatformIconRow } from "@/components/interface/social/PlatformIcon"
 import { SocialStatusPill } from "@/components/interface/social/SocialStatusPill"
 import {

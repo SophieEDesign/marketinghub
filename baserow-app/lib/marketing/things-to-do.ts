@@ -335,7 +335,6 @@ export function assignRowGroup(item: ThingsToDoItem, now = new Date()): ThingsTo
 
   const due = parseDue(item.dueDate)
   if (!due) {
-    if (item.status === "waiting" || item.status === "needs-review") return "waiting"
     return "due-this-week"
   }
 
@@ -346,11 +345,7 @@ export function assignRowGroup(item: ThingsToDoItem, now = new Date()): ThingsTo
   const weekEnd = endOfWeek(today, { weekStartsOn: 1 })
   if (!isAfter(due, weekEnd)) return "due-this-week"
 
-  if (
-    item.status === "waiting" ||
-    item.status === "needs-review" ||
-    item.type === "review"
-  ) {
+  if (item.type === "review" || item.type === "approval") {
     return "waiting"
   }
 

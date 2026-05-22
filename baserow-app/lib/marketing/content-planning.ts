@@ -316,10 +316,10 @@ export function buildContentItems(params: {
     })
 }
 
-export function filterContentItems(
-  items: ContentPlanningItem[],
+export function filterContentItems<T extends ContentPlanningItem>(
+  items: T[],
   filters: ContentPlanningFilters
-): ContentPlanningItem[] {
+): T[] {
   const search = filters.search.trim().toLowerCase()
   const { start: qStart, end: qEnd } =
     filters.quarter === "all"

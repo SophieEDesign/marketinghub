@@ -37,12 +37,13 @@ function hotPathError(message: string, payload: Record<string, unknown>) {
 }
 
 const MARKETING_CORE_PAGE_ORDER = [
-  "Dashboard",
+  "Marketing Home",
   "Theme Workspace",
   "Content Planning",
+  "Things To Do",
+  "Resource Hub",
+  "Social Calendar",
   "Event Calendar",
-  "Social Media Calendar",
-  "Internal Staff Hub",
 ] as const
 const QUIET_PAGE_HINTS = ["test", "admin", "debug", "raw", "seed", "tmp"]
 

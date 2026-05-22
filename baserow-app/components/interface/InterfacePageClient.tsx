@@ -44,6 +44,7 @@ import { AppPageHeader } from "@/components/layout/ui-system"
 import { shouldApplyResolvedTableId } from "@/lib/immediate-phase/guards"
 import {
   isMarketingHomePage,
+  isMarketingHubWorkspacePage,
   SHOW_MARKETING_HOME_PLACEHOLDER,
 } from "@/lib/marketing/marketing-home"
 import ShellPagePlaceholder from "@/components/shell/ShellPagePlaceholder"
@@ -183,18 +184,13 @@ function InterfacePageClientInternal({
   // Content pages only: ephemeral record context (never persisted). Not used for record_review/record_view.
   const [recordContext, setRecordContext] = useState<RecordContext>(null)
 
-  /** Marketing Dashboard shell: calmer spacing and block styling (name or config.layout_style). */
+  /** Marketing Hub shell: calmer spacing and block styling for workspace pages. */
   const marketingHome = useMemo(() => isMarketingHomePage(page), [page?.name, page?.config])
 
   const marketingDashboard = useMemo(() => {
     if (!page) return false
-    const cfg = page.config as { layout_style?: string } | undefined
-    return (
-      marketingHome ||
-      page.name === "Marketing Dashboard" ||
-      cfg?.layout_style === "marketing_dashboard"
-    )
-  }, [page?.name, page?.config, marketingHome])
+    return isMarketingHubWorkspacePage(page) || marketingHome
+  }, [page?.name, marketingHome])
 
   // Track previous pageId to reset blocks when page changes
   // CRITICAL: Use ref to track actual pageId changes, not effect dependencies

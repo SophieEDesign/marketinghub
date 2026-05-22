@@ -1,13 +1,8 @@
 ﻿/**
- * Applies a curated Marketing Hub workspace structure using existing data model.
+ * Applies the Marketing Hub workspace: seven Interface Builder pages composed from blocks.
  *
- * Goals:
- * - Keep schema unchanged
- * - Reuse interface pages + view_blocks + record modal behavior
- * - Enforce hierarchy:
- *   Dashboard -> Theme Workspace -> Content Planning
- * - Enforce per-page structure:
- *   one primary block + one supporting block + one compact summary strip
+ * - No layout_style canvas bypass
+ * - Idempotent block sync via config.provisioning_key
  *
  * Run from baserow-app:
  *   npm run apply:marketing-hub
@@ -48,48 +43,79 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 })
 
-function normalizeName(value) {
-  return String(value || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-}
+/** Mirrors baserow-app/lib/interface/kpi-summary-defaults.ts */
+const DEFAULT_KPI_SUMMARY_CARDS = [
+  {
+    id: "active-campaigns",
+    label: "Active Campaigns",
+    value: "12",
+    trend: "↑ 20% vs last 7 days",
+    trend_direction: "up",
+    icon: "rocket",
+    accent: "purple",
+  },
+  {
+    id: "content-scheduled",
+    label: "Content Scheduled",
+    value: "48",
+    trend: "↑ 16% vs last 7 days",
+    trend_direction: "up",
+    icon: "calendar",
+    accent: "blue",
+  },
+  {
+    id: "engagement",
+    label: "Engagement",
+    value: "8.3K",
+    trend: "↑ 12% vs last 7 days",
+    trend_direction: "up",
+    icon: "barchart",
+    accent: "purple",
+  },
+  {
+    id: "events-month",
+    label: "Events This Month",
+    value: "5",
+    trend: "↓ 10% vs last month",
+    trend_direction: "down",
+    icon: "calendardays",
+    accent: "red",
+  },
+]
 
-function pickFieldName(fields, patterns, fallback = null) {
-  const names = (fields || []).map((f) => f.name).filter(Boolean)
-  for (const pattern of patterns) {
-    const hit = names.find((name) => pattern.test(name) || pattern.test(normalizeName(name)))
-    if (hit) return hit
-  }
-  return fallback
-}
-
-function hasField(fields, name) {
-  if (!name) return false
-  return (fields || []).some((f) => f?.name === name)
-}
-
-function safeFilter(fields, filter) {
-  if (!filter?.field) return null
-  return hasField(fields, filter.field) ? filter : null
-}
-
-function compactFilters(fields, filters) {
-  return (filters || []).map((f) => safeFilter(fields, f)).filter(Boolean)
-}
-
-function section(title, description, y, h = 2) {
-  return {
+function introBlock(provisioningKey, title, subtitle, y, h = 2) {
+  return makeBlock({
+    provisioningKey,
     type: "html",
-    position_x: 0,
+    x: 0,
+    y,
+    w: 12,
+    h,
+    config: {
+      title: `${title} intro`,
+      html: `<div class="px-1 py-2"><h1 class="text-2xl font-bold tracking-tight text-[#111827] md:text-3xl">${title}</h1><p class="mt-1 text-sm text-[#6B7280]">${subtitle}</p></div>`,
+    },
+  })
+}
+
+function makeBlock({ provisioningKey, type, x, y, w, h, config }) {
+  return {
+    type,
+    position_x: x,
     position_y: y,
-    width: 12,
+    width: w,
     height: h,
     config: {
-      title: "",
-      html: `<div class="pt-2 pb-2 border-b border-border/50"><h2 class="text-lg font-semibold tracking-tight text-foreground">${title}</h2><p class="text-sm text-muted-foreground mt-1">${description}</p></div>`,
+      provisioning_key: provisioningKey,
+      ...config,
     },
   }
+}
+
+function blockMatchKey(row) {
+  const cfg = row?.config || {}
+  if (cfg.provisioning_key) return String(cfg.provisioning_key)
+  return [row?.type || "", cfg.title || ""].join("::")
 }
 
 async function fetchRequiredMetadata() {
@@ -98,34 +124,14 @@ async function fetchRequiredMetadata() {
 
   const findTable = (pred) => tables.find((t) => pred(t.name))
   const quarterlyThemes = findTable((n) => /quarterly/i.test(n) && /theme/i.test(n))
-  const matrix = findTable((n) => /theme/i.test(n) && /division/i.test(n) && /matrix/i.test(n))
   const campaigns = findTable((n) => /campaign/i.test(n) && !/content/i.test(n))
-  const content = findTable((n) => /^content$/i.test(n.trim()) || (/content/i.test(n) && !/calendar/i.test(n) && !/briefing/i.test(n)))
-  const sponsorships = findTable((n) => /sponsorship/i.test(n))
-  const contacts = findTable((n) => /^contact(s)?$/i.test(n.trim()))
+  const content = findTable((n) =>
+    /^content$/i.test(n.trim()) || (/content/i.test(n) && !/calendar/i.test(n) && !/briefing/i.test(n))
+  )
   const resources = findTable((n) => /resource|document|asset|file|library/i.test(n))
 
   if (!quarterlyThemes || !campaigns || !content) {
     throw new Error("Missing required tables: Quarterly Themes, Campaigns, or Content")
-  }
-
-  const tableIds = [quarterlyThemes.id, campaigns.id, content.id]
-  if (matrix) tableIds.push(matrix.id)
-  if (sponsorships) tableIds.push(sponsorships.id)
-  if (contacts) tableIds.push(contacts.id)
-  if (resources) tableIds.push(resources.id)
-
-  const { data: fieldRows, error: fErr } = await supabase
-    .from("table_fields")
-    .select("table_id, name")
-    .in("table_id", tableIds)
-  if (fErr) throw new Error(`Could not load table_fields: ${fErr.message}`)
-
-  const fieldsByTable = new Map()
-  for (const row of fieldRows || []) {
-    const bucket = fieldsByTable.get(row.table_id) || []
-    bucket.push(row)
-    fieldsByTable.set(row.table_id, bucket)
   }
 
   const { data: anchorViews, error: vErr } = await supabase
@@ -139,15 +145,14 @@ async function fetchRequiredMetadata() {
   const anchors = {
     home: firstViewFor(quarterlyThemes.id),
     theme: firstViewFor(quarterlyThemes.id),
-    campaigns: firstViewFor(campaigns.id),
     content: firstViewFor(content.id),
     resources: resources ? firstViewFor(resources.id) || firstViewFor(content.id) : firstViewFor(content.id),
   }
-  if (!anchors.home || !anchors.theme || !anchors.campaigns || !anchors.content) {
+  if (!anchors.home || !anchors.theme || !anchors.content) {
     throw new Error("Missing saved views for required page anchors")
   }
 
-  return { quarterlyThemes, matrix, campaigns, content, sponsorships, contacts, resources, fieldsByTable, anchors }
+  return { anchors }
 }
 
 async function getGroupIdByName(name) {
@@ -217,12 +222,7 @@ async function upsertPage({ name, aliases = [], page_type, group_id, order_index
   return created.id
 }
 
-function blockSignature(block) {
-  const cfg = block?.config || {}
-  return [block?.type || "", cfg.title || "", cfg.table_id || "", cfg.view_type || "", cfg.kpi_label || ""].join("::")
-}
-
-async function applyPageBlocksAdditive(pageId, blocks) {
+async function syncPageBlocks(pageId, blocks) {
   const { data: existing, error: existingError } = await supabase
     .from("view_blocks")
     .select("id, type, position_x, position_y, width, height, config, order_index")
@@ -231,15 +231,18 @@ async function applyPageBlocksAdditive(pageId, blocks) {
     .order("order_index", { ascending: true })
   if (existingError) throw new Error(`Block lookup failed for page ${pageId}: ${existingError.message}`)
 
-  const existingBySignature = new Map()
+  const existingByKey = new Map()
   for (const row of existing || []) {
-    existingBySignature.set(blockSignature(row), row)
+    existingByKey.set(blockMatchKey(row), row)
   }
+
+  const desiredKeys = new Set()
 
   for (let i = 0; i < blocks.length; i += 1) {
     const next = blocks[i]
-    const signature = blockSignature(next)
-    const match = existingBySignature.get(signature)
+    const key = blockMatchKey(next)
+    desiredKeys.add(key)
+    const match = existingByKey.get(key)
 
     if (match?.id) {
       const { error } = await supabase
@@ -271,298 +274,259 @@ async function applyPageBlocksAdditive(pageId, blocks) {
     })
     if (error) throw new Error(`Block insert failed for page ${pageId}: ${error.message}`)
   }
+
+  for (const row of existing || []) {
+    const key = blockMatchKey(row)
+    if (!desiredKeys.has(key)) {
+      const { error } = await supabase.from("view_blocks").update({ is_archived: true }).eq("id", row.id)
+      if (error) throw new Error(`Block archive failed for page ${pageId}: ${error.message}`)
+    }
+  }
 }
 
-/** Marketing Home dashboard — Interface Builder blocks (layout_style: marketing_home). */
-function buildMarketingHomeBlocks(_ctx) {
-  const blocks = []
-  let y = 0
-
-  blocks.push({
-    type: "html",
-    position_x: 0,
-    position_y: y,
-    width: 12,
-    height: 2,
-    config: {
-      title: "Marketing Hub Header",
-      html: `<div class="px-1 py-2"><h1 class="text-2xl font-bold tracking-tight text-[#111827] md:text-3xl">Marketing Hub</h1><p class="mt-1 text-sm text-[#6B7280]">Plan campaigns, content, resources and activity from one shared workspace.</p></div>`,
-    },
-  })
-  y += 3
-
-  blocks.push({
-    type: "kpi_summary",
-    position_x: 0,
-    position_y: y,
-    width: 12,
-    height: 3,
-    config: {
-      title: "Marketing Hub KPIs",
-    },
-  })
-  y += 4
-
-  blocks.push({
-    type: "content_theme",
-    position_x: 0,
-    position_y: y,
-    width: 8,
-    height: 14,
-    config: {
-      title: "Content Themes",
-      content_theme_subtitle:
-        "Strategic themes and content focus areas for the quarter.",
-      content_theme_year: 2026,
-      content_theme_quarter: "Q2",
-      content_theme_show_filters: true,
-      content_theme_show_view_toggle: true,
-      content_theme_show_footer: true,
-      content_theme_card_density: "comfortable",
-      content_theme_highlight_current_quarter: true,
-      content_theme_max_themes: 4,
-      content_theme_view_mode: "grid",
-    },
-  })
-  blocks.push({
-    type: "internal_resource_hub",
-    position_x: 8,
-    position_y: y,
-    width: 4,
-    height: 14,
-    config: {
-      title: "Internal Resource Hub",
-      resource_hub_subtitle: "Logos, documents, templates and internal assets.",
-      resource_hub_layout_mode: "list",
-      resource_hub_use_dashboard_mock: true,
-      resource_hub_show_search: false,
-      resource_hub_show_recent: false,
-      resource_hub_show_upload: false,
-    },
-  })
-  y += 15
-
-  blocks.push({
-    type: "content_timeline",
-    position_x: 0,
-    position_y: y,
-    width: 8,
-    height: 11,
-    config: {
-      title: "Content Timeline",
-      content_timeline_subtitle: "Plan and track key content and campaigns.",
-      content_timeline_default_view: "month",
-      content_timeline_group_by: "theme",
-      content_timeline_preset: "marketing_home",
-      content_timeline_show_filters: true,
-      content_timeline_show_status_badges: false,
-      content_timeline_show_owner_initials: false,
-      content_timeline_enable_detail_panel: false,
-      content_timeline_compact_mode: true,
-      content_timeline_show_footer_link: true,
-      content_timeline_footer_link_label: "View full calendar →",
-      appearance: { showTitle: false },
-    },
-  })
-  blocks.push({
-    type: "html",
-    position_x: 8,
-    position_y: y,
-    width: 4,
-    height: 11,
-    config: {
-      title: "Upcoming Events (placeholder)",
-      html: `<div class="flex h-full min-h-[280px] flex-col rounded-xl border border-dashed border-[#E6E6EF] bg-[#F8F8FC]/50 p-5"><div class="flex items-center gap-2 text-[#111827]"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-[#6D4AFF]" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg><h2 class="text-base font-semibold">Upcoming Events</h2></div><p class="mt-3 text-xs font-medium uppercase tracking-wide text-[#6B7280]">Future block: Event Calendar</p><p class="mt-2 text-sm text-[#6B7280]">This block will show upcoming events, boat shows, attendance and planning.</p><div class="mt-auto flex flex-1 items-center justify-center py-8"><div class="rounded-full bg-[#F3F0FF] p-4 text-[#6D4AFF] opacity-60"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg></div></div></div>`,
-    },
-  })
-
-  return blocks
-}
-
-/** Rendered by ThemeOverviewDashboard (layout_style: theme_overview) - no grid blocks. */
-function buildThemeWorkspaceBlocks(_ctx) {
-  return []
-}
-
-
-function buildCampaignWorkspaceBlocks(ctx) {
-  const campaignFields = ctx.fieldsByTable.get(ctx.campaigns.id) || []
-  const contentFields = ctx.fieldsByTable.get(ctx.content.id) || []
-
-  const campaignName = pickFieldName(campaignFields, [/^name$/i], "name")
-  const campaignStatus = pickFieldName(campaignFields, [/^status$/i], "status")
-  const campaignTheme = pickFieldName(campaignFields, [/quarterly_theme/i, /^theme$/i], null)
-  const campaignContent = pickFieldName(campaignFields, [/^content$/i, /content_link/i], null)
-  const contentName = pickFieldName(contentFields, [/content_name/i, /^name$/i], "content_name")
-  const contentStatus = pickFieldName(contentFields, [/^status$/i, /state/i], null)
-  const contentDate = pickFieldName(contentFields, [/^date$/i, /publish_date/i], "date")
-  const contentCampaign = pickFieldName(contentFields, [/campaigns?/i], null)
-
-  const blocks = []
-  let y = 0
-  blocks.push({
-    type: "html",
-    position_x: 0,
-    position_y: y,
-    width: 12,
-    height: 2,
-    config: {
-      title: "",
-      html: `<div class="rounded-card-lg border border-border/60 bg-card px-5 py-4 shadow-sm"><h2 class="text-xl font-semibold tracking-tight text-foreground">Campaign Archive</h2><p class="mt-1 text-sm text-muted-foreground">Review campaign performance context and connected content history.</p></div>`,
-    },
-  })
-  y += 3
-  blocks.push({
-    type: "kpi",
-    position_x: 0,
-    position_y: y,
-    width: 3,
-    height: 3,
-    config: {
-      title: "Active campaigns",
-      kpi_label: "In progress",
-      table_id: ctx.campaigns.id,
-      kpi_aggregate: "count",
-      filters: compactFilters(
-        campaignFields,
-        campaignStatus ? [{ field: campaignStatus, operator: "is_any_of", value: ["In Progress", "Live", "Active", "Planning"] }] : []
-      ),
-    },
-  })
-  blocks.push({
-    type: "kpi",
-    position_x: 3,
-    position_y: y,
-    width: 3,
-    height: 3,
-    config: {
-      title: "Linked content",
-      kpi_label: "With content",
-      table_id: ctx.campaigns.id,
-      kpi_aggregate: "count",
-      filters: compactFilters(campaignFields, campaignContent ? [{ field: campaignContent, operator: "is_not_empty", value: "" }] : []),
-    },
-  })
-  blocks.push({
-    type: "kpi",
-    position_x: 6,
-    position_y: y,
-    width: 3,
-    height: 3,
-    config: {
-      title: "Upcoming items",
-      kpi_label: "Next 30d",
-      table_id: ctx.content.id,
-      kpi_aggregate: "count",
-      filters: compactFilters(contentFields, [{ field: contentDate, operator: "date_next_days", value: 30 }]),
-    },
-  })
-  blocks.push({
-    type: "kpi",
-    position_x: 9,
-    position_y: y,
-    width: 3,
-    height: 3,
-    config: {
-      title: "Needs review",
-      kpi_label: "Awaiting approval",
-      table_id: ctx.content.id,
-      kpi_aggregate: "count",
-      filters: compactFilters(contentFields, [
-        { field: contentName, operator: "is_not_empty", value: "" },
-        ...(contentStatus ? [{ field: contentStatus, operator: "is_any_of", value: ["Sent for Approval", "Awaiting approval", "Waiting for approval"] }] : []),
-      ]),
-    },
-  })
-  y += 4
-
-  const campaignVisible = [campaignName, campaignStatus].filter(Boolean)
-  if (campaignTheme) campaignVisible.push(campaignTheme)
-  blocks.push({
-    type: "grid",
-    position_x: 0,
-    position_y: y,
-    width: 12,
-    height: 7,
-    config: {
-      title: "Past Campaigns",
-      table_id: ctx.campaigns.id,
-      view_type: "list",
-      row_limit: 8,
-      list_title_field: campaignName,
-      visible_fields: campaignVisible,
-      pill_fields: campaignStatus ? [campaignStatus] : [],
-      ...(campaignStatus ? { group_by_field: campaignStatus } : {}),
-      appearance: { showTitle: true, border: "none", compact: true, padding: "compact", showDivider: true },
-    },
-  })
-  y += 8
-
-  const contentVisible = [contentName, contentDate].filter(Boolean)
-  if (contentCampaign) contentVisible.push(contentCampaign)
-  blocks.push({
-    type: "grid",
-    position_x: 0,
-    position_y: y,
-    width: 8,
-    height: 6,
-    config: {
-      title: "Related Content",
-      table_id: ctx.content.id,
-      view_type: "list",
-      row_limit: 8,
-      list_title_field: contentName,
-      visible_fields: contentVisible,
-      filters: compactFilters(contentFields, [
-        { field: contentName, operator: "is_not_empty", value: "" },
-        { field: contentDate, operator: "date_next_days", value: 60 },
-      ]),
-      sorts: [{ field: contentDate, direction: "asc" }],
-      appearance: { showTitle: true, border: "none", compact: true, padding: "compact", showDivider: true },
-    },
-  })
-  blocks.push({
-    type: "grid",
-    position_x: 8,
-    position_y: y,
-    width: 4,
-    height: 6,
-    config: {
-      title: "Campaign Calendar",
-      table_id: ctx.content.id,
-      view_type: "calendar",
-      calendar_date_field: contentDate,
-      visible_week_span: 4,
-      default_date_range_preset: "thisMonth",
-      visible_fields: [contentName, contentDate].filter(Boolean),
-      filters: compactFilters(contentFields, [
-        { field: contentName, operator: "is_not_empty", value: "" },
-        ...(contentDate ? [{ field: contentDate, operator: "date_next_days", value: 60 }] : []),
-      ]),
-      appearance: { showTitle: true, border: "none", compact: true, event_density: "compact" },
-    },
-  })
-
-  return blocks
-}
-
-/** Rendered by ContentPlanningDashboard (layout_style: content_planning) â€” no grid blocks. */
-function buildContentPlanningBlocks(_ctx) {
-  return []
-}
-
-/** Social Media Calendar page — single full-page social_media_calendar block. */
-function buildSocialMediaCalendarBlocks(_ctx) {
+function buildMarketingHomeBlocks() {
   return [
-    {
+    introBlock(
+      "home_intro",
+      "Marketing Hub",
+      "Plan campaigns, content, resources and activity from one shared workspace.",
+      0
+    ),
+    makeBlock({
+      provisioningKey: "home_kpi",
+      type: "kpi_summary",
+      x: 0,
+      y: 2,
+      w: 12,
+      h: 3,
+      config: {
+        title: "Marketing Overview",
+        kpi_summary_cards: DEFAULT_KPI_SUMMARY_CARDS,
+      },
+    }),
+    makeBlock({
+      provisioningKey: "home_themes",
+      type: "content_theme",
+      x: 0,
+      y: 5,
+      w: 8,
+      h: 8,
+      config: {
+        title: "Content Themes",
+        content_theme_subtitle: "Strategic themes and content focus areas for the quarter.",
+        content_theme_year: 2026,
+        content_theme_quarter: "Q2",
+        content_theme_show_filters: true,
+        content_theme_show_view_toggle: true,
+        content_theme_show_footer: true,
+        content_theme_highlight_current_quarter: true,
+        content_theme_view_mode: "grid",
+      },
+    }),
+    makeBlock({
+      provisioningKey: "home_todo",
+      type: "things_to_do",
+      x: 8,
+      y: 5,
+      w: 4,
+      h: 4,
+      config: {
+        title: "Things To Do",
+        things_to_do_subtitle: "Content actions that need attention.",
+        things_to_do_compact_mode: true,
+        things_to_do_max_items: 5,
+        things_to_do_show_stats: true,
+        things_to_do_show_filters: false,
+        things_to_do_enable_detail_panel: false,
+        appearance: { showTitle: true },
+      },
+    }),
+    makeBlock({
+      provisioningKey: "home_resources",
+      type: "internal_resource_hub",
+      x: 8,
+      y: 9,
+      w: 4,
+      h: 4,
+      config: {
+        title: "Latest Resources",
+        resource_hub_subtitle: "Logos, documents, templates and internal assets.",
+        resource_hub_layout_mode: "list",
+        resource_hub_use_dashboard_mock: true,
+        resource_hub_show_search: false,
+        resource_hub_show_recent: false,
+        resource_hub_show_upload: false,
+      },
+    }),
+    makeBlock({
+      provisioningKey: "home_timeline",
+      type: "content_timeline",
+      x: 0,
+      y: 13,
+      w: 8,
+      h: 8,
+      config: {
+        title: "Content Timeline",
+        content_timeline_subtitle: "Plan and track key content and campaigns.",
+        content_timeline_default_view: "month",
+        content_timeline_group_by: "theme",
+        content_timeline_preset: "marketing_home",
+        content_timeline_show_filters: true,
+        content_timeline_enable_detail_panel: true,
+        content_timeline_compact_mode: false,
+        appearance: { showTitle: true },
+      },
+    }),
+    makeBlock({
+      provisioningKey: "home_events",
+      type: "event_calendar",
+      x: 8,
+      y: 13,
+      w: 4,
+      h: 8,
+      config: {
+        title: "Upcoming Events",
+        event_calendar_subtitle: "Upcoming events, boat shows and planning.",
+        event_calendar_default_view: "list",
+        event_calendar_show_toolbar: false,
+        event_calendar_show_metrics: false,
+        event_calendar_show_filters: false,
+        event_calendar_show_search: false,
+        event_calendar_show_add_button: false,
+        event_calendar_density: "compact",
+        appearance: { showTitle: true },
+      },
+    }),
+  ]
+}
+
+function buildThemeWorkspaceBlocks() {
+  return [
+    introBlock(
+      "theme_intro",
+      "Theme Workspace",
+      "Shape quarterly themes, campaign angles and content focus areas.",
+      0
+    ),
+    makeBlock({
+      provisioningKey: "theme_themes",
+      type: "content_theme",
+      x: 0,
+      y: 2,
+      w: 12,
+      h: 8,
+      config: {
+        title: "Content Themes",
+        content_theme_subtitle: "Strategic themes and content focus areas.",
+        content_theme_year: 2026,
+        content_theme_quarter: "Q2",
+        content_theme_show_filters: true,
+        content_theme_show_footer: true,
+        content_theme_highlight_current_quarter: true,
+        content_theme_view_mode: "grid",
+      },
+    }),
+    makeBlock({
+      provisioningKey: "theme_timeline",
+      type: "content_timeline",
+      x: 0,
+      y: 10,
+      w: 8,
+      h: 8,
+      config: {
+        title: "Theme Timeline",
+        content_timeline_subtitle: "See how themes connect to planned content.",
+        content_timeline_default_view: "quarter",
+        content_timeline_group_by: "theme",
+        content_timeline_show_filters: true,
+        appearance: { showTitle: true },
+      },
+    }),
+    makeBlock({
+      provisioningKey: "theme_actions",
+      type: "things_to_do",
+      x: 8,
+      y: 10,
+      w: 4,
+      h: 8,
+      config: {
+        title: "Theme Actions",
+        things_to_do_subtitle: "Tasks linked to current content themes.",
+        things_to_do_compact_mode: true,
+        things_to_do_max_items: 5,
+        things_to_do_show_stats: true,
+        appearance: { showTitle: true },
+      },
+    }),
+  ]
+}
+
+function buildContentPlanningBlocks() {
+  return [
+    introBlock(
+      "planning_intro",
+      "Content Planning",
+      "Plan, organise and review upcoming content across channels.",
+      0
+    ),
+    makeBlock({
+      provisioningKey: "planning_todo",
+      type: "things_to_do",
+      x: 0,
+      y: 2,
+      w: 4,
+      h: 6,
+      config: {
+        title: "Things To Do",
+        things_to_do_subtitle: "Content actions, approvals and missing assets.",
+        things_to_do_compact_mode: false,
+        things_to_do_max_items: 8,
+        things_to_do_show_stats: true,
+        appearance: { showTitle: true },
+      },
+    }),
+    makeBlock({
+      provisioningKey: "planning_timeline",
+      type: "content_timeline",
+      x: 4,
+      y: 2,
+      w: 8,
+      h: 8,
+      config: {
+        title: "Content Timeline",
+        content_timeline_subtitle: "Plan and track upcoming content.",
+        content_timeline_default_view: "month",
+        content_timeline_group_by: "theme",
+        content_timeline_show_filters: true,
+        content_timeline_enable_detail_panel: true,
+        appearance: { showTitle: true },
+      },
+    }),
+    makeBlock({
+      provisioningKey: "planning_theme_context",
+      type: "content_theme",
+      x: 0,
+      y: 8,
+      w: 4,
+      h: 6,
+      config: {
+        title: "Content Theme Context",
+        content_theme_view_mode: "compact",
+        content_theme_max_themes: 4,
+        content_theme_card_density: "compact",
+        content_theme_show_filters: false,
+        content_theme_show_footer: false,
+      },
+    }),
+    makeBlock({
+      provisioningKey: "planning_social",
       type: "social_media_calendar",
-      position_x: 0,
-      position_y: 0,
-      width: 12,
-      height: 16,
+      x: 0,
+      y: 14,
+      w: 12,
+      h: 10,
       config: {
         title: "Social Media Calendar",
-        is_full_page: true,
         social_media_calendar_subtitle:
           "Visual planning for social posts — platforms, media, and approval status at a glance.",
         social_media_calendar_default_view: "month",
@@ -574,25 +538,204 @@ function buildSocialMediaCalendarBlocks(_ctx) {
         social_media_calendar_show_media_preview: true,
         social_media_calendar_show_approval_status: true,
         social_media_calendar_show_platform_icons: true,
-        social_media_calendar_show_page_header: true,
-        appearance: { showTitle: false },
+        appearance: { showTitle: true },
       },
-    },
+    }),
   ]
 }
 
-/** Full-page event_calendar block on the Event Calendar Interface Builder page. */
-function buildEventCalendarBlocks(_ctx) {
+function buildThingsToDoBlocks() {
   return [
-    {
+    introBlock(
+      "todo_intro",
+      "Things To Do",
+      "Track content actions, approvals, missing assets and upcoming deadlines.",
+      0
+    ),
+    makeBlock({
+      provisioningKey: "todo_main",
+      type: "things_to_do",
+      x: 0,
+      y: 2,
+      w: 12,
+      h: 8,
+      config: {
+        title: "Things To Do",
+        things_to_do_subtitle: "Content actions that need attention.",
+        things_to_do_compact_mode: false,
+        things_to_do_max_items: 12,
+        things_to_do_show_stats: true,
+        things_to_do_show_filters: true,
+        things_to_do_enable_detail_panel: true,
+        appearance: { showTitle: true },
+      },
+    }),
+    makeBlock({
+      provisioningKey: "todo_timeline",
+      type: "content_timeline",
+      x: 0,
+      y: 10,
+      w: 8,
+      h: 8,
+      config: {
+        title: "Upcoming Deadlines",
+        content_timeline_subtitle: "See task and content deadlines in context.",
+        content_timeline_default_view: "month",
+        content_timeline_group_by: "status",
+        content_timeline_show_filters: true,
+        appearance: { showTitle: true },
+      },
+    }),
+    makeBlock({
+      provisioningKey: "todo_social_preview",
+      type: "social_media_calendar",
+      x: 8,
+      y: 10,
+      w: 4,
+      h: 8,
+      config: {
+        title: "Social Tasks Preview",
+        social_media_calendar_content_scope: "social_only",
+        social_media_calendar_mode: "compact",
+        social_media_calendar_default_view: "list",
+        social_media_calendar_max_posts: 5,
+        social_media_calendar_show_status_bar: true,
+        social_media_calendar_show_filters: false,
+        social_media_calendar_show_toolbar: false,
+        appearance: { showTitle: true },
+      },
+    }),
+  ]
+}
+
+function buildResourceHubBlocks() {
+  return [
+    introBlock(
+      "resources_intro",
+      "Resource Hub",
+      "Find logos, documents, media, templates and internal assets.",
+      0
+    ),
+    makeBlock({
+      provisioningKey: "resources_hub",
+      type: "internal_resource_hub",
+      x: 0,
+      y: 2,
+      w: 12,
+      h: 8,
+      config: {
+        title: "Internal Resource Hub",
+        resource_hub_subtitle: "Logos, documents, templates and internal assets.",
+        resource_hub_layout_mode: "list",
+        resource_hub_use_dashboard_mock: true,
+        resource_hub_show_search: true,
+        resource_hub_show_recent: true,
+        resource_hub_show_upload: true,
+      },
+    }),
+    makeBlock({
+      provisioningKey: "resources_actions",
+      type: "things_to_do",
+      x: 0,
+      y: 10,
+      w: 4,
+      h: 6,
+      config: {
+        title: "Resource Actions",
+        things_to_do_subtitle: "Assets or content items needing attention.",
+        things_to_do_compact_mode: true,
+        things_to_do_max_items: 5,
+        things_to_do_show_stats: true,
+        // TODO: filter missing media when config supports it
+        appearance: { showTitle: true },
+      },
+    }),
+  ]
+}
+
+function buildSocialCalendarBlocks() {
+  return [
+    introBlock(
+      "social_intro",
+      "Social Calendar",
+      "Plan social posts, captions, platforms, creative and approvals.",
+      0
+    ),
+    makeBlock({
+      provisioningKey: "social_calendar",
+      type: "social_media_calendar",
+      x: 0,
+      y: 2,
+      w: 12,
+      h: 10,
+      config: {
+        title: "Social Media Calendar",
+        social_media_calendar_subtitle:
+          "Visual planning for social posts — platforms, media, and approval status at a glance.",
+        social_media_calendar_default_view: "month",
+        social_media_calendar_content_scope: "social_only",
+        social_media_calendar_mode: "full",
+        social_media_calendar_show_status_bar: true,
+        social_media_calendar_show_filters: true,
+        social_media_calendar_show_toolbar: true,
+        social_media_calendar_show_media_preview: true,
+        social_media_calendar_show_approval_status: true,
+        social_media_calendar_show_platform_icons: true,
+        appearance: { showTitle: true },
+      },
+    }),
+    makeBlock({
+      provisioningKey: "social_actions",
+      type: "things_to_do",
+      x: 0,
+      y: 12,
+      w: 4,
+      h: 6,
+      config: {
+        title: "Social Actions",
+        things_to_do_subtitle: "Social posts needing approval, scheduling or media.",
+        things_to_do_compact_mode: true,
+        things_to_do_max_items: 6,
+        things_to_do_show_stats: true,
+        // TODO: filter social when config supports it
+        appearance: { showTitle: true },
+      },
+    }),
+    makeBlock({
+      provisioningKey: "social_timeline",
+      type: "content_timeline",
+      x: 4,
+      y: 12,
+      w: 8,
+      h: 6,
+      config: {
+        title: "Social Timeline",
+        content_timeline_default_view: "month",
+        content_timeline_group_by: "status",
+        content_timeline_show_filters: true,
+        appearance: { showTitle: true },
+      },
+    }),
+  ]
+}
+
+function buildEventCalendarBlocks() {
+  return [
+    introBlock(
+      "events_intro",
+      "Event Calendar",
+      "Plan events, boat shows, attendance and related marketing activity.",
+      0
+    ),
+    makeBlock({
+      provisioningKey: "events_calendar",
       type: "event_calendar",
-      position_x: 0,
-      position_y: 0,
-      width: 12,
-      height: 14,
+      x: 0,
+      y: 2,
+      w: 12,
+      h: 10,
       config: {
         title: "Event Calendar",
-        is_full_page: true,
         event_calendar_subtitle:
           "Plan, manage and track marketing events, trade shows and activations.",
         event_calendar_default_view: "month",
@@ -607,244 +750,42 @@ function buildEventCalendarBlocks(_ctx) {
         event_calendar_show_notes: true,
         event_calendar_show_legend: true,
         event_calendar_density: "comfortable",
-        appearance: { showTitle: false },
+        appearance: { showTitle: true },
       },
-    },
+    }),
+    makeBlock({
+      provisioningKey: "events_resources",
+      type: "internal_resource_hub",
+      x: 0,
+      y: 12,
+      w: 6,
+      h: 6,
+      config: {
+        title: "Event Resources",
+        resource_hub_subtitle: "Assets, documents and resources linked to events.",
+        resource_hub_layout_mode: "list",
+        resource_hub_use_dashboard_mock: true,
+        resource_hub_show_search: false,
+        resource_hub_show_recent: false,
+      },
+    }),
+    makeBlock({
+      provisioningKey: "events_actions",
+      type: "things_to_do",
+      x: 6,
+      y: 12,
+      w: 6,
+      h: 6,
+      config: {
+        title: "Event Actions",
+        things_to_do_subtitle: "Content and resources needed for upcoming events.",
+        things_to_do_compact_mode: true,
+        things_to_do_max_items: 5,
+        things_to_do_show_stats: true,
+        appearance: { showTitle: true },
+      },
+    }),
   ]
-}
-
-function buildInternalStaffBlocks(ctx) {
-  const resourceTable = ctx.resources || ctx.content
-  const resourceFields = ctx.fieldsByTable.get(resourceTable.id) || []
-  const contactFields = ctx.contacts ? ctx.fieldsByTable.get(ctx.contacts.id) || [] : []
-
-  const resourceTitle = pickFieldName(resourceFields, [/^name$/i, /^title$/i, /document/i, /resource/i], "name")
-  const resourceType = pickFieldName(resourceFields, [/^type$/i, /category/i, /format/i], null)
-  const resourceCategory = pickFieldName(resourceFields, [/^category$/i, /segment/i, /group/i], null)
-  const resourceOwner = pickFieldName(resourceFields, [/owner/i, /assignee/i, /team/i], null)
-  const resourceLink = pickFieldName(resourceFields, [/url/i, /link/i, /document_link/i, /drive/i], null)
-  const resourceStatus = pickFieldName(resourceFields, [/^status$/i, /state/i], null)
-  const resourceUpdatedAt = pickFieldName(resourceFields, [/^updated_at$/i, /last_updated/i, /modified/i, /updated/i], null)
-  const resourceDescription = pickFieldName(resourceFields, [/description/i, /summary/i, /notes?/i, /details?/i], null)
-  const resourceIsArchived = pickFieldName(resourceFields, [/^is_archived$/i, /^archived$/i], null)
-  const resourceDeletedAt = pickFieldName(resourceFields, [/^deleted_at$/i], null)
-
-  const contactName = pickFieldName(contactFields, [/^name$/i, /contact/i], "name")
-  const contactRole = pickFieldName(contactFields, [/role/i, /title/i, /job/i], null)
-  const contactTeam = pickFieldName(contactFields, [/team/i, /department/i, /division/i], null)
-  const contactEmail = pickFieldName(contactFields, [/email/i], null)
-  const contactIsArchived = pickFieldName(contactFields, [/^is_archived$/i, /^archived$/i], null)
-  const contactDeletedAt = pickFieldName(contactFields, [/^deleted_at$/i], null)
-  const linkTypeValues = ["Link", "Tool", "Useful Link", "External", "Platform"]
-
-  const blocks = []
-  let y = 0
-  blocks.push({
-    type: "html",
-    position_x: 0,
-    position_y: y,
-    width: 12,
-    height: 2,
-    config: {
-      title: "",
-      html: `<div class="rounded-card-lg border border-border/60 bg-card px-5 py-4 shadow-sm"><div class="flex items-start justify-between gap-4"><div><h2 class="text-xl font-semibold tracking-tight text-foreground">Internal Marketing Hub</h2><p class="mt-1 text-sm text-muted-foreground">Resources, contacts and tools for the Marketing team.</p></div><div class="flex items-center gap-2"><div class="hidden md:flex items-center rounded-md border border-border/70 bg-background px-3 py-1.5 text-xs text-muted-foreground min-w-[180px]">Search resources...</div></div></div></div>`,
-    },
-  })
-  y += 3
-
-  const baseResourceFilters = compactFilters(resourceFields, [
-    { field: resourceTitle, operator: "is_not_empty", value: "" },
-    ...(resourceIsArchived ? [{ field: resourceIsArchived, operator: "is_not_any_of", value: [true, "true", 1, "1"] }] : []),
-    ...(resourceDeletedAt ? [{ field: resourceDeletedAt, operator: "is_empty", value: "" }] : []),
-  ])
-  const baseContactFilters = compactFilters(contactFields, [
-    ...(contactName ? [{ field: contactName, operator: "is_not_empty", value: "" }] : []),
-    ...(contactIsArchived ? [{ field: contactIsArchived, operator: "is_not_any_of", value: [true, "true", 1, "1"] }] : []),
-    ...(contactDeletedAt ? [{ field: contactDeletedAt, operator: "is_empty", value: "" }] : []),
-  ])
-
-  blocks.push({
-    type: "kpi",
-    position_x: 0,
-    position_y: y,
-    width: 3,
-    height: 3,
-    config: {
-      title: "Total resources",
-      kpi_label: "Available to staff",
-      table_id: resourceTable.id,
-      kpi_aggregate: "count",
-      filters: baseResourceFilters,
-    },
-  })
-  blocks.push({
-    type: "kpi",
-    position_x: 3,
-    position_y: y,
-    width: 3,
-    height: 3,
-    config: {
-      title: "With links",
-      kpi_label: "Quick access",
-      table_id: resourceTable.id,
-      kpi_aggregate: "count",
-      filters: compactFilters(resourceFields, [
-        ...baseResourceFilters,
-        ...(resourceLink ? [{ field: resourceLink, operator: "is_not_empty", value: "" }] : []),
-      ]),
-    },
-  })
-  blocks.push({
-    type: "kpi",
-    position_x: 6,
-    position_y: y,
-    width: 3,
-    height: 3,
-    config: {
-      title: "Recently updated",
-      kpi_label: resourceUpdatedAt ? "In the last 30 days" : "Active set",
-      table_id: resourceTable.id,
-      kpi_aggregate: "count",
-      filters: compactFilters(resourceFields, [
-        ...baseResourceFilters,
-        ...(resourceUpdatedAt
-          ? [{ field: resourceUpdatedAt, operator: "date_last_days", value: 30 }]
-          : resourceStatus
-          ? [{ field: resourceStatus, operator: "is_any_of", value: ["Active", "Live", "Published", "In Use"] }]
-          : []),
-      ]),
-    },
-  })
-  blocks.push({
-    type: "kpi",
-    position_x: 9,
-    position_y: y,
-    width: 3,
-    height: 3,
-    config: {
-      title: "Downloads this month",
-      kpi_label: "Team activity",
-      table_id: resourceTable.id,
-      kpi_aggregate: "count",
-      filters: compactFilters(resourceFields, [
-        ...baseResourceFilters,
-        ...(resourceUpdatedAt
-          ? [{ field: resourceUpdatedAt, operator: "date_this_month", value: true }]
-          : resourceLink
-          ? [{ field: resourceLink, operator: "is_not_empty", value: "" }]
-          : []),
-      ]),
-    },
-  })
-  y += 4
-
-  const primaryVisible = [resourceTitle, resourceType, resourceCategory, resourceUpdatedAt, resourceLink].filter(Boolean)
-  blocks.push({
-    type: "grid",
-    position_x: 0,
-    position_y: y,
-    width: 12,
-    height: 7,
-    config: {
-      title: "Resource Library",
-      table_id: resourceTable.id,
-      view_type: "list",
-      row_limit: 7,
-      list_title_field: resourceTitle,
-      visible_fields: primaryVisible,
-      list_subtitle_fields: [resourceDescription].filter(Boolean),
-      list_meta_fields: [resourceType, resourceCategory, resourceUpdatedAt, resourceOwner].filter(Boolean),
-      ...(resourceType ? { pill_fields: [resourceType] } : resourceStatus ? { pill_fields: [resourceStatus] } : {}),
-      filters: baseResourceFilters,
-      sorts: [...(resourceUpdatedAt ? [{ field: resourceUpdatedAt, direction: "desc" }] : [])],
-      appearance: { showTitle: true, border: "none", compact: true, padding: "compact", showDivider: true },
-    },
-  })
-  y += 8
-
-  if (ctx.contacts && contactName) {
-    const supportVisible = [contactName, contactRole, contactTeam, contactEmail].filter(Boolean)
-    blocks.push({
-      type: "grid",
-      position_x: 0,
-      position_y: y,
-      width: 7,
-      height: 6,
-      config: {
-        title: "Internal Contacts",
-        table_id: ctx.contacts.id,
-        view_type: "list",
-        row_limit: 6,
-        list_title_field: contactName,
-        visible_fields: supportVisible,
-        list_meta_fields: [contactRole, contactTeam, contactEmail].filter(Boolean),
-        ...(contactTeam ? { group_by_field: contactTeam } : {}),
-        filters: baseContactFilters,
-        appearance: { showTitle: true, border: "none", compact: true, padding: "compact" },
-      },
-    })
-    blocks.push({
-      type: "grid",
-      position_x: 7,
-      position_y: y,
-      width: 5,
-      height: 6,
-      config: {
-        title: "Useful Links",
-        table_id: resourceTable.id,
-        view_type: "list",
-        row_limit: 6,
-        list_title_field: resourceTitle,
-        visible_fields: [resourceTitle, resourceDescription, resourceLink].filter(Boolean),
-        list_subtitle_fields: [resourceDescription].filter(Boolean),
-        list_meta_fields: [resourceType].filter(Boolean),
-        ...(resourceType ? { pill_fields: [resourceType] } : {}),
-        filters: compactFilters(resourceFields, [
-          ...baseResourceFilters,
-          ...(resourceLink ? [{ field: resourceLink, operator: "is_not_empty", value: "" }] : []),
-          ...(resourceType ? [{ field: resourceType, operator: "is_any_of", value: linkTypeValues }] : []),
-        ]),
-        appearance: { showTitle: true, border: "none", compact: true, padding: "compact" },
-      },
-    })
-  } else {
-    blocks.push({
-      type: "html",
-      position_x: 0,
-      position_y: y,
-      width: 7,
-      height: 4,
-      config: {
-        title: "Internal Contacts",
-        html: `<div class="rounded-card-lg border border-border/60 bg-card p-4 shadow-sm"><p class="text-sm text-muted-foreground">No contact table is connected yet. Add a Contacts table to enable the internal directory panel.</p></div>`,
-      },
-    })
-    blocks.push({
-      type: "grid",
-      position_x: 7,
-      position_y: y,
-      width: 5,
-      height: 6,
-      config: {
-        title: "Useful Links",
-        table_id: resourceTable.id,
-        view_type: "list",
-        row_limit: 6,
-        list_title_field: resourceTitle,
-        visible_fields: [resourceTitle, resourceDescription, resourceLink].filter(Boolean),
-        list_subtitle_fields: [resourceDescription].filter(Boolean),
-        list_meta_fields: [resourceType].filter(Boolean),
-        ...(resourceType ? { pill_fields: [resourceType] } : {}),
-        filters: compactFilters(resourceFields, [
-          ...baseResourceFilters,
-          ...(resourceLink ? [{ field: resourceLink, operator: "is_not_empty", value: "" }] : []),
-        ]),
-        appearance: { showTitle: true, border: "none", compact: true, padding: "compact" },
-      },
-    })
-  }
-
-  return blocks
 }
 
 async function applyVisibilityCuration() {
@@ -899,9 +840,10 @@ async function applyMarketingNavPriority(pageIds) {
     pageIds.home,
     pageIds.theme,
     pageIds.content,
-    pageIds.eventCalendar,
+    pageIds.thingsToDo,
+    pageIds.resourceHub,
     pageIds.social,
-    pageIds.internalStaff,
+    pageIds.eventCalendar,
   ].filter(Boolean)
   for (let i = 0; i < orderedIds.length; i += 1) {
     await supabase.from("interface_pages").update({ order_index: i, is_admin_only: false }).eq("id", orderedIds[i])
@@ -912,43 +854,58 @@ async function main() {
   const ctx = await fetchRequiredMetadata()
 
   const publicGroup = (await getGroupIdByName("Public")) || (await getGroupIdByName("Other"))
-  const strategyGroup = (await getGroupIdByName("Strategy")) || publicGroup
-  const plannerGroup = (await getGroupIdByName("Planner")) || publicGroup
-  if (!publicGroup || !strategyGroup || !plannerGroup) {
+  if (!publicGroup) {
     throw new Error("Could not resolve required interface groups")
   }
 
   const homePageId = await upsertPage({
-    name: "Dashboard",
-    aliases: ["Marketing Home", "Marketing Dashboard"],
+    name: "Marketing Home",
+    aliases: ["Dashboard", "Marketing Dashboard"],
     page_type: "content",
     group_id: publicGroup,
     order_index: 0,
     saved_view_id: ctx.anchors.home,
-    config: { layout_style: "marketing_home" },
+    config: { is_home: true },
   })
   const themePageId = await upsertPage({
     name: "Theme Workspace",
     page_type: "content",
     group_id: publicGroup,
-    order_index: 2,
+    order_index: 1,
     saved_view_id: ctx.anchors.theme,
-    config: { layout_style: "theme_overview" },
+    config: {},
   })
   const contentPageId = await upsertPage({
     name: "Content Planning",
     page_type: "content",
     group_id: publicGroup,
-    order_index: 4,
+    order_index: 2,
     saved_view_id: ctx.anchors.content,
-    config: { layout_style: "content_planning" },
+    config: {},
   })
-  const socialCalendarPageId = await upsertPage({
-    name: "Social Media Calendar",
-    aliases: ["Social Calendar", "Social Media"],
+  const thingsToDoPageId = await upsertPage({
+    name: "Things To Do",
     page_type: "content",
     group_id: publicGroup,
     order_index: 3,
+    saved_view_id: ctx.anchors.content,
+    config: {},
+  })
+  const resourceHubPageId = await upsertPage({
+    name: "Resource Hub",
+    aliases: ["Internal Staff Hub", "Internal Marketing Hub"],
+    page_type: "content",
+    group_id: publicGroup,
+    order_index: 4,
+    saved_view_id: ctx.anchors.resources,
+    config: {},
+  })
+  const socialCalendarPageId = await upsertPage({
+    name: "Social Calendar",
+    aliases: ["Social Media Calendar", "Social Media"],
+    page_type: "content",
+    group_id: publicGroup,
+    order_index: 5,
     saved_view_id: ctx.anchors.content,
     config: {},
   })
@@ -957,48 +914,42 @@ async function main() {
     aliases: ["Events Calendar", "Marketing Events"],
     page_type: "content",
     group_id: publicGroup,
-    order_index: 5,
+    order_index: 6,
     saved_view_id: ctx.anchors.content,
     config: {},
   })
-  const internalStaffPageId = await upsertPage({
-    name: "Internal Staff Hub",
-    page_type: "content",
-    group_id: publicGroup,
-    order_index: 1,
-    saved_view_id: ctx.anchors.resources,
-    config: { layout_style: "internal_staff_hub" },
-  })
 
-  await applyPageBlocksAdditive(homePageId, buildMarketingHomeBlocks(ctx))
-  await applyPageBlocksAdditive(themePageId, buildThemeWorkspaceBlocks(ctx))
-  await applyPageBlocksAdditive(contentPageId, buildContentPlanningBlocks(ctx))
-  await applyPageBlocksAdditive(socialCalendarPageId, buildSocialMediaCalendarBlocks(ctx))
-  await applyPageBlocksAdditive(eventCalendarPageId, buildEventCalendarBlocks(ctx))
-  await applyPageBlocksAdditive(internalStaffPageId, buildInternalStaffBlocks(ctx))
+  await syncPageBlocks(homePageId, buildMarketingHomeBlocks())
+  await syncPageBlocks(themePageId, buildThemeWorkspaceBlocks())
+  await syncPageBlocks(contentPageId, buildContentPlanningBlocks())
+  await syncPageBlocks(thingsToDoPageId, buildThingsToDoBlocks())
+  await syncPageBlocks(resourceHubPageId, buildResourceHubBlocks())
+  await syncPageBlocks(socialCalendarPageId, buildSocialCalendarBlocks())
+  await syncPageBlocks(eventCalendarPageId, buildEventCalendarBlocks())
 
   await archiveDeprecatedPages()
   await applyMarketingNavPriority({
     home: homePageId,
-    internalStaff: internalStaffPageId,
     theme: themePageId,
-    social: socialCalendarPageId,
     content: contentPageId,
+    thingsToDo: thingsToDoPageId,
+    resourceHub: resourceHubPageId,
+    social: socialCalendarPageId,
     eventCalendar: eventCalendarPageId,
   })
   await applyVisibilityCuration()
 
   console.log("Marketing Hub workspace applied successfully.")
-  console.log(`Dashboard: /pages/${homePageId}`)
+  console.log(`Marketing Home: /pages/${homePageId}`)
   console.log(`Theme Workspace: /pages/${themePageId}`)
   console.log(`Content Planning: /pages/${contentPageId}`)
-  console.log(`Social Media Calendar: /pages/${socialCalendarPageId}`)
+  console.log(`Things To Do: /pages/${thingsToDoPageId}`)
+  console.log(`Resource Hub: /pages/${resourceHubPageId}`)
+  console.log(`Social Calendar: /pages/${socialCalendarPageId}`)
   console.log(`Event Calendar: /pages/${eventCalendarPageId}`)
-  console.log(`Internal Staff Hub: /pages/${internalStaffPageId}`)
 }
 
 main().catch((error) => {
   console.error(error)
   process.exit(1)
 })
-

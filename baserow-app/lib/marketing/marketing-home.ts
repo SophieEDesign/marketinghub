@@ -10,16 +10,33 @@ const HOME_NAMES = new Set([
   "dashboard",
 ])
 
+/** Canonical Marketing Hub workspace pages (Interface Builder canvas). */
+const WORKSPACE_PAGE_NAMES = new Set([
+  "marketing home",
+  "theme workspace",
+  "content planning",
+  "things to do",
+  "resource hub",
+  "social calendar",
+  "social media calendar",
+  "event calendar",
+  // Legacy names still in nav until reprovisioned
+  "internal staff hub",
+])
+
 export function isMarketingHomePage(
   page: Pick<InterfacePage, "name" | "config"> | null | undefined
 ): boolean {
   if (!page) return false
-  const cfg = page.config as { layout_style?: string; is_home?: boolean } | undefined
+  const cfg = page.config as { is_home?: boolean } | undefined
   const name = (page.name || "").trim().toLowerCase()
-  return (
-    cfg?.layout_style === "marketing_dashboard" ||
-    cfg?.layout_style === "marketing_home" ||
-    cfg?.is_home === true ||
-    HOME_NAMES.has(name)
-  )
+  return cfg?.is_home === true || HOME_NAMES.has(name)
+}
+
+export function isMarketingHubWorkspacePage(
+  page: Pick<InterfacePage, "name"> | null | undefined
+): boolean {
+  if (!page) return false
+  const name = (page.name || "").trim().toLowerCase()
+  return WORKSPACE_PAGE_NAMES.has(name)
 }
