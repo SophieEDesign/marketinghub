@@ -53,8 +53,10 @@ function CalendarSkeleton({ compact }: { compact: boolean }) {
 export function EventCalendarCore({
   settings,
   canEdit = false,
+  isEditing = false,
+  embeddedInBlock = true,
   className,
-}: EventCalendarCoreProps) {
+}: EventCalendarCoreProps & { isEditing?: boolean; embeddedInBlock?: boolean }) {
   const { openRecordModal } = useRecordModal()
   const { toast } = useToast()
   const {
@@ -131,6 +133,24 @@ export function EventCalendarCore({
   )
 
   const panelOpen = !!selectedEventId && !!selectedEvent
+  const useInlineDetailPanel = !embeddedInBlock && !isEditing
+
+  const handleEventClick = useCallback(
+    (id: string) => {
+      if (isEditing) return
+      if (embeddedInBlock && tableIds?.contentTableId) {
+        openRecordModal({
+          tableId: tableIds.contentTableId,
+          recordId: id,
+          supabaseTableName: tableIds.contentSupabaseTable,
+          onRecordUpdated: () => reload(),
+        })
+        return
+      }
+      setSelectedEventId(id)
+    },
+    [isEditing, embeddedInBlock, tableIds, openRecordModal, reload]
+  )
 
   const handleAddEvent = useCallback(() => {
     if (!tableIds?.contentTableId) return
@@ -252,6 +272,7 @@ export function EventCalendarCore({
         className
       )}
       data-event-calendar-core
+      data-block-selectable
     >
       {settings.showPageHeader ? (
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between shrink-0">
@@ -321,19 +342,21 @@ export function EventCalendarCore({
               viewMode={viewMode}
               cursorDate={cursorDate}
               selectedId={selectedEventId}
-              onEventClick={setSelectedEventId}
+              onEventClick={handleEventClick}
               onDatesChange={setCursorDate}
               compact={settings.density === "compact"}
             />
           </div>
 
-          {!isMobile ? (
+          {useInlineDetailPanel && !isMobile ? (
             <EventDetailPanel {...panelProps} />
           ) : null}
 
-          {isMobile ? <EventDetailPanel {...panelProps} isMobile /> : null}
+          {useInlineDetailPanel && isMobile ? (
+            <EventDetailPanel {...panelProps} isMobile />
+          ) : null}
 
-          {!isMobile ? (
+          {useInlineDetailPanel && !isMobile ? (
             <div className="hidden md:block lg:hidden">
               <EventDetailPanelOverlay {...panelProps} />
             </div>
@@ -376,17 +399,29 @@ export function EventCalendarCore({
 export function EventCalendarFromConfig({
   config,
   canEdit,
+  isEditing = false,
+  embeddedInBlock = true,
   className,
 }: {
   config?: BlockConfig
   canEdit?: boolean
+  isEditing?: boolean
+  embeddedInBlock?: boolean
   className?: string
 }) {
   const settings = useMemo(
     () => eventCalendarSettingsFromConfig(config as Record<string, unknown>),
     [config]
   )
-  return <EventCalendarCore settings={settings} canEdit={canEdit} className={className} />
+  return (
+    <EventCalendarCore
+      settings={settings}
+      canEdit={canEdit}
+      isEditing={isEditing}
+      embeddedInBlock={embeddedInBlock}
+      className={className}
+    />
+  )
 }
 
 export default EventCalendarCore

@@ -38,7 +38,13 @@ export type DeadlineStatus =
 
 export type DeadlinePriority = 'low' | 'medium' | 'high'
 
-export interface DeadlineItem {
+/** When set, row opens in RecordModal from the block. */
+export interface UpcomingSummaryRecordRef {
+  recordTableId?: string
+  recordSupabaseTable?: string
+}
+
+export interface DeadlineItem extends UpcomingSummaryRecordRef {
   id: string
   title: string
   owner?: string
@@ -49,7 +55,7 @@ export interface DeadlineItem {
   channel?: string
 }
 
-export interface CampaignItem {
+export interface CampaignItem extends UpcomingSummaryRecordRef {
   id: string
   title: string
   startDate?: string
@@ -60,7 +66,7 @@ export interface CampaignItem {
   theme?: string
 }
 
-export interface EventItem {
+export interface EventItem extends UpcomingSummaryRecordRef {
   id: string
   title: string
   startDate: string
@@ -70,7 +76,7 @@ export interface EventItem {
   status?: string
 }
 
-export interface ApprovalItem {
+export interface ApprovalItem extends UpcomingSummaryRecordRef {
   id: string
   title: string
   contentType?: string
@@ -85,14 +91,14 @@ export type BlockerReason =
   | 'missing-brief'
   | 'date-not-set'
 
-export interface BlockerItem {
+export interface BlockerItem extends UpcomingSummaryRecordRef {
   id: string
   title: string
   reason: BlockerReason
   relatedContent?: string
 }
 
-export interface PublishedItem {
+export interface PublishedItem extends UpcomingSummaryRecordRef {
   id: string
   title: string
   publishedDate: string

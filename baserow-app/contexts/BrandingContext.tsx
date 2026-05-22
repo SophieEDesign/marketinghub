@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useEffect, ReactNode } from 'react'
-import type { WorkspaceSettings } from '@/lib/branding'
+import { normalizeSidebarTextColor, type WorkspaceSettings } from '@/lib/branding'
 
 interface BrandingContextType {
   settings: WorkspaceSettings | null
@@ -27,8 +27,8 @@ export function BrandingProvider({
   const primaryColor = settings?.primary_color || 'hsl(222.2, 47.4%, 11.2%)' // Default from theme
   const accentColor = settings?.accent_color || 'hsl(210, 40%, 96.1%)' // Default from theme
   const sidebarColor = settings?.sidebar_color || '#ffffff' // Default white
-  // Light sidebar always needs dark link text — never fall back to primary (often light on white)
-  const sidebarTextColor = settings?.sidebar_text_color || '#4b5563'
+  // Light sidebar always needs dark link text — never use white/light branding on white bg
+  const sidebarTextColor = normalizeSidebarTextColor(settings?.sidebar_text_color)
 
   // Set CSS custom properties for global text color
   useEffect(() => {

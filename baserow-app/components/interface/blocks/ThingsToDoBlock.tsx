@@ -165,7 +165,7 @@ export default function ThingsToDoBlock({
     })
   }, [selectedItem, openRecordModal, reload])
 
-  const showDetail = enableDetailPanel && selectedItem != null
+  const showDetail = enableDetailPanel && selectedItem != null && !isEditing
 
   if (loading && !fromLiveData) {
     return (

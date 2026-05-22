@@ -86,7 +86,7 @@ export default function GroupedInterfaces({
   const router = useRouter()
   // Single source of truth: derive from pathname only (no params/searchParams mix)
   const currentPageId = pathname?.match(/\/pages\/([^/?]+)/)?.[1] ?? undefined
-  const { primaryColor, sidebarTextColor } = useBranding()
+  const { primaryColor } = useBranding()
   const { toast } = useToast()
   // Filter out any null/undefined groups (safety check)
   const [groups, setGroups] = useState<InterfaceGroup[]>(initialGroups.filter(g => g && g.id))
@@ -792,20 +792,19 @@ export default function GroupedInterfaces({
         <div className="px-2 py-1">
           <button
             onClick={() => toggleGroup(group.id)}
-            className="w-full flex items-center gap-2 px-2 py-1.5 text-sm font-medium hover:bg-black/10 rounded transition-colors"
-            style={{ color: sidebarTextColor }}
+            className="w-full flex items-center gap-2 px-2 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 rounded transition-colors"
           >
             {isCollapsed ? (
-              <ChevronRight className="h-4 w-4" style={{ color: sidebarTextColor }} />
+              <ChevronRight className="h-4 w-4 text-slate-500" />
             ) : (
-              <ChevronDown className="h-4 w-4" style={{ color: sidebarTextColor }} />
+              <ChevronDown className="h-4 w-4 text-slate-500" />
             )}
             {group.icon ? (
-              <span style={{ color: sidebarTextColor }}>
+              <span className="text-slate-500">
                 {renderIconByName(group.icon, "h-4 w-4")}
               </span>
             ) : (
-              <Folder className="h-4 w-4" style={{ color: sidebarTextColor }} />
+              <Folder className="h-4 w-4 text-slate-500" />
             )}
             <span className="flex-1 text-left truncate">{group.name}</span>
           </button>
@@ -830,37 +829,36 @@ export default function GroupedInterfaces({
         style={style} 
         className={`group ${isOver && canDrag ? 'bg-blue-50 border-l-2 border-blue-400' : ''} ${isDragging ? 'pointer-events-none' : ''}`}
       >
-        <div className="flex items-center gap-1 px-2 py-1 hover:bg-black/10 rounded min-w-0">
+        <div className="flex items-center gap-1 px-2 py-1 hover:bg-slate-100 rounded min-w-0">
           {canDrag ? (
             <button
               {...attributes}
               {...listeners}
-              className="p-0.5 hover:bg-black/20 rounded cursor-grab active:cursor-grabbing flex-shrink-0"
+              className="p-0.5 hover:bg-slate-200 rounded cursor-grab active:cursor-grabbing flex-shrink-0 text-slate-500"
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
               title="Drag to reorder"
             >
-              <GripVertical className="h-3 w-3" style={{ color: sidebarTextColor }} />
+              <GripVertical className="h-3 w-3" />
             </button>
           ) : (
             <div className="p-0.5 w-3 h-3 flex-shrink-0" />
           )}
           <button
             onClick={() => toggleGroup(group.id)}
-            className="flex-1 flex items-center gap-1 px-1 py-0.5 text-xs font-semibold uppercase tracking-wider hover:bg-black/10 rounded min-w-0"
-            style={{ color: sidebarTextColor }}
+            className="flex-1 flex items-center gap-1 px-1 py-0.5 text-xs font-semibold uppercase tracking-wider text-slate-500 hover:bg-slate-100 rounded min-w-0"
           >
             {isCollapsed ? (
-              <ChevronRight className="h-3 w-3 flex-shrink-0" style={{ color: sidebarTextColor }} />
+              <ChevronRight className="h-3 w-3 flex-shrink-0 text-slate-500" />
             ) : (
-              <ChevronDown className="h-3 w-3 flex-shrink-0" style={{ color: sidebarTextColor }} />
+              <ChevronDown className="h-3 w-3 flex-shrink-0 text-slate-500" />
             )}
             {group.icon ? (
-              <span className="flex-shrink-0" style={{ color: sidebarTextColor }}>
+              <span className="flex-shrink-0 text-slate-500">
                 {renderIconByName(group.icon, "h-3 w-3")}
               </span>
             ) : (
-              <Folder className="h-3 w-3 flex-shrink-0" style={{ color: sidebarTextColor }} />
+              <Folder className="h-3 w-3 flex-shrink-0 text-slate-500" />
             )}
             {editingGroupId === group.id ? (
               <Input
@@ -889,11 +887,11 @@ export default function GroupedInterfaces({
           <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
               <button 
-                className="p-0.5 hover:bg-black/20 rounded opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                className="p-0.5 hover:bg-slate-200 rounded opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 text-slate-500"
                 disabled={isDragging || isRenaming}
                 onMouseDown={(e) => e.stopPropagation()}
               >
-                <Edit2 className="h-3 w-3" style={{ color: sidebarTextColor }} />
+                <Edit2 className="h-3 w-3" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -1003,7 +1001,7 @@ export default function GroupedInterfaces({
             <button
               {...attributes}
               {...listeners}
-              className="p-0.5 hover:bg-black/20 rounded cursor-grab active:cursor-grabbing opacity-0 group-hover/page:opacity-100 transition-opacity flex-shrink-0"
+              className="p-0.5 hover:bg-slate-200 rounded cursor-grab active:cursor-grabbing opacity-0 group-hover/page:opacity-100 transition-opacity flex-shrink-0 text-slate-500"
               onClick={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
@@ -1011,7 +1009,7 @@ export default function GroupedInterfaces({
               onMouseDown={(e) => e.stopPropagation()}
               title="Drag to reorder"
             >
-              <GripVertical className="h-3 w-3" style={{ color: sidebarTextColor }} />
+              <GripVertical className="h-3 w-3" />
             </button>
           ) : (
             <div className="p-0.5 w-3 h-3 flex-shrink-0 opacity-0 group-hover/page:opacity-0" />
@@ -1078,11 +1076,11 @@ export default function GroupedInterfaces({
             <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
               <button 
-                className="p-0.5 hover:bg-black/20 rounded opacity-0 group-hover/page:opacity-100 transition-opacity flex-shrink-0"
+                className="p-0.5 hover:bg-slate-200 rounded opacity-0 group-hover/page:opacity-100 transition-opacity flex-shrink-0 text-slate-500"
                 disabled={isDragging || isRenaming}
                 onMouseDown={(e) => e.stopPropagation()}
               >
-                <Edit2 className="h-3 w-3" style={{ color: sidebarTextColor }} />
+                <Edit2 className="h-3 w-3" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -1196,19 +1194,17 @@ export default function GroupedInterfaces({
         <div className="px-2 mb-2 flex gap-1 flex-shrink-0">
           <button
             onClick={() => setNewPageModalOpen(true)}
-            className="flex-1 flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-black/10 rounded transition-colors"
-            style={{ color: sidebarTextColor }}
+            className="flex-1 flex items-center gap-2 px-2 py-1.5 text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900 rounded transition-colors"
           >
-            <Plus className="h-4 w-4" style={{ color: sidebarTextColor }} />
+            <Plus className="h-4 w-4" />
             <span>New Page</span>
           </button>
           <button
             onClick={handleCreateGroup}
-            className="flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-black/10 rounded transition-colors"
-            style={{ color: sidebarTextColor }}
+            className="flex items-center gap-2 px-2 py-1.5 text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900 rounded transition-colors"
             title="New section"
           >
-            <Plus className="h-4 w-4" style={{ color: sidebarTextColor }} />
+            <Plus className="h-4 w-4" />
             <span className="hidden sm:inline">Section</span>
           </button>
         </div>

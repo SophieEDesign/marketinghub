@@ -217,7 +217,7 @@ export default function ContentTimelineBlock({
           )}
         </div>
 
-        {enableDetailPanel && selectedItem && (
+        {enableDetailPanel && selectedItem && !isEditing && (
           <ContentTimelineDetailPanel
             item={selectedItem}
             onClose={() => setSelectedId(null)}

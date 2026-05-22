@@ -395,6 +395,8 @@ export interface BlockConfig {
   upcoming_summary_show_owners?: boolean
   upcoming_summary_show_view_all?: boolean
   upcoming_summary_group_campaigns_by_status?: boolean
+  /** When true, show sample data instead of live Content / Campaigns / Events. */
+  upcoming_summary_use_mock?: boolean
   // Things To Do block
   things_to_do_subtitle?: string
   things_to_do_default_view?: 'list' | 'board' | 'by-priority' | 'by-campaign' | 'calendar'

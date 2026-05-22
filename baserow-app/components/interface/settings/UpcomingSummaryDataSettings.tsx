@@ -47,11 +47,25 @@ export default function UpcomingSummaryDataSettings({
 
   return (
     <div className="space-y-4">
-      <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
-        <p className="text-sm text-amber-900">
-          This block currently uses demo data only. Section counts are samples until wired to
-          Content, Campaigns, and Events.
+      <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+        <p className="text-sm text-blue-800">
+          Loads from Content (deadlines, approvals, blockers, published, events) and Campaigns.
+          Tables are discovered by name. Click a row in view mode to open the record.
         </p>
+      </div>
+
+      <div className="flex items-center justify-between rounded-md border border-border/40 px-3 py-2">
+        <div className="space-y-0.5 pr-3">
+          <Label htmlFor="us-use-mock">Use demo data</Label>
+          <p className="text-xs text-muted-foreground">
+            Show sample sections instead of live table data.
+          </p>
+        </div>
+        <Switch
+          id="us-use-mock"
+          checked={config.upcoming_summary_use_mock === true}
+          onCheckedChange={(v) => onUpdate({ upcoming_summary_use_mock: v ? true : undefined })}
+        />
       </div>
       <div className="space-y-2">
         <Label htmlFor="upcoming-summary-title">Block title</Label>
@@ -208,7 +222,7 @@ export default function UpcomingSummaryDataSettings({
       </div>
 
       <p className="text-xs text-gray-500">
-        Uses mock data until connected to Content, Campaigns, and Events tables.
+        Enable demo data only for presentations when tables are unavailable.
       </p>
     </div>
   )

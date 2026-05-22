@@ -1,6 +1,9 @@
 "use client"
 
 import { useCallback, useMemo } from "react"
+import { useRecordModal } from "@/contexts/RecordModalContext"
+import { useUpcomingSummaryData } from "@/hooks/useUpcomingSummaryData"
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 import { format, parseISO, isValid } from "date-fns"
 import {
   AlertCircle,
@@ -106,15 +109,12 @@ function StatusPill({ label, className }: { label: string; className?: string })
   )
 }
 
-/** Set true when RecordModal / table links are wired */
-const UPCOMING_SUMMARY_LINKS_ENABLED = false
-
 function ItemRow({
   children,
   onClick,
   isCompact,
   showChevron,
-  interactive = UPCOMING_SUMMARY_LINKS_ENABLED,
+  interactive = false,
 }: {
   children: React.ReactNode
   onClick?: () => void
@@ -167,6 +167,12 @@ export default function UpcomingSummaryBlock({
   isEditing = false,
 }: UpcomingSummaryBlockProps) {
   const { config } = block
+  const { openRecordModal } = useRecordModal()
+  const { loading, error, fromLiveData, data: liveData, reload } = useUpcomingSummaryData()
+
+  const forceMock = config.upcoming_summary_use_mock === true
+  const useLive = fromLiveData && !forceMock
+  const isDemoData = !useLive
 
   const blockTitle = config.title || "Upcoming Summary"
   const subtitle =
@@ -189,9 +195,18 @@ export default function UpcomingSummaryBlock({
       ? "grid grid-cols-1 gap-3"
       : "grid grid-cols-1 gap-3 md:grid-cols-2"
 
+  const sourceDeadlines = useLive ? liveData.deadlines : MOCK_DEADLINES
+  const sourceCampaigns = useLive ? liveData.campaigns : MOCK_CAMPAIGNS
+  const sourceEvents = useLive ? liveData.events : MOCK_EVENTS
+  const sourceApproval = useLive ? liveData.approval : MOCK_APPROVAL
+  const sourceBlockers = useLive ? liveData.blockers : MOCK_BLOCKERS
+  const sourcePublished = useLive ? liveData.published : MOCK_PUBLISHED
+
+  const linksEnabled = useLive
+
   const deadlinesInRange = useMemo(
-    () => filterDeadlinesByRange(MOCK_DEADLINES, dateRange),
-    [dateRange]
+    () => filterDeadlinesByRange(sourceDeadlines, dateRange),
+    [sourceDeadlines, dateRange]
   )
   const deadlinesVisible = useMemo(
     () => sliceItems(deadlinesInRange, maxItems),
@@ -199,8 +214,8 @@ export default function UpcomingSummaryBlock({
   )
 
   const campaignsInRange = useMemo(
-    () => filterCampaignsByRange(MOCK_CAMPAIGNS, dateRange),
-    [dateRange]
+    () => filterCampaignsByRange(sourceCampaigns, dateRange),
+    [sourceCampaigns, dateRange]
   )
   const campaignsVisible = useMemo(() => {
     const list = groupCampaigns
@@ -210,8 +225,8 @@ export default function UpcomingSummaryBlock({
   }, [groupCampaigns, campaignsInRange, maxItems])
 
   const eventsInRange = useMemo(
-    () => filterEventsByRange(MOCK_EVENTS, dateRange),
-    [dateRange]
+    () => filterEventsByRange(sourceEvents, dateRange),
+    [sourceEvents, dateRange]
   )
   const eventsVisible = useMemo(
     () => sliceItems(eventsInRange, maxItems),
@@ -219,18 +234,18 @@ export default function UpcomingSummaryBlock({
   )
 
   const approvalVisible = useMemo(
-    () => sliceItems(MOCK_APPROVAL, maxItems),
-    [maxItems]
+    () => sliceItems(sourceApproval, maxItems),
+    [sourceApproval, maxItems]
   )
 
   const blockersVisible = useMemo(
-    () => sliceItems(MOCK_BLOCKERS, maxItems),
-    [maxItems]
+    () => sliceItems(sourceBlockers, maxItems),
+    [sourceBlockers, maxItems]
   )
 
   const publishedInRange = useMemo(
-    () => filterPublishedByRange(MOCK_PUBLISHED, dateRange),
-    [dateRange]
+    () => filterPublishedByRange(sourcePublished, dateRange),
+    [sourcePublished, dateRange]
   )
   const publishedVisible = useMemo(
     () => sliceItems(publishedInRange, maxItems),
@@ -238,17 +253,24 @@ export default function UpcomingSummaryBlock({
   )
 
   const handleItemClick = useCallback(
-    (_itemId: string, _section: UpcomingSummarySectionId) => {
-      // TODO: connect deadlines to Content table date/status fields
-      // TODO: connect campaigns to Campaigns table
-      // TODO: connect events to Events table
-      // TODO: connect approval items to status field
-      // TODO: connect blockers to missing required fields
-      // TODO: connect recently published to published content status
-      // TODO: open existing RecordModal / RecordEditor on click
-      // e.g. openRecordModal({ tableId, recordId: itemId, supabaseTableName, ... })
+    (
+      item: {
+        id: string
+        recordTableId?: string
+        recordSupabaseTable?: string
+      },
+      _section: UpcomingSummarySectionId
+    ) => {
+      if (!linksEnabled || isEditing) return
+      if (!item.recordTableId || !item.recordSupabaseTable) return
+      openRecordModal({
+        tableId: item.recordTableId,
+        recordId: item.id,
+        supabaseTableName: item.recordSupabaseTable,
+        onRecordUpdated: () => reload(),
+      })
     },
-    []
+    [linksEnabled, isEditing, openRecordModal, reload]
   )
 
   const handleViewAll = useCallback((_section: UpcomingSummarySectionId) => {
@@ -272,7 +294,8 @@ export default function UpcomingSummaryBlock({
       <ItemRow
         key={item.id}
         isCompact={isCompact}
-        onClick={() => handleItemClick(item.id, "deadlines")}
+        interactive={linksEnabled && !isEditing}
+        onClick={() => handleItemClick(item, "deadlines")}
       >
         <span
           className={cn("h-1.5 w-1.5 shrink-0 rounded-full", STATUS_DOT[item.status] ?? "bg-gray-400")}
@@ -309,7 +332,8 @@ export default function UpcomingSummaryBlock({
         key={item.id}
         isCompact={isCompact}
         showChevron
-        onClick={() => handleItemClick(item.id, "campaigns")}
+        interactive={linksEnabled && !isEditing}
+        onClick={() => handleItemClick(item, "campaigns")}
       >
         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-purple-400" aria-hidden />
         <div className="min-w-0 flex-1">
@@ -335,7 +359,8 @@ export default function UpcomingSummaryBlock({
       key={item.id}
       isCompact={isCompact}
       showChevron
-      onClick={() => handleItemClick(item.id, "events")}
+      interactive={linksEnabled && !isEditing}
+      onClick={() => handleItemClick(item, "events")}
     >
       <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden />
       <div className="min-w-0 flex-1">
@@ -362,7 +387,8 @@ export default function UpcomingSummaryBlock({
     <ItemRow
       key={item.id}
       isCompact={isCompact}
-      onClick={() => handleItemClick(item.id, "approval")}
+      interactive={linksEnabled && !isEditing}
+      onClick={() => handleItemClick(item, "approval")}
     >
       <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-orange-400" aria-hidden />
       <FileText className="h-3.5 w-3.5 shrink-0 text-[#6B7280]" aria-hidden />
@@ -382,7 +408,8 @@ export default function UpcomingSummaryBlock({
     <ItemRow
       key={item.id}
       isCompact={isCompact}
-      onClick={() => handleItemClick(item.id, "blockers")}
+      interactive={linksEnabled && !isEditing}
+      onClick={() => handleItemClick(item, "blockers")}
     >
       <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" aria-hidden />
       <div className="min-w-0 flex-1">
@@ -399,7 +426,8 @@ export default function UpcomingSummaryBlock({
     <ItemRow
       key={item.id}
       isCompact={isCompact}
-      onClick={() => handleItemClick(item.id, "published")}
+      interactive={linksEnabled && !isEditing}
+      onClick={() => handleItemClick(item, "published")}
     >
       <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden />
       <Globe className="h-3.5 w-3.5 shrink-0 text-[#6B7280]" aria-hidden />
@@ -433,7 +461,7 @@ export default function UpcomingSummaryBlock({
         }
         countBadgeClass="bg-red-100 text-red-700"
         showCounts={showCounts}
-        showViewAll={showViewAll && UPCOMING_SUMMARY_LINKS_ENABLED}
+        showViewAll={showViewAll && linksEnabled}
         viewAllLabel="View all deadlines"
         isCompact={isCompact}
         onViewAll={() => handleViewAll("deadlines")}
@@ -456,7 +484,7 @@ export default function UpcomingSummaryBlock({
         }
         countBadgeClass="bg-purple-100 text-purple-700"
         showCounts={showCounts}
-        showViewAll={showViewAll && UPCOMING_SUMMARY_LINKS_ENABLED}
+        showViewAll={showViewAll && linksEnabled}
         viewAllLabel="View all campaigns"
         isCompact={isCompact}
         onViewAll={() => handleViewAll("campaigns")}
@@ -479,7 +507,7 @@ export default function UpcomingSummaryBlock({
         }
         countBadgeClass="bg-emerald-100 text-emerald-700"
         showCounts={showCounts}
-        showViewAll={showViewAll && UPCOMING_SUMMARY_LINKS_ENABLED}
+        showViewAll={showViewAll && linksEnabled}
         viewAllLabel="View all events"
         isCompact={isCompact}
         onViewAll={() => handleViewAll("events")}
@@ -498,7 +526,7 @@ export default function UpcomingSummaryBlock({
         countLabel={showCounts ? `${approvalVisible.length} items` : undefined}
         countBadgeClass="bg-orange-100 text-orange-700"
         showCounts={showCounts}
-        showViewAll={showViewAll && UPCOMING_SUMMARY_LINKS_ENABLED}
+        showViewAll={showViewAll && linksEnabled}
         viewAllLabel="View all approvals"
         isCompact={isCompact}
         onViewAll={() => handleViewAll("approval")}
@@ -517,7 +545,7 @@ export default function UpcomingSummaryBlock({
         countLabel={showCounts ? `${blockersVisible.length} issues` : undefined}
         countBadgeClass="bg-red-100 text-red-700"
         showCounts={showCounts}
-        showViewAll={showViewAll && UPCOMING_SUMMARY_LINKS_ENABLED}
+        showViewAll={showViewAll && linksEnabled}
         viewAllLabel="View all blockers"
         isCompact={isCompact}
         onViewAll={() => handleViewAll("blockers")}
@@ -540,7 +568,7 @@ export default function UpcomingSummaryBlock({
         }
         countBadgeClass="bg-emerald-100 text-emerald-700"
         showCounts={showCounts}
-        showViewAll={showViewAll && UPCOMING_SUMMARY_LINKS_ENABLED}
+        showViewAll={showViewAll && linksEnabled}
         viewAllLabel="View all published"
         isCompact={isCompact}
         onViewAll={() => handleViewAll("published")}
@@ -554,6 +582,23 @@ export default function UpcomingSummaryBlock({
     Boolean
   )
 
+  const demoBannerMessage = forceMock
+    ? "Using demo data — demo mode is enabled in block settings."
+    : error
+      ? `Using demo data — ${error}`
+      : "Using demo data — connect Content and Campaigns tables or disable demo mode in block settings."
+
+  if (loading && !fromLiveData) {
+    return (
+      <div
+        data-block-selectable
+        className="flex h-full min-h-[200px] items-center justify-center rounded-2xl border border-[#E6E6EF] bg-white"
+      >
+        <LoadingSpinner size="lg" text="Loading upcoming summary…" />
+      </div>
+    )
+  }
+
   return (
     <div
       data-block-selectable
@@ -563,7 +608,7 @@ export default function UpcomingSummaryBlock({
       )}
     >
       <div className="flex min-h-full flex-col">
-        <MarketingDemoDataBanner message="Using demo data — counts and items are samples until this block is wired to Content, Campaigns, and Events." />
+        {isDemoData ? <MarketingDemoDataBanner message={demoBannerMessage} /> : null}
         <div
           className={cn(
             "flex flex-wrap items-start justify-between gap-3 border-b border-[#E6E6EF] bg-[#F8F8FC]/50",
@@ -596,7 +641,7 @@ export default function UpcomingSummaryBlock({
               <Calendar className="h-3.5 w-3.5 text-[#6B7280]" aria-hidden />
               {DATE_RANGE_LABELS[dateRange]}
             </span>
-            {UPCOMING_SUMMARY_LINKS_ENABLED ? (
+            {linksEnabled ? (
               <button
                 type="button"
                 onClick={handleViewAllActivity}

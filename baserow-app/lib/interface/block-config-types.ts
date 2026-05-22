@@ -113,7 +113,7 @@ export type KpiSummaryBlockConfig = BaseBlockConfig
 // Things To Do Block Config (mock data until Supabase wiring)
 export type ThingsToDoBlockConfig = BaseBlockConfig
 
-// Upcoming Summary Block Config (mock data until Supabase wiring)
+// Upcoming Summary Block Config (live Content / Campaigns / Events; optional demo mode)
 export type UpcomingSummaryBlockConfig = BaseBlockConfig
 
 // Filter Block Config

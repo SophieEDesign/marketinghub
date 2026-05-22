@@ -23,6 +23,7 @@ export default function EventCalendarBlock({
   pageEditable,
 }: EventCalendarBlockProps) {
   const canEdit = pageEditable !== false
+  const embeddedInBlock = block.config?.is_full_page !== true
 
   return (
     <div
@@ -36,6 +37,8 @@ export default function EventCalendarBlock({
       <EventCalendarFromConfig
         config={block.config}
         canEdit={canEdit}
+        isEditing={isEditing}
+        embeddedInBlock={embeddedInBlock}
         className="flex-1 min-h-0"
       />
     </div>

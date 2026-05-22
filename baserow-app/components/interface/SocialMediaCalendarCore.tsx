@@ -488,7 +488,12 @@ export function SocialMediaCalendarCore({
         </TabsList>
       </Tabs>
 
-      <div className="flex flex-col xl:flex-row gap-3 min-h-0 flex-1 relative overflow-hidden">
+      <div
+        className={cn(
+          "flex min-h-0 flex-1 relative overflow-hidden gap-3",
+          useInlinePreview ? "flex-col lg:flex-row" : "flex-col xl:flex-row"
+        )}
+      >
         <SocialPostQuickViewMobileBackdrop
           open={!!showQuickView && !useInlinePreview}
           onClose={() => setSelectedId(null)}
