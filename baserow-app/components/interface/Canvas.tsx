@@ -2426,109 +2426,164 @@ export default function Canvas({
                   e.stopPropagation()
                 }}
               >
-            {/* Edit Mode Controls - Always mount for stability; visibility toggled by isEditing */}
-            <div
-              data-block-chrome
-              className={isEditing ? "" : "invisible pointer-events-none"}
-            >
-                {/* Drag Handle - Hidden for full-page (no drag); visible for grid blocks */}
-                {!isFullPageMode && (
+            {/* Edit chrome: above block content (z-30). Full-page blocks keep settings/dup/delete; drag only on grid layout. */}
+            {(() => {
+              const isBlockSelected =
+                selectedBlockId === block.id ||
+                (selectedBlockIds != null && selectedBlockIds.has(block.id))
+              const isThisFullPageBlock =
+                isFullPageMode && fullPageBlock != null && block.id === fullPageBlock.id
+              const showChromeToolbar =
+                isEditing &&
+                (isBlockSelected || isThisFullPageBlock || !isFullPageMode)
+              return (
                 <div
-                  className={`absolute top-1.5 left-1.5 z-20 drag-handle transition-all duration-200 ${
-                    (selectedBlockId === block.id || (selectedBlockIds && selectedBlockIds.has(block.id))) ? "opacity-100 scale-100" : "opacity-30 group-hover:opacity-100 scale-95 group-hover:scale-100"
-                  }`}
+                  data-block-chrome
+                  className={
+                    isEditing
+                      ? "pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between gap-2 p-1.5"
+                      : "invisible pointer-events-none"
+                  }
+                  aria-hidden={!isEditing}
                 >
-                  <button
-                    type="button"
-                    className={cn(
-                      "cursor-grab active:cursor-grabbing touch-none transition-all duration-150 min-w-[30px] min-h-[30px] flex items-center justify-center",
-                      BUILDER_CHROME_DRAG_HANDLE
-                    )}
-                    title="Drag to move (or use arrow keys)"
-                    aria-label="Drag to move block"
-                    onMouseDown={(e) => {
-                      // Prevent dragging if TextBlock is editing
-                      const blockContent = e.currentTarget
-                        .closest(".react-grid-item")
-                        ?.querySelector('[data-block-editing="true"]')
-                      if (blockContent) {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        return false
-                      }
-                    }}
-                  >
-                    {/* 6-dot grip icon (reads as "drag handle" vs menu) */}
-                    <svg className="h-4 w-4 text-gray-700 group-hover:text-blue-600 transition-colors" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                      <circle cx="7" cy="6" r="1.2" />
-                      <circle cx="13" cy="6" r="1.2" />
-                      <circle cx="7" cy="10" r="1.2" />
-                      <circle cx="13" cy="10" r="1.2" />
-                      <circle cx="7" cy="14" r="1.2" />
-                      <circle cx="13" cy="14" r="1.2" />
-                    </svg>
-                  </button>
-                </div>
-                )}
-
-                {/* Block Toolbar - Only visible on hover */}
-                <div className={`absolute top-1.5 right-1.5 z-20 flex items-center gap-1 transition-all duration-200 ${
-                  (selectedBlockId === block.id || (selectedBlockIds && selectedBlockIds.has(block.id))) ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                }`}>
-                  {/* Settings - opens block settings panel (critical for TextBlock which can't be selected by clicking editor) */}
-                  {onBlockClick && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        e.preventDefault()
-                        onBlockClick(block.id)
-                      }}
-                      className="h-7 w-7 p-0 rounded-md shadow-sm bg-white text-gray-600 border border-gray-300 hover:bg-gray-50 hover:border-blue-400 transition-all duration-150 inline-flex items-center justify-center"
-                      title="Block settings"
-                      aria-label="Block settings"
-                    >
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                    </button>
-                  )}
-                  {onBlockDelete && (
-                    <>
-                      {onBlockDuplicate && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            e.preventDefault()
-                            onBlockDuplicate(block.id)
-                          }}
-                          className="h-7 w-7 p-0 rounded-md shadow-sm bg-white text-gray-600 border border-gray-300 hover:bg-gray-50 hover:border-gray-400 transition-all duration-150 inline-flex items-center justify-center"
-                          title="Duplicate block (Cmd+D)"
-                          aria-label="Duplicate block"
-                        >
-                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                          </svg>
-                        </button>
+                  {!isFullPageMode ? (
+                    <div
+                      className={cn(
+                        "drag-handle pointer-events-auto transition-all duration-200",
+                        isBlockSelected
+                          ? "opacity-100 scale-100"
+                          : "opacity-30 group-hover:opacity-100 scale-95 group-hover:scale-100"
                       )}
+                    >
                       <button
+                        type="button"
+                        className={cn(
+                          "cursor-grab active:cursor-grabbing touch-none transition-all duration-150 min-w-[30px] min-h-[30px] flex items-center justify-center",
+                          BUILDER_CHROME_DRAG_HANDLE
+                        )}
+                        title="Drag to move (or use arrow keys)"
+                        aria-label="Drag to move block"
+                        onMouseDown={(e) => {
+                          const blockContent = e.currentTarget
+                            .closest(".react-grid-item")
+                            ?.querySelector('[data-block-editing="true"]')
+                          if (blockContent) {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            return false
+                          }
+                        }}
+                      >
+                        <svg
+                          className="h-4 w-4 text-gray-700 group-hover:text-blue-600 transition-colors"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                          aria-hidden="true"
+                        >
+                          <circle cx="7" cy="6" r="1.2" />
+                          <circle cx="13" cy="6" r="1.2" />
+                          <circle cx="7" cy="10" r="1.2" />
+                          <circle cx="13" cy="10" r="1.2" />
+                          <circle cx="7" cy="14" r="1.2" />
+                          <circle cx="13" cy="14" r="1.2" />
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="pointer-events-none min-w-[30px]" aria-hidden />
+                  )}
+
+                  <div
+                    className={cn(
+                      "pointer-events-auto flex items-center gap-1 transition-all duration-200",
+                      showChromeToolbar ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                    )}
+                  >
+                    {isThisFullPageBlock && isEditing && !isBlockSelected ? (
+                      <span className="mr-1 hidden sm:inline-flex rounded-md border border-border/50 bg-card/95 px-2 py-0.5 text-[10px] font-medium text-muted-foreground shadow-sm">
+                        Click block to edit
+                      </span>
+                    ) : null}
+                    {onBlockClick ? (
+                      <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation()
                           e.preventDefault()
-                          onBlockDelete(block.id)
+                          onBlockClick(block.id)
                         }}
-                        className="h-7 w-7 p-0 rounded-md shadow-sm bg-white text-red-600 border border-red-300 hover:bg-red-50 hover:border-red-400 transition-all duration-150 inline-flex items-center justify-center"
-                        title="Delete block (Del)"
-                        aria-label="Delete block"
+                        className="h-7 w-7 p-0 rounded-md shadow-sm bg-white text-gray-600 border border-gray-300 hover:bg-gray-50 hover:border-blue-400 transition-all duration-150 inline-flex items-center justify-center"
+                        title="Block settings"
+                        aria-label="Block settings"
                       >
                         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
                         </svg>
                       </button>
-                    </>
-                  )}
+                    ) : null}
+                    {onBlockDelete ? (
+                      <>
+                        {onBlockDuplicate && !isFullPageMode ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              e.preventDefault()
+                              onBlockDuplicate(block.id)
+                            }}
+                            className="h-7 w-7 p-0 rounded-md shadow-sm bg-white text-gray-600 border border-gray-300 hover:bg-gray-50 hover:border-gray-400 transition-all duration-150 inline-flex items-center justify-center"
+                            title="Duplicate block (Cmd+D)"
+                            aria-label="Duplicate block"
+                          >
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                              />
+                            </svg>
+                          </button>
+                        ) : null}
+                        {!isFullPageMode ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              e.preventDefault()
+                              onBlockDelete(block.id)
+                            }}
+                            className="h-7 w-7 p-0 rounded-md shadow-sm bg-white text-red-600 border border-red-300 hover:bg-red-50 hover:border-red-400 transition-all duration-150 inline-flex items-center justify-center"
+                            title="Delete block (Del)"
+                            aria-label="Delete block"
+                          >
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                              />
+                            </svg>
+                          </button>
+                        ) : null}
+                      </>
+                    ) : null}
+                  </div>
                 </div>
-            </div>
+              )
+            })()}
 
             {/* Lock Indicator - Always mount; visibility toggled by isEditing and locked */}
             <div
@@ -2546,10 +2601,10 @@ export default function Canvas({
             {/* Block Content - ALWAYS visible; never conditional on isEditing. No transition/willChange - immediate paint. */}
             {/* overflow-hidden for all blocks: single scroll per surface (Canvas/InterfaceContainer) */}
             <div
-              className={`block-content h-full w-full max-w-full min-h-0 min-w-0 rounded-lg ${block.config?.locked ? 'pointer-events-none opacity-75' : ''} ${
+              className={`block-content relative z-0 h-full w-full max-w-full min-h-0 min-w-0 rounded-lg ${block.config?.locked ? 'pointer-events-none opacity-75' : ''} ${
                 block.type === 'field' ? 'overflow-visible' :
                 'overflow-hidden'
-              }`}
+              } ${isEditing && isFullPageMode && fullPageBlock && block.id === fullPageBlock.id ? 'pt-10' : ''}`}
               data-block-id={block.id}
             >
               {isFullPageMode && fullPageBlock && block.id === fullPageBlock.id ? (
