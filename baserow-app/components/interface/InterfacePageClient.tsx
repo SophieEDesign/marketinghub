@@ -48,6 +48,9 @@ import {
   SHOW_MARKETING_HOME_PLACEHOLDER,
 } from "@/lib/marketing/marketing-home"
 import ShellPagePlaceholder from "@/components/shell/ShellPagePlaceholder"
+import { useMemberPreview } from "@/contexts/MemberPreviewContext"
+import { isPageEditableForUser } from "@/lib/navigation/member-preview"
+import { Button } from "@/components/ui/button"
 // Lazy load InterfaceBuilder for dashboard/overview pages
 const InterfaceBuilder = dynamic(() => import("./InterfaceBuilder"), { ssr: false })
 // Lazy load RecordReviewPage for record_review pages
@@ -129,7 +132,7 @@ function InterfacePageContent({
         onBlocksMirror={onBlocksMirror}
         mode="view"
         marketingDashboard={marketingDashboard}
-        pageEditable={isAdmin && !isViewer}
+        pageEditable={isPageEditableForUser(isAdmin, isViewer)}
       />
     </div>
   )
@@ -1363,11 +1366,13 @@ function InterfacePageClientInternal({
     [page?.id, page?.config]
   )
 
-  const isViewer = searchParams?.get("view") === "true"
+  const { isMemberPreview, setMemberPreview } = useMemberPreview()
+  const isViewer = isMemberPreview
+  const pageDeniedInPreview = isMemberPreview && Boolean(page?.is_admin_only)
   const isRecordView = page?.page_type === 'record_view'
   const isRecordReview = page?.page_type === 'record_review'
   const useRecordReviewLayout = isRecordReview || isRecordView
-  const hasPage = Boolean(page && page.id)
+  const hasPage = Boolean(page && page.id) && !pageDeniedInPreview
   const pageForRender = pageWithConfig
 
   const showShellPlaceholder = useMemo(() => {
@@ -1440,9 +1445,25 @@ function InterfacePageClientInternal({
       {/* Page not found overlay */}
       {!loading && !hasPage && (
         <div className="absolute inset-0 flex items-center justify-center z-20 bg-background">
-          <div className="text-center">
-            <h2 className="text-lg font-semibold text-foreground mb-2">Page not found</h2>
-            <p className="text-sm text-muted-foreground">The page you&apos;re looking for doesn&apos;t exist.</p>
+          <div className="text-center max-w-sm px-4">
+            <h2 className="text-lg font-semibold text-foreground mb-2">
+              {pageDeniedInPreview ? "Admin-only page" : "Page not found"}
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {pageDeniedInPreview
+                ? "Members cannot access this page. Exit member preview to view it."
+                : "The page you&apos;re looking for doesn&apos;t exist."}
+            </p>
+            {pageDeniedInPreview && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-4"
+                onClick={() => setMemberPreview(false)}
+              >
+                Exit member preview
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -1450,7 +1471,7 @@ function InterfacePageClientInternal({
       {hasPage && isAdmin && (
         <PageActionsRegistrar pageId={pageId} isAdmin={isAdmin} isViewer={isViewer} />
       )}
-      {/* Header - Admin Only. Compact when single calendar (suppressMainScroll) for Airtable-style */}
+      {/* Header - Admin in normal mode */}
       {!isViewer && hasPage && isAdmin && (
         <AppPageHeader
           className={suppressMainScroll ? "py-2" : undefined}
@@ -1485,6 +1506,24 @@ function InterfacePageClientInternal({
             page?.updated_at ? (
               <span suppressHydrationWarning>Updated {formatDateUK(page?.updated_at ?? "")}</span>
             ) : null
+          }
+        />
+      )}
+
+      {/* Header - Admin in member preview (title + exit) */}
+      {isViewer && hasPage && isAdmin && (
+        <AppPageHeader
+          className={suppressMainScroll ? "py-2" : undefined}
+          title={<span className={suppressMainScroll ? "text-base" : "text-lg"}>{page?.name}</span>}
+          actions={
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs shrink-0"
+              onClick={() => setMemberPreview(false)}
+            >
+              Exit preview
+            </Button>
           }
         />
       )}

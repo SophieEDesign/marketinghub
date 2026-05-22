@@ -33,6 +33,18 @@ export function isMarketingHomePage(
   return cfg?.is_home === true || HOME_NAMES.has(name)
 }
 
+/** Pick the canonical marketing dashboard / home page from a list (prefers `is_home`). */
+export function pickMarketingHomePageId(
+  pages: Array<Pick<InterfacePage, "id" | "name" | "config">>
+): string | null {
+  const homePages = pages.filter((p) => isMarketingHomePage(p))
+  if (homePages.length === 0) return null
+  const explicit = homePages.find(
+    (p) => (p.config as { is_home?: boolean } | undefined)?.is_home === true
+  )
+  return (explicit ?? homePages[0]).id
+}
+
 export function isMarketingHubWorkspacePage(
   page: Pick<InterfacePage, "name"> | null | undefined
 ): boolean {

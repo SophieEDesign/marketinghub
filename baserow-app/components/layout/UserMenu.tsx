@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Settings, LogOut, ChevronDown } from "lucide-react"
+import { Settings, LogOut, ChevronDown, Eye, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { supabase } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
+import { useMemberPreviewOptional } from "@/contexts/MemberPreviewContext"
 
 function getInitials(name: string | null, email: string | null): string {
   if (name) {
@@ -28,9 +29,11 @@ function getInitials(name: string | null, email: string | null): string {
 
 export default function UserMenu() {
   const router = useRouter()
+  const memberPreview = useMemberPreviewOptional()
   const [displayName, setDisplayName] = useState<string | null>(null)
   const [email, setEmail] = useState<string | null>(null)
   const [role, setRole] = useState<string | null>(null)
+  const [isAdminUser, setIsAdminUser] = useState(false)
 
   useEffect(() => {
     const loadUser = async () => {
@@ -48,8 +51,13 @@ export default function UserMenu() {
         .select("role")
         .eq("id", user.id)
         .maybeSingle()
-      if (profile?.role === "admin") setRole("Admin")
-      else if (profile?.role === "member") setRole("Member")
+      if (profile?.role === "admin") {
+        setRole("Admin")
+        setIsAdminUser(true)
+      } else if (profile?.role === "member") {
+        setRole("Member")
+        setIsAdminUser(false)
+      }
     }
     loadUser()
   }, [])
@@ -61,6 +69,8 @@ export default function UserMenu() {
   }
 
   const initials = getInitials(displayName, email)
+  const previewActive = memberPreview?.isMemberPreview ?? false
+  const canTogglePreview = isAdminUser && memberPreview != null
 
   return (
     <DropdownMenu>
@@ -84,7 +94,9 @@ export default function UserMenu() {
               {displayName ?? "Account"}
             </span>
             {role ? (
-              <span className="truncate text-[11px] text-muted-foreground leading-tight">{role}</span>
+              <span className="truncate text-[11px] text-muted-foreground leading-tight">
+                {previewActive ? "Preview · Member" : role}
+              </span>
             ) : null}
           </span>
           <ChevronDown className="hidden lg:block h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -95,6 +107,21 @@ export default function UserMenu() {
           <div className="px-2 py-1.5 text-xs text-muted-foreground truncate">{email}</div>
         ) : null}
         <DropdownMenuSeparator />
+        {canTogglePreview ? (
+          <>
+            <DropdownMenuItem
+              onClick={() => memberPreview!.toggleMemberPreview()}
+              className="flex items-center justify-between gap-2"
+            >
+              <span className="flex items-center gap-2">
+                <Eye className="h-4 w-4" />
+                Preview as member
+              </span>
+              {previewActive ? <Check className="h-4 w-4 text-hub-primary" /> : null}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        ) : null}
         <DropdownMenuItem onClick={() => router.push("/settings")}>
           <Settings className="mr-2 h-4 w-4" />
           Settings

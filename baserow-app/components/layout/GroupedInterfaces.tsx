@@ -49,6 +49,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 import PageCreationWizard from "@/components/interface/PageCreationWizard"
 import { useToast } from "@/components/ui/use-toast"
+import { useMemberPreview } from "@/contexts/MemberPreviewContext"
+import { withMemberPreviewHref } from "@/lib/navigation/member-preview"
 
 interface InterfacePage {
   id: string
@@ -57,6 +59,7 @@ interface InterfacePage {
   group_id?: string | null
   order_index?: number
   is_hidden?: boolean
+  is_admin_only?: boolean
 }
 
 interface InterfaceGroup {
@@ -84,6 +87,7 @@ export default function GroupedInterfaces({
 }: GroupedInterfacesProps) {
   const pathname = usePathname()
   const router = useRouter()
+  const { isMemberPreview } = useMemberPreview()
   // Single source of truth: derive from pathname only (no params/searchParams mix)
   const currentPageId = pathname?.match(/\/pages\/([^/?]+)/)?.[1] ?? undefined
   const { primaryColor } = useBranding()
@@ -216,10 +220,11 @@ export default function GroupedInterfaces({
 
   // Organize pages by group
   // Pages without group_id go to "Ungrouped" system group
-  const pagesForDisplay = useMemo(
-    () => (editMode ? pages : pages.filter((page) => !page.is_hidden)),
-    [editMode, pages]
-  )
+  const pagesForDisplay = useMemo(() => {
+    const base = editMode ? pages : pages.filter((page) => !page.is_hidden)
+    if (!isMemberPreview) return base
+    return base.filter((page) => !page.is_admin_only)
+  }, [editMode, pages, isMemberPreview])
 
   const pagesByGroup = useMemo(() => {
     const result: Record<string, InterfacePage[]> = {}
@@ -923,7 +928,7 @@ export default function GroupedInterfaces({
   // Use full page navigation - Next.js client-side routing (Link/router.push) fails in this app
   function NavigationPage({ page, level = 0 }: { page: InterfacePage; level?: number }) {
     const targetPageId = page.id
-    const targetPath = `/pages/${targetPageId}`
+    const targetPath = withMemberPreviewHref(`/pages/${targetPageId}`, isMemberPreview)
     const isActive = currentPageId === targetPageId
 
     const className = cn(
@@ -1037,7 +1042,7 @@ export default function GroupedInterfaces({
             />
           ) : (
             <a
-              href={`/pages/${targetPageId}`}
+              href={withMemberPreviewHref(`/pages/${targetPageId}`, isMemberPreview)}
               className={cn(
                 "flex-1 flex items-center gap-2 min-w-0 rounded-lg px-2 py-1.5 transition-colors",
                 sidebarNavItemClassName(isActive)

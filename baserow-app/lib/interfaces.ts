@@ -1,5 +1,6 @@
 import { createClient } from './supabase/server'
 import { getUserRole, isAdmin } from './roles'
+import { pickMarketingHomePageId } from './marketing/marketing-home'
 
 export interface InterfaceCategory {
   id: string
@@ -298,10 +299,41 @@ async function getAccessibleInterfacePages(): Promise<Interface[]> {
 }
 
 /**
+ * Resolve the Marketing Home / Marketing Dashboard page for post-login landing.
+ */
+async function findMarketingHomePageId(userIsAdmin: boolean): Promise<string | null> {
+  const supabase = await createClient()
+  let pagesQuery = supabase
+    .from('interface_pages')
+    .select('id, name, config, is_admin_only')
+    .eq('is_archived', false)
+    .order('order_index', { ascending: true })
+    .order('created_at', { ascending: true })
+
+  if (!userIsAdmin) {
+    pagesQuery = pagesQuery.or('is_admin_only.is.null,is_admin_only.eq.false')
+  }
+
+  const { data: pagesData, error: pagesError } = await pagesQuery
+  if (pagesError || !pagesData?.length) {
+    return null
+  }
+
+  const pageId = pickMarketingHomePageId(pagesData)
+  if (!pageId) {
+    return null
+  }
+
+  const validation = await validatePageAccess(pageId, userIsAdmin)
+  return validation.valid ? pageId : null
+}
+
+/**
  * Resolve landing page with priority order:
  * 1. User default page (if exists and user has access)
  * 2. Workspace default page (if exists and user has access)
- * 3. First accessible interface page
+ * 3. Marketing home / dashboard (`is_home` or canonical name)
+ * 4. First accessible interface page
  */
 export async function resolveLandingPage(): Promise<{ pageId: string | null; reason: string }> {
   const supabase = await createClient()
@@ -436,8 +468,24 @@ export async function resolveLandingPage(): Promise<{ pageId: string | null; rea
       console.log('[Landing Page] Workspace settings column may not exist (expected in some setups)')
     }
   }
+
+  // Priority 3: Marketing home / dashboard (when no valid user or workspace default)
+  try {
+    const marketingHomePageId = await findMarketingHomePageId(userIsAdmin)
+    if (marketingHomePageId) {
+      console.log('[resolveLandingPage] returning marketing_home:', marketingHomePageId)
+      if (isDev) {
+        console.log('[Landing Page] Using marketing home page:', marketingHomePageId)
+      }
+      return { pageId: marketingHomePageId, reason: 'marketing_home' }
+    }
+  } catch (error: unknown) {
+    if (isDev) {
+      console.warn('[Landing Page] Error resolving marketing home page:', error)
+    }
+  }
   
-  // Priority 3: Get first accessible interface page
+  // Priority 4: Get first accessible interface page
   // BUT: If workspace default was set but invalid, log a warning
   const accessiblePages = await getAccessibleInterfacePages()
   if (accessiblePages.length > 0) {
@@ -471,7 +519,7 @@ export async function resolveLandingPage(): Promise<{ pageId: string | null; rea
     return { pageId: accessiblePages[0].id, reason: 'first_accessible' }
   }
   
-  // Priority 4: Fallback to any page from interface_pages table (even if admin-only)
+  // Priority 5: Fallback to any page from interface_pages table (even if admin-only)
   // This ensures we always have a default page if any pages exist
   try {
     const { data: anyPages } = await supabase

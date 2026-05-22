@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { useMemberPreview } from "@/contexts/MemberPreviewContext"
 
 // Stable extensions array so useEditor doesn't see a new reference every render (prevents React #185)
 const TEXT_BLOCK_EXTENSIONS = [
@@ -67,19 +68,8 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     e.stopPropagation()
   }, [])
 
-  // CRITICAL: Determine if viewer mode is forced (check URL or parent context)
-  // Viewer mode should always force read-only, regardless of isEditing prop
-  // FIX: Use state + useEffect to prevent hydration mismatch
-  // Initialize to false (matches server render), then check on client
-  const [isViewer, setIsViewer] = useState(false)
-  
-  useEffect(() => {
-    // Only check URL on client side after mount to prevent hydration mismatch
-    if (typeof window !== 'undefined') {
-      setIsViewer(window.location.search.includes('view=true'))
-    }
-  }, [])
-  
+  const { isMemberPreview } = useMemberPreview()
+  const isViewer = isMemberPreview
   const readOnly = isViewer || !isEditing
   
   // Lifecycle logging - SANITY TEST for remount detection

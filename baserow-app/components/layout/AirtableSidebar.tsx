@@ -31,6 +31,8 @@ import RecentsFavoritesSection from "./RecentsFavoritesSection"
 import BaseDropdown from "./BaseDropdown"
 import { cn } from "@/lib/utils"
 import { useIsMobile } from "@/hooks/useResponsive"
+import { useMemberPreview } from "@/contexts/MemberPreviewContext"
+import { withMemberPreviewHref } from "@/lib/navigation/member-preview"
 import type { Table, View } from "@/types/database"
 
 interface InterfacePage {
@@ -40,6 +42,7 @@ interface InterfacePage {
   group_id?: string | null
   order_index?: number
   is_hidden?: boolean
+  is_admin_only?: boolean
 }
 
 interface InterfaceGroup {
@@ -176,6 +179,7 @@ export default function AirtableSidebar({
   const shouldForceCompactOnDesktop = !isMobile && autoCompact && !manuallyExpandedDuringAutoCompact
   const isCollapsed = isMobile ? !isOpen : (internalCollapsed || shouldForceCompactOnDesktop)
 
+  const { isMemberPreview } = useMemberPreview()
   const isAdmin = userRole === "admin"
   const isEditMode = isSidebarEditMode
 
@@ -183,7 +187,7 @@ export default function AirtableSidebar({
   const currentPageIdFromPath = pathname?.match(/\/pages\/([^/?]+)/)?.[1]
   const homeHref =
     typeof defaultPageId === "string" && defaultPageId.length > 0
-      ? `/pages/${defaultPageId}`
+      ? withMemberPreviewHref(`/pages/${defaultPageId}`, isMemberPreview)
       : null
   const isHomeActive =
     Boolean(homeHref && currentPageIdFromPath && defaultPageId === currentPageIdFromPath)

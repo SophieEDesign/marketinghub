@@ -7,6 +7,7 @@ import type { PageBlock } from "@/lib/interface/types"
 import type { TableField } from "@/types/fields"
 import { Paperclip } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
+import { useMemberPreview } from "@/contexts/MemberPreviewContext"
 import AttachmentPreview, { type Attachment } from "@/components/attachments/AttachmentPreview"
 import InlineFieldEditor from "@/components/records/InlineFieldEditor"
 import { resolveSystemFieldAlias } from "@/lib/fields/systemFieldAliases"
@@ -61,6 +62,7 @@ export default function FieldBlock({
   const [createRecordTableFields, setCreateRecordTableFields] = useState<any[]>([])
   const [createRecordResolve, setCreateRecordResolve] = useState<((id: string | null) => void) | null>(null)
   const { toast } = useToast()
+  const { isMemberPreview } = useMemberPreview()
 
   const allowInlineEdit = config?.allow_inline_edit || false
   const editPermission = config?.inline_edit_permission || 'both'
@@ -151,8 +153,11 @@ export default function FieldBlock({
     
     // If allowInlineEdit is true, check role-based permissions (if configured)
     if (allowInlineEdit === true) {
+      const roleForPermissions: 'admin' | 'member' | null = isMemberPreview
+        ? 'member'
+        : userRole
       // If no user role loaded yet, wait (will be set to member by default)
-      if (!userRole) {
+      if (!roleForPermissions) {
         return
       }
       
@@ -160,8 +165,8 @@ export default function FieldBlock({
       // Otherwise, check role match
       const canEdit = 
         editPermission === 'both' ||
-        (editPermission === 'admin' && userRole === 'admin') ||
-        (editPermission === 'member' && userRole === 'member')
+        (editPermission === 'admin' && roleForPermissions === 'admin') ||
+        (editPermission === 'member' && roleForPermissions === 'member')
       
       setCanEditInline(canEdit)
       return
@@ -169,7 +174,7 @@ export default function FieldBlock({
     
     // Default: if allowInlineEdit is not explicitly set, disable editing
     setCanEditInline(false)
-  }, [allowInlineEdit, editPermission, userRole, fieldId])
+  }, [allowInlineEdit, editPermission, userRole, fieldId, isMemberPreview])
 
   async function loadUserRole() {
     try {

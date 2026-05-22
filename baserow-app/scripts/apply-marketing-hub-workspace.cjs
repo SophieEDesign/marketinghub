@@ -910,6 +910,41 @@ async function applyMarketingNavPriority(pageIds) {
   }
 }
 
+/** Set workspace default landing page to Marketing Home (login + `/` redirect). */
+async function setWorkspaceDefaultPage(pageId) {
+  if (!pageId) return
+  const { data: rows, error: loadError } = await supabase
+    .from("workspace_settings")
+    .select("id, default_interface_id")
+    .order("created_at", { ascending: false })
+  if (loadError) {
+    console.warn(`Could not load workspace_settings: ${loadError.message}`)
+    return
+  }
+  if (!rows?.length) {
+    const { error: insertError } = await supabase
+      .from("workspace_settings")
+      .insert({ default_interface_id: pageId })
+    if (insertError) {
+      console.warn(`Could not create workspace_settings: ${insertError.message}`)
+    } else {
+      console.log("Set workspace default page (new settings row)")
+    }
+    return
+  }
+  const target = rows[0]
+  if (target.default_interface_id === pageId) return
+  const { error: updateError } = await supabase
+    .from("workspace_settings")
+    .update({ default_interface_id: pageId })
+    .eq("id", target.id)
+  if (updateError) {
+    console.warn(`Could not update workspace default page: ${updateError.message}`)
+  } else {
+    console.log(`Set workspace default page to Marketing Home (${pageId})`)
+  }
+}
+
 async function main() {
   const ctx = await fetchRequiredMetadata()
 
@@ -1000,6 +1035,7 @@ async function main() {
     eventCalendar: eventCalendarPageId,
   })
   await applyVisibilityCuration()
+  await setWorkspaceDefaultPage(homePageId)
 
   console.log("Marketing Hub workspace applied successfully.")
   console.log(`Marketing Home: /pages/${homePageId}`)

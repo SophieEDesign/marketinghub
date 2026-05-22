@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation"
 import AirtableSidebar from "./AirtableSidebar"
 import Topbar from "./Topbar"
 import EditModeBanner from "./EditModeBanner"
+import MemberPreviewBanner from "./MemberPreviewBanner"
+import { useEffectiveUserRole } from "@/contexts/MemberPreviewContext"
 import EditModeGuard from "./EditModeGuard"
 import { RecordPanelProvider, useRecordPanel } from "@/contexts/RecordPanelContext"
 import { RecordModalProvider } from "@/contexts/RecordModalContext"
@@ -178,6 +180,7 @@ function ShellContent({
   const { isEditing: isBlockEditingOnPage } = useBlockEditMode(pageId)
   const { isEditing: isPageEditingOnPage } = usePageEditMode(pageId)
   const isEditMode = isUiEdit(pageId) || isBlockEditingOnPage || isPageEditingOnPage
+  const effectiveUserRole = useEffectiveUserRole(userRole)
   const { selectedContext } = useSelectionContext()
   const [sidebarAutoCompactDismissed, setSidebarAutoCompactDismissed] = useState(false)
 
@@ -205,6 +208,7 @@ function ShellContent({
     <div className="flex flex-col h-screen min-h-[100dvh] bg-canvas overflow-hidden">
       {!hideTopbar && <OnboardingTour />}
       {/* Edit mode banner - full app width at top, above sidebar and content */}
+      <MemberPreviewBanner />
       <EditModeBanner />
       <EditModeGuard />
       <AppShell
@@ -214,7 +218,7 @@ function ShellContent({
             interfaceGroups={interfaceGroups}
             tables={tables}
             views={views}
-            userRole={userRole}
+            userRole={effectiveUserRole}
             isOpen={isMobile ? sidebarOpen : undefined}
             onClose={isMobile ? () => setSidebarOpen(false) : undefined}
             defaultPageId={defaultPageId}

@@ -4,9 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getUserRole, isAdmin } from "@/lib/roles"
 import { getWorkspaceSettings } from "@/lib/branding"
 import { BrandingProvider } from "@/contexts/BrandingContext"
-import { SidebarModeProvider } from "@/contexts/SidebarModeContext"
-import { EditModeProvider } from "@/contexts/EditModeContext"
-import { UIModeProvider } from "@/contexts/UIModeContext"
+import MemberPreviewProviders from "@/components/layout/MemberPreviewProviders"
 import { getInterfaces, getInterfaceCategories, resolveLandingPage, type Interface, type InterfaceCategory } from "@/lib/interfaces"
 import { withTimeout } from "@/lib/with-timeout"
 import WorkspaceShell from "./WorkspaceShell"
@@ -397,29 +395,25 @@ export default async function WorkspaceShellWrapper({
     return (
       <BrandingProvider settings={safeBrandingSettings}>
         <DynamicFavicon />
-        <EditModeProvider>
-          <UIModeProvider>
-            <SidebarModeProvider>
-              <div data-page-title={finalTitle}>
-              <WorkspaceShell
-                title={title}
-                tables={safeTables}
-                views={safeViewsByTable}
-                interfacePages={safeInterfacePages as any}
-                interfaceGroups={safeInterfaceGroups}
-                dashboards={safeDashboards}
-                userRole={userRole}
-                hideTopbar={hideTopbar}
-                hideRecordPanel={hideRecordPanel}
-                defaultPageId={defaultPageId}
-                landingPageTitle={landingPageTitle}
-              >
-                {children}
-              </WorkspaceShell>
-              </div>
-            </SidebarModeProvider>
-          </UIModeProvider>
-        </EditModeProvider>
+        <MemberPreviewProviders userRole={userRole}>
+          <div data-page-title={finalTitle}>
+            <WorkspaceShell
+              title={title}
+              tables={safeTables}
+              views={safeViewsByTable}
+              interfacePages={safeInterfacePages as any}
+              interfaceGroups={safeInterfaceGroups}
+              dashboards={safeDashboards}
+              userRole={userRole}
+              hideTopbar={hideTopbar}
+              hideRecordPanel={hideRecordPanel}
+              defaultPageId={defaultPageId}
+              landingPageTitle={landingPageTitle}
+            >
+              {children}
+            </WorkspaceShell>
+          </div>
+        </MemberPreviewProviders>
       </BrandingProvider>
     )
   } catch (error) {

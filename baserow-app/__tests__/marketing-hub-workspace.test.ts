@@ -5,6 +5,7 @@ import { getAllBlockTypes, BLOCK_REGISTRY } from "@/lib/interface/registry"
 import {
   isMarketingHomePage,
   isMarketingHubWorkspacePage,
+  pickMarketingHomePageId,
 } from "@/lib/marketing/marketing-home"
 
 const scriptPath = join(process.cwd(), "scripts/apply-marketing-hub-workspace.cjs")
@@ -132,6 +133,15 @@ describe("marketing-home helpers", () => {
     expect(isMarketingHomePage({ name: "Marketing Home", config: { is_home: true } })).toBe(true)
     expect(isMarketingHomePage({ name: "Dashboard", config: {} })).toBe(true)
     expect(isMarketingHomePage({ name: "Theme Workspace", config: {} })).toBe(false)
+  })
+
+  it("picks marketing home page preferring is_home flag", () => {
+    const id = pickMarketingHomePageId([
+      { id: "theme-id", name: "Theme Workspace", config: {} },
+      { id: "dash-id", name: "Dashboard", config: {} },
+      { id: "home-id", name: "Marketing Home", config: { is_home: true } },
+    ])
+    expect(id).toBe("home-id")
   })
 
   it("detects workspace pages without layout_style", () => {
