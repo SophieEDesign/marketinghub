@@ -182,12 +182,8 @@ export default function AirtableSidebar({
 
   const isSettings = pathname.includes("/settings")
   const currentPageIdFromPath = pathname?.match(/\/pages\/([^/?]+)/)?.[1]
-  const {
-    isWorkspaceEditing,
-    isSidebarEditing,
-    isLayoutEditing,
-    toggle: toggleWorkspaceEdit,
-  } = useWorkspaceLayoutEdit(currentPageIdFromPath)
+  const { isWorkspaceEditing, toggle: toggleWorkspaceEdit } =
+    useWorkspaceLayoutEdit(currentPageIdFromPath)
   const isEditMode = isWorkspaceEditing
   const homeHref =
     typeof defaultPageId === "string" && defaultPageId.length > 0
@@ -360,11 +356,6 @@ export default function AirtableSidebar({
                   </>
                 )}
               </button>
-              {isSidebarEditing && !isLayoutEditing && (
-                <p className="px-2 text-[10px] leading-snug text-muted-foreground">
-                  Open a page to edit blocks, or use Edit page in the page header.
-                </p>
-              )}
             </div>
           )}
 

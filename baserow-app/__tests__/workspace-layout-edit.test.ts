@@ -25,16 +25,36 @@ describe("unified workspace layout edit", () => {
     expect(src).toContain("toggleWorkspaceEdit")
     expect(src).not.toContain("Done organising")
     expect(src).toContain(">Edit<")
+    expect(src).not.toContain("Edit page in the page header")
   })
 
-  it("page header renders Edit page button", () => {
+  it("page header does not render duplicate Edit page button", () => {
     const src = readFileSync(
       join(process.cwd(), "components/interface/InterfacePageClient.tsx"),
       "utf8"
     )
-    expect(src).toContain("Edit page")
+    expect(src).not.toContain("Edit page")
+    expect(src).not.toContain("Edit page layout")
     expect(src).toContain("enterWorkspaceEdit")
-    expect(src).toContain("exitWorkspaceEdit")
+  })
+
+  it("MarketingDashboardLayout does not render in-canvas search hint", () => {
+    const src = readFileSync(
+      join(process.cwd(), "components/interface/MarketingDashboardLayout.tsx"),
+      "utf8"
+    )
+    expect(src).not.toContain("⌘K to search")
+    expect(src).not.toContain("marketing-dashboard-search-hint-dismissed")
+    expect(src).not.toContain("useCommandPalette")
+  })
+
+  it("global search remains in AppPageHeader", () => {
+    const src = readFileSync(
+      join(process.cwd(), "components/layout/ui-system.tsx"),
+      "utf8"
+    )
+    expect(src).toContain("showSearch")
+    expect(src).toContain("AppPageHeader")
   })
 
   it("PageActionsRegistrar uses unified enter (not sidebar-only exit)", () => {

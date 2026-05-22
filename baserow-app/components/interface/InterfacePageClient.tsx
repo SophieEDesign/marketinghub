@@ -51,7 +51,6 @@ import ShellPagePlaceholder from "@/components/shell/ShellPagePlaceholder"
 import { useMemberPreview } from "@/contexts/MemberPreviewContext"
 import { isPageEditableForUser } from "@/lib/navigation/member-preview"
 import { Button } from "@/components/ui/button"
-import { Check, Pencil } from "lucide-react"
 import { useWorkspaceLayoutEdit } from "@/hooks/useWorkspaceLayoutEdit"
 // Lazy load InterfaceBuilder for dashboard/overview pages
 const InterfaceBuilder = dynamic(() => import("./InterfaceBuilder"), { ssr: false })
@@ -174,11 +173,7 @@ function InterfacePageClientInternal({
   
   const { blocksDirty } = useEditMode()
   const { isEdit, uiMode } = useUIMode()
-  const {
-    isLayoutEditing,
-    enter: enterWorkspaceEdit,
-    exit: exitWorkspaceEdit,
-  } = useWorkspaceLayoutEdit(pageId)
+  const { isLayoutEditing, enter: enterWorkspaceEdit } = useWorkspaceLayoutEdit(pageId)
   const isEditMode = isEdit(pageId)
   const { selectedContext, setSelectedContext } = useSelectionContext()
   const { setData: setRightPanelData } = useRightSettingsPanelData()
@@ -1507,30 +1502,6 @@ function InterfacePageClientInternal({
             page?.updated_at ? (
               <span suppressHydrationWarning>Updated {formatDateUK(page?.updated_at ?? "")}</span>
             ) : null
-          }
-          actions={
-            <Button
-              type="button"
-              variant={isLayoutEditing ? "secondary" : "outline"}
-              size="sm"
-              className="shrink-0 text-xs gap-1.5"
-              onClick={() =>
-                isLayoutEditing ? exitWorkspaceEdit() : enterWorkspaceEdit()
-              }
-              aria-label={isLayoutEditing ? "Done editing page" : "Edit page layout"}
-            >
-              {isLayoutEditing ? (
-                <>
-                  <Check className="h-3.5 w-3.5" aria-hidden />
-                  Done
-                </>
-              ) : (
-                <>
-                  <Pencil className="h-3.5 w-3.5" aria-hidden />
-                  Edit page
-                </>
-              )}
-            </Button>
           }
         />
       )}
