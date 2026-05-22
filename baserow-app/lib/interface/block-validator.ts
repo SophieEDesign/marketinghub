@@ -108,7 +108,10 @@ export function isBlockConfigComplete(
     blockType === 'content_timeline' ||
     blockType === 'upcoming_summary' ||
     blockType === 'kpi_summary' ||
-    blockType === 'internal_resource_hub'
+    blockType === 'internal_resource_hub' ||
+    blockType === 'things_to_do' ||
+    blockType === 'event_calendar' ||
+    blockType === 'social_media_calendar'
   ) {
     return true
   }

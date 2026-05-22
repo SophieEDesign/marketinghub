@@ -218,8 +218,11 @@ export function assertBlockConfig(
     case 'content_theme':
     case 'upcoming_summary':
     case 'content_timeline':
+    case 'event_calendar':
     case 'internal_resource_hub':
     case 'kpi_summary':
+    case 'things_to_do':
+    case 'social_media_calendar':
       // These blocks don't require config
       return { valid: true }
 

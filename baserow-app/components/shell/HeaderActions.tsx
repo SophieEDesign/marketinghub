@@ -1,6 +1,6 @@
 "use client"
 
-import { Search, Bell, CircleHelp } from "lucide-react"
+import { Search, Bell, HelpCircle } from "lucide-react"
 import { useCommandPalette } from "@/contexts/CommandPaletteContext"
 import UserMenu from "@/components/layout/UserMenu"
 import { cn } from "@/lib/utils"
@@ -46,7 +46,7 @@ export default function HeaderActions({ className, showSearch = true }: HeaderAc
         className="hidden sm:flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
         aria-label="Help"
       >
-        <CircleHelp className="h-4 w-4" />
+        <HelpCircle className="h-4 w-4" />
       </button>
 
       <div data-tour="user-menu" className="ml-1">

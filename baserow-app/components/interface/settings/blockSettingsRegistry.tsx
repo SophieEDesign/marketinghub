@@ -38,6 +38,9 @@ import ContentThemeDataSettings from "./ContentThemeDataSettings"
 import UpcomingSummaryDataSettings from "./UpcomingSummaryDataSettings"
 import InternalResourceHubDataSettings from "./InternalResourceHubDataSettings"
 import ContentTimelineDataSettings from "./ContentTimelineDataSettings"
+import ThingsToDoDataSettings from "./ThingsToDoDataSettings"
+import EventCalendarDataSettings from "./EventCalendarDataSettings"
+import SocialMediaCalendarDataSettings from "./SocialMediaCalendarDataSettings"
 import KPISummaryDataSettings from "./KPISummaryDataSettings"
 import CommonAppearanceSettings from "./CommonAppearanceSettings"
 
@@ -111,7 +114,10 @@ const DATA_SETTINGS_RENDERERS: Partial<Record<BlockType, DataRenderer>> = {
   content_theme: (ctx) => <ContentThemeDataSettings {...ctx} />,
   upcoming_summary: (ctx) => <UpcomingSummaryDataSettings {...ctx} />,
   content_timeline: (ctx) => <ContentTimelineDataSettings {...ctx} />,
+  things_to_do: (ctx) => <ThingsToDoDataSettings {...ctx} />,
+  event_calendar: (ctx) => <EventCalendarDataSettings {...ctx} />,
   internal_resource_hub: (ctx) => <InternalResourceHubDataSettings {...ctx} />,
+  social_media_calendar: (ctx) => <SocialMediaCalendarDataSettings {...ctx} />,
 }
 
 const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRenderer>> = {
@@ -213,6 +219,26 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
     </>
   ),
   content_timeline: (ctx) => (
+    <>
+      <CommonAppearanceSettings
+        config={ctx.config}
+        onUpdate={ctx.onUpdateAppearance}
+        blockType={ctx.blockType}
+        fields={ctx.fields}
+      />
+    </>
+  ),
+  event_calendar: (ctx) => (
+    <>
+      <CommonAppearanceSettings
+        config={ctx.config}
+        onUpdate={ctx.onUpdateAppearance}
+        blockType={ctx.blockType}
+        fields={ctx.fields}
+      />
+    </>
+  ),
+  social_media_calendar: (ctx) => (
     <>
       <CommonAppearanceSettings
         config={ctx.config}

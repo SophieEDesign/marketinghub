@@ -551,14 +551,66 @@ function buildContentPlanningBlocks(_ctx) {
   return []
 }
 
-/** Rendered by SocialMediaCalendarDashboard (layout_style: social_media_calendar) — no grid blocks. */
+/** Social Media Calendar page — single full-page social_media_calendar block. */
 function buildSocialMediaCalendarBlocks(_ctx) {
-  return []
+  return [
+    {
+      type: "social_media_calendar",
+      position_x: 0,
+      position_y: 0,
+      width: 12,
+      height: 16,
+      config: {
+        title: "Social Media Calendar",
+        is_full_page: true,
+        social_media_calendar_subtitle:
+          "Visual planning for social posts — platforms, media, and approval status at a glance.",
+        social_media_calendar_default_view: "month",
+        social_media_calendar_content_scope: "social_only",
+        social_media_calendar_mode: "full",
+        social_media_calendar_show_status_bar: true,
+        social_media_calendar_show_filters: true,
+        social_media_calendar_show_toolbar: true,
+        social_media_calendar_show_media_preview: true,
+        social_media_calendar_show_approval_status: true,
+        social_media_calendar_show_platform_icons: true,
+        social_media_calendar_show_page_header: true,
+        appearance: { showTitle: false },
+      },
+    },
+  ]
 }
 
-/** Rendered by EventCalendarDashboard (layout_style: event_calendar) — no grid blocks. */
+/** Full-page event_calendar block on the Event Calendar Interface Builder page. */
 function buildEventCalendarBlocks(_ctx) {
-  return []
+  return [
+    {
+      type: "event_calendar",
+      position_x: 0,
+      position_y: 0,
+      width: 12,
+      height: 14,
+      config: {
+        title: "Event Calendar",
+        is_full_page: true,
+        event_calendar_subtitle:
+          "Plan, manage and track marketing events, trade shows and activations.",
+        event_calendar_default_view: "month",
+        event_calendar_show_toolbar: true,
+        event_calendar_show_metrics: true,
+        event_calendar_show_filters: true,
+        event_calendar_show_search: true,
+        event_calendar_show_add_button: true,
+        event_calendar_show_attendance_controls: true,
+        event_calendar_show_schedule: true,
+        event_calendar_show_resources: true,
+        event_calendar_show_notes: true,
+        event_calendar_show_legend: true,
+        event_calendar_density: "comfortable",
+        appearance: { showTitle: false },
+      },
+    },
+  ]
 }
 
 function buildInternalStaffBlocks(ctx) {
@@ -898,7 +950,7 @@ async function main() {
     group_id: publicGroup,
     order_index: 3,
     saved_view_id: ctx.anchors.content,
-    config: { layout_style: "social_media_calendar" },
+    config: {},
   })
   const eventCalendarPageId = await upsertPage({
     name: "Event Calendar",
@@ -907,7 +959,7 @@ async function main() {
     group_id: publicGroup,
     order_index: 5,
     saved_view_id: ctx.anchors.content,
-    config: { layout_style: "event_calendar" },
+    config: {},
   })
   const internalStaffPageId = await upsertPage({
     name: "Internal Staff Hub",

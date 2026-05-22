@@ -110,6 +110,9 @@ export type InternalResourceHubBlockConfig = BaseBlockConfig
 // KPI Summary Block Config (mock metrics until Supabase wiring)
 export type KpiSummaryBlockConfig = BaseBlockConfig
 
+// Things To Do Block Config (mock data until Supabase wiring)
+export type ThingsToDoBlockConfig = BaseBlockConfig
+
 // Filter Block Config
 // Note: table_id, target_blocks, allowed_fields, allowed_operators, filters are already in BlockConfig
 export type FilterBlockConfig = BaseBlockConfig
@@ -150,6 +153,7 @@ export type BlockConfigUnion =
   | (ContentTimelineBlockConfig & { _type: 'content_timeline' })
   | (InternalResourceHubBlockConfig & { _type: 'internal_resource_hub' })
   | (KpiSummaryBlockConfig & { _type: 'kpi_summary' })
+  | (ThingsToDoBlockConfig & { _type: 'things_to_do' })
   | (FilterBlockConfig & { _type: 'filter' })
   | (RecordContextBlockConfig & { _type: 'record_context' })
   | (FieldSectionBlockConfig & { _type: 'field_section' })
@@ -157,7 +161,7 @@ export type BlockConfigUnion =
 /** Block types that have typed config in BlockConfigUnion (for drift detection). */
 export const BLOCK_CONFIG_UNION_TYPES = [
   'grid', 'form', 'record', 'chart', 'kpi', 'text', 'html', 'image', 'gallery',
-  'divider', 'button', 'action', 'link_preview', 'content_theme', 'content_timeline', 'internal_resource_hub', 'kpi_summary', 'filter', 'record_context', 'field_section',
+  'divider', 'button', 'action', 'link_preview', 'content_theme', 'content_timeline', 'internal_resource_hub', 'kpi_summary', 'things_to_do', 'filter', 'record_context', 'field_section',
 ] as const
 
 /**
@@ -392,6 +396,10 @@ export function validateBlockConfig(
 
     case 'kpi_summary':
       // KPI summary uses mock data; no required fields
+      break
+
+    case 'things_to_do':
+      // Things to do block uses mock data; no required fields
       break
 
     // divider, button, link_preview have no required fields

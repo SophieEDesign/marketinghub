@@ -60,6 +60,7 @@ interface EventCalendarViewProps {
   onEventClick?: (id: string) => void
   onDatesChange?: (date: Date) => void
   className?: string
+  compact?: boolean
 }
 
 export default function EventCalendarView({
@@ -71,7 +72,9 @@ export default function EventCalendarView({
   onEventClick,
   onDatesChange,
   className,
+  compact = false,
 }: EventCalendarViewProps) {
+  const panelMinH = compact ? "min-h-[420px]" : "min-h-[min(72vh,620px)]"
   const fcEvents: EventInput[] = useMemo(
     () =>
       events.map((e) => ({
@@ -101,7 +104,7 @@ export default function EventCalendarView({
 
   if (viewMode === "list") {
     return (
-      <MarketingPanelPrimary className={cn("overflow-hidden min-h-[min(72vh,620px)] flex-1", className)}>
+      <MarketingPanelPrimary className={cn("overflow-hidden flex-1", panelMinH, className)}>
         <EventListView
           items={items}
           selectedId={selectedId}
@@ -114,7 +117,7 @@ export default function EventCalendarView({
 
   if (viewMode === "timeline") {
     return (
-      <MarketingPanelPrimary className={cn("overflow-hidden min-h-[min(72vh,620px)] flex-1 p-3", className)}>
+      <MarketingPanelPrimary className={cn("overflow-hidden flex-1 p-3", panelMinH, className)}>
         <EventTimelineView
           items={items}
           selectedId={selectedId}
@@ -129,7 +132,7 @@ export default function EventCalendarView({
 
   return (
     <MarketingPanelPrimary
-      className={cn("overflow-hidden min-h-[min(72vh,620px)] flex-1 shadow-none", className)}
+      className={cn("overflow-hidden flex-1 shadow-none", panelMinH, className)}
     >
       <div className="calendar-embed calendar-embed--events h-full min-h-0">
         <FullCalendar

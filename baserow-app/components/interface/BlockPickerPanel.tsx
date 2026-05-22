@@ -22,9 +22,11 @@ import {
   Hash,
   Lightbulb,
   LayoutGrid,
-  LayoutTimeline,
+  GanttChart,
   FolderOpen,
   CalendarClock,
+  CalendarDays,
+  CheckSquare,
 } from "lucide-react"
 import { BLOCK_REGISTRY } from "@/lib/interface/registry"
 import type { BlockType } from "@/lib/interface/types"
@@ -63,9 +65,11 @@ export const blockPickerIconMap: Record<BlockType, React.ElementType> = {
   number: Hash,
   horizontal_grouped: Columns,
   content_theme: Lightbulb,
-  content_timeline: LayoutTimeline,
+  content_timeline: GanttChart,
   internal_resource_hub: FolderOpen,
   upcoming_summary: CalendarClock,
+  things_to_do: CheckSquare,
+  event_calendar: CalendarDays,
 }
 
 interface BlockPickerPanelProps {

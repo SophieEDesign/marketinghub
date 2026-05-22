@@ -112,6 +112,26 @@ const ContentTimelineBlock = dynamic(() => import("./blocks/ContentTimelineBlock
   ssr: false,
   loading: () => <BlockLoadingPlaceholder />,
 })
+const ThingsToDoBlock = dynamic(() => import("./blocks/ThingsToDoBlock"), {
+  ssr: false,
+  loading: () => <BlockLoadingPlaceholder />,
+})
+const EventCalendarBlock = dynamic(() => import("./blocks/EventCalendarBlock"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-full flex items-center justify-center">
+      <LoadingSpinner size="lg" text="Loading event calendar..." />
+    </div>
+  ),
+})
+const SocialMediaCalendarBlock = dynamic(() => import("./blocks/SocialMediaCalendarBlock"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-full flex items-center justify-center">
+      <LoadingSpinner size="lg" text="Loading social calendar..." />
+    </div>
+  ),
+})
 
 // Module-level Set to track warned blocks across all component instances
 const warnedBlocks = new Set<string>()
@@ -636,6 +656,17 @@ export default function BlockRenderer({
       case "upcoming_summary":
         return <UpcomingSummaryBlock block={safeBlock} isEditing={canEdit} />
 
+      case "things_to_do":
+        return (
+          <LazyBlockWrapper enabled={true}>
+            <ThingsToDoBlock
+              block={safeBlock}
+              isEditing={canEdit}
+              interfaceMode={interfaceMode}
+            />
+          </LazyBlockWrapper>
+        )
+
       case "content_timeline":
         return (
           <LazyBlockWrapper enabled={true}>
@@ -643,6 +674,30 @@ export default function BlockRenderer({
               block={safeBlock}
               isEditing={canEdit}
               interfaceMode={interfaceMode}
+            />
+          </LazyBlockWrapper>
+        )
+
+      case "event_calendar":
+        return (
+          <LazyBlockWrapper enabled={true}>
+            <EventCalendarBlock
+              block={safeBlock}
+              isEditing={canEdit}
+              interfaceMode={interfaceMode}
+              pageEditable={pageEditable}
+            />
+          </LazyBlockWrapper>
+        )
+
+      case "social_media_calendar":
+        return (
+          <LazyBlockWrapper enabled={true}>
+            <SocialMediaCalendarBlock
+              block={safeBlock}
+              isEditing={canEdit}
+              interfaceMode={interfaceMode}
+              pageEditable={pageEditable}
             />
           </LazyBlockWrapper>
         )

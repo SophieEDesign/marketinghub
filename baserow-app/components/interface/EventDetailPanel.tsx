@@ -29,6 +29,10 @@ interface EventDetailPanelProps {
   onToggleAttending: () => void
   onManageAttendees?: () => void
   isMobile?: boolean
+  showScheduleTab?: boolean
+  showResourcesTab?: boolean
+  showNotesTab?: boolean
+  showAttendanceControls?: boolean
 }
 
 function PanelBody({
@@ -38,6 +42,10 @@ function PanelBody({
   onEdit,
   onToggleAttending,
   onManageAttendees,
+  showScheduleTab = true,
+  showResourcesTab = true,
+  showNotesTab = true,
+  showAttendanceControls = true,
 }: {
   event: MarketingEventItem
   canEdit: boolean
@@ -45,6 +53,10 @@ function PanelBody({
   onEdit: () => void
   onToggleAttending: () => void
   onManageAttendees?: () => void
+  showScheduleTab?: boolean
+  showResourcesTab?: boolean
+  showNotesTab?: boolean
+  showAttendanceControls?: boolean
 }) {
   const { toast } = useToast()
   const statusColor = statusAccentColor(event.status)
@@ -138,11 +150,36 @@ function PanelBody({
       ) : null}
 
       <Tabs defaultValue="overview" className="flex flex-col flex-1 min-h-0 px-4">
-        <TabsList className="w-full grid grid-cols-4 h-8 shrink-0">
-          <TabsTrigger value="overview" className="text-xs">Overview</TabsTrigger>
-          <TabsTrigger value="schedule" className="text-xs">Schedule</TabsTrigger>
-          <TabsTrigger value="resources" className="text-xs">Resources</TabsTrigger>
-          <TabsTrigger value="notes" className="text-xs">Notes</TabsTrigger>
+        <TabsList
+          className={cn(
+            "w-full h-8 shrink-0",
+            showScheduleTab && showResourcesTab && showNotesTab
+              ? "grid grid-cols-4"
+              : showScheduleTab && showResourcesTab
+                ? "grid grid-cols-3"
+                : showScheduleTab || showResourcesTab || showNotesTab
+                  ? "grid grid-cols-2"
+                  : "grid grid-cols-1"
+          )}
+        >
+          <TabsTrigger value="overview" className="text-xs">
+            Overview
+          </TabsTrigger>
+          {showScheduleTab ? (
+            <TabsTrigger value="schedule" className="text-xs">
+              Schedule
+            </TabsTrigger>
+          ) : null}
+          {showResourcesTab ? (
+            <TabsTrigger value="resources" className="text-xs">
+              Resources
+            </TabsTrigger>
+          ) : null}
+          {showNotesTab ? (
+            <TabsTrigger value="notes" className="text-xs">
+              Notes
+            </TabsTrigger>
+          ) : null}
         </TabsList>
 
         <TabsContent value="overview" className="flex-1 overflow-y-auto mt-3 space-y-4 text-sm">
@@ -194,6 +231,7 @@ function PanelBody({
           ) : null}
         </TabsContent>
 
+        {showScheduleTab ? (
         <TabsContent value="schedule" className="flex-1 overflow-y-auto mt-3">
           {event.scheduleItems.length === 0 ? (
             <p className="text-xs text-muted-foreground">No schedule items yet.</p>
@@ -212,7 +250,9 @@ function PanelBody({
             </ul>
           )}
         </TabsContent>
+        ) : null}
 
+        {showResourcesTab ? (
         <TabsContent value="resources" className="flex-1 overflow-y-auto mt-3">
           {event.resources.length === 0 ? (
             <p className="text-xs text-muted-foreground">No resources linked.</p>
@@ -237,12 +277,15 @@ function PanelBody({
             </ul>
           )}
         </TabsContent>
+        ) : null}
 
+        {showNotesTab ? (
         <TabsContent value="notes" className="flex-1 overflow-y-auto mt-3">
           <p className="text-xs text-muted-foreground whitespace-pre-wrap">
             {event.notes || "No internal notes."}
           </p>
         </TabsContent>
+        ) : null}
       </Tabs>
 
       <div className="shrink-0 border-t border-border/40 p-4 flex flex-col gap-2 mt-auto">
@@ -257,14 +300,16 @@ function PanelBody({
             <Share2 className="h-3.5 w-3.5" aria-hidden />
             Share event
           </Button>
-          <Button
-            type="button"
-            variant={event.currentUserAttending ? "secondary" : "outline"}
-            className="flex-1 text-xs"
-            onClick={onToggleAttending}
-          >
-            {event.currentUserAttending ? "Attending" : "Mark attending"}
-          </Button>
+          {showAttendanceControls ? (
+            <Button
+              type="button"
+              variant={event.currentUserAttending ? "secondary" : "outline"}
+              className="flex-1 text-xs"
+              onClick={onToggleAttending}
+            >
+              {event.currentUserAttending ? "Attending" : "Mark attending"}
+            </Button>
+          ) : null}
         </div>
       </div>
     </div>
@@ -280,21 +325,31 @@ export default function EventDetailPanel({
   onToggleAttending,
   onManageAttendees,
   isMobile = false,
+  showScheduleTab = true,
+  showResourcesTab = true,
+  showNotesTab = true,
+  showAttendanceControls = true,
 }: EventDetailPanelProps) {
   if (!event) return null
+
+  const bodyProps = {
+    event,
+    canEdit,
+    onClose,
+    onEdit,
+    onToggleAttending,
+    onManageAttendees,
+    showScheduleTab,
+    showResourcesTab,
+    showNotesTab,
+    showAttendanceControls,
+  }
 
   if (isMobile) {
     return (
       <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
         <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">
-          <PanelBody
-            event={event}
-            canEdit={canEdit}
-            onClose={onClose}
-            onEdit={onEdit}
-            onToggleAttending={onToggleAttending}
-            onManageAttendees={onManageAttendees}
-          />
+          <PanelBody {...bodyProps} />
         </SheetContent>
       </Sheet>
     )
@@ -309,29 +364,28 @@ export default function EventDetailPanel({
         "max-h-[min(78vh,720px)] rounded-l-xl shadow-sm overflow-hidden"
       )}
     >
-      <PanelBody
-        event={event}
-        canEdit={canEdit}
-        onClose={onClose}
-        onEdit={onEdit}
-        onToggleAttending={onToggleAttending}
-        onManageAttendees={onManageAttendees}
-      />
+      <PanelBody {...bodyProps} />
     </aside>
   )
 }
 
 /** Tablet overlay panel */
-export function EventDetailPanelOverlay({
-  event,
-  open,
-  onClose,
-  canEdit,
-  onEdit,
-  onToggleAttending,
-  onManageAttendees,
-}: EventDetailPanelProps) {
+export function EventDetailPanelOverlay(props: EventDetailPanelProps) {
+  const { event, open, onClose } = props
   if (!event || !open) return null
+
+  const bodyProps = {
+    event,
+    canEdit: props.canEdit,
+    onClose,
+    onEdit: props.onEdit,
+    onToggleAttending: props.onToggleAttending,
+    onManageAttendees: props.onManageAttendees,
+    showScheduleTab: props.showScheduleTab,
+    showResourcesTab: props.showResourcesTab,
+    showNotesTab: props.showNotesTab,
+    showAttendanceControls: props.showAttendanceControls,
+  }
 
   return (
     <>
@@ -341,14 +395,7 @@ export function EventDetailPanelOverlay({
         aria-hidden
       />
       <aside className="fixed top-0 right-0 bottom-0 z-50 w-full max-w-md bg-background border-l border-border/40 shadow-xl flex flex-col lg:hidden">
-        <PanelBody
-          event={event}
-          canEdit={canEdit}
-          onClose={onClose}
-          onEdit={onEdit}
-          onToggleAttending={onToggleAttending}
-          onManageAttendees={onManageAttendees}
-        />
+        <PanelBody {...bodyProps} />
       </aside>
     </>
   )

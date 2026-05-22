@@ -14,7 +14,7 @@ import {
 import { formatDisplayValue } from "@/lib/marketing/field-utils"
 import type { FieldOptions } from "@/types/fields"
 
-type FieldRow = { name: string; type?: string; options?: unknown }
+type FieldRow = { name: string; type?: string; options?: FieldOptions }
 
 function mapFieldRow(row: { name: string; type?: string; options?: unknown }): FieldRow {
   return {

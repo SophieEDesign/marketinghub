@@ -76,6 +76,7 @@ interface EventCalendarToolbarProps {
   onFilterStatus: (v: string) => void
   onFilterOwner: (v: string) => void
   showFilters?: boolean
+  showFiltersRow?: boolean
 }
 
 export default function EventCalendarToolbar({
@@ -98,6 +99,7 @@ export default function EventCalendarToolbar({
   onFilterStatus,
   onFilterOwner,
   showFilters = true,
+  showFiltersRow = true,
 }: EventCalendarToolbarProps) {
   return (
     <div className="flex flex-col gap-3">
@@ -136,7 +138,7 @@ export default function EventCalendarToolbar({
         </div>
       </div>
 
-      {showFilters ? (
+      {showFilters && showFiltersRow ? (
         <div className="flex flex-wrap items-center gap-2">
           <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0" aria-hidden />
           <FilterSelect

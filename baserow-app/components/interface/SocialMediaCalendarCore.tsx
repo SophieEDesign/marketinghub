@@ -1,0 +1,543 @@
+"use client"
+
+import { useEffect, useMemo, useState } from "react"
+import { Plus, Search } from "lucide-react"
+import SocialMediaCalendarView from "@/components/interface/SocialMediaCalendarView"
+import DashboardEmpty from "@/components/interface/primitives/DashboardEmpty"
+import { SocialCalendarStatusBar } from "@/components/interface/social/SocialCalendarStatusBar"
+import { SocialMediaFeedView } from "@/components/interface/social/SocialMediaFeedView"
+import { SocialMediaListView } from "@/components/interface/social/SocialMediaListView"
+import {
+  SocialPostQuickView,
+  SocialPostQuickViewMobileBackdrop,
+} from "@/components/interface/social/SocialPostQuickView"
+import { MarketingFilterStrip } from "@/components/layout/ui-system"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
+import { useRecordModal } from "@/contexts/RecordModalContext"
+import { useSocialMediaCalendarData } from "@/hooks/useSocialMediaCalendarData"
+import { formatDisplayValue } from "@/lib/marketing/field-utils"
+import {
+  applyContentScope,
+  buildSocialCalendarEvents,
+  buildSocialCalendarItems,
+  buildSocialStatusSummary,
+  collectSocialFilterOptions,
+  extendSocialCalendarFieldMap,
+  filterSocialCalendarItems,
+  getCurrentQuarter,
+  quarterLabel,
+  type ContentScopeMode,
+  type QuarterNum,
+  type SocialCalendarFilters,
+  type SocialCalendarViewMode,
+  socialCalendarSettingsFromConfig,
+  type SocialMediaCalendarBlockSettings,
+  type SocialPlatform,
+} from "@/lib/marketing/social-media-calendar"
+import { cn } from "@/lib/utils"
+
+const FILTER_CONTROL = "h-8 text-xs border-border/40"
+
+const PLATFORM_LABELS: Record<SocialPlatform, string> = {
+  instagram: "Instagram",
+  linkedin: "LinkedIn",
+  twitter: "X",
+  facebook: "Facebook",
+  tiktok: "TikTok",
+  youtube: "YouTube",
+  other: "Other",
+}
+
+function FilterSelect({
+  label,
+  value,
+  options,
+  onChange,
+  placeholder,
+  className,
+}: {
+  label: string
+  value: string
+  options: { value: string; label: string }[]
+  onChange: (v: string) => void
+  placeholder: string
+  className?: string
+}) {
+  if (options.length === 0) return null
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className={cn(FILTER_CONTROL, "w-[120px]", className)} aria-label={label}>
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">{placeholder}</SelectItem>
+        {options.map((o) => (
+          <SelectItem key={o.value} value={o.value}>
+            {o.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
+export interface SocialMediaCalendarCoreProps {
+  settings: SocialMediaCalendarBlockSettings
+  canEdit?: boolean
+  className?: string
+}
+
+export function SocialMediaCalendarFromConfig({
+  config,
+  canEdit = false,
+  className,
+}: {
+  config?: import("@/lib/interface/types").BlockConfig | null
+  canEdit?: boolean
+  className?: string
+}) {
+  const settings = socialCalendarSettingsFromConfig(config)
+  return <SocialMediaCalendarCore settings={settings} canEdit={canEdit} className={className} />
+}
+
+export function SocialMediaCalendarCore({
+  settings,
+  canEdit = false,
+  className,
+}: SocialMediaCalendarCoreProps) {
+  const { openRecordModal } = useRecordModal()
+  const {
+    loading,
+    error,
+    tableIds,
+    fields,
+    contentFields,
+    contentRows,
+    allItems,
+    campaignRows,
+    reload,
+  } = useSocialMediaCalendarData()
+
+  const isCompact = settings.mode === "compact"
+
+  const [contentScope, setContentScope] = useState<ContentScopeMode>(settings.contentScope)
+  const [year, setYear] = useState(() => new Date().getFullYear())
+  const [quarter, setQuarter] = useState<QuarterNum | "all">(getCurrentQuarter())
+  const [platformFilter, setPlatformFilter] = useState("all")
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [themeFilter, setThemeFilter] = useState("all")
+  const [ownerFilter, setOwnerFilter] = useState("all")
+  const [search, setSearch] = useState("")
+  const [viewMode, setViewMode] = useState<SocialCalendarViewMode>(settings.defaultView)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  useEffect(() => {
+    setContentScope(settings.contentScope)
+  }, [settings.contentScope])
+
+  useEffect(() => {
+    setViewMode(settings.defaultView)
+  }, [settings.defaultView])
+
+  const socialFields = useMemo(() => {
+    if (!fields || contentFields.length === 0) return null
+    return extendSocialCalendarFieldMap(fields, contentFields)
+  }, [fields, contentFields])
+
+  const campaignLabelById = useMemo(() => {
+    const map = new Map<string, string>()
+    if (!fields) return map
+    for (const row of campaignRows) {
+      map.set(String(row.id), formatDisplayValue(row[fields.campaignName]) || "Campaign")
+    }
+    return map
+  }, [campaignRows, fields])
+
+  const allSocialItems = useMemo(() => {
+    if (!socialFields) return []
+    return buildSocialCalendarItems({
+      baseItems: allItems,
+      contentRows,
+      fields: socialFields,
+      campaignLabelById,
+    })
+  }, [allItems, contentRows, socialFields, campaignLabelById])
+
+  const scopedItems = useMemo(
+    () => applyContentScope(allSocialItems, contentScope),
+    [allSocialItems, contentScope]
+  )
+
+  const filterOptions = useMemo(() => collectSocialFilterOptions(scopedItems), [scopedItems])
+
+  const filters: SocialCalendarFilters = useMemo(
+    () => ({
+      year,
+      quarter,
+      contentTypes: [],
+      divisions: [],
+      statuses: statusFilter === "all" ? [] : [statusFilter],
+      search: settings.showFilters ? search : "",
+      platforms: platformFilter === "all" ? [] : [platformFilter as SocialPlatform],
+      themes: themeFilter === "all" ? [] : [themeFilter],
+      owners: ownerFilter === "all" ? [] : [ownerFilter],
+    }),
+    [
+      year,
+      quarter,
+      statusFilter,
+      search,
+      platformFilter,
+      themeFilter,
+      ownerFilter,
+      settings.showFilters,
+    ]
+  )
+
+  const filteredItems = useMemo(() => {
+    const base = filterSocialCalendarItems(scopedItems, filters)
+    if (settings.maxPosts != null && settings.maxPosts > 0) {
+      return base.slice(0, settings.maxPosts)
+    }
+    return base
+  }, [scopedItems, filters, settings.maxPosts])
+
+  const calendarEvents = useMemo(
+    () => buildSocialCalendarEvents(filteredItems),
+    [filteredItems]
+  )
+
+  const statusSummary = useMemo(
+    () => buildSocialStatusSummary(filteredItems),
+    [filteredItems]
+  )
+
+  const selectedItem = useMemo(
+    () => filteredItems.find((i) => i.id === selectedId) ?? null,
+    [filteredItems, selectedId]
+  )
+
+  const openPost = (recordId: string | null) => {
+    if (!tableIds) return
+    openRecordModal({
+      tableId: tableIds.contentTableId,
+      recordId,
+      supabaseTableName: tableIds.contentSupabaseTable,
+      onRecordUpdated: reload,
+      onDeleted: reload,
+      onSave: () => reload(),
+    })
+  }
+
+  if (loading) {
+    return (
+      <div className={cn("flex items-center justify-center py-16", className)}>
+        <LoadingSpinner size="lg" text="Loading social calendar…" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div
+        className={cn(
+          "rounded-card-lg border border-destructive/30 bg-destructive/5 px-4 py-6 text-sm text-destructive",
+          className
+        )}
+      >
+        {error}
+      </div>
+    )
+  }
+
+  const calendarView = viewMode === "week" ? "week" : "month"
+  const showQuickView = settings.showMediaPreview && selectedItem
+
+  return (
+    <div
+      className={cn(
+        "flex flex-col gap-3 md:gap-4 min-w-0 min-h-0 h-full w-full",
+        isCompact && "gap-2 md:gap-3",
+        className
+      )}
+      data-social-media-calendar-core
+    >
+      {settings.showPageHeader ? (
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between shrink-0">
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <h2 className={cn("text-foreground font-semibold", isCompact ? "text-base" : "text-page-title")}>
+              {settings.title}
+            </h2>
+            <p className="text-meta text-muted-foreground">{settings.subtitle}</p>
+          </div>
+          {settings.showToolbar ? (
+            <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+              <div
+                className="inline-flex rounded-lg border border-border/40 p-0.5 bg-muted/25"
+                role="group"
+                aria-label="Content scope"
+              >
+                <button
+                  type="button"
+                  className={cn(
+                    "rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                    contentScope === "social_only"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                  onClick={() => setContentScope("social_only")}
+                >
+                  Social only
+                </button>
+                <button
+                  type="button"
+                  className={cn(
+                    "rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                    contentScope === "all_content"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                  onClick={() => setContentScope("all_content")}
+                >
+                  All content
+                </button>
+              </div>
+              {canEdit ? (
+                <Button type="button" size="sm" onClick={() => openPost(null)}>
+                  <Plus className="h-3.5 w-3.5 mr-1" />
+                  Create post
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+        </header>
+      ) : settings.showToolbar ? (
+        <div className="flex items-center justify-end gap-2 shrink-0 flex-wrap">
+          <div
+            className="inline-flex rounded-lg border border-border/40 p-0.5 bg-muted/25"
+            role="group"
+            aria-label="Content scope"
+          >
+            <button
+              type="button"
+              className={cn(
+                "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                contentScope === "social_only"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground"
+              )}
+              onClick={() => setContentScope("social_only")}
+            >
+              Social only
+            </button>
+            <button
+              type="button"
+              className={cn(
+                "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                contentScope === "all_content"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground"
+              )}
+              onClick={() => setContentScope("all_content")}
+            >
+              All content
+            </button>
+          </div>
+          {canEdit ? (
+            <Button type="button" size="sm" variant="outline" onClick={() => openPost(null)}>
+              <Plus className="h-3.5 w-3.5 mr-1" />
+              Create
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {settings.showFilters ? (
+        <MarketingFilterStrip className="shrink-0">
+          <div className="relative flex-1 min-w-[200px] max-w-md order-first">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search posts…"
+              className={cn(FILTER_CONTROL, "pl-8 bg-background ring-1 ring-border/30 w-full")}
+            />
+          </div>
+          <FilterSelect
+            label="Platform"
+            value={platformFilter}
+            placeholder="Platforms"
+            options={filterOptions.platforms.map((p) => ({
+              value: p,
+              label: PLATFORM_LABELS[p],
+            }))}
+            onChange={setPlatformFilter}
+          />
+          <FilterSelect
+            label="Status"
+            value={statusFilter}
+            placeholder="Status"
+            options={filterOptions.statuses.map((s) => ({ value: s, label: s }))}
+            onChange={setStatusFilter}
+          />
+          <FilterSelect
+            label="Theme"
+            value={themeFilter}
+            placeholder="Theme"
+            options={filterOptions.themes.map((t) => ({ value: t, label: t }))}
+            onChange={setThemeFilter}
+          />
+          <FilterSelect
+            label="Owner"
+            value={ownerFilter}
+            placeholder="Owner"
+            options={filterOptions.owners.map((o) => ({ value: o, label: o }))}
+            onChange={setOwnerFilter}
+          />
+          <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
+            <SelectTrigger className={cn(FILTER_CONTROL, "w-[88px]")} aria-label="Year">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {filterOptions.years.map((y) => (
+                <SelectItem key={y} value={String(y)}>
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={quarter === "all" ? "all" : String(quarter)}
+            onValueChange={(v) => setQuarter(v === "all" ? "all" : (Number(v) as QuarterNum))}
+          >
+            <SelectTrigger className={cn(FILTER_CONTROL, "w-[100px]")} aria-label="Quarter">
+              <SelectValue placeholder="Quarter" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All quarters</SelectItem>
+              {([1, 2, 3, 4] as const).map((q) => (
+                <SelectItem key={q} value={String(q)}>
+                  {quarterLabel(q)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {statusSummary.overdue > 0 ? (
+            <Badge
+              variant="outline"
+              className="text-[11px] font-normal border-destructive/40 text-destructive"
+            >
+              {statusSummary.overdue} overdue
+            </Badge>
+          ) : null}
+        </MarketingFilterStrip>
+      ) : null}
+
+      <Tabs
+        value={viewMode}
+        onValueChange={(v) => setViewMode(v as SocialCalendarViewMode)}
+        className="shrink-0"
+      >
+        <TabsList className="h-8">
+          <TabsTrigger value="month" className="text-xs px-3">
+            Month
+          </TabsTrigger>
+          <TabsTrigger value="week" className="text-xs px-3">
+            Week
+          </TabsTrigger>
+          <TabsTrigger value="list" className="text-xs px-3">
+            List
+          </TabsTrigger>
+          <TabsTrigger value="feed" className="text-xs px-3">
+            Feed
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      <div className="flex flex-col xl:flex-row gap-3 min-h-0 flex-1 relative">
+        <SocialPostQuickViewMobileBackdrop
+          open={!!showQuickView}
+          onClose={() => setSelectedId(null)}
+        />
+
+        <div className="flex-1 min-w-0 flex flex-col gap-2 min-h-0">
+          {filteredItems.length === 0 ? (
+            <DashboardEmpty
+              title="No social posts"
+              description="Adjust filters or create a new post."
+              className="py-12"
+            />
+          ) : viewMode === "month" || viewMode === "week" ? (
+            <div
+              className={cn(
+                "rounded-card border border-border/30 overflow-hidden flex-1 min-h-0",
+                isCompact ? "min-h-[360px]" : "min-h-[400px]"
+              )}
+            >
+              <SocialMediaCalendarView
+                events={calendarEvents}
+                viewMode={calendarView}
+                onEventClick={(id) => setSelectedId(id)}
+                compact={isCompact}
+                showPlatformIcons={settings.showPlatformIcons}
+                showApprovalStatus={settings.showApprovalStatus}
+              />
+            </div>
+          ) : viewMode === "list" ? (
+            <SocialMediaListView
+              items={filteredItems}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              compact={isCompact}
+              showPlatformIcons={settings.showPlatformIcons}
+              showApprovalStatus={settings.showApprovalStatus}
+            />
+          ) : (
+            <SocialMediaFeedView
+              items={filteredItems}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              compact={isCompact}
+              showPlatformIcons={settings.showPlatformIcons}
+              showApprovalStatus={settings.showApprovalStatus}
+            />
+          )}
+
+          {settings.showStatusBar ? (
+            <SocialCalendarStatusBar summary={statusSummary} />
+          ) : null}
+        </div>
+
+        {showQuickView ? (
+          <div
+            className={cn(
+              "xl:static fixed inset-y-0 right-0 z-40 w-full max-w-[360px] p-3 xl:p-0",
+              "xl:block bg-background/95 xl:bg-transparent backdrop-blur-sm xl:backdrop-blur-none shadow-xl xl:shadow-none shrink-0"
+            )}
+          >
+            <SocialPostQuickView
+              item={selectedItem}
+              onClose={() => setSelectedId(null)}
+              onEdit={() => openPost(selectedItem.id)}
+              onOpenFullRecord={() => openPost(selectedItem.id)}
+              showMediaPreview={settings.showMediaPreview}
+              showApprovalStatus={settings.showApprovalStatus}
+              showPlatformIcons={settings.showPlatformIcons}
+            />
+          </div>
+        ) : null}
+      </div>
+    </div>
+  )
+}

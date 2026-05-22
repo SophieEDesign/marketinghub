@@ -178,11 +178,81 @@ export interface EventCalendarEvent {
   extendedProps: Record<string, unknown>
 }
 
+/** @deprecated Page identity only — do not use for InterfacePageClient routing. */
 export function isEventCalendarPage(page: { name?: string; config?: unknown } | null): boolean {
   if (!page) return false
-  const cfg = page.config as { layout_style?: string } | undefined
   const name = String(page.name || "").trim().toLowerCase()
-  return cfg?.layout_style === "event_calendar" || name === "event calendar"
+  return name === "event calendar"
+}
+
+export type EventCalendarDensity = "comfortable" | "compact"
+
+/** Block settings parsed from PageBlock.config for `event_calendar` blocks. */
+export interface EventCalendarBlockSettings {
+  title: string
+  subtitle: string
+  defaultView: EventCalendarViewMode
+  showToolbar: boolean
+  showMetrics: boolean
+  showFilters: boolean
+  showSearch: boolean
+  showAddButton: boolean
+  showAttendanceControls: boolean
+  showScheduleTab: boolean
+  showResourcesTab: boolean
+  showNotesTab: boolean
+  showLegend: boolean
+  showPageHeader: boolean
+  density: EventCalendarDensity
+}
+
+export function eventCalendarSettingsFromConfig(
+  config?: Record<string, unknown> | null
+): EventCalendarBlockSettings {
+  const c = config || {}
+  const view = c.event_calendar_default_view
+  const validView =
+    view === "week" || view === "list" || view === "timeline" ? view : "month"
+
+  return {
+    title: String(c.title || "Event Calendar"),
+    subtitle: String(
+      c.event_calendar_subtitle ||
+        "Plan, manage and track marketing events, trade shows and activations."
+    ),
+    defaultView: validView,
+    showToolbar: c.event_calendar_show_toolbar !== false,
+    showMetrics: c.event_calendar_show_metrics !== false,
+    showFilters: c.event_calendar_show_filters !== false,
+    showSearch: c.event_calendar_show_search !== false,
+    showAddButton: c.event_calendar_show_add_button !== false,
+    showAttendanceControls: c.event_calendar_show_attendance_controls !== false,
+    showScheduleTab: c.event_calendar_show_schedule !== false,
+    showResourcesTab: c.event_calendar_show_resources !== false,
+    showNotesTab: c.event_calendar_show_notes !== false,
+    showLegend: c.event_calendar_show_legend !== false,
+    showPageHeader: c.event_calendar_show_page_header === true,
+    density: c.event_calendar_density === "compact" ? "compact" : "comfortable",
+  }
+}
+
+export const DEFAULT_EVENT_CALENDAR_BLOCK_CONFIG: Record<string, unknown> = {
+  title: "Event Calendar",
+  event_calendar_subtitle:
+    "Plan, manage and track marketing events, trade shows and activations.",
+  event_calendar_default_view: "month",
+  event_calendar_show_toolbar: true,
+  event_calendar_show_metrics: true,
+  event_calendar_show_filters: true,
+  event_calendar_show_search: true,
+  event_calendar_show_add_button: true,
+  event_calendar_show_attendance_controls: true,
+  event_calendar_show_schedule: true,
+  event_calendar_show_resources: true,
+  event_calendar_show_notes: true,
+  event_calendar_show_legend: true,
+  event_calendar_density: "comfortable",
+  appearance: { showTitle: true },
 }
 
 /** Field map when events are Content rows (content type = Event). */

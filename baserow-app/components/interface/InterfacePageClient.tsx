@@ -49,10 +49,6 @@ import {
 import ShellPagePlaceholder from "@/components/shell/ShellPagePlaceholder"
 // Lazy load InterfaceBuilder for dashboard/overview pages
 const InterfaceBuilder = dynamic(() => import("./InterfaceBuilder"), { ssr: false })
-const EventCalendarDashboard = dynamic(() => import("./EventCalendarDashboard"), { ssr: false })
-import MarketingDashboardLayout from "@/components/interface/MarketingDashboardLayout"
-import { DashboardEditChromeProvider } from "@/components/interface/EditableDashboardRegion"
-import { isEventCalendarPage } from "@/lib/marketing/events"
 // Lazy load RecordReviewPage for record_review pages
 const RecordReviewPage = dynamic(() => import("./RecordReviewPage"), { ssr: false })
 
@@ -71,7 +67,6 @@ function InterfacePageContent({
   recordContext,
   setRecordContext,
   marketingDashboard,
-  showEventCalendar,
   showShellPlaceholder,
   isAdmin,
   onBlocksMirror,
@@ -90,23 +85,10 @@ function InterfacePageContent({
   recordContext: RecordContext
   setRecordContext: (ctx: RecordContext) => void
   marketingDashboard: boolean
-  showEventCalendar: boolean
   showShellPlaceholder?: boolean
   /** When InterfaceBuilder is mounted it owns blocks; mirror updates to parent for loadBlocks/sync (REG-005). */
   onBlocksMirror?: (blocks: PageBlock[]) => void
 }) {
-  if (showEventCalendar) {
-    return (
-      <MarketingDashboardLayout>
-        <DashboardEditChromeProvider>
-          <div className={`min-h-0 min-w-0 w-full max-w-full flex flex-col ${BLOCK_EMBED_CLASSNAME}`}>
-            <EventCalendarDashboard canEdit={isAdmin && !isViewer} />
-          </div>
-        </DashboardEditChromeProvider>
-      </MarketingDashboardLayout>
-    )
-  }
-
   if (showShellPlaceholder && hasPage) {
     return (
       <ShellPagePlaceholder
@@ -143,6 +125,7 @@ function InterfacePageContent({
         onBlocksMirror={onBlocksMirror}
         mode="view"
         marketingDashboard={marketingDashboard}
+        pageEditable={isAdmin && !isViewer}
       />
     </div>
   )
@@ -202,18 +185,16 @@ function InterfacePageClientInternal({
 
   /** Marketing Dashboard shell: calmer spacing and block styling (name or config.layout_style). */
   const marketingHome = useMemo(() => isMarketingHomePage(page), [page?.name, page?.config])
-  const eventCalendar = useMemo(() => isEventCalendarPage(page), [page?.name, page?.config])
 
   const marketingDashboard = useMemo(() => {
     if (!page) return false
     const cfg = page.config as { layout_style?: string } | undefined
     return (
-      eventCalendar ||
       marketingHome ||
       page.name === "Marketing Dashboard" ||
       cfg?.layout_style === "marketing_dashboard"
     )
-  }, [page?.name, page?.config, marketingHome, eventCalendar])
+  }, [page?.name, page?.config, marketingHome])
 
   // Track previous pageId to reset blocks when page changes
   // CRITICAL: Use ref to track actual pageId changes, not effect dependencies
@@ -1304,9 +1285,9 @@ function InterfacePageClientInternal({
       isSingleCalendar
     // Suppress main scroll for: (1) full-page content blocks, (2) record_view/record_review two-panel layout
     // Both layouts fill viewport; panels scroll internally.
-    const shouldSuppress = !!isFullPage || !!useRecordReviewLayout || eventCalendar
+    const shouldSuppress = !!isFullPage || !!useRecordReviewLayout
     mainScroll.setSuppressMainScroll(shouldSuppress)
-  }, [mainScroll, page?.page_type, blocks, eventCalendar])
+  }, [mainScroll, page?.page_type, blocks])
 
   // CRITICAL: Stable callback for record_view layout save - MUST be before early returns (React Hooks rule).
   // Inline function caused infinite loop (RecordReviewPage effect depends on onLayoutSave; new ref every render → setRightPanelData → re-render → loop)
@@ -1379,7 +1360,7 @@ function InterfacePageClientInternal({
   const pageForRender = pageWithConfig
 
   const showShellPlaceholder = useMemo(() => {
-    if (!hasPage || useRecordReviewLayout || eventCalendar) return false
+    if (!hasPage || useRecordReviewLayout) return false
     if (SHOW_MARKETING_HOME_PLACEHOLDER && marketingHome) return true
     if (isEditMode) return false
     if (blocksLoading) return false
@@ -1387,7 +1368,6 @@ function InterfacePageClientInternal({
   }, [
     hasPage,
     useRecordReviewLayout,
-    eventCalendar,
     marketingHome,
     isEditMode,
     blocksLoading,
@@ -1526,7 +1506,7 @@ function InterfacePageClientInternal({
         <CanvasContainer
           scrollOwner={suppressMainScroll ? "parent" : "self"}
           fullBleed
-          className={`relative ${suppressMainScroll ? "flex-1 min-h-0" : "min-h-full"} ${isEditMode && !eventCalendar ? "pb-48" : ""}`}
+          className={`relative ${suppressMainScroll ? "flex-1 min-h-0" : "min-h-full"} ${isEditMode ? "pb-48" : ""}`}
         >
           <InterfacePageContent
             useRecordReviewLayout={useRecordReviewLayout}
@@ -1542,7 +1522,6 @@ function InterfacePageClientInternal({
             recordContext={recordContext}
             setRecordContext={setRecordContext}
             marketingDashboard={marketingDashboard}
-            showEventCalendar={eventCalendar}
             showShellPlaceholder={showShellPlaceholder}
             isAdmin={isAdmin}
             onBlocksMirror={handleBlocksMirror}

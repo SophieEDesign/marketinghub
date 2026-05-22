@@ -32,6 +32,9 @@ export type BlockType =
   | 'content_timeline'
   | 'internal_resource_hub'
   | 'upcoming_summary'
+  | 'things_to_do'
+  | 'event_calendar'
+  | 'social_media_calendar'
 
 export type UpcomingSummarySectionId =
   | 'deadlines'
@@ -392,6 +395,45 @@ export interface BlockConfig {
   upcoming_summary_show_owners?: boolean
   upcoming_summary_show_view_all?: boolean
   upcoming_summary_group_campaigns_by_status?: boolean
+  // Things To Do block
+  things_to_do_subtitle?: string
+  things_to_do_default_view?: 'list' | 'board' | 'by-priority' | 'by-campaign' | 'calendar'
+  things_to_do_default_grouping?: 'due-date' | 'status' | 'campaign' | 'priority'
+  things_to_do_show_filters?: boolean
+  things_to_do_show_quick_links?: boolean
+  things_to_do_show_stats?: boolean
+  things_to_do_enable_detail_panel?: boolean
+  things_to_do_max_items?: number
+  things_to_do_date_range?: 'all' | 'this_week' | 'next_30_days' | 'this_quarter'
+  things_to_do_compact_mode?: boolean
+  // Event Calendar block
+  event_calendar_subtitle?: string
+  event_calendar_default_view?: 'month' | 'week' | 'list' | 'timeline'
+  event_calendar_show_toolbar?: boolean
+  event_calendar_show_metrics?: boolean
+  event_calendar_show_filters?: boolean
+  event_calendar_show_search?: boolean
+  event_calendar_show_add_button?: boolean
+  event_calendar_show_attendance_controls?: boolean
+  event_calendar_show_schedule?: boolean
+  event_calendar_show_resources?: boolean
+  event_calendar_show_notes?: boolean
+  event_calendar_show_legend?: boolean
+  event_calendar_show_page_header?: boolean
+  event_calendar_density?: 'comfortable' | 'compact'
+  // Social Media Calendar block
+  social_media_calendar_subtitle?: string
+  social_media_calendar_default_view?: 'month' | 'week' | 'list' | 'feed'
+  social_media_calendar_content_scope?: 'social_only' | 'all_content'
+  social_media_calendar_mode?: 'full' | 'compact'
+  social_media_calendar_show_status_bar?: boolean
+  social_media_calendar_show_filters?: boolean
+  social_media_calendar_show_toolbar?: boolean
+  social_media_calendar_show_media_preview?: boolean
+  social_media_calendar_show_approval_status?: boolean
+  social_media_calendar_show_platform_icons?: boolean
+  social_media_calendar_max_posts?: number
+  social_media_calendar_show_page_header?: boolean
   // List block specific config (at root level for backward compatibility)
   list_title_field?: string
   list_subtitle_fields?: string[]
