@@ -20,8 +20,8 @@ function EditModeWithPreview({ children }: { children: ReactNode }) {
   const { isMemberPreview } = useMemberPreview()
   return (
     <EditModeProvider isViewer={isMemberPreview}>
-      <MemberPreviewEffects />
       <UIModeProvider>
+        <MemberPreviewEffects />
         <SidebarModeProvider>{children}</SidebarModeProvider>
       </UIModeProvider>
     </EditModeProvider>
