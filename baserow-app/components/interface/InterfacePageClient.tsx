@@ -71,6 +71,7 @@ function InterfacePageContent({
   showShellPlaceholder,
   isAdmin,
   onBlocksMirror,
+  isPageLayoutEditing,
 }: {
   useRecordReviewLayout: boolean
   hasPage: boolean
@@ -89,6 +90,8 @@ function InterfacePageContent({
   showShellPlaceholder?: boolean
   /** When InterfaceBuilder is mounted it owns blocks; mirror updates to parent for loadBlocks/sync (REG-005). */
   onBlocksMirror?: (blocks: PageBlock[]) => void
+  /** Page layout edit (UIMode editPages / block scope) — shows builder toolbar when header is hidden. */
+  isPageLayoutEditing?: boolean
 }) {
   if (showShellPlaceholder && hasPage) {
     return (
@@ -118,7 +121,7 @@ function InterfacePageContent({
         page={(interfaceBuilderPage ?? fallbackPage) as any}
         initialBlocks={memoizedBlocks}
         isViewer={isViewer}
-        hideHeader={true}
+        hideHeader={!isPageLayoutEditing}
         pageTableId={pageTableId}
         recordId={recordContext?.recordId ?? null}
         recordTableId={recordContext?.tableId ?? null}
@@ -168,7 +171,7 @@ function InterfacePageClientInternal({
   const { isEditing: isPageEditing, enter: enterPageEdit, exit: exitPageEdit } = usePageEditMode(pageId)
   const { isEditing: isBlockEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(pageId)
   const { blocksDirty } = useEditMode()
-  const { enterEditPages, exitEditPages, isEdit } = useUIMode()
+  const { enterEditPages, exitEditPages, isEdit, uiMode } = useUIMode()
   const isEditMode = isEdit(pageId)
   const { selectedContext, setSelectedContext } = useSelectionContext()
   const { setData: setRightPanelData } = useRightSettingsPanelData()
@@ -217,6 +220,15 @@ function InterfacePageClientInternal({
       enterEditPages(pageId)
     }
   }, [pageId, enterBlockEdit, enterEditPages])
+
+  // Layout edit persists across page navigation — re-target UIMode/block scope to the page being viewed.
+  useEffect(() => {
+    if (!pageId) return
+    if (uiMode === "editPages" && !isEditMode) {
+      enterBlockEdit()
+      enterEditPages(pageId)
+    }
+  }, [pageId, uiMode, isEditMode, enterBlockEdit, enterEditPages])
 
   // CRITICAL: Edit state is NOT reset on navigation - only when user explicitly exits
   // Do NOT add effects that depend on blocks, page, or edit mode - they cause remount loops
@@ -1524,6 +1536,7 @@ function InterfacePageClientInternal({
             showShellPlaceholder={showShellPlaceholder}
             isAdmin={isAdmin}
             onBlocksMirror={handleBlocksMirror}
+            isPageLayoutEditing={isEditing}
           />
           {blocksLoading && (
             <div className="absolute inset-0 bg-white/60 flex items-center justify-center z-10 pointer-events-none">

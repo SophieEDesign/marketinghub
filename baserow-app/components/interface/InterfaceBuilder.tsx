@@ -5,7 +5,7 @@ import { useInterfaceBuilderSelection } from "./useInterfaceBuilderSelection"
 import { useUndoRedo } from "@/hooks/useUndoRedo"
 import { Save, Eye, Edit2, Plus, Trash2, Settings, MoreVertical, Undo2, Redo2 } from "lucide-react"
 import { useBranding } from "@/contexts/BrandingContext"
-import { useBlockEditMode, useEditMode } from "@/contexts/EditModeContext"
+import { useBlockEditMode, useEditMode, usePageEditMode } from "@/contexts/EditModeContext"
 import { useUIMode } from "@/contexts/UIModeContext"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { useSelectionContext } from "@/contexts/SelectionContext"
@@ -98,6 +98,7 @@ function InterfaceBuilderInner({
   
   // Context-driven editing: Edit/View toggle from sidebar menu controls block editing
   const { isEditing: isBlockEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(page.id)
+  const { isEditing: isPageEditing } = usePageEditMode(page.id)
   const { enterEditPages, isEdit: isUiEdit } = useUIMode()
   const { setBlocksDirty } = useEditMode()
   const { selectedContext, setSelectedContext } = useSelectionContext()
@@ -105,7 +106,7 @@ function InterfaceBuilderInner({
 
   // Page layout edit: block scope OR UIMode editPages for this page (panel can show from UIMode alone)
   const isUiPageEdit = isUiEdit(page.id)
-  const effectiveIsEditing = !isViewer && (isBlockEditing || isUiPageEdit)
+  const effectiveIsEditing = !isViewer && (isBlockEditing || isUiPageEdit || isPageEditing)
 
   // Keep block scope aligned when shell is in editPages for this page
   useEffect(() => {
@@ -1384,6 +1385,20 @@ function InterfaceBuilderInner({
   }, [blocks])
 
   const fullPageBlock = fullPageBlockId ? blocks.find((b) => b.id === fullPageBlockId) : null
+
+  // Full-page pages: select the sole block when entering layout edit so settings panel opens immediately.
+  useEffect(() => {
+    if (!effectiveIsEditing || !fullPageBlockId) return
+    if (selectedBlockId === fullPageBlockId) return
+    setSelectedBlockId(fullPageBlockId)
+    setSelectedContext({ type: "block", blockId: fullPageBlockId })
+  }, [
+    effectiveIsEditing,
+    fullPageBlockId,
+    selectedBlockId,
+    setSelectedBlockId,
+    setSelectedContext,
+  ])
 
   // Sync record context to right panel when record is selected (record_context full page)
   // Like calendar modal: Record settings (Fields, View-only/Editable) show in right panel

@@ -55,6 +55,7 @@ import {
   builderBlockFrameClassName,
   BUILDER_CHROME_DRAG_HANDLE,
 } from "@/components/interface/primitives/BuilderBlockFrame"
+import { shouldShowBlockChromeToolbar } from "@/lib/interface/canvas-edit-chrome"
 import { cn } from "@/lib/utils"
 
 const ResponsiveGridLayout = withResizeObserverWidthProvider(Responsive)
@@ -2402,13 +2403,20 @@ export default function Canvas({
               }
             }
 
+            const isBlockSelected =
+              selectedBlockId === block.id ||
+              (selectedBlockIds != null && selectedBlockIds.has(block.id))
+            const isThisFullPageBlock =
+              isFullPageMode && fullPageBlock != null && block.id === fullPageBlock.id
+
             return (
               <div
                 key={block.id}
                 className={cn(
                   builderBlockFrameClassName({
                     isEditing,
-                    isSelected: selectedBlockId === block.id,
+                    isSelected: isBlockSelected,
+                    isFullPageLayout: isThisFullPageBlock,
                     isSnapHighlighted: Boolean(
                       activeSnapTargets?.highlightedBlocks?.includes(block.id)
                     ),
@@ -2428,14 +2436,12 @@ export default function Canvas({
               >
             {/* Edit chrome: above block content (z-30). Full-page blocks keep settings/dup/delete; drag only on grid layout. */}
             {(() => {
-              const isBlockSelected =
-                selectedBlockId === block.id ||
-                (selectedBlockIds != null && selectedBlockIds.has(block.id))
-              const isThisFullPageBlock =
-                isFullPageMode && fullPageBlock != null && block.id === fullPageBlock.id
-              const showChromeToolbar =
-                isEditing &&
-                (isBlockSelected || isThisFullPageBlock || !isFullPageMode)
+              const showChromeToolbar = shouldShowBlockChromeToolbar({
+                isEditing,
+                isFullPageMode,
+                isThisFullPageBlock,
+                isBlockSelected,
+              })
               return (
                 <div
                   data-block-chrome
@@ -2644,7 +2650,7 @@ export default function Canvas({
                           )}
                         </div>
                       )}
-                      <BlockAppearanceWrapper block={fullPageBlock} isFullPage isRail className={isEditing ? "pointer-events-auto" : ""}>
+                      <BlockAppearanceWrapper block={fullPageBlock} isFullPage isRail isLayoutEditing={isEditing} className={isEditing ? "pointer-events-auto" : ""}>
                         <div className={`h-full w-full overflow-hidden ${isEditing && fullPageBlock.type === "record_context" ? "pt-10" : ""}`}>
                           <BlockRenderer
                             block={fullPageBlock}
@@ -2702,7 +2708,7 @@ export default function Canvas({
                     </div>
                   </div>
                 ) : (
-                  <BlockAppearanceWrapper block={fullPageBlock} isFullPage className={isEditing ? "pointer-events-auto" : ""}>
+                  <BlockAppearanceWrapper block={fullPageBlock} isFullPage isLayoutEditing={isEditing} className={isEditing ? "pointer-events-auto" : ""}>
                     <div className="h-full w-full overflow-hidden">
                       <BlockRenderer
                         block={fullPageBlock}

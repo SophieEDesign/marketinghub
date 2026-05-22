@@ -339,7 +339,7 @@ export default function AirtableSidebar({
                 {isEditMode ? (
                   <>
                     <Check className="h-3.5 w-3.5" />
-                    <span>Done</span>
+                    <span>Done organising</span>
                   </>
                 ) : (
                   <>

@@ -16,6 +16,8 @@ export interface BuilderBlockFrameProps {
   isSelected?: boolean
   isSnapHighlighted?: boolean
   isKeyboardHighlighted?: boolean
+  /** Single full-page block layout — use inset ring so outline is not clipped by overflow-hidden parents */
+  isFullPageLayout?: boolean
   className?: string
   onClick?: (e: MouseEvent<HTMLDivElement>) => void
   children: ReactNode
@@ -26,9 +28,14 @@ export function builderBlockFrameClassName({
   isSelected,
   isSnapHighlighted,
   isKeyboardHighlighted,
+  isFullPageLayout = false,
 }: Pick<
   BuilderBlockFrameProps,
-  "isEditing" | "isSelected" | "isSnapHighlighted" | "isKeyboardHighlighted"
+  | "isEditing"
+  | "isSelected"
+  | "isSnapHighlighted"
+  | "isKeyboardHighlighted"
+  | "isFullPageLayout"
 >): string {
   if (!isEditing) {
     return cn("block-container relative", BUILDER_CHROME_FRAME_VIEW)
@@ -37,6 +44,8 @@ export function builderBlockFrameClassName({
   return cn(
     "block-container relative",
     BUILDER_CHROME_FRAME_BASE,
+    isFullPageLayout &&
+      "border-accent-link/50 ring-2 ring-inset ring-accent-link/35 shadow-card",
     isSelected && BUILDER_CHROME_FRAME_SELECTED,
     isSnapHighlighted && BUILDER_CHROME_FRAME_SNAP,
     isKeyboardHighlighted && BUILDER_CHROME_FRAME_KEYBOARD
@@ -50,6 +59,7 @@ export default function BuilderBlockFrame({
   isSelected,
   isSnapHighlighted,
   isKeyboardHighlighted,
+  isFullPageLayout,
   className,
   onClick,
   children,
@@ -62,6 +72,7 @@ export default function BuilderBlockFrame({
           isSelected,
           isSnapHighlighted,
           isKeyboardHighlighted,
+          isFullPageLayout,
         }),
         className
       )}

@@ -15,7 +15,7 @@ import RightSettingsPanel from "@/components/interface/RightSettingsPanel"
 import RecordPanel from "@/components/records/RecordPanel"
 import { MainScrollProvider } from "@/contexts/MainScrollContext"
 import { useUIMode } from "@/contexts/UIModeContext"
-import { useBlockEditMode } from "@/contexts/EditModeContext"
+import { useBlockEditMode, usePageEditMode } from "@/contexts/EditModeContext"
 import { useSelectionContext } from "@/contexts/SelectionContext"
 import { useIsMobile } from "@/hooks/useResponsive"
 import { useBranding } from "@/contexts/BrandingContext"
@@ -176,7 +176,8 @@ function ShellContent({
   const pageId = pathname?.match(/\/pages\/([^/?]+)/)?.[1]
   const { isEdit: isUiEdit } = useUIMode()
   const { isEditing: isBlockEditingOnPage } = useBlockEditMode(pageId)
-  const isEditMode = isUiEdit(pageId) || isBlockEditingOnPage
+  const { isEditing: isPageEditingOnPage } = usePageEditMode(pageId)
+  const isEditMode = isUiEdit(pageId) || isBlockEditingOnPage || isPageEditingOnPage
   const { selectedContext } = useSelectionContext()
   const [sidebarAutoCompactDismissed, setSidebarAutoCompactDismissed] = useState(false)
 

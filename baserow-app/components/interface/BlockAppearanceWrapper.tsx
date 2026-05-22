@@ -14,6 +14,8 @@ interface BlockAppearanceWrapperProps {
   isFullPage?: boolean
   /** When true with isFullPage, block is a rail (fixed width); parent constrains width. */
   isRail?: boolean
+  /** Layout edit mode — full-page blocks still show a selectable outline (view mode stays chromeless). */
+  isLayoutEditing?: boolean
 }
 
 export default function BlockAppearanceWrapper({
@@ -22,12 +24,24 @@ export default function BlockAppearanceWrapper({
   className,
   isFullPage = false,
   isRail = false,
+  isLayoutEditing = false,
 }: BlockAppearanceWrapperProps) {
   const sizing = getEffectiveBlockSizing(block)
 
-  // Full-page: transparent dimensionless wrapper; no block chrome. Single scroll context = block internal content.
+  // Full-page: no card chrome in view mode; in layout edit show inset ring for selection affordance.
   if (isFullPage) {
-    return <div className={cn("h-full w-full min-h-0 flex flex-col", className)}>{children}</div>
+    return (
+      <div
+        className={cn(
+          "relative h-full w-full min-h-0 flex flex-col",
+          isLayoutEditing &&
+            "ring-2 ring-inset ring-accent-link/35 rounded-lg border border-dashed border-accent-link/40",
+          className
+        )}
+      >
+        {children}
+      </div>
+    )
   }
 
   const appearance = block.config?.appearance
