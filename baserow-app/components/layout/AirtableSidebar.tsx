@@ -26,7 +26,7 @@ import {
 } from "lucide-react"
 import { useBranding } from "@/contexts/BrandingContext"
 import { usePageActions } from "@/contexts/PageActionsContext"
-import { useSidebarEditMode } from "@/contexts/EditModeContext"
+import { useWorkspaceLayoutEdit } from "@/hooks/useWorkspaceLayoutEdit"
 import RecentsFavoritesSection from "./RecentsFavoritesSection"
 import BaseDropdown from "./BaseDropdown"
 import { cn } from "@/lib/utils"
@@ -90,8 +90,6 @@ export default function AirtableSidebar({
   const router = useRouter()
   const { brandName, logoUrl, primaryColor } = useBranding()
   const { pageActions } = usePageActions()
-  const { isEditing: isSidebarEditMode, enter: enterSidebarEdit, exit: exitSidebarEdit } =
-    useSidebarEditMode()
   const isMobile = useIsMobile()
   const previousPathnameRef = useRef<string | null>(null)
 
@@ -181,10 +179,16 @@ export default function AirtableSidebar({
 
   const { isMemberPreview } = useMemberPreview()
   const isAdmin = userRole === "admin"
-  const isEditMode = isSidebarEditMode
 
   const isSettings = pathname.includes("/settings")
   const currentPageIdFromPath = pathname?.match(/\/pages\/([^/?]+)/)?.[1]
+  const {
+    isWorkspaceEditing,
+    isSidebarEditing,
+    isLayoutEditing,
+    toggle: toggleWorkspaceEdit,
+  } = useWorkspaceLayoutEdit(currentPageIdFromPath)
+  const isEditMode = isWorkspaceEditing
   const homeHref =
     typeof defaultPageId === "string" && defaultPageId.length > 0
       ? withMemberPreviewHref(`/pages/${defaultPageId}`, isMemberPreview)
@@ -328,30 +332,39 @@ export default function AirtableSidebar({
           </div>
 
           {isAdmin && (
-            <div className="flex-shrink-0 px-3 pb-2 flex items-center">
+            <div className="flex-shrink-0 px-3 pb-2 flex flex-col gap-1">
               <button
                 type="button"
-                onClick={() => (isEditMode ? exitSidebarEdit() : enterSidebarEdit())}
+                onClick={toggleWorkspaceEdit}
                 className={cn(
                   "flex items-center gap-2 px-2 py-1.5 text-xs font-medium rounded-lg transition-colors text-muted-foreground",
                   "hover:bg-muted/60 hover:text-foreground",
                   isEditMode && "bg-hub-nav-active text-hub-primary"
                 )}
-                title={isEditMode ? "Finish organising the sidebar" : "Reorder pages and sections"}
-                aria-label={isEditMode ? "Done organising sidebar" : "Organise sidebar"}
+                title={
+                  isEditMode
+                    ? "Finish editing workspace (sidebar and page blocks)"
+                    : "Edit workspace: reorder pages and edit blocks"
+                }
+                aria-label={isEditMode ? "Done editing workspace" : "Edit workspace"}
               >
                 {isEditMode ? (
                   <>
                     <Check className="h-3.5 w-3.5" />
-                    <span>Done organising</span>
+                    <span>Done</span>
                   </>
                 ) : (
                   <>
                     <Edit2 className="h-3.5 w-3.5" />
-                    <span>Organise</span>
+                    <span>Edit</span>
                   </>
                 )}
               </button>
+              {isSidebarEditing && !isLayoutEditing && (
+                <p className="px-2 text-[10px] leading-snug text-muted-foreground">
+                  Open a page to edit blocks, or use Edit page in the page header.
+                </p>
+              )}
             </div>
           )}
 

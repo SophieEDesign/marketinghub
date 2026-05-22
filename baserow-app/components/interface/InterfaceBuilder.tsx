@@ -7,6 +7,7 @@ import { Save, Eye, Edit2, Plus, Trash2, Settings, MoreVertical, Undo2, Redo2 } 
 import { useBranding } from "@/contexts/BrandingContext"
 import { useBlockEditMode, useEditMode, usePageEditMode } from "@/contexts/EditModeContext"
 import { useUIMode } from "@/contexts/UIModeContext"
+import { useWorkspaceLayoutEdit } from "@/hooks/useWorkspaceLayoutEdit"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { useSelectionContext } from "@/contexts/SelectionContext"
 import { FilterStateProvider } from "@/lib/interface/filter-state"
@@ -100,6 +101,7 @@ function InterfaceBuilderInner({
   const { isEditing: isBlockEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(page.id)
   const { isEditing: isPageEditing } = usePageEditMode(page.id)
   const { enterEditPages, isEdit: isUiEdit } = useUIMode()
+  const { enter: enterWorkspaceEdit, exit: exitWorkspaceEdit } = useWorkspaceLayoutEdit(page.id)
   const { setBlocksDirty } = useEditMode()
   const { selectedContext, setSelectedContext } = useSelectionContext()
   const { setData: setRightPanelData } = useRightSettingsPanelData()
@@ -653,11 +655,11 @@ function InterfaceBuilderInner({
 
     // Exit edit mode if requested
     if (exitAfterSave) {
-      exitBlockEdit()
+      exitWorkspaceEdit()
       clearSelectionState()
       setSelectedContext(null)
     }
-  }, [saveLayout, page.id, toast, exitBlockEdit, clearSelectionState, setSelectedContext])
+  }, [saveLayout, page.id, toast, exitWorkspaceEdit, clearSelectionState, setSelectedContext])
 
   // Save layout and exit edit mode
   const handleExitEditMode = useCallback(async () => {
@@ -1233,11 +1235,10 @@ function InterfaceBuilderInner({
       // User may need to edit other blocks, so explicitly keep edit mode active
       // Only if not in viewer mode
       if (!isViewer && !effectiveIsEditing) {
-        enterBlockEdit()
-        enterEditPages(page.id)
+        enterWorkspaceEdit()
       }
     },
-    [handleBlockUpdate, isViewer, effectiveIsEditing, enterBlockEdit, enterEditPages, page.id]
+    [handleBlockUpdate, isViewer, effectiveIsEditing, enterWorkspaceEdit]
   )
 
   const handlePageUpdate = useCallback(async () => {

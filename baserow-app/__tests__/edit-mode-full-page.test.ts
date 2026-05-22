@@ -72,7 +72,7 @@ describe("InterfacePageClient — layout edit follows navigation", () => {
       "utf8"
     )
     expect(src).toContain('uiMode === "editPages"')
-    expect(src).toContain("enterEditPages(pageId)")
+    expect(src).toContain("enterWorkspaceEdit()")
   })
 
   it("shows InterfaceBuilder toolbar when page layout editing", () => {

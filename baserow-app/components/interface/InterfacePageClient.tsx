@@ -14,7 +14,7 @@ import PageRenderer from "./PageRenderer"
 import PageSetupState from "./PageSetupState"
 import { useRightSettingsPanelData } from "@/contexts/RightSettingsPanelDataContext"
 import { getRequiredAnchorType } from "@/lib/interface/page-types"
-import { usePageEditMode, useBlockEditMode, useEditMode } from "@/contexts/EditModeContext"
+import { useEditMode } from "@/contexts/EditModeContext"
 import { useUIMode } from "@/contexts/UIModeContext"
 import { useMainScroll } from "@/contexts/MainScrollContext"
 import { useSelectionContext } from "@/contexts/SelectionContext"
@@ -51,6 +51,8 @@ import ShellPagePlaceholder from "@/components/shell/ShellPagePlaceholder"
 import { useMemberPreview } from "@/contexts/MemberPreviewContext"
 import { isPageEditableForUser } from "@/lib/navigation/member-preview"
 import { Button } from "@/components/ui/button"
+import { Check, Pencil } from "lucide-react"
+import { useWorkspaceLayoutEdit } from "@/hooks/useWorkspaceLayoutEdit"
 // Lazy load InterfaceBuilder for dashboard/overview pages
 const InterfaceBuilder = dynamic(() => import("./InterfaceBuilder"), { ssr: false })
 // Lazy load RecordReviewPage for record_review pages
@@ -170,11 +172,13 @@ function InterfacePageClientInternal({
   const initialDataRef = useRef<any[]>(initialData)
   const pageLoadedRef = useRef<boolean>(!!initialPage)
   
-  // Use unified editing context (block scope kept in sync with UIMode editPages)
-  const { isEditing: isPageEditing, enter: enterPageEdit, exit: exitPageEdit } = usePageEditMode(pageId)
-  const { isEditing: isBlockEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(pageId)
   const { blocksDirty } = useEditMode()
-  const { enterEditPages, exitEditPages, isEdit, uiMode } = useUIMode()
+  const { isEdit, uiMode } = useUIMode()
+  const {
+    isLayoutEditing,
+    enter: enterWorkspaceEdit,
+    exit: exitWorkspaceEdit,
+  } = useWorkspaceLayoutEdit(pageId)
   const isEditMode = isEdit(pageId)
   const { selectedContext, setSelectedContext } = useSelectionContext()
   const { setData: setRightPanelData } = useRightSettingsPanelData()
@@ -219,19 +223,17 @@ function InterfacePageClientInternal({
     if (!pageId || typeof window === "undefined") return
     const saved = localStorage.getItem(`block-edit-mode-${pageId}`)
     if (saved === "true") {
-      enterBlockEdit()
-      enterEditPages(pageId)
+      enterWorkspaceEdit()
     }
-  }, [pageId, enterBlockEdit, enterEditPages])
+  }, [pageId, enterWorkspaceEdit])
 
-  // Layout edit persists across page navigation — re-target UIMode/block scope to the page being viewed.
+  // Layout edit persists across page navigation — re-target scope to the page being viewed.
   useEffect(() => {
     if (!pageId) return
     if (uiMode === "editPages" && !isEditMode) {
-      enterBlockEdit()
-      enterEditPages(pageId)
+      enterWorkspaceEdit()
     }
-  }, [pageId, uiMode, isEditMode, enterBlockEdit, enterEditPages])
+  }, [pageId, uiMode, isEditMode, enterWorkspaceEdit])
 
   // CRITICAL: Edit state is NOT reset on navigation - only when user explicitly exits
   // Do NOT add effects that depend on blocks, page, or edit mode - they cause remount loops
@@ -256,8 +258,7 @@ function InterfacePageClientInternal({
   const savedViewUpdatedAtRef = useRef<string | null>(null)
   const viewCheckIntervalRef = useRef<NodeJS.Timeout | null>(null)
   
-  // Determine if we're in edit mode (page, block, or UIMode editPages for this page)
-  const isEditing = isPageEditing || isBlockEditing || isEditMode
+  const isEditing = isLayoutEditing
 
   // Auto-open Right Settings Panel with Page Settings when entering Edit Mode
   const prevIsEditingRef = useRef(isEditing)
@@ -1506,6 +1507,30 @@ function InterfacePageClientInternal({
             page?.updated_at ? (
               <span suppressHydrationWarning>Updated {formatDateUK(page?.updated_at ?? "")}</span>
             ) : null
+          }
+          actions={
+            <Button
+              type="button"
+              variant={isLayoutEditing ? "secondary" : "outline"}
+              size="sm"
+              className="shrink-0 text-xs gap-1.5"
+              onClick={() =>
+                isLayoutEditing ? exitWorkspaceEdit() : enterWorkspaceEdit()
+              }
+              aria-label={isLayoutEditing ? "Done editing page" : "Edit page layout"}
+            >
+              {isLayoutEditing ? (
+                <>
+                  <Check className="h-3.5 w-3.5" aria-hidden />
+                  Done
+                </>
+              ) : (
+                <>
+                  <Pencil className="h-3.5 w-3.5" aria-hidden />
+                  Edit page
+                </>
+              )}
+            </Button>
           }
         />
       )}

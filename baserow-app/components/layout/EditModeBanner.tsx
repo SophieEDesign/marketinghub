@@ -5,31 +5,21 @@
  * Makes edit mode unmistakably obvious across the app.
  */
 import { usePathname } from "next/navigation"
-import { useEditMode, useBlockEditMode } from "@/contexts/EditModeContext"
-import { useUIMode } from "@/contexts/UIModeContext"
+import { useWorkspaceLayoutEdit } from "@/hooks/useWorkspaceLayoutEdit"
 import { Button } from "@/components/ui/button"
 import { Check, Pencil } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export default function EditModeBanner() {
-  const { isEditing, exitAllEditModes } = useEditMode()
-  const { exitEditPages, isEdit } = useUIMode()
   const pathname = usePathname()
   const pageId = pathname?.match(/\/pages\/([^/?]+)/)?.[1]
-  const { isEditing: isBlockEditingOnPage } = useBlockEditMode(pageId)
-
-  const isPageLayoutEditing =
-    isEdit(pageId) ||
-    isBlockEditingOnPage ||
-    isEditing("page")
+  const { isLayoutEditing, exit: exitWorkspaceEdit } = useWorkspaceLayoutEdit(pageId)
 
   const handleDone = () => {
-    exitAllEditModes()
-    exitEditPages()
+    exitWorkspaceEdit()
   }
 
-  // Sidebar "Organise" is not page layout edit — do not show this banner (avoids false "Editing" state).
-  if (!isPageLayoutEditing) return null
+  if (!isLayoutEditing) return null
 
   return (
     <div
@@ -46,7 +36,10 @@ export default function EditModeBanner() {
           <Pencil className="h-3.5 w-3.5 text-amber-800" aria-hidden />
         </div>
         <span className="font-medium text-sm">
-          Editing
+          Editing workspace
+        </span>
+        <span className="hidden sm:inline text-xs text-amber-800/80">
+          — reorder pages and edit blocks
         </span>
       </div>
       <Button

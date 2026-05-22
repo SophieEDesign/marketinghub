@@ -7,8 +7,7 @@
  */
 import { useEffect, useCallback } from "react"
 import { usePageActions } from "@/contexts/PageActionsContext"
-import { usePageEditMode, useBlockEditMode, useSidebarEditMode } from "@/contexts/EditModeContext"
-import { useUIMode } from "@/contexts/UIModeContext"
+import { useWorkspaceLayoutEdit } from "@/hooks/useWorkspaceLayoutEdit"
 import { useSelectionContext } from "@/contexts/SelectionContext"
 
 interface PageActionsRegistrarProps {
@@ -23,10 +22,8 @@ export default function PageActionsRegistrar({
   isViewer,
 }: PageActionsRegistrarProps) {
   const { registerPageActions, unregisterPageActions } = usePageActions()
-  const { isEditing: isPageEditing, exit: exitPageEdit } = usePageEditMode(pageId)
-  const { isEditing: isBlockEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(pageId)
-  const { enterEditPages, exitEditPages, isEdit: isUiEdit } = useUIMode()
-  const { exit: exitSidebarEdit } = useSidebarEditMode()
+  const { isLayoutEditing, enter: enterWorkspaceEdit, exit: exitWorkspaceEdit } =
+    useWorkspaceLayoutEdit(pageId)
   const { setSelectedContext } = useSelectionContext()
 
   const onOpenPageSettings = useCallback(() => {
@@ -34,16 +31,12 @@ export default function PageActionsRegistrar({
   }, [setSelectedContext])
 
   const onEnterEdit = useCallback(() => {
-    exitSidebarEdit()
-    enterBlockEdit()
-    enterEditPages(pageId)
-  }, [exitSidebarEdit, enterBlockEdit, enterEditPages, pageId])
+    enterWorkspaceEdit()
+  }, [enterWorkspaceEdit])
 
   const onExitEdit = useCallback(() => {
-    exitPageEdit()
-    exitBlockEdit()
-    exitEditPages()
-  }, [exitPageEdit, exitBlockEdit, exitEditPages])
+    exitWorkspaceEdit()
+  }, [exitWorkspaceEdit])
 
   useEffect(() => {
     if (!pageId) return
@@ -57,13 +50,13 @@ export default function PageActionsRegistrar({
       onOpenPageSettings,
       onEnterEdit,
       onExitEdit,
-      isEditing: isPageEditing || isBlockEditing || isUiEdit(pageId ?? undefined),
+      isEditing: isLayoutEditing,
     })
 
     return () => {
       unregisterPageActions()
     }
-  }, [pageId, isAdmin, isViewer, isPageEditing, isBlockEditing, isUiEdit, onOpenPageSettings, onEnterEdit, onExitEdit, registerPageActions, unregisterPageActions])
+  }, [pageId, isAdmin, isViewer, isLayoutEditing, onOpenPageSettings, onEnterEdit, onExitEdit, registerPageActions, unregisterPageActions])
 
   return null
 }
