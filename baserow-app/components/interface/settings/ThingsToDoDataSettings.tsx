@@ -25,8 +25,23 @@ export default function ThingsToDoDataSettings({
     <div className="space-y-4">
       <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
         <p className="text-sm text-blue-800">
-          Work queue loads actionable rows from the Content table (tasks, reviews, due dates). Falls back to samples if loading fails.
+          Work queue loads actionable rows from the Content table (reviews, due dates, approvals).
+          There is no separate Tasks table yet — enable demo data only for presentations.
         </p>
+      </div>
+
+      <div className="flex items-center justify-between rounded-md border border-border/40 px-3 py-2">
+        <div className="space-y-0.5 pr-3">
+          <Label htmlFor="ttd-use-mock">Use demo data</Label>
+          <p className="text-xs text-muted-foreground">
+            Show sample tasks instead of live Content-derived actions.
+          </p>
+        </div>
+        <Switch
+          id="ttd-use-mock"
+          checked={config.things_to_do_use_mock === true}
+          onCheckedChange={(v) => onUpdate({ things_to_do_use_mock: v ? true : undefined })}
+        />
       </div>
 
       <div className="space-y-2">

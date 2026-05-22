@@ -101,6 +101,14 @@
 }
 
 @layer base {
+  /* White sidebar: readable nav regardless of app dark/light theme */
+  [data-sidebar-appearance="light"] {
+    color: hsl(221 39% 11%);
+  }
+  [data-sidebar-appearance="light"] .text-muted-foreground {
+    color: hsl(220 9% 46%);
+  }
+
   .marketing-dashboard-shell {
     --section-gap: 1.125rem;
   }

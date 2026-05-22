@@ -48,6 +48,7 @@ import {
   type PublishedItem,
 } from "@/lib/interface/upcoming-summary-mock-data"
 import UpcomingSummarySectionCard from "./upcoming-summary/UpcomingSummarySectionCard"
+import MarketingDemoDataBanner from "@/components/interface/primitives/MarketingDemoDataBanner"
 
 interface UpcomingSummaryBlockProps {
   block: PageBlock
@@ -562,6 +563,7 @@ export default function UpcomingSummaryBlock({
       )}
     >
       <div className="flex min-h-full flex-col">
+        <MarketingDemoDataBanner message="Using demo data — counts and items are samples until this block is wired to Content, Campaigns, and Events." />
         <div
           className={cn(
             "flex flex-wrap items-start justify-between gap-3 border-b border-[#E6E6EF] bg-[#F8F8FC]/50",

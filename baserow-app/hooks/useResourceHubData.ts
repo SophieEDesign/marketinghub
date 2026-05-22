@@ -82,7 +82,7 @@ export function useResourceHubData(): UseResourceHubDataResult {
           mediaSupabaseTable: media.supabase_table,
         })
         setResources(resources)
-        setFromLiveData(resources.length > 0)
+        setFromLiveData(true)
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : "Failed to load resources")

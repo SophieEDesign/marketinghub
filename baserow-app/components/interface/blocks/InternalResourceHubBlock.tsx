@@ -31,6 +31,7 @@ import {
 } from "./internal-resource-hub/utils"
 import type { CategoryFilter } from "./internal-resource-hub/types"
 import { debugLog } from "@/lib/debug"
+import MarketingDemoDataBanner from "@/components/interface/primitives/MarketingDemoDataBanner"
 
 interface InternalResourceHubBlockProps {
   block: PageBlock
@@ -67,14 +68,18 @@ export default function InternalResourceHubBlock({
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [favourites, setFavourites] = useState<Set<string>>(() => new Set())
 
-  const useLive = !preferMock && fromLiveData && liveResources.length > 0
+  const useLive = !preferMock && fromLiveData
   const resources = useLive
     ? liveResources
     : preferMock
       ? MARKETING_HOME_MOCK_RESOURCES
-      : liveResources.length > 0
-        ? liveResources
-        : MOCK_RESOURCES
+      : MOCK_RESOURCES
+  const isDemoData = !useLive
+  const demoBannerMessage = preferMock
+    ? "Using demo data — dashboard mock is enabled in block settings."
+    : error
+      ? `Using demo data — ${error}`
+      : "Using demo data — connect a Media / Resources table or enable demo mode in block settings."
   const counts = useMemo(() => countByCategory(resources), [resources])
   const filtered = useMemo(
     () => filterResources(resources, category, searchQuery),
@@ -123,7 +128,7 @@ export default function InternalResourceHubBlock({
     [resources]
   )
 
-  if (loading && !useLive && !preferMock) {
+  if (loading && !fromLiveData && !preferMock) {
     return (
       <div className="flex h-full min-h-[200px] items-center justify-center rounded-xl border border-border/40 bg-background">
         <LoadingSpinner size="lg" text="Loading resources…" />
@@ -137,11 +142,7 @@ export default function InternalResourceHubBlock({
         data-block-selectable
         className="flex h-full min-h-[320px] w-full min-w-0 flex-col overflow-hidden rounded-xl border border-[#E6E6EF] bg-white shadow-sm"
       >
-        {error && !useLive ? (
-          <p className="shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">
-            Showing sample resources ({error})
-          </p>
-        ) : null}
+        {isDemoData ? <MarketingDemoDataBanner message={demoBannerMessage} /> : null}
         <ResourceListHeader
           title={title}
           subtitle={subtitle}
@@ -161,11 +162,7 @@ export default function InternalResourceHubBlock({
       data-block-selectable
       className="flex h-full min-h-[400px] w-full min-w-0 flex-col overflow-hidden rounded-card-lg border border-border/60 bg-background shadow-card"
     >
-      {error && !useLive ? (
-        <p className="shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">
-          Showing sample resources ({error})
-        </p>
-      ) : null}
+      {isDemoData ? <MarketingDemoDataBanner message={demoBannerMessage} /> : null}
       <HubHeader
         title={title}
         subtitle={subtitle}

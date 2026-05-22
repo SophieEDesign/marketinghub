@@ -27,8 +27,8 @@ export function BrandingProvider({
   const primaryColor = settings?.primary_color || 'hsl(222.2, 47.4%, 11.2%)' // Default from theme
   const accentColor = settings?.accent_color || 'hsl(210, 40%, 96.1%)' // Default from theme
   const sidebarColor = settings?.sidebar_color || '#ffffff' // Default white
-  // Use primaryColor as the default text color for all text (branding color)
-  const sidebarTextColor = settings?.sidebar_text_color || primaryColor
+  // Light sidebar always needs dark link text — never fall back to primary (often light on white)
+  const sidebarTextColor = settings?.sidebar_text_color || '#4b5563'
 
   // Set CSS custom properties for global text color
   useEffect(() => {

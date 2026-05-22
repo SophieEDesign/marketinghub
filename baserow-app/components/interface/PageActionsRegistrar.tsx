@@ -7,7 +7,7 @@
  */
 import { useEffect, useCallback } from "react"
 import { usePageActions } from "@/contexts/PageActionsContext"
-import { usePageEditMode, useBlockEditMode } from "@/contexts/EditModeContext"
+import { usePageEditMode, useBlockEditMode, useSidebarEditMode } from "@/contexts/EditModeContext"
 import { useUIMode } from "@/contexts/UIModeContext"
 import { useSelectionContext } from "@/contexts/SelectionContext"
 
@@ -26,6 +26,7 @@ export default function PageActionsRegistrar({
   const { isEditing: isPageEditing, exit: exitPageEdit } = usePageEditMode(pageId)
   const { isEditing: isBlockEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(pageId)
   const { enterEditPages, exitEditPages, isEdit: isUiEdit } = useUIMode()
+  const { exit: exitSidebarEdit } = useSidebarEditMode()
   const { setSelectedContext } = useSelectionContext()
 
   const onOpenPageSettings = useCallback(() => {
@@ -33,9 +34,10 @@ export default function PageActionsRegistrar({
   }, [setSelectedContext])
 
   const onEnterEdit = useCallback(() => {
+    exitSidebarEdit()
     enterBlockEdit()
     enterEditPages(pageId)
-  }, [enterBlockEdit, enterEditPages, pageId])
+  }, [exitSidebarEdit, enterBlockEdit, enterEditPages, pageId])
 
   const onExitEdit = useCallback(() => {
     exitPageEdit()
@@ -55,7 +57,7 @@ export default function PageActionsRegistrar({
       onOpenPageSettings,
       onEnterEdit,
       onExitEdit,
-      isEditing: isPageEditing || isBlockEditing || isUiEdit(pageId),
+      isEditing: isPageEditing || isBlockEditing || isUiEdit(pageId ?? undefined),
     })
 
     return () => {

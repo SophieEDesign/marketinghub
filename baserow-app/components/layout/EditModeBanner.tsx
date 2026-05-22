@@ -4,22 +4,32 @@
  * Airtable-style edit mode banner - a prominent top toolbar shown when editing.
  * Makes edit mode unmistakably obvious across the app.
  */
-import { useEditMode } from "@/contexts/EditModeContext"
+import { usePathname } from "next/navigation"
+import { useEditMode, useBlockEditMode } from "@/contexts/EditModeContext"
 import { useUIMode } from "@/contexts/UIModeContext"
 import { Button } from "@/components/ui/button"
 import { Check, Pencil } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export default function EditModeBanner() {
-  const { isAnyEditing, exitAllEditModes } = useEditMode()
-  const { exitEditPages } = useUIMode()
+  const { isEditing, exitAllEditModes } = useEditMode()
+  const { exitEditPages, isEdit } = useUIMode()
+  const pathname = usePathname()
+  const pageId = pathname?.match(/\/pages\/([^/?]+)/)?.[1]
+  const { isEditing: isBlockEditingOnPage } = useBlockEditMode(pageId)
+
+  const isPageLayoutEditing =
+    isEdit(pageId) ||
+    isBlockEditingOnPage ||
+    isEditing("page")
 
   const handleDone = () => {
     exitAllEditModes()
     exitEditPages()
   }
 
-  if (!isAnyEditing()) return null
+  // Sidebar "Organise" is not page layout edit — do not show this banner (avoids false "Editing" state).
+  if (!isPageLayoutEditing) return null
 
   return (
     <div

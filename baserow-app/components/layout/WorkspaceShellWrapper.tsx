@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation"
 import { getTables } from "@/lib/crud/tables"
-import { getViews } from "@/lib/crud/views"
 import { createClient } from "@/lib/supabase/server"
 import { getUserRole, isAdmin } from "@/lib/roles"
 import { getWorkspaceSettings } from "@/lib/branding"
@@ -18,6 +17,7 @@ import {
   assertJsonSerializable,
   prepareForRscPayload,
 } from "@/lib/serialization/sanitize-for-client"
+import { isNextRedirectError } from "@/lib/next-navigation"
 import { cache } from "react"
 
 interface WorkspaceShellWrapperProps {
@@ -82,15 +82,24 @@ const loadShellCoreNav = cache(async () => {
   ])
 
   const viewsByTable: Record<string, View[]> = {}
-  await Promise.all(
-    tables.map(async (table) => {
-      try {
-        viewsByTable[table.id] = (await getViews(table.id).catch(() => [])) || []
-      } catch {
-        viewsByTable[table.id] = []
+  for (const table of tables) {
+    viewsByTable[table.id] = []
+  }
+  if (tables.length > 0) {
+    const tableIds = tables.map((t) => t.id)
+    const { data: allViews, error: viewsError } = await supabase
+      .from("views")
+      .select("*")
+      .in("table_id", tableIds)
+      .order("created_at", { ascending: true })
+    if (!viewsError && allViews) {
+      for (const view of allViews as View[]) {
+        if (view.table_id && viewsByTable[view.table_id]) {
+          viewsByTable[view.table_id].push(view)
+        }
       }
-    })
-  )
+    }
+  }
 
   return { supabase, tables, userRole, brandingSettings, userIsAdmin: admin, admin, viewsByTable }
 })
@@ -192,18 +201,17 @@ export default async function WorkspaceShellWrapper({
   // Filter by permissions: admin sees all, member sees only non-admin-only interfaces
   let interfacePages: any[] = []
   try {
+    const activePageOr = userIsAdmin
+      ? 'is_archived.is.null,is_archived.eq.false'
+      : 'and(is_archived.is.null,is_archived.eq.false,is_admin_only.is.null,is_admin_only.eq.false)'
+
     // Load from new interface_pages table
     let newPagesQuery = supabase
       .from('interface_pages')
       .select('id, name, page_type, group_id, order_index, created_at, updated_at, created_by, is_admin_only, is_hidden')
-      .or('is_archived.is.null,is_archived.eq.false')
+      .or(activePageOr)
       .order('order_index', { ascending: true })
       .order('created_at', { ascending: false })
-    
-    // Filter out admin-only interfaces for non-admin users
-    if (!userIsAdmin) {
-      newPagesQuery = newPagesQuery.or('is_admin_only.is.null,is_admin_only.eq.false')
-    }
     
     const { data: newPagesData, error: newPagesError } = await newPagesQuery
     
@@ -231,14 +239,9 @@ export default async function WorkspaceShellWrapper({
       .from('views')
       .select('id, name, description, table_id, type, access_level, allowed_roles, created_at, updated_at, owner_id, group_id, order_index, is_admin_only')
       .eq('type', 'interface')
-      .or('is_archived.is.null,is_archived.eq.false')
+      .or(activePageOr)
       .order('order_index', { ascending: true })
       .order('created_at', { ascending: false })
-    
-    // Filter out admin-only interfaces for non-admin users
-    if (!userIsAdmin) {
-      oldPagesQuery = oldPagesQuery.or('is_admin_only.is.null,is_admin_only.eq.false')
-    }
     
     const { data: oldPagesData, error: oldPagesError } = await oldPagesQuery
     
@@ -346,7 +349,7 @@ export default async function WorkspaceShellWrapper({
 
     const resolvedLanding = await withTimeout(
       resolveLandingPage(),
-      12_000,
+      8_000,
       "resolveLandingPage timed out"
     )
     const resolvedPageId = (resolvedLanding as any)?.pageId
@@ -372,6 +375,7 @@ export default async function WorkspaceShellWrapper({
   const safeInterfacePages = prepareForRscPayload(interfacePages)
   const safeInterfaceGroups = prepareForRscPayload(interfaceGroups)
   const safeDashboards = prepareForRscPayload(dashboards)
+  const safeBrandingSettings = prepareForRscPayload(brandingSettings)
 
   assertJsonSerializable(
     {
@@ -391,7 +395,7 @@ export default async function WorkspaceShellWrapper({
   )
 
     return (
-      <BrandingProvider settings={brandingSettings}>
+      <BrandingProvider settings={safeBrandingSettings}>
         <DynamicFavicon />
         <EditModeProvider>
           <UIModeProvider>
@@ -419,7 +423,12 @@ export default async function WorkspaceShellWrapper({
       </BrandingProvider>
     )
   } catch (error) {
-    console.error("[WorkspaceShellWrapper] Render failed:", error)
+    if (isNextRedirectError(error)) {
+      throw error
+    }
+    const message = error instanceof Error ? error.message : String(error)
+    const digest = error && typeof error === "object" && "digest" in error ? (error as { digest?: string }).digest : undefined
+    console.error("[WorkspaceShellWrapper] Render failed:", { message, digest, error })
     throw error
   }
 }

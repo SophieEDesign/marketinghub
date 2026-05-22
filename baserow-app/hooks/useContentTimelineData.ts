@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { fetchProfileLabelById } from "@/lib/users/profile-labels"
 import {
   buildContentItems,
   buildContentTimelineItems,
@@ -139,18 +140,7 @@ export function useContentTimelineData(options?: {
           )
         }
 
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("id, full_name, email")
-
-        const profileLabelById = new Map<string, string>()
-        for (const p of profiles || []) {
-          const label =
-            formatDisplayValue(p.full_name) ||
-            formatDisplayValue(p.email) ||
-            String(p.id).slice(0, 8)
-          profileLabelById.set(String(p.id), label)
-        }
+        const profileLabelById = await fetchProfileLabelById(supabase)
 
         const planningItems = buildContentItems({
           contentRows,
@@ -175,7 +165,7 @@ export function useContentTimelineData(options?: {
         if (cancelled) return
         setTableIds(ids)
         setItems(timelineItems)
-        setFromLiveData(timelineItems.length > 0)
+        setFromLiveData(true)
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : "Failed to load timeline")

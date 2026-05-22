@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
+import { usePathname } from "next/navigation"
 import AirtableSidebar from "./AirtableSidebar"
 import Topbar from "./Topbar"
 import EditModeBanner from "./EditModeBanner"
@@ -14,6 +15,7 @@ import RightSettingsPanel from "@/components/interface/RightSettingsPanel"
 import RecordPanel from "@/components/records/RecordPanel"
 import { MainScrollProvider } from "@/contexts/MainScrollContext"
 import { useUIMode } from "@/contexts/UIModeContext"
+import { useBlockEditMode } from "@/contexts/EditModeContext"
 import { useSelectionContext } from "@/contexts/SelectionContext"
 import { useIsMobile } from "@/hooks/useResponsive"
 import { useBranding } from "@/contexts/BrandingContext"
@@ -170,12 +172,15 @@ function ShellContent({
   setSidebarOpen: (v: boolean) => void
   primaryColor: string
 }) {
-  const isEditMode = useUIMode().isEdit()
+  const pathname = usePathname()
+  const pageId = pathname?.match(/\/pages\/([^/?]+)/)?.[1]
+  const { isEdit: isUiEdit } = useUIMode()
+  const { isEditing: isBlockEditingOnPage } = useBlockEditMode(pageId)
+  const isEditMode = isUiEdit(pageId) || isBlockEditingOnPage
   const { selectedContext } = useSelectionContext()
   const [sidebarAutoCompactDismissed, setSidebarAutoCompactDismissed] = useState(false)
 
-  // Right Settings Panel: always visible in Edit Mode - cannot be closed/crossed off.
-  // UIModeContext is single source of truth. Panel shows "Select an element" when no context.
+  // Right Settings Panel: visible when this page is in layout edit (UIMode or block scope).
   const isPanelVisible = isEditMode
   const hasBlockLevelSelection = useMemo(
     () =>

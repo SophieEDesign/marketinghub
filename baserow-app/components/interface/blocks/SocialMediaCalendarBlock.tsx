@@ -22,6 +22,7 @@ export default function SocialMediaCalendarBlock({
   pageEditable,
 }: SocialMediaCalendarBlockProps) {
   const canEdit = pageEditable !== false
+  const embeddedInBlock = block.config?.is_full_page !== true
 
   return (
     <div
@@ -32,10 +33,13 @@ export default function SocialMediaCalendarBlock({
           : "rounded-2xl border border-border/40 bg-background"
       )}
       data-block-type="social_media_calendar"
+      data-block-selectable
     >
       <SocialMediaCalendarFromConfig
         config={block.config}
         canEdit={canEdit}
+        isEditing={isEditing}
+        embeddedInBlock={embeddedInBlock}
         className="flex-1 min-h-0 p-3 md:p-4"
       />
     </div>

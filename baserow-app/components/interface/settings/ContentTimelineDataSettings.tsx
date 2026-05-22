@@ -26,8 +26,23 @@ export default function ContentTimelineDataSettings({
     <div className="space-y-4">
       <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
         <p className="text-sm text-blue-800">
-          Timeline loads from the Content table (rows with dates). Enable mock in block config only for demos.
+          Timeline loads from the Content table (and linked Campaigns / Quarterly Themes). Tables are
+          discovered by name — no separate source table ID is required.
         </p>
+      </div>
+
+      <div className="flex items-center justify-between rounded-md border border-border/40 px-3 py-2">
+        <div className="space-y-0.5 pr-3">
+          <Label htmlFor="ct-use-mock">Use demo data</Label>
+          <p className="text-xs text-muted-foreground">
+            Show sample timeline items instead of live Content rows.
+          </p>
+        </div>
+        <Switch
+          id="ct-use-mock"
+          checked={config.content_timeline_use_mock === true}
+          onCheckedChange={(v) => onUpdate({ content_timeline_use_mock: v ? true : undefined })}
+        />
       </div>
 
       <div className="space-y-2">

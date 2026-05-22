@@ -31,6 +31,7 @@ export default function EventCalendarBlock({
         block.config?.is_full_page && "rounded-none border-0 shadow-none"
       )}
       data-block-type="event_calendar"
+      data-block-selectable
     >
       <EventCalendarFromConfig
         config={block.config}

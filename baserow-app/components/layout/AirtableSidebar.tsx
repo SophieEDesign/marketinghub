@@ -318,7 +318,7 @@ export default function AirtableSidebar({
 
         <div className="flex-1 overflow-y-auto">
           <div className="px-4 pt-3 pb-1">
-            <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            <div className="text-xs font-medium tracking-wide text-slate-500 uppercase">
               Workspace
             </div>
           </div>

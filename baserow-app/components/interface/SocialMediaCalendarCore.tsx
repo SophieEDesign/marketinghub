@@ -101,21 +101,39 @@ export interface SocialMediaCalendarCoreProps {
 export function SocialMediaCalendarFromConfig({
   config,
   canEdit = false,
+  isEditing = false,
+  embeddedInBlock = true,
   className,
 }: {
   config?: import("@/lib/interface/types").BlockConfig | null
   canEdit?: boolean
+  isEditing?: boolean
+  /** When true, preview panel stays inline (dashboard block). When false, full-page may use a drawer on small screens. */
+  embeddedInBlock?: boolean
   className?: string
 }) {
   const settings = socialCalendarSettingsFromConfig(config)
-  return <SocialMediaCalendarCore settings={settings} canEdit={canEdit} className={className} />
+  return (
+    <SocialMediaCalendarCore
+      settings={settings}
+      canEdit={canEdit}
+      isEditing={isEditing}
+      embeddedInBlock={embeddedInBlock}
+      className={className}
+    />
+  )
 }
 
 export function SocialMediaCalendarCore({
   settings,
   canEdit = false,
+  isEditing = false,
+  embeddedInBlock = true,
   className,
-}: SocialMediaCalendarCoreProps) {
+}: SocialMediaCalendarCoreProps & {
+  isEditing?: boolean
+  embeddedInBlock?: boolean
+}) {
   const { openRecordModal } = useRecordModal()
   const {
     loading,
@@ -240,6 +258,11 @@ export function SocialMediaCalendarCore({
     })
   }
 
+  const handleSelectPost = (id: string) => {
+    if (isEditing) return
+    setSelectedId(id)
+  }
+
   if (loading) {
     return (
       <div className={cn("flex items-center justify-center py-16", className)}>
@@ -260,7 +283,8 @@ export function SocialMediaCalendarCore({
   }
 
   const calendarView = viewMode === "week" ? "week" : "month"
-  const showQuickView = settings.showMediaPreview && selectedItem
+  const showQuickView = settings.showMediaPreview && selectedItem && !isEditing
+  const useInlinePreview = embeddedInBlock
 
   return (
     <div
@@ -270,6 +294,7 @@ export function SocialMediaCalendarCore({
         className
       )}
       data-social-media-calendar-core
+      data-block-selectable
     >
       {settings.showPageHeader ? (
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between shrink-0">
@@ -463,9 +488,9 @@ export function SocialMediaCalendarCore({
         </TabsList>
       </Tabs>
 
-      <div className="flex flex-col xl:flex-row gap-3 min-h-0 flex-1 relative">
+      <div className="flex flex-col xl:flex-row gap-3 min-h-0 flex-1 relative overflow-hidden">
         <SocialPostQuickViewMobileBackdrop
-          open={!!showQuickView}
+          open={!!showQuickView && !useInlinePreview}
           onClose={() => setSelectedId(null)}
         />
 
@@ -486,7 +511,7 @@ export function SocialMediaCalendarCore({
               <SocialMediaCalendarView
                 events={calendarEvents}
                 viewMode={calendarView}
-                onEventClick={(id) => setSelectedId(id)}
+                onEventClick={handleSelectPost}
                 compact={isCompact}
                 showPlatformIcons={settings.showPlatformIcons}
                 showApprovalStatus={settings.showApprovalStatus}
@@ -496,7 +521,7 @@ export function SocialMediaCalendarCore({
             <SocialMediaListView
               items={filteredItems}
               selectedId={selectedId}
-              onSelect={setSelectedId}
+              onSelect={handleSelectPost}
               compact={isCompact}
               showPlatformIcons={settings.showPlatformIcons}
               showApprovalStatus={settings.showApprovalStatus}
@@ -505,7 +530,7 @@ export function SocialMediaCalendarCore({
             <SocialMediaFeedView
               items={filteredItems}
               selectedId={selectedId}
-              onSelect={setSelectedId}
+              onSelect={handleSelectPost}
               compact={isCompact}
               showPlatformIcons={settings.showPlatformIcons}
               showApprovalStatus={settings.showApprovalStatus}
@@ -520,8 +545,13 @@ export function SocialMediaCalendarCore({
         {showQuickView ? (
           <div
             className={cn(
-              "xl:static fixed inset-y-0 right-0 z-40 w-full max-w-[360px] p-3 xl:p-0",
-              "xl:block bg-background/95 xl:bg-transparent backdrop-blur-sm xl:backdrop-blur-none shadow-xl xl:shadow-none shrink-0"
+              "shrink-0 min-h-0",
+              useInlinePreview
+                ? "w-full max-w-[320px] border-l border-border/40 pl-3 min-w-[240px]"
+                : cn(
+                    "xl:static fixed inset-y-0 right-0 z-40 w-full max-w-[360px] p-3 xl:p-0",
+                    "xl:block bg-background/95 xl:bg-transparent backdrop-blur-sm xl:backdrop-blur-none shadow-xl xl:shadow-none"
+                  )
             )}
           >
             <SocialPostQuickView

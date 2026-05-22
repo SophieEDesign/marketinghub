@@ -47,6 +47,12 @@ export default function UpcomingSummaryDataSettings({
 
   return (
     <div className="space-y-4">
+      <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
+        <p className="text-sm text-amber-900">
+          This block currently uses demo data only. Section counts are samples until wired to
+          Content, Campaigns, and Events.
+        </p>
+      </div>
       <div className="space-y-2">
         <Label htmlFor="upcoming-summary-title">Block title</Label>
         <Input

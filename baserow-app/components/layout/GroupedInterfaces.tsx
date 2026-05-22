@@ -1060,10 +1060,16 @@ export default function GroupedInterfaces({
               <Layers
                 className={cn(
                   "h-4 w-4 flex-shrink-0",
-                  isActive ? "text-foreground" : "text-muted-foreground"
+                  isActive ? "text-slate-900" : "text-slate-500"
                 )}
               />
-              <span className={cn("text-sm truncate min-w-0 flex-1", isHidden && "italic text-muted-foreground")}>
+              <span
+                className={cn(
+                  "text-sm truncate min-w-0 flex-1",
+                  isActive ? "text-slate-900" : "text-slate-600",
+                  isHidden && "italic text-slate-500"
+                )}
+              >
                 {page.name}
                 {isHidden ? " (Hidden)" : ""}
               </span>

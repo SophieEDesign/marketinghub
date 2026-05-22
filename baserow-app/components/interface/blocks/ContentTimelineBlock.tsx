@@ -23,6 +23,7 @@ import { ContentTimelineFilterBar } from "@/components/interface/content-timelin
 import { ContentTimelineGrid } from "@/components/interface/content-timeline/ContentTimelineGrid"
 import { ContentTimelineHeader } from "@/components/interface/content-timeline/ContentTimelineHeader"
 import { ContentTimelineStatusLegend } from "@/components/interface/content-timeline/ContentTimelineStatusLegend"
+import MarketingDemoDataBanner from "@/components/interface/primitives/MarketingDemoDataBanner"
 
 interface ContentTimelineBlockProps {
   block: PageBlock
@@ -75,8 +76,14 @@ export default function ContentTimelineBlock({
   const footerLabel =
     config?.content_timeline_footer_link_label || "View full calendar →"
 
-  const useLive = fromLiveData && liveItems.length > 0 && !forceMock
+  const useLive = fromLiveData && !forceMock
   const allItems = useLive ? liveItems : mockItems
+  const isDemoData = !useLive
+  const demoBannerMessage = forceMock
+    ? "Using demo data — demo mode is enabled in block settings."
+    : error
+      ? `Using demo data — ${error}`
+      : "Using demo data — connect your Content table or disable demo mode in block settings."
 
   const [view, setView] = useState<ContentTimelineView>(defaultView)
   const [anchorDate, setAnchorDate] = useState(() => new Date())
@@ -146,7 +153,7 @@ export default function ContentTimelineBlock({
     })
   }
 
-  if (loading && !useLive) {
+  if (loading && !fromLiveData) {
     return (
       <div className="flex h-full min-h-[200px] items-center justify-center rounded-2xl border border-border/40 bg-background">
         <LoadingSpinner size="lg" text="Loading content timeline…" />
@@ -159,11 +166,7 @@ export default function ContentTimelineBlock({
       data-block-selectable
       className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border/40 bg-background shadow-sm"
     >
-      {error && !useLive ? (
-        <p className="shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">
-          Showing sample timeline ({error})
-        </p>
-      ) : null}
+      {isDemoData ? <MarketingDemoDataBanner message={demoBannerMessage} /> : null}
 
       <ContentTimelineHeader
         title={title}

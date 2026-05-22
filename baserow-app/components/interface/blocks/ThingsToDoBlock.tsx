@@ -31,6 +31,7 @@ import { ThingsToDoHeader } from "@/components/interface/things-to-do/ThingsToDo
 import { ThingsToDoListToolbar } from "@/components/interface/things-to-do/ThingsToDoListToolbar"
 import { ThingsToDoPlaceholderView } from "@/components/interface/things-to-do/ThingsToDoPlaceholderView"
 import { ThingsToDoViewTabs } from "@/components/interface/things-to-do/ThingsToDoViewTabs"
+import MarketingDemoDataBanner from "@/components/interface/primitives/MarketingDemoDataBanner"
 
 interface ThingsToDoBlockProps {
   block: PageBlock
@@ -63,8 +64,14 @@ export default function ThingsToDoBlock({
   const forceMock = config?.things_to_do_use_mock === true
 
   const mockItems = getThingsToDoMockItems()
-  const useLive = fromLiveData && liveItems.length > 0 && !forceMock
+  const useLive = fromLiveData && !forceMock
   const sourceItems = useLive ? liveItems : mockItems
+  const isDemoData = !useLive
+  const demoBannerMessage = forceMock
+    ? "Using demo data — demo mode is enabled in block settings."
+    : error
+      ? `Using demo data — ${error}`
+      : "Using demo data — no task source configured. Actionable Content rows load when the Content table is available."
 
   const [view, setView] = useState<ThingsToDoView>(defaultView)
   const [filters, setFilters] = useState<ThingsToDoFilters>(EMPTY_THINGS_TO_DO_FILTERS)
@@ -160,7 +167,7 @@ export default function ThingsToDoBlock({
 
   const showDetail = enableDetailPanel && selectedItem != null
 
-  if (loading && !useLive) {
+  if (loading && !fromLiveData) {
     return (
       <div className="flex h-full min-h-[200px] items-center justify-center rounded-2xl border border-border/40 bg-background">
         <LoadingSpinner size="lg" text="Loading things to do…" />
@@ -173,11 +180,7 @@ export default function ThingsToDoBlock({
       data-block-selectable
       className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border/40 bg-background shadow-sm"
     >
-      {error && !useLive ? (
-        <p className="shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">
-          Showing sample tasks ({error})
-        </p>
-      ) : null}
+      {isDemoData ? <MarketingDemoDataBanner message={demoBannerMessage} /> : null}
 
       <ThingsToDoHeader
         title={title}
