@@ -1,8 +1,13 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { fetchProfileLabelById } from "@/lib/users/profile-labels"
+import {
+  contentTimelineOverridesFromConfig,
+  isMarketingMockEnabled,
+  resolveMarketingTable,
+} from "@/lib/marketing/block-config-resolver"
 import {
   buildContentItems,
   buildContentTimelineItems,
@@ -18,12 +23,19 @@ import type { ContentPlanningTableIds } from "@/lib/marketing/content-planning"
 import type { ContentTimelineItem } from "@/lib/marketing/content-timeline"
 import { formatDisplayValue } from "@/lib/marketing/field-utils"
 import { buildThemeMaps } from "@/lib/marketing/content-planning"
+import type { BlockConfig } from "@/lib/interface/types"
 import type { FieldOptions } from "@/types/fields"
 
-type FieldRow = { name: string; type?: string; options?: FieldOptions }
+type FieldRow = { id?: string; name: string; type?: string; options?: FieldOptions }
 
-function mapFieldRow(row: { name: string; type?: string; options?: unknown }): FieldRow {
+function mapFieldRow(row: {
+  id?: string
+  name: string
+  type?: string
+  options?: unknown
+}): FieldRow {
   return {
+    id: row.id,
     name: row.name,
     type: row.type,
     options: row.options as FieldOptions | undefined,
@@ -34,18 +46,24 @@ export interface UseContentTimelineDataResult {
   loading: boolean
   error: string | null
   fromLiveData: boolean
+  hasTable: boolean
   tableIds: ContentPlanningTableIds | null
   items: ContentTimelineItem[]
   reload: () => void
 }
 
 export function useContentTimelineData(options?: {
+  config?: BlockConfig
   excludeEventTypes?: boolean
 }): UseContentTimelineDataResult {
+  const config = options?.config
   const excludeEventTypes = options?.excludeEventTypes !== false
-  const [loading, setLoading] = useState(true)
+  const forceMock = isMarketingMockEnabled(config, "content_timeline_use_mock")
+
+  const [loading, setLoading] = useState(!forceMock)
   const [error, setError] = useState<string | null>(null)
   const [fromLiveData, setFromLiveData] = useState(false)
+  const [hasTable, setHasTable] = useState(false)
   const [tableIds, setTableIds] = useState<ContentPlanningTableIds | null>(null)
   const [items, setItems] = useState<ContentTimelineItem[]>([])
   const [reloadToken, setReloadToken] = useState(0)
@@ -53,6 +71,16 @@ export function useContentTimelineData(options?: {
   const reload = useCallback(() => setReloadToken((n) => n + 1), [])
 
   useEffect(() => {
+    if (forceMock) {
+      setLoading(false)
+      setError(null)
+      setFromLiveData(false)
+      setHasTable(false)
+      setTableIds(null)
+      setItems([])
+      return
+    }
+
     let cancelled = false
 
     async function load() {
@@ -69,13 +97,16 @@ export function useContentTimelineData(options?: {
         }
 
         const registry = tables as MarketingTableRow[]
-        const content = findContentTable(registry)
+        const content = resolveMarketingTable(registry, config?.table_id, findContentTable)
         const campaigns = findCampaignsTable(registry)
         const themes = findQuarterlyThemesTable(registry)
 
         if (!content?.supabase_table) {
-          throw new Error("Content table not found")
+          setHasTable(false)
+          throw new Error("Content table not found — select a source table in block settings")
         }
+
+        setHasTable(true)
 
         const ids: ContentPlanningTableIds = {
           contentTableId: content.id,
@@ -105,10 +136,17 @@ export function useContentTimelineData(options?: {
           mapFieldRow
         )
 
+        const fieldIds = contentFieldRows.map((f) => ({
+          id: f.id || f.name,
+          name: f.name,
+        }))
+
         const fieldMap = resolveContentPlanningFields(
           contentFieldRows,
           campaignFieldRows,
-          themeFieldRows
+          themeFieldRows,
+          contentTimelineOverridesFromConfig(config),
+          fieldIds
         )
 
         const [contentRes, themesRes, campaignsRes] = await Promise.all([
@@ -181,7 +219,7 @@ export function useContentTimelineData(options?: {
     return () => {
       cancelled = true
     }
-  }, [reloadToken, excludeEventTypes])
+  }, [reloadToken, excludeEventTypes, config, forceMock])
 
-  return { loading, error, fromLiveData, tableIds, items, reload }
+  return { loading, error, fromLiveData, hasTable, tableIds, items, reload }
 }

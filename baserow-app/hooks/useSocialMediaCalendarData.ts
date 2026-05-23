@@ -10,6 +10,13 @@ import {
   type ContentPlanningItem,
   type ContentPlanningTableIds,
 } from "@/lib/marketing/content-planning"
+import {
+  contentPlanningOverridesFromConfig,
+  isMarketingMockEnabled,
+  resolveMarketingTable,
+} from "@/lib/marketing/block-config-resolver"
+import { findCampaignsTable, findContentTable, findQuarterlyThemesTable } from "@/lib/marketing/marketing-tables"
+import type { BlockConfig } from "@/lib/interface/types"
 import type { FieldOptions } from "@/types/fields"
 
 type PlanningFieldRow = { name: string; type?: string; options?: FieldOptions }
@@ -29,6 +36,8 @@ function mapToPlanningFieldRow(row: {
 export interface UseSocialMediaCalendarDataResult {
   loading: boolean
   error: string | null
+  fromLiveData: boolean
+  hasTable: boolean
   tableIds: ContentPlanningTableIds | null
   fields: ContentPlanningFieldMap | null
   contentFields: PlanningFieldRow[]
@@ -38,8 +47,15 @@ export interface UseSocialMediaCalendarDataResult {
   reload: () => void
 }
 
-export function useSocialMediaCalendarData(): UseSocialMediaCalendarDataResult {
-  const [loading, setLoading] = useState(true)
+export function useSocialMediaCalendarData(options?: {
+  config?: BlockConfig
+}): UseSocialMediaCalendarDataResult {
+  const config = options?.config
+  const forceMock = isMarketingMockEnabled(config, "social_media_calendar_use_mock")
+
+  const [loading, setLoading] = useState(!forceMock)
+  const [fromLiveData, setFromLiveData] = useState(false)
+  const [hasTable, setHasTable] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [tableIds, setTableIds] = useState<ContentPlanningTableIds | null>(null)
   const [fields, setFields] = useState<ContentPlanningFieldMap | null>(null)
@@ -54,6 +70,13 @@ export function useSocialMediaCalendarData(): UseSocialMediaCalendarDataResult {
   }, [])
 
   useEffect(() => {
+    if (forceMock) {
+      setLoading(false)
+      setFromLiveData(false)
+      setHasTable(false)
+      return
+    }
+
     let cancelled = false
 
     async function load() {
@@ -69,22 +92,19 @@ export function useSocialMediaCalendarData(): UseSocialMediaCalendarDataResult {
           throw new Error(tablesErr?.message || "Could not load tables")
         }
 
-        const quarterlyThemes = tables.find(
-          (t) => /quarterly/i.test(t.name) && /theme/i.test(t.name)
-        )
-        const campaigns = tables.find(
-          (t) => /campaign/i.test(t.name) && !/content/i.test(t.name)
-        )
-        const content = tables.find(
-          (t) =>
-            /^content$/i.test(String(t.name).trim()) ||
-            (/content/i.test(t.name) &&
-              !/calendar/i.test(t.name) &&
-              !/briefing/i.test(t.name))
-        )
+        const registry = tables as import("@/lib/marketing/marketing-tables").MarketingTableRow[]
+        const quarterlyThemes = findQuarterlyThemesTable(registry)
+        const campaigns = findCampaignsTable(registry)
+        const content = resolveMarketingTable(registry, config?.table_id, findContentTable)
 
-        if (!quarterlyThemes?.supabase_table || !content?.supabase_table || !campaigns?.supabase_table) {
-          throw new Error("Content, Campaigns, or Quarterly Themes table not found")
+        if (!content?.supabase_table) {
+          setHasTable(false)
+          throw new Error("Content table not found — select a source table in block settings")
+        }
+        setHasTable(true)
+
+        if (!quarterlyThemes?.supabase_table || !campaigns?.supabase_table) {
+          throw new Error("Campaigns or Quarterly Themes table not found")
         }
 
         const ids: ContentPlanningTableIds = {
@@ -112,10 +132,17 @@ export function useSocialMediaCalendarData(): UseSocialMediaCalendarDataResult {
         const themeFieldRows = (fieldRows?.filter((f) => f.table_id === quarterlyThemes.id) || []).map(
           mapToPlanningFieldRow
         )
+        const fieldIds = (fieldRows?.filter((f) => f.table_id === content.id) || []).map((f) => ({
+          id: f.id,
+          name: f.name,
+        }))
+
         const fieldMap = resolveContentPlanningFields(
           contentFieldRows,
           campaignFieldRows,
-          themeFieldRows
+          themeFieldRows,
+          contentPlanningOverridesFromConfig(config, "social_media_calendar"),
+          fieldIds
         )
 
         const [themesRes, contentRes, campaignsRes] = await Promise.all([
@@ -148,6 +175,7 @@ export function useSocialMediaCalendarData(): UseSocialMediaCalendarDataResult {
         setThemeRows((themesRes.data || []) as Record<string, unknown>[])
         setContentRows((contentRes.data || []) as Record<string, unknown>[])
         setCampaignRows((campaignsRes.data || []) as Record<string, unknown>[])
+        setFromLiveData(true)
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : "Failed to load social calendar data")
@@ -156,6 +184,7 @@ export function useSocialMediaCalendarData(): UseSocialMediaCalendarDataResult {
           setContentRows([])
           setThemeRows([])
           setCampaignRows([])
+          setFromLiveData(false)
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -166,7 +195,7 @@ export function useSocialMediaCalendarData(): UseSocialMediaCalendarDataResult {
     return () => {
       cancelled = true
     }
-  }, [reloadToken])
+  }, [reloadToken, config, forceMock])
 
   const { labelById, colorById } = useMemo(() => {
     if (!fields) return { labelById: new Map<string, string>(), colorById: new Map<string, string>() }
@@ -187,6 +216,8 @@ export function useSocialMediaCalendarData(): UseSocialMediaCalendarDataResult {
   return {
     loading,
     error,
+    fromLiveData,
+    hasTable,
     tableIds,
     fields,
     contentFields,

@@ -11,38 +11,107 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import type { BlockConfig } from "@/lib/interface/types"
-
-interface ThingsToDoDataSettingsProps {
-  config: BlockConfig
-  onUpdate: (updates: Partial<BlockConfig>) => void
-}
+import type { DataSettingsCtx } from "./blockSettingsRegistry"
+import MarketingDataSourceSection from "./shared/MarketingDataSourceSection"
+import MarketingFieldMappingSection from "./shared/MarketingFieldMappingSection"
+import MarketingFieldSelect from "./shared/MarketingFieldSelect"
 
 export default function ThingsToDoDataSettings({
   config,
+  tables,
+  views,
+  fields,
   onUpdate,
-}: ThingsToDoDataSettingsProps) {
+  onTableChange,
+}: DataSettingsCtx) {
+  const tableFields = config.table_id
+    ? fields.filter((f) => f.table_id === config.table_id)
+    : fields
+
+  const setField = (idKey: keyof BlockConfig, nameKey: keyof BlockConfig) =>
+    (fieldId: string | undefined, fieldName: string | undefined) => {
+      onUpdate({ [idKey]: fieldId, [nameKey]: fieldName } as Partial<BlockConfig>)
+    }
+
   return (
     <div className="space-y-4">
-      <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-        <p className="text-sm text-blue-800">
-          Work queue loads actionable rows from the Content table (reviews, due dates, approvals).
-          There is no separate Tasks table yet — enable demo data only for presentations.
-        </p>
-      </div>
+      <MarketingDataSourceSection
+        config={config}
+        tables={tables}
+        views={views}
+        onUpdate={onUpdate}
+        onTableChange={onTableChange}
+        mockConfigKey="things_to_do_use_mock"
+      />
 
-      <div className="flex items-center justify-between rounded-md border border-border/40 px-3 py-2">
-        <div className="space-y-0.5 pr-3">
-          <Label htmlFor="ttd-use-mock">Use demo data</Label>
-          <p className="text-xs text-muted-foreground">
-            Show sample tasks instead of live Content-derived actions.
-          </p>
-        </div>
-        <Switch
-          id="ttd-use-mock"
-          checked={config.things_to_do_use_mock === true}
-          onCheckedChange={(v) => onUpdate({ things_to_do_use_mock: v ? true : undefined })}
-        />
-      </div>
+      {config.table_id ? (
+        <MarketingFieldMappingSection>
+          <MarketingFieldSelect
+            label="Title"
+            fieldId={config.things_to_do_title_field_id}
+            fieldName={config.things_to_do_title_field}
+            fields={tableFields}
+            onChange={setField("things_to_do_title_field_id", "things_to_do_title_field")}
+          />
+          <MarketingFieldSelect
+            label="Type"
+            fieldId={config.things_to_do_type_field_id}
+            fieldName={config.things_to_do_type_field}
+            fields={tableFields}
+            onChange={setField("things_to_do_type_field_id", "things_to_do_type_field")}
+          />
+          <MarketingFieldSelect
+            label="Status"
+            fieldId={config.things_to_do_status_field_id}
+            fieldName={config.things_to_do_status_field}
+            fields={tableFields}
+            onChange={setField("things_to_do_status_field_id", "things_to_do_status_field")}
+          />
+          <MarketingFieldSelect
+            label="Priority"
+            fieldId={config.things_to_do_priority_field_id}
+            fieldName={config.things_to_do_priority_field}
+            fields={tableFields}
+            onChange={setField("things_to_do_priority_field_id", "things_to_do_priority_field")}
+          />
+          <MarketingFieldSelect
+            label="Owner"
+            fieldId={config.things_to_do_owner_field_id}
+            fieldName={config.things_to_do_owner_field}
+            fields={tableFields}
+            onChange={setField("things_to_do_owner_field_id", "things_to_do_owner_field")}
+          />
+          <MarketingFieldSelect
+            label="Reviewer"
+            fieldId={config.things_to_do_reviewer_field_id}
+            fieldName={config.things_to_do_reviewer_field}
+            fields={tableFields}
+            onChange={setField("things_to_do_reviewer_field_id", "things_to_do_reviewer_field")}
+          />
+          <MarketingFieldSelect
+            label="Due date"
+            fieldId={config.things_to_do_due_date_field_id}
+            fieldName={config.things_to_do_due_date_field}
+            fields={tableFields}
+            onChange={setField("things_to_do_due_date_field_id", "things_to_do_due_date_field")}
+            fieldTypes={["date"]}
+          />
+          <MarketingFieldSelect
+            label="Campaign"
+            fieldId={config.things_to_do_campaign_field_id}
+            fieldName={config.things_to_do_campaign_field}
+            fields={tableFields}
+            onChange={setField("things_to_do_campaign_field_id", "things_to_do_campaign_field")}
+          />
+          <MarketingFieldSelect
+            label="Theme"
+            fieldId={config.things_to_do_theme_field_id}
+            fieldName={config.things_to_do_theme_field}
+            fields={tableFields}
+            onChange={setField("things_to_do_theme_field_id", "things_to_do_theme_field")}
+          />
+        </MarketingFieldMappingSection>
+      ) : null}
 
       <div className="space-y-2">
         <Label htmlFor="ttd-title">Block title</Label>
@@ -50,7 +119,6 @@ export default function ThingsToDoDataSettings({
           id="ttd-title"
           value={config.title || ""}
           onChange={(e) => onUpdate({ title: e.target.value })}
-          placeholder="Things To Do"
         />
       </div>
 
@@ -60,7 +128,6 @@ export default function ThingsToDoDataSettings({
           id="ttd-subtitle"
           value={config.things_to_do_subtitle || ""}
           onChange={(e) => onUpdate({ things_to_do_subtitle: e.target.value })}
-          placeholder="Tasks, reviews, approvals and actions in one place."
         />
       </div>
 
@@ -132,7 +199,7 @@ export default function ThingsToDoDataSettings({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="ttd-max">Max items (optional)</Label>
+        <Label htmlFor="ttd-max">Max items</Label>
         <Input
           id="ttd-max"
           type="number"
@@ -144,51 +211,29 @@ export default function ThingsToDoDataSettings({
               things_to_do_max_items: v === "" ? undefined : Math.max(0, parseInt(v, 10) || 0),
             })
           }}
-          placeholder="No limit"
         />
       </div>
 
       <div className="space-y-3 pt-2 border-t">
-        <div className="flex items-center justify-between">
-          <Label htmlFor="ttd-show-filters">Show filters</Label>
-          <Switch
-            id="ttd-show-filters"
-            checked={config.things_to_do_show_filters !== false}
-            onCheckedChange={(v) => onUpdate({ things_to_do_show_filters: v })}
-          />
-        </div>
-        <div className="flex items-center justify-between">
-          <Label htmlFor="ttd-quick-links">Show quick links</Label>
-          <Switch
-            id="ttd-quick-links"
-            checked={config.things_to_do_show_quick_links !== false}
-            onCheckedChange={(v) => onUpdate({ things_to_do_show_quick_links: v })}
-          />
-        </div>
-        <div className="flex items-center justify-between">
-          <Label htmlFor="ttd-show-stats">Show stats</Label>
-          <Switch
-            id="ttd-show-stats"
-            checked={config.things_to_do_show_stats !== false}
-            onCheckedChange={(v) => onUpdate({ things_to_do_show_stats: v })}
-          />
-        </div>
-        <div className="flex items-center justify-between">
-          <Label htmlFor="ttd-detail-panel">Show detail panel</Label>
-          <Switch
-            id="ttd-detail-panel"
-            checked={config.things_to_do_enable_detail_panel !== false}
-            onCheckedChange={(v) => onUpdate({ things_to_do_enable_detail_panel: v })}
-          />
-        </div>
-        <div className="flex items-center justify-between">
-          <Label htmlFor="ttd-compact">Compact mode</Label>
-          <Switch
-            id="ttd-compact"
-            checked={config.things_to_do_compact_mode === true}
-            onCheckedChange={(v) => onUpdate({ things_to_do_compact_mode: v })}
-          />
-        </div>
+        {(
+          [
+            ["things_to_do_show_filters", "Show filters", true],
+            ["things_to_do_show_search", "Show search", true],
+            ["things_to_do_show_quick_links", "Show quick links", true],
+            ["things_to_do_show_stats", "Show stats", true],
+            ["things_to_do_enable_detail_panel", "Show detail panel", true],
+            ["things_to_do_compact_mode", "Compact mode", false],
+          ] as const
+        ).map(([key, label, defaultOn]) => (
+          <div key={key} className="flex items-center justify-between">
+            <Label htmlFor={key}>{label}</Label>
+            <Switch
+              id={key}
+              checked={(config as Record<string, boolean | undefined>)[key] ?? defaultOn}
+              onCheckedChange={(v) => onUpdate({ [key]: v } as Partial<BlockConfig>)}
+            />
+          </div>
+        ))}
       </div>
     </div>
   )

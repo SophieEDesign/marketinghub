@@ -11,41 +11,120 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import type { BlockConfig } from "@/lib/interface/types"
+import type { DataSettingsCtx } from "./blockSettingsRegistry"
 import { CONTENT_TIMELINE_THEMES } from "@/lib/marketing/content-timeline"
-
-interface ContentTimelineDataSettingsProps {
-  config: BlockConfig
-  onUpdate: (updates: Partial<BlockConfig>) => void
-}
+import MarketingDataSourceSection from "./shared/MarketingDataSourceSection"
+import MarketingFieldMappingSection from "./shared/MarketingFieldMappingSection"
+import MarketingFieldSelect from "./shared/MarketingFieldSelect"
 
 export default function ContentTimelineDataSettings({
   config,
+  tables,
+  views,
+  fields,
   onUpdate,
-}: ContentTimelineDataSettingsProps) {
+  onTableChange,
+}: DataSettingsCtx) {
+  const tableFields = config.table_id
+    ? fields.filter((f) => f.table_id === config.table_id)
+    : fields
+
+  const setField = (idKey: keyof BlockConfig, nameKey: keyof BlockConfig) =>
+    (fieldId: string | undefined, fieldName: string | undefined) => {
+      onUpdate({
+        [idKey]: fieldId,
+        [nameKey]: fieldName,
+      } as Partial<BlockConfig>)
+    }
+
   return (
     <div className="space-y-4">
-      <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-        <p className="text-sm text-blue-800">
-          Timeline loads from the Content table (and linked Campaigns / Quarterly Themes). Tables are
-          discovered by name — no separate source table ID is required.
-        </p>
-      </div>
+      <MarketingDataSourceSection
+        config={config}
+        tables={tables}
+        views={views}
+        onUpdate={onUpdate}
+        onTableChange={onTableChange}
+        mockConfigKey="content_timeline_use_mock"
+      />
 
-      <div className="flex items-center justify-between rounded-md border border-border/40 px-3 py-2">
-        <div className="space-y-0.5 pr-3">
-          <Label htmlFor="ct-use-mock">Use demo data</Label>
-          <p className="text-xs text-muted-foreground">
-            Show sample timeline items instead of live Content rows.
-          </p>
-        </div>
-        <Switch
-          id="ct-use-mock"
-          checked={config.content_timeline_use_mock === true}
-          onCheckedChange={(v) => onUpdate({ content_timeline_use_mock: v ? true : undefined })}
-        />
-      </div>
+      {config.table_id ? (
+        <MarketingFieldMappingSection>
+          <MarketingFieldSelect
+            label="Title"
+            fieldId={config.content_timeline_title_field_id}
+            fieldName={config.content_timeline_title_field}
+            fields={tableFields}
+            onChange={setField("content_timeline_title_field_id", "content_timeline_title_field")}
+          />
+          <MarketingFieldSelect
+            label="Theme"
+            fieldId={config.content_timeline_theme_field_id}
+            fieldName={config.content_timeline_theme_field}
+            fields={tableFields}
+            onChange={setField("content_timeline_theme_field_id", "content_timeline_theme_field")}
+          />
+          <MarketingFieldSelect
+            label="Campaign"
+            fieldId={config.content_timeline_campaign_field_id}
+            fieldName={config.content_timeline_campaign_field}
+            fields={tableFields}
+            onChange={setField("content_timeline_campaign_field_id", "content_timeline_campaign_field")}
+          />
+          <MarketingFieldSelect
+            label="Content type"
+            fieldId={config.content_timeline_type_field_id}
+            fieldName={config.content_timeline_type_field}
+            fields={tableFields}
+            onChange={setField("content_timeline_type_field_id", "content_timeline_type_field")}
+          />
+          <MarketingFieldSelect
+            label="Channel"
+            fieldId={config.content_timeline_channel_field_id}
+            fieldName={config.content_timeline_channel_field}
+            fields={tableFields}
+            onChange={setField("content_timeline_channel_field_id", "content_timeline_channel_field")}
+          />
+          <MarketingFieldSelect
+            label="Status"
+            fieldId={config.content_timeline_status_field_id}
+            fieldName={config.content_timeline_status_field}
+            fields={tableFields}
+            onChange={setField("content_timeline_status_field_id", "content_timeline_status_field")}
+          />
+          <MarketingFieldSelect
+            label="Owner"
+            fieldId={config.content_timeline_owner_field_id}
+            fieldName={config.content_timeline_owner_field}
+            fields={tableFields}
+            onChange={setField("content_timeline_owner_field_id", "content_timeline_owner_field")}
+          />
+          <MarketingFieldSelect
+            label="Start date"
+            fieldId={config.content_timeline_start_date_field_id}
+            fieldName={config.content_timeline_start_date_field}
+            fields={tableFields}
+            onChange={setField(
+              "content_timeline_start_date_field_id",
+              "content_timeline_start_date_field"
+            )}
+            fieldTypes={["date"]}
+          />
+          <MarketingFieldSelect
+            label="End / due date"
+            fieldId={config.content_timeline_end_date_field_id}
+            fieldName={config.content_timeline_end_date_field}
+            fields={tableFields}
+            onChange={setField(
+              "content_timeline_end_date_field_id",
+              "content_timeline_end_date_field"
+            )}
+            fieldTypes={["date"]}
+          />
+        </MarketingFieldMappingSection>
+      ) : null}
 
-      <div className="space-y-2">
+      <div className="space-y-2 pt-2 border-t">
         <Label htmlFor="ct-title">Block title</Label>
         <Input
           id="ct-title"
@@ -61,7 +140,6 @@ export default function ContentTimelineDataSettings({
           id="ct-subtitle"
           value={config.content_timeline_subtitle || ""}
           onChange={(e) => onUpdate({ content_timeline_subtitle: e.target.value })}
-          placeholder="Plan campaigns, posts, pages and marketing activity by theme."
         />
       </div>
 
@@ -101,11 +179,28 @@ export default function ContentTimelineDataSettings({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="theme">Theme</SelectItem>
+            <SelectItem value="campaign">Campaign</SelectItem>
             <SelectItem value="channel">Channel</SelectItem>
             <SelectItem value="status">Status</SelectItem>
             <SelectItem value="owner">Owner</SelectItem>
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="ct-max">Max items</Label>
+        <Input
+          id="ct-max"
+          type="number"
+          min={0}
+          value={config.content_timeline_max_items ?? ""}
+          onChange={(e) =>
+            onUpdate({
+              content_timeline_max_items:
+                e.target.value === "" ? undefined : Math.max(0, parseInt(e.target.value, 10) || 0),
+            })
+          }
+        />
       </div>
 
       <div className="space-y-2">
@@ -133,46 +228,26 @@ export default function ContentTimelineDataSettings({
       </div>
 
       <div className="space-y-3 pt-2 border-t">
-        <div className="flex items-center justify-between">
-          <Label htmlFor="ct-show-filters">Show filters</Label>
-          <Switch
-            id="ct-show-filters"
-            checked={config.content_timeline_show_filters !== false}
-            onCheckedChange={(v) => onUpdate({ content_timeline_show_filters: v })}
-          />
-        </div>
-        <div className="flex items-center justify-between">
-          <Label htmlFor="ct-show-badges">Show status badges</Label>
-          <Switch
-            id="ct-show-badges"
-            checked={config.content_timeline_show_status_badges !== false}
-            onCheckedChange={(v) => onUpdate({ content_timeline_show_status_badges: v })}
-          />
-        </div>
-        <div className="flex items-center justify-between">
-          <Label htmlFor="ct-show-owners">Show owner initials</Label>
-          <Switch
-            id="ct-show-owners"
-            checked={config.content_timeline_show_owner_initials !== false}
-            onCheckedChange={(v) => onUpdate({ content_timeline_show_owner_initials: v })}
-          />
-        </div>
-        <div className="flex items-center justify-between">
-          <Label htmlFor="ct-detail-panel">Enable detail panel</Label>
-          <Switch
-            id="ct-detail-panel"
-            checked={config.content_timeline_enable_detail_panel !== false}
-            onCheckedChange={(v) => onUpdate({ content_timeline_enable_detail_panel: v })}
-          />
-        </div>
-        <div className="flex items-center justify-between">
-          <Label htmlFor="ct-compact-default">Compact mode default</Label>
-          <Switch
-            id="ct-compact-default"
-            checked={config.content_timeline_compact_mode === true}
-            onCheckedChange={(v) => onUpdate({ content_timeline_compact_mode: v })}
-          />
-        </div>
+        <p className="text-xs font-medium text-muted-foreground">Display</p>
+        {(
+          [
+            ["content_timeline_show_filters", "Show filters", true],
+            ["content_timeline_show_search", "Show search", true],
+            ["content_timeline_show_status_badges", "Show status badges", true],
+            ["content_timeline_show_owner_initials", "Show owner initials", true],
+            ["content_timeline_enable_detail_panel", "Enable detail panel", true],
+            ["content_timeline_compact_mode", "Compact mode default", false],
+          ] as const
+        ).map(([key, label, defaultOn]) => (
+          <div key={key} className="flex items-center justify-between">
+            <Label htmlFor={key}>{label}</Label>
+            <Switch
+              id={key}
+              checked={(config as Record<string, boolean | undefined>)[key] ?? defaultOn}
+              onCheckedChange={(v) => onUpdate({ [key]: v } as Partial<BlockConfig>)}
+            />
+          </div>
+        ))}
       </div>
     </div>
   )

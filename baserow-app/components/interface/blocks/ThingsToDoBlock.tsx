@@ -19,6 +19,11 @@ import {
   type ThingsToDoView,
 } from "@/lib/marketing/things-to-do"
 import { useThingsToDoData } from "@/hooks/useThingsToDoData"
+import {
+  isMarketingMockEnabled,
+  marketingDemoState,
+  MARKETING_DEMO_BANNER_DEFAULT,
+} from "@/lib/marketing/block-config-resolver"
 import { useRecordModal } from "@/contexts/RecordModalContext"
 import DashboardEmpty from "@/components/interface/primitives/DashboardEmpty"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
@@ -45,7 +50,8 @@ export default function ThingsToDoBlock({
 }: ThingsToDoBlockProps) {
   const { config } = block
   const { openRecordModal } = useRecordModal()
-  const { loading, error, fromLiveData, items: liveItems, reload } = useThingsToDoData()
+  const { loading, error, fromLiveData, hasTable, items: liveItems, reload } =
+    useThingsToDoData({ config })
 
   const title = config?.title || "Things To Do"
   const subtitle =
@@ -61,17 +67,21 @@ export default function ThingsToDoBlock({
   const dateRange = (config?.things_to_do_date_range || "next_30_days") as ThingsToDoDateRange
   const defaultGrouping = (config?.things_to_do_default_grouping ||
     "due-date") as ThingsToDoGrouping
-  const forceMock = config?.things_to_do_use_mock === true
-
+  const forceMock = isMarketingMockEnabled(config, "things_to_do_use_mock")
   const mockItems = getThingsToDoMockItems()
-  const useLive = fromLiveData && !forceMock
-  const sourceItems = useLive ? liveItems : mockItems
-  const isDemoData = !useLive
-  const demoBannerMessage = forceMock
-    ? "Using demo data — demo mode is enabled in block settings."
-    : error
-      ? `Using demo data — ${error}`
-      : "Using demo data — no task source configured. Actionable Content rows load when the Content table is available."
+  const demoState = marketingDemoState({ forceMock, fromLiveData, hasTable, error })
+  const sourceItems = demoState.useDemoData
+    ? mockItems
+    : demoState.useLiveData
+      ? liveItems
+      : []
+  const isDemoData = demoState.useDemoData
+  const demoBannerMessage = demoState.showDemoBanner
+    ? forceMock
+      ? demoState.bannerMessage
+      : MARKETING_DEMO_BANNER_DEFAULT
+    : ""
+  const showSearch = config?.things_to_do_show_search !== false
 
   const [view, setView] = useState<ThingsToDoView>(defaultView)
   const [filters, setFilters] = useState<ThingsToDoFilters>(EMPTY_THINGS_TO_DO_FILTERS)
@@ -167,7 +177,27 @@ export default function ThingsToDoBlock({
 
   const showDetail = enableDetailPanel && selectedItem != null && !isEditing
 
-  if (loading && !fromLiveData) {
+  if (demoState.showEmptyState && !demoState.useDemoData) {
+    return (
+      <div data-block-selectable className="flex h-full min-h-[200px] flex-col rounded-2xl border border-border/40 bg-background p-6">
+        <ThingsToDoHeader
+          title={title}
+          subtitle={subtitle}
+          stats={{
+            overdue: 0,
+            dueToday: 0,
+            dueThisWeek: 0,
+            waiting: 0,
+            completed: 0,
+          }}
+          showStats={false}
+        />
+        <DashboardEmpty title="No tasks" description={demoState.bannerMessage} variant="default" />
+      </div>
+    )
+  }
+
+  if (loading && !demoState.useLiveData && !forceMock) {
     return (
       <div className="flex h-full min-h-[200px] items-center justify-center rounded-2xl border border-border/40 bg-background">
         <LoadingSpinner size="lg" text="Loading things to do…" />

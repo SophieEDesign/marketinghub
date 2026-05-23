@@ -14,6 +14,11 @@ import { Input } from "@/components/ui/input"
 import { useRecordModal } from "@/contexts/RecordModalContext"
 import { useEventCalendarData } from "@/hooks/useEventCalendarData"
 import {
+  isMarketingMockEnabled,
+  marketingDemoState,
+} from "@/lib/marketing/block-config-resolver"
+import MarketingDemoDataBanner from "@/components/interface/primitives/MarketingDemoDataBanner"
+import {
   buildEventCalendarEvents,
   computeEventMetrics,
   eventCalendarSettingsFromConfig,
@@ -28,6 +33,7 @@ import type { BlockConfig } from "@/lib/interface/types"
 
 export interface EventCalendarCoreProps {
   settings: EventCalendarBlockSettings
+  config?: BlockConfig
   canEdit?: boolean
   className?: string
 }
@@ -52,6 +58,7 @@ function CalendarSkeleton({ compact }: { compact: boolean }) {
 
 export function EventCalendarCore({
   settings,
+  config,
   canEdit = false,
   isEditing = false,
   embeddedInBlock = true,
@@ -62,6 +69,8 @@ export function EventCalendarCore({
   const {
     loading,
     error,
+    fromLiveData,
+    hasTable,
     tableIds,
     fields,
     allItems,
@@ -69,8 +78,14 @@ export function EventCalendarCore({
     currentUserId,
     reload,
     updateAttendees,
-  } = useEventCalendarData()
+  } = useEventCalendarData({ config })
 
+  const forceMock = isMarketingMockEnabled(config, "event_calendar_use_mock")
+  const demoState = marketingDemoState({ forceMock, fromLiveData, hasTable, error })
+  const maxItems =
+    typeof config?.event_calendar_max_items === "number"
+      ? config.event_calendar_max_items
+      : undefined
   const [viewMode, setViewMode] = useState<EventCalendarViewMode>(settings.defaultView)
   const [cursorDate, setCursorDate] = useState(() => new Date())
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
@@ -113,8 +128,11 @@ export function EventCalendarCore({
   )
 
   const filteredItems = useMemo(
-    () => filterEventItems(allItems, filters, currentUserId),
-    [allItems, filters, currentUserId]
+    () => {
+      const filtered = filterEventItems(allItems, filters, currentUserId)
+      return maxItems != null && maxItems > 0 ? filtered.slice(0, maxItems) : filtered
+    },
+    [allItems, filters, currentUserId, maxItems]
   )
 
   const calendarEvents = useMemo(
@@ -251,18 +269,19 @@ export function EventCalendarCore({
     )
   }
 
-  if (error) {
+  if (demoState.showEmptyState && !demoState.useDemoData) {
     return (
       <div className={cn("py-12 text-center", className)}>
-        <DashboardEmpty title="Could not load events" description={error} variant="default" />
-        <Button type="button" variant="outline" className="mt-4" onClick={() => reload()}>
-          Retry
-        </Button>
+        <DashboardEmpty
+          title="Event calendar not configured"
+          description={demoState.bannerMessage}
+          variant="default"
+        />
       </div>
     )
   }
 
-  const showEmpty = allItems.length === 0
+  const showEmpty = filteredItems.length === 0
 
   return (
     <div
@@ -274,6 +293,9 @@ export function EventCalendarCore({
       data-event-calendar-core
       data-block-selectable
     >
+      {demoState.showDemoBanner ? (
+        <MarketingDemoDataBanner message={demoState.bannerMessage} />
+      ) : null}
       {settings.showPageHeader ? (
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between shrink-0">
           <div>
@@ -416,6 +438,7 @@ export function EventCalendarFromConfig({
   return (
     <EventCalendarCore
       settings={settings}
+      config={config}
       canEdit={canEdit}
       isEditing={isEditing}
       embeddedInBlock={embeddedInBlock}

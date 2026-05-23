@@ -11,18 +11,73 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import type { BlockConfig } from "@/lib/interface/types"
-
-interface ContentThemeDataSettingsProps {
-  config: BlockConfig
-  onUpdate: (updates: Partial<BlockConfig>) => void
-}
+import type { DataSettingsCtx } from "./blockSettingsRegistry"
+import MarketingDataSourceSection from "./shared/MarketingDataSourceSection"
+import MarketingFieldMappingSection from "./shared/MarketingFieldMappingSection"
+import MarketingFieldSelect from "./shared/MarketingFieldSelect"
 
 export default function ContentThemeDataSettings({
   config,
+  tables,
+  views,
+  fields,
   onUpdate,
-}: ContentThemeDataSettingsProps) {
+  onTableChange,
+}: DataSettingsCtx) {
+  const tableFields = config.table_id
+    ? fields.filter((f) => f.table_id === config.table_id)
+    : fields
+
+  const setField = (idKey: keyof BlockConfig, nameKey: keyof BlockConfig) =>
+    (fieldId: string | undefined, fieldName: string | undefined) => {
+      onUpdate({ [idKey]: fieldId, [nameKey]: fieldName } as Partial<BlockConfig>)
+    }
+
   return (
     <div className="space-y-4">
+      <MarketingDataSourceSection
+        config={config}
+        tables={tables}
+        views={views}
+        onUpdate={onUpdate}
+        onTableChange={onTableChange}
+        mockConfigKey="content_theme_use_mock"
+        tableLabel="Quarterly Themes table"
+      />
+
+      {config.table_id ? (
+        <MarketingFieldMappingSection>
+          <MarketingFieldSelect
+            label="Theme name"
+            fieldId={config.content_theme_name_field_id}
+            fieldName={config.content_theme_name_field}
+            fields={tableFields}
+            onChange={setField("content_theme_name_field_id", "content_theme_name_field")}
+          />
+          <MarketingFieldSelect
+            label="Quarter"
+            fieldId={config.content_theme_quarter_field_id}
+            fieldName={config.content_theme_quarter_field}
+            fields={tableFields}
+            onChange={setField("content_theme_quarter_field_id", "content_theme_quarter_field")}
+          />
+          <MarketingFieldSelect
+            label="Year"
+            fieldId={config.content_theme_year_field_id}
+            fieldName={config.content_theme_year_field}
+            fields={tableFields}
+            onChange={setField("content_theme_year_field_id", "content_theme_year_field")}
+          />
+          <MarketingFieldSelect
+            label="Colour"
+            fieldId={config.content_theme_colour_field_id}
+            fieldName={config.content_theme_colour_field}
+            fields={tableFields}
+            onChange={setField("content_theme_colour_field_id", "content_theme_colour_field")}
+          />
+        </MarketingFieldMappingSection>
+      ) : null}
+
       <div className="space-y-2">
         <Label htmlFor="content-theme-title">Block title</Label>
         <Input
@@ -173,9 +228,6 @@ export default function ContentThemeDataSettings({
         </div>
       </div>
 
-      <p className="text-xs text-gray-500">
-        Theme cards use mock data until connected to Quarterly Themes and Content tables.
-      </p>
     </div>
   )
 }

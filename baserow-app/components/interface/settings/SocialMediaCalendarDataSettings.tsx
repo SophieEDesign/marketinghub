@@ -11,24 +11,74 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import type { BlockConfig } from "@/lib/interface/types"
-
-interface SocialMediaCalendarDataSettingsProps {
-  config: BlockConfig
-  onUpdate: (updates: Partial<BlockConfig>) => void
-}
+import type { DataSettingsCtx } from "./blockSettingsRegistry"
+import MarketingDataSourceSection from "./shared/MarketingDataSourceSection"
+import MarketingFieldMappingSection from "./shared/MarketingFieldMappingSection"
+import MarketingFieldSelect from "./shared/MarketingFieldSelect"
 
 export default function SocialMediaCalendarDataSettings({
   config,
+  tables,
+  views,
+  fields,
   onUpdate,
-}: SocialMediaCalendarDataSettingsProps) {
+  onTableChange,
+}: DataSettingsCtx) {
+  const tableFields = config.table_id
+    ? fields.filter((f) => f.table_id === config.table_id)
+    : fields
+
+  const setField = (idKey: keyof BlockConfig, nameKey: keyof BlockConfig) =>
+    (fieldId: string | undefined, fieldName: string | undefined) => {
+      onUpdate({ [idKey]: fieldId, [nameKey]: fieldName } as Partial<BlockConfig>)
+    }
+
   return (
     <div className="space-y-4">
-      <div className="p-3 bg-muted/30 border border-border/40 rounded-md">
-        <p className="text-sm text-muted-foreground">
-          Posts load from the Content table. Social-only mode filters by content type and platform
-          fields.
-        </p>
-      </div>
+      <MarketingDataSourceSection
+        config={config}
+        tables={tables}
+        views={views}
+        onUpdate={onUpdate}
+        onTableChange={onTableChange}
+        mockConfigKey="social_media_calendar_use_mock"
+      />
+
+      {config.table_id ? (
+        <MarketingFieldMappingSection>
+          <MarketingFieldSelect
+            label="Title"
+            fieldId={config.social_media_calendar_title_field_id}
+            fieldName={config.social_media_calendar_title_field}
+            fields={tableFields}
+            onChange={setField(
+              "social_media_calendar_title_field_id",
+              "social_media_calendar_title_field"
+            )}
+          />
+          <MarketingFieldSelect
+            label="Publish date"
+            fieldId={config.social_media_calendar_publish_date_field_id}
+            fieldName={config.social_media_calendar_publish_date_field}
+            fields={tableFields}
+            onChange={setField(
+              "social_media_calendar_publish_date_field_id",
+              "social_media_calendar_publish_date_field"
+            )}
+            fieldTypes={["date"]}
+          />
+          <MarketingFieldSelect
+            label="Status"
+            fieldId={config.social_media_calendar_status_field_id}
+            fieldName={config.social_media_calendar_status_field}
+            fields={tableFields}
+            onChange={setField(
+              "social_media_calendar_status_field_id",
+              "social_media_calendar_status_field"
+            )}
+          />
+        </MarketingFieldMappingSection>
+      ) : null}
 
       <div className="space-y-2">
         <Label htmlFor="smc-title">Block title</Label>
@@ -135,6 +185,7 @@ export default function SocialMediaCalendarDataSettings({
       <div className="space-y-3 pt-2 border-t border-border/30">
         {(
           [
+            ["social_media_calendar_show_search", "Search", true],
             ["social_media_calendar_show_toolbar", "Toolbar & scope toggle", true],
             ["social_media_calendar_show_filters", "Filter row", true],
             ["social_media_calendar_show_status_bar", "Status bar", true],

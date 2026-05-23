@@ -520,6 +520,7 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
     minHeight: 8,
     defaultConfig: {
       title: 'Content Timeline',
+      table_id: '',
       content_timeline_subtitle:
         'Plan campaigns, posts, pages and marketing activity by theme.',
       content_timeline_default_view: 'quarter',
@@ -553,6 +554,7 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
     minHeight: 10,
     defaultConfig: {
       title: 'Event Calendar',
+      table_id: '',
       event_calendar_subtitle:
         'Plan, manage and track marketing events, trade shows and activations.',
       event_calendar_default_view: 'month',
@@ -591,6 +593,7 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
     minHeight: 10,
     defaultConfig: {
       title: 'Social Media Calendar',
+      table_id: '',
       social_media_calendar_subtitle:
         'Visual planning for social posts — platforms, media, and approval status at a glance.',
       social_media_calendar_default_view: 'month',
@@ -627,6 +630,7 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
     minHeight: 6,
     defaultConfig: {
       title: 'Upcoming Summary',
+      table_id: '',
       upcoming_summary_subtitle:
         'A quick view of deadlines, campaigns and marketing activity needing attention.',
       upcoming_summary_sections: [
@@ -666,6 +670,7 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
     minHeight: 8,
     defaultConfig: {
       title: 'Things To Do',
+      table_id: '',
       things_to_do_subtitle:
         'Tasks, reviews, approvals and actions in one place.',
       things_to_do_default_view: 'list',
@@ -700,6 +705,7 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
     minHeight: 6,
     defaultConfig: {
       title: 'Content Themes',
+      table_id: '',
       content_theme_subtitle:
         'Strategic themes and content focus areas for the quarter.',
       content_theme_year: 2026,
@@ -732,6 +738,7 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
     minHeight: 6,
     defaultConfig: {
       title: 'Brand & Media Resources',
+      table_id: '',
       resource_hub_subtitle:
         'Access official logos, brand assets, images and documents for internal use.',
       resource_hub_default_category: 'all',

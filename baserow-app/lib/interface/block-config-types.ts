@@ -406,6 +406,11 @@ export function validateBlockConfig(
       // Things to do block uses mock data; no required fields
       break
 
+    case 'event_calendar':
+    case 'social_media_calendar':
+      // Marketing calendar blocks: optional table_id; no required fields
+      break
+
     // divider, button, link_preview have no required fields
   }
 

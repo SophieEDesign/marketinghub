@@ -9,12 +9,18 @@ import {
 } from "@/lib/marketing/content-planning"
 import { buildUpcomingSummaryData, type UpcomingSummaryBuiltData } from "@/lib/marketing/upcoming-summary-data"
 import {
+  isMarketingMockEnabled,
+  resolveMarketingTable,
+} from "@/lib/marketing/block-config-resolver"
+import {
   findCampaignsTable,
   findContentTable,
+  findMediaTable,
   findQuarterlyThemesTable,
   type MarketingTableRow,
 } from "@/lib/marketing/marketing-tables"
 import type { ContentPlanningTableIds } from "@/lib/marketing/content-planning"
+import type { BlockConfig } from "@/lib/interface/types"
 import type { FieldOptions } from "@/types/fields"
 
 type FieldRow = { name: string; type?: string; options?: FieldOptions }
@@ -40,13 +46,19 @@ export interface UseUpcomingSummaryDataResult {
   loading: boolean
   error: string | null
   fromLiveData: boolean
+  hasTable: boolean
   tableIds: ContentPlanningTableIds | null
   data: UpcomingSummaryBuiltData
   reload: () => void
 }
 
-export function useUpcomingSummaryData(): UseUpcomingSummaryDataResult {
-  const [loading, setLoading] = useState(true)
+export function useUpcomingSummaryData(options?: {
+  config?: BlockConfig
+}): UseUpcomingSummaryDataResult {
+  const config = options?.config
+  const forceMock = isMarketingMockEnabled(config, "upcoming_summary_use_mock")
+  const [loading, setLoading] = useState(!forceMock)
+  const [hasTable, setHasTable] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fromLiveData, setFromLiveData] = useState(false)
   const [tableIds, setTableIds] = useState<ContentPlanningTableIds | null>(null)
@@ -56,6 +68,14 @@ export function useUpcomingSummaryData(): UseUpcomingSummaryDataResult {
   const reload = useCallback(() => setReloadToken((n) => n + 1), [])
 
   useEffect(() => {
+    if (forceMock) {
+      setLoading(false)
+      setFromLiveData(false)
+      setHasTable(false)
+      setData(EMPTY_DATA)
+      return
+    }
+
     let cancelled = false
 
     async function load() {
@@ -72,13 +92,21 @@ export function useUpcomingSummaryData(): UseUpcomingSummaryDataResult {
         }
 
         const registry = tables as MarketingTableRow[]
-        const content = findContentTable(registry)
-        const campaigns = findCampaignsTable(registry)
+        const content = resolveMarketingTable(
+          registry,
+          config?.upcoming_summary_content_table_id || config?.table_id,
+          findContentTable
+        )
+        const campaigns = config?.upcoming_summary_campaigns_table_id
+          ? registry.find((t) => t.id === config.upcoming_summary_campaigns_table_id)
+          : findCampaignsTable(registry)
         const themes = findQuarterlyThemesTable(registry)
 
         if (!content?.supabase_table) {
-          throw new Error("Content table not found")
+          setHasTable(false)
+          throw new Error("Content table not found — configure a content source table")
         }
+        setHasTable(true)
 
         const ids: ContentPlanningTableIds = {
           contentTableId: content.id,
@@ -169,7 +197,7 @@ export function useUpcomingSummaryData(): UseUpcomingSummaryDataResult {
     return () => {
       cancelled = true
     }
-  }, [reloadToken])
+  }, [reloadToken, config, forceMock])
 
-  return { loading, error, fromLiveData, tableIds, data, reload }
+  return { loading, error, fromLiveData, hasTable, tableIds, data, reload }
 }

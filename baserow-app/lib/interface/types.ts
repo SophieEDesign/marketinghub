@@ -352,10 +352,42 @@ export interface BlockConfig {
   content_theme_highlight_current_quarter?: boolean
   content_theme_max_themes?: number
   content_theme_view_mode?: 'grid' | 'list' | 'compact'
+  content_theme_use_mock?: boolean
+  content_theme_name_field_id?: string
+  content_theme_name_field?: string
+  content_theme_quarter_field_id?: string
+  content_theme_quarter_field?: string
+  content_theme_year_field_id?: string
+  content_theme_year_field?: string
+  content_theme_colour_field_id?: string
+  content_theme_colour_field?: string
+  content_theme_divisions_field_id?: string
+  content_theme_divisions_field?: string
   // Content Timeline block
+  content_timeline_use_mock?: boolean
+  content_timeline_max_items?: number
+  content_timeline_show_search?: boolean
+  content_timeline_title_field_id?: string
+  content_timeline_title_field?: string
+  content_timeline_theme_field_id?: string
+  content_timeline_theme_field?: string
+  content_timeline_campaign_field_id?: string
+  content_timeline_campaign_field?: string
+  content_timeline_type_field_id?: string
+  content_timeline_type_field?: string
+  content_timeline_channel_field_id?: string
+  content_timeline_channel_field?: string
+  content_timeline_status_field_id?: string
+  content_timeline_status_field?: string
+  content_timeline_owner_field_id?: string
+  content_timeline_owner_field?: string
+  content_timeline_start_date_field_id?: string
+  content_timeline_start_date_field?: string
+  content_timeline_end_date_field_id?: string
+  content_timeline_end_date_field?: string
   content_timeline_subtitle?: string
   content_timeline_default_view?: 'month' | 'quarter' | 'year'
-  content_timeline_group_by?: 'theme' | 'channel' | 'status' | 'owner'
+  content_timeline_group_by?: 'theme' | 'channel' | 'status' | 'owner' | 'campaign'
   content_timeline_default_theme_filter?: string
   content_timeline_show_filters?: boolean
   content_timeline_show_status_badges?: boolean
@@ -383,8 +415,39 @@ export interface BlockConfig {
   resource_hub_show_upload?: boolean
   resource_hub_layout_mode?: 'gallery' | 'preview' | 'list'
   resource_hub_use_dashboard_mock?: boolean
+  resource_hub_use_mock?: boolean
+  resource_hub_max_items?: number
+  resource_hub_show_detail_panel?: boolean
+  resource_hub_title_field_id?: string
+  resource_hub_title_field?: string
+  resource_hub_category_field_id?: string
+  resource_hub_category_field?: string
+  resource_hub_file_type_field_id?: string
+  resource_hub_file_type_field?: string
+  resource_hub_file_url_field_id?: string
+  resource_hub_file_url_field?: string
+  resource_hub_thumbnail_url_field_id?: string
+  resource_hub_thumbnail_url_field?: string
+  resource_hub_description_field_id?: string
+  resource_hub_description_field?: string
+  resource_hub_tags_field_id?: string
+  resource_hub_tags_field?: string
+  resource_hub_usage_field_id?: string
+  resource_hub_usage_field?: string
+  resource_hub_uploaded_by_field_id?: string
+  resource_hub_uploaded_by_field?: string
+  resource_hub_updated_at_field_id?: string
+  resource_hub_updated_at_field?: string
   resource_hub_internal_notice?: string
   // Upcoming Summary block
+  upcoming_summary_content_table_id?: string
+  upcoming_summary_campaigns_table_id?: string
+  upcoming_summary_events_table_id?: string
+  upcoming_summary_tasks_table_id?: string
+  upcoming_summary_media_table_id?: string
+  upcoming_summary_empty_deadlines_title?: string
+  upcoming_summary_empty_campaigns_title?: string
+  upcoming_summary_empty_events_title?: string
   upcoming_summary_subtitle?: string
   upcoming_summary_sections?: UpcomingSummarySectionId[]
   upcoming_summary_max_items?: number
@@ -408,7 +471,50 @@ export interface BlockConfig {
   things_to_do_max_items?: number
   things_to_do_date_range?: 'all' | 'this_week' | 'next_30_days' | 'this_quarter'
   things_to_do_compact_mode?: boolean
+  things_to_do_use_mock?: boolean
+  things_to_do_show_search?: boolean
+  things_to_do_title_field_id?: string
+  things_to_do_title_field?: string
+  things_to_do_type_field_id?: string
+  things_to_do_type_field?: string
+  things_to_do_status_field_id?: string
+  things_to_do_status_field?: string
+  things_to_do_priority_field_id?: string
+  things_to_do_priority_field?: string
+  things_to_do_owner_field_id?: string
+  things_to_do_owner_field?: string
+  things_to_do_reviewer_field_id?: string
+  things_to_do_reviewer_field?: string
+  things_to_do_due_date_field_id?: string
+  things_to_do_due_date_field?: string
+  things_to_do_campaign_field_id?: string
+  things_to_do_campaign_field?: string
+  things_to_do_theme_field_id?: string
+  things_to_do_theme_field?: string
   // Event Calendar block
+  event_calendar_use_mock?: boolean
+  event_calendar_max_items?: number
+  event_calendar_detail_mode?: 'panel' | 'modal' | 'record'
+  event_calendar_title_field_id?: string
+  event_calendar_title_field?: string
+  event_calendar_event_type_field_id?: string
+  event_calendar_event_type_field?: string
+  event_calendar_location_field_id?: string
+  event_calendar_location_field?: string
+  event_calendar_country_field_id?: string
+  event_calendar_country_field?: string
+  event_calendar_start_date_field_id?: string
+  event_calendar_start_date_field?: string
+  event_calendar_end_date_field_id?: string
+  event_calendar_end_date_field?: string
+  event_calendar_status_field_id?: string
+  event_calendar_status_field?: string
+  event_calendar_attending_field_id?: string
+  event_calendar_attending_field?: string
+  event_calendar_campaign_field_id?: string
+  event_calendar_campaign_field?: string
+  event_calendar_resources_field_id?: string
+  event_calendar_resources_field?: string
   event_calendar_subtitle?: string
   event_calendar_default_view?: 'month' | 'week' | 'list' | 'timeline'
   event_calendar_show_toolbar?: boolean
@@ -436,6 +542,29 @@ export interface BlockConfig {
   social_media_calendar_show_platform_icons?: boolean
   social_media_calendar_max_posts?: number
   social_media_calendar_show_page_header?: boolean
+  social_media_calendar_use_mock?: boolean
+  social_media_calendar_show_search?: boolean
+  social_media_calendar_preview_mode?: 'inline' | 'drawer' | 'modal'
+  social_media_calendar_title_field_id?: string
+  social_media_calendar_title_field?: string
+  social_media_calendar_caption_field_id?: string
+  social_media_calendar_caption_field?: string
+  social_media_calendar_platform_field_id?: string
+  social_media_calendar_platform_field?: string
+  social_media_calendar_status_field_id?: string
+  social_media_calendar_status_field?: string
+  social_media_calendar_owner_field_id?: string
+  social_media_calendar_owner_field?: string
+  social_media_calendar_publish_date_field_id?: string
+  social_media_calendar_publish_date_field?: string
+  social_media_calendar_campaign_field_id?: string
+  social_media_calendar_campaign_field?: string
+  social_media_calendar_theme_field_id?: string
+  social_media_calendar_theme_field?: string
+  social_media_calendar_image_field_id?: string
+  social_media_calendar_image_field?: string
+  social_media_calendar_post_url_field_id?: string
+  social_media_calendar_post_url_field?: string
   // List block specific config (at root level for backward compatibility)
   list_title_field?: string
   list_subtitle_fields?: string[]

@@ -2,12 +2,18 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
-import type { MockResource } from "@/components/interface/blocks/internal-resource-hub/types"
+import {
+  isMarketingMockEnabled,
+  resolveMarketingTable,
+  resourceHubOverridesFromConfig,
+} from "@/lib/marketing/block-config-resolver"
 import {
   buildResourceHubItems,
   resolveMediaFields,
 } from "@/lib/marketing/resource-hub-data"
 import { findMediaTable, type MarketingTableRow } from "@/lib/marketing/marketing-tables"
+import type { MockResource } from "@/components/interface/blocks/internal-resource-hub/types"
+import type { BlockConfig } from "@/lib/interface/types"
 
 export interface ResourceHubTableIds {
   mediaTableId: string
@@ -18,15 +24,26 @@ export interface UseResourceHubDataResult {
   loading: boolean
   error: string | null
   fromLiveData: boolean
+  hasTable: boolean
   tableIds: ResourceHubTableIds | null
   resources: MockResource[]
   reload: () => void
 }
 
-export function useResourceHubData(): UseResourceHubDataResult {
-  const [loading, setLoading] = useState(true)
+export function useResourceHubData(options?: {
+  config?: BlockConfig
+}): UseResourceHubDataResult {
+  const config = options?.config
+  const forceMock = isMarketingMockEnabled(
+    config,
+    "resource_hub_use_mock",
+    "resource_hub_use_dashboard_mock"
+  )
+
+  const [loading, setLoading] = useState(!forceMock)
   const [error, setError] = useState<string | null>(null)
   const [fromLiveData, setFromLiveData] = useState(false)
+  const [hasTable, setHasTable] = useState(false)
   const [tableIds, setTableIds] = useState<ResourceHubTableIds | null>(null)
   const [resources, setResources] = useState<MockResource[]>([])
   const [reloadToken, setReloadToken] = useState(0)
@@ -34,6 +51,15 @@ export function useResourceHubData(): UseResourceHubDataResult {
   const reload = useCallback(() => setReloadToken((n) => n + 1), [])
 
   useEffect(() => {
+    if (forceMock) {
+      setLoading(false)
+      setError(null)
+      setFromLiveData(false)
+      setHasTable(false)
+      setResources([])
+      return
+    }
+
     let cancelled = false
 
     async function load() {
@@ -49,19 +75,29 @@ export function useResourceHubData(): UseResourceHubDataResult {
           throw new Error(tablesErr?.message || "Could not load tables")
         }
 
-        const media = findMediaTable(tables as MarketingTableRow[])
+        const media = resolveMarketingTable(
+          tables as MarketingTableRow[],
+          config?.table_id,
+          findMediaTable
+        )
         if (!media?.supabase_table) {
-          throw new Error("Media / Resource table not found")
+          setHasTable(false)
+          throw new Error("Media / Resource table not found — select a source table in block settings")
         }
+
+        setHasTable(true)
 
         const { data: fieldRows, error: fieldsErr } = await supabase
           .from("table_fields")
-          .select("name, type")
+          .select("id, name, type")
           .eq("table_id", media.id)
 
         if (fieldsErr) throw new Error(fieldsErr.message)
 
-        const fieldMap = resolveMediaFields(fieldRows || [])
+        const fieldMap = resolveMediaFields(
+          fieldRows || [],
+          resourceHubOverridesFromConfig(config)
+        )
 
         const { data: rows, error: rowsErr } = await supabase
           .from(media.supabase_table)
@@ -70,7 +106,7 @@ export function useResourceHubData(): UseResourceHubDataResult {
 
         if (rowsErr) throw new Error(rowsErr.message)
 
-        const resources = buildResourceHubItems(
+        const built = buildResourceHubItems(
           (rows || []) as Record<string, unknown>[],
           fieldMap,
           media.id
@@ -81,7 +117,7 @@ export function useResourceHubData(): UseResourceHubDataResult {
           mediaTableId: media.id,
           mediaSupabaseTable: media.supabase_table,
         })
-        setResources(resources)
+        setResources(built)
         setFromLiveData(true)
       } catch (e) {
         if (!cancelled) {
@@ -98,7 +134,7 @@ export function useResourceHubData(): UseResourceHubDataResult {
     return () => {
       cancelled = true
     }
-  }, [reloadToken])
+  }, [reloadToken, config, forceMock])
 
-  return { loading, error, fromLiveData, tableIds, resources, reload }
+  return { loading, error, fromLiveData, hasTable, tableIds, resources, reload }
 }

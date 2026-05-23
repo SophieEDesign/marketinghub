@@ -2,6 +2,10 @@
  * Event Calendar — field resolution, filtering, FullCalendar events, metrics.
  */
 
+import {
+  applyFieldOverrides,
+  type FieldOverridePair,
+} from "@/lib/marketing/block-config-resolver"
 import { formatDisplayValue, pickFieldName } from "@/lib/marketing/field-utils"
 import { normalizeHexColor } from "@/lib/field-colors"
 import type { FieldOptions } from "@/types/fields"
@@ -256,9 +260,12 @@ export const DEFAULT_EVENT_CALENDAR_BLOCK_CONFIG: Record<string, unknown> = {
 }
 
 /** Field map when events are Content rows (content type = Event). */
-export function resolveContentEventFields(fields: FieldRow[]): ContentEventFieldMap {
+export function resolveContentEventFields(
+  fields: FieldRow[],
+  overrides?: Partial<Record<keyof EventFieldMap, FieldOverridePair>>
+): ContentEventFieldMap {
   const base = resolveEventFields(fields)
-  return {
+  const merged: ContentEventFieldMap = {
     ...base,
     eventName:
       pickFieldName(fields, [/content.?name/i, /event.?name/i, /^name$/i, /^title$/i], "content_name") ||
@@ -292,6 +299,12 @@ export function resolveContentEventFields(fields: FieldRow[]): ContentEventField
     heroImage:
       pickFieldName(fields, [/images/i, /hero/i, /image/i, /photo/i, /banner/i], base.heroImage) ||
       base.heroImage,
+  }
+  if (!overrides || Object.keys(overrides).length === 0) return merged
+  const fieldIds = fields.map((f) => ({ id: (f as { id?: string }).id || f.name, name: f.name }))
+  return {
+    ...applyFieldOverrides(merged, overrides, fieldIds),
+    contentType: merged.contentType,
   }
 }
 

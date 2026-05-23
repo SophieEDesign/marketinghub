@@ -3,6 +3,10 @@
  */
 
 import { pickFieldName, formatDisplayValue } from "@/lib/marketing/field-utils"
+import {
+  applyFieldOverrides,
+  type FieldOverridePair,
+} from "@/lib/marketing/block-config-resolver"
 import { resolveChoiceColor, normalizeHexColor, SEMANTIC_COLORS } from "@/lib/field-colors"
 import type { FieldOptions } from "@/types/fields"
 import {
@@ -139,9 +143,14 @@ function isCompletedStatus(status: string | null): boolean {
 export function resolveContentPlanningFields(
   contentFields: FieldRow[],
   campaignFields: FieldRow[],
-  themeFields: FieldRow[]
+  themeFields: FieldRow[],
+  contentOverrides?: Partial<Record<keyof ContentPlanningFieldMap, FieldOverridePair>>,
+  contentFieldIds?: Array<{ id: string; name: string }>
 ): ContentPlanningFieldMap {
-  return {
+  const contentFieldsWithId =
+    contentFieldIds ||
+    contentFields.map((f) => ({ id: (f as { id?: string }).id || f.name, name: f.name }))
+  const base: ContentPlanningFieldMap = {
     contentName: pickFieldName(contentFields, [/content_name/i, /^name$/i, /title/i], "content_name")!,
     contentDate: pickFieldName(contentFields, [/^date$/i, /publish_date/i], null),
     contentDueDate: pickFieldName(contentFields, [/date_due/i, /due_date/i], null),
@@ -165,6 +174,10 @@ export function resolveContentPlanningFields(
     themeColor: pickFieldName(themeFields, [/theme_colou?r/i, /^colou?r$/i, /accent/i], null),
     themeDivisions: pickFieldName(themeFields, [/lead_divisions/i, /divisions/i], null),
   }
+  if (!contentOverrides || Object.keys(contentOverrides).length === 0) {
+    return base
+  }
+  return applyFieldOverrides(base, contentOverrides, contentFieldsWithId)
 }
 
 export function getQuarterDateRange(year: number, quarter: QuarterNum): { start: Date; end: Date } {

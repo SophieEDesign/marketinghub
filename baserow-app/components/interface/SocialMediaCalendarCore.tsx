@@ -45,6 +45,12 @@ import {
   type SocialMediaCalendarBlockSettings,
   type SocialPlatform,
 } from "@/lib/marketing/social-media-calendar"
+import {
+  isMarketingMockEnabled,
+  marketingDemoState,
+  MARKETING_DEMO_BANNER_DEFAULT,
+} from "@/lib/marketing/block-config-resolver"
+import MarketingDemoDataBanner from "@/components/interface/primitives/MarketingDemoDataBanner"
 import { cn } from "@/lib/utils"
 
 const FILTER_CONTROL = "h-8 text-xs border-border/40"
@@ -94,6 +100,7 @@ function FilterSelect({
 
 export interface SocialMediaCalendarCoreProps {
   settings: SocialMediaCalendarBlockSettings
+  config?: import("@/lib/interface/types").BlockConfig | null
   canEdit?: boolean
   className?: string
 }
@@ -116,6 +123,7 @@ export function SocialMediaCalendarFromConfig({
   return (
     <SocialMediaCalendarCore
       settings={settings}
+      config={config}
       canEdit={canEdit}
       isEditing={isEditing}
       embeddedInBlock={embeddedInBlock}
@@ -126,6 +134,7 @@ export function SocialMediaCalendarFromConfig({
 
 export function SocialMediaCalendarCore({
   settings,
+  config,
   canEdit = false,
   isEditing = false,
   embeddedInBlock = true,
@@ -138,6 +147,8 @@ export function SocialMediaCalendarCore({
   const {
     loading,
     error,
+    fromLiveData,
+    hasTable,
     tableIds,
     fields,
     contentFields,
@@ -145,9 +156,13 @@ export function SocialMediaCalendarCore({
     allItems,
     campaignRows,
     reload,
-  } = useSocialMediaCalendarData()
+  } = useSocialMediaCalendarData({ config })
+
+  const forceMock = isMarketingMockEnabled(config, "social_media_calendar_use_mock")
+  const demoState = marketingDemoState({ forceMock, fromLiveData, hasTable, error })
 
   const isCompact = settings.mode === "compact"
+  const showSearch = config?.social_media_calendar_show_search !== false
 
   const [contentScope, setContentScope] = useState<ContentScopeMode>(settings.contentScope)
   const [year, setYear] = useState(() => new Date().getFullYear())
@@ -263,7 +278,7 @@ export function SocialMediaCalendarCore({
     setSelectedId(id)
   }
 
-  if (loading) {
+  if (loading && !demoState.useLiveData && !forceMock) {
     return (
       <div className={cn("flex items-center justify-center py-16", className)}>
         <LoadingSpinner size="lg" text="Loading social calendar…" />
@@ -271,13 +286,14 @@ export function SocialMediaCalendarCore({
     )
   }
 
-  if (error) {
+  if (demoState.showEmptyState && !demoState.useDemoData) {
     return (
       <div className={cn("flex flex-col items-center gap-4 py-12 text-center", className)}>
-        <DashboardEmpty title="Could not load social calendar" description={error} variant="default" />
-        <Button type="button" variant="outline" size="sm" onClick={() => reload()}>
-          Retry
-        </Button>
+        <DashboardEmpty
+          title="Social calendar not configured"
+          description={demoState.bannerMessage}
+          variant="default"
+        />
       </div>
     )
   }
@@ -296,6 +312,13 @@ export function SocialMediaCalendarCore({
       data-social-media-calendar-core
       data-block-selectable
     >
+      {demoState.showDemoBanner ? (
+        <MarketingDemoDataBanner
+          message={
+            forceMock ? demoState.bannerMessage : MARKETING_DEMO_BANNER_DEFAULT
+          }
+        />
+      ) : null}
       {settings.showPageHeader ? (
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between shrink-0">
           <div className="flex flex-col gap-0.5 min-w-0">

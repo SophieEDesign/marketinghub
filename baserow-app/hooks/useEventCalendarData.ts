@@ -4,6 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { fetchProfileLabelById } from "@/lib/users/profile-labels"
 import {
+  eventCalendarOverridesFromConfig,
+  isMarketingMockEnabled,
+  resolveMarketingTable,
+} from "@/lib/marketing/block-config-resolver"
+import {
   buildEventItems,
   collectEventFilterOptions,
   isEventContentRecord,
@@ -12,7 +17,9 @@ import {
   type EventTableIds,
   type MarketingEventItem,
 } from "@/lib/marketing/events"
+import { findContentTable, findQuarterlyThemesTable } from "@/lib/marketing/marketing-tables"
 import { formatDisplayValue } from "@/lib/marketing/field-utils"
+import type { BlockConfig } from "@/lib/interface/types"
 import type { FieldOptions } from "@/types/fields"
 
 type FieldRow = { name: string; type?: string; options?: FieldOptions }
@@ -28,6 +35,8 @@ function mapFieldRow(row: { name: string; type?: string; options?: unknown }): F
 export interface UseEventCalendarDataResult {
   loading: boolean
   error: string | null
+  fromLiveData: boolean
+  hasTable: boolean
   tableIds: EventTableIds | null
   fields: ContentEventFieldMap | null
   allItems: MarketingEventItem[]
@@ -37,9 +46,15 @@ export interface UseEventCalendarDataResult {
   updateAttendees: (eventId: string, attendeeIds: string[]) => Promise<void>
 }
 
-export function useEventCalendarData(): UseEventCalendarDataResult {
-  const [loading, setLoading] = useState(true)
+export function useEventCalendarData(options?: {
+  config?: BlockConfig
+}): UseEventCalendarDataResult {
+  const config = options?.config
+  const forceMock = isMarketingMockEnabled(config, "event_calendar_use_mock")
+  const [loading, setLoading] = useState(!forceMock)
   const [error, setError] = useState<string | null>(null)
+  const [fromLiveData, setFromLiveData] = useState(false)
+  const [hasTable, setHasTable] = useState(false)
   const [tableIds, setTableIds] = useState<EventTableIds | null>(null)
   const [fields, setFields] = useState<ContentEventFieldMap | null>(null)
   const [allItems, setAllItems] = useState<MarketingEventItem[]>([])
@@ -66,6 +81,15 @@ export function useEventCalendarData(): UseEventCalendarDataResult {
   )
 
   useEffect(() => {
+    if (forceMock) {
+      setLoading(false)
+      setError(null)
+      setFromLiveData(false)
+      setHasTable(false)
+      setAllItems([])
+      return
+    }
+
     let cancelled = false
 
     async function load() {
@@ -87,21 +111,16 @@ export function useEventCalendarData(): UseEventCalendarDataResult {
           throw new Error(tablesErr?.message || "Could not load tables")
         }
 
-        const contentTable = tables.find(
-          (t) =>
-            /^content$/i.test(String(t.name).trim()) ||
-            (/content/i.test(t.name) &&
-              !/calendar/i.test(t.name) &&
-              !/briefing/i.test(t.name))
-        )
+        const registry = tables as import("@/lib/marketing/marketing-tables").MarketingTableRow[]
+        const contentTable = resolveMarketingTable(registry, config?.table_id, findContentTable)
         const locationsTable = tables.find((t) => /location/i.test(t.name))
-        const themesTable = tables.find(
-          (t) => /quarterly/i.test(t.name) && /theme/i.test(t.name)
-        )
+        const themesTable = findQuarterlyThemesTable(registry)
 
         if (!contentTable?.supabase_table) {
-          throw new Error("Content table not found")
+          setHasTable(false)
+          throw new Error("Content table not found — select a source table in block settings")
         }
+        setHasTable(true)
 
         const ids: EventTableIds = {
           contentTableId: contentTable.id,
@@ -130,7 +149,10 @@ export function useEventCalendarData(): UseEventCalendarDataResult {
         const contentFieldRows = (fieldRows || [])
           .filter((f) => f.table_id === contentTable.id)
           .map(mapFieldRow)
-        const resolved = resolveContentEventFields(contentFieldRows)
+        const resolved = resolveContentEventFields(
+          contentFieldRows,
+          eventCalendarOverridesFromConfig(config)
+        )
 
         if (process.env.NODE_ENV === "development" && !resolved.contentType) {
           console.warn(
@@ -195,10 +217,12 @@ export function useEventCalendarData(): UseEventCalendarDataResult {
         setTableIds(ids)
         setFields(resolved)
         setAllItems(items)
+        setFromLiveData(true)
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : "Failed to load events")
           setAllItems([])
+          setFromLiveData(false)
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -209,13 +233,15 @@ export function useEventCalendarData(): UseEventCalendarDataResult {
     return () => {
       cancelled = true
     }
-  }, [reloadToken])
+  }, [reloadToken, config, forceMock])
 
   const filterOptions = useMemo(() => collectEventFilterOptions(allItems), [allItems])
 
   return {
     loading,
     error,
+    fromLiveData,
+    hasTable,
     tableIds,
     fields,
     allItems,

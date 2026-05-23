@@ -15,6 +15,11 @@ import {
   type ContentTimelineView,
 } from "@/lib/marketing/content-timeline"
 import { useContentTimelineData } from "@/hooks/useContentTimelineData"
+import {
+  isMarketingMockEnabled,
+  marketingDemoState,
+  MARKETING_DEMO_BANNER_DEFAULT,
+} from "@/lib/marketing/block-config-resolver"
 import { useRecordModal } from "@/contexts/RecordModalContext"
 import DashboardEmpty from "@/components/interface/primitives/DashboardEmpty"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
@@ -52,9 +57,10 @@ export default function ContentTimelineBlock({
     loading,
     error,
     fromLiveData,
+    hasTable,
     items: liveItems,
     reload,
-  } = useContentTimelineData({ excludeEventTypes: true })
+  } = useContentTimelineData({ config, excludeEventTypes: true })
 
   const title = config?.title || "Content Timeline"
   const subtitle =
@@ -70,20 +76,36 @@ export default function ContentTimelineBlock({
   const configCompact = config?.content_timeline_compact_mode === true
   const preset = config?.content_timeline_preset
   const isMarketingHomePreset = preset === "marketing_home"
-  const forceMock = config?.content_timeline_use_mock === true
+  const forceMock = isMarketingMockEnabled(config, "content_timeline_use_mock")
   const mockItems = getContentTimelineMockItems(preset)
   const showFooterLink = config?.content_timeline_show_footer_link !== false
   const footerLabel =
     config?.content_timeline_footer_link_label || "View full calendar →"
+  const showSearch = config?.content_timeline_show_search !== false
+  const maxItems =
+    typeof config?.content_timeline_max_items === "number"
+      ? config.content_timeline_max_items
+      : undefined
 
-  const useLive = fromLiveData && !forceMock
-  const allItems = useLive ? liveItems : mockItems
-  const isDemoData = !useLive
-  const demoBannerMessage = forceMock
-    ? "Using demo data — demo mode is enabled in block settings."
-    : error
-      ? `Using demo data — ${error}`
-      : "Using demo data — connect your Content table or disable demo mode in block settings."
+  const demoState = marketingDemoState({
+    forceMock,
+    fromLiveData,
+    hasTable,
+    error,
+  })
+  const allItems = demoState.useDemoData
+    ? mockItems
+    : demoState.useLiveData
+      ? maxItems != null
+        ? liveItems.slice(0, maxItems)
+        : liveItems
+      : []
+  const isDemoData = demoState.useDemoData
+  const demoBannerMessage = demoState.showDemoBanner
+    ? forceMock
+      ? demoState.bannerMessage
+      : MARKETING_DEMO_BANNER_DEFAULT
+    : ""
 
   const [view, setView] = useState<ContentTimelineView>(defaultView)
   const [anchorDate, setAnchorDate] = useState(() => new Date())
@@ -97,10 +119,10 @@ export default function ContentTimelineBlock({
   }))
 
   useEffect(() => {
-    if (!isMarketingHomePreset && !useLive) {
+    if (!isMarketingHomePreset && !demoState.useLiveData) {
       setAnchorDate(parseISO("2025-05-21T12:00:00"))
     }
-  }, [isMarketingHomePreset, useLive])
+  }, [isMarketingHomePreset, demoState.useLiveData])
 
   const showAddButton = isEditing || interfaceMode === "edit"
 
@@ -153,10 +175,26 @@ export default function ContentTimelineBlock({
     })
   }
 
-  if (loading && !fromLiveData) {
+  if (loading && !demoState.useLiveData && !forceMock) {
     return (
       <div className="flex h-full min-h-[200px] items-center justify-center rounded-2xl border border-border/40 bg-background">
         <LoadingSpinner size="lg" text="Loading content timeline…" />
+      </div>
+    )
+  }
+
+  if (demoState.showEmptyState && !demoState.useDemoData) {
+    return (
+      <div
+        data-block-selectable
+        className="flex h-full min-h-[200px] flex-col overflow-hidden rounded-2xl border border-border/40 bg-background"
+      >
+        <ContentTimelineHeader title={title} subtitle={subtitle} periodLabel="" view={view} />
+        <DashboardEmpty
+          title="No timeline data"
+          description={demoState.bannerMessage}
+          variant="default"
+        />
       </div>
     )
   }
@@ -173,7 +211,7 @@ export default function ContentTimelineBlock({
         subtitle={subtitle}
         periodLabel={periodLabel}
         view={view}
-        showAddButton={showAddButton && useLive}
+        showAddButton={showAddButton && demoState.useLiveData}
         onViewChange={setView}
         onPrevPeriod={() => setAnchorDate((d) => shiftAnchorDate(view, d, -1))}
         onNextPeriod={() => setAnchorDate((d) => shiftAnchorDate(view, d, 1))}

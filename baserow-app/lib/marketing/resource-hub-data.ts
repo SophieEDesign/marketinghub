@@ -3,6 +3,10 @@
  */
 
 import { format } from "date-fns"
+import {
+  applyFieldOverrides,
+  type FieldOverridePair,
+} from "@/lib/marketing/block-config-resolver"
 import { formatDisplayValue } from "@/lib/marketing/field-utils"
 import type {
   MockResource,
@@ -20,7 +24,8 @@ export interface MediaFieldMap {
 }
 
 export function resolveMediaFields(
-  fields: Array<{ name: string }>
+  fields: Array<{ id?: string; name: string }>,
+  overrides?: Partial<Record<keyof MediaFieldMap, FieldOverridePair>>
 ): MediaFieldMap {
   const pick = (patterns: RegExp[], fallback: string | null = null) => {
     for (const p of patterns) {
@@ -29,14 +34,17 @@ export function resolveMediaFields(
     }
     return fallback
   }
-  return {
-    name: pick([/^name$/i], "name")!,
-    notes: pick([/^notes$/i], null),
-    status: pick([/^status$/i], null),
-    documentLink: pick([/document_link/i, /link/i, /url/i], "document_link"),
-    assignee: pick([/assignee/i, /owned_by/i, /owner/i], null),
+  const base: MediaFieldMap = {
+    name: pick([/^name$/i, /title/i], "name")!,
+    notes: pick([/^notes$/i, /description/i], null),
+    status: pick([/^status$/i, /category/i, /type/i], null),
+    documentLink: pick([/document_link/i, /file_url/i, /link/i, /url/i], "document_link"),
+    assignee: pick([/assignee/i, /owned_by/i, /owner/i, /uploaded_by/i], null),
     updatedAt: pick([/^updated_at$/i], "updated_at"),
   }
+  if (!overrides || Object.keys(overrides).length === 0) return base
+  const fieldIds = fields.map((f) => ({ id: f.id || f.name, name: f.name }))
+  return applyFieldOverrides(base, overrides, fieldIds)
 }
 
 function fileTypeFromUrl(url: string | null): ResourceFileType {

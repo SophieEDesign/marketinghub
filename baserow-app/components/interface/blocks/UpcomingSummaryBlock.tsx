@@ -52,6 +52,7 @@ import {
 } from "@/lib/interface/upcoming-summary-mock-data"
 import UpcomingSummarySectionCard from "./upcoming-summary/UpcomingSummarySectionCard"
 import MarketingDemoDataBanner from "@/components/interface/primitives/MarketingDemoDataBanner"
+import { marketingDemoState } from "@/lib/marketing/block-config-resolver"
 
 interface UpcomingSummaryBlockProps {
   block: PageBlock
@@ -168,11 +169,13 @@ export default function UpcomingSummaryBlock({
 }: UpcomingSummaryBlockProps) {
   const { config } = block
   const { openRecordModal } = useRecordModal()
-  const { loading, error, fromLiveData, data: liveData, reload } = useUpcomingSummaryData()
+  const { loading, error, fromLiveData, hasTable, data: liveData, reload } =
+    useUpcomingSummaryData({ config })
 
   const forceMock = config.upcoming_summary_use_mock === true
-  const useLive = fromLiveData && !forceMock
-  const isDemoData = !useLive
+  const demoState = marketingDemoState({ forceMock, fromLiveData, hasTable, error })
+  const useLive = demoState.useLiveData
+  const isDemoData = demoState.useDemoData
 
   const blockTitle = config.title || "Upcoming Summary"
   const subtitle =

@@ -13,7 +13,9 @@ import {
 } from "@/components/ui/select"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { UpcomingSummarySectionId } from "@/lib/interface/types"
+import type { DataSettingsCtx } from "./blockSettingsRegistry"
 import { ALL_UPCOMING_SUMMARY_SECTIONS } from "@/lib/interface/upcoming-summary-mock-data"
+import TableSelector from "./shared/TableSelector"
 
 const SECTION_LABELS: Record<UpcomingSummarySectionId, string> = {
   deadlines: "Upcoming deadlines",
@@ -24,15 +26,11 @@ const SECTION_LABELS: Record<UpcomingSummarySectionId, string> = {
   published: "Recently published",
 }
 
-interface UpcomingSummaryDataSettingsProps {
-  config: BlockConfig
-  onUpdate: (updates: Partial<BlockConfig>) => void
-}
-
 export default function UpcomingSummaryDataSettings({
   config,
+  tables,
   onUpdate,
-}: UpcomingSummaryDataSettingsProps) {
+}: DataSettingsCtx) {
   const sections =
     config.upcoming_summary_sections?.length
       ? config.upcoming_summary_sections
@@ -53,6 +51,38 @@ export default function UpcomingSummaryDataSettings({
           Tables are discovered by name. Click a row in view mode to open the record.
         </p>
       </div>
+
+      <details className="rounded-lg border border-border/40">
+        <summary className="cursor-pointer px-3 py-2 text-sm font-medium">Data sources</summary>
+        <div className="space-y-3 border-t border-border/40 p-3">
+          <TableSelector
+            label="Content table"
+            value={config.upcoming_summary_content_table_id || config.table_id || ""}
+            onChange={(id) =>
+              onUpdate({
+                upcoming_summary_content_table_id: id || undefined,
+                table_id: id || undefined,
+              })
+            }
+            tables={tables}
+            required={false}
+          />
+          <TableSelector
+            label="Campaigns table"
+            value={config.upcoming_summary_campaigns_table_id || ""}
+            onChange={(id) => onUpdate({ upcoming_summary_campaigns_table_id: id || undefined })}
+            tables={tables}
+            required={false}
+          />
+          <TableSelector
+            label="Events table (optional)"
+            value={config.upcoming_summary_events_table_id || ""}
+            onChange={(id) => onUpdate({ upcoming_summary_events_table_id: id || undefined })}
+            tables={tables}
+            required={false}
+          />
+        </div>
+      </details>
 
       <div className="flex items-center justify-between rounded-md border border-border/40 px-3 py-2">
         <div className="space-y-0.5 pr-3">

@@ -24,6 +24,15 @@ import {
   type ContentThemeItem,
   type ContentThemeStatus,
 } from "@/lib/interface/content-theme-mock-data"
+import { useContentThemeData } from "@/hooks/useContentThemeData"
+import {
+  isMarketingMockEnabled,
+  marketingDemoState,
+  MARKETING_DEMO_BANNER_DEFAULT,
+} from "@/lib/marketing/block-config-resolver"
+import MarketingDemoDataBanner from "@/components/interface/primitives/MarketingDemoDataBanner"
+import DashboardEmpty from "@/components/interface/primitives/DashboardEmpty"
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 
 interface ContentThemeBlockProps {
   block: PageBlock
@@ -120,6 +129,11 @@ function HeaderButton({
 
 export default function ContentThemeBlock({ block, isEditing = false }: ContentThemeBlockProps) {
   const { config } = block
+  const forceMock = isMarketingMockEnabled(config, "content_theme_use_mock")
+  const { loading, error, fromLiveData, hasTable, themes: liveThemes } = useContentThemeData({
+    config,
+  })
+  const demoState = marketingDemoState({ forceMock, fromLiveData, hasTable, error })
 
   const blockTitle = config.title || "Content Themes"
   const subtitle =
@@ -137,12 +151,13 @@ export default function ContentThemeBlock({ block, isEditing = false }: ContentT
 
   const quarterBadge = `${selectedQuarter} ${year}`
 
-  // TODO: Connect themes to Quarterly Themes table
-  // TODO: Connect content ideas to Content table
-  // TODO: Connect campaigns to Campaigns table
-  // TODO: Add Supabase data loading
-  // TODO: Add filtering by year, quarter, division, status and owner
-  const themes = MOCK_CONTENT_THEMES.slice(0, Math.max(1, maxThemes))
+  const themes = (
+    demoState.useDemoData
+      ? MOCK_CONTENT_THEMES
+      : demoState.useLiveData
+        ? liveThemes
+        : []
+  ).slice(0, Math.max(1, maxThemes))
 
   const isCompact = cardDensity === "compact"
   const cardPadding = isCompact ? "p-3" : "p-4"
@@ -159,6 +174,22 @@ export default function ContentThemeBlock({ block, isEditing = false }: ContentT
     return false
   }
 
+  if (loading && !demoState.useLiveData && !forceMock) {
+    return (
+      <div className="flex h-full min-h-[200px] items-center justify-center rounded-xl border border-[#E6E6EF] bg-white">
+        <LoadingSpinner size="lg" text="Loading content themes…" />
+      </div>
+    )
+  }
+
+  if (demoState.showEmptyState && !demoState.useDemoData) {
+    return (
+      <div data-block-selectable className="rounded-xl border border-[#E6E6EF] bg-white p-6">
+        <DashboardEmpty title="No themes" description={demoState.bannerMessage} variant="default" />
+      </div>
+    )
+  }
+
   return (
     <div
       data-block-selectable
@@ -168,6 +199,11 @@ export default function ContentThemeBlock({ block, isEditing = false }: ContentT
       )}
     >
       <div className="flex min-h-full flex-col">
+        {demoState.showDemoBanner ? (
+          <MarketingDemoDataBanner
+            message={forceMock ? demoState.bannerMessage : MARKETING_DEMO_BANNER_DEFAULT}
+          />
+        ) : null}
         {/* Header */}
         <div
           className={cn(

@@ -11,22 +11,104 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import type { BlockConfig } from "@/lib/interface/types"
-
-interface EventCalendarDataSettingsProps {
-  config: BlockConfig
-  onUpdate: (updates: Partial<BlockConfig>) => void
-}
+import type { DataSettingsCtx } from "./blockSettingsRegistry"
+import MarketingDataSourceSection from "./shared/MarketingDataSourceSection"
+import MarketingFieldMappingSection from "./shared/MarketingFieldMappingSection"
+import MarketingFieldSelect from "./shared/MarketingFieldSelect"
 
 export default function EventCalendarDataSettings({
   config,
+  tables,
+  views,
+  fields,
   onUpdate,
-}: EventCalendarDataSettingsProps) {
+  onTableChange,
+}: DataSettingsCtx) {
+  const tableFields = config.table_id
+    ? fields.filter((f) => f.table_id === config.table_id)
+    : fields
+
+  const setField = (idKey: keyof BlockConfig, nameKey: keyof BlockConfig) =>
+    (fieldId: string | undefined, fieldName: string | undefined) => {
+      onUpdate({ [idKey]: fieldId, [nameKey]: fieldName } as Partial<BlockConfig>)
+    }
+
   return (
     <div className="space-y-4">
-      <div className="p-3 bg-muted/30 border border-border/40 rounded-md">
-        <p className="text-sm text-muted-foreground">
-          Events are loaded from the Content table where Content Type is Event.
-        </p>
+      <MarketingDataSourceSection
+        config={config}
+        tables={tables}
+        views={views}
+        onUpdate={onUpdate}
+        onTableChange={onTableChange}
+        mockConfigKey="event_calendar_use_mock"
+      />
+
+      {config.table_id ? (
+        <MarketingFieldMappingSection>
+          <MarketingFieldSelect
+            label="Title"
+            fieldId={config.event_calendar_title_field_id}
+            fieldName={config.event_calendar_title_field}
+            fields={tableFields}
+            onChange={setField("event_calendar_title_field_id", "event_calendar_title_field")}
+          />
+          <MarketingFieldSelect
+            label="Event type"
+            fieldId={config.event_calendar_event_type_field_id}
+            fieldName={config.event_calendar_event_type_field}
+            fields={tableFields}
+            onChange={setField(
+              "event_calendar_event_type_field_id",
+              "event_calendar_event_type_field"
+            )}
+          />
+          <MarketingFieldSelect
+            label="Start date"
+            fieldId={config.event_calendar_start_date_field_id}
+            fieldName={config.event_calendar_start_date_field}
+            fields={tableFields}
+            onChange={setField(
+              "event_calendar_start_date_field_id",
+              "event_calendar_start_date_field"
+            )}
+            fieldTypes={["date"]}
+          />
+          <MarketingFieldSelect
+            label="End date"
+            fieldId={config.event_calendar_end_date_field_id}
+            fieldName={config.event_calendar_end_date_field}
+            fields={tableFields}
+            onChange={setField(
+              "event_calendar_end_date_field_id",
+              "event_calendar_end_date_field"
+            )}
+            fieldTypes={["date"]}
+          />
+          <MarketingFieldSelect
+            label="Status"
+            fieldId={config.event_calendar_status_field_id}
+            fieldName={config.event_calendar_status_field}
+            fields={tableFields}
+            onChange={setField("event_calendar_status_field_id", "event_calendar_status_field")}
+          />
+        </MarketingFieldMappingSection>
+      ) : null}
+
+      <div className="space-y-2">
+        <Label htmlFor="ec-max">Max items</Label>
+        <Input
+          id="ec-max"
+          type="number"
+          min={0}
+          value={config.event_calendar_max_items ?? ""}
+          onChange={(e) =>
+            onUpdate({
+              event_calendar_max_items:
+                e.target.value === "" ? undefined : Math.max(0, parseInt(e.target.value, 10) || 0),
+            })
+          }
+        />
       </div>
 
       <div className="space-y-2">
