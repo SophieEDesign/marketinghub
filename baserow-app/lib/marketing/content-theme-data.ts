@@ -64,7 +64,9 @@ export function buildContentThemeItems(
 ): ContentThemeItem[] {
   return rows.map((row, index) => {
     const title = formatDisplayValue(row[fields.name]) || "Theme"
-    const quarter = formatDisplayValue(row[fields.quarter]) || opts.selectedQuarter
+    const quarter =
+      formatDisplayValue(fields.quarter ? row[fields.quarter] : undefined) ||
+      opts.selectedQuarter
     const status = statusFromQuarter(quarter, opts.selectedQuarter, opts.selectedYear)
     const colorRaw = fields.color ? formatDisplayValue(row[fields.color]) : null
     return {

@@ -189,7 +189,16 @@ export default function ContentTimelineBlock({
         data-block-selectable
         className="flex h-full min-h-[200px] flex-col overflow-hidden rounded-2xl border border-border/40 bg-background"
       >
-        <ContentTimelineHeader title={title} subtitle={subtitle} periodLabel="" view={view} />
+        <ContentTimelineHeader
+          title={title}
+          subtitle={subtitle}
+          periodLabel=""
+          view={view}
+          showAddButton={false}
+          onViewChange={() => {}}
+          onPrevPeriod={() => {}}
+          onNextPeriod={() => {}}
+        />
         <DashboardEmpty
           title="No timeline data"
           description={demoState.bannerMessage}

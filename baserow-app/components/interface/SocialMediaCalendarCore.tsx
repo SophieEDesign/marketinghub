@@ -143,6 +143,7 @@ export function SocialMediaCalendarCore({
   isEditing?: boolean
   embeddedInBlock?: boolean
 }) {
+  const blockConfig = config ?? undefined
   const { openRecordModal } = useRecordModal()
   const {
     loading,
@@ -156,9 +157,9 @@ export function SocialMediaCalendarCore({
     allItems,
     campaignRows,
     reload,
-  } = useSocialMediaCalendarData({ config })
+  } = useSocialMediaCalendarData({ config: blockConfig })
 
-  const forceMock = isMarketingMockEnabled(config, "social_media_calendar_use_mock")
+  const forceMock = isMarketingMockEnabled(blockConfig, "social_media_calendar_use_mock")
   const demoState = marketingDemoState({ forceMock, fromLiveData, hasTable, error })
 
   const isCompact = settings.mode === "compact"

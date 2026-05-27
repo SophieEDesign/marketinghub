@@ -47,7 +47,7 @@ export function fieldNameFromConfig(
   return null
 }
 
-export function applyFieldOverrides<T extends Record<string, string | null>>(
+export function applyFieldOverrides<T extends object>(
   baseMap: T,
   overrides: Partial<Record<keyof T, FieldOverridePair | undefined>>,
   fields: FieldLike[]
@@ -58,7 +58,7 @@ export function applyFieldOverrides<T extends Record<string, string | null>>(
     if (!pair) continue
     const resolved = fieldNameFromConfig(fields, pair.fieldId, pair.fieldName)
     if (resolved) {
-      result[key] = resolved as T[keyof T]
+      ;(result as Record<keyof T, string | null>)[key] = resolved
     }
   }
   return result
