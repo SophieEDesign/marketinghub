@@ -945,7 +945,7 @@ function InterfacePageClientInternal({
       // Convert view_blocks format to PageBlock format
       // CRITICAL: Preserve actual database values - API already maps position_x/position_y/width/height to x/y/w/h
       // Only default if values are explicitly null/undefined (new blocks)
-      const pageBlocks = (data.blocks || []).map((block: any) => {
+      const pageBlocks: PageBlock[] = (data.blocks || []).map((block: any) => {
         // REGRESSION CHECK: Warn if existing block has null layout values
         if (process.env.NODE_ENV === 'development' && block.created_at) {
           const hasNullLayout = 
@@ -1007,14 +1007,14 @@ function InterfacePageClientInternal({
       
       // CRITICAL: Compare blocks before updating to prevent unnecessary re-renders
       // Only update if blocks actually changed (different IDs, positions, or config)
-      const oldBlockIds = blocks.map((b: any) => b.id).sort().join(',')
-      const newBlockIds = pageBlocks.map((b: any) => b.id).sort().join(',')
+      const oldBlockIds = blocks.map((b) => b.id).sort().join(',')
+      const newBlockIds = pageBlocks.map((b) => b.id).sort().join(',')
       const blockIdsChanged = oldBlockIds !== newBlockIds
       
       // Check if block positions or config changed (shallow comparison)
       let blockContentChanged = false
       if (!blockIdsChanged && blocks.length === pageBlocks.length) {
-        const pageBlockById = new Map(pageBlocks.map((block: any) => [block.id, block]))
+        const pageBlockById = new Map<string, PageBlock>(pageBlocks.map((block) => [block.id, block] as const))
         // Same IDs and count - check if positions or config changed
         for (let i = 0; i < blocks.length; i++) {
           const oldBlock = blocks[i]
@@ -1043,8 +1043,8 @@ function InterfacePageClientInternal({
         forceReload,
         oldBlocksCount: blocks.length,
         newBlocksCount: pageBlocks.length,
-        oldBlockIds: blocks.map((b: any) => b.id),
-        newBlockIds: pageBlocks.map((b: any) => b.id),
+        oldBlockIds: blocks.map((b) => b.id),
+        newBlockIds: pageBlocks.map((b) => b.id),
         blockIdsChanged,
         blockContentChanged,
         blocksChanged,
