@@ -187,6 +187,7 @@ export default function InternalResourceHubDataSettings({
         {(
           [
             ["resource_hub_show_search", "Show search", true],
+            ["resource_hub_show_filters", "Show filters", true],
             ["resource_hub_show_recent", "Show recent resources", true],
             ["resource_hub_show_upload", "Show upload area (edit mode)", true],
             ["resource_hub_show_detail_panel", "Show detail panel", true],

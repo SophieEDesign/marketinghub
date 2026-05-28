@@ -183,6 +183,7 @@ export default function SocialMediaCalendarDataSettings({
       </div>
 
       <div className="space-y-3 pt-2 border-t border-border/30">
+        <p className="text-xs font-medium text-muted-foreground">Filters & view controls</p>
         {(
           [
             ["social_media_calendar_show_search", "Search", true],

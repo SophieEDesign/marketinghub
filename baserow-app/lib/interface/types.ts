@@ -411,6 +411,7 @@ export interface BlockConfig {
   resource_hub_subtitle?: string
   resource_hub_default_category?: string
   resource_hub_show_search?: boolean
+  resource_hub_show_filters?: boolean
   resource_hub_show_recent?: boolean
   resource_hub_show_upload?: boolean
   resource_hub_layout_mode?: 'gallery' | 'preview' | 'list'

@@ -45,7 +45,13 @@ export default function MarketingDataSourceSection({
 
       <TableSelector
         value={config.table_id || ""}
-        onChange={onTableChange}
+        onChange={async (tableId) => {
+          await onTableChange(tableId)
+          onUpdate({
+            table_id: tableId || undefined,
+            view_id: undefined,
+          })
+        }}
         tables={tables}
         required={false}
         label={tableLabel}

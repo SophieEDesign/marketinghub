@@ -59,6 +59,7 @@ export default function InternalResourceHubBlock({
     config.resource_hub_subtitle ||
     "Access official logos, brand assets, images and documents for internal use."
   const showSearch = config.resource_hub_show_search !== false
+  const showFilters = config.resource_hub_show_filters !== false
   const showRecent = config.resource_hub_show_recent !== false
   const showUploadArea =
     config.resource_hub_show_upload !== false && isEditing
@@ -206,23 +207,27 @@ export default function InternalResourceHubBlock({
         onFilterClick={() => mockAction("Filter (stub)")}
       />
 
-      <CategoryPills
-        category={category}
-        counts={counts}
-        onCategoryChange={setCategory}
-      />
-
-      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-        <CategorySidebar
-          className="hidden md:flex"
+      {showFilters ? (
+        <CategoryPills
           category={category}
           counts={counts}
-          recent={recent}
-          noticeText={noticeText}
-          showRecent={showRecent}
           onCategoryChange={setCategory}
-          onSelectResource={handleSelect}
         />
+      ) : null}
+
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+        {showFilters ? (
+          <CategorySidebar
+            className="hidden md:flex"
+            category={category}
+            counts={counts}
+            recent={recent}
+            noticeText={noticeText}
+            showRecent={showRecent}
+            onCategoryChange={setCategory}
+            onSelectResource={handleSelect}
+          />
+        ) : null}
 
         <main className="min-h-0 flex-1 overflow-y-auto bg-muted/5">
           {showPreview && selected ? (
@@ -244,19 +249,21 @@ export default function InternalResourceHubBlock({
           )}
         </main>
 
-        <DetailPanel
-          resource={showPreview ? selected : null}
-          isFavourite={selectedId ? favourites.has(selectedId) : false}
-          isEditing={isEditing}
-          onToggleFavourite={toggleFavourite}
-          onDownload={() => {
-            if (selected?.url) window.open(selected.url, "_blank", "noopener,noreferrer")
-            else mockAction(`Download: ${selected?.title}`)
-          }}
-          onViewFull={() => openResourceUrl(selectedId!)}
-          onCopyLink={() => mockAction(`Copy link: ${selected?.title}`)}
-          className={showPreview ? undefined : "hidden md:flex"}
-        />
+        {showDetailPanel ? (
+          <DetailPanel
+            resource={showPreview ? selected : null}
+            isFavourite={selectedId ? favourites.has(selectedId) : false}
+            isEditing={isEditing}
+            onToggleFavourite={toggleFavourite}
+            onDownload={() => {
+              if (selected?.url) window.open(selected.url, "_blank", "noopener,noreferrer")
+              else mockAction(`Download: ${selected?.title}`)
+            }}
+            onViewFull={() => openResourceUrl(selectedId!)}
+            onCopyLink={() => mockAction(`Copy link: ${selected?.title}`)}
+            className={showPreview ? undefined : "hidden md:flex"}
+          />
+        ) : null}
       </div>
     </div>
   )

@@ -743,6 +743,7 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
         'Access official logos, brand assets, images and documents for internal use.',
       resource_hub_default_category: 'all',
       resource_hub_show_search: true,
+      resource_hub_show_filters: true,
       resource_hub_show_recent: true,
       resource_hub_show_upload: true,
       resource_hub_layout_mode: 'gallery',

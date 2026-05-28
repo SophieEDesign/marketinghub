@@ -174,7 +174,7 @@ export default function EventCalendarDataSettings({
       </div>
 
       <div className="space-y-3 pt-2 border-t border-border/40">
-        <p className="text-xs font-medium text-muted-foreground">Display</p>
+        <p className="text-xs font-medium text-muted-foreground">Filters & view controls</p>
         {(
           [
             ["event_calendar_show_toolbar", "Toolbar (views & date navigation)", true],
