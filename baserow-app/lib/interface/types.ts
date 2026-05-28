@@ -35,6 +35,7 @@ export type BlockType =
   | 'things_to_do'
   | 'event_calendar'
   | 'social_media_calendar'
+  | 'campaigns_overview'
 
 export type UpcomingSummarySectionId =
   | 'deadlines'
@@ -549,6 +550,47 @@ export interface BlockConfig {
   social_media_calendar_image_field?: string
   social_media_calendar_post_url_field_id?: string
   social_media_calendar_post_url_field?: string
+  // Campaigns Overview block
+  campaigns_use_mock?: boolean
+  campaigns_max_items?: number
+  campaigns_default_view?: "list" | "kanban" | "calendar" | "timeline"
+  campaigns_show_filters?: boolean
+  campaigns_show_search?: boolean
+  campaigns_show_kpis?: boolean
+  campaigns_show_progress?: boolean
+  campaigns_show_thumbnails?: boolean
+  campaigns_density?: "comfortable" | "compact"
+  campaigns_subtitle?: string
+  title_field_id?: string
+  title_field?: string
+  type_field_id?: string
+  type_field?: string
+  division_field_id?: string
+  division_field?: string
+  status_field_id?: string
+  status_field?: string
+  priority_field_id?: string
+  priority_field?: string
+  stage_field_id?: string
+  stage_field?: string
+  start_date_field_id?: string
+  start_date_field?: string
+  end_date_field_id?: string
+  end_date_field?: string
+  owner_field_id?: string
+  owner_field?: string
+  progress_field_id?: string
+  progress_field?: string
+  image_field_id?: string
+  image_field?: string
+  linked_content_field_id?: string
+  linked_content_field?: string
+  linked_tasks_field_id?: string
+  linked_tasks_field?: string
+  linked_events_field_id?: string
+  linked_events_field?: string
+  click_action?: "open_record" | "none"
+  open_record_mode?: "modal" | "side_panel"
   // List block specific config (at root level for backward compatibility)
   list_title_field?: string
   list_subtitle_fields?: string[]

@@ -132,6 +132,10 @@ const SocialMediaCalendarBlock = dynamic(() => import("./blocks/SocialMediaCalen
     </div>
   ),
 })
+const CampaignsOverviewBlock = dynamic(() => import("./blocks/CampaignsOverviewBlock"), {
+  ssr: false,
+  loading: () => <BlockLoadingPlaceholder />,
+})
 
 // Module-level Set to track warned blocks across all component instances
 const warnedBlocks = new Set<string>()
@@ -699,6 +703,13 @@ export default function BlockRenderer({
               interfaceMode={interfaceMode}
               pageEditable={pageEditable}
             />
+          </LazyBlockWrapper>
+        )
+
+      case "campaigns_overview":
+        return (
+          <LazyBlockWrapper enabled={true}>
+            <CampaignsOverviewBlock block={safeBlock} isEditing={canEdit} />
           </LazyBlockWrapper>
         )
 

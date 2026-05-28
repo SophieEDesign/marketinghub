@@ -177,9 +177,14 @@ export function useEventCalendarData(options?: {
         )
         if (contentErr) throw new Error(contentErr.message)
 
-        const eventRows = (contentRows || []).filter((row) =>
-          isEventContentRecord(row as Record<string, unknown>, resolved.contentType)
-        )
+        const sourceLooksLikeDedicatedEventsTable = /event/i.test(String(contentTable.name || ""))
+        const shouldFilterByContentType =
+          !sourceLooksLikeDedicatedEventsTable && !!resolved.contentType
+        const eventRows = shouldFilterByContentType
+          ? (contentRows || []).filter((row) =>
+              isEventContentRecord(row as Record<string, unknown>, resolved.contentType)
+            )
+          : (contentRows || [])
 
         const locationById = new Map<string, Record<string, unknown>>()
         if (locationsTable?.supabase_table) {

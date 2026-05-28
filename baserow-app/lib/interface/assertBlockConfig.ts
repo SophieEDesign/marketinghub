@@ -223,6 +223,7 @@ export function assertBlockConfig(
     case 'kpi_summary':
     case 'things_to_do':
     case 'social_media_calendar':
+    case 'campaigns_overview':
       // These blocks don't require config
       return { valid: true }
 

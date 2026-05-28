@@ -83,6 +83,7 @@ const MARKETING_TYPES = [
   "social_media_calendar",
   "event_calendar",
   "content_theme",
+  "campaigns_overview",
 ] as const
 
 describe("validateBlockConfig marketing blocks", () => {

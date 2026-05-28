@@ -145,6 +145,7 @@ export type UpcomingSummaryBlockConfig = BaseBlockConfig
 export type EventCalendarBlockConfig = BaseBlockConfig
 
 export type SocialMediaCalendarBlockConfig = BaseBlockConfig
+export type CampaignsOverviewBlockConfig = BaseBlockConfig
 
 // Filter Block Config
 // Note: table_id, target_blocks, allowed_fields, allowed_operators, filters are already in BlockConfig
@@ -203,6 +204,7 @@ export type BlockConfigUnion =
   | (UpcomingSummaryBlockConfig & { _type: 'upcoming_summary' })
   | (EventCalendarBlockConfig & { _type: 'event_calendar' })
   | (SocialMediaCalendarBlockConfig & { _type: 'social_media_calendar' })
+  | (CampaignsOverviewBlockConfig & { _type: 'campaigns_overview' })
   | (FilterBlockConfig & { _type: 'filter' })
   | (RecordContextBlockConfig & { _type: 'record_context' })
   | (FieldSectionBlockConfig & { _type: 'field_section' })
@@ -214,6 +216,7 @@ export const BLOCK_CONFIG_UNION_TYPES = [
   'divider', 'button', 'action', 'link_preview', 'horizontal_grouped', 'field',
   'content_theme', 'content_timeline', 'internal_resource_hub', 'kpi_summary',
   'things_to_do', 'upcoming_summary', 'event_calendar', 'social_media_calendar',
+  'campaigns_overview',
   'filter', 'record_context', 'field_section',
 ] as const
 
@@ -457,6 +460,7 @@ export function validateBlockConfig(
 
     case 'event_calendar':
     case 'social_media_calendar':
+    case 'campaigns_overview':
       // Marketing calendar blocks: optional table_id; no required fields
       break
 

@@ -41,10 +41,11 @@ describe("apply-marketing-hub-workspace.cjs", () => {
     expect(scriptSrc).toContain("Campaign Workspace")
   })
 
-  it("provisions all seven workspace pages", () => {
+  it("provisions all eight workspace pages", () => {
     for (const pageName of [
       "Marketing Home",
       "Theme Workspace",
+      "Campaigns",
       "Content Planning",
       "Things To Do",
       "Resource Hub",
@@ -53,6 +54,11 @@ describe("apply-marketing-hub-workspace.cjs", () => {
     ]) {
       expect(scriptSrc).toContain(`name: "${pageName}"`)
     }
+  })
+
+  it("Campaigns page blocks", () => {
+    const types = blockTypesInBuilder("buildCampaignsBlocks")
+    expect(types).toContain("campaigns_overview")
   })
 
   it("Marketing Home blocks", () => {
@@ -116,6 +122,7 @@ describe("Marketing Hub block registry", () => {
     "social_media_calendar",
     "event_calendar",
     "things_to_do",
+    "campaigns_overview",
     "html",
   ]
 

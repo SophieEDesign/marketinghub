@@ -12,6 +12,7 @@ const MARKETING_CUSTOM_BLOCK_TYPES = [
   "things_to_do",
   "event_calendar",
   "social_media_calendar",
+  "campaigns_overview",
 ] as const
 
 describe("edit mode — marketing block settings registry", () => {

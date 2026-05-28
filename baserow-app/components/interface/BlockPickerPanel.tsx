@@ -72,6 +72,7 @@ export const blockPickerIconMap: Record<BlockType, React.ElementType> = {
   things_to_do: CheckSquare,
   event_calendar: CalendarDays,
   social_media_calendar: Share2,
+  campaigns_overview: LayoutGrid,
 }
 
 interface BlockPickerPanelProps {

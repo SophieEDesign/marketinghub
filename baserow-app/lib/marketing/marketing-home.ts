@@ -14,6 +14,7 @@ const HOME_NAMES = new Set([
 const WORKSPACE_PAGE_NAMES = new Set([
   "marketing home",
   "theme workspace",
+  "campaigns",
   "content planning",
   "things to do",
   "resource hub",

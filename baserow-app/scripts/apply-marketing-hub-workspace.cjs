@@ -162,10 +162,11 @@ async function fetchRequiredMetadata() {
   const anchors = {
     home: firstViewFor(quarterlyThemes.id),
     theme: firstViewFor(quarterlyThemes.id),
+    campaigns: firstViewFor(campaigns.id),
     content: firstViewFor(content.id),
     resources: resources ? firstViewFor(resources.id) || firstViewFor(content.id) : firstViewFor(content.id),
   }
-  if (!anchors.home || !anchors.theme || !anchors.content) {
+  if (!anchors.home || !anchors.theme || !anchors.campaigns || !anchors.content) {
     throw new Error("Missing saved views for required page anchors")
   }
 
@@ -561,6 +562,40 @@ function buildContentPlanningBlocks() {
   ]
 }
 
+function buildCampaignsBlocks() {
+  return [
+    introBlock(
+      "campaigns_intro",
+      "Campaigns",
+      "Plan, manage and track all marketing campaigns.",
+      0
+    ),
+    makeBlock({
+      provisioningKey: "campaigns_overview_main",
+      type: "campaigns_overview",
+      x: 0,
+      y: 2,
+      w: 12,
+      h: 14,
+      config: {
+        title: "Campaigns",
+        campaigns_subtitle: "Plan, manage and track all marketing campaigns.",
+        campaigns_default_view: "list",
+        campaigns_show_search: true,
+        campaigns_show_filters: true,
+        campaigns_show_kpis: true,
+        campaigns_show_progress: true,
+        campaigns_show_thumbnails: true,
+        campaigns_density: "comfortable",
+        campaigns_max_items: 200,
+        click_action: "open_record",
+        open_record_mode: "modal",
+        appearance: { showTitle: true },
+      },
+    }),
+  ]
+}
+
 function buildThingsToDoBlocks() {
   return [
     introBlock(
@@ -899,6 +934,7 @@ async function applyMarketingNavPriority(pageIds) {
   const orderedIds = [
     pageIds.home,
     pageIds.theme,
+    pageIds.campaigns,
     pageIds.content,
     pageIds.thingsToDo,
     pageIds.resourceHub,
@@ -976,15 +1012,23 @@ async function main() {
     name: "Content Planning",
     page_type: "content",
     group_id: publicGroup,
-    order_index: 2,
+    order_index: 3,
     saved_view_id: ctx.anchors.content,
+    config: {},
+  })
+  const campaignsPageId = await upsertPage({
+    name: "Campaigns",
+    page_type: "content",
+    group_id: publicGroup,
+    order_index: 2,
+    saved_view_id: ctx.anchors.campaigns,
     config: {},
   })
   const thingsToDoPageId = await upsertPage({
     name: "Things To Do",
     page_type: "content",
     group_id: publicGroup,
-    order_index: 3,
+    order_index: 4,
     saved_view_id: ctx.anchors.content,
     config: {},
   })
@@ -993,7 +1037,7 @@ async function main() {
     aliases: ["Internal Staff Hub", "Internal Marketing Hub"],
     page_type: "content",
     group_id: publicGroup,
-    order_index: 4,
+    order_index: 5,
     saved_view_id: ctx.anchors.resources,
     config: {},
   })
@@ -1002,7 +1046,7 @@ async function main() {
     aliases: ["Social Media Calendar", "Social Media"],
     page_type: "content",
     group_id: publicGroup,
-    order_index: 5,
+    order_index: 6,
     saved_view_id: ctx.anchors.content,
     config: {},
   })
@@ -1011,13 +1055,14 @@ async function main() {
     aliases: ["Events Calendar", "Marketing Events"],
     page_type: "content",
     group_id: publicGroup,
-    order_index: 6,
+    order_index: 7,
     saved_view_id: ctx.anchors.content,
     config: {},
   })
 
   await syncPageBlocks(homePageId, buildMarketingHomeBlocks())
   await syncPageBlocks(themePageId, buildThemeWorkspaceBlocks())
+  await syncPageBlocks(campaignsPageId, buildCampaignsBlocks())
   await syncPageBlocks(contentPageId, buildContentPlanningBlocks())
   await syncPageBlocks(thingsToDoPageId, buildThingsToDoBlocks())
   await syncPageBlocks(resourceHubPageId, buildResourceHubBlocks())
@@ -1028,6 +1073,7 @@ async function main() {
   await applyMarketingNavPriority({
     home: homePageId,
     theme: themePageId,
+    campaigns: campaignsPageId,
     content: contentPageId,
     thingsToDo: thingsToDoPageId,
     resourceHub: resourceHubPageId,
@@ -1040,6 +1086,7 @@ async function main() {
   console.log("Marketing Hub workspace applied successfully.")
   console.log(`Marketing Home: /pages/${homePageId}`)
   console.log(`Theme Workspace: /pages/${themePageId}`)
+  console.log(`Campaigns: /pages/${campaignsPageId}`)
   console.log(`Content Planning: /pages/${contentPageId}`)
   console.log(`Things To Do: /pages/${thingsToDoPageId}`)
   console.log(`Resource Hub: /pages/${resourceHubPageId}`)
