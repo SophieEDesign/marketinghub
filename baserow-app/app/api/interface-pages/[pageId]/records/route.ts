@@ -41,7 +41,6 @@ export async function POST(
     const tableId =
       page.base_table ||
       pageConfig.table_id ||
-      (pageConfig as { tableId?: string }).tableId ||
       (pageConfig as { primary_table_id?: string }).primary_table_id ||
       null
 

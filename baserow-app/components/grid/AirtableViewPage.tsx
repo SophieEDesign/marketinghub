@@ -141,7 +141,7 @@ export default function AirtableViewPage({
         return
       }
 
-      // Try profiles table first (new system)
+      // Canonical role source: profiles.role
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("role")
@@ -151,24 +151,6 @@ export default function AirtableViewPage({
       if (!profileError && profile?.role) {
         setUserRole(profile.role === "admin" ? "admin" : "editor")
         return
-      }
-
-      // Fallback to user_roles table (legacy support)
-      if (
-        profileError?.code === "PGRST116" ||
-        profileError?.message?.includes("relation") ||
-        profileError?.message?.includes("does not exist")
-      ) {
-        const { data: legacyRole, error: legacyError } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", user.id)
-          .maybeSingle()
-
-        if (!legacyError && legacyRole?.role) {
-          setUserRole(legacyRole.role === "admin" || legacyRole.role === "editor" ? "admin" : "editor")
-          return
-        }
       }
 
       // Default to editor so existing edit flows keep working; server still enforces admin-only deletes.

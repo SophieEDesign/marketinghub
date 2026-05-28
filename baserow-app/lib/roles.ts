@@ -19,7 +19,7 @@ export async function getUserRole(): Promise<UserRole | null> {
   
   if (!user) return null
   
-  // Try profiles table first (new system)
+  // Canonical role source: profiles.role
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('role')
@@ -28,26 +28,6 @@ export async function getUserRole(): Promise<UserRole | null> {
   
   if (!profileError && profile?.role) {
     return profile.role as UserRole
-  }
-  
-  // Fallback to user_roles table (legacy support)
-  // We fall back not only when the profiles table is missing, but also when the row is missing
-  // (maybeSingle can return { data: null, error: null } for "no rows").
-  try {
-    const { data: legacyRole, error: legacyError } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
-      .maybeSingle()
-    
-    if (!legacyError && legacyRole?.role) {
-      // Map legacy roles: admin/editor -> admin, viewer -> member
-      return legacyRole.role === 'admin' || legacyRole.role === 'editor'
-        ? 'admin'
-        : 'member'
-    }
-  } catch {
-    // Ignore missing legacy table / other failures and default safely below
   }
   
   // If no profile exists, default to member for security

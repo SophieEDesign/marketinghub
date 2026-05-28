@@ -5,10 +5,8 @@ import { isAbortError } from '@/lib/api/error-handling'
 export type ClientUserRole = 'admin' | 'member'
 
 /**
- * Client-side role loader.
- * - Prefers `profiles.role` (new system)
- * - Falls back to `user_roles.role` (legacy)
- * - Defaults to 'member' for safety
+ * Client-side role loader from canonical `profiles.role`.
+ * Defaults to 'member' for safety.
  * 
  * Note: Abort errors during rapid navigation/unmount are expected and silently ignored.
  */
@@ -34,7 +32,7 @@ export function useUserRole() {
           return
         }
 
-        // Try profiles table first (new system)
+        // Canonical role source: profiles.role
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('role')
@@ -46,35 +44,6 @@ export function useUserRole() {
         if (!profileError && profile?.role) {
           if (!cancelled) setRole(profile.role === 'admin' ? 'admin' : 'member')
           return
-        }
-
-        // Fallback to user_roles table (legacy support)
-        // Note: `maybeSingle()` can return { data: null, error: null } when no rows match,
-        // so we also fall back when the profile row doesn't exist.
-        try {
-          const { data: legacyRole, error: legacyError } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', user.id)
-            .maybeSingle()
-
-          if (cancelled) return
-
-          if (!legacyError && legacyRole?.role) {
-            // Map legacy roles: admin/editor -> admin, viewer -> member
-            if (!cancelled) {
-              setRole(
-                legacyRole.role === 'admin' || legacyRole.role === 'editor'
-                  ? 'admin'
-                  : 'member'
-              )
-            }
-            return
-          }
-        } catch (e) {
-          // Ignore abort errors (expected during rapid navigation/unmount)
-          if (isAbortError(e)) return
-          // Ignore other errors and default safely below
         }
 
         if (!cancelled) setRole('member')

@@ -78,7 +78,8 @@ export function generateAddColumnSQL(
   }
 
   const pgType = mapFieldTypeToPostgres(fieldType, options)
-  return `ALTER TABLE ${quoteMaybeQualifiedName(tableName)} ADD COLUMN ${quoteIdent(columnName)} ${pgType};`
+  // Idempotent add protects CSV/import retries and partial previous runs.
+  return `ALTER TABLE ${quoteMaybeQualifiedName(tableName)} ADD COLUMN IF NOT EXISTS ${quoteIdent(columnName)} ${pgType};`
 }
 
 /**

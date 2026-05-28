@@ -186,7 +186,7 @@ export default function FieldBlock({
         return
       }
       
-      // Try profiles table first (new system)
+      // Canonical role source: profiles.role
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('role')
@@ -196,21 +196,6 @@ export default function FieldBlock({
       if (!profileError && profile) {
         setUserRole(profile.role as 'admin' | 'member')
         return
-      }
-      
-      // Fallback to user_roles table (legacy support)
-      if (profileError?.code === 'PGRST116' || profileError?.message?.includes('relation') || profileError?.message?.includes('does not exist')) {
-        const { data: legacyRole, error: legacyError } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .maybeSingle()
-        
-        if (!legacyError && legacyRole) {
-          // Map legacy roles: admin/editor -> admin, viewer -> member
-          setUserRole(legacyRole.role === 'admin' || legacyRole.role === 'editor' ? 'admin' : 'member')
-          return
-        }
       }
       
       // Default to member if no profile found

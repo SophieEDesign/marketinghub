@@ -36,7 +36,7 @@ export function normalizeBlockConfig(
   let safeConfig: BlockConfig = {}
   
   if (config && typeof config === 'object' && !Array.isArray(config)) {
-    safeConfig = config as BlockConfig
+    safeConfig = canonicalizeConfigKeys(config as BlockConfig)
   } else if (config) {
     // If config is not a valid object (e.g., array), silently normalize to empty object
     // This can happen with corrupted or malformed data
@@ -67,6 +67,32 @@ export function normalizeBlockConfig(
   }
 
   return safeConfig
+}
+
+function canonicalizeConfigKeys(config: BlockConfig): BlockConfig {
+  const next: Record<string, unknown> = { ...(config as Record<string, unknown>) }
+
+  // Canonical source keys
+  if (next.table_id == null && next.tableId != null) next.table_id = next.tableId
+  if (next.view_id == null && next.viewId != null) next.view_id = next.viewId
+  if (next.table_id == null && next.sourceTableId != null) next.table_id = next.sourceTableId
+  if (next.view_id == null && next.sourceViewId != null) next.view_id = next.sourceViewId
+
+  // Common field key migration pattern: fooFieldId -> foo_field_id
+  for (const key of Object.keys(next)) {
+    if (!key.endsWith('FieldId')) continue
+    const snake = key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase()
+    if (next[snake] == null && next[key] != null) {
+      next[snake] = next[key]
+    }
+  }
+
+  delete next.tableId
+  delete next.viewId
+  delete next.sourceTableId
+  delete next.sourceViewId
+
+  return next as BlockConfig
 }
 
 /**

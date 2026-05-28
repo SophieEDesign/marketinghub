@@ -1,6 +1,19 @@
 import { createClient } from '@/lib/supabase/server'
 import type { TableRow } from '@/types/database'
 
+async function resolveSupabaseTableName(tableId: string): Promise<string> {
+  const supabase = await createClient()
+  const { data: table, error } = await supabase
+    .from('tables')
+    .select('supabase_table')
+    .eq('id', tableId)
+    .maybeSingle()
+  if (error || !table?.supabase_table) {
+    throw new Error(`Table not found for table_id=${tableId}`)
+  }
+  return table.supabase_table
+}
+
 export async function getRows(tableId: string, options?: {
   limit?: number
   offset?: number
@@ -16,10 +29,10 @@ export async function getRows(tableId: string, options?: {
   const sanitizedTableId = tableId.split(':')[0]
 
   const supabase = await createClient()
+  const physicalTable = await resolveSupabaseTableName(sanitizedTableId)
   let query = supabase
-    .from('table_rows')
+    .from(physicalTable)
     .select('*')
-    .eq('table_id', sanitizedTableId)
   
   if (options?.limit) {
     query = query.limit(options.limit)
@@ -32,8 +45,7 @@ export async function getRows(tableId: string, options?: {
   if (options?.sorts && options.sorts.length > 0) {
     // Apply sorting
     for (const sort of options.sorts) {
-      // This is simplified - actual implementation would need field mapping
-      query = query.order('created_at', { ascending: sort.order_direction === 'asc' })
+      query = query.order(sort.field_name || 'created_at', { ascending: sort.order_direction === 'asc' })
     }
   } else {
     query = query.order('created_at', { ascending: false })
@@ -42,20 +54,16 @@ export async function getRows(tableId: string, options?: {
   const { data, error } = await query
   
   if (error) {
-    // Handle case where table_rows doesn't exist
-    if (error.code === 'PGRST205' || error.message?.includes('table_rows')) {
-      console.warn("table_rows table does not exist. Run migration to create it.")
-      return []
-    }
     throw error
   }
   return (data || []) as TableRow[]
 }
 
-export async function getRow(id: string) {
+export async function getRow(tableId: string, id: string) {
   const supabase = await createClient()
+  const physicalTable = await resolveSupabaseTableName(tableId)
   const { data, error } = await supabase
-    .from('table_rows')
+    .from(physicalTable)
     .select('*')
     .eq('id', id)
     .single()
@@ -67,10 +75,11 @@ export async function getRow(id: string) {
 export async function createRow(row: Omit<TableRow, 'id' | 'created_at' | 'updated_at'>) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  const physicalTable = await resolveSupabaseTableName(row.table_id)
   
   const { data, error } = await supabase
-    .from('table_rows')
-    .insert([{ ...row, created_by: user?.id }])
+    .from(physicalTable)
+    .insert([{ ...(row.data || {}), created_by: user?.id }])
     .select()
     .single()
   
@@ -78,13 +87,14 @@ export async function createRow(row: Omit<TableRow, 'id' | 'created_at' | 'updat
   return data as TableRow
 }
 
-export async function updateRow(id: string, updates: Partial<TableRow>) {
+export async function updateRow(tableId: string, id: string, updates: Partial<TableRow>) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  const physicalTable = await resolveSupabaseTableName(tableId)
   
   const { data, error } = await supabase
-    .from('table_rows')
-    .update({ ...updates, updated_by: user?.id })
+    .from(physicalTable)
+    .update({ ...(updates.data || {}), updated_by: user?.id })
     .eq('id', id)
     .select()
     .single()
@@ -93,10 +103,11 @@ export async function updateRow(id: string, updates: Partial<TableRow>) {
   return data as TableRow
 }
 
-export async function deleteRow(id: string) {
+export async function deleteRow(tableId: string, id: string) {
   const supabase = await createClient()
+  const physicalTable = await resolveSupabaseTableName(tableId)
   const { error } = await supabase
-    .from('table_rows')
+    .from(physicalTable)
     .delete()
     .eq('id', id)
   
