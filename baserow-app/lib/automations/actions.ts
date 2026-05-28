@@ -7,12 +7,13 @@ import { Parser } from '@/lib/formulas/parser'
 import { Evaluator } from '@/lib/formulas/evaluator'
 import type { TableField } from '@/types/fields'
 import { getUserFriendlyError } from './error-messages'
+import { Resend } from 'resend'
 
 export interface ActionResult {
   success: boolean
   error?: string
   data?: any
-  logs?: Array<{ level: LogLevel; message: string }>
+  logs?: Array<{ level: LogLevel; message: string; data?: Record<string, any> }>
 }
 
 const ACTION_TIMEOUT = 30000 // 30 seconds
@@ -315,29 +316,174 @@ async function executeSendEmail(
   action: ActionConfig,
   context: AutomationContext
 ): Promise<ActionResult> {
-  // For now, just log - email sending would require an email service
-  const to = replaceVariablesInObject(action.to || '', context)
-  const cc = replaceVariablesInObject(action.cc || '', context)
-  const bcc = replaceVariablesInObject(action.bcc || '', context)
-  const fromName = replaceVariablesInObject(action.from_name || '', context)
-  const replyTo = replaceVariablesInObject(action.reply_to || '', context)
-  const subject = replaceVariablesInObject(action.subject || '', context)
-  const body = replaceVariablesInObject(action.email_body || '', context)
+  const toRaw = replaceVariablesInObject(action.to || '', context)
+  const ccRaw = replaceVariablesInObject(action.cc || '', context)
+  const bccRaw = replaceVariablesInObject(action.bcc || '', context)
+  const fromNameRaw = replaceVariablesInObject(action.from_name || '', context)
+  const replyToRaw = replaceVariablesInObject(action.reply_to || '', context)
+  const subjectRaw = replaceVariablesInObject(action.subject || '', context)
+  const bodyRaw = replaceVariablesInObject(action.email_body || '', context)
 
-  const emailDetails: Record<string, any> = { to, subject, body }
-  if (cc) emailDetails.cc = cc
-  if (bcc) emailDetails.bcc = bcc
-  if (fromName) emailDetails.from_name = fromName
-  if (replyTo) emailDetails.reply_to = replyTo
+  const to = parseEmailList(toRaw)
+  const cc = parseEmailList(ccRaw)
+  const bcc = parseEmailList(bccRaw)
+  const fromName = String(fromNameRaw || '').trim()
+  const replyTo = parseEmailList(replyToRaw)
+  const subject = String(subjectRaw || '').trim()
+  const body = String(bodyRaw || '')
 
-  return {
-    success: true,
-    data: emailDetails,
-    logs: [{
-      level: 'info',
-      message: `Email would be sent to ${to}: ${subject}`,
-    }],
+  if (to.length === 0) {
+    return {
+      success: false,
+      error: 'Email action requires at least one valid "to" address',
+      logs: [
+        {
+          level: 'error',
+          message: 'Email action validation failed: no valid recipients',
+        },
+      ],
+    }
   }
+
+  if (!subject) {
+    return {
+      success: false,
+      error: 'Email action requires a subject',
+      logs: [
+        {
+          level: 'error',
+          message: 'Email action validation failed: subject is required',
+        },
+      ],
+    }
+  }
+
+  const apiKey = process.env.RESEND_API_KEY?.trim()
+  if (!apiKey) {
+    return {
+      success: false,
+      error: 'Email provider is not configured (RESEND_API_KEY missing)',
+      logs: [
+        {
+          level: 'error',
+          message: 'Email provider not configured: RESEND_API_KEY is missing',
+        },
+      ],
+    }
+  }
+
+  const fromEmail = (process.env.RESEND_FROM_EMAIL || 'marketing@petersandmay.com').trim()
+  const from = fromName ? `${fromName} <${fromEmail}>` : fromEmail
+
+  const emailDetails: Record<string, any> = {
+    to,
+    subject,
+    from,
+    has_html: true,
+  }
+  if (cc.length > 0) emailDetails.cc = cc
+  if (bcc.length > 0) emailDetails.bcc = bcc
+  if (replyTo.length > 0) emailDetails.reply_to = replyTo
+
+  try {
+    const resend = new Resend(apiKey)
+    const { data, error } = await resend.emails.send({
+      from,
+      to,
+      cc: cc.length > 0 ? cc : undefined,
+      bcc: bcc.length > 0 ? bcc : undefined,
+      replyTo: replyTo.length > 0 ? replyTo : undefined,
+      subject,
+      html: bodyToHtml(body),
+    })
+
+    if (error) {
+      return {
+        success: false,
+        error: `Email provider rejected request: ${error.message}`,
+        data: {
+          ...emailDetails,
+          provider: 'resend',
+          provider_error: error.message,
+        },
+        logs: [
+          {
+            level: 'error',
+            message: 'Email send failed at provider',
+            data: {
+              provider: 'resend',
+              ...emailDetails,
+              provider_error: error.message,
+            },
+          },
+        ],
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        ...emailDetails,
+        provider: 'resend',
+        provider_message_id: data?.id,
+      },
+      logs: [
+        {
+          level: 'info',
+          message: `Email sent to ${to.join(', ')}: ${subject}`,
+          data: {
+            provider: 'resend',
+            ...emailDetails,
+            provider_message_id: data?.id,
+          },
+        },
+      ],
+    }
+  } catch (error: any) {
+    const errorMessage = error?.message || 'Unknown provider error'
+    return {
+      success: false,
+      error: `Email send failed: ${errorMessage}`,
+      data: {
+        ...emailDetails,
+        provider: 'resend',
+      },
+      logs: [
+        {
+          level: 'error',
+          message: 'Email send failed with exception',
+          data: {
+            provider: 'resend',
+            ...emailDetails,
+            provider_error: errorMessage,
+          },
+        },
+      ],
+    }
+  }
+}
+
+function parseEmailList(input: unknown): string[] {
+  const normalized = String(input || '').trim()
+  if (!normalized) return []
+
+  return normalized
+    .split(/[;,]/)
+    .map((email) => email.trim())
+    .filter(Boolean)
+}
+
+function bodyToHtml(body: string): string {
+  const escaped = escapeHtml(body)
+  return `<div style="font-family: system-ui, -apple-system, sans-serif; line-height: 1.5; white-space: pre-wrap;">${escaped}</div>`
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
 
 async function executeCallWebhook(

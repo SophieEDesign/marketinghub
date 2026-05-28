@@ -60,6 +60,7 @@ export async function executeAutomation(
   const runId = run.id
 
   try {
+    let hadActionFailures = false
     // Evaluate trigger
     const triggerResult = await evaluateTrigger(
       automation.trigger_type as TriggerType,
@@ -237,7 +238,7 @@ export async function executeAutomation(
                 // Add action logs
                 if (actionResult.logs) {
                   for (const log of actionResult.logs) {
-                    await logMessage(supabase, automation.id, runId, log.level, log.message)
+                    await logMessage(supabase, automation.id, runId, log.level, log.message, (log as any).data)
                     logs.push({
                       id: '',
                       automation_id: automation.id,
@@ -255,6 +256,7 @@ export async function executeAutomation(
             } catch (actionError: any) {
               const errorMessage = actionError.message || 'Unknown error executing action'
               await logMessage(supabase, automation.id, runId, 'error', `Action failed: ${errorMessage}`)
+              hadActionFailures = true
               logs.push({
                 id: '',
                 automation_id: automation.id,
@@ -297,13 +299,14 @@ export async function executeAutomation(
       // Log action result
       if (result.logs) {
         for (const log of result.logs) {
-          await logMessage(supabase, automation.id, runId, log.level, log.message)
+          await logMessage(supabase, automation.id, runId, log.level, log.message, (log as any).data)
           logs.push({
             id: '',
             automation_id: automation.id,
             run_id: runId,
             level: log.level,
             message: log.message,
+            data: (log as any).data,
             created_at: new Date().toISOString(),
           })
         }
@@ -311,6 +314,7 @@ export async function executeAutomation(
 
       if (!result.success) {
         await logMessage(supabase, automation.id, runId, 'error', `Action failed: ${result.error}`)
+        hadActionFailures = true
         logs.push({
           id: '',
           automation_id: automation.id,
@@ -360,18 +364,23 @@ export async function executeAutomation(
     }
     }
 
-    // Mark run as completed
+    const finalStatus = hadActionFailures ? 'failed' : 'completed'
+    const finalError = hadActionFailures ? 'One or more automation actions failed' : null
+
+    // Mark run as completed or failed based on action outcomes
     await supabase
       .from('automation_runs')
       .update({
-        status: 'completed',
+        status: finalStatus,
         completed_at: new Date().toISOString(),
+        error: finalError,
       })
       .eq('id', runId)
 
     return {
-      success: true,
+      success: !hadActionFailures,
       runId,
+      error: hadActionFailures ? finalError || undefined : undefined,
       logs,
     }
   } catch (error: any) {
@@ -416,7 +425,8 @@ async function logMessage(
   automationId: string,
   runId: string | undefined,
   level: 'info' | 'warning' | 'error',
-  message: string
+  message: string,
+  data?: Record<string, any>
 ) {
   try {
     await supabase
@@ -427,6 +437,7 @@ async function logMessage(
           run_id: runId,
           level,
           message,
+          data,
         },
       ])
   } catch (error) {
