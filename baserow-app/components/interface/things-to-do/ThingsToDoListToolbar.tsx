@@ -27,6 +27,7 @@ const STATUS_CHIPS = [
   { value: "all", label: "All" },
   { value: "to-do", label: "To do" },
   { value: "in-progress", label: "In progress" },
+  { value: "scheduled", label: "Scheduled" },
 ]
 
 export function ThingsToDoListToolbar({

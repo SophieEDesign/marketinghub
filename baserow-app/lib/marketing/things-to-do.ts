@@ -47,6 +47,7 @@ export type ThingsToDoItemType =
 export type ThingsToDoStatus =
   | "to-do"
   | "in-progress"
+  | "scheduled"
   | "waiting"
   | "needs-review"
   | "changes-requested"
@@ -161,6 +162,7 @@ export const THINGS_TO_DO_TYPES: { value: ThingsToDoItemType; label: string }[] 
 export const THINGS_TO_DO_STATUSES: { value: ThingsToDoStatus; label: string }[] = [
   { value: "to-do", label: "To do" },
   { value: "in-progress", label: "In progress" },
+  { value: "scheduled", label: "Scheduled" },
   { value: "waiting", label: "Waiting" },
   { value: "needs-review", label: "Needs review" },
   { value: "changes-requested", label: "Changes requested" },
@@ -214,6 +216,7 @@ const TYPE_CLASSES: Record<ThingsToDoItemType, { bg: string; text: string }> = {
 const STATUS_CLASSES: Record<ThingsToDoStatus, { bg: string; text: string }> = {
   "to-do": { bg: "bg-blue-100", text: "text-blue-800" },
   "in-progress": { bg: "bg-sky-100", text: "text-sky-800" },
+  scheduled: { bg: "bg-indigo-100", text: "text-indigo-800" },
   waiting: { bg: "bg-purple-100", text: "text-purple-800" },
   "needs-review": { bg: "bg-violet-100", text: "text-violet-800" },
   "changes-requested": { bg: "bg-orange-100", text: "text-orange-800" },
@@ -267,10 +270,11 @@ const STATUS_ORDER: Record<ThingsToDoStatus, number> = {
   "changes-requested": 0,
   "needs-review": 1,
   "in-progress": 2,
-  "to-do": 3,
-  waiting: 4,
-  approved: 5,
-  done: 6,
+  scheduled: 3,
+  "to-do": 4,
+  waiting: 5,
+  approved: 6,
+  done: 7,
 }
 
 const OWNER_SOPHIE: ThingsToDoPerson = { id: "u1", name: "Sophie B.", initials: "SB" }
@@ -448,6 +452,7 @@ export function filterThingsToDoItems(
     if (statusChip && statusChip !== "all") {
       if (statusChip === "to-do" && item.status !== "to-do") return false
       if (statusChip === "in-progress" && item.status !== "in-progress") return false
+      if (statusChip === "scheduled" && item.status !== "scheduled") return false
     }
 
     if (q) {

@@ -37,6 +37,7 @@ function mapStatus(status: string | null): ThingsToDoStatus {
   if (!status) return "to-do"
   const s = status.trim().toLowerCase()
   if (/done|complete|published/i.test(s)) return "done"
+  if (/schedul|planned|queued|ready/i.test(s)) return "scheduled"
   if (/approv/i.test(s)) return "approved"
   if (/changes/i.test(s)) return "changes-requested"
   if (/review|awaiting/i.test(s)) return "needs-review"

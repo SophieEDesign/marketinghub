@@ -26,31 +26,31 @@ export function SocialCalendarEventCard({
 
   return (
     <div
-      className="fc-social-event flex gap-1.5 min-w-0 w-full overflow-hidden rounded-md border border-border/20 bg-card/95 shadow-sm"
-      style={{ borderLeftWidth: 3, borderLeftColor: accent }}
+      className="fc-social-event flex gap-2 min-w-0 w-full overflow-hidden rounded-xl border border-border/40 bg-card shadow-sm"
+      style={{ borderLeftWidth: 4, borderLeftColor: accent }}
     >
-      <div className="relative w-10 shrink-0 bg-muted/30 flex items-center justify-center min-h-[52px]">
+      <div className="relative w-14 shrink-0 bg-muted/30 flex items-center justify-center min-h-[68px]">
         {thumbnailUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={thumbnailUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
         ) : (
-          <ImageIcon className="h-3.5 w-3.5 text-muted-foreground/45" aria-hidden />
+          <ImageIcon className="h-4 w-4 text-muted-foreground/45" aria-hidden />
         )}
       </div>
-      <div className="flex flex-col gap-0.5 py-1 pr-1 min-w-0 flex-1">
-        <div className="flex items-center justify-between gap-0.5">
+      <div className="flex flex-col gap-1 py-1.5 pr-1.5 min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-1">
           {showPlatformIcons ? (
             <PlatformIconRow platforms={platforms} max={3} size="sm" />
           ) : (
             <span />
           )}
           {scheduledTime ? (
-            <span className="text-[9px] text-muted-foreground tabular-nums shrink-0">
+            <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
               {scheduledTime}
             </span>
           ) : null}
         </div>
-        <p className="text-[10px] font-medium leading-tight line-clamp-2 text-foreground">
+        <p className="text-xs font-medium leading-snug line-clamp-3 text-foreground">
           {captionSnippet}
         </p>
         {showApprovalStatus ? (

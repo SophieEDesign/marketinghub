@@ -81,6 +81,76 @@ export default function SocialMediaCalendarDataSettings({
               "social_media_calendar_status_field"
             )}
           />
+          <MarketingFieldSelect
+            label="Caption"
+            fieldId={config.social_media_calendar_caption_field_id}
+            fieldName={config.social_media_calendar_caption_field}
+            fields={tableFields}
+            onChange={setField(
+              "social_media_calendar_caption_field_id",
+              "social_media_calendar_caption_field"
+            )}
+          />
+          <MarketingFieldSelect
+            label="Platform"
+            fieldId={config.social_media_calendar_platform_field_id}
+            fieldName={config.social_media_calendar_platform_field}
+            fields={tableFields}
+            onChange={setField(
+              "social_media_calendar_platform_field_id",
+              "social_media_calendar_platform_field"
+            )}
+          />
+          <MarketingFieldSelect
+            label="Owner"
+            fieldId={config.social_media_calendar_owner_field_id}
+            fieldName={config.social_media_calendar_owner_field}
+            fields={tableFields}
+            onChange={setField(
+              "social_media_calendar_owner_field_id",
+              "social_media_calendar_owner_field"
+            )}
+          />
+          <MarketingFieldSelect
+            label="Campaign"
+            fieldId={config.social_media_calendar_campaign_field_id}
+            fieldName={config.social_media_calendar_campaign_field}
+            fields={tableFields}
+            onChange={setField(
+              "social_media_calendar_campaign_field_id",
+              "social_media_calendar_campaign_field"
+            )}
+          />
+          <MarketingFieldSelect
+            label="Theme"
+            fieldId={config.social_media_calendar_theme_field_id}
+            fieldName={config.social_media_calendar_theme_field}
+            fields={tableFields}
+            onChange={setField(
+              "social_media_calendar_theme_field_id",
+              "social_media_calendar_theme_field"
+            )}
+          />
+          <MarketingFieldSelect
+            label="Image / media"
+            fieldId={config.social_media_calendar_image_field_id}
+            fieldName={config.social_media_calendar_image_field}
+            fields={tableFields}
+            onChange={setField(
+              "social_media_calendar_image_field_id",
+              "social_media_calendar_image_field"
+            )}
+          />
+          <MarketingFieldSelect
+            label="Post URL"
+            fieldId={config.social_media_calendar_post_url_field_id}
+            fieldName={config.social_media_calendar_post_url_field}
+            fields={tableFields}
+            onChange={setField(
+              "social_media_calendar_post_url_field_id",
+              "social_media_calendar_post_url_field"
+            )}
+          />
         </MarketingFieldMappingSection>
       ) : null}
 

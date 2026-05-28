@@ -111,7 +111,7 @@ export default function SocialMediaCalendarView({
         aspectRatio={compact ? 0.9 : viewMode === "week" ? 1.05 : 1.2}
         eventClick={handleEventClick}
         eventContent={eventContent}
-        dayMaxEvents={viewMode === "month" ? (compact ? 2 : 4) : compact ? 4 : 8}
+        dayMaxEvents={viewMode === "month" ? (compact ? 1 : 2) : compact ? 3 : 5}
         moreLinkClick="popover"
         fixedWeekCount={viewMode === "month"}
       />
