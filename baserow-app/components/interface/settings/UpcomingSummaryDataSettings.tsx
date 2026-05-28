@@ -48,7 +48,7 @@ export default function UpcomingSummaryDataSettings({
       <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
         <p className="text-sm text-blue-800">
           Loads from Content (deadlines, approvals, blockers, published, events) and Campaigns.
-          Tables are discovered by name. Click a row in view mode to open the record.
+          Configure source tables directly or let the block discover by table name. Click a row in view mode to open the record.
         </p>
       </div>
 
@@ -71,13 +71,6 @@ export default function UpcomingSummaryDataSettings({
             label="Campaigns table"
             value={config.upcoming_summary_campaigns_table_id || ""}
             onChange={(id) => onUpdate({ upcoming_summary_campaigns_table_id: id || undefined })}
-            tables={tables}
-            required={false}
-          />
-          <TableSelector
-            label="Events table (optional)"
-            value={config.upcoming_summary_events_table_id || ""}
-            onChange={(id) => onUpdate({ upcoming_summary_events_table_id: id || undefined })}
             tables={tables}
             required={false}
           />

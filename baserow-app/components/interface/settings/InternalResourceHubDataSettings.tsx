@@ -45,6 +45,7 @@ export default function InternalResourceHubDataSettings({
         onTableChange={onTableChange}
         mockConfigKey="resource_hub_use_mock"
         legacyMockKey="resource_hub_use_dashboard_mock"
+        showView={false}
       />
 
       {config.table_id ? (

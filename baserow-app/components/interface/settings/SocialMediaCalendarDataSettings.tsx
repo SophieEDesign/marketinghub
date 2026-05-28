@@ -42,6 +42,7 @@ export default function SocialMediaCalendarDataSettings({
         onUpdate={onUpdate}
         onTableChange={onTableChange}
         mockConfigKey="social_media_calendar_use_mock"
+        showView={false}
       />
 
       {config.table_id ? (

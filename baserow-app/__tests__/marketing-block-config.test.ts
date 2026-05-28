@@ -27,7 +27,7 @@ describe("fieldNameFromConfig", () => {
     expect(fieldNameFromConfig(FIELDS, undefined, "content_name")).toBe("content_name")
   })
 
-  it("returns null when neither resolves", () => {
+  it("falls back to stored name even when field id is missing", () => {
     expect(fieldNameFromConfig(FIELDS, "missing", "also_missing")).toBe("also_missing")
   })
 })

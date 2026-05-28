@@ -42,6 +42,7 @@ export default function ThingsToDoDataSettings({
         onUpdate={onUpdate}
         onTableChange={onTableChange}
         mockConfigKey="things_to_do_use_mock"
+        showView={false}
       />
 
       {config.table_id ? (

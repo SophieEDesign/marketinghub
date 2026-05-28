@@ -15,6 +15,7 @@ import {
 import { pickFieldName, formatDisplayValue } from "@/lib/marketing/field-utils"
 import { normalizeHexColor } from "@/lib/field-colors"
 import type { BlockConfig } from "@/lib/interface/types"
+import { plainTextFromHtml } from "@/lib/sanitize"
 import type { FieldOptions } from "@/types/fields"
 import { format } from "date-fns"
 
@@ -409,6 +410,32 @@ function snippet(text: string, max = 80): string {
   return `${t.slice(0, max - 1)}…`
 }
 
+function decodeCommonHtmlEntities(text: string): string {
+  return text
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+}
+
+function normalizeCaptionText(raw: string): string {
+  const trimmed = raw.trim()
+  if (!trimmed) return ""
+
+  // Some sources store escaped HTML (e.g. &lt;p&gt;...&lt;/p&gt;), others store real tags.
+  const decoded = decodeCommonHtmlEntities(trimmed)
+  const stripped = plainTextFromHtml(decoded)
+
+  // Fallback cleanup for malformed fragments that can survive sanitization.
+  return stripped
+    .replace(/<\/?p>/gi, " ")
+    .replace(/<\/?br\s*\/?>/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
 export function buildSocialCalendarItems(params: {
   baseItems: ContentPlanningItem[]
   contentRows: Record<string, unknown>[]
@@ -421,7 +448,7 @@ export function buildSocialCalendarItems(params: {
   return baseItems.map((item) => {
     const row = rowById.get(item.id) ?? {}
     const captionRaw = fields.caption ? formatDisplayValue(row[fields.caption]) : null
-    const caption = captionRaw?.trim() || null
+    const caption = captionRaw ? normalizeCaptionText(captionRaw) || null : null
     const captionSnippet = snippet(caption || item.title, 72)
     const channels = fields.channels ? row[fields.channels] : null
     const platforms = derivePlatforms({

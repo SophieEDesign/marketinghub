@@ -12,8 +12,18 @@ import {
   layoutItemToDbUpdate, 
   dbBlockToPageBlock 
 } from '@/lib/interface/layout-mapping'
+import { BLOCK_REGISTRY } from '@/lib/interface/registry'
+import { BLOCK_CONFIG_UNION_TYPES } from '@/lib/interface/block-config-types'
 
 describe('Interface Invariants - Pre-Deploy Safety Checks', () => {
+  describe('0. Block Contract Parity', () => {
+    it('keeps block config union types aligned with canonical registry types', () => {
+      const registryTypes = Object.keys(BLOCK_REGISTRY).sort()
+      const unionTypes = [...BLOCK_CONFIG_UNION_TYPES].sort()
+      expect(unionTypes).toEqual(registryTypes)
+    })
+  })
+
   describe('1. Single Source of Truth - Layout Persistence', () => {
     it('should map layout round-trip correctly (save → DB → load)', () => {
       // Simulate: User drags block to x=2, y=4, w=6, h=8

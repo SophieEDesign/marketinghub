@@ -529,8 +529,8 @@ function InterfacePageClientInternal({
     // Initial check
     checkViewUpdates()
     
-    // Set up interval to check every 5 seconds (less frequent to reduce load)
-    viewCheckIntervalRef.current = setInterval(checkViewUpdates, 5000)
+    // Set up interval to check every 15 seconds to reduce background load.
+    viewCheckIntervalRef.current = setInterval(checkViewUpdates, 15000)
     
     // Also check when page becomes visible (user switches back to tab)
     // CRITICAL: Guard document access to prevent hydration issues
@@ -937,7 +937,6 @@ function InterfacePageClientInternal({
         apiResponseRaw: data,
         apiResponseBlocksCount: data.blocks?.length || 0,
         apiResponseBlockIds: data.blocks?.map((b: any) => b.id) || [],
-        apiResponseBlocks: data.blocks, // Full blocks array for inspection
         forceReload,
         currentBlocksCount: blocks.length,
         currentBlockIds: blocks.map(b => b.id),
@@ -1015,10 +1014,11 @@ function InterfacePageClientInternal({
       // Check if block positions or config changed (shallow comparison)
       let blockContentChanged = false
       if (!blockIdsChanged && blocks.length === pageBlocks.length) {
+        const pageBlockById = new Map(pageBlocks.map((block: any) => [block.id, block]))
         // Same IDs and count - check if positions or config changed
         for (let i = 0; i < blocks.length; i++) {
           const oldBlock = blocks[i]
-          const newBlock = pageBlocks.find((b: any) => b.id === oldBlock.id)
+          const newBlock = pageBlockById.get(oldBlock.id)
           if (!newBlock) {
             blockContentChanged = true
             break

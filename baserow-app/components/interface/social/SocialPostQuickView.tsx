@@ -180,7 +180,7 @@ export function SocialPostQuickViewMobileBackdrop({
   if (!open) return null
   return (
     <div
-      className="fixed inset-0 md:left-64 bg-black/20 z-30 xl:hidden"
+      className="fixed inset-0 md:left-sidebar bg-black/20 z-30 xl:hidden"
       onClick={onClose}
       aria-hidden
     />

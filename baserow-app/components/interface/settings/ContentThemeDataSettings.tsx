@@ -42,6 +42,7 @@ export default function ContentThemeDataSettings({
         onUpdate={onUpdate}
         onTableChange={onTableChange}
         mockConfigKey="content_theme_use_mock"
+        showView={false}
         tableLabel="Quarterly Themes table"
       />
 

@@ -443,9 +443,6 @@ export interface BlockConfig {
   // Upcoming Summary block
   upcoming_summary_content_table_id?: string
   upcoming_summary_campaigns_table_id?: string
-  upcoming_summary_events_table_id?: string
-  upcoming_summary_tasks_table_id?: string
-  upcoming_summary_media_table_id?: string
   upcoming_summary_empty_deadlines_title?: string
   upcoming_summary_empty_campaigns_title?: string
   upcoming_summary_empty_events_title?: string

@@ -75,6 +75,32 @@ export interface GalleryBlockConfig extends GridBlockConfig {
   view_type?: 'gallery'
 }
 
+// Calendar/Kanban/Timeline/List block configs share grid-like source requirements.
+export interface CalendarBlockConfig extends GridBlockConfig {
+  view_type?: 'calendar'
+}
+
+export interface KanbanBlockConfig extends GridBlockConfig {
+  view_type?: 'kanban'
+}
+
+export interface TimelineBlockConfig extends GridBlockConfig {
+  view_type?: 'timeline'
+}
+
+export interface ListBlockConfig extends GridBlockConfig {
+  view_type?: 'list'
+}
+
+export interface MultiCalendarBlockConfig extends BaseBlockConfig {}
+
+export interface MultiTimelineBlockConfig extends BaseBlockConfig {}
+
+export interface NumberBlockConfig extends BaseBlockConfig {
+  table_id: string
+  field_id: string
+}
+
 // Divider Block Config
 // Note: divider appearance settings are already in BlockConfig.appearance
 export type DividerBlockConfig = BaseBlockConfig
@@ -116,9 +142,19 @@ export type ThingsToDoBlockConfig = BaseBlockConfig
 // Upcoming Summary Block Config (live Content / Campaigns / Events; optional demo mode)
 export type UpcomingSummaryBlockConfig = BaseBlockConfig
 
+export type EventCalendarBlockConfig = BaseBlockConfig
+
+export type SocialMediaCalendarBlockConfig = BaseBlockConfig
+
 // Filter Block Config
 // Note: table_id, target_blocks, allowed_fields, allowed_operators, filters are already in BlockConfig
 export type FilterBlockConfig = BaseBlockConfig
+
+export interface FieldBlockConfig extends BaseBlockConfig {
+  field_id: string
+}
+
+export type HorizontalGroupedBlockConfig = BaseBlockConfig
 
 // Record Context Block Config (context setter only; no record_id in config)
 export interface RecordContextBlockConfig extends BaseBlockConfig {
@@ -148,16 +184,27 @@ export type BlockConfigUnion =
   | (HtmlBlockConfig & { _type: 'html' })
   | (ImageBlockConfig & { _type: 'image' })
   | (GalleryBlockConfig & { _type: 'gallery' })
+  | (CalendarBlockConfig & { _type: 'calendar' })
+  | (KanbanBlockConfig & { _type: 'kanban' })
+  | (TimelineBlockConfig & { _type: 'timeline' })
+  | (ListBlockConfig & { _type: 'list' })
+  | (MultiCalendarBlockConfig & { _type: 'multi_calendar' })
+  | (MultiTimelineBlockConfig & { _type: 'multi_timeline' })
+  | (NumberBlockConfig & { _type: 'number' })
   | (DividerBlockConfig & { _type: 'divider' })
   | (ButtonBlockConfig & { _type: 'button' })
   | (ActionBlockConfig & { _type: 'action' })
   | (LinkPreviewBlockConfig & { _type: 'link_preview' })
+  | (HorizontalGroupedBlockConfig & { _type: 'horizontal_grouped' })
+  | (FieldBlockConfig & { _type: 'field' })
   | (ContentThemeBlockConfig & { _type: 'content_theme' })
   | (ContentTimelineBlockConfig & { _type: 'content_timeline' })
   | (InternalResourceHubBlockConfig & { _type: 'internal_resource_hub' })
   | (KpiSummaryBlockConfig & { _type: 'kpi_summary' })
   | (ThingsToDoBlockConfig & { _type: 'things_to_do' })
   | (UpcomingSummaryBlockConfig & { _type: 'upcoming_summary' })
+  | (EventCalendarBlockConfig & { _type: 'event_calendar' })
+  | (SocialMediaCalendarBlockConfig & { _type: 'social_media_calendar' })
   | (FilterBlockConfig & { _type: 'filter' })
   | (RecordContextBlockConfig & { _type: 'record_context' })
   | (FieldSectionBlockConfig & { _type: 'field_section' })
@@ -165,7 +212,11 @@ export type BlockConfigUnion =
 /** Block types that have typed config in BlockConfigUnion (for drift detection). */
 export const BLOCK_CONFIG_UNION_TYPES = [
   'grid', 'form', 'record', 'chart', 'kpi', 'text', 'html', 'image', 'gallery',
-  'divider', 'button', 'action', 'link_preview', 'content_theme', 'content_timeline', 'internal_resource_hub', 'kpi_summary', 'things_to_do', 'upcoming_summary', 'filter', 'record_context', 'field_section',
+  'calendar', 'kanban', 'timeline', 'list', 'multi_calendar', 'multi_timeline', 'number',
+  'divider', 'button', 'action', 'link_preview', 'horizontal_grouped', 'field',
+  'content_theme', 'content_timeline', 'internal_resource_hub', 'kpi_summary',
+  'things_to_do', 'upcoming_summary', 'event_calendar', 'social_media_calendar',
+  'filter', 'record_context', 'field_section',
 ] as const
 
 /**

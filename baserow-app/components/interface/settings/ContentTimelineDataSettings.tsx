@@ -46,6 +46,7 @@ export default function ContentTimelineDataSettings({
         onUpdate={onUpdate}
         onTableChange={onTableChange}
         mockConfigKey="content_timeline_use_mock"
+        showView={false}
       />
 
       {config.table_id ? (

@@ -42,6 +42,7 @@ export default function EventCalendarDataSettings({
         onUpdate={onUpdate}
         onTableChange={onTableChange}
         mockConfigKey="event_calendar_use_mock"
+        showView={false}
       />
 
       {config.table_id ? (

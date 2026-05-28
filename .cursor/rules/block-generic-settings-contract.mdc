@@ -1,0 +1,44 @@
+---
+description: Enforce generic Interface Builder block settings contract
+alwaysApply: true
+---
+
+# Block Generic Settings Contract
+
+Use the canonical Interface Builder path only (`baserow-app/lib/interface/types.ts`, `registry.ts`, `block-config-types.ts`, `components/interface/settings/blockSettingsRegistry.tsx`).
+
+## Canonical keys
+
+- Use `table_id` and `view_id` (never `sourceTableId` / `sourceViewId`).
+- Use block-prefixed `*_use_mock` flags for demo mode.
+- Use `record_limit` where shared; otherwise block-prefixed `*_max_items` / `*_max_posts`.
+- Field mapping keys must be `*_field_id` with optional `*_field` fallback.
+
+## Field resolution order (required)
+
+1. `*_field_id` (resolve to actual field name)
+2. `*_field` (stored field name fallback)
+3. Existing heuristic discovery (`pickFieldName`)
+
+## Baseline settings for data-driven custom blocks
+
+Unless clearly not relevant, each block should expose:
+
+- `title` + `subtitle`
+- source table selection (`table_id`; `view_id` when supported)
+- demo toggle (`*_use_mock`)
+- item limit (`record_limit` or `*_max_items`)
+- filter/search/grouping controls when block supports those concepts
+
+## Runtime behavior rules
+
+- Settings UI must be wired to runtime behavior (not cosmetic only).
+- `table_id` must override name-discovery; discovery remains fallback.
+- Do not silently show demo records as live data.
+- If demo mode is off and live data is unavailable, show empty/unconfigured state.
+
+## Validation and persistence rules
+
+- Keep marketing/custom block validation non-blocking for unconfigured state.
+- New config keys must be included in `BlockConfig` and defaults where applicable.
+- Do not introduce parallel config systems or duplicate schema names.
