@@ -28,9 +28,9 @@ export default function ContentThemeDataSettings({
     ? fields.filter((f) => f.table_id === config.table_id)
     : fields
 
-  const setField = (idKey: keyof BlockConfig, nameKey: keyof BlockConfig) =>
-    (fieldId: string | undefined, fieldName: string | undefined) => {
-      onUpdate({ [idKey]: fieldId, [nameKey]: fieldName } as Partial<BlockConfig>)
+  const setField = (idKey: keyof BlockConfig) =>
+    (fieldId: string | undefined) => {
+      onUpdate({ [idKey]: fieldId } as Partial<BlockConfig>)
     }
 
   return (
@@ -51,30 +51,26 @@ export default function ContentThemeDataSettings({
           <MarketingFieldSelect
             label="Theme name"
             fieldId={config.content_theme_name_field_id}
-            fieldName={config.content_theme_name_field}
             fields={tableFields}
-            onChange={setField("content_theme_name_field_id", "content_theme_name_field")}
+            onChange={setField("content_theme_name_field_id")}
           />
           <MarketingFieldSelect
             label="Quarter"
             fieldId={config.content_theme_quarter_field_id}
-            fieldName={config.content_theme_quarter_field}
             fields={tableFields}
-            onChange={setField("content_theme_quarter_field_id", "content_theme_quarter_field")}
+            onChange={setField("content_theme_quarter_field_id")}
           />
           <MarketingFieldSelect
             label="Year"
             fieldId={config.content_theme_year_field_id}
-            fieldName={config.content_theme_year_field}
             fields={tableFields}
-            onChange={setField("content_theme_year_field_id", "content_theme_year_field")}
+            onChange={setField("content_theme_year_field_id")}
           />
           <MarketingFieldSelect
             label="Colour"
             fieldId={config.content_theme_colour_field_id}
-            fieldName={config.content_theme_colour_field}
             fields={tableFields}
-            onChange={setField("content_theme_colour_field_id", "content_theme_colour_field")}
+            onChange={setField("content_theme_colour_field_id")}
           />
         </MarketingFieldMappingSection>
       ) : null}

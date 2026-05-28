@@ -15,6 +15,7 @@ import {
   isMarketingMockEnabled,
   resolveMarketingTable,
 } from "@/lib/marketing/block-config-resolver"
+import { applyMarketingBlockDataQuery } from "@/lib/marketing/block-data-query"
 import { findCampaignsTable, findContentTable, findQuarterlyThemesTable } from "@/lib/marketing/marketing-tables"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { FieldOptions } from "@/types/fields"
@@ -151,11 +152,11 @@ export function useSocialMediaCalendarData(options?: {
             .select("*")
             .is("deleted_at", null)
             .order("created_at", { ascending: true }),
-          supabase
-            .from(content.supabase_table)
-            .select("*")
-            .is("deleted_at", null)
-            .order("created_at", { ascending: true }),
+          applyMarketingBlockDataQuery(
+            supabase.from(content.supabase_table).select("*").is("deleted_at", null),
+            config,
+            contentFieldRows
+          ),
           supabase
             .from(campaigns.supabase_table)
             .select("*")

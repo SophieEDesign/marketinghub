@@ -24,8 +24,8 @@ export default function LinkPreviewDataSettings({
         <Label>External URL *</Label>
         <Input
           type="url"
-          value={config.url || config.link_url || ""}
-          onChange={(e) => onUpdate({ url: e.target.value, link_url: e.target.value })}
+          value={config.link_url || ""}
+          onChange={(e) => onUpdate({ link_url: e.target.value })}
           placeholder="https://onedrive.live.com/..."
         />
         <p className="text-xs text-gray-500">
@@ -50,8 +50,8 @@ export default function LinkPreviewDataSettings({
       <div className="space-y-2">
         <Label>Description (optional)</Label>
         <Input
-          value={config.link_description || config.description || ""}
-          onChange={(e) => onUpdate({ link_description: e.target.value, description: e.target.value })}
+          value={config.link_description || ""}
+          onChange={(e) => onUpdate({ link_description: e.target.value })}
           placeholder="File description"
         />
       </div>

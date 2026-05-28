@@ -160,9 +160,7 @@ export type HorizontalGroupedBlockConfig = BaseBlockConfig
 export interface RecordContextBlockConfig extends BaseBlockConfig {
   table_id: string // Required - which table to list records from
   view_id?: string
-  displayMode: 'list' | 'grid' | 'compact'
-  allowClear: boolean
-  selectionMode: 'single'
+  display_mode?: 'list' | 'grid' | 'compact'
 }
 
 // Field Section Block (record layouts: renders all fields in a section)

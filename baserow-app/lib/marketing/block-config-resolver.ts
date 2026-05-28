@@ -67,12 +67,12 @@ export function applyFieldOverrides<T extends object>(
 export function overridePair(
   config: BlockConfig | undefined,
   idKey: keyof BlockConfig,
-  nameKey: keyof BlockConfig
+  nameKey?: keyof BlockConfig
 ): FieldOverridePair {
   const c = config || {}
   return {
     fieldId: c[idKey] as string | undefined,
-    fieldName: c[nameKey] as string | undefined,
+    fieldName: nameKey ? (c[nameKey] as string | undefined) : undefined,
   }
 }
 

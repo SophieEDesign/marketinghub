@@ -8,6 +8,7 @@ import {
   isMarketingMockEnabled,
   resolveMarketingTable,
 } from "@/lib/marketing/block-config-resolver"
+import { applyMarketingBlockDataQuery } from "@/lib/marketing/block-data-query"
 import {
   buildEventItems,
   collectEventFilterOptions,
@@ -167,7 +168,13 @@ export function useEventCalendarData(options?: {
         if (resolved.deletedAt) {
           contentQuery = contentQuery.is(resolved.deletedAt, null)
         }
-        const { data: contentRows, error: contentErr } = await contentQuery
+        const { data: contentRows, error: contentErr } = await applyMarketingBlockDataQuery(
+          contentQuery,
+          config,
+          (fieldRows || [])
+            .filter((f) => f.table_id === contentTable.id)
+            .map((f) => ({ id: undefined, name: f.name, type: f.type, options: f.options }))
+        )
         if (contentErr) throw new Error(contentErr.message)
 
         const eventRows = (contentRows || []).filter((row) =>

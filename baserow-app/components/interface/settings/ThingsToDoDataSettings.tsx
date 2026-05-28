@@ -15,6 +15,8 @@ import type { DataSettingsCtx } from "./blockSettingsRegistry"
 import MarketingDataSourceSection from "./shared/MarketingDataSourceSection"
 import MarketingFieldMappingSection from "./shared/MarketingFieldMappingSection"
 import MarketingFieldSelect from "./shared/MarketingFieldSelect"
+import BlockFilterEditor from "./BlockFilterEditor"
+import SortSelector from "./shared/SortSelector"
 
 export default function ThingsToDoDataSettings({
   config,
@@ -27,10 +29,11 @@ export default function ThingsToDoDataSettings({
   const tableFields = config.table_id
     ? fields.filter((f) => f.table_id === config.table_id)
     : fields
+  const blockFilters = Array.isArray(config.filters) ? config.filters : []
 
-  const setField = (idKey: keyof BlockConfig, nameKey: keyof BlockConfig) =>
-    (fieldId: string | undefined, fieldName: string | undefined) => {
-      onUpdate({ [idKey]: fieldId, [nameKey]: fieldName } as Partial<BlockConfig>)
+  const setField = (idKey: keyof BlockConfig) =>
+    (fieldId: string | undefined) => {
+      onUpdate({ [idKey]: fieldId } as Partial<BlockConfig>)
     }
 
   return (
@@ -50,68 +53,77 @@ export default function ThingsToDoDataSettings({
           <MarketingFieldSelect
             label="Title"
             fieldId={config.things_to_do_title_field_id}
-            fieldName={config.things_to_do_title_field}
             fields={tableFields}
-            onChange={setField("things_to_do_title_field_id", "things_to_do_title_field")}
+            onChange={setField("things_to_do_title_field_id")}
           />
           <MarketingFieldSelect
             label="Type"
             fieldId={config.things_to_do_type_field_id}
-            fieldName={config.things_to_do_type_field}
             fields={tableFields}
-            onChange={setField("things_to_do_type_field_id", "things_to_do_type_field")}
+            onChange={setField("things_to_do_type_field_id")}
           />
           <MarketingFieldSelect
             label="Status"
             fieldId={config.things_to_do_status_field_id}
-            fieldName={config.things_to_do_status_field}
             fields={tableFields}
-            onChange={setField("things_to_do_status_field_id", "things_to_do_status_field")}
+            onChange={setField("things_to_do_status_field_id")}
           />
           <MarketingFieldSelect
             label="Priority"
             fieldId={config.things_to_do_priority_field_id}
-            fieldName={config.things_to_do_priority_field}
             fields={tableFields}
-            onChange={setField("things_to_do_priority_field_id", "things_to_do_priority_field")}
+            onChange={setField("things_to_do_priority_field_id")}
           />
           <MarketingFieldSelect
             label="Owner"
             fieldId={config.things_to_do_owner_field_id}
-            fieldName={config.things_to_do_owner_field}
             fields={tableFields}
-            onChange={setField("things_to_do_owner_field_id", "things_to_do_owner_field")}
+            onChange={setField("things_to_do_owner_field_id")}
           />
           <MarketingFieldSelect
             label="Reviewer"
             fieldId={config.things_to_do_reviewer_field_id}
-            fieldName={config.things_to_do_reviewer_field}
             fields={tableFields}
-            onChange={setField("things_to_do_reviewer_field_id", "things_to_do_reviewer_field")}
+            onChange={setField("things_to_do_reviewer_field_id")}
           />
           <MarketingFieldSelect
             label="Due date"
             fieldId={config.things_to_do_due_date_field_id}
-            fieldName={config.things_to_do_due_date_field}
             fields={tableFields}
-            onChange={setField("things_to_do_due_date_field_id", "things_to_do_due_date_field")}
+            onChange={setField("things_to_do_due_date_field_id")}
             fieldTypes={["date"]}
           />
           <MarketingFieldSelect
             label="Campaign"
             fieldId={config.things_to_do_campaign_field_id}
-            fieldName={config.things_to_do_campaign_field}
             fields={tableFields}
-            onChange={setField("things_to_do_campaign_field_id", "things_to_do_campaign_field")}
+            onChange={setField("things_to_do_campaign_field_id")}
           />
           <MarketingFieldSelect
             label="Theme"
             fieldId={config.things_to_do_theme_field_id}
-            fieldName={config.things_to_do_theme_field}
             fields={tableFields}
-            onChange={setField("things_to_do_theme_field_id", "things_to_do_theme_field")}
+            onChange={setField("things_to_do_theme_field_id")}
           />
         </MarketingFieldMappingSection>
+      ) : null}
+
+      {config.table_id && tableFields.length > 0 ? (
+        <div className="space-y-4 pt-2 border-t border-border/40">
+          <SortSelector
+            value={Array.isArray(config.sorts) ? config.sorts : undefined}
+            onChange={(sorts) => onUpdate({ sorts: sorts as BlockConfig["sorts"] })}
+            fields={tableFields}
+            allowMultiple
+          />
+          <BlockFilterEditor
+            filters={blockFilters}
+            tableFields={tableFields}
+            config={config}
+            onChange={(filters) => onUpdate({ filters })}
+            onConfigUpdate={(updates) => onUpdate(updates)}
+          />
+        </div>
       ) : null}
 
       <div className="space-y-2">

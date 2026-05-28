@@ -8,6 +8,7 @@ import {
   isMarketingMockEnabled,
   resolveMarketingTable,
 } from "@/lib/marketing/block-config-resolver"
+import { applyMarketingBlockDataQuery } from "@/lib/marketing/block-data-query"
 import {
   buildContentItems,
   buildContentTimelineItems,
@@ -150,10 +151,11 @@ export function useContentTimelineData(options?: {
         )
 
         const [contentRes, themesRes, campaignsRes] = await Promise.all([
-          supabase
-            .from(content.supabase_table)
-            .select("*")
-            .order("created_at", { ascending: true }),
+          applyMarketingBlockDataQuery(
+            supabase.from(content.supabase_table).select("*"),
+            config,
+            contentFieldRows
+          ),
           themes?.supabase_table
             ? supabase.from(themes.supabase_table).select("*").order("created_at", { ascending: true })
             : Promise.resolve({ data: [], error: null }),

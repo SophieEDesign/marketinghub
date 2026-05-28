@@ -88,23 +88,11 @@ export function useContentThemeData(options?: {
         if (fieldsErr) throw new Error(fieldsErr.message)
 
         const fieldMap = resolveThemeFields(fieldRows || [], {
-          name: overridePair(config, "content_theme_name_field_id", "content_theme_name_field"),
-          quarter: overridePair(
-            config,
-            "content_theme_quarter_field_id",
-            "content_theme_quarter_field"
-          ),
-          year: overridePair(config, "content_theme_year_field_id", "content_theme_year_field"),
-          color: overridePair(
-            config,
-            "content_theme_colour_field_id",
-            "content_theme_colour_field"
-          ),
-          divisions: overridePair(
-            config,
-            "content_theme_divisions_field_id",
-            "content_theme_divisions_field"
-          ),
+          name: overridePair(config, "content_theme_name_field_id"),
+          quarter: overridePair(config, "content_theme_quarter_field_id"),
+          year: overridePair(config, "content_theme_year_field_id"),
+          color: overridePair(config, "content_theme_colour_field_id"),
+          divisions: overridePair(config, "content_theme_divisions_field_id"),
         })
 
         const { data: rows, error: rowsErr } = await supabase

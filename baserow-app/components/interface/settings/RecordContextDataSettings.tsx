@@ -52,7 +52,7 @@ export default function RecordContextDataSettings({
     setSelectedTableId(config.table_id || "")
   }, [config.table_id])
 
-  const displayMode = (config.displayMode ?? (config as any).display_mode ?? "list") as DisplayMode
+  const displayMode = (config.display_mode ?? "list") as DisplayMode
 
   const handleTableChange = async (tableId: string) => {
     setSelectedTableId(tableId)
@@ -165,7 +165,7 @@ export default function RecordContextDataSettings({
           <Select
             value={displayMode}
             onValueChange={(value: DisplayMode) =>
-              onUpdate({ displayMode: value, display_mode: value } as any)
+              onUpdate({ display_mode: value } as any)
             }
           >
             <SelectTrigger>

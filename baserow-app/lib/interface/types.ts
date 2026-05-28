@@ -354,15 +354,10 @@ export interface BlockConfig {
   content_theme_view_mode?: 'grid' | 'list' | 'compact'
   content_theme_use_mock?: boolean
   content_theme_name_field_id?: string
-  content_theme_name_field?: string
   content_theme_quarter_field_id?: string
-  content_theme_quarter_field?: string
   content_theme_year_field_id?: string
-  content_theme_year_field?: string
   content_theme_colour_field_id?: string
-  content_theme_colour_field?: string
   content_theme_divisions_field_id?: string
-  content_theme_divisions_field?: string
   // Content Timeline block
   content_timeline_use_mock?: boolean
   content_timeline_max_items?: number
@@ -472,23 +467,14 @@ export interface BlockConfig {
   things_to_do_use_mock?: boolean
   things_to_do_show_search?: boolean
   things_to_do_title_field_id?: string
-  things_to_do_title_field?: string
   things_to_do_type_field_id?: string
-  things_to_do_type_field?: string
   things_to_do_status_field_id?: string
-  things_to_do_status_field?: string
   things_to_do_priority_field_id?: string
-  things_to_do_priority_field?: string
   things_to_do_owner_field_id?: string
-  things_to_do_owner_field?: string
   things_to_do_reviewer_field_id?: string
-  things_to_do_reviewer_field?: string
   things_to_do_due_date_field_id?: string
-  things_to_do_due_date_field?: string
   things_to_do_campaign_field_id?: string
-  things_to_do_campaign_field?: string
   things_to_do_theme_field_id?: string
-  things_to_do_theme_field?: string
   // Event Calendar block
   event_calendar_use_mock?: boolean
   event_calendar_max_items?: number

@@ -54,7 +54,7 @@ export default function RecordContextBlock({
 }: RecordContextBlockProps) {
   const config = block.config || {}
   const tableId = config.table_id ?? (config as any).tableId ?? pageTableId ?? null
-  const displayMode = config.displayMode ?? (config as any).display_mode ?? "list"
+  const displayMode = config.display_mode ?? "list"
   const showSearch = config.show_search !== false
   const showAddRecord = (config as any).show_add_record === true
 

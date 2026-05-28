@@ -16,6 +16,8 @@ import { CONTENT_TIMELINE_THEMES } from "@/lib/marketing/content-timeline"
 import MarketingDataSourceSection from "./shared/MarketingDataSourceSection"
 import MarketingFieldMappingSection from "./shared/MarketingFieldMappingSection"
 import MarketingFieldSelect from "./shared/MarketingFieldSelect"
+import BlockFilterEditor from "./BlockFilterEditor"
+import SortSelector from "./shared/SortSelector"
 
 export default function ContentTimelineDataSettings({
   config,
@@ -28,6 +30,7 @@ export default function ContentTimelineDataSettings({
   const tableFields = config.table_id
     ? fields.filter((f) => f.table_id === config.table_id)
     : fields
+  const blockFilters = Array.isArray(config.filters) ? config.filters : []
 
   const setField = (idKey: keyof BlockConfig, nameKey: keyof BlockConfig) =>
     (fieldId: string | undefined, fieldName: string | undefined) => {
@@ -123,6 +126,24 @@ export default function ContentTimelineDataSettings({
             fieldTypes={["date"]}
           />
         </MarketingFieldMappingSection>
+      ) : null}
+
+      {config.table_id && tableFields.length > 0 ? (
+        <div className="space-y-4 pt-2 border-t border-border/40">
+          <SortSelector
+            value={Array.isArray(config.sorts) ? config.sorts : undefined}
+            onChange={(sorts) => onUpdate({ sorts: sorts as BlockConfig["sorts"] })}
+            fields={tableFields}
+            allowMultiple
+          />
+          <BlockFilterEditor
+            filters={blockFilters}
+            tableFields={tableFields}
+            config={config}
+            onChange={(filters) => onUpdate({ filters })}
+            onConfigUpdate={(updates) => onUpdate(updates)}
+          />
+        </div>
       ) : null}
 
       <div className="space-y-2 pt-2 border-t">
