@@ -4,8 +4,10 @@
 
 import {
   applyFieldOverrides,
+  fieldNameFromConfig,
   type FieldOverridePair,
 } from "@/lib/marketing/block-config-resolver"
+import { isPendingApprovalStatus } from "@/lib/marketing/event-calendar-config"
 import { formatDisplayValue, pickFieldName } from "@/lib/marketing/field-utils"
 import { normalizeHexColor } from "@/lib/field-colors"
 import type { FieldOptions } from "@/types/fields"
@@ -186,6 +188,7 @@ export interface MarketingEventItem {
   accentColor: string
   backgroundColor: string
   dateRangeLabel: string
+  isPendingApproval: boolean
 }
 
 export interface EventCalendarFilters {
@@ -328,13 +331,19 @@ export const DEFAULT_EVENT_CALENDAR_BLOCK_CONFIG: Record<string, unknown> = {
   event_calendar_show_notes: true,
   event_calendar_show_legend: true,
   event_calendar_density: "comfortable",
+  event_calendar_submitted_status_value: "Submitted",
+  event_calendar_approved_status_value: "Published",
+  event_calendar_rejected_status_value: "Cancelled",
+  event_calendar_member_default_visibility: "members_only",
+  event_calendar_content_type_default: "Event",
   appearance: { showTitle: true },
 }
 
 /** Field map when events are Content rows (content type = Event). */
 export function resolveContentEventFields(
   fields: FieldRow[],
-  overrides?: Partial<Record<keyof EventFieldMap, FieldOverridePair>>
+  overrides?: Partial<Record<keyof EventFieldMap, FieldOverridePair>>,
+  contentTypeOverride?: FieldOverridePair
 ): ContentEventFieldMap {
   const base = resolveEventFields(fields)
   const merged: ContentEventFieldMap = {
@@ -372,11 +381,19 @@ export function resolveContentEventFields(
       pickFieldName(fields, [/images/i, /hero/i, /image/i, /photo/i, /banner/i], base.heroImage) ||
       base.heroImage,
   }
-  if (!overrides || Object.keys(overrides).length === 0) return merged
   const fieldIds = fields.map((f) => ({ id: (f as { id?: string }).id || f.name, name: f.name }))
+  const withOverrides =
+    overrides && Object.keys(overrides).length > 0
+      ? applyFieldOverrides(merged, overrides, fieldIds)
+      : merged
+  const contentTypeField =
+    (contentTypeOverride &&
+      fieldNameFromConfig(fieldIds, contentTypeOverride.fieldId, contentTypeOverride.fieldName)) ||
+    withOverrides.contentType ||
+    merged.contentType
   return {
-    ...applyFieldOverrides(merged, overrides, fieldIds),
-    contentType: merged.contentType,
+    ...withOverrides,
+    contentType: contentTypeField,
   }
 }
 
@@ -726,6 +743,7 @@ export function buildEventItems(params: {
       accentColor: accent,
       backgroundColor: accentBackground(accent),
       dateRangeLabel: formatEventDateRange(startDate, effectiveEnd),
+      isPendingApproval: isPendingApprovalStatus(status),
     })
   }
 

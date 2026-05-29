@@ -4,17 +4,23 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { fetchProfileLabelById } from "@/lib/users/profile-labels"
 import {
+  eventCalendarContentTypeOverride,
   eventCalendarOverridesFromConfig,
   isMarketingMockEnabled,
   resolveMarketingTable,
 } from "@/lib/marketing/block-config-resolver"
 import { applyMarketingBlockDataQuery } from "@/lib/marketing/block-data-query"
 import {
+  mergeAttendanceIntoEventItems,
+  type EventAttendanceRow,
+} from "@/lib/marketing/event-attendance"
+import {
   buildEventItems,
   collectEventFilterOptions,
   isEventContentRecord,
   resolveContentEventFields,
   type ContentEventFieldMap,
+  type EventAttendanceStatus,
   type EventTableIds,
   type MarketingEventItem,
 } from "@/lib/marketing/events"
@@ -44,7 +50,10 @@ export interface UseEventCalendarDataResult {
   filterOptions: ReturnType<typeof collectEventFilterOptions>
   currentUserId: string | null
   reload: () => void
+  /** @deprecated Use upsertAttendance */
   updateAttendees: (eventId: string, attendeeIds: string[]) => Promise<void>
+  upsertAttendance: (eventId: string, status: EventAttendanceStatus) => Promise<void>
+  updateEventStatus: (eventId: string, statusValue: string) => Promise<void>
 }
 
 export function useEventCalendarData(options?: {
@@ -66,14 +75,79 @@ export function useEventCalendarData(options?: {
     setReloadToken((n) => n + 1)
   }, [])
 
-  const updateAttendees = useCallback(
+  const syncLegacyAttendeeColumn = useCallback(
     async (eventId: string, attendeeIds: string[]) => {
-      if (!tableIds?.contentSupabaseTable || !fields) return
-      const col = fields.attendees || "attendee_user_ids"
+      if (!tableIds?.contentSupabaseTable || !fields?.attendees) return
       const supabase = createClient()
       const { error: updateErr } = await supabase
         .from(tableIds.contentSupabaseTable)
-        .update({ [col]: attendeeIds })
+        .update({ [fields.attendees]: attendeeIds })
+        .eq("id", eventId)
+      if (updateErr) throw new Error(updateErr.message)
+    },
+    [tableIds, fields]
+  )
+
+  const updateAttendees = useCallback(
+    async (eventId: string, attendeeIds: string[]) => {
+      await syncLegacyAttendeeColumn(eventId, attendeeIds)
+      reload()
+    },
+    [syncLegacyAttendeeColumn, reload]
+  )
+
+  const upsertAttendance = useCallback(
+    async (eventId: string, status: EventAttendanceStatus) => {
+      if (!currentUserId) throw new Error("Sign in required")
+      const supabase = createClient()
+
+      const { error: upsertErr } = await supabase.from("event_attendance").upsert(
+        {
+          event_id: eventId,
+          user_id: currentUserId,
+          attendance_status: status,
+        },
+        { onConflict: "event_id,user_id" }
+      )
+
+      if (upsertErr) {
+        if (status === "attending" && fields?.attendees) {
+          const item = allItems.find((i) => i.id === eventId)
+          const next = item?.currentUserAttending
+            ? (item.attendeeIds.filter((id) => id !== currentUserId))
+            : [...new Set([...(item?.attendeeIds || []), currentUserId])]
+          await syncLegacyAttendeeColumn(eventId, next)
+          reload()
+          return
+        }
+        throw new Error(upsertErr.message)
+      }
+
+      if (fields?.attendees) {
+        const item = allItems.find((i) => i.id === eventId)
+        let next = [...(item?.attendeeIds || [])]
+        if (status === "attending") {
+          next = [...new Set([...next, currentUserId])]
+        } else {
+          next = next.filter((id) => id !== currentUserId)
+        }
+        await syncLegacyAttendeeColumn(eventId, next)
+      }
+
+      reload()
+    },
+    [currentUserId, fields, allItems, syncLegacyAttendeeColumn, reload]
+  )
+
+  const updateEventStatus = useCallback(
+    async (eventId: string, statusValue: string) => {
+      if (!tableIds?.contentSupabaseTable || !fields?.status) {
+        throw new Error("Status field not configured")
+      }
+      const supabase = createClient()
+      const { error: updateErr } = await supabase
+        .from(tableIds.contentSupabaseTable)
+        .update({ [fields.status]: statusValue })
         .eq("id", eventId)
       if (updateErr) throw new Error(updateErr.message)
       reload()
@@ -134,11 +208,9 @@ export function useEventCalendarData(options?: {
           themesSupabaseTable: themesTable?.supabase_table ?? null,
         }
 
-        const tableIdList = [
-          contentTable.id,
-          locationsTable?.id,
-          themesTable?.id,
-        ].filter(Boolean) as string[]
+        const tableIdList = [contentTable.id, locationsTable?.id, themesTable?.id].filter(
+          Boolean
+        ) as string[]
 
         const { data: fieldRows, error: fieldsErr } = await supabase
           .from("table_fields")
@@ -152,17 +224,9 @@ export function useEventCalendarData(options?: {
           .map(mapFieldRow)
         const resolved = resolveContentEventFields(
           contentFieldRows,
-          eventCalendarOverridesFromConfig(config)
+          eventCalendarOverridesFromConfig(config),
+          eventCalendarContentTypeOverride(config)
         )
-
-        if (process.env.NODE_ENV === "development" && !resolved.contentType) {
-          console.warn(
-            "[EventCalendar] No content type field resolved — filtering with common field names"
-          )
-        }
-        if (process.env.NODE_ENV === "development" && !resolved.startDate) {
-          console.warn("[EventCalendar] No start date field resolved on Content table")
-        }
 
         let contentQuery = supabase.from(contentTable.supabase_table).select("*")
         if (resolved.deletedAt) {
@@ -184,13 +248,11 @@ export function useEventCalendarData(options?: {
           ? (contentRows || []).filter((row: Record<string, unknown>) =>
               isEventContentRecord(row, resolved.contentType)
             )
-          : (contentRows || [])
+          : contentRows || []
 
         const locationById = new Map<string, Record<string, unknown>>()
         if (locationsTable?.supabase_table) {
-          const { data: locRows } = await supabase
-            .from(locationsTable.supabase_table)
-            .select("*")
+          const { data: locRows } = await supabase.from(locationsTable.supabase_table).select("*")
           for (const row of locRows || []) {
             locationById.set(String(row.id), row as Record<string, unknown>)
           }
@@ -201,11 +263,8 @@ export function useEventCalendarData(options?: {
           const themeFields = (fieldRows || [])
             .filter((f) => f.table_id === themesTable.id)
             .map(mapFieldRow)
-          const themeNameField =
-            themeFields.find((f) => /name/i.test(f.name))?.name ?? "name"
-          const { data: themeRows } = await supabase
-            .from(themesTable.supabase_table)
-            .select("*")
+          const themeNameField = themeFields.find((f) => /name/i.test(f.name))?.name ?? "name"
+          const { data: themeRows } = await supabase.from(themesTable.supabase_table).select("*")
           for (const row of themeRows || []) {
             const label = formatDisplayValue(row[themeNameField])
             if (label) themeLabelById.set(String(row.id), label)
@@ -214,7 +273,7 @@ export function useEventCalendarData(options?: {
 
         const profileLabelById = await fetchProfileLabelById(supabase)
 
-        const items = buildEventItems({
+        let items = buildEventItems({
           rows: eventRows as Record<string, unknown>[],
           fields: resolved,
           locationById,
@@ -224,6 +283,22 @@ export function useEventCalendarData(options?: {
           contentTypeField: resolved.contentType,
           filterContentEvents: false,
         })
+
+        const eventIds = items.map((i) => i.id)
+        if (eventIds.length > 0) {
+          const { data: attendanceRows, error: attErr } = await supabase
+            .from("event_attendance")
+            .select("event_id, user_id, attendance_status")
+            .in("event_id", eventIds)
+
+          if (!attErr && attendanceRows?.length) {
+            items = mergeAttendanceIntoEventItems(
+              items,
+              attendanceRows as EventAttendanceRow[],
+              userId
+            )
+          }
+        }
 
         if (cancelled) return
         setTableIds(ids)
@@ -261,5 +336,7 @@ export function useEventCalendarData(options?: {
     currentUserId,
     reload,
     updateAttendees,
+    upsertAttendance,
+    updateEventStatus,
   }
 }

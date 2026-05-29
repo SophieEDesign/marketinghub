@@ -403,70 +403,9 @@ export function resourceHubOverridesFromConfig(
   }
 }
 
-export function eventCalendarOverridesFromConfig(
-  config?: BlockConfig
-): Partial<
-  Record<
-    | "eventName"
-    | "startDate"
-    | "endDate"
-    | "eventType"
-    | "status"
-    | "visibility"
-    | "locationName"
-    | "country"
-    | "venue"
-    | "website"
-    | "description"
-    | "campaign"
-    | "attendees"
-    | "resources",
-    FieldOverridePair
-  >
-> {
-  const c = config || {}
-  return {
-    eventName: overridePair(c, "event_calendar_title_field_id", "event_calendar_title_field"),
-    eventType: overridePair(
-      c,
-      "event_calendar_event_type_field_id",
-      "event_calendar_event_type_field"
-    ),
-    startDate: overridePair(
-      c,
-      "event_calendar_start_date_field_id",
-      "event_calendar_start_date_field"
-    ),
-    endDate: overridePair(c, "event_calendar_end_date_field_id", "event_calendar_end_date_field"),
-    status: overridePair(c, "event_calendar_status_field_id", "event_calendar_status_field"),
-    visibility: overridePair(
-      c,
-      "event_calendar_visibility_field_id",
-      "event_calendar_visibility_field"
-    ),
-    locationName: overridePair(
-      c,
-      "event_calendar_location_field_id",
-      "event_calendar_location_field"
-    ),
-    country: overridePair(c, "event_calendar_country_field_id", "event_calendar_country_field"),
-    venue: overridePair(c, "event_calendar_venue_field_id", "event_calendar_venue_field"),
-    website: overridePair(c, "event_calendar_url_field_id", "event_calendar_url_field"),
-    description: overridePair(
-      c,
-      "event_calendar_description_field_id",
-      "event_calendar_description_field"
-    ),
-    campaign: overridePair(c, "event_calendar_campaign_field_id", "event_calendar_campaign_field"),
-    attendees: overridePair(
-      c,
-      "event_calendar_attending_field_id",
-      "event_calendar_attending_field"
-    ),
-    resources: overridePair(
-      c,
-      "event_calendar_resources_field_id",
-      "event_calendar_resources_field"
-    ),
-  }
-}
+export {
+  eventCalendarOverridesFromConfig,
+  eventCalendarContentTypeOverride,
+  eventCalendarWorkflowFromConfig,
+  isPendingApprovalStatus,
+} from "@/lib/marketing/event-calendar-config"

@@ -174,6 +174,131 @@ export default function EventCalendarDataSettings({
               "event_calendar_description_field"
             )}
           />
+          <p className="text-xs font-medium text-muted-foreground pt-2">Location &amp; links</p>
+          <MarketingFieldSelect
+            label="Location (linked record)"
+            fieldId={config.event_calendar_location_link_field_id}
+            fieldName={config.event_calendar_location_link_field}
+            fields={tableFields}
+            onChange={setField(
+              "event_calendar_location_link_field_id",
+              "event_calendar_location_link_field"
+            )}
+          />
+          <MarketingFieldSelect
+            label="City"
+            fieldId={config.event_calendar_city_field_id}
+            fieldName={config.event_calendar_city_field}
+            fields={tableFields}
+            onChange={setField("event_calendar_city_field_id", "event_calendar_city_field")}
+          />
+          <MarketingFieldSelect
+            label="Content type (filter)"
+            fieldId={config.event_calendar_content_type_field_id}
+            fieldName={config.event_calendar_content_type_field}
+            fields={tableFields}
+            onChange={setField(
+              "event_calendar_content_type_field_id",
+              "event_calendar_content_type_field"
+            )}
+          />
+          <p className="text-xs font-medium text-muted-foreground pt-2">Schedule &amp; media</p>
+          <MarketingFieldSelect
+            label="All day"
+            fieldId={config.event_calendar_all_day_field_id}
+            fieldName={config.event_calendar_all_day_field}
+            fields={tableFields}
+            onChange={setField("event_calendar_all_day_field_id", "event_calendar_all_day_field")}
+          />
+          <MarketingFieldSelect
+            label="Start time"
+            fieldId={config.event_calendar_start_time_field_id}
+            fieldName={config.event_calendar_start_time_field}
+            fields={tableFields}
+            onChange={setField(
+              "event_calendar_start_time_field_id",
+              "event_calendar_start_time_field"
+            )}
+          />
+          <MarketingFieldSelect
+            label="End time"
+            fieldId={config.event_calendar_end_time_field_id}
+            fieldName={config.event_calendar_end_time_field}
+            fields={tableFields}
+            onChange={setField(
+              "event_calendar_end_time_field_id",
+              "event_calendar_end_time_field"
+            )}
+          />
+          <MarketingFieldSelect
+            label="Timezone"
+            fieldId={config.event_calendar_timezone_field_id}
+            fieldName={config.event_calendar_timezone_field}
+            fields={tableFields}
+            onChange={setField(
+              "event_calendar_timezone_field_id",
+              "event_calendar_timezone_field"
+            )}
+          />
+          <MarketingFieldSelect
+            label="Hero image"
+            fieldId={config.event_calendar_hero_image_field_id}
+            fieldName={config.event_calendar_hero_image_field}
+            fields={tableFields}
+            onChange={setField(
+              "event_calendar_hero_image_field_id",
+              "event_calendar_hero_image_field"
+            )}
+          />
+          <MarketingFieldSelect
+            label="Schedule items"
+            fieldId={config.event_calendar_schedule_field_id}
+            fieldName={config.event_calendar_schedule_field}
+            fields={tableFields}
+            onChange={setField(
+              "event_calendar_schedule_field_id",
+              "event_calendar_schedule_field"
+            )}
+          />
+          <p className="text-xs font-medium text-muted-foreground pt-2">People &amp; admin</p>
+          <MarketingFieldSelect
+            label="Theme"
+            fieldId={config.event_calendar_theme_field_id}
+            fieldName={config.event_calendar_theme_field}
+            fields={tableFields}
+            onChange={setField("event_calendar_theme_field_id", "event_calendar_theme_field")}
+          />
+          <MarketingFieldSelect
+            label="Organiser / owner"
+            fieldId={config.event_calendar_owner_field_id}
+            fieldName={config.event_calendar_owner_field}
+            fields={tableFields}
+            onChange={setField("event_calendar_owner_field_id", "event_calendar_owner_field")}
+          />
+          <MarketingFieldSelect
+            label="Budget"
+            fieldId={config.event_calendar_budget_field_id}
+            fieldName={config.event_calendar_budget_field}
+            fields={tableFields}
+            onChange={setField("event_calendar_budget_field_id", "event_calendar_budget_field")}
+          />
+          <MarketingFieldSelect
+            label="Internal notes"
+            fieldId={config.event_calendar_notes_field_id}
+            fieldName={config.event_calendar_notes_field}
+            fields={tableFields}
+            onChange={setField("event_calendar_notes_field_id", "event_calendar_notes_field")}
+          />
+          <MarketingFieldSelect
+            label="Deleted at (soft delete)"
+            fieldId={config.event_calendar_deleted_at_field_id}
+            fieldName={config.event_calendar_deleted_at_field}
+            fields={tableFields}
+            onChange={setField(
+              "event_calendar_deleted_at_field_id",
+              "event_calendar_deleted_at_field"
+            )}
+          />
         </MarketingFieldMappingSection>
       ) : null}
 
@@ -273,6 +398,87 @@ export default function EventCalendarDataSettings({
         </Select>
       </div>
 
+      <div className="space-y-3 pt-2 border-t border-border/40">
+        <p className="text-xs font-medium text-muted-foreground">Workflow values</p>
+        <div className="space-y-2">
+          <Label htmlFor="ec-submitted-status">Submitted status value</Label>
+          <Input
+            id="ec-submitted-status"
+            value={config.event_calendar_submitted_status_value || ""}
+            onChange={(e) =>
+              onUpdate({ event_calendar_submitted_status_value: e.target.value || undefined })
+            }
+            placeholder="Submitted"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="ec-approved-status">Approved status value</Label>
+          <Input
+            id="ec-approved-status"
+            value={config.event_calendar_approved_status_value || ""}
+            onChange={(e) =>
+              onUpdate({ event_calendar_approved_status_value: e.target.value || undefined })
+            }
+            placeholder="Published"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="ec-rejected-status">Rejected status value</Label>
+          <Input
+            id="ec-rejected-status"
+            value={config.event_calendar_rejected_status_value || ""}
+            onChange={(e) =>
+              onUpdate({ event_calendar_rejected_status_value: e.target.value || undefined })
+            }
+            placeholder="Cancelled"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="ec-member-vis">Member submit default visibility</Label>
+          <Input
+            id="ec-member-vis"
+            value={config.event_calendar_member_default_visibility || ""}
+            onChange={(e) =>
+              onUpdate({
+                event_calendar_member_default_visibility: e.target.value || undefined,
+              })
+            }
+            placeholder="members_only"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="ec-content-type-default">Content type default (new events)</Label>
+          <Input
+            id="ec-content-type-default"
+            value={config.event_calendar_content_type_default || ""}
+            onChange={(e) =>
+              onUpdate({ event_calendar_content_type_default: e.target.value || undefined })
+            }
+            placeholder="Event"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Calendar feed scope</Label>
+        <Select
+          value={config.event_calendar_feed_scope || "all"}
+          onValueChange={(v) =>
+            onUpdate({
+              event_calendar_feed_scope: v as BlockConfig["event_calendar_feed_scope"],
+            })
+          }
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All visible events</SelectItem>
+            <SelectItem value="attending">My attending events only</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="space-y-2 pt-2 border-t border-border/40">
         <Label>On event click</Label>
         <Select
@@ -339,6 +545,7 @@ export default function EventCalendarDataSettings({
             ["event_calendar_show_schedule", "Schedule tab", true],
             ["event_calendar_show_resources", "Resources tab", true],
             ["event_calendar_show_notes", "Internal notes tab", true],
+            ["event_calendar_show_sync_banner", "Subscribe banner", false],
           ] as const
         ).map(([key, label]) => (
           <div key={key} className="flex items-center justify-between gap-2">

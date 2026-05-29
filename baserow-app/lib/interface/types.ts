@@ -548,6 +548,41 @@ export interface BlockConfig {
   event_calendar_campaign_field?: string
   event_calendar_resources_field_id?: string
   event_calendar_resources_field?: string
+  event_calendar_content_type_field_id?: string
+  event_calendar_content_type_field?: string
+  event_calendar_location_link_field_id?: string
+  event_calendar_location_link_field?: string
+  event_calendar_city_field_id?: string
+  event_calendar_city_field?: string
+  event_calendar_all_day_field_id?: string
+  event_calendar_all_day_field?: string
+  event_calendar_start_time_field_id?: string
+  event_calendar_start_time_field?: string
+  event_calendar_end_time_field_id?: string
+  event_calendar_end_time_field?: string
+  event_calendar_timezone_field_id?: string
+  event_calendar_timezone_field?: string
+  event_calendar_hero_image_field_id?: string
+  event_calendar_hero_image_field?: string
+  event_calendar_theme_field_id?: string
+  event_calendar_theme_field?: string
+  event_calendar_owner_field_id?: string
+  event_calendar_owner_field?: string
+  event_calendar_budget_field_id?: string
+  event_calendar_budget_field?: string
+  event_calendar_notes_field_id?: string
+  event_calendar_notes_field?: string
+  event_calendar_schedule_field_id?: string
+  event_calendar_schedule_field?: string
+  event_calendar_deleted_at_field_id?: string
+  event_calendar_deleted_at_field?: string
+  event_calendar_submitted_status_value?: string
+  event_calendar_approved_status_value?: string
+  event_calendar_rejected_status_value?: string
+  event_calendar_member_default_visibility?: string
+  event_calendar_content_type_default?: string
+  event_calendar_show_sync_banner?: boolean
+  event_calendar_feed_scope?: 'all' | 'attending'
   event_calendar_subtitle?: string
   event_calendar_default_view?: 'month' | 'week' | 'list' | 'timeline'
   event_calendar_show_toolbar?: boolean

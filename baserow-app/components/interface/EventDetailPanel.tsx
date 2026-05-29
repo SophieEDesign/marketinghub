@@ -30,6 +30,7 @@ const ATTENDANCE_OPTIONS: { value: EventAttendanceStatus; label: string }[] = [
   { value: "attending", label: "Attending" },
   { value: "maybe", label: "Maybe" },
   { value: "not_attending", label: "Not attending" },
+  { value: "interested", label: "Interested" },
 ]
 
 export interface EventDetailContentProps {
@@ -48,6 +49,9 @@ export interface EventDetailContentProps {
   allowCalendarExport?: boolean
   attendanceStatus?: EventAttendanceStatus | null
   isEditingBlock?: boolean
+  onApprove?: () => void
+  onReject?: () => void
+  showApprovalActions?: boolean
 }
 
 export function EventDetailContent({
@@ -66,6 +70,9 @@ export function EventDetailContent({
   allowCalendarExport = true,
   attendanceStatus = null,
   isEditingBlock = false,
+  onApprove,
+  onReject,
+  showApprovalActions = false,
 }: EventDetailContentProps) {
   const { toast } = useToast()
   const statusColor = statusAccentColor(event.status)
@@ -371,6 +378,18 @@ export function EventDetailContent({
       ) : null}
 
       <div className="shrink-0 border-t border-border/40 p-4 flex flex-col gap-2 mt-auto">
+        {showApprovalActions && onApprove ? (
+          <div className="flex flex-col gap-2 pb-2">
+            <Button type="button" className="w-full" onClick={onApprove}>
+              Approve event
+            </Button>
+            {onReject ? (
+              <Button type="button" variant="outline" className="w-full" onClick={onReject}>
+                Reject
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
         {onViewRecord ? (
           <Button type="button" className="w-full gap-2" onClick={onViewRecord}>
             View details

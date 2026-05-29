@@ -12,6 +12,7 @@ import EventDetailPanel, {
 } from "@/components/interface/EventDetailPanel"
 import EventMetricStrip from "@/components/interface/EventMetricStrip"
 import EventEmptyState from "@/components/interface/EventEmptyState"
+import EventMemberSubmissionSheet from "@/components/interface/EventMemberSubmissionSheet"
 import DashboardEmpty from "@/components/interface/primitives/DashboardEmpty"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -30,6 +31,10 @@ import {
 import MarketingDemoDataBanner from "@/components/interface/primitives/MarketingDemoDataBanner"
 import { EVENT_CALENDAR_MOCK_ITEMS } from "@/lib/marketing/event-calendar-mock-data"
 import { filterEventsByAudience } from "@/lib/marketing/event-calendar-visibility"
+import { eventCalendarWorkflowFromConfig } from "@/lib/marketing/event-calendar-config"
+import {
+  downloadCalendarIcs,
+} from "@/lib/marketing/event-calendar-ics"
 import {
   buildEventCalendarEvents,
   computeEventMetrics,
@@ -91,8 +96,11 @@ export function EventCalendarCore({
     filterOptions,
     currentUserId,
     reload,
-    updateAttendees,
+    upsertAttendance,
+    updateEventStatus,
   } = useEventCalendarData({ config })
+
+  const workflow = useMemo(() => eventCalendarWorkflowFromConfig(config), [config])
 
   const forceMock = isMarketingMockEnabled(config, "event_calendar_use_mock")
   const demoState = marketingDemoState({ forceMock, fromLiveData, hasTable, error })
@@ -127,9 +135,7 @@ export function EventCalendarCore({
   const [filterStatus, setFilterStatus] = useState("all")
   const [filterOwner, setFilterOwner] = useState("all")
   const [isMobile, setIsMobile] = useState(false)
-  const [attendanceOverrides, setAttendanceOverrides] = useState<
-    Record<string, EventAttendanceStatus>
-  >({})
+  const [memberSubmitOpen, setMemberSubmitOpen] = useState(false)
 
   useEffect(() => {
     setViewMode(settings.defaultView)
@@ -232,18 +238,16 @@ export function EventCalendarCore({
       return
     }
 
-    const isMemberSubmit = !canEdit && settings.allowMemberSubmissions
-    const initialData: Record<string, unknown> = fields?.contentType
-      ? { [fields.contentType]: "Event" }
-      : { content_type: "Event" }
+    if (!canEdit && settings.allowMemberSubmissions) {
+      setMemberSubmitOpen(true)
+      return
+    }
 
-    if (isMemberSubmit) {
-      // TODO: dedicated member submission form — RecordModal with Submitted status for now.
-      if (fields?.status) {
-        initialData[fields.status] = "Submitted"
-      } else {
-        initialData.status = "Submitted"
-      }
+    const initialData: Record<string, unknown> = {}
+    if (fields?.contentType) {
+      initialData[fields.contentType] = workflow.contentTypeDefault
+    } else {
+      initialData.content_type = workflow.contentTypeDefault
     }
 
     openRecordModal({
@@ -259,6 +263,7 @@ export function EventCalendarCore({
     fields,
     canEdit,
     settings.allowMemberSubmissions,
+    workflow.contentTypeDefault,
     openRecordModal,
     reload,
     toast,
@@ -282,38 +287,15 @@ export function EventCalendarCore({
         return
       }
 
-      if (status === "maybe" || status === "not_attending" || status === "interested") {
-        // TODO: persist via Event Attendance table when available.
-        setAttendanceOverrides((prev) => ({ ...prev, [selectedEvent.id]: status }))
-        toast({
-          title: "Attendance noted",
-          description:
-            "Maybe / Not attending will sync when Event Attendance is configured. Only Attending is saved to the record today.",
-        })
-        if (status === "not_attending" && selectedEvent.currentUserAttending) {
-          try {
-            const next = selectedEvent.attendeeIds.filter((id) => id !== currentUserId)
-            await updateAttendees(selectedEvent.id, next)
-          } catch {
-            /* ignore */
-          }
-        }
-        return
-      }
-
       try {
-        const next = selectedEvent.currentUserAttending
-          ? selectedEvent.attendeeIds.filter((id) => id !== currentUserId)
-          : [...new Set([...selectedEvent.attendeeIds, currentUserId])]
-        await updateAttendees(selectedEvent.id, next)
-        setAttendanceOverrides((prev) => {
-          const copy = { ...prev }
-          delete copy[selectedEvent.id]
-          return copy
-        })
-        toast({
-          title: selectedEvent.currentUserAttending ? "Removed from attendees" : "Marked as attending",
-        })
+        await upsertAttendance(selectedEvent.id, status)
+        const labels: Record<EventAttendanceStatus, string> = {
+          attending: "Marked as attending",
+          maybe: "Marked as maybe",
+          not_attending: "Marked as not attending",
+          interested: "Marked as interested",
+        }
+        toast({ title: labels[status] })
       } catch (e) {
         toast({
           title: "Could not update attendance",
@@ -328,10 +310,40 @@ export function EventCalendarCore({
       settings.showAttendanceControls,
       selectedEvent,
       currentUserId,
-      updateAttendees,
+      upsertAttendance,
       toast,
     ]
   )
+
+  const handleApproveEvent = useCallback(async () => {
+    if (!selectedEventId) return
+    try {
+      await updateEventStatus(selectedEventId, workflow.approvedStatus)
+      toast({ title: "Event approved", description: workflow.approvedStatus })
+      setSelectedEventId(null)
+    } catch (e) {
+      toast({
+        title: "Could not approve",
+        description: e instanceof Error ? e.message : "Try again",
+        variant: "destructive",
+      })
+    }
+  }, [selectedEventId, updateEventStatus, workflow.approvedStatus, toast])
+
+  const handleRejectEvent = useCallback(async () => {
+    if (!selectedEventId) return
+    try {
+      await updateEventStatus(selectedEventId, workflow.rejectedStatus)
+      toast({ title: "Event rejected" })
+      setSelectedEventId(null)
+    } catch (e) {
+      toast({
+        title: "Could not reject",
+        description: e instanceof Error ? e.message : "Try again",
+        variant: "destructive",
+      })
+    }
+  }, [selectedEventId, updateEventStatus, workflow.rejectedStatus, toast])
 
   const handleManageAttendees = useCallback(() => {
     handleEditEvent()
@@ -347,12 +359,30 @@ export function EventCalendarCore({
   }
   const onToday = () => setCursorDate(new Date())
 
-  const handleExport = () => {
+  const handleDownloadFilteredIcs = useCallback(() => {
+    if (filteredItems.length === 0) {
+      toast({ title: "No events", description: "Nothing to export for the current filters." })
+      return
+    }
+    downloadCalendarIcs(filteredItems, "marketing-events.ics")
+    toast({ title: "Download started", description: `${filteredItems.length} events exported.` })
+  }, [filteredItems, toast])
+
+  const handleCopyCalendarFeed = useCallback(() => {
+    if (!config?.table_id) {
+      toast({ title: "Feed unavailable", description: "Select a source table in block settings." })
+      return
+    }
+    const scope = config.event_calendar_feed_scope === "attending" ? "attending" : "all"
+    const external = externalMode ? "1" : "0"
+    const url = `${typeof window !== "undefined" ? window.location.origin : ""}/api/calendar/events/feed?tableId=${encodeURIComponent(config.table_id)}&scope=${scope}&external=${external}`
+    const webcal = url.replace(/^https:/, "webcal:").replace(/^http:/, "webcal:")
+    void navigator.clipboard?.writeText(webcal)
     toast({
-      title: "Calendar feed",
-      description: "Subscribe to calendar feed — coming in a later phase.",
+      title: "Calendar feed URL copied",
+      description: "Paste into Google Calendar, Outlook, or Apple Calendar to subscribe.",
     })
-  }
+  }, [config?.table_id, config?.event_calendar_feed_scope, externalMode, toast])
 
   const showAddButton =
     settings.showAddButton &&
@@ -364,7 +394,9 @@ export function EventCalendarCore({
     canEdit: canEdit && !externalMode,
     isExternalView: externalMode,
     onEdit: handleEditEvent,
-    onViewRecord: tableIds?.contentTableId ? () => selectedEventId && openRecordForEvent(selectedEventId) : undefined,
+    onViewRecord: tableIds?.contentTableId
+      ? () => selectedEventId && openRecordForEvent(selectedEventId)
+      : undefined,
     onAttendanceChange: handleAttendanceChange,
     onManageAttendees: canEdit && settings.showAttendanceControls ? handleManageAttendees : undefined,
     showScheduleTab: settings.showScheduleTab,
@@ -373,10 +405,15 @@ export function EventCalendarCore({
     showAttendanceControls:
       settings.showAttendanceControls && settings.allowAttendanceUpdates && !isEditing,
     allowCalendarExport: settings.allowCalendarExport && !isEditing,
-    attendanceStatus: selectedEvent
-      ? attendanceOverrides[selectedEvent.id] ?? selectedEvent.currentUserAttendanceStatus
-      : null,
+    attendanceStatus: selectedEvent?.currentUserAttendanceStatus ?? null,
     isEditingBlock: isEditing,
+    showApprovalActions:
+      canEdit &&
+      !externalMode &&
+      !isEditing &&
+      !!selectedEvent?.isPendingApproval,
+    onApprove: handleApproveEvent,
+    onReject: handleRejectEvent,
   }
 
   if (loading) {
@@ -439,15 +476,23 @@ export function EventCalendarCore({
         {settings.showActions ? (
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             {settings.allowCalendarExport && !isEditing ? (
-              <Button
-                type="button"
-                variant="outline"
-                className="gap-2 h-9 text-sm"
-                onClick={handleExport}
-              >
-                <Calendar className="h-4 w-4" aria-hidden />
-                Export / Sync
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" variant="outline" className="gap-2 h-9 text-sm">
+                    <Calendar className="h-4 w-4" aria-hidden />
+                    Export / Sync
+                    <ChevronDown className="h-3.5 w-3.5 opacity-70" aria-hidden />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleDownloadFilteredIcs}>
+                    Download filtered events (.ics)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleCopyCalendarFeed}>
+                    Get calendar feed URL
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : null}
             {showAddButton ? (
               <DropdownMenu>
@@ -582,8 +627,17 @@ export function EventCalendarCore({
           teamAttending={metrics.teamAttending}
           countries={metrics.countries}
           thisMonth={metrics.thisMonth}
-          onExport={handleExport}
+          onExport={handleDownloadFilteredIcs}
         />
+      ) : null}
+
+      {config?.event_calendar_show_sync_banner && !showEmpty && settings.allowCalendarExport ? (
+        <div className="rounded-lg border border-accent-link/20 bg-accent-link/5 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0">
+          <p className="text-sm text-foreground">Stay up to date — subscribe to the event calendar feed.</p>
+          <Button type="button" variant="secondary" size="sm" onClick={handleCopyCalendarFeed}>
+            Get calendar feed
+          </Button>
+        </div>
       ) : null}
 
       {!showEmpty && settings.showLegend ? (
@@ -595,6 +649,20 @@ export function EventCalendarCore({
             </span>
           ))}
         </div>
+      ) : null}
+
+      {fields && tableIds?.contentSupabaseTable ? (
+        <EventMemberSubmissionSheet
+          open={memberSubmitOpen}
+          onClose={() => setMemberSubmitOpen(false)}
+          supabaseTable={tableIds.contentSupabaseTable}
+          fields={fields}
+          workflow={workflow}
+          onSubmitted={() => {
+            reload()
+            toast({ title: "Event submitted", description: "Pending approval." })
+          }}
+        />
       ) : null}
     </div>
   )

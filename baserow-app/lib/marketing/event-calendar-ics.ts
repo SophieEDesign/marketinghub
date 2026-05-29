@@ -1,5 +1,5 @@
 /**
- * ICS generation and calendar deep-links for Event Calendar export (Phase 1).
+ * ICS generation and calendar deep-links for Event Calendar export (Phase 1–2).
  */
 
 import { addDays, format } from "date-fns"
@@ -37,17 +37,11 @@ function eventDateBounds(item: MarketingEventItem): { start: Date; end: Date; al
   return { start: startIso, end: endIso, allDay: false }
 }
 
-/** Build a single VEVENT block inside VCALENDAR (RFC 5545 subset). */
-export function buildEventIcs(item: MarketingEventItem, uid?: string): string {
+function buildVeventLines(item: MarketingEventItem, uid?: string): string[] {
   const { start, end, allDay } = eventDateBounds(item)
   const eventUid = uid || `event-${item.id}@marketing-hub`
   const dtStamp = formatIcsUtc(new Date())
   const lines = [
-    "BEGIN:VCALENDAR",
-    "VERSION:2.0",
-    "PRODID:-//Marketing Hub//Event Calendar//EN",
-    "CALSCALE:GREGORIAN",
-    "METHOD:PUBLISH",
     "BEGIN:VEVENT",
     `UID:${eventUid}`,
     `DTSTAMP:${dtStamp}`,
@@ -68,17 +62,57 @@ export function buildEventIcs(item: MarketingEventItem, uid?: string): string {
   if (item.websiteUrl) {
     lines.push(`URL:${item.websiteUrl.startsWith("http") ? item.websiteUrl : `https://${item.websiteUrl}`}`)
   }
-  lines.push("END:VEVENT", "END:VCALENDAR")
+  lines.push("END:VEVENT")
+  return lines
+}
+
+/** Build a single VEVENT block inside VCALENDAR (RFC 5545 subset). */
+export function buildEventIcs(item: MarketingEventItem, uid?: string): string {
+  return [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Marketing Hub//Event Calendar//EN",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    ...buildVeventLines(item, uid),
+    "END:VCALENDAR",
+  ].join("\r\n")
+}
+
+/** Multiple events in one calendar file (Phase 2 bulk export). */
+export function buildCalendarIcs(items: MarketingEventItem[]): string {
+  const events = items.filter((i) => i.startDate)
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Marketing Hub//Event Calendar//EN",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+  ]
+  for (const item of events) {
+    lines.push(...buildVeventLines(item))
+  }
+  lines.push("END:VCALENDAR")
   return lines.join("\r\n")
 }
 
 export function downloadEventIcs(item: MarketingEventItem, filename?: string): void {
-  const ics = buildEventIcs(item)
+  downloadIcsContent(
+    buildEventIcs(item),
+    filename || `${item.eventName.replace(/[^\w.-]+/g, "_")}.ics`
+  )
+}
+
+export function downloadCalendarIcs(items: MarketingEventItem[], filename = "events.ics"): void {
+  downloadIcsContent(buildCalendarIcs(items), filename)
+}
+
+function downloadIcsContent(ics: string, filename: string): void {
   const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" })
   const url = URL.createObjectURL(blob)
   const a = document.createElement("a")
   a.href = url
-  a.download = filename || `${item.eventName.replace(/[^\w.-]+/g, "_")}.ics`
+  a.download = filename
   a.click()
   URL.revokeObjectURL(url)
 }

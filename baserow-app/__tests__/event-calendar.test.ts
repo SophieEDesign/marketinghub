@@ -13,12 +13,20 @@ import {
   DEFAULT_EVENT_CALENDAR_BLOCK_CONFIG,
   type MarketingEventItem,
 } from "@/lib/marketing/events"
-import { buildEventIcs } from "@/lib/marketing/event-calendar-ics"
+import { buildCalendarIcs, buildEventIcs } from "@/lib/marketing/event-calendar-ics"
 import {
   filterEventsByAudience,
   normalizeEventVisibility,
 } from "@/lib/marketing/event-calendar-visibility"
-import { eventCalendarOverridesFromConfig } from "@/lib/marketing/block-config-resolver"
+import {
+  eventCalendarOverridesFromConfig,
+  eventCalendarWorkflowFromConfig,
+  isPendingApprovalStatus,
+} from "@/lib/marketing/event-calendar-config"
+import {
+  attendeeIdsForLegacyColumn,
+  mergeAttendanceIntoEventItems,
+} from "@/lib/marketing/event-attendance"
 
 function sampleItem(overrides: Partial<MarketingEventItem> = {}): MarketingEventItem {
   return {
@@ -57,6 +65,7 @@ function sampleItem(overrides: Partial<MarketingEventItem> = {}): MarketingEvent
     accentColor: "#3B82F6",
     backgroundColor: "#3B82F61A",
     dateRangeLabel: "23–26 Sep 2026",
+    isPendingApproval: false,
     ...overrides,
   }
 }
@@ -217,10 +226,14 @@ describe("event calendar field mapping config keys", () => {
       event_calendar_title_field_id: "f-title",
       event_calendar_visibility_field_id: "f-vis",
       event_calendar_venue_field_id: "f-venue",
+      event_calendar_location_link_field_id: "f-loc-link",
+      event_calendar_owner_field_id: "f-owner",
     })
     expect(overrides.eventName?.fieldId).toBe("f-title")
     expect(overrides.visibility?.fieldId).toBe("f-vis")
     expect(overrides.venue?.fieldId).toBe("f-venue")
+    expect(overrides.location?.fieldId).toBe("f-loc-link")
+    expect(overrides.owner?.fieldId).toBe("f-owner")
   })
 })
 
@@ -238,6 +251,71 @@ describe("visibility filtering", () => {
   it("normalizes visibility labels", () => {
     expect(normalizeEventVisibility("Members Only")).toBe("members_only")
     expect(normalizeEventVisibility("internal")).toBe("internal_only")
+  })
+})
+
+describe("eventCalendarWorkflowFromConfig", () => {
+  it("parses workflow status values", () => {
+    const w = eventCalendarWorkflowFromConfig({
+      event_calendar_submitted_status_value: "Submitted",
+      event_calendar_approved_status_value: "Published",
+    })
+    expect(w.submittedStatus).toBe("Submitted")
+    expect(w.approvedStatus).toBe("Published")
+  })
+})
+
+describe("isPendingApprovalStatus", () => {
+  it("detects submitted statuses", () => {
+    expect(isPendingApprovalStatus("Submitted")).toBe(true)
+    expect(isPendingApprovalStatus("Published")).toBe(false)
+  })
+})
+
+describe("mergeAttendanceIntoEventItems", () => {
+  it("merges attending rows and current user status", () => {
+    const item = sampleItem({ id: "e1", attendeeIds: [], currentUserAttending: false })
+    const merged = mergeAttendanceIntoEventItems(
+      [item],
+      [{ event_id: "e1", user_id: "u1", attendance_status: "maybe" }],
+      "u1"
+    )
+    expect(merged[0].currentUserAttendanceStatus).toBe("maybe")
+    expect(merged[0].currentUserAttending).toBe(false)
+  })
+
+  it("syncs legacy attendee_user_ids when attending", () => {
+    const rows: { event_id: string; user_id: string; attendance_status: "attending" | "maybe" }[] =
+      []
+    const ids = attendeeIdsForLegacyColumn("e1", rows, ["legacy-u"], "u1", "attending")
+    expect(ids).toContain("u1")
+  })
+
+  it("removes user from legacy array on non-attending status", () => {
+    const rows = [{ event_id: "e1", user_id: "u1", attendance_status: "attending" as const }]
+    const ids = attendeeIdsForLegacyColumn("e1", rows, ["u1", "u2"], "u1", "maybe")
+    expect(ids).not.toContain("u1")
+  })
+
+  it("counts attending users from event_attendance table", () => {
+    const item = sampleItem({ id: "e1" })
+    const merged = mergeAttendanceIntoEventItems(
+      [item],
+      [
+        { event_id: "e1", user_id: "u1", attendance_status: "attending" },
+        { event_id: "e1", user_id: "u2", attendance_status: "attending" },
+      ],
+      null
+    )
+    expect(merged[0].attendeeCount).toBe(2)
+  })
+})
+
+describe("buildCalendarIcs", () => {
+  it("includes multiple VEVENT blocks", () => {
+    const ics = buildCalendarIcs([sampleItem(), sampleItem({ id: "e2", eventName: "Other" })])
+    const count = (ics.match(/BEGIN:VEVENT/g) || []).length
+    expect(count).toBe(2)
   })
 })
 
