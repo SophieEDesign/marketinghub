@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { PageBlock, BlockFilter } from "@/lib/interface/types"
+import type { RecordContextBlockConfig } from "@/lib/interface/block-config-types"
 import type { RecordContext } from "@/lib/interface/types"
 import { applyFiltersToQuery, normalizeFilter, type FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
@@ -53,8 +54,12 @@ export default function RecordContextBlock({
   rowHeight = ROW_HEIGHT_DEFAULT,
 }: RecordContextBlockProps) {
   const config = block.config || {}
-  const tableId = config.table_id ?? (config as any).tableId ?? pageTableId ?? null
-  const displayMode = config.display_mode ?? "list"
+  const tableId = config.table_id ?? (config as { tableId?: string }).tableId ?? pageTableId ?? null
+  const displayMode =
+    ((config as RecordContextBlockConfig).display_mode ?? "list") as
+      | "list"
+      | "grid"
+      | "compact"
   const showSearch = config.show_search !== false
   const showAddRecord = (config as any).show_add_record === true
 

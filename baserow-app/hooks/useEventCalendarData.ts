@@ -181,8 +181,8 @@ export function useEventCalendarData(options?: {
         const shouldFilterByContentType =
           !sourceLooksLikeDedicatedEventsTable && !!resolved.contentType
         const eventRows = shouldFilterByContentType
-          ? (contentRows || []).filter((row) =>
-              isEventContentRecord(row as Record<string, unknown>, resolved.contentType)
+          ? (contentRows || []).filter((row: Record<string, unknown>) =>
+              isEventContentRecord(row, resolved.contentType)
             )
           : (contentRows || [])
 

@@ -120,6 +120,9 @@ export async function PATCH(
   { params }: { params: { pageId: string } }
 ) {
   try {
+    const { admin, response } = await requireAdmin()
+    if (!admin && response) return response
+
     const supabase = await createClient()
     const body = await request.json()
     const {
@@ -145,9 +148,6 @@ export async function PATCH(
         { status: 500 }
       )
     }
-
-    const { admin, response } = await requireAdmin()
-    if (!admin && response) return response
 
     const updates: Record<string, unknown> = {
       updated_at: new Date().toISOString(),

@@ -158,9 +158,10 @@ export interface FieldBlockConfig extends BaseBlockConfig {
 export type HorizontalGroupedBlockConfig = BaseBlockConfig
 
 // Record Context Block Config (context setter only; no record_id in config)
-export interface RecordContextBlockConfig extends BaseBlockConfig {
+export interface RecordContextBlockConfig extends Omit<BaseBlockConfig, 'display_mode'> {
   table_id: string // Required - which table to list records from
   view_id?: string
+  /** Record list layout (distinct from grid block fit/fixed display_mode). */
   display_mode?: 'list' | 'grid' | 'compact'
 }
 
