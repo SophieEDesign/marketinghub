@@ -164,15 +164,18 @@ export default function CampaignsOverviewDataSettings({
           </MarketingFieldMappingSection>
 
           <SortSelector
-            config={config}
+            value={Array.isArray(config.sorts) ? config.sorts : undefined}
+            onChange={(sorts) => onUpdate({ sorts: sorts as BlockConfig["sorts"] })}
             fields={tableFields}
-            onUpdate={onUpdate}
+            allowMultiple
           />
 
           <BlockFilterEditor
             filters={blockFilters}
-            fields={tableFields}
+            tableFields={tableFields}
+            config={config}
             onChange={(filters) => onUpdate({ filters })}
+            onConfigUpdate={(updates) => onUpdate(updates)}
           />
         </>
       ) : null}

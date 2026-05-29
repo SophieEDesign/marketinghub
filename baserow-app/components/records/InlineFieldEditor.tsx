@@ -125,6 +125,7 @@ export default function InlineFieldEditor({
   }
 
   const handleBlur = () => {
+    if (!field) return
     const committed =
       field.type === "date"
         ? localValue
@@ -137,6 +138,7 @@ export default function InlineFieldEditor({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!field) return
     if (e.key === "Enter" && field.type !== "long_text") {
       e.preventDefault()
       handleBlur()
@@ -148,6 +150,7 @@ export default function InlineFieldEditor({
 
   // Handle paste - block for lookup fields, allow for linked fields
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    if (!field) return
     if (field.type === "lookup") {
       e.preventDefault()
       toast({
@@ -158,15 +161,7 @@ export default function InlineFieldEditor({
       return
     }
     // For linked fields, paste is handled by LookupFieldPicker
-  }, [field.type, toast])
-
-  const isVirtual = field.type === "formula" || field.type === "lookup"
-  // Use prop override first, then check field-level read-only, then virtual
-  const isReadOnly = propIsReadOnly !== undefined ? propIsReadOnly : (isVirtual || field.options?.read_only)
-  
-  // Determine if this is a lookup field (derived) vs linked field (editable)
-  const isLookupField = field.type === "lookup"
-  const isLinkedField = field.type === "link_to_table"
+  }, [field, toast])
 
   // Handle modal save - called when RecordModal saves successfully
   // Must be at top level (before conditional returns) to satisfy React hooks rules
@@ -193,6 +188,12 @@ export default function InlineFieldEditor({
   }, [createRecordResolve])
 
   if (!field) return null
+
+  const isVirtual = field.type === "formula" || field.type === "lookup"
+  const isReadOnly =
+    propIsReadOnly !== undefined ? propIsReadOnly : isVirtual || field.options?.read_only
+  const isLookupField = field.type === "lookup"
+  const isLinkedField = field.type === "link_to_table"
 
   // Linked records and lookup fields - use LookupFieldPicker
   if (field.type === "link_to_table" || field.type === "lookup") {
