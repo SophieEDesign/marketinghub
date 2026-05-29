@@ -6,7 +6,6 @@ import { fetchProfileLabelById } from "@/lib/users/profile-labels"
 import {
   contentTimelineOverridesFromConfig,
   isMarketingMockEnabled,
-  resolveMarketingTable,
 } from "@/lib/marketing/block-config-resolver"
 import { applyMarketingBlockDataQuery } from "@/lib/marketing/block-data-query"
 import {
@@ -16,8 +15,9 @@ import {
 } from "@/lib/marketing/content-timeline-data"
 import {
   findCampaignsTable,
-  findContentTable,
   findQuarterlyThemesTable,
+  findSocialPostsTable,
+  resolveContentTimelineSourceTables,
   type MarketingTableRow,
 } from "@/lib/marketing/marketing-tables"
 import type { ContentPlanningTableIds } from "@/lib/marketing/content-planning"
@@ -98,11 +98,15 @@ export function useContentTimelineData(options?: {
         }
 
         const registry = tables as MarketingTableRow[]
-        const content = resolveMarketingTable(registry, config?.table_id, findContentTable)
+        const sourceTables = resolveContentTimelineSourceTables(registry, {
+          tableId: config?.table_id,
+          includeSocialPosts: config?.content_timeline_include_social_posts !== false,
+        })
+        const primary = sourceTables[0]
         const campaigns = findCampaignsTable(registry)
         const themes = findQuarterlyThemesTable(registry)
 
-        if (!content?.supabase_table) {
+        if (!primary?.supabase_table) {
           setHasTable(false)
           throw new Error("Content table not found — select a source table in block settings")
         }
@@ -110,15 +114,21 @@ export function useContentTimelineData(options?: {
         setHasTable(true)
 
         const ids: ContentPlanningTableIds = {
-          contentTableId: content.id,
-          contentSupabaseTable: content.supabase_table,
-          campaignsTableId: campaigns?.id ?? content.id,
-          campaignsSupabaseTable: campaigns?.supabase_table ?? content.supabase_table,
-          themesTableId: themes?.id ?? content.id,
-          themesSupabaseTable: themes?.supabase_table ?? content.supabase_table,
+          contentTableId: primary.id,
+          contentSupabaseTable: primary.supabase_table,
+          campaignsTableId: campaigns?.id ?? primary.id,
+          campaignsSupabaseTable: campaigns?.supabase_table ?? primary.supabase_table,
+          themesTableId: themes?.id ?? primary.id,
+          themesSupabaseTable: themes?.supabase_table ?? primary.supabase_table,
         }
 
-        const tableIdList = [content.id, campaigns?.id, themes?.id].filter(Boolean) as string[]
+        const tableIdList = [
+          ...new Set([
+            ...sourceTables.map((t) => t.id),
+            campaigns?.id,
+            themes?.id,
+          ].filter(Boolean)),
+        ] as string[]
 
         const { data: fieldRows, error: fieldsErr } = await supabase
           .from("table_fields")
@@ -127,9 +137,6 @@ export function useContentTimelineData(options?: {
 
         if (fieldsErr) throw new Error(fieldsErr.message)
 
-        const contentFieldRows = (fieldRows?.filter((f) => f.table_id === content.id) || []).map(
-          mapFieldRow
-        )
         const campaignFieldRows = (fieldRows?.filter((f) => f.table_id === campaigns?.id) || []).map(
           mapFieldRow
         )
@@ -137,25 +144,7 @@ export function useContentTimelineData(options?: {
           mapFieldRow
         )
 
-        const fieldIds = contentFieldRows.map((f) => ({
-          id: f.id || f.name,
-          name: f.name,
-        }))
-
-        const fieldMap = resolveContentPlanningFields(
-          contentFieldRows,
-          campaignFieldRows,
-          themeFieldRows,
-          contentTimelineOverridesFromConfig(config),
-          fieldIds
-        )
-
-        const [contentRes, themesRes, campaignsRes] = await Promise.all([
-          applyMarketingBlockDataQuery(
-            supabase.from(content.supabase_table).select("*"),
-            config,
-            contentFieldRows
-          ),
+        const [themesRes, campaignsRes] = await Promise.all([
           themes?.supabase_table
             ? supabase.from(themes.supabase_table).select("*").order("created_at", { ascending: true })
             : Promise.resolve({ data: [], error: null }),
@@ -164,43 +153,86 @@ export function useContentTimelineData(options?: {
             : Promise.resolve({ data: [], error: null }),
         ])
 
-        if (contentRes.error) throw new Error(contentRes.error.message)
-
-        const contentRows = (contentRes.data || []) as Record<string, unknown>[]
         const themeRows = (themesRes.data || []) as Record<string, unknown>[]
         const campaignRows = (campaignsRes.data || []) as Record<string, unknown>[]
 
-        const { labelById: themeLabelById } = buildThemeMaps(themeRows, fieldMap)
-
-        const campaignLabelById = new Map<string, string>()
-        for (const row of campaignRows) {
-          campaignLabelById.set(
-            String(row.id),
-            formatDisplayValue(row[fieldMap.campaignName]) || "Campaign"
-          )
-        }
-
         const profileLabelById = await fetchProfileLabelById(supabase)
 
-        const planningItems = buildContentItems({
-          contentRows,
-          fields: fieldMap,
-          contentFields: contentFieldRows,
-          themeLabelById,
-          themeColorById: new Map(),
-        })
+        const campaignLabelById = new Map<string, string>()
+        const socialPostsTable = findSocialPostsTable(registry)
+        const isSocialPostsTable = (tableId: string) =>
+          socialPostsTable?.id === tableId
 
-        const timelineItems = buildContentTimelineItems({
-          contentRows,
-          fields: fieldMap,
-          contentFields: contentFieldRows,
-          planningItems,
-          campaignLabelById,
-          profileLabelById,
-          contentTableId: content.id,
-          contentSupabaseTable: content.supabase_table,
-          excludeEventTypes,
-        })
+        const timelineItems: ContentTimelineItem[] = []
+
+        for (const sourceTable of sourceTables) {
+          const contentFieldRows = (fieldRows?.filter((f) => f.table_id === sourceTable.id) || []).map(
+            mapFieldRow
+          )
+          const fieldIds = contentFieldRows.map((f) => ({
+            id: f.id || f.name,
+            name: f.name,
+          }))
+
+          const fieldMap = resolveContentPlanningFields(
+            contentFieldRows,
+            campaignFieldRows,
+            themeFieldRows,
+            contentTimelineOverridesFromConfig(config),
+            fieldIds
+          )
+
+          const { labelById: themeLabelById } = buildThemeMaps(themeRows, fieldMap)
+
+          for (const row of campaignRows) {
+            campaignLabelById.set(
+              String(row.id),
+              formatDisplayValue(row[fieldMap.campaignName]) || "Campaign"
+            )
+          }
+
+          const applyBlockFilters = sourceTable.id === primary.id
+          const contentQuery = applyBlockFilters
+            ? applyMarketingBlockDataQuery(
+                supabase.from(sourceTable.supabase_table).select("*"),
+                config,
+                contentFieldRows
+              )
+            : supabase
+                .from(sourceTable.supabase_table)
+                .select("*")
+                .order("created_at", { ascending: true })
+
+          const contentRes = await contentQuery
+          if (contentRes.error) throw new Error(contentRes.error.message)
+
+          const contentRows = (contentRes.data || []) as Record<string, unknown>[]
+
+          const planningItems = buildContentItems({
+            contentRows,
+            fields: fieldMap,
+            contentFields: contentFieldRows,
+            themeLabelById,
+            themeColorById: new Map(),
+          })
+
+          const fromSocialTable = isSocialPostsTable(sourceTable.id)
+
+          timelineItems.push(
+            ...buildContentTimelineItems({
+              contentRows,
+              fields: fieldMap,
+              contentFields: contentFieldRows,
+              planningItems,
+              campaignLabelById,
+              profileLabelById,
+              contentTableId: sourceTable.id,
+              contentSupabaseTable: sourceTable.supabase_table,
+              excludeEventTypes: fromSocialTable ? false : excludeEventTypes,
+              defaultTimelineType: fromSocialTable ? "social" : undefined,
+            })
+          )
+        }
 
         if (cancelled) return
         setTableIds(ids)

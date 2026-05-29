@@ -151,9 +151,21 @@ export function resolveContentPlanningFields(
     contentFieldIds ||
     contentFields.map((f) => ({ id: (f as { id?: string }).id || f.name, name: f.name }))
   const base: ContentPlanningFieldMap = {
-    contentName: pickFieldName(contentFields, [/content_name/i, /^name$/i, /title/i], "content_name")!,
-    contentDate: pickFieldName(contentFields, [/^date$/i, /publish_date/i], null),
-    contentDueDate: pickFieldName(contentFields, [/date_due/i, /due_date/i], null),
+    contentName: pickFieldName(
+      contentFields,
+      [/content_name/i, /^name$/i, /title/i, /^caption$/i, /post_title/i],
+      "content_name"
+    )!,
+    contentDate: pickFieldName(
+      contentFields,
+      [/^date$/i, /publish_date/i, /post_date/i, /scheduled_date/i, /go_live/i, /scheduled_for/i],
+      null
+    ),
+    contentDueDate: pickFieldName(
+      contentFields,
+      [/date_due/i, /due_date/i, /scheduled_date/i, /post_date/i],
+      null
+    ),
     contentStatus: pickFieldName(contentFields, [/^status$/i], null),
     contentType: pickFieldName(contentFields, [/content_type/i, /^type$/i], null),
     contentTheme: pickFieldName(contentFields, [/quarterly_theme/i, /^theme$/i], null),

@@ -6,11 +6,16 @@ import {
 } from "@/lib/marketing/block-config-resolver"
 import { validateBlockConfig } from "@/lib/interface/block-config-types"
 import type { BlockConfig } from "@/lib/interface/types"
-import { findContentTable, type MarketingTableRow } from "@/lib/marketing/marketing-tables"
+import {
+  findContentTable,
+  resolveContentTimelineSourceTables,
+  type MarketingTableRow,
+} from "@/lib/marketing/marketing-tables"
 
 const REGISTRY: MarketingTableRow[] = [
   { id: "t-content", name: "Content", supabase_table: "content_rows" },
   { id: "t-campaigns", name: "Campaigns", supabase_table: "campaigns_rows" },
+  { id: "t-social", name: "Social Posts", supabase_table: "social_posts_rows" },
 ]
 
 const FIELDS = [
@@ -29,6 +34,20 @@ describe("fieldNameFromConfig", () => {
 
   it("falls back to stored name even when field id is missing", () => {
     expect(fieldNameFromConfig(FIELDS, "missing", "also_missing")).toBe("also_missing")
+  })
+})
+
+describe("resolveContentTimelineSourceTables", () => {
+  it("merges Content and Social Posts when auto-discovering", () => {
+    const tables = resolveContentTimelineSourceTables(REGISTRY)
+    expect(tables.map((t) => t.id)).toEqual(["t-content", "t-social"])
+  })
+
+  it("uses only explicit table_id when set", () => {
+    const tables = resolveContentTimelineSourceTables(REGISTRY, {
+      tableId: "t-social",
+    })
+    expect(tables.map((t) => t.id)).toEqual(["t-social"])
   })
 })
 

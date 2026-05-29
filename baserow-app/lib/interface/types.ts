@@ -389,6 +389,8 @@ export interface BlockConfig {
   content_timeline_show_status_badges?: boolean
   content_timeline_show_owner_initials?: boolean
   content_timeline_enable_detail_panel?: boolean
+  /** When true (default), auto-discovery loads Social Posts table alongside Content. */
+  content_timeline_include_social_posts?: boolean
   content_timeline_compact_mode?: boolean
   content_timeline_preset?: 'marketing_home' | 'default'
   content_timeline_show_footer_link?: boolean

@@ -119,7 +119,9 @@ export default function ContentTimelineBlock({
   }))
 
   useEffect(() => {
-    if (!isMarketingHomePreset && !demoState.useLiveData) {
+    if (demoState.useLiveData) {
+      setAnchorDate(new Date())
+    } else if (!isMarketingHomePreset) {
       setAnchorDate(parseISO("2025-05-21T12:00:00"))
     }
   }, [isMarketingHomePreset, demoState.useLiveData])

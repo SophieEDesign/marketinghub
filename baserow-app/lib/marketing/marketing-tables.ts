@@ -49,6 +49,47 @@ export function findContentTable(tables: MarketingTableRow[]): MarketingTableRow
   return ranked[0]?.table
 }
 
+/** Dedicated Social Posts table (not the main Content planner table). */
+export function findSocialPostsTable(
+  tables: MarketingTableRow[]
+): MarketingTableRow | undefined {
+  return tables.find((t) => {
+    const n = String(t.name).trim().toLowerCase()
+    if (n === "social posts" || n === "social post") return true
+    return /social/.test(n) && /post/.test(n) && !/content planner|content planning/.test(n)
+  })
+}
+
+/**
+ * Tables to load for Content Timeline.
+ * When no table_id is set, merges Content + Social Posts (if both exist).
+ */
+export function resolveContentTimelineSourceTables(
+  tables: MarketingTableRow[],
+  options?: {
+    tableId?: string
+    includeSocialPosts?: boolean
+  }
+): MarketingTableRow[] {
+  const explicitId = options?.tableId?.trim()
+  const primary = explicitId
+    ? tables.find((t) => t.id === explicitId)
+    : findContentTable(tables)
+
+  if (!primary) return []
+
+  const includeSocial =
+    options?.includeSocialPosts !== false && !explicitId
+
+  if (!includeSocial) return [primary]
+
+  const social = findSocialPostsTable(tables)
+  if (social && social.id !== primary.id) {
+    return [primary, social]
+  }
+  return [primary]
+}
+
 export function findCampaignsTable(tables: MarketingTableRow[]): MarketingTableRow | undefined {
   return tables.find((t) => /campaign/i.test(t.name) && !/content/i.test(t.name))
 }

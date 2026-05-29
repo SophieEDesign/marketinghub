@@ -101,6 +101,8 @@ export function buildContentTimelineItems(params: {
   contentTableId: string
   contentSupabaseTable: string
   excludeEventTypes?: boolean
+  /** When set (e.g. dedicated Social Posts table), overrides type inference from content_type. */
+  defaultTimelineType?: ContentTimelineItemType
 }): ContentTimelineItem[] {
   const {
     contentRows,
@@ -112,6 +114,7 @@ export function buildContentTimelineItems(params: {
     contentTableId,
     contentSupabaseTable,
     excludeEventTypes = true,
+    defaultTimelineType,
   } = params
 
   const planningById = new Map(planningItems.map((p) => [p.id, p]))
@@ -184,7 +187,7 @@ export function buildContentTimelineItems(params: {
       id,
       title,
       theme: themeLabel,
-      type: mapContentTypeToTimelineType(contentType),
+      type: defaultTimelineType ?? mapContentTypeToTimelineType(contentType),
       channel: mapChannel(row, "channels"),
       status: mapContentStatusToTimelineStatus(statusRaw),
       owner: ownerLabel ?? undefined,

@@ -251,6 +251,20 @@ export default function ContentTimelineDataSettings({
 
       <div className="space-y-3 pt-2 border-t">
         <p className="text-xs font-medium text-muted-foreground">Display</p>
+        {!config.table_id ? (
+          <div className="flex items-center justify-between">
+            <Label htmlFor="content_timeline_include_social_posts">
+              Include Social Posts table
+            </Label>
+            <Switch
+              id="content_timeline_include_social_posts"
+              checked={config.content_timeline_include_social_posts !== false}
+              onCheckedChange={(v) =>
+                onUpdate({ content_timeline_include_social_posts: v })
+              }
+            />
+          </div>
+        ) : null}
         {(
           [
             ["content_timeline_show_filters", "Show filters", true],
