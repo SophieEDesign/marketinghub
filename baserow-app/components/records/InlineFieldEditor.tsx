@@ -26,7 +26,7 @@ import { sanitizeRichText } from "@/lib/sanitize"
 import { FIELD_LABEL_CLASS_NO_MARGIN, FIELD_LABEL_GAP_CLASS } from "@/lib/fields/field-label"
 
 interface InlineFieldEditorProps {
-  field: TableField
+  field?: TableField | null
   value: any
   onChange: (value: any) => void
   onBlur?: (value: any) => void
@@ -81,7 +81,7 @@ export default function InlineFieldEditor({
   const containerClassName = showLabel ? FIELD_LABEL_GAP_CLASS : ""
   
   // Check if this is a user field and fetch display name
-  const isUserFieldType = isUserField(field.name)
+  const isUserFieldType = field ? isUserField(field.name) : false
   
   useEffect(() => {
     if (isUserFieldType && value && typeof value === "string") {
@@ -191,6 +191,8 @@ export default function InlineFieldEditor({
     setCreateRecordTableId(null)
     setCreateRecordTableFields([])
   }, [createRecordResolve])
+
+  if (!field) return null
 
   // Linked records and lookup fields - use LookupFieldPicker
   if (field.type === "link_to_table" || field.type === "lookup") {

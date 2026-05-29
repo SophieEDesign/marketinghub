@@ -105,6 +105,7 @@ export interface BlockConfig {
   /** When true, this block is the single full-page block (content page only). Stored in config; no DB column. */
   is_full_page?: boolean
   title?: string
+  subtitle?: string
   table_id?: string
   view_id?: string
   view_type?: ViewType // View type for grid blocks (grid, kanban, calendar, gallery, timeline)
@@ -649,37 +650,38 @@ export interface BlockConfig {
   campaigns_show_progress?: boolean
   campaigns_show_thumbnails?: boolean
   campaigns_density?: "comfortable" | "compact"
+  /** @deprecated Use subtitle */
   campaigns_subtitle?: string
-  title_field_id?: string
-  title_field?: string
-  type_field_id?: string
-  type_field?: string
-  division_field_id?: string
-  division_field?: string
-  status_field_id?: string
-  status_field?: string
-  priority_field_id?: string
-  priority_field?: string
-  stage_field_id?: string
-  stage_field?: string
-  start_date_field_id?: string
-  start_date_field?: string
-  end_date_field_id?: string
-  end_date_field?: string
-  owner_field_id?: string
-  owner_field?: string
-  progress_field_id?: string
-  progress_field?: string
-  image_field_id?: string
-  image_field?: string
-  linked_content_field_id?: string
-  linked_content_field?: string
-  linked_tasks_field_id?: string
-  linked_tasks_field?: string
-  linked_events_field_id?: string
-  linked_events_field?: string
-  click_action?: "open_record" | "none"
-  open_record_mode?: "modal" | "side_panel"
+  campaigns_title_field_id?: string
+  campaigns_title_field?: string
+  campaigns_type_field_id?: string
+  campaigns_type_field?: string
+  campaigns_division_field_id?: string
+  campaigns_division_field?: string
+  campaigns_status_field_id?: string
+  campaigns_status_field?: string
+  campaigns_priority_field_id?: string
+  campaigns_priority_field?: string
+  campaigns_stage_field_id?: string
+  campaigns_stage_field?: string
+  campaigns_start_date_field_id?: string
+  campaigns_start_date_field?: string
+  campaigns_end_date_field_id?: string
+  campaigns_end_date_field?: string
+  campaigns_owner_field_id?: string
+  campaigns_owner_field?: string
+  campaigns_progress_field_id?: string
+  campaigns_progress_field?: string
+  campaigns_image_field_id?: string
+  campaigns_image_field?: string
+  campaigns_linked_content_field_id?: string
+  campaigns_linked_content_field?: string
+  campaigns_linked_tasks_field_id?: string
+  campaigns_linked_tasks_field?: string
+  campaigns_linked_events_field_id?: string
+  campaigns_linked_events_field?: string
+  campaigns_click_action?: "open_record" | "none"
+  campaigns_open_record_mode?: "modal" | "side_panel"
   // List block specific config (at root level for backward compatibility)
   list_title_field?: string
   list_subtitle_fields?: string[]

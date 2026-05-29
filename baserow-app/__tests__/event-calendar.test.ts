@@ -11,6 +11,7 @@ import {
   filterEventItems,
   eventCalendarSettingsFromConfig,
   DEFAULT_EVENT_CALENDAR_BLOCK_CONFIG,
+  resolveContentEventFields,
   type MarketingEventItem,
 } from "@/lib/marketing/events"
 import { buildCalendarIcs, buildEventIcs } from "@/lib/marketing/event-calendar-ics"
@@ -216,6 +217,23 @@ describe("eventCalendarSettingsFromConfig behaviour", () => {
     expect(settings.externalMode).toBe(true)
     expect(settings.clickAction).toBe("none")
     expect(settings.allowAttendanceUpdates).toBe(false)
+  })
+})
+
+describe("resolveContentEventFields content dates", () => {
+  it("prefers date and date_to columns on Content-shaped schemas", () => {
+    const fields = [
+      { name: "content_name" },
+      { name: "content_type" },
+      { name: "date" },
+      { name: "date_to" },
+      { name: "status" },
+    ]
+    const resolved = resolveContentEventFields(fields)
+    expect(resolved.eventName).toBe("content_name")
+    expect(resolved.startDate).toBe("date")
+    expect(resolved.endDate).toBe("date_to")
+    expect(resolved.contentType).toBe("content_type")
   })
 })
 

@@ -455,7 +455,7 @@ export default function FieldBlock({
     )
   }
 
-  // Loading state
+  // Loading state (guard: never render InlineFieldEditor without field)
   if (loading || !field) {
     return (
       <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">

@@ -106,7 +106,22 @@ const MARKETING_TYPES = [
 ] as const
 
 describe("validateBlockConfig marketing blocks", () => {
-  it("allows saving with table_id and field mapping keys", () => {
+  it("allows campaigns_overview with canonical config keys", () => {
+    const config: BlockConfig = {
+      title: "Test",
+      subtitle: "Overview",
+      table_id: "t-content",
+      view_id: "v1",
+      campaigns_use_mock: false,
+      campaigns_title_field_id: "f1",
+      campaigns_title_field: "campaign_name",
+      campaigns_max_items: 50,
+    }
+    const result = validateBlockConfig("campaigns_overview", config)
+    expect(result.valid).toBe(true)
+  })
+
+  it("allows content_timeline with table_id and field mapping keys", () => {
     const config: BlockConfig = {
       title: "Test",
       table_id: "t-content",

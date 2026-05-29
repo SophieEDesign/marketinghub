@@ -11,6 +11,7 @@ import {
   formatDateRange,
   type CampaignOverviewFilters,
 } from "@/lib/marketing/campaigns-overview"
+import { campaignsOverviewSubtitle } from "@/lib/marketing/campaigns-overview-config"
 import { useRecordModal } from "@/contexts/RecordModalContext"
 import MarketingDemoDataBanner from "@/components/interface/primitives/MarketingDemoDataBanner"
 import DashboardEmpty from "@/components/interface/primitives/DashboardEmpty"
@@ -65,6 +66,12 @@ export default function CampaignsOverviewBlock({ block, isEditing = false }: Cam
   }, [items])
 
   const dense = config?.campaigns_density === "compact"
+  const subtitle = campaignsOverviewSubtitle(config)
+  const appearance = config?.appearance || {}
+  const showTitle =
+    (appearance.showTitle ?? (appearance as { show_title?: boolean }).show_title) !== false
+  const clickAction =
+    config?.campaigns_click_action ?? config?.click_action ?? "open_record"
   const updateFilter = (key: keyof CampaignOverviewFilters, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }))
   }
@@ -81,9 +88,7 @@ export default function CampaignsOverviewBlock({ block, isEditing = false }: Cam
     return (
       <div data-block-selectable className="flex h-full min-h-[240px] flex-col rounded-2xl border border-border/40 bg-background p-6">
         <h2 className="text-xl font-semibold text-foreground">{config?.title || "Campaigns"}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {config?.campaigns_subtitle || "Plan, manage and track all marketing campaigns."}
-        </p>
+        <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
         <div className="mt-4">
           <DashboardEmpty
             title="No Campaigns table connected"
@@ -100,12 +105,14 @@ export default function CampaignsOverviewBlock({ block, isEditing = false }: Cam
       {showDemoBanner ? <MarketingDemoDataBanner message={demoMessage} /> : null}
       <div className="border-b border-border/40 px-5 py-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-semibold text-foreground">{config?.title || "Campaigns"}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {config?.campaigns_subtitle || "Plan, manage and track all marketing campaigns."}
-            </p>
-          </div>
+          {showTitle ? (
+            <div>
+              <h2 className="text-xl font-semibold text-foreground">{config?.title || "Campaigns"}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+            </div>
+          ) : (
+            <div />
+          )}
           <div className="flex items-center gap-2">
             {config?.campaigns_show_search !== false ? (
               <div className="relative">
@@ -217,7 +224,7 @@ export default function CampaignsOverviewBlock({ block, isEditing = false }: Cam
                   dense ? "h-10" : "h-14"
                 )}
                 onClick={() => {
-                  if (isEditing || config?.click_action === "none") return
+                  if (isEditing || clickAction === "none") return
                   if (!item.recordTableId || !item.recordSupabaseTable) return
                   openRecordModal({
                     tableId: item.recordTableId,

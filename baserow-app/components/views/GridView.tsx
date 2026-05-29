@@ -1,5 +1,10 @@
 "use client"
 
+/**
+ * @deprecated This component is not used anywhere. Core Data grid views use AirtableViewPage → AirtableGridView.
+ * Interface builder grid blocks use GridBlock → GridViewWrapper → components/grid/GridView.tsx.
+ * See docs/GRID_AND_VIEW_USAGE.md for when to use which grid.
+ */
 import { useState, useEffect, useRef } from "react"
 import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"

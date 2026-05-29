@@ -4,6 +4,7 @@
 
 import type { MarketingEventItem } from "@/lib/marketing/events"
 import { accentBackground, eventTypeAccentColor, formatEventDateRange } from "@/lib/marketing/events"
+import { isPendingApprovalStatus } from "@/lib/marketing/event-calendar-config"
 
 function mockItem(partial: Partial<MarketingEventItem> & Pick<MarketingEventItem, "id" | "eventName" | "startDate">): MarketingEventItem {
   const eventType = partial.eventType ?? "Conference"
@@ -45,7 +46,8 @@ function mockItem(partial: Partial<MarketingEventItem> & Pick<MarketingEventItem
     accentColor: accent,
     backgroundColor: accentBackground(accent),
     dateRangeLabel: formatEventDateRange(start, end),
-    isPendingApproval: partial.isPendingApproval ?? false,
+    isPendingApproval:
+      partial.isPendingApproval ?? isPendingApprovalStatus(partial.status ?? "Published"),
   }
 }
 

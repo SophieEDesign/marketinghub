@@ -359,6 +359,7 @@ export default function FieldSectionBlock({
         {!collapsed && (
           <div className="space-y-3 pl-2">
             {fields.map((field) => {
+              if (!field) return null
               const value = fieldValues[field.id]
               const isThisEditing = editingField === field.id
               const isEditable = isEditing && !field.options?.system && field.type !== "formula" && field.type !== "lookup"

@@ -107,7 +107,7 @@ BEGIN
 
   v_config := jsonb_build_object(
     'title', 'Campaigns',
-    'campaigns_subtitle', 'Plan, manage and track all marketing campaigns.',
+    'subtitle', 'Plan, manage and track all marketing campaigns.',
     'campaigns_default_view', 'list',
     'campaigns_show_search', true,
     'campaigns_show_filters', true,
@@ -116,8 +116,8 @@ BEGIN
     'campaigns_show_thumbnails', true,
     'campaigns_density', 'comfortable',
     'campaigns_max_items', 200,
-    'click_action', 'open_record',
-    'open_record_mode', 'modal',
+    'campaigns_click_action', 'open_record',
+    'campaigns_open_record_mode', 'modal',
     'appearance', jsonb_build_object('showTitle', true)
   );
 

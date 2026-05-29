@@ -110,6 +110,15 @@ Interface pages can include blocks arranged using react-grid-layout. Supported b
 - **Table**: Embed another table view
 - **Automation**: Automation workflow display
 
+## Security
+
+- **Auth model**: Session-based auth via Supabase; protected routes require an authenticated user. Middleware enforces this for `/api/*` (except allowlisted routes) and page access.
+- **Authorization**: Row Level Security (RLS) on Supabase tables is the primary enforcement. Some routes also perform app-level checks (e.g. `isAdmin()`, `getUserRole()`) for admin-only or role-scoped actions.
+- **Admin vs member**: Admin users (role in `profiles` or legacy `user_roles`) can access Core Data (tables/views), settings, and user management; members have access according to RLS and page-level rules.
+- **Public API routes**: Only routes explicitly allowlisted (e.g. `/api/workspace-settings`, auth callbacks) are public; all other `/api/*` routes require an authenticated session.
+- **Secrets**: `SUPABASE_SERVICE_ROLE_KEY` must be used only on the server (API routes, server components). Never expose it in client-side code or commit it to version control.
+- **AUTH_BYPASS**: Development-only flag to skip auth checks. Never enable in production.
+
 ## Access Controls
 
 Tables support four access control levels:

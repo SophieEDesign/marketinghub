@@ -646,8 +646,9 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
     minHeight: 8,
     defaultConfig: {
       title: 'Campaigns',
-      campaigns_subtitle: 'Plan, manage and track all marketing campaigns.',
+      subtitle: 'Plan, manage and track all marketing campaigns.',
       table_id: '',
+      campaigns_use_mock: false,
       campaigns_default_view: 'list',
       campaigns_show_search: true,
       campaigns_show_filters: true,
@@ -656,8 +657,8 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       campaigns_show_thumbnails: true,
       campaigns_density: 'comfortable',
       campaigns_max_items: 100,
-      click_action: 'open_record',
-      open_record_mode: 'modal',
+      campaigns_click_action: 'open_record',
+      campaigns_open_record_mode: 'modal',
       appearance: { showTitle: false },
     },
     applicableSettings: {

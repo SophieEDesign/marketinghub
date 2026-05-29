@@ -33,6 +33,9 @@ export default function EventMemberSubmissionSheet({
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
   const [location, setLocation] = useState("")
+  const [city, setCity] = useState("")
+  const [country, setCountry] = useState("")
+  const [venue, setVenue] = useState("")
   const [description, setDescription] = useState("")
   const [website, setWebsite] = useState("")
   const [submitting, setSubmitting] = useState(false)
@@ -52,6 +55,9 @@ export default function EventMemberSubmissionSheet({
       if (fields.startDate && startDate) row[fields.startDate] = startDate
       if (fields.endDate && endDate) row[fields.endDate] = endDate
       if (fields.locationName && location) row[fields.locationName] = location
+      if (fields.city && city) row[fields.city] = city
+      if (fields.country && country) row[fields.country] = country
+      if (fields.venue && venue) row[fields.venue] = venue
       if (fields.description && description) row[fields.description] = description
       if (fields.website && website) row[fields.website] = website
       if (fields.contentType) row[fields.contentType] = workflow.contentTypeDefault
@@ -68,6 +74,9 @@ export default function EventMemberSubmissionSheet({
       setStartDate("")
       setEndDate("")
       setLocation("")
+      setCity("")
+      setCountry("")
+      setVenue("")
       setDescription("")
       setWebsite("")
     } catch (e) {
@@ -152,6 +161,28 @@ export default function EventMemberSubmissionSheet({
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                 />
+              </div>
+            ) : null}
+            {fields.city ? (
+              <div className="space-y-2">
+                <Label htmlFor="es-city">City</Label>
+                <Input id="es-city" value={city} onChange={(e) => setCity(e.target.value)} />
+              </div>
+            ) : null}
+            {fields.country ? (
+              <div className="space-y-2">
+                <Label htmlFor="es-country">Country</Label>
+                <Input
+                  id="es-country"
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                />
+              </div>
+            ) : null}
+            {fields.venue ? (
+              <div className="space-y-2">
+                <Label htmlFor="es-venue">Venue</Label>
+                <Input id="es-venue" value={venue} onChange={(e) => setVenue(e.target.value)} />
               </div>
             ) : null}
             {fields.description ? (

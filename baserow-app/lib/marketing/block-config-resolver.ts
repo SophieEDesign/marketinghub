@@ -409,3 +409,10 @@ export {
   eventCalendarWorkflowFromConfig,
   isPendingApprovalStatus,
 } from "@/lib/marketing/event-calendar-config"
+
+export {
+  campaignsOverviewOverridesFromConfig,
+  resolveCampaignOverviewFields,
+  campaignsOverviewSubtitle,
+  campaignsOverviewMaxItems,
+} from "@/lib/marketing/campaigns-overview-config"

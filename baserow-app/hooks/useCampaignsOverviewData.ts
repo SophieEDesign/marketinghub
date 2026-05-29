@@ -10,8 +10,13 @@ import {
   marketingDemoState,
   MARKETING_DEMO_BANNER_DEFAULT,
   resolveMarketingTable,
-  fieldNameFromConfig,
 } from "@/lib/marketing/block-config-resolver"
+import { applyMarketingBlockDataQuery } from "@/lib/marketing/block-data-query"
+import {
+  campaignsOverviewMaxItems,
+  campaignsOverviewOverridesFromConfig,
+  resolveCampaignOverviewFields,
+} from "@/lib/marketing/campaigns-overview-config"
 import { findCampaignsTable, type MarketingTableRow } from "@/lib/marketing/marketing-tables"
 import {
   CAMPAIGNS_OVERVIEW_MOCK,
@@ -19,22 +24,6 @@ import {
   toCount,
   type CampaignOverviewItem,
 } from "@/lib/marketing/campaigns-overview"
-
-function pickFieldName(
-  fields: Array<{ id: string; name: string }>,
-  exact: string[],
-  includes: string[]
-): string | null {
-  for (const name of exact) {
-    const hit = fields.find((f) => f.name.toLowerCase() === name)
-    if (hit) return hit.name
-  }
-  for (const needle of includes) {
-    const hit = fields.find((f) => f.name.toLowerCase().includes(needle))
-    if (hit) return hit.name
-  }
-  return null
-}
 
 export interface UseCampaignsOverviewDataResult {
   loading: boolean
@@ -99,74 +88,40 @@ export function useCampaignsOverviewData(config?: BlockConfig): UseCampaignsOver
 
         const { data: fields, error: fieldsErr } = await supabase
           .from("table_fields")
-          .select("id, name")
+          .select("id, name, type, options")
           .eq("table_id", campaignsTable.id)
 
         if (fieldsErr) throw new Error(fieldsErr.message)
-        const tableFields = (fields || []) as Array<{ id: string; name: string }>
+        const tableFields = (fields || []) as Array<{
+          id: string
+          name: string
+          type?: string
+          options?: unknown
+        }>
 
-        const titleField =
-          fieldNameFromConfig(tableFields, config?.title_field_id, config?.title_field) ||
-          pickFieldName(tableFields, ["campaign_name", "name", "title"], ["campaign", "name"]) ||
-          "name"
-        const typeField =
-          fieldNameFromConfig(tableFields, config?.type_field_id, config?.type_field) ||
-          pickFieldName(tableFields, ["campaign_type", "type"], ["type"])
-        const divisionField =
-          fieldNameFromConfig(tableFields, config?.division_field_id, config?.division_field) ||
-          pickFieldName(tableFields, ["division"], ["division"])
-        const statusField =
-          fieldNameFromConfig(tableFields, config?.status_field_id, config?.status_field) ||
-          pickFieldName(tableFields, ["status", "campaign_status"], ["status", "state"])
-        const priorityField =
-          fieldNameFromConfig(tableFields, config?.priority_field_id, config?.priority_field) ||
-          pickFieldName(tableFields, ["priority"], ["priority"])
-        const stageField =
-          fieldNameFromConfig(tableFields, config?.stage_field_id, config?.stage_field) ||
-          pickFieldName(tableFields, ["campaign_stage", "stage"], ["stage"])
-        const startDateField =
-          fieldNameFromConfig(tableFields, config?.start_date_field_id, config?.start_date_field) ||
-          pickFieldName(tableFields, ["start_date"], ["start"])
-        const endDateField =
-          fieldNameFromConfig(tableFields, config?.end_date_field_id, config?.end_date_field) ||
-          pickFieldName(tableFields, ["end_date"], ["end"])
-        const ownerField =
-          fieldNameFromConfig(tableFields, config?.owner_field_id, config?.owner_field) ||
-          pickFieldName(tableFields, ["owner"], ["owner"])
-        const progressField =
-          fieldNameFromConfig(tableFields, config?.progress_field_id, config?.progress_field) ||
-          pickFieldName(tableFields, ["progress"], ["progress"])
-        const imageField =
-          fieldNameFromConfig(tableFields, config?.image_field_id, config?.image_field) ||
-          pickFieldName(tableFields, ["image", "thumbnail"], ["image", "thumb"])
-        const linkedContentField =
-          fieldNameFromConfig(
-            tableFields,
-            config?.linked_content_field_id,
-            config?.linked_content_field
-          ) || pickFieldName(tableFields, ["linked_content"], ["content"])
-        const linkedTasksField =
-          fieldNameFromConfig(tableFields, config?.linked_tasks_field_id, config?.linked_tasks_field) ||
-          pickFieldName(tableFields, ["linked_tasks", "things_to_do"], ["task"])
-        const linkedEventsField =
-          fieldNameFromConfig(tableFields, config?.linked_events_field_id, config?.linked_events_field) ||
-          pickFieldName(tableFields, ["linked_events"], ["event"])
+        const fieldMap = resolveCampaignOverviewFields(
+          tableFields,
+          campaignsOverviewOverridesFromConfig(config)
+        )
 
-        const { data: rows, error: rowsErr } = await supabase
-          .from(campaignsTable.supabase_table)
-          .select("*")
-          .limit(config?.campaigns_max_items ?? 200)
+        let query = supabase.from(campaignsTable.supabase_table).select("*")
+        query = applyMarketingBlockDataQuery(query, config, tableFields)
+        query = query.limit(campaignsOverviewMaxItems(config))
+
+        const { data: rows, error: rowsErr } = await query
         if (rowsErr) throw new Error(rowsErr.message)
 
         const profileLabelById = await fetchProfileLabelById(supabase)
 
         const mapped: CampaignOverviewItem[] = (rows || []).map((row: Record<string, unknown>) => {
           const id = String(row.id)
-          const openTasksCount = linkedTasksField ? toCount(row[linkedTasksField]) : 0
-          const linkedContentCount = linkedContentField ? toCount(row[linkedContentField]) : 0
-          const progress = progressField ? parseProgress(row[progressField]) : null
-          const status = statusField ? String(row[statusField] ?? "") : ""
-          const priority = priorityField ? String(row[priorityField] ?? "") : ""
+          const openTasksCount = fieldMap.linkedTasks ? toCount(row[fieldMap.linkedTasks]) : 0
+          const linkedContentCount = fieldMap.linkedContent
+            ? toCount(row[fieldMap.linkedContent])
+            : 0
+          const progress = fieldMap.progress ? parseProgress(row[fieldMap.progress]) : null
+          const status = fieldMap.status ? String(row[fieldMap.status] ?? "") : ""
+          const priority = fieldMap.priority ? String(row[fieldMap.priority] ?? "") : ""
           const needsAttention =
             openTasksCount > 0 ||
             status.toLowerCase() === "on hold" ||
@@ -175,26 +130,28 @@ export function useCampaignsOverviewData(config?: BlockConfig): UseCampaignsOver
 
           return {
             id,
-            title: String(row[titleField] ?? "Untitled campaign"),
-            thumbnailUrl: imageField ? String(row[imageField] ?? "") || undefined : undefined,
-            type: typeField ? String(row[typeField] ?? "") : "",
-            division: divisionField ? String(row[divisionField] ?? "") : "",
+            title: String(row[fieldMap.title] ?? "Untitled campaign"),
+            thumbnailUrl: fieldMap.image
+              ? String(row[fieldMap.image] ?? "") || undefined
+              : undefined,
+            type: fieldMap.type ? String(row[fieldMap.type] ?? "") : "",
+            division: fieldMap.division ? String(row[fieldMap.division] ?? "") : "",
             status,
             priority,
-            stage: stageField ? String(row[stageField] ?? "") : "",
-            startDate: startDateField ? String(row[startDateField] ?? "") : "",
-            endDate: endDateField ? String(row[endDateField] ?? "") : "",
-            owner: ownerField
+            stage: fieldMap.stage ? String(row[fieldMap.stage] ?? "") : "",
+            startDate: fieldMap.startDate ? String(row[fieldMap.startDate] ?? "") : "",
+            endDate: fieldMap.endDate ? String(row[fieldMap.endDate] ?? "") : "",
+            owner: fieldMap.owner
               ? (() => {
-                  const raw = row[ownerField]
-                  const id =
+                  const raw = row[fieldMap.owner!]
+                  const ownerId =
                     typeof raw === "string"
                       ? raw
                       : raw && typeof raw === "object" && "id" in (raw as object)
                         ? String((raw as { id: string }).id)
                         : null
-                  if (id && profileLabelById.has(id)) {
-                    return profileLabelById.get(id) ?? ""
+                  if (ownerId && profileLabelById.has(ownerId)) {
+                    return profileLabelById.get(ownerId) ?? ""
                   }
                   return formatDisplayValue(raw) ?? ""
                 })()
@@ -206,7 +163,9 @@ export function useCampaignsOverviewData(config?: BlockConfig): UseCampaignsOver
             recordTableId: campaignsTable.id,
             recordSupabaseTable: campaignsTable.supabase_table,
             notesSearchText: String(row.notes ?? row.objective ?? ""),
-            linkedEventsText: linkedEventsField ? String(row[linkedEventsField] ?? "") : "",
+            linkedEventsText: fieldMap.linkedEvents
+              ? String(row[fieldMap.linkedEvents] ?? "")
+              : "",
           }
         })
 
