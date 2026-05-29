@@ -29,6 +29,7 @@ interface ThingsToDoRowProps {
   checked?: boolean
   onSelect: () => void
   onCheckedChange?: (checked: boolean) => void
+  onOpenRecord?: () => void
 }
 
 export function ThingsToDoRow({
@@ -38,6 +39,7 @@ export function ThingsToDoRow({
   checked,
   onSelect,
   onCheckedChange,
+  onOpenRecord,
 }: ThingsToDoRowProps) {
   const group = assignRowGroup(item)
   const { row } = getRowGroupClasses(group)
@@ -138,7 +140,8 @@ export function ThingsToDoRow({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem
-              onClick={() => debugLog(`[ThingsToDo] Open: ${item.title}`)}
+              onClick={() => (onOpenRecord ? onOpenRecord() : debugLog(`[ThingsToDo] Open: ${item.title}`))}
+              disabled={!onOpenRecord && !item.recordTableId}
             >
               Open record
             </DropdownMenuItem>

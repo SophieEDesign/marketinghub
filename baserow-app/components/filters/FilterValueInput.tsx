@@ -16,7 +16,10 @@ import {
   resolveChoiceColor,
   normalizeHexColor,
 } from "@/lib/field-colors"
-import { getManualChoiceLabels } from "@/lib/fields/select-options"
+import { getManualChoiceLabels, sortLabelsByManualOrder } from "@/lib/fields/select-options"
+import { operatorSupportsMultiValue } from "@/lib/filters/field-operators"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Check } from "lucide-react"
 import LookupFieldPicker from "@/components/fields/LookupFieldPicker"
 import type { LookupFieldConfig } from "@/components/fields/LookupFieldPicker"
 
@@ -90,10 +93,15 @@ export default function FilterValueInput({
     )
   }
 
-  // Select fields: Show dropdown with options and colors
+  // Select fields: single-value dropdown, or multi-select for is_any_of / is_not_any_of
   if (field.type === 'single_select' || field.type === 'multi_select') {
-    const choices = getManualChoiceLabels(field.type, field.options)
-    
+    const selectFieldType = field.type as 'single_select' | 'multi_select'
+    const choices = getManualChoiceLabels(selectFieldType, field.options)
+    const useSemanticColors = selectFieldType === 'single_select'
+
+    const getChoiceColor = (choice: string) =>
+      resolveChoiceColor(choice, selectFieldType, field.options, useSemanticColors)
+
     if (choices.length === 0) {
       return (
         <div className={`${controlHeight} flex items-center text-xs text-gray-400 px-3 ${className}`}>
@@ -102,42 +110,118 @@ export default function FilterValueInput({
       )
     }
 
+    if (operatorSupportsMultiValue(operator)) {
+      const selectedValuesRaw: string[] = Array.isArray(value)
+        ? value.map(String)
+        : value != null && value !== ''
+          ? [String(value)]
+          : []
+      const selectedValues = sortLabelsByManualOrder(
+        selectedValuesRaw,
+        selectFieldType,
+        field.options
+      )
+
+      const renderChoiceDot = (choice: string) => (
+        <span
+          className="inline-block w-3 h-3 rounded-full flex-shrink-0"
+          style={{ backgroundColor: normalizeHexColor(getChoiceColor(choice)) }}
+        />
+      )
+
+      return (
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className={`w-full ${controlHeight} px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center gap-1.5 text-left overflow-hidden ${textSize} ${className}`}
+            >
+              {selectedValues.length > 0 ? (
+                <span className="flex items-center gap-1.5 truncate">
+                  {renderChoiceDot(selectedValues[0])}
+                  <span className="truncate">
+                    {selectedValues.length === 1
+                      ? selectedValues[0]
+                      : `${selectedValues.length} selected`}
+                  </span>
+                </span>
+              ) : (
+                <span className="text-gray-400">Select values...</span>
+              )}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-64 p-1">
+            <div className="max-h-64 overflow-auto">
+              {choices.map((choice) => {
+                const isSelected = selectedValuesRaw.includes(choice)
+                return (
+                  <button
+                    key={choice}
+                    type="button"
+                    onClick={() => {
+                      const toggled = isSelected
+                        ? selectedValuesRaw.filter((v) => v !== choice)
+                        : [...selectedValuesRaw, choice]
+                      onChange(
+                        sortLabelsByManualOrder(toggled, selectFieldType, field.options)
+                      )
+                    }}
+                    className={`w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-gray-50 ${
+                      isSelected ? 'bg-purple-50' : ''
+                    }`}
+                  >
+                    {isSelected ? (
+                      <Check className="h-4 w-4 text-purple-600 flex-shrink-0" />
+                    ) : (
+                      <span className="w-4 flex-shrink-0" />
+                    )}
+                    {renderChoiceDot(choice)}
+                    <span className="truncate">{choice}</span>
+                  </button>
+                )
+              })}
+            </div>
+            {selectedValuesRaw.length > 0 && (
+              <div className="pt-1 mt-1 border-t">
+                <button
+                  type="button"
+                  onClick={() => onChange([])}
+                  className="w-full text-xs text-gray-600 hover:text-gray-900 py-1"
+                >
+                  Clear all
+                </button>
+              </div>
+            )}
+          </PopoverContent>
+        </Popover>
+      )
+    }
+
+    const singleValue = Array.isArray(value) ? (value[0] as string | undefined) : (value as string | undefined)
+
     return (
       <Select
-        value={value as string || ""}
+        value={singleValue || ""}
         onValueChange={(val) => onChange(val)}
       >
         <SelectTrigger className={`${controlHeight} ${textSize} ${className}`}>
           <SelectValue placeholder="Select value...">
-            {value && (
+            {singleValue && (
               <div className="flex items-center gap-2">
                 <span
                   className="inline-block w-3 h-3 rounded-full flex-shrink-0"
-                    style={{
-                    backgroundColor: normalizeHexColor(
-                      resolveChoiceColor(
-                        value as string,
-                        field.type as 'single_select' | 'multi_select',
-                        field.options,
-                        field.type === 'single_select'
-                      )
-                    ),
+                  style={{
+                    backgroundColor: normalizeHexColor(getChoiceColor(singleValue)),
                   }}
                 />
-                <span>{value}</span>
+                <span>{singleValue}</span>
               </div>
             )}
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {choices.map((choice: string) => {
-            const hexColor = resolveChoiceColor(
-              choice,
-              field.type as 'single_select' | 'multi_select',
-              field.options,
-              field.type === 'single_select'
-            )
-            const bgColor = normalizeHexColor(hexColor)
+            const bgColor = normalizeHexColor(getChoiceColor(choice))
             return (
               <SelectItem key={choice} value={choice}>
                 <div className="flex items-center gap-2">
@@ -421,7 +505,7 @@ export default function FilterValueInput({
 
   // Lookup fields: Derived value input
   if (field.type === 'lookup') {
-    const isMultiValueOperator = operator === 'is_any_of' || operator === 'is_not_any_of'
+    const isMultiValueOperator = operatorSupportsMultiValue(operator)
     const stringValue = Array.isArray(value) ? value.join(', ') : (value as string || "")
     return (
       <Input

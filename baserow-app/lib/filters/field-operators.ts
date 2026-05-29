@@ -139,6 +139,11 @@ export function isOperatorValidForField(fieldType: string, operator: FilterOpera
   return operators.some(op => op.value === operator)
 }
 
+/** Operators that accept multiple values (e.g. status is not any of A, B, C). */
+export function operatorSupportsMultiValue(operator: FilterOperator): boolean {
+  return operator === 'is_any_of' || operator === 'is_not_any_of'
+}
+
 /**
  * Get the default operator for a field type
  */

@@ -30,6 +30,7 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { ThingsToDoDetailPanel } from "@/components/interface/things-to-do/ThingsToDoDetailPanel"
+import { ThingsToDoRecordSidePanel } from "@/components/interface/things-to-do/ThingsToDoRecordSidePanel"
 import { ThingsToDoFilterSidebar } from "@/components/interface/things-to-do/ThingsToDoFilterSidebar"
 import { ThingsToDoGroupedList } from "@/components/interface/things-to-do/ThingsToDoGroupedList"
 import { ThingsToDoHeader } from "@/components/interface/things-to-do/ThingsToDoHeader"
@@ -165,17 +166,23 @@ export default function ThingsToDoBlock({
     })
   }, [])
 
-  const handleOpenRecord = useCallback(() => {
-    if (!selectedItem?.recordTableId || !selectedItem.recordSupabaseTable) return
-    openRecordModal({
-      tableId: selectedItem.recordTableId,
-      recordId: selectedItem.id,
-      supabaseTableName: selectedItem.recordSupabaseTable,
-      onRecordUpdated: () => reload(),
-    })
-  }, [selectedItem, openRecordModal, reload])
+  const handleOpenRecord = useCallback(
+    (item = selectedItem) => {
+      if (!item?.recordTableId || !item.recordSupabaseTable) return
+      openRecordModal({
+        tableId: item.recordTableId,
+        recordId: item.id,
+        supabaseTableName: item.recordSupabaseTable,
+        onRecordUpdated: () => reload(),
+      })
+    },
+    [selectedItem, openRecordModal, reload]
+  )
 
   const showDetail = enableDetailPanel && selectedItem != null && !isEditing
+  const showRecordSidePanel =
+    showDetail && Boolean(selectedItem?.recordTableId && selectedItem.recordSupabaseTable)
+  const showSummaryDetailPanel = showDetail && !showRecordSidePanel
 
   if (demoState.showEmptyState && !demoState.useDemoData) {
     return (
@@ -278,18 +285,35 @@ export default function ThingsToDoBlock({
                       checkedIds={checkedIds}
                       onSelect={setSelectedId}
                       onCheckedChange={handleCheckedChange}
+                      onOpenRecord={(item) => {
+                        if (!enableDetailPanel) {
+                          setSelectedId(item.id)
+                        }
+                        handleOpenRecord(item)
+                      }}
                     />
                   )}
                 </div>
 
-                {showDetail && selectedItem ? (
+                {showRecordSidePanel && selectedItem?.recordTableId && selectedItem.recordSupabaseTable ? (
+                  <ThingsToDoRecordSidePanel
+                    tableId={selectedItem.recordTableId}
+                    recordId={selectedItem.id}
+                    supabaseTableName={selectedItem.recordSupabaseTable}
+                    title={selectedItem.title}
+                    onClose={() => setSelectedId(null)}
+                    onRecordUpdated={() => reload()}
+                  />
+                ) : null}
+
+                {showSummaryDetailPanel && selectedItem ? (
                   <ThingsToDoDetailPanel
                     item={selectedItem}
                     checklist={selectedChecklist}
                     onClose={() => setSelectedId(null)}
                     onChecklistToggle={handleChecklistToggle}
                     onOpenRecord={
-                      selectedItem.recordTableId ? handleOpenRecord : undefined
+                      selectedItem.recordTableId ? () => handleOpenRecord() : undefined
                     }
                   />
                 ) : null}

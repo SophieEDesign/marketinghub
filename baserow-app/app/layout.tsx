@@ -8,6 +8,7 @@ import ConsoleErrorFilter from "@/components/layout/ConsoleErrorFilter"
 import RootErrorBoundary from "@/components/layout/RootErrorBoundary"
 import DiagnosticsInitializer from "@/components/layout/DiagnosticsInitializer"
 import InteractionFailsafe from "@/components/layout/InteractionFailsafe"
+import ChunkLoadRecovery from "@/components/layout/ChunkLoadRecovery"
 // NavigationDiagnostics temporarily disabled for performance isolation
 // import NavigationDiagnostics from "@/components/layout/NavigationDiagnostics"
 import NavigationProgress from "@/components/layout/NavigationProgress"
@@ -87,6 +88,7 @@ export default function RootLayout({
           <ConsoleErrorFilter />
           <DiagnosticsInitializer />
           <InteractionFailsafe />
+          <ChunkLoadRecovery />
           <PerformanceMonitor />
           <NavigationProgress />
           {/* STEP 1: Temporarily disabled to verify not causing heavy message listeners or loops */}

@@ -24,8 +24,8 @@ export default function RootErrorBoundary({
               Something went wrong
             </h1>
             <p className="text-sm text-slate-600">
-              An unexpected error occurred. Please refresh the page or try
-              navigating to another section.
+              An unexpected error occurred. If you just deployed or updated the app,
+              refresh the page to load the latest version.
             </p>
             <button
               type="button"

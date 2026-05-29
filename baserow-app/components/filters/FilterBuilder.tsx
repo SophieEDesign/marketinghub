@@ -19,7 +19,11 @@ import {
   flattenFilterTree,
   conditionsToFilterTree,
 } from "@/lib/filters/canonical-model"
-import { getOperatorsForFieldType, getDefaultOperatorForFieldType } from "@/lib/filters/field-operators"
+import {
+  getOperatorsForFieldType,
+  getDefaultOperatorForFieldType,
+  operatorSupportsMultiValue,
+} from "@/lib/filters/field-operators"
 import FilterValueInput from "./FilterValueInput"
 
 interface FilterBuilderProps {
@@ -149,6 +153,27 @@ export default function FilterBuilder({
     onChange(newTree)
   }, [normalizedTree, onChange])
 
+  const updateConditionOperator = useCallback(
+    (path: number[], nextOperator: FilterCondition['operator'], current: FilterCondition) => {
+      const wasMulti = operatorSupportsMultiValue(current.operator)
+      const isMulti = operatorSupportsMultiValue(nextOperator)
+      const updates: Partial<FilterCondition> = { operator: nextOperator }
+      if (wasMulti !== isMulti && current.value != null) {
+        if (isMulti) {
+          updates.value = Array.isArray(current.value)
+            ? current.value
+            : [String(current.value)]
+        } else {
+          updates.value = Array.isArray(current.value)
+            ? (current.value[0] ?? undefined)
+            : current.value
+        }
+      }
+      updateCondition(path, updates)
+    },
+    [updateCondition]
+  )
+
   // Update a group's operator
   const updateGroupOperator = useCallback((path: number[], operator: GroupOperator) => {
     const nextOperator = allowOr ? operator : 'AND'
@@ -204,7 +229,9 @@ export default function FilterBuilder({
 
           <Select
             value={condition.operator}
-            onValueChange={(value) => updateCondition(path, { operator: value as FilterCondition["operator"] })}
+            onValueChange={(value) =>
+              updateConditionOperator(path, value as FilterCondition["operator"], condition)
+            }
           >
             <SelectTrigger className="h-8 text-xs min-w-32">
               <SelectValue />
@@ -297,7 +324,7 @@ export default function FilterBuilder({
               <Select
                 value={condition.operator}
                 onValueChange={(value) => {
-                  updateCondition(path, { operator: value as FilterCondition['operator'] })
+                  updateConditionOperator(path, value as FilterCondition['operator'], condition)
                 }}
               >
                 <SelectTrigger className="h-9 text-sm">
@@ -349,7 +376,7 @@ export default function FilterBuilder({
         </div>
       </div>
     )
-  }, [tableFields, updateCondition, removeItem, duplicateItem, variant])
+  }, [tableFields, updateCondition, updateConditionOperator, removeItem, duplicateItem, variant])
 
   // Render a group
   const renderGroup = useCallback(function renderGroupImpl(

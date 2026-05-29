@@ -1,6 +1,7 @@
 "use client"
 
 import React from "react"
+import { isChunkLoadError, reloadOnceForStaleChunks } from "@/lib/chunk-load-error"
 
 interface ErrorBoundaryState {
   hasError: boolean
@@ -39,6 +40,10 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    if (isChunkLoadError(error)) {
+      reloadOnceForStaleChunks()
+      return
+    }
     console.error("ErrorBoundary caught an error:", error, errorInfo)
     if (this.props.onError) {
       this.props.onError(error, errorInfo)

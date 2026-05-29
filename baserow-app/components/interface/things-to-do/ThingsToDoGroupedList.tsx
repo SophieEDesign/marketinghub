@@ -16,6 +16,7 @@ interface ThingsToDoGroupedListProps {
   checkedIds: Set<string>
   onSelect: (id: string) => void
   onCheckedChange: (id: string, checked: boolean) => void
+  onOpenRecord?: (item: ThingsToDoItem) => void
 }
 
 export function ThingsToDoGroupedList({
@@ -25,6 +26,7 @@ export function ThingsToDoGroupedList({
   checkedIds,
   onSelect,
   onCheckedChange,
+  onOpenRecord,
 }: ThingsToDoGroupedListProps) {
   if (sections.length === 0) {
     return (
@@ -66,6 +68,7 @@ export function ThingsToDoGroupedList({
                   checked={checkedIds.has(item.id)}
                   onSelect={() => onSelect(item.id)}
                   onCheckedChange={(c) => onCheckedChange(item.id, c)}
+                  onOpenRecord={onOpenRecord ? () => onOpenRecord(item) : undefined}
                 />
               ))}
             </div>
