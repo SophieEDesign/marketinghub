@@ -37,20 +37,21 @@ export function ThingsToDoRecordSidePanel({
   useEffect(() => {
     let cancelled = false
     setLoadingFields(true)
-    createClient()
-      .from("table_fields")
-      .select("*")
-      .eq("table_id", tableId)
-      .order("order_index", { ascending: true })
-      .then(({ data }) => {
+    void (async () => {
+      try {
+        const { data } = await createClient()
+          .from("table_fields")
+          .select("*")
+          .eq("table_id", tableId)
+          .order("order_index", { ascending: true })
         if (!cancelled) {
           setTableFields((data as TableField[]) || [])
           setLoadingFields(false)
         }
-      })
-      .catch(() => {
+      } catch {
         if (!cancelled) setLoadingFields(false)
-      })
+      }
+    })()
     return () => {
       cancelled = true
     }

@@ -35,17 +35,16 @@ export function formatDisplayValue(value: unknown): string | null {
 /** Labels from single_select / multi_select field options (table schema). */
 export function choiceLabelsFromField(field: FieldWithOptions | undefined): string[] {
   if (!field?.options) return []
-  const opts = field.options as FieldOptions & {
-    choices?: Array<{ value?: string; label?: string; name?: string }>
+  const opts = field.options as FieldOptions
+  const selectOptions = opts.selectOptions
+  if (Array.isArray(selectOptions) && selectOptions.length > 0) {
+    return selectOptions
+      .map((o) => o.label?.trim() ?? "")
+      .filter(Boolean)
   }
   const choices = opts.choices
   if (!Array.isArray(choices)) return []
-  return choices
-    .map((c) => {
-      const label = c.label ?? c.name ?? c.value
-      return label != null ? String(label).trim() : ""
-    })
-    .filter(Boolean)
+  return choices.map((c) => String(c).trim()).filter(Boolean)
 }
 
 export function choiceLabelsForFieldNames(

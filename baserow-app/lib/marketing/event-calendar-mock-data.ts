@@ -11,8 +11,7 @@ function mockItem(partial: Partial<MarketingEventItem> & Pick<MarketingEventItem
   const start = partial.startDate!
   const end = partial.endDate ?? start
   return {
-    id: partial.id,
-    eventName: partial.eventName,
+    ...partial,
     eventType,
     status: partial.status ?? "Published",
     startDate: start,
@@ -46,7 +45,7 @@ function mockItem(partial: Partial<MarketingEventItem> & Pick<MarketingEventItem
     accentColor: accent,
     backgroundColor: accentBackground(accent),
     dateRangeLabel: formatEventDateRange(start, end),
-    ...partial,
+    isPendingApproval: partial.isPendingApproval ?? false,
   }
 }
 

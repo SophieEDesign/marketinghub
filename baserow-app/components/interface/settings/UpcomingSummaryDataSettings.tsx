@@ -11,9 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import type { BlockConfig } from "@/lib/interface/types"
-import type { UpcomingSummarySectionId } from "@/lib/interface/types"
-import type { BlockConfig } from "@/lib/interface/types"
+import type { BlockConfig, UpcomingSummarySectionId } from "@/lib/interface/types"
 import type { DataSettingsCtx } from "./blockSettingsRegistry"
 import { ALL_UPCOMING_SUMMARY_SECTIONS } from "@/lib/interface/upcoming-summary-mock-data"
 import TableSelector from "./shared/TableSelector"
