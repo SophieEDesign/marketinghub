@@ -1,7 +1,21 @@
 "use client"
 
-import { format } from "date-fns"
-import { ChevronLeft, ChevronRight, Filter } from "lucide-react"
+import { useMemo, useState } from "react"
+import {
+  addMonths,
+  format,
+  setMonth,
+  setYear,
+  startOfMonth,
+} from "date-fns"
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  LayoutList,
+  SlidersHorizontal,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Select,
@@ -13,13 +27,17 @@ import {
 import { cn } from "@/lib/utils"
 import type { EventCalendarViewMode } from "@/lib/marketing/events"
 
-const FILTER_CONTROL = "h-8 text-xs border-border/40"
+const FILTER_CONTROL = "h-8 text-xs border-border/40 bg-background"
 
-const VIEW_OPTIONS: { value: EventCalendarViewMode; label: string }[] = [
-  { value: "month", label: "Month" },
-  { value: "week", label: "Week" },
-  { value: "list", label: "List" },
-  { value: "timeline", label: "Timeline" },
+const VIEW_OPTIONS: {
+  value: EventCalendarViewMode
+  label: string
+  icon: typeof CalendarDays
+}[] = [
+  { value: "month", label: "Month", icon: CalendarDays },
+  { value: "week", label: "Week", icon: CalendarDays },
+  { value: "list", label: "List", icon: LayoutList },
+  { value: "timeline", label: "Timeline", icon: SlidersHorizontal },
 ]
 
 function FilterSelect({
@@ -40,7 +58,7 @@ function FilterSelect({
   if (options.length === 0) return null
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className={cn(FILTER_CONTROL, "w-[130px]", className)} aria-label={label}>
+      <SelectTrigger className={cn(FILTER_CONTROL, "min-w-[140px]", className)} aria-label={label}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
@@ -56,6 +74,7 @@ function FilterSelect({
 }
 
 interface EventCalendarToolbarProps {
+  title?: string
   viewMode: EventCalendarViewMode
   onViewModeChange: (mode: EventCalendarViewMode) => void
   cursorDate: Date
@@ -75,14 +94,17 @@ interface EventCalendarToolbarProps {
   onFilterLocation: (v: string) => void
   onFilterStatus: (v: string) => void
   onFilterOwner: (v: string) => void
+  onClearFilters?: () => void
   showFilters?: boolean
   showFiltersRow?: boolean
 }
 
 export default function EventCalendarToolbar({
+  title = "Event Calendar",
   viewMode,
   onViewModeChange,
   cursorDate,
+  onCursorDateChange,
   onPrev,
   onNext,
   onToday,
@@ -98,49 +120,143 @@ export default function EventCalendarToolbar({
   onFilterLocation,
   onFilterStatus,
   onFilterOwner,
+  onClearFilters,
   showFilters = true,
   showFiltersRow = true,
 }: EventCalendarToolbarProps) {
+  const [filtersExpanded, setFiltersExpanded] = useState(false)
+
+  const monthOptions = useMemo(() => {
+    const anchor = startOfMonth(cursorDate)
+    const items: { value: string; label: string; date: Date }[] = []
+    for (let i = -12; i <= 12; i++) {
+      const d = addMonths(anchor, i)
+      items.push({
+        value: format(d, "yyyy-MM"),
+        label: format(d, "MMMM yyyy"),
+        date: d,
+      })
+    }
+    return items
+  }, [cursorDate])
+
+  const monthValue = format(cursorDate, "yyyy-MM")
+
+  const hasActiveFilters =
+    filterEventType !== "all" ||
+    filterLocation !== "all" ||
+    filterStatus !== "all" ||
+    filterOwner !== "all"
+
+  const filtersVisible = showFilters && (showFiltersRow || filtersExpanded)
+
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="inline-flex rounded-lg border border-border/40 p-0.5 bg-muted/20">
-          {VIEW_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => onViewModeChange(opt.value)}
-              className={cn(
-                "px-2.5 py-1 text-xs font-medium rounded-md transition-colors",
-                viewMode === opt.value
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {opt.label}
-            </button>
-          ))}
+    <div className="flex flex-col gap-3 shrink-0">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <h2 className="text-lg font-semibold text-foreground tracking-tight shrink-0">{title}</h2>
+
+        <div className="flex flex-wrap items-center gap-2 lg:flex-1 lg:justify-center">
+          <div
+            className="inline-flex rounded-lg border border-border/50 bg-muted/30 p-0.5"
+            role="tablist"
+            aria-label="Calendar view"
+          >
+            {VIEW_OPTIONS.map((opt) => {
+              const Icon = opt.icon
+              const active = viewMode === opt.value
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => onViewModeChange(opt.value)}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                    active
+                      ? "bg-accent-link/12 text-accent-link shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  {opt.label}
+                </button>
+              )
+            })}
+          </div>
         </div>
 
-        <div className="flex items-center gap-1">
-          <Button type="button" variant="outline" size="icon" className="h-8 w-8" onClick={onPrev} aria-label="Previous">
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={onToday}>
+        <div className="flex flex-wrap items-center gap-1.5 shrink-0 lg:justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs font-medium"
+            onClick={onToday}
+          >
             Today
           </Button>
-          <Button type="button" variant="outline" size="icon" className="h-8 w-8" onClick={onNext} aria-label="Next">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-8 w-8"
+            onClick={onPrev}
+            aria-label="Previous period"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-8 w-8"
+            onClick={onNext}
+            aria-label="Next period"
+          >
             <ChevronRight className="h-4 w-4" />
           </Button>
-          <span className="text-sm font-semibold text-foreground ml-1 min-w-[120px]">
-            {format(cursorDate, "MMMM yyyy")}
-          </span>
+          <Select
+            value={monthValue}
+            onValueChange={(v) => {
+              const picked = monthOptions.find((m) => m.value === v)
+              if (picked) onCursorDateChange(picked.date)
+              else {
+                const [y, m] = v.split("-").map(Number)
+                if (y && m) onCursorDateChange(setMonth(setYear(cursorDate, y), m - 1))
+              }
+            }}
+          >
+            <SelectTrigger className={cn(FILTER_CONTROL, "w-[148px] font-semibold")} aria-label="Month">
+              <SelectValue>{format(cursorDate, "MMMM yyyy")}</SelectValue>
+            </SelectTrigger>
+            <SelectContent className="max-h-64">
+              {monthOptions.map((m) => (
+                <SelectItem key={m.value} value={m.value}>
+                  {m.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {showFilters ? (
+            <Button
+              type="button"
+              variant={filtersExpanded ? "secondary" : "outline"}
+              size="sm"
+              className="h-8 gap-1.5 text-xs font-medium ml-0.5"
+              onClick={() => setFiltersExpanded((v) => !v)}
+              aria-expanded={filtersExpanded}
+            >
+              <Filter className="h-3.5 w-3.5" aria-hidden />
+              Filters
+            </Button>
+          ) : null}
         </div>
       </div>
 
-      {showFilters && showFiltersRow ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0" aria-hidden />
+      {filtersVisible ? (
+        <div className="flex flex-wrap items-center gap-2 border-t border-border/30 pt-3">
+          <SlidersHorizontal className="h-3.5 w-3.5 text-muted-foreground shrink-0" aria-hidden />
           <FilterSelect
             label="Event type"
             options={eventTypes}
@@ -162,13 +278,24 @@ export default function EventCalendarToolbar({
             onChange={onFilterStatus}
             placeholder="All statuses"
           />
-          <FilterSelect
-            label="Owner"
-            options={owners}
-            value={filterOwner}
-            onChange={onFilterOwner}
-            placeholder="All owners"
-          />
+          {filtersExpanded && owners.length > 0 ? (
+            <FilterSelect
+              label="Owner"
+              options={owners}
+              value={filterOwner}
+              onChange={onFilterOwner}
+              placeholder="All owners"
+            />
+          ) : null}
+          {hasActiveFilters && onClearFilters ? (
+            <button
+              type="button"
+              onClick={onClearFilters}
+              className="text-xs font-medium text-accent-link hover:underline ml-1"
+            >
+              Clear filters
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>

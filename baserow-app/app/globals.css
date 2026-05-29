@@ -929,7 +929,64 @@
   padding: 0.18rem 0.22rem;
 }
 
-/* Event Calendar — spanning bars and pastel event cards */
+/* Event Calendar — marketing month grid (white cards, purple today) */
+.calendar-embed--events .fc {
+  --fc-border-color: hsl(var(--border) / 0.35);
+  --fc-page-bg-color: transparent;
+  --fc-today-bg-color: hsl(var(--accent-link) / 0.06);
+}
+
+.calendar-embed--events .fc .fc-scrollgrid {
+  border: 1px solid hsl(var(--border) / 0.35);
+  border-radius: 0.625rem;
+}
+
+.calendar-embed--events .fc .fc-col-header-cell {
+  background: transparent;
+  border-color: hsl(var(--border) / 0.35);
+}
+
+.calendar-embed--events .fc .fc-col-header-cell-cushion {
+  padding: 0.5rem 0.25rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.calendar-embed--events .fc .fc-daygrid-day-top {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+}
+
+.calendar-embed--events .fc .fc-daygrid-day-number {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: hsl(var(--foreground));
+  padding: 0.25rem 0.35rem;
+}
+
+.calendar-embed--events .fc .fc-day-other .fc-daygrid-day-number {
+  color: hsl(var(--muted-foreground) / 0.45);
+}
+
+.calendar-embed--events .fc .fc-day-sunday .fc-daygrid-day-number {
+  color: #ef4444;
+}
+
+.calendar-embed--events .fc .fc-day-today .fc-daygrid-day-number {
+  background-color: hsl(var(--accent-link));
+  color: white;
+  border-radius: 9999px;
+  width: 1.625rem;
+  height: 1.625rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0.15rem 0.2rem;
+  font-weight: 600;
+}
+
 .calendar-embed--events .fc-event {
   background: transparent !important;
   border: none !important;
@@ -937,7 +994,7 @@
 }
 
 .calendar-embed--events .fc-daygrid-event {
-  margin-top: 2px;
+  margin-top: 3px;
   border-radius: 0.5rem;
 }
 
@@ -945,25 +1002,18 @@
   padding: 0;
 }
 
-.calendar-embed--events .fc .fc-day-today {
-  background-color: hsl(var(--accent-link) / 0.06);
-}
-
-.calendar-embed--events .fc .fc-day-today .fc-daygrid-day-number {
-  background-color: hsl(var(--accent-link));
-  color: white;
-  border-radius: 9999px;
-  width: 1.5rem;
-  height: 1.5rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0.1rem;
+.calendar-embed--events .fc .fc-daygrid-more-link {
+  color: hsl(var(--accent-link));
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.125rem 0.25rem;
 }
 
 .calendar-embed--events .fc-timegrid-event {
-  border-radius: 0.4rem;
-  border-left-width: 3px !important;
+  border-radius: 0.5rem;
+  border-left-width: 4px !important;
+  background: hsl(var(--card)) !important;
+  border-color: hsl(var(--border) / 0.5) !important;
 }
 
 /* Social media calendar block */

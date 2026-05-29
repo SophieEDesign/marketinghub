@@ -6,10 +6,9 @@ import dayGridPlugin from "@fullcalendar/daygrid"
 import timeGridPlugin from "@fullcalendar/timegrid"
 import interactionPlugin from "@fullcalendar/interaction"
 import type { EventClickArg, EventContentArg, EventInput } from "@fullcalendar/core"
-import { MarketingPanelPrimary } from "@/components/layout/ui-system"
-import { EventAvatarStack } from "@/components/interface/events/EventAvatarStack"
 import { EventListView } from "@/components/interface/events/EventListView"
 import { EventTimelineView } from "@/components/interface/events/EventTimelineView"
+import { EventCalendarEventCard } from "@/components/interface/EventCalendarEventCard"
 import {
   type EventCalendarEvent,
   type EventCalendarViewMode,
@@ -18,37 +17,13 @@ import { cn } from "@/lib/utils"
 
 const CALENDAR_PLUGINS = [dayGridPlugin, timeGridPlugin, interactionPlugin]
 
-function EventCalendarEventContent({ arg }: { arg: EventContentArg }) {
-  const accent = (arg.event.extendedProps?.accentColor as string) || "#8B5CF6"
-  const locationLabel = arg.event.extendedProps?.locationLabel as string | null
-  const dateRangeLabel = arg.event.extendedProps?.dateRangeLabel as string | null
-  const attendeeLabels = (arg.event.extendedProps?.attendeeLabels as string[]) || []
-
-  return (
-    <div
-      className="fc-event-calendar-card flex flex-col gap-0.5 min-w-0 px-1.5 py-1 overflow-hidden rounded-md"
-      style={{
-        backgroundColor: arg.event.backgroundColor || `${accent}1A`,
-        borderLeft: `3px solid ${accent}`,
-      }}
-    >
-      <span className="text-xs font-semibold leading-tight truncate text-foreground">
-        {arg.event.title}
-      </span>
-      {locationLabel ? (
-        <span className="text-[10px] text-muted-foreground truncate">{locationLabel}</span>
-      ) : null}
-      {dateRangeLabel && arg.view.type.includes("dayGrid") ? (
-        <span className="text-[10px] text-muted-foreground/80 truncate">{dateRangeLabel}</span>
-      ) : null}
-      <EventAvatarStack labels={attendeeLabels} max={3} className="mt-0.5" />
-    </div>
-  )
-}
-
 function viewModeToInitial(viewMode: EventCalendarViewMode): string {
   if (viewMode === "week") return "timeGridWeek"
   return "dayGridMonth"
+}
+
+function dayCellClassNames(arg: { date: Date }) {
+  return arg.date.getDay() === 0 ? ["fc-day-sunday"] : []
 }
 
 interface EventCalendarViewProps {
@@ -75,6 +50,7 @@ export default function EventCalendarView({
   compact = false,
 }: EventCalendarViewProps) {
   const panelMinH = compact ? "min-h-[420px]" : "min-h-[min(72vh,620px)]"
+
   const fcEvents: EventInput[] = useMemo(
     () =>
       events.map((e) => ({
@@ -98,43 +74,47 @@ export default function EventCalendarView({
   )
 
   const eventContent = useCallback(
-    (arg: EventContentArg) => <EventCalendarEventContent arg={arg} />,
+    (arg: EventContentArg) => <EventCalendarEventCard arg={arg} />,
     []
   )
 
   if (viewMode === "list") {
     return (
-      <MarketingPanelPrimary className={cn("overflow-hidden flex-1", panelMinH, className)}>
+      <div className={cn("overflow-hidden flex-1 rounded-xl border border-border/40 bg-card", panelMinH, className)}>
         <EventListView
           items={items}
           selectedId={selectedId}
           onSelect={(id) => onEventClick?.(id)}
           cursorDate={cursorDate}
         />
-      </MarketingPanelPrimary>
+      </div>
     )
   }
 
   if (viewMode === "timeline") {
     return (
-      <MarketingPanelPrimary className={cn("overflow-hidden flex-1 p-3", panelMinH, className)}>
+      <div className={cn("overflow-hidden flex-1 rounded-xl border border-border/40 bg-card p-3", panelMinH, className)}>
         <EventTimelineView
           items={items}
           selectedId={selectedId}
           onSelect={(id) => onEventClick?.(id)}
           rangeStart={cursorDate}
         />
-      </MarketingPanelPrimary>
+      </div>
     )
   }
 
   const initialDate = cursorDate
 
   return (
-    <MarketingPanelPrimary
-      className={cn("overflow-hidden flex-1 shadow-none", panelMinH, className)}
+    <div
+      className={cn(
+        "overflow-hidden flex-1 rounded-xl border border-border/40 bg-card shadow-sm",
+        panelMinH,
+        className
+      )}
     >
-      <div className="calendar-embed calendar-embed--events h-full min-h-0">
+      <div className="calendar-embed calendar-embed--events h-full min-h-0 p-2 md:p-3">
         <FullCalendar
           key={`${viewMode}-${initialDate.toISOString()}`}
           plugins={CALENDAR_PLUGINS}
@@ -143,13 +123,15 @@ export default function EventCalendarView({
           events={fcEvents}
           firstDay={1}
           height="auto"
-          aspectRatio={viewMode === "week" ? 1.1 : 1.25}
+          aspectRatio={viewMode === "week" ? 1.1 : 1.35}
           eventClick={handleEventClick}
           eventContent={eventContent}
-          dayMaxEvents={viewMode === "month" ? 4 : 8}
+          dayMaxEvents={viewMode === "month" ? 2 : 8}
+          moreLinkText={(n) => `+${n} more`}
           moreLinkClick="popover"
           fixedWeekCount={viewMode === "month"}
           headerToolbar={false}
+          dayCellClassNames={dayCellClassNames}
           datesSet={(info) => {
             if (onDatesChange && info.view.currentStart) {
               onDatesChange(info.view.currentStart)
@@ -160,6 +142,6 @@ export default function EventCalendarView({
           allDaySlot={true}
         />
       </div>
-    </MarketingPanelPrimary>
+    </div>
   )
 }

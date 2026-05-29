@@ -330,6 +330,7 @@ export function EventCalendarCore({
 
       {settings.showToolbar ? (
         <EventCalendarToolbar
+          title={settings.title}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           cursorDate={cursorDate}
@@ -349,6 +350,13 @@ export function EventCalendarCore({
           onFilterLocation={setFilterLocation}
           onFilterStatus={setFilterStatus}
           onFilterOwner={setFilterOwner}
+          onClearFilters={() => {
+            setFilterEventType("all")
+            setFilterLocation("all")
+            setFilterStatus("all")
+            setFilterOwner("all")
+            setSearch("")
+          }}
           showFilters={settings.showFilters}
         />
       ) : null}
