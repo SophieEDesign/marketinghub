@@ -381,6 +381,14 @@ export interface BlockConfig {
   content_timeline_start_date_field?: string
   content_timeline_end_date_field_id?: string
   content_timeline_end_date_field?: string
+  content_timeline_images_field_id?: string
+  content_timeline_images_field?: string
+  content_timeline_notes_field_id?: string
+  content_timeline_notes_field?: string
+  content_timeline_date_to_field_id?: string
+  content_timeline_date_to_field?: string
+  content_timeline_division_field_id?: string
+  content_timeline_division_field?: string
   content_timeline_subtitle?: string
   content_timeline_default_view?: 'month' | 'quarter' | 'year'
   content_timeline_group_by?: 'theme' | 'channel' | 'status' | 'owner' | 'campaign'
@@ -456,6 +464,28 @@ export interface BlockConfig {
   upcoming_summary_group_campaigns_by_status?: boolean
   /** When true, show sample data instead of live Content / Campaigns / Events. */
   upcoming_summary_use_mock?: boolean
+  upcoming_summary_title_field_id?: string
+  upcoming_summary_title_field?: string
+  upcoming_summary_type_field_id?: string
+  upcoming_summary_type_field?: string
+  upcoming_summary_status_field_id?: string
+  upcoming_summary_status_field?: string
+  upcoming_summary_theme_field_id?: string
+  upcoming_summary_theme_field?: string
+  upcoming_summary_campaign_field_id?: string
+  upcoming_summary_campaign_field?: string
+  upcoming_summary_owner_field_id?: string
+  upcoming_summary_owner_field?: string
+  upcoming_summary_date_field_id?: string
+  upcoming_summary_date_field?: string
+  upcoming_summary_due_date_field_id?: string
+  upcoming_summary_due_date_field?: string
+  upcoming_summary_priority_field_id?: string
+  upcoming_summary_priority_field?: string
+  upcoming_summary_campaign_name_field_id?: string
+  upcoming_summary_campaign_name_field?: string
+  upcoming_summary_campaign_status_field_id?: string
+  upcoming_summary_campaign_status_field?: string
   // Things To Do block
   things_to_do_subtitle?: string
   things_to_do_default_view?: 'list' | 'board' | 'by-priority' | 'by-campaign' | 'calendar'
@@ -478,6 +508,8 @@ export interface BlockConfig {
   things_to_do_due_date_field_id?: string
   things_to_do_campaign_field_id?: string
   things_to_do_theme_field_id?: string
+  things_to_do_description_field_id?: string
+  things_to_do_channels_field_id?: string
   // Event Calendar block
   event_calendar_use_mock?: boolean
   event_calendar_max_items?: number
@@ -538,6 +570,10 @@ export interface BlockConfig {
   social_media_calendar_caption_field?: string
   social_media_calendar_platform_field_id?: string
   social_media_calendar_platform_field?: string
+  social_media_calendar_channels_field_id?: string
+  social_media_calendar_channels_field?: string
+  social_media_calendar_images_field_id?: string
+  social_media_calendar_images_field?: string
   social_media_calendar_status_field_id?: string
   social_media_calendar_status_field?: string
   social_media_calendar_owner_field_id?: string

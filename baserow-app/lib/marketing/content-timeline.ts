@@ -720,13 +720,25 @@ export function ownerInitials(owner?: string): string {
 export function collectFilterOptions(items: ContentTimelineItem[]) {
   const owners = new Set<string>()
   const divisions = new Set<string>()
+  const themes = new Set<string>()
+  const types = new Set<ContentTimelineItemType>()
+  const channels = new Set<ContentTimelineChannel>()
+  const statuses = new Set<ContentTimelineStatus>()
   for (const item of items) {
     if (item.owner) owners.add(item.owner)
     if (item.division) divisions.add(item.division)
+    if (item.theme) themes.add(item.theme)
+    types.add(item.type)
+    channels.add(item.channel)
+    statuses.add(item.status)
   }
   return {
-    owners: Array.from(owners).sort(),
-    divisions: Array.from(divisions).sort(),
+    themes: Array.from(themes).sort((a, b) => a.localeCompare(b)),
+    types: Array.from(types),
+    channels: Array.from(channels),
+    statuses: Array.from(statuses),
+    owners: Array.from(owners).sort((a, b) => a.localeCompare(b)),
+    divisions: Array.from(divisions).sort((a, b) => a.localeCompare(b)),
   }
 }
 

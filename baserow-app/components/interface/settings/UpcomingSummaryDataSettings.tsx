@@ -13,9 +13,12 @@ import {
 } from "@/components/ui/select"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { UpcomingSummarySectionId } from "@/lib/interface/types"
+import type { BlockConfig } from "@/lib/interface/types"
 import type { DataSettingsCtx } from "./blockSettingsRegistry"
 import { ALL_UPCOMING_SUMMARY_SECTIONS } from "@/lib/interface/upcoming-summary-mock-data"
 import TableSelector from "./shared/TableSelector"
+import MarketingFieldMappingSection from "./shared/MarketingFieldMappingSection"
+import MarketingFieldSelect from "./shared/MarketingFieldSelect"
 
 const SECTION_LABELS: Record<UpcomingSummarySectionId, string> = {
   deadlines: "Upcoming deadlines",
@@ -29,8 +32,22 @@ const SECTION_LABELS: Record<UpcomingSummarySectionId, string> = {
 export default function UpcomingSummaryDataSettings({
   config,
   tables,
+  fields,
   onUpdate,
 }: DataSettingsCtx) {
+  const contentTableId = config.upcoming_summary_content_table_id || config.table_id
+  const contentFields = contentTableId
+    ? fields.filter((f) => f.table_id === contentTableId)
+    : fields
+
+  const setField =
+    (idKey: keyof BlockConfig, nameKey?: keyof BlockConfig) =>
+    (fieldId: string | undefined, fieldName?: string | undefined) => {
+      onUpdate({
+        [idKey]: fieldId,
+        ...(nameKey ? { [nameKey]: fieldName } : {}),
+      } as Partial<BlockConfig>)
+    }
   const sections =
     config.upcoming_summary_sections?.length
       ? config.upcoming_summary_sections
@@ -76,6 +93,69 @@ export default function UpcomingSummaryDataSettings({
           />
         </div>
       </details>
+
+      {contentTableId && contentFields.length > 0 ? (
+        <MarketingFieldMappingSection>
+          <MarketingFieldSelect
+            label="Title"
+            fieldId={config.upcoming_summary_title_field_id}
+            fieldName={config.upcoming_summary_title_field}
+            fields={contentFields}
+            onChange={setField("upcoming_summary_title_field_id", "upcoming_summary_title_field")}
+          />
+          <MarketingFieldSelect
+            label="Content type"
+            fieldId={config.upcoming_summary_type_field_id}
+            fieldName={config.upcoming_summary_type_field}
+            fields={contentFields}
+            onChange={setField("upcoming_summary_type_field_id", "upcoming_summary_type_field")}
+          />
+          <MarketingFieldSelect
+            label="Status"
+            fieldId={config.upcoming_summary_status_field_id}
+            fieldName={config.upcoming_summary_status_field}
+            fields={contentFields}
+            onChange={setField("upcoming_summary_status_field_id", "upcoming_summary_status_field")}
+          />
+          <MarketingFieldSelect
+            label="Due date"
+            fieldId={config.upcoming_summary_due_date_field_id}
+            fieldName={config.upcoming_summary_due_date_field}
+            fields={contentFields}
+            onChange={setField("upcoming_summary_due_date_field_id", "upcoming_summary_due_date_field")}
+            fieldTypes={["date"]}
+          />
+          <MarketingFieldSelect
+            label="Publish date"
+            fieldId={config.upcoming_summary_date_field_id}
+            fieldName={config.upcoming_summary_date_field}
+            fields={contentFields}
+            onChange={setField("upcoming_summary_date_field_id", "upcoming_summary_date_field")}
+            fieldTypes={["date"]}
+          />
+          <MarketingFieldSelect
+            label="Owner"
+            fieldId={config.upcoming_summary_owner_field_id}
+            fieldName={config.upcoming_summary_owner_field}
+            fields={contentFields}
+            onChange={setField("upcoming_summary_owner_field_id", "upcoming_summary_owner_field")}
+          />
+          <MarketingFieldSelect
+            label="Priority"
+            fieldId={config.upcoming_summary_priority_field_id}
+            fieldName={config.upcoming_summary_priority_field}
+            fields={contentFields}
+            onChange={setField("upcoming_summary_priority_field_id", "upcoming_summary_priority_field")}
+          />
+          <MarketingFieldSelect
+            label="Theme"
+            fieldId={config.upcoming_summary_theme_field_id}
+            fieldName={config.upcoming_summary_theme_field}
+            fields={contentFields}
+            onChange={setField("upcoming_summary_theme_field_id", "upcoming_summary_theme_field")}
+          />
+        </MarketingFieldMappingSection>
+      ) : null}
 
       <div className="flex items-center justify-between rounded-md border border-border/40 px-3 py-2">
         <div className="space-y-0.5 pr-3">

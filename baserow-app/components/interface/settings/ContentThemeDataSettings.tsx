@@ -72,6 +72,12 @@ export default function ContentThemeDataSettings({
             fields={tableFields}
             onChange={setField("content_theme_colour_field_id")}
           />
+          <MarketingFieldSelect
+            label="Divisions"
+            fieldId={config.content_theme_divisions_field_id}
+            fields={tableFields}
+            onChange={setField("content_theme_divisions_field_id")}
+          />
         </MarketingFieldMappingSection>
       ) : null}
 

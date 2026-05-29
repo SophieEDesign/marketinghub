@@ -4,8 +4,10 @@ import { useCallback, useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { fetchProfileLabelById } from "@/lib/users/profile-labels"
 import {
+  contentTimelineExtraOverridesFromConfig,
   contentTimelineOverridesFromConfig,
   isMarketingMockEnabled,
+  resolveContentTimelineExtraFields,
 } from "@/lib/marketing/block-config-resolver"
 import { applyMarketingBlockDataQuery } from "@/lib/marketing/block-data-query"
 import {
@@ -182,6 +184,11 @@ export function useContentTimelineData(options?: {
             fieldIds
           )
 
+          const extraFieldMap = resolveContentTimelineExtraFields(
+            fieldIds,
+            contentTimelineExtraOverridesFromConfig(config)
+          )
+
           const { labelById: themeLabelById } = buildThemeMaps(themeRows, fieldMap)
 
           for (const row of campaignRows) {
@@ -223,6 +230,7 @@ export function useContentTimelineData(options?: {
               contentRows,
               fields: fieldMap,
               contentFields: contentFieldRows,
+              extraFields: extraFieldMap,
               planningItems,
               campaignLabelById,
               profileLabelById,

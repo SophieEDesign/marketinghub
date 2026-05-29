@@ -105,6 +105,18 @@ export default function ThingsToDoDataSettings({
             fields={tableFields}
             onChange={setField("things_to_do_theme_field_id")}
           />
+          <MarketingFieldSelect
+            label="Description"
+            fieldId={config.things_to_do_description_field_id}
+            fields={tableFields}
+            onChange={setField("things_to_do_description_field_id")}
+          />
+          <MarketingFieldSelect
+            label="Channels"
+            fieldId={config.things_to_do_channels_field_id}
+            fields={tableFields}
+            onChange={setField("things_to_do_channels_field_id")}
+          />
         </MarketingFieldMappingSection>
       ) : null}
 

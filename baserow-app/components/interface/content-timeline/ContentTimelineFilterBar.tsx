@@ -2,11 +2,13 @@
 
 import { Search } from "lucide-react"
 import {
-  CONTENT_TIMELINE_CHANNELS,
-  CONTENT_TIMELINE_STATUSES,
-  CONTENT_TIMELINE_THEMES,
-  CONTENT_TIMELINE_TYPES,
+  getChannelLabel,
+  getStatusLabel,
+  getTypeLabel,
+  type ContentTimelineChannel,
   type ContentTimelineFilters,
+  type ContentTimelineItemType,
+  type ContentTimelineStatus,
 } from "@/lib/marketing/content-timeline"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -24,6 +26,10 @@ const FILTER_CONTROL = "h-8 text-xs border-border/40"
 
 interface ContentTimelineFilterBarProps {
   filters: ContentTimelineFilters
+  themeOptions: string[]
+  typeOptions: ContentTimelineItemType[]
+  channelOptions: ContentTimelineChannel[]
+  statusOptions: ContentTimelineStatus[]
   ownerOptions: string[]
   divisionOptions: string[]
   compact: boolean
@@ -70,6 +76,10 @@ function FilterSelect({
 
 export function ContentTimelineFilterBar({
   filters,
+  themeOptions,
+  typeOptions,
+  channelOptions,
+  statusOptions,
   ownerOptions,
   divisionOptions,
   compact,
@@ -106,30 +116,40 @@ export function ContentTimelineFilterBar({
             <FilterSelect
               label="Theme"
               value={filters.themes}
-              options={CONTENT_TIMELINE_THEMES}
+              options={themeOptions}
               placeholder="Theme"
               onChange={(themes) => onFiltersChange({ themes })}
             />
             <FilterSelect
               label="Content type"
               value={filters.types}
-              options={CONTENT_TIMELINE_TYPES}
+              options={typeOptions.map((t) => ({ value: t, label: getTypeLabel(t) }))}
               placeholder="Type"
-              onChange={(types) => onFiltersChange({ types })}
+              onChange={(types) => onFiltersChange({ types: types as ContentTimelineItemType[] })}
             />
             <FilterSelect
               label="Channel"
               value={filters.channels}
-              options={CONTENT_TIMELINE_CHANNELS}
+              options={channelOptions.map((c) => ({
+                value: c,
+                label: getChannelLabel(c),
+              }))}
               placeholder="Channel"
-              onChange={(channels) => onFiltersChange({ channels })}
+              onChange={(channels) =>
+                onFiltersChange({ channels: channels as ContentTimelineChannel[] })
+              }
             />
             <FilterSelect
               label="Status"
               value={filters.statuses}
-              options={CONTENT_TIMELINE_STATUSES}
+              options={statusOptions.map((s) => ({
+                value: s,
+                label: getStatusLabel(s),
+              }))}
               placeholder="Status"
-              onChange={(statuses) => onFiltersChange({ statuses })}
+              onChange={(statuses) =>
+                onFiltersChange({ statuses: statuses as ContentTimelineStatus[] })
+              }
             />
             <FilterSelect
               label="Owner"

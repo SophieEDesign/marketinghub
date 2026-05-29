@@ -165,12 +165,106 @@ export function contentPlanningOverridesFromConfig(
             `${p}_start_date_field_id` as keyof BlockConfig,
             `${p}_start_date_field` as keyof BlockConfig
           ),
-    contentDueDate: overridePair(
+    contentDueDate:
+      prefix === "things_to_do"
+        ? overridePair(c, "things_to_do_due_date_field_id")
+        : overridePair(
+            c,
+            `${p}_end_date_field_id` as keyof BlockConfig,
+            `${p}_end_date_field` as keyof BlockConfig
+          ),
+  }
+}
+
+export interface ThingsToDoExtraFieldMap {
+  priority: string | null
+  reviewer: string | null
+  description: string | null
+  channels: string | null
+}
+
+export function thingsToDoExtraOverridesFromConfig(
+  config?: BlockConfig
+): Partial<Record<keyof ThingsToDoExtraFieldMap, FieldOverridePair>> {
+  const c = config || {}
+  return {
+    priority: overridePair(c, "things_to_do_priority_field_id"),
+    reviewer: overridePair(c, "things_to_do_reviewer_field_id"),
+    description: overridePair(c, "things_to_do_description_field_id"),
+    channels: overridePair(c, "things_to_do_channels_field_id"),
+  }
+}
+
+export function resolveThingsToDoExtraFields(
+  fields: FieldLike[],
+  overrides?: Partial<Record<keyof ThingsToDoExtraFieldMap, FieldOverridePair>>
+): ThingsToDoExtraFieldMap {
+  const pick = (patterns: RegExp[]) => {
+    for (const p of patterns) {
+      const hit = fields.find((f) => p.test(f.name))
+      if (hit) return hit.name
+    }
+    return null
+  }
+  const base: ThingsToDoExtraFieldMap = {
+    priority: pick([/^priority$/i]),
+    reviewer: pick([/approved_by/i, /reviewer/i, /post_originator_approve/i]),
+    description: pick([/notes_detail/i, /^description$/i, /brief/i]),
+    channels: pick([/^channels$/i, /platform/i]),
+  }
+  if (!overrides || Object.keys(overrides).length === 0) return base
+  return applyFieldOverrides(base, overrides, fields)
+}
+
+export interface ContentTimelineExtraFieldMap {
+  channel: string | null
+  images: string | null
+  notes: string | null
+  dateTo: string | null
+  division: string | null
+}
+
+export function contentTimelineExtraOverridesFromConfig(
+  config?: BlockConfig
+): Partial<Record<keyof ContentTimelineExtraFieldMap, FieldOverridePair>> {
+  const c = config || {}
+  return {
+    channel: overridePair(
       c,
-      `${p}_end_date_field_id` as keyof BlockConfig,
-      `${p}_end_date_field` as keyof BlockConfig
+      "content_timeline_channel_field_id",
+      "content_timeline_channel_field"
+    ),
+    images: overridePair(c, "content_timeline_images_field_id", "content_timeline_images_field"),
+    notes: overridePair(c, "content_timeline_notes_field_id", "content_timeline_notes_field"),
+    dateTo: overridePair(c, "content_timeline_date_to_field_id", "content_timeline_date_to_field"),
+    division: overridePair(
+      c,
+      "content_timeline_division_field_id",
+      "content_timeline_division_field"
     ),
   }
+}
+
+export function resolveContentTimelineExtraFields(
+  fields: FieldLike[],
+  overrides?: Partial<Record<keyof ContentTimelineExtraFieldMap, FieldOverridePair>>
+): ContentTimelineExtraFieldMap {
+  const pick = (patterns: RegExp[]) => {
+    for (const p of patterns) {
+      const hit = fields.find((f) => p.test(f.name))
+      if (hit) return hit.name
+    }
+    return null
+  }
+  const base: ContentTimelineExtraFieldMap = {
+    channel: pick([/^channels$/i, /channel/i, /platform/i]),
+    images: pick([/^images$/i, /media/i, /attachment/i]),
+    notes: pick([/notes_detail/i, /^description$/i, /brief/i]),
+    dateTo: pick([/^date_to$/i, /end_date/i]),
+    division: pick([/primary_division/i, /^division$/i, /team/i]),
+  }
+  if (!overrides || Object.keys(overrides).length === 0) return base
+  return applyFieldOverrides(base, overrides, fields)
 }
 
 export function contentTimelineOverridesFromConfig(
@@ -182,6 +276,112 @@ export function contentTimelineOverridesFromConfig(
     contentTheme: overridePair(c, "content_timeline_theme_field_id", "content_timeline_theme_field"),
     contentType: overridePair(c, "content_timeline_type_field_id", "content_timeline_type_field"),
   }
+}
+
+export function upcomingSummaryOverridesFromConfig(
+  config?: BlockConfig
+): Partial<Record<keyof ContentPlanningFieldMap, FieldOverridePair>> {
+  const c = config || {}
+  return {
+    contentName: overridePair(
+      c,
+      "upcoming_summary_title_field_id",
+      "upcoming_summary_title_field"
+    ),
+    contentType: overridePair(c, "upcoming_summary_type_field_id", "upcoming_summary_type_field"),
+    contentStatus: overridePair(c, "upcoming_summary_status_field_id", "upcoming_summary_status_field"),
+    contentTheme: overridePair(c, "upcoming_summary_theme_field_id", "upcoming_summary_theme_field"),
+    contentCampaign: overridePair(
+      c,
+      "upcoming_summary_campaign_field_id",
+      "upcoming_summary_campaign_field"
+    ),
+    contentOwner: overridePair(c, "upcoming_summary_owner_field_id", "upcoming_summary_owner_field"),
+    contentDate: overridePair(c, "upcoming_summary_date_field_id", "upcoming_summary_date_field"),
+    contentDueDate: overridePair(
+      c,
+      "upcoming_summary_due_date_field_id",
+      "upcoming_summary_due_date_field"
+    ),
+    campaignName: overridePair(
+      c,
+      "upcoming_summary_campaign_name_field_id",
+      "upcoming_summary_campaign_name_field"
+    ),
+    campaignStatus: overridePair(
+      c,
+      "upcoming_summary_campaign_status_field_id",
+      "upcoming_summary_campaign_status_field"
+    ),
+  }
+}
+
+export function upcomingSummaryPriorityFieldFromConfig(
+  config?: BlockConfig,
+  fields?: FieldLike[]
+): string | null {
+  if (!fields?.length) return null
+  return fieldNameFromConfig(
+    fields,
+    config?.upcoming_summary_priority_field_id,
+    config?.upcoming_summary_priority_field
+  )
+}
+
+export interface SocialCalendarExtraFieldMap {
+  caption: string | null
+  platform: string | null
+  channels: string | null
+  images: string | null
+}
+
+export function socialCalendarExtraOverridesFromConfig(
+  config?: BlockConfig
+): Partial<Record<keyof SocialCalendarExtraFieldMap, FieldOverridePair>> {
+  const c = config || {}
+  return {
+    caption: overridePair(
+      c,
+      "social_media_calendar_caption_field_id",
+      "social_media_calendar_caption_field"
+    ),
+    platform: overridePair(
+      c,
+      "social_media_calendar_platform_field_id",
+      "social_media_calendar_platform_field"
+    ),
+    channels: overridePair(
+      c,
+      "social_media_calendar_channels_field_id",
+      "social_media_calendar_channels_field"
+    ),
+    images: overridePair(
+      c,
+      "social_media_calendar_images_field_id",
+      "social_media_calendar_images_field"
+    ),
+  }
+}
+
+export function resolveSocialCalendarExtraFields(
+  fields: FieldLike[],
+  overrides?: Partial<Record<keyof SocialCalendarExtraFieldMap, FieldOverridePair>>
+): SocialCalendarExtraFieldMap {
+  const pick = (patterns: RegExp[]) => {
+    for (const p of patterns) {
+      const hit = fields.find((f) => p.test(f.name))
+      if (hit) return hit.name
+    }
+    return null
+  }
+  const base: SocialCalendarExtraFieldMap = {
+    caption: pick([/content_post_text/i, /post_text/i, /caption/i]),
+    platform: pick([/^platform$/i, /^channels$/i]),
+    channels: pick([/^channels$/i]),
+    images: pick([/^images$/i, /media/i]),
+  }
+  if (!overrides || Object.keys(overrides).length === 0) return base
+  return applyFieldOverrides(base, overrides, fields)
 }
 
 export function resourceHubOverridesFromConfig(

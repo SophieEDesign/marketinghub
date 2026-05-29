@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/select"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { DataSettingsCtx } from "./blockSettingsRegistry"
-import { CONTENT_TIMELINE_THEMES } from "@/lib/marketing/content-timeline"
 import MarketingDataSourceSection from "./shared/MarketingDataSourceSection"
 import MarketingFieldMappingSection from "./shared/MarketingFieldMappingSection"
 import MarketingFieldSelect from "./shared/MarketingFieldSelect"
@@ -125,6 +124,35 @@ export default function ContentTimelineDataSettings({
             )}
             fieldTypes={["date"]}
           />
+          <MarketingFieldSelect
+            label="Date to (range end)"
+            fieldId={config.content_timeline_date_to_field_id}
+            fieldName={config.content_timeline_date_to_field}
+            fields={tableFields}
+            onChange={setField("content_timeline_date_to_field_id", "content_timeline_date_to_field")}
+            fieldTypes={["date"]}
+          />
+          <MarketingFieldSelect
+            label="Images"
+            fieldId={config.content_timeline_images_field_id}
+            fieldName={config.content_timeline_images_field}
+            fields={tableFields}
+            onChange={setField("content_timeline_images_field_id", "content_timeline_images_field")}
+          />
+          <MarketingFieldSelect
+            label="Notes / brief"
+            fieldId={config.content_timeline_notes_field_id}
+            fieldName={config.content_timeline_notes_field}
+            fields={tableFields}
+            onChange={setField("content_timeline_notes_field_id", "content_timeline_notes_field")}
+          />
+          <MarketingFieldSelect
+            label="Division"
+            fieldId={config.content_timeline_division_field_id}
+            fieldName={config.content_timeline_division_field}
+            fields={tableFields}
+            onChange={setField("content_timeline_division_field_id", "content_timeline_division_field")}
+          />
         </MarketingFieldMappingSection>
       ) : null}
 
@@ -226,27 +254,17 @@ export default function ContentTimelineDataSettings({
       </div>
 
       <div className="space-y-2">
-        <Label>Default theme filter</Label>
-        <Select
-          value={config.content_timeline_default_theme_filter || "none"}
-          onValueChange={(v) =>
+        <Label htmlFor="ct-default-theme">Default theme filter</Label>
+        <Input
+          id="ct-default-theme"
+          value={config.content_timeline_default_theme_filter || ""}
+          onChange={(e) =>
             onUpdate({
-              content_timeline_default_theme_filter: v === "none" ? undefined : v,
+              content_timeline_default_theme_filter: e.target.value.trim() || undefined,
             })
           }
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="None" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">None</SelectItem>
-            {CONTENT_TIMELINE_THEMES.map((t) => (
-              <SelectItem key={t} value={t}>
-                {t}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          placeholder="Leave empty for no default — matches theme label from table"
+        />
       </div>
 
       <div className="space-y-3 pt-2 border-t">

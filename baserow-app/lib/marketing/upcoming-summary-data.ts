@@ -162,6 +162,7 @@ export function buildUpcomingSummaryData(params: {
   contentSupabaseTable: string
   campaignsTableId: string
   campaignsSupabaseTable: string
+  priorityField?: string | null
 }): UpcomingSummaryBuiltData {
   const {
     contentRows,
@@ -175,10 +176,12 @@ export function buildUpcomingSummaryData(params: {
     contentSupabaseTable,
     campaignsTableId,
     campaignsSupabaseTable,
+    priorityField: priorityFieldParam,
   } = params
 
   const today = startOfDay(new Date())
-  const priorityField = pickFieldName(contentFields, [/priority/i], null)
+  const priorityField =
+    priorityFieldParam ?? pickFieldName(contentFields, [/priority/i], null)
   const imagesField =
     contentFields.find((f) => /^images$/i.test(f.name))?.name ?? "images"
   const notesField =

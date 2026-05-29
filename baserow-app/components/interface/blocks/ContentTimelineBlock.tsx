@@ -232,6 +232,10 @@ export default function ContentTimelineBlock({
       {showFilters && (
         <ContentTimelineFilterBar
           filters={filters}
+          themeOptions={filterOptions.themes}
+          typeOptions={filterOptions.types}
+          channelOptions={filterOptions.channels}
+          statusOptions={filterOptions.statuses}
           ownerOptions={filterOptions.owners}
           divisionOptions={filterOptions.divisions}
           compact={compact}

@@ -9,8 +9,10 @@ import {
 } from "@/lib/marketing/content-planning"
 import { buildUpcomingSummaryData, type UpcomingSummaryBuiltData } from "@/lib/marketing/upcoming-summary-data"
 import {
+  fieldNameFromConfig,
   isMarketingMockEnabled,
   resolveMarketingTable,
+  upcomingSummaryOverridesFromConfig,
 } from "@/lib/marketing/block-config-resolver"
 import {
   findCampaignsTable,
@@ -136,11 +138,24 @@ export function useUpcomingSummaryData(options?: {
           mapFieldRow
         )
 
+        const contentFieldIds = (fieldRows?.filter((f) => f.table_id === content.id) || []).map(
+          (f) => ({ id: f.id, name: f.name })
+        )
+
         const fieldMap = resolveContentPlanningFields(
           contentFieldRows,
           campaignFieldRows,
-          themeFieldRows
+          themeFieldRows,
+          upcomingSummaryOverridesFromConfig(config),
+          contentFieldIds
         )
+
+        const priorityField =
+          fieldNameFromConfig(
+            contentFieldIds,
+            config?.upcoming_summary_priority_field_id,
+            config?.upcoming_summary_priority_field
+          ) || contentFieldRows.find((f) => /priority/i.test(f.name))?.name
 
         const [contentRes, themesRes, campaignsRes] = await Promise.all([
           supabase
@@ -176,6 +191,7 @@ export function useUpcomingSummaryData(options?: {
           contentSupabaseTable: content.supabase_table,
           campaignsTableId: ids.campaignsTableId,
           campaignsSupabaseTable: ids.campaignsSupabaseTable,
+          priorityField: priorityField ?? null,
         })
 
         if (cancelled) return

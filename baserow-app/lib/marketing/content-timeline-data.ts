@@ -9,6 +9,7 @@ import {
   type ContentPlanningFieldMap,
   type ContentPlanningItem,
 } from "@/lib/marketing/content-planning"
+import type { ContentTimelineExtraFieldMap } from "@/lib/marketing/block-config-resolver"
 import { formatDisplayValue } from "@/lib/marketing/field-utils"
 import type {
   ContentTimelineChannel,
@@ -65,7 +66,8 @@ export function mapContentStatusToTimelineStatus(
 
 function mapChannel(
   row: Record<string, unknown>,
-  channelsField: string | null
+  channelsField: string | null,
+  platformFields: Array<string | null>
 ): ContentTimelineChannel {
   const fromMulti = channelsField ? formatDisplayValue(row[channelsField]) : null
   if (fromMulti) {
@@ -78,8 +80,17 @@ function mapChannel(
     if (first.includes("website") || first.includes("web")) return "website"
     if (first.includes("print")) return "internal"
   }
-  if (row.linkedin) return "linkedin"
-  if (row.instagram) return "instagram"
+  for (const pf of platformFields) {
+    if (!pf) continue
+    const v = row[pf]
+    if (v === true || v === "true" || (v != null && v !== "" && v !== false)) {
+      const name = pf.toLowerCase()
+      if (name.includes("linkedin")) return "linkedin"
+      if (name.includes("instagram")) return "instagram"
+      if (name.includes("facebook")) return "facebook"
+      if (name.includes("twitter") || name === "x") return "pr"
+    }
+  }
   return "internal"
 }
 
@@ -95,6 +106,7 @@ export function buildContentTimelineItems(params: {
   contentRows: Record<string, unknown>[]
   fields: ContentPlanningFieldMap
   contentFields: FieldRow[]
+  extraFields: ContentTimelineExtraFieldMap
   planningItems: ContentPlanningItem[]
   campaignLabelById: Map<string, string>
   profileLabelById: Map<string, string>
@@ -108,6 +120,7 @@ export function buildContentTimelineItems(params: {
     contentRows,
     fields,
     contentFields,
+    extraFields,
     planningItems,
     campaignLabelById,
     profileLabelById,
@@ -118,13 +131,12 @@ export function buildContentTimelineItems(params: {
   } = params
 
   const planningById = new Map(planningItems.map((p) => [p.id, p]))
-  const imagesField =
-    contentFields.find((f) => /^images$/i.test(f.name))?.name ?? "images"
-  const divisionField =
-    contentFields.find((f) => /primary_division|^division$/i.test(f.name))?.name ??
-    fields.contentDivision
-  const notesField =
-    contentFields.find((f) => /notes_detail|^description$/i.test(f.name))?.name ?? null
+  const imagesField = extraFields.images
+  const divisionField = extraFields.division ?? fields.contentDivision
+  const notesField = extraFields.notes
+  const platformToggleFields = contentFields
+    .filter((f) => /^(instagram|linkedin|facebook|twitter|x|tiktok)$/i.test(f.name))
+    .map((f) => f.name)
 
   const items: ContentTimelineItem[] = []
 
@@ -147,8 +159,7 @@ export function buildContentTimelineItems(params: {
       (fields.contentDueDate ? toIsoDate(row[fields.contentDueDate]) : null)
     if (!startIso) continue
 
-    const dateToField = contentFields.find((f) => /^date_to$/i.test(f.name))?.name ?? "date_to"
-    const endFromRow = toIsoDate(row[dateToField])
+    const endFromRow = extraFields.dateTo ? toIsoDate(row[extraFields.dateTo]) : null
     const dueIso = planning?.dueDate
       ? format(planning.dueDate, "yyyy-MM-dd")
       : fields.contentDueDate
@@ -188,7 +199,7 @@ export function buildContentTimelineItems(params: {
       title,
       theme: themeLabel,
       type: defaultTimelineType ?? mapContentTypeToTimelineType(contentType),
-      channel: mapChannel(row, "channels"),
+      channel: mapChannel(row, extraFields.channel, platformToggleFields),
       status: mapContentStatusToTimelineStatus(statusRaw),
       owner: ownerLabel ?? undefined,
       startDate: startIso,
@@ -197,7 +208,7 @@ export function buildContentTimelineItems(params: {
       campaign: campaignLabel,
       division,
       brief: notesField ? formatDisplayValue(row[notesField]) ?? undefined : undefined,
-      notes: formatDisplayValue(row.notes_detail) ?? undefined,
+      notes: notesField ? formatDisplayValue(row[notesField]) ?? undefined : undefined,
       assetStatus: deriveAssetStatus(row, imagesField),
       approvalStatus: /review|awaiting/i.test(statusRaw ?? "") ? statusRaw ?? undefined : undefined,
       colour: planning?.accentColor,

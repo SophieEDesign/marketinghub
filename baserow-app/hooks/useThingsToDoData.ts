@@ -7,6 +7,8 @@ import {
   contentPlanningOverridesFromConfig,
   isMarketingMockEnabled,
   resolveMarketingTable,
+  resolveThingsToDoExtraFields,
+  thingsToDoExtraOverridesFromConfig,
 } from "@/lib/marketing/block-config-resolver"
 import { applyMarketingBlockDataQuery } from "@/lib/marketing/block-data-query"
 import {
@@ -146,6 +148,11 @@ export function useThingsToDoData(options?: {
           fieldIds
         )
 
+        const extraFieldMap = resolveThingsToDoExtraFields(
+          fieldIds,
+          thingsToDoExtraOverridesFromConfig(config)
+        )
+
         const [contentRes, themesRes, campaignsRes] = await Promise.all([
           applyMarketingBlockDataQuery(
             supabase.from(content.supabase_table).select("*"),
@@ -181,6 +188,7 @@ export function useThingsToDoData(options?: {
         const todoItems = buildThingsToDoItems({
           contentRows,
           fields: fieldMap,
+          extraFields: extraFieldMap,
           profileLabelById,
           campaignLabelById,
           themeLabelById,

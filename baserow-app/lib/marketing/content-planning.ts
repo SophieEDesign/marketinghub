@@ -2,7 +2,12 @@
  * Content Planning — shared field resolution, items, and filtering for marketing blocks.
  */
 
-import { pickFieldName, formatDisplayValue } from "@/lib/marketing/field-utils"
+import {
+  pickFieldName,
+  formatDisplayValue,
+  choiceLabelsForFieldNames,
+  mergeFilterOptionLists,
+} from "@/lib/marketing/field-utils"
 import {
   applyFieldOverrides,
   type FieldOverridePair,
@@ -198,15 +203,24 @@ export function getQuarterDateRange(year: number, quarter: QuarterNum): { start:
   return { start, end }
 }
 
-export function collectFilterOptions(items: ContentPlanningItem[]): {
+export function collectFilterOptions(
+  items: ContentPlanningItem[],
+  opts?: {
+    contentFields?: FieldRow[]
+    fieldMap?: ContentPlanningFieldMap
+    themeLabels?: string[]
+  }
+): {
   contentTypes: string[]
   divisions: string[]
   statuses: string[]
+  themes: string[]
   years: number[]
 } {
   const contentTypes = new Set<string>()
   const divisions = new Set<string>()
   const statuses = new Set<string>()
+  const themes = new Set<string>(opts?.themeLabels ?? [])
   const years = new Set<number>()
   years.add(new Date().getFullYear())
 
@@ -214,14 +228,28 @@ export function collectFilterOptions(items: ContentPlanningItem[]): {
     if (item.contentType) contentTypes.add(item.contentType)
     if (item.division) divisions.add(item.division)
     if (item.status) statuses.add(item.status)
+    if (item.themeLabel) themes.add(item.themeLabel)
     const d = item.date ?? item.dueDate
     if (d) years.add(d.getFullYear())
   }
 
+  const fields = opts?.contentFields ?? []
+  const map = opts?.fieldMap
+
   return {
-    contentTypes: Array.from(contentTypes).sort(),
-    divisions: Array.from(divisions).sort(),
-    statuses: Array.from(statuses).sort(),
+    contentTypes: mergeFilterOptionLists(
+      Array.from(contentTypes),
+      choiceLabelsForFieldNames(fields, [map?.contentType])
+    ),
+    divisions: mergeFilterOptionLists(
+      Array.from(divisions),
+      choiceLabelsForFieldNames(fields, [map?.contentDivision])
+    ),
+    statuses: mergeFilterOptionLists(
+      Array.from(statuses),
+      choiceLabelsForFieldNames(fields, [map?.contentStatus])
+    ),
+    themes: Array.from(themes).sort((a, b) => a.localeCompare(b)),
     years: Array.from(years).sort((a, b) => b - a),
   }
 }

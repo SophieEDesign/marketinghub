@@ -12,7 +12,16 @@ import {
   type ContentPlanningItem,
   type QuarterNum,
 } from "@/lib/marketing/content-planning"
-import { pickFieldName, formatDisplayValue } from "@/lib/marketing/field-utils"
+import {
+  resolveSocialCalendarExtraFields,
+  socialCalendarExtraOverridesFromConfig,
+} from "@/lib/marketing/block-config-resolver"
+import {
+  pickFieldName,
+  formatDisplayValue,
+  choiceLabelsForFieldNames,
+  mergeFilterOptionLists,
+} from "@/lib/marketing/field-utils"
 import { normalizeHexColor } from "@/lib/field-colors"
 import type { BlockConfig } from "@/lib/interface/types"
 import { plainTextFromHtml } from "@/lib/sanitize"
@@ -199,14 +208,25 @@ export function resolveSocialCalendarFields(
 
 export function extendSocialCalendarFieldMap(
   base: ContentPlanningFieldMap,
-  contentFields: FieldRow[]
+  contentFields: FieldRow[],
+  config?: import("@/lib/interface/types").BlockConfig | null
 ): SocialCalendarFieldMap {
   const extra = resolveSocialCalendarFields(contentFields, [], [])
+  const fieldIds = contentFields.map((f) => ({
+    id: (f as { id?: string }).id || f.name,
+    name: f.name,
+  }))
+  const resolved = resolveSocialCalendarExtraFields(
+    fieldIds,
+    socialCalendarExtraOverridesFromConfig(config ?? undefined)
+  )
+  const channels =
+    resolved.channels ?? resolved.platform ?? extra.channels
   return {
     ...base,
-    caption: extra.caption,
-    images: extra.images,
-    channels: extra.channels,
+    caption: resolved.caption ?? extra.caption,
+    images: resolved.images ?? extra.images,
+    channels,
     schedule: extra.schedule,
     approvalNotes: extra.approvalNotes,
     instagram: extra.instagram,
@@ -531,7 +551,14 @@ export function filterSocialCalendarItems(
   })
 }
 
-export function collectSocialFilterOptions(items: SocialCalendarItem[]): {
+export function collectSocialFilterOptions(
+  items: SocialCalendarItem[],
+  opts?: {
+    contentFields?: FieldRow[]
+    statusFieldName?: string | null
+    typeFieldName?: string | null
+  }
+): {
   platforms: SocialPlatform[]
   themes: string[]
   owners: string[]
@@ -564,11 +591,15 @@ export function collectSocialFilterOptions(items: SocialCalendarItem[]): {
     "other",
   ]
 
+  const statusFromSchema = opts?.contentFields?.length
+    ? choiceLabelsForFieldNames(opts.contentFields, [opts.statusFieldName])
+    : []
+
   return {
     platforms: platformOrder.filter((p) => platforms.has(p)),
     themes: Array.from(themes).sort(),
     owners: Array.from(owners).sort(),
-    statuses: Array.from(statuses).sort(),
+    statuses: mergeFilterOptionLists(Array.from(statuses), statusFromSchema),
     years: Array.from(years).sort((a, b) => b - a),
   }
 }

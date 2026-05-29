@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { fetchProfileLabelById } from "@/lib/users/profile-labels"
+import { formatDisplayValue } from "@/lib/marketing/field-utils"
 import type { BlockConfig } from "@/lib/interface/types"
 import {
   isMarketingMockEnabled,
@@ -156,6 +158,8 @@ export function useCampaignsOverviewData(config?: BlockConfig): UseCampaignsOver
           .limit(config?.campaigns_max_items ?? 200)
         if (rowsErr) throw new Error(rowsErr.message)
 
+        const profileLabelById = await fetchProfileLabelById(supabase)
+
         const mapped: CampaignOverviewItem[] = (rows || []).map((row: Record<string, unknown>) => {
           const id = String(row.id)
           const openTasksCount = linkedTasksField ? toCount(row[linkedTasksField]) : 0
@@ -180,7 +184,21 @@ export function useCampaignsOverviewData(config?: BlockConfig): UseCampaignsOver
             stage: stageField ? String(row[stageField] ?? "") : "",
             startDate: startDateField ? String(row[startDateField] ?? "") : "",
             endDate: endDateField ? String(row[endDateField] ?? "") : "",
-            owner: ownerField ? String(row[ownerField] ?? "") : "",
+            owner: ownerField
+              ? (() => {
+                  const raw = row[ownerField]
+                  const id =
+                    typeof raw === "string"
+                      ? raw
+                      : raw && typeof raw === "object" && "id" in (raw as object)
+                        ? String((raw as { id: string }).id)
+                        : null
+                  if (id && profileLabelById.has(id)) {
+                    return profileLabelById.get(id) ?? ""
+                  }
+                  return formatDisplayValue(raw) ?? ""
+                })()
+              : "",
             progress,
             openTasksCount,
             linkedContentCount,

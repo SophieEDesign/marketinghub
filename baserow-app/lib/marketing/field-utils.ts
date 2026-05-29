@@ -2,6 +2,10 @@
  * Shared field-resolution helpers for marketing dashboards.
  */
 
+import type { FieldOptions } from "@/types/fields"
+
+type FieldWithOptions = { name: string; type?: string; options?: FieldOptions }
+
 export function pickFieldName(
   fields: Array<{ name: string }>,
   patterns: RegExp[],
@@ -26,4 +30,45 @@ export function formatDisplayValue(value: unknown): string | null {
     return formatDisplayValue((value as { label?: unknown }).label)
   }
   return String(value)
+}
+
+/** Labels from single_select / multi_select field options (table schema). */
+export function choiceLabelsFromField(field: FieldWithOptions | undefined): string[] {
+  if (!field?.options) return []
+  const opts = field.options as FieldOptions & {
+    choices?: Array<{ value?: string; label?: string; name?: string }>
+  }
+  const choices = opts.choices
+  if (!Array.isArray(choices)) return []
+  return choices
+    .map((c) => {
+      const label = c.label ?? c.name ?? c.value
+      return label != null ? String(label).trim() : ""
+    })
+    .filter(Boolean)
+}
+
+export function choiceLabelsForFieldNames(
+  fields: FieldWithOptions[],
+  fieldNames: Array<string | null | undefined>
+): string[] {
+  const labels = new Set<string>()
+  for (const name of fieldNames) {
+    if (!name) continue
+    const field = fields.find((f) => f.name === name)
+    for (const label of choiceLabelsFromField(field)) {
+      labels.add(label)
+    }
+  }
+  return Array.from(labels).sort((a, b) => a.localeCompare(b))
+}
+
+/** Merge live row values with schema choices (deduped, sorted). */
+export function mergeFilterOptionLists(live: string[], fromSchema: string[]): string[] {
+  const set = new Set<string>()
+  for (const v of [...fromSchema, ...live]) {
+    const t = v.trim()
+    if (t) set.add(t)
+  }
+  return Array.from(set).sort((a, b) => a.localeCompare(b))
 }

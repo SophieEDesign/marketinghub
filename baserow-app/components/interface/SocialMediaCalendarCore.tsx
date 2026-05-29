@@ -7,10 +7,6 @@ import DashboardEmpty from "@/components/interface/primitives/DashboardEmpty"
 import { SocialCalendarStatusBar } from "@/components/interface/social/SocialCalendarStatusBar"
 import { SocialMediaFeedView } from "@/components/interface/social/SocialMediaFeedView"
 import { SocialMediaListView } from "@/components/interface/social/SocialMediaListView"
-import {
-  SocialPostQuickView,
-  SocialPostQuickViewMobileBackdrop,
-} from "@/components/interface/social/SocialPostQuickView"
 import { MarketingFilterStrip } from "@/components/layout/ui-system"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -25,6 +21,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 import { useRecordModal } from "@/contexts/RecordModalContext"
+import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { useSocialMediaCalendarData } from "@/hooks/useSocialMediaCalendarData"
 import { formatDisplayValue } from "@/lib/marketing/field-utils"
 import {
@@ -145,6 +142,7 @@ export function SocialMediaCalendarCore({
 }) {
   const blockConfig = config ?? undefined
   const { openRecordModal } = useRecordModal()
+  const { openRecord } = useRecordPanel()
   const {
     loading,
     error,
@@ -186,8 +184,8 @@ export function SocialMediaCalendarCore({
 
   const socialFields = useMemo(() => {
     if (!fields || contentFields.length === 0) return null
-    return extendSocialCalendarFieldMap(fields, contentFields)
-  }, [fields, contentFields])
+    return extendSocialCalendarFieldMap(fields, contentFields, blockConfig)
+  }, [fields, contentFields, blockConfig])
 
   const campaignLabelById = useMemo(() => {
     const map = new Map<string, string>()
@@ -213,7 +211,14 @@ export function SocialMediaCalendarCore({
     [allSocialItems, contentScope]
   )
 
-  const filterOptions = useMemo(() => collectSocialFilterOptions(scopedItems), [scopedItems])
+  const filterOptions = useMemo(
+    () =>
+      collectSocialFilterOptions(scopedItems, {
+        contentFields,
+        statusFieldName: fields?.contentStatus ?? null,
+      }),
+    [scopedItems, contentFields, fields?.contentStatus]
+  )
 
   const filters: SocialCalendarFilters = useMemo(
     () => ({
@@ -257,11 +262,6 @@ export function SocialMediaCalendarCore({
     [filteredItems]
   )
 
-  const selectedItem = useMemo(
-    () => filteredItems.find((i) => i.id === selectedId) ?? null,
-    [filteredItems, selectedId]
-  )
-
   const openPost = (recordId: string | null) => {
     if (!tableIds) return
     openRecordModal({
@@ -277,6 +277,19 @@ export function SocialMediaCalendarCore({
   const handleSelectPost = (id: string) => {
     if (isEditing) return
     setSelectedId(id)
+    if (settings.showMediaPreview && tableIds) {
+      openRecord(
+        tableIds.contentTableId,
+        id,
+        tableIds.contentSupabaseTable,
+        undefined,
+        undefined,
+        undefined,
+        "view",
+        reload,
+        reload
+      )
+    }
   }
 
   if (loading && !demoState.useLiveData && !forceMock) {
@@ -300,8 +313,6 @@ export function SocialMediaCalendarCore({
   }
 
   const calendarView = viewMode === "week" ? "week" : "month"
-  const showQuickView = settings.showMediaPreview && selectedItem && !isEditing
-  const useInlinePreview = embeddedInBlock
 
   return (
     <div
@@ -512,17 +523,7 @@ export function SocialMediaCalendarCore({
         </TabsList>
       </Tabs>
 
-      <div
-        className={cn(
-          "flex min-h-0 flex-1 relative overflow-hidden gap-3",
-          useInlinePreview ? "flex-col lg:flex-row" : "flex-col xl:flex-row"
-        )}
-      >
-        <SocialPostQuickViewMobileBackdrop
-          open={!!showQuickView && !useInlinePreview}
-          onClose={() => setSelectedId(null)}
-        />
-
+      <div className="flex min-h-0 flex-1 relative overflow-hidden flex-col">
         <div className="flex-1 min-w-0 flex flex-col gap-2 min-h-0">
           {filteredItems.length === 0 ? (
             <DashboardEmpty
@@ -570,30 +571,6 @@ export function SocialMediaCalendarCore({
             <SocialCalendarStatusBar summary={statusSummary} />
           ) : null}
         </div>
-
-        {showQuickView ? (
-          <div
-            className={cn(
-              "shrink-0 min-h-0",
-              useInlinePreview
-                ? "w-full max-w-[320px] border-l border-border/40 pl-3 min-w-[240px]"
-                : cn(
-                    "xl:static fixed inset-y-0 right-0 z-40 w-full max-w-[360px] p-3 xl:p-0",
-                    "xl:block bg-background/95 xl:bg-transparent backdrop-blur-sm xl:backdrop-blur-none shadow-xl xl:shadow-none"
-                  )
-            )}
-          >
-            <SocialPostQuickView
-              item={selectedItem}
-              onClose={() => setSelectedId(null)}
-              onEdit={() => openPost(selectedItem.id)}
-              onOpenFullRecord={() => openPost(selectedItem.id)}
-              showMediaPreview={settings.showMediaPreview}
-              showApprovalStatus={settings.showApprovalStatus}
-              showPlatformIcons={settings.showPlatformIcons}
-            />
-          </div>
-        ) : null}
       </div>
     </div>
   )

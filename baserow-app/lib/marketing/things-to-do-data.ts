@@ -5,6 +5,7 @@
 import { format } from "date-fns"
 import { formatDisplayValue } from "@/lib/marketing/field-utils"
 import type { ContentPlanningFieldMap } from "@/lib/marketing/content-planning"
+import type { ThingsToDoExtraFieldMap } from "@/lib/marketing/block-config-resolver"
 import type {
   ThingsToDoItem,
   ThingsToDoItemType,
@@ -95,6 +96,7 @@ export function isThingsToDoContentRow(
 export function buildThingsToDoItems(params: {
   contentRows: Record<string, unknown>[]
   fields: ContentPlanningFieldMap
+  extraFields: ThingsToDoExtraFieldMap
   profileLabelById: Map<string, string>
   campaignLabelById: Map<string, string>
   themeLabelById: Map<string, string>
@@ -104,6 +106,7 @@ export function buildThingsToDoItems(params: {
   const {
     contentRows,
     fields,
+    extraFields,
     profileLabelById,
     campaignLabelById,
     themeLabelById,
@@ -122,12 +125,13 @@ export function buildThingsToDoItems(params: {
 
     const contentType = fields.contentType ? formatDisplayValue(row[fields.contentType]) : null
     const statusRaw = fields.contentStatus ? formatDisplayValue(row[fields.contentStatus]) : null
-    const priorityRaw = formatDisplayValue(row.priority) ?? null
+    const priorityRaw = extraFields.priority
+      ? formatDisplayValue(row[extraFields.priority])
+      : null
 
     const ownerId = fields.contentOwner ? extractLinkedId(row[fields.contentOwner]) : null
-    const reviewerId = formatDisplayValue(row.approved_by)
-      ? extractLinkedId(row.post_originator_approve ?? row.approved_by)
-      : null
+    const reviewerRaw = extraFields.reviewer ? row[extraFields.reviewer] : null
+    const reviewerId = reviewerRaw ? extractLinkedId(reviewerRaw) : null
 
     const themeId = fields.contentTheme ? extractLinkedId(row[fields.contentTheme]) : null
     const campaignId = fields.contentCampaign ? extractLinkedId(row[fields.contentCampaign]) : null
@@ -145,12 +149,18 @@ export function buildThingsToDoItems(params: {
       },
     ]
 
-    const channels = formatDisplayValue(row.channels)
+    const channels = extraFields.channels
+      ? formatDisplayValue(row[extraFields.channels])
+      : null
+
+    const description = extraFields.description
+      ? formatDisplayValue(row[extraFields.description])
+      : null
 
     items.push({
       id,
       title,
-      description: formatDisplayValue(row.notes_detail) ?? formatDisplayValue(row.description) ?? undefined,
+      description: description ?? undefined,
       type: mapItemType(contentType, statusRaw),
       status: mapStatus(statusRaw),
       priority: mapPriority(priorityRaw),
