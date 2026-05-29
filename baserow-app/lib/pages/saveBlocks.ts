@@ -304,17 +304,25 @@ export async function createBlock(
 }
 
 export async function deleteBlock(blockId: string): Promise<void> {
-  const supabase = await createClient()
+  // Use admin client to bypass RLS — same rationale as saveBlockLayout.
+  // Soft-delete can fail silently under user RLS (e.g. legacy view_id-only blocks).
+  const supabase = createAdminClient()
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('view_blocks')
     .update({
       is_archived: true,
       archived_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     })
     .eq('id', blockId)
+    .select('id')
 
   if (error) {
     throw new Error(`Failed to delete block: ${error.message}`)
+  }
+
+  if (!data || data.length === 0) {
+    throw new Error('Failed to delete block: Block not found')
   }
 }
