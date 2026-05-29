@@ -2,69 +2,87 @@
 
 import {
   X,
-  MoreHorizontal,
   MapPin,
   Calendar,
   ExternalLink,
   Users,
   Pencil,
   Share2,
+  ChevronRight,
+  Download,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { EventAvatarStack } from "@/components/interface/events/EventAvatarStack"
-import type { MarketingEventItem } from "@/lib/marketing/events"
+import type { EventAttendanceStatus, MarketingEventItem } from "@/lib/marketing/events"
 import { statusAccentColor } from "@/lib/marketing/events"
+import {
+  downloadEventIcs,
+  googleCalendarAddUrl,
+  outlookCalendarAddUrl,
+} from "@/lib/marketing/event-calendar-ics"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 
-interface EventDetailPanelProps {
-  event: MarketingEventItem | null
-  open: boolean
+const ATTENDANCE_OPTIONS: { value: EventAttendanceStatus; label: string }[] = [
+  { value: "attending", label: "Attending" },
+  { value: "maybe", label: "Maybe" },
+  { value: "not_attending", label: "Not attending" },
+]
+
+export interface EventDetailContentProps {
+  event: MarketingEventItem
   onClose: () => void
   canEdit: boolean
+  isExternalView?: boolean
   onEdit: () => void
-  onToggleAttending: () => void
+  onViewRecord?: () => void
+  onAttendanceChange?: (status: EventAttendanceStatus) => void
   onManageAttendees?: () => void
-  isMobile?: boolean
   showScheduleTab?: boolean
   showResourcesTab?: boolean
   showNotesTab?: boolean
   showAttendanceControls?: boolean
+  allowCalendarExport?: boolean
+  attendanceStatus?: EventAttendanceStatus | null
+  isEditingBlock?: boolean
 }
 
-function PanelBody({
+export function EventDetailContent({
   event,
-  canEdit,
   onClose,
+  canEdit,
+  isExternalView = false,
   onEdit,
-  onToggleAttending,
+  onViewRecord,
+  onAttendanceChange,
   onManageAttendees,
   showScheduleTab = true,
   showResourcesTab = true,
   showNotesTab = true,
   showAttendanceControls = true,
-}: {
-  event: MarketingEventItem
-  canEdit: boolean
-  onClose: () => void
-  onEdit: () => void
-  onToggleAttending: () => void
-  onManageAttendees?: () => void
-  showScheduleTab?: boolean
-  showResourcesTab?: boolean
-  showNotesTab?: boolean
-  showAttendanceControls?: boolean
-}) {
+  allowCalendarExport = true,
+  attendanceStatus = null,
+  isEditingBlock = false,
+}: EventDetailContentProps) {
   const { toast } = useToast()
   const statusColor = statusAccentColor(event.status)
+  const resolvedAttendance =
+    attendanceStatus ?? event.currentUserAttendanceStatus ?? (event.currentUserAttending ? "attending" : null)
+  const showInternalNotes = showNotesTab && !isExternalView && canEdit
+  const showBudget = !isExternalView && canEdit && !!event.budget
 
   const share = () => {
     const url = typeof window !== "undefined" ? window.location.href : ""
     void navigator.clipboard?.writeText(url)
     toast({ title: "Link copied", description: "Event page link copied to clipboard." })
+  }
+
+  const handleAttendance = (status: EventAttendanceStatus) => {
+    if (isEditingBlock) return
+    onAttendanceChange?.(status)
   }
 
   return (
@@ -78,40 +96,35 @@ function PanelBody({
         >
           <X className="h-4 w-4" />
         </button>
-        <button
-          type="button"
-          className="rounded p-1 text-muted-foreground hover:bg-muted"
-          aria-label="More options"
-        >
-          <MoreHorizontal className="h-4 w-4" />
-        </button>
+        <div className="flex flex-wrap gap-1 justify-end">
+          {event.eventType ? (
+            <Badge
+              variant="secondary"
+              className="text-[10px] font-medium"
+              style={{
+                backgroundColor: event.backgroundColor,
+                color: event.accentColor,
+              }}
+            >
+              {event.eventType}
+            </Badge>
+          ) : null}
+          {event.status ? (
+            <span
+              className="inline-flex text-[10px] font-medium rounded-full px-2 py-0.5"
+              style={{
+                backgroundColor: `${statusColor}22`,
+                color: statusColor,
+              }}
+            >
+              {event.status}
+            </span>
+          ) : null}
+        </div>
       </div>
 
       <div className="px-4 pb-3 shrink-0">
-        {event.eventType ? (
-          <Badge
-            variant="secondary"
-            className="mb-2 text-[10px] font-medium"
-            style={{
-              backgroundColor: event.backgroundColor,
-              color: event.accentColor,
-            }}
-          >
-            {event.eventType}
-          </Badge>
-        ) : null}
         <h2 className="text-lg font-semibold text-foreground leading-tight">{event.eventName}</h2>
-        {event.status ? (
-          <span
-            className="inline-flex mt-2 text-[11px] font-medium rounded-full px-2 py-0.5"
-            style={{
-              backgroundColor: `${statusColor}22`,
-              color: statusColor,
-            }}
-          >
-            {event.status}
-          </span>
-        ) : null}
       </div>
 
       <div className="px-4 space-y-2 text-sm text-muted-foreground shrink-0">
@@ -125,6 +138,12 @@ function PanelBody({
             {event.locationLabel}
           </p>
         ) : null}
+        {event.country && !event.locationLabel?.includes(event.country) ? (
+          <p className="text-xs pl-6">{event.country}</p>
+        ) : null}
+        {event.venueLabel ? (
+          <p className="text-xs pl-6 text-muted-foreground/90">Venue: {event.venueLabel}</p>
+        ) : null}
         {event.websiteUrl ? (
           <a
             href={event.websiteUrl.startsWith("http") ? event.websiteUrl : `https://${event.websiteUrl}`}
@@ -137,6 +156,12 @@ function PanelBody({
           </a>
         ) : null}
       </div>
+
+      {event.description ? (
+        <p className="px-4 py-2 text-sm text-muted-foreground leading-relaxed shrink-0 line-clamp-4">
+          {event.description}
+        </p>
+      ) : null}
 
       {event.heroImageUrl ? (
         <div className="px-4 py-3 shrink-0">
@@ -153,11 +178,11 @@ function PanelBody({
         <TabsList
           className={cn(
             "w-full h-8 shrink-0",
-            showScheduleTab && showResourcesTab && showNotesTab
+            showScheduleTab && showResourcesTab && showInternalNotes
               ? "grid grid-cols-4"
-              : showScheduleTab && showResourcesTab
+              : showScheduleTab && (showResourcesTab || showInternalNotes)
                 ? "grid grid-cols-3"
-                : showScheduleTab || showResourcesTab || showNotesTab
+                : showScheduleTab || showResourcesTab || showInternalNotes
                   ? "grid grid-cols-2"
                   : "grid grid-cols-1"
           )}
@@ -175,7 +200,7 @@ function PanelBody({
               Resources
             </TabsTrigger>
           ) : null}
-          {showNotesTab ? (
+          {showInternalNotes ? (
             <TabsTrigger value="notes" className="text-xs">
               Notes
             </TabsTrigger>
@@ -183,6 +208,45 @@ function PanelBody({
         </TabsList>
 
         <TabsContent value="overview" className="flex-1 overflow-y-auto mt-3 space-y-4 text-sm">
+          <dl className="space-y-2 text-xs">
+            {event.eventType ? (
+              <div className="flex justify-between gap-2">
+                <dt className="text-muted-foreground">Event type</dt>
+                <dd className="font-medium text-foreground">{event.eventType}</dd>
+              </div>
+            ) : null}
+            {event.status ? (
+              <div className="flex justify-between gap-2">
+                <dt className="text-muted-foreground">Status</dt>
+                <dd className="font-medium text-foreground">{event.status}</dd>
+              </div>
+            ) : null}
+            {!isExternalView && event.visibility ? (
+              <div className="flex justify-between gap-2">
+                <dt className="text-muted-foreground">Visibility</dt>
+                <dd className="font-medium text-foreground">{event.visibility}</dd>
+              </div>
+            ) : null}
+            {event.campaignLabel ? (
+              <div className="flex justify-between gap-2">
+                <dt className="text-muted-foreground">Linked campaign</dt>
+                <dd className="font-medium text-accent-link">{event.campaignLabel}</dd>
+              </div>
+            ) : null}
+            {event.ownerLabel ? (
+              <div className="flex justify-between gap-2">
+                <dt className="text-muted-foreground">Organiser</dt>
+                <dd className="font-medium text-foreground">{event.ownerLabel}</dd>
+              </div>
+            ) : null}
+            {showBudget ? (
+              <div className="flex justify-between gap-2">
+                <dt className="text-muted-foreground">Budget</dt>
+                <dd className="font-medium text-foreground">{event.budget}</dd>
+              </div>
+            ) : null}
+          </dl>
+
           <div>
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
@@ -200,162 +264,143 @@ function PanelBody({
             </div>
             <EventAvatarStack labels={event.attendeeLabels} max={8} />
           </div>
-          <dl className="space-y-2 text-xs">
-            {event.eventType ? (
-              <div className="flex justify-between gap-2">
-                <dt className="text-muted-foreground">Event type</dt>
-                <dd className="font-medium text-foreground">{event.eventType}</dd>
-              </div>
-            ) : null}
-            {event.themeLabel ? (
-              <div className="flex justify-between gap-2">
-                <dt className="text-muted-foreground">Theme</dt>
-                <dd className="font-medium text-foreground">{event.themeLabel}</dd>
-              </div>
-            ) : null}
-            {event.ownerLabel ? (
-              <div className="flex justify-between gap-2">
-                <dt className="text-muted-foreground">Owner</dt>
-                <dd className="font-medium text-foreground">{event.ownerLabel}</dd>
-              </div>
-            ) : null}
-            {event.budget ? (
-              <div className="flex justify-between gap-2">
-                <dt className="text-muted-foreground">Budget</dt>
-                <dd className="font-medium text-foreground">{event.budget}</dd>
-              </div>
-            ) : null}
-          </dl>
-          {event.description ? (
-            <p className="text-xs text-muted-foreground leading-relaxed">{event.description}</p>
-          ) : null}
         </TabsContent>
 
         {showScheduleTab ? (
-        <TabsContent value="schedule" className="flex-1 overflow-y-auto mt-3">
-          {event.scheduleItems.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No schedule items yet.</p>
-          ) : (
-            <ul className="space-y-2">
-              {event.scheduleItems.map((item, i) => (
-                <li key={`${item.label}-${i}`} className="text-xs border-l-2 pl-2 border-border/50">
-                  <p className="font-medium text-foreground">{item.label}</p>
-                  <p className="text-muted-foreground">
-                    {item.date}
-                    {item.time ? ` · ${item.time}` : ""}
-                  </p>
-                  {item.notes ? <p className="text-muted-foreground/80 mt-0.5">{item.notes}</p> : null}
-                </li>
-              ))}
-            </ul>
-          )}
-        </TabsContent>
+          <TabsContent value="schedule" className="flex-1 overflow-y-auto mt-3">
+            {event.scheduleItems.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No schedule items yet.</p>
+            ) : (
+              <ul className="space-y-2">
+                {event.scheduleItems.map((item, i) => (
+                  <li key={`${item.label}-${i}`} className="text-xs border-l-2 pl-2 border-border/50">
+                    <p className="font-medium text-foreground">{item.label}</p>
+                    <p className="text-muted-foreground">
+                      {item.date}
+                      {item.time ? ` · ${item.time}` : ""}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </TabsContent>
         ) : null}
 
         {showResourcesTab ? (
-        <TabsContent value="resources" className="flex-1 overflow-y-auto mt-3">
-          {event.resources.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No resources linked.</p>
-          ) : (
-            <ul className="space-y-2">
-              {event.resources.map((r, i) => (
-                <li key={`${r.label}-${i}`}>
-                  {r.url ? (
-                    <a
-                      href={r.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-accent-link hover:underline"
-                    >
-                      {r.label}
-                    </a>
-                  ) : (
-                    <span className="text-xs text-foreground">{r.label}</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </TabsContent>
+          <TabsContent value="resources" className="flex-1 overflow-y-auto mt-3">
+            {event.resources.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No resources linked.</p>
+            ) : (
+              <ul className="space-y-2">
+                {event.resources.map((r, i) => (
+                  <li key={`${r.label}-${i}`}>
+                    {r.url ? (
+                      <a
+                        href={r.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-accent-link hover:underline"
+                      >
+                        {r.label}
+                      </a>
+                    ) : (
+                      <span className="text-xs text-foreground">{r.label}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </TabsContent>
         ) : null}
 
-        {showNotesTab ? (
-        <TabsContent value="notes" className="flex-1 overflow-y-auto mt-3">
-          <p className="text-xs text-muted-foreground whitespace-pre-wrap">
-            {event.notes || "No internal notes."}
-          </p>
-        </TabsContent>
+        {showInternalNotes ? (
+          <TabsContent value="notes" className="flex-1 overflow-y-auto mt-3">
+            <p className="text-xs text-muted-foreground whitespace-pre-wrap">
+              {event.notes || "No internal notes."}
+            </p>
+          </TabsContent>
         ) : null}
       </Tabs>
 
+      {showAttendanceControls && !isEditingBlock ? (
+        <div className="shrink-0 px-4 py-3 border-t border-border/30">
+          <p className="text-xs font-medium text-muted-foreground mb-2">Your attendance</p>
+          <div className="flex flex-wrap gap-1.5">
+            {ATTENDANCE_OPTIONS.map((opt) => (
+              <Button
+                key={opt.value}
+                type="button"
+                size="sm"
+                variant={resolvedAttendance === opt.value ? "default" : "outline"}
+                className="h-8 text-xs"
+                onClick={() => handleAttendance(opt.value)}
+              >
+                {opt.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {allowCalendarExport && !isEditingBlock ? (
+        <div className="shrink-0 px-4 pb-2">
+          <p className="text-xs font-medium text-muted-foreground mb-2">Add to calendar</p>
+          <div className="flex flex-wrap gap-1.5">
+            <Button type="button" variant="outline" size="sm" className="h-8 text-xs" asChild>
+              <a href={googleCalendarAddUrl(event)} target="_blank" rel="noopener noreferrer">
+                Google
+              </a>
+            </Button>
+            <Button type="button" variant="outline" size="sm" className="h-8 text-xs" asChild>
+              <a href={outlookCalendarAddUrl(event)} target="_blank" rel="noopener noreferrer">
+                Outlook
+              </a>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs gap-1"
+              onClick={() => downloadEventIcs(event)}
+            >
+              <Download className="h-3.5 w-3.5" aria-hidden />
+              .ics
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       <div className="shrink-0 border-t border-border/40 p-4 flex flex-col gap-2 mt-auto">
+        {onViewRecord ? (
+          <Button type="button" className="w-full gap-2" onClick={onViewRecord}>
+            View details
+            <ChevronRight className="h-4 w-4" aria-hidden />
+          </Button>
+        ) : null}
         {canEdit ? (
-          <Button type="button" className="w-full gap-2" onClick={onEdit}>
+          <Button type="button" variant={onViewRecord ? "outline" : "default"} className="w-full gap-2" onClick={onEdit}>
             <Pencil className="h-4 w-4" aria-hidden />
             Edit event
           </Button>
         ) : null}
-        <div className="flex gap-2">
-          <Button type="button" variant="outline" className="flex-1 gap-2 text-xs" onClick={share}>
-            <Share2 className="h-3.5 w-3.5" aria-hidden />
-            Share event
-          </Button>
-          {showAttendanceControls ? (
-            <Button
-              type="button"
-              variant={event.currentUserAttending ? "secondary" : "outline"}
-              className="flex-1 text-xs"
-              onClick={onToggleAttending}
-            >
-              {event.currentUserAttending ? "Attending" : "Mark attending"}
-            </Button>
-          ) : null}
-        </div>
+        <Button type="button" variant="outline" className="w-full gap-2 text-xs" onClick={share}>
+          <Share2 className="h-3.5 w-3.5" aria-hidden />
+          Share event
+        </Button>
       </div>
     </div>
   )
 }
 
-export default function EventDetailPanel({
-  event,
-  open,
-  onClose,
-  canEdit,
-  onEdit,
-  onToggleAttending,
-  onManageAttendees,
-  isMobile = false,
-  showScheduleTab = true,
-  showResourcesTab = true,
-  showNotesTab = true,
-  showAttendanceControls = true,
-}: EventDetailPanelProps) {
-  if (!event) return null
+interface EventDetailPanelProps {
+  event: MarketingEventItem | null
+  open: boolean
+  onClose: () => void
+  contentProps: Omit<EventDetailContentProps, "event" | "onClose">
+}
 
-  const bodyProps = {
-    event,
-    canEdit,
-    onClose,
-    onEdit,
-    onToggleAttending,
-    onManageAttendees,
-    showScheduleTab,
-    showResourcesTab,
-    showNotesTab,
-    showAttendanceControls,
-  }
-
-  if (isMobile) {
-    return (
-      <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-        <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">
-          <PanelBody {...bodyProps} />
-        </SheetContent>
-      </Sheet>
-    )
-  }
-
-  if (!open) return null
+export default function EventDetailPanel({ event, open, onClose, contentProps }: EventDetailPanelProps) {
+  if (!event || !open) return null
 
   return (
     <aside
@@ -364,39 +409,45 @@ export default function EventDetailPanel({
         "max-h-[min(78vh,720px)] rounded-l-xl shadow-sm overflow-hidden"
       )}
     >
-      <PanelBody {...bodyProps} />
+      <EventDetailContent event={event} onClose={onClose} {...contentProps} />
     </aside>
   )
 }
 
-/** Tablet overlay panel */
-export function EventDetailPanelOverlay(props: EventDetailPanelProps) {
-  const { event, open, onClose } = props
+export function EventDetailPanelOverlay({
+  event,
+  open,
+  onClose,
+  contentProps,
+}: EventDetailPanelProps) {
   if (!event || !open) return null
-
-  const bodyProps = {
-    event,
-    canEdit: props.canEdit,
-    onClose,
-    onEdit: props.onEdit,
-    onToggleAttending: props.onToggleAttending,
-    onManageAttendees: props.onManageAttendees,
-    showScheduleTab: props.showScheduleTab,
-    showResourcesTab: props.showResourcesTab,
-    showNotesTab: props.showNotesTab,
-    showAttendanceControls: props.showAttendanceControls,
-  }
 
   return (
     <>
       <div
-        className="fixed inset-0 md:left-sidebar bg-black/20 z-40 lg:hidden"
+        className="fixed inset-0 md:left-64 bg-black/20 z-40"
         onClick={onClose}
         aria-hidden
       />
-      <aside className="fixed top-0 right-0 bottom-0 z-50 w-full max-w-md bg-background border-l border-border/40 shadow-xl flex flex-col lg:hidden">
-        <PanelBody {...bodyProps} />
+      <aside className="fixed top-0 right-0 bottom-0 z-50 w-full max-w-md bg-background border-l border-border/40 shadow-xl flex flex-col">
+        <EventDetailContent event={event} onClose={onClose} {...contentProps} />
       </aside>
     </>
+  )
+}
+
+/** Modal variant for event_calendar_detail_mode = modal */
+export function EventDetailModal({
+  event,
+  open,
+  onClose,
+  contentProps,
+}: EventDetailPanelProps) {
+  return (
+    <Sheet open={open && !!event} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">
+        {event ? <EventDetailContent event={event} onClose={onClose} {...contentProps} /> : null}
+      </SheetContent>
+    </Sheet>
   )
 }

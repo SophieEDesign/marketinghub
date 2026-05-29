@@ -153,7 +153,9 @@ export default function EventCalendarToolbar({
   return (
     <div className="flex flex-col gap-3 shrink-0">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <h2 className="text-lg font-semibold text-foreground tracking-tight shrink-0">{title}</h2>
+        {title ? (
+          <h2 className="text-lg font-semibold text-foreground tracking-tight shrink-0">{title}</h2>
+        ) : null}
 
         <div className="flex flex-wrap items-center gap-2 lg:flex-1 lg:justify-center">
           <div

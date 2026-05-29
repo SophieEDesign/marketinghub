@@ -513,7 +513,13 @@ export interface BlockConfig {
   // Event Calendar block
   event_calendar_use_mock?: boolean
   event_calendar_max_items?: number
-  event_calendar_detail_mode?: 'panel' | 'modal' | 'record'
+  event_calendar_detail_mode?: 'drawer' | 'modal' | 'inline' | 'record' | 'panel'
+  event_calendar_click_action?: 'open_detail' | 'open_record' | 'none'
+  event_calendar_allow_attendance_updates?: boolean
+  event_calendar_allow_member_submissions?: boolean
+  event_calendar_allow_calendar_export?: boolean
+  event_calendar_external_mode?: boolean
+  event_calendar_mobile_default_view?: 'month' | 'week' | 'list' | 'timeline'
   event_calendar_title_field_id?: string
   event_calendar_title_field?: string
   event_calendar_event_type_field_id?: string
@@ -522,13 +528,21 @@ export interface BlockConfig {
   event_calendar_location_field?: string
   event_calendar_country_field_id?: string
   event_calendar_country_field?: string
+  event_calendar_venue_field_id?: string
+  event_calendar_venue_field?: string
   event_calendar_start_date_field_id?: string
   event_calendar_start_date_field?: string
   event_calendar_end_date_field_id?: string
   event_calendar_end_date_field?: string
   event_calendar_status_field_id?: string
   event_calendar_status_field?: string
+  event_calendar_visibility_field_id?: string
+  event_calendar_visibility_field?: string
   event_calendar_attending_field_id?: string
+  event_calendar_url_field_id?: string
+  event_calendar_url_field?: string
+  event_calendar_description_field_id?: string
+  event_calendar_description_field?: string
   event_calendar_attending_field?: string
   event_calendar_campaign_field_id?: string
   event_calendar_campaign_field?: string
@@ -538,6 +552,8 @@ export interface BlockConfig {
   event_calendar_default_view?: 'month' | 'week' | 'list' | 'timeline'
   event_calendar_show_toolbar?: boolean
   event_calendar_show_metrics?: boolean
+  event_calendar_show_stats?: boolean
+  event_calendar_show_actions?: boolean
   event_calendar_show_filters?: boolean
   event_calendar_show_search?: boolean
   event_calendar_show_add_button?: boolean

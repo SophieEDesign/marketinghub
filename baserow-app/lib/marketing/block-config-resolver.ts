@@ -412,8 +412,12 @@ export function eventCalendarOverridesFromConfig(
     | "endDate"
     | "eventType"
     | "status"
+    | "visibility"
     | "locationName"
     | "country"
+    | "venue"
+    | "website"
+    | "description"
     | "campaign"
     | "attendees"
     | "resources",
@@ -435,12 +439,24 @@ export function eventCalendarOverridesFromConfig(
     ),
     endDate: overridePair(c, "event_calendar_end_date_field_id", "event_calendar_end_date_field"),
     status: overridePair(c, "event_calendar_status_field_id", "event_calendar_status_field"),
+    visibility: overridePair(
+      c,
+      "event_calendar_visibility_field_id",
+      "event_calendar_visibility_field"
+    ),
     locationName: overridePair(
       c,
       "event_calendar_location_field_id",
       "event_calendar_location_field"
     ),
     country: overridePair(c, "event_calendar_country_field_id", "event_calendar_country_field"),
+    venue: overridePair(c, "event_calendar_venue_field_id", "event_calendar_venue_field"),
+    website: overridePair(c, "event_calendar_url_field_id", "event_calendar_url_field"),
+    description: overridePair(
+      c,
+      "event_calendar_description_field_id",
+      "event_calendar_description_field"
+    ),
     campaign: overridePair(c, "event_calendar_campaign_field_id", "event_calendar_campaign_field"),
     attendees: overridePair(
       c,

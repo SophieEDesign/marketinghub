@@ -45,7 +45,7 @@ export default function EventCalendarDataSettings({
         onUpdate={onUpdate}
         onTableChange={onTableChange}
         mockConfigKey="event_calendar_use_mock"
-        showView={false}
+        showView
       />
 
       {config.table_id ? (
@@ -95,6 +95,84 @@ export default function EventCalendarDataSettings({
             fieldName={config.event_calendar_status_field}
             fields={tableFields}
             onChange={setField("event_calendar_status_field_id", "event_calendar_status_field")}
+          />
+          <MarketingFieldSelect
+            label="Visibility"
+            fieldId={config.event_calendar_visibility_field_id}
+            fieldName={config.event_calendar_visibility_field}
+            fields={tableFields}
+            onChange={setField(
+              "event_calendar_visibility_field_id",
+              "event_calendar_visibility_field"
+            )}
+          />
+          <MarketingFieldSelect
+            label="Location"
+            fieldId={config.event_calendar_location_field_id}
+            fieldName={config.event_calendar_location_field}
+            fields={tableFields}
+            onChange={setField("event_calendar_location_field_id", "event_calendar_location_field")}
+          />
+          <MarketingFieldSelect
+            label="Country"
+            fieldId={config.event_calendar_country_field_id}
+            fieldName={config.event_calendar_country_field}
+            fields={tableFields}
+            onChange={setField("event_calendar_country_field_id", "event_calendar_country_field")}
+          />
+          <MarketingFieldSelect
+            label="Venue"
+            fieldId={config.event_calendar_venue_field_id}
+            fieldName={config.event_calendar_venue_field}
+            fields={tableFields}
+            onChange={setField("event_calendar_venue_field_id", "event_calendar_venue_field")}
+          />
+          <MarketingFieldSelect
+            label="Attendees"
+            fieldId={config.event_calendar_attending_field_id}
+            fieldName={config.event_calendar_attending_field}
+            fields={tableFields}
+            onChange={setField(
+              "event_calendar_attending_field_id",
+              "event_calendar_attending_field"
+            )}
+          />
+          <MarketingFieldSelect
+            label="Campaign"
+            fieldId={config.event_calendar_campaign_field_id}
+            fieldName={config.event_calendar_campaign_field}
+            fields={tableFields}
+            onChange={setField(
+              "event_calendar_campaign_field_id",
+              "event_calendar_campaign_field"
+            )}
+          />
+          <MarketingFieldSelect
+            label="Resources"
+            fieldId={config.event_calendar_resources_field_id}
+            fieldName={config.event_calendar_resources_field}
+            fields={tableFields}
+            onChange={setField(
+              "event_calendar_resources_field_id",
+              "event_calendar_resources_field"
+            )}
+          />
+          <MarketingFieldSelect
+            label="Event URL"
+            fieldId={config.event_calendar_url_field_id}
+            fieldName={config.event_calendar_url_field}
+            fields={tableFields}
+            onChange={setField("event_calendar_url_field_id", "event_calendar_url_field")}
+          />
+          <MarketingFieldSelect
+            label="Description"
+            fieldId={config.event_calendar_description_field_id}
+            fieldName={config.event_calendar_description_field}
+            fields={tableFields}
+            onChange={setField(
+              "event_calendar_description_field_id",
+              "event_calendar_description_field"
+            )}
           />
         </MarketingFieldMappingSection>
       ) : null}
@@ -195,22 +273,74 @@ export default function EventCalendarDataSettings({
         </Select>
       </div>
 
+      <div className="space-y-2 pt-2 border-t border-border/40">
+        <Label>On event click</Label>
+        <Select
+          value={config.event_calendar_click_action || "open_detail"}
+          onValueChange={(v) =>
+            onUpdate({
+              event_calendar_click_action: v as BlockConfig["event_calendar_click_action"],
+            })
+          }
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="open_detail">Open detail drawer</SelectItem>
+            <SelectItem value="open_record">Open record</SelectItem>
+            <SelectItem value="none">None</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Detail mode</Label>
+        <Select
+          value={
+            config.event_calendar_detail_mode === "panel"
+              ? "drawer"
+              : config.event_calendar_detail_mode || "drawer"
+          }
+          onValueChange={(v) =>
+            onUpdate({
+              event_calendar_detail_mode: v as BlockConfig["event_calendar_detail_mode"],
+            })
+          }
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="drawer">Drawer</SelectItem>
+            <SelectItem value="modal">Modal</SelectItem>
+            <SelectItem value="inline">Inline (full page)</SelectItem>
+            <SelectItem value="record">Record only</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="space-y-3 pt-2 border-t border-border/40">
-        <p className="text-xs font-medium text-muted-foreground">Filters & view controls</p>
+        <p className="text-xs font-medium text-muted-foreground">Display & behaviour</p>
         {(
           [
             ["event_calendar_show_toolbar", "Toolbar (views & date navigation)", true],
             ["event_calendar_show_filters", "Filter row", true],
             ["event_calendar_show_search", "Search", true],
-            ["event_calendar_show_metrics", "Summary metrics", true],
+            ["event_calendar_show_stats", "Summary stats", true],
             ["event_calendar_show_legend", "Event type legend", true],
+            ["event_calendar_show_actions", "Header actions (add / export)", true],
             ["event_calendar_show_add_button", "Add event button", true],
             ["event_calendar_show_attendance_controls", "Attendance controls", true],
+            ["event_calendar_allow_attendance_updates", "Allow attendance updates", true],
+            ["event_calendar_allow_calendar_export", "Add to calendar / .ics", true],
+            ["event_calendar_allow_member_submissions", "Member event submissions", false],
+            ["event_calendar_external_mode", "External / member view (filter visibility)", false],
             ["event_calendar_show_schedule", "Schedule tab", true],
             ["event_calendar_show_resources", "Resources tab", true],
-            ["event_calendar_show_notes", "Notes tab", true],
+            ["event_calendar_show_notes", "Internal notes tab", true],
           ] as const
-        ).map(([key, label, defaultOn]) => (
+        ).map(([key, label]) => (
           <div key={key} className="flex items-center justify-between gap-2">
             <Label htmlFor={key} className="text-sm font-normal">
               {label}

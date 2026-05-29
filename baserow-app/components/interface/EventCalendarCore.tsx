@@ -2,15 +2,25 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { addMonths, addWeeks, subMonths, subWeeks } from "date-fns"
-import { Plus, Search } from "lucide-react"
+import { Calendar, ChevronDown, Plus, Search } from "lucide-react"
 import EventCalendarView from "@/components/interface/EventCalendarView"
 import EventCalendarToolbar from "@/components/interface/EventCalendarToolbar"
-import EventDetailPanel, { EventDetailPanelOverlay } from "@/components/interface/EventDetailPanel"
+import EventDetailDrawer from "@/components/interface/EventDetailDrawer"
+import EventDetailPanel, {
+  EventDetailModal,
+  EventDetailPanelOverlay,
+} from "@/components/interface/EventDetailPanel"
 import EventMetricStrip from "@/components/interface/EventMetricStrip"
 import EventEmptyState from "@/components/interface/EventEmptyState"
 import DashboardEmpty from "@/components/interface/primitives/DashboardEmpty"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { useRecordModal } from "@/contexts/RecordModalContext"
 import { useEventCalendarData } from "@/hooks/useEventCalendarData"
 import {
@@ -18,11 +28,15 @@ import {
   marketingDemoState,
 } from "@/lib/marketing/block-config-resolver"
 import MarketingDemoDataBanner from "@/components/interface/primitives/MarketingDemoDataBanner"
+import { EVENT_CALENDAR_MOCK_ITEMS } from "@/lib/marketing/event-calendar-mock-data"
+import { filterEventsByAudience } from "@/lib/marketing/event-calendar-visibility"
 import {
   buildEventCalendarEvents,
   computeEventMetrics,
   eventCalendarSettingsFromConfig,
+  EVENT_TYPE_LEGEND,
   filterEventItems,
+  type EventAttendanceStatus,
   type EventCalendarBlockSettings,
   type EventCalendarFilters,
   type EventCalendarViewMode,
@@ -73,7 +87,7 @@ export function EventCalendarCore({
     hasTable,
     tableIds,
     fields,
-    allItems,
+    allItems: liveItems,
     filterOptions,
     currentUserId,
     reload,
@@ -82,10 +96,28 @@ export function EventCalendarCore({
 
   const forceMock = isMarketingMockEnabled(config, "event_calendar_use_mock")
   const demoState = marketingDemoState({ forceMock, fromLiveData, hasTable, error })
+  /** When true, hides internal-only/draft events (for member/public pages). */
+  const externalMode = settings.externalMode
+
+  const sourceItems = useMemo(() => {
+    if (demoState.useDemoData) return EVENT_CALENDAR_MOCK_ITEMS
+    return liveItems
+  }, [demoState.useDemoData, liveItems])
+
+  const audienceItems = useMemo(
+    () =>
+      filterEventsByAudience(sourceItems, {
+        externalMode,
+        isAdminView: canEdit && !externalMode,
+      }),
+    [sourceItems, externalMode, canEdit]
+  )
+
   const maxItems =
     typeof config?.event_calendar_max_items === "number"
       ? config.event_calendar_max_items
       : undefined
+
   const [viewMode, setViewMode] = useState<EventCalendarViewMode>(settings.defaultView)
   const [cursorDate, setCursorDate] = useState(() => new Date())
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
@@ -95,6 +127,9 @@ export function EventCalendarCore({
   const [filterStatus, setFilterStatus] = useState("all")
   const [filterOwner, setFilterOwner] = useState("all")
   const [isMobile, setIsMobile] = useState(false)
+  const [attendanceOverrides, setAttendanceOverrides] = useState<
+    Record<string, EventAttendanceStatus>
+  >({})
 
   useEffect(() => {
     setViewMode(settings.defaultView)
@@ -102,11 +137,17 @@ export function EventCalendarCore({
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 1023px)")
-    const update = () => setIsMobile(mq.matches)
+    const update = () => {
+      const mobile = mq.matches
+      setIsMobile(mobile)
+      if (mobile && (externalMode || settings.mobileDefaultView)) {
+        setViewMode(settings.mobileDefaultView)
+      }
+    }
     update()
     mq.addEventListener("change", update)
     return () => mq.removeEventListener("change", update)
-  }, [])
+  }, [externalMode, settings.mobileDefaultView])
 
   const filters: EventCalendarFilters = useMemo(
     () => ({
@@ -117,23 +158,13 @@ export function EventCalendarCore({
       owners: filterOwner === "all" ? [] : [filterOwner],
       attendeeFilter: "all",
     }),
-    [
-      search,
-      filterEventType,
-      filterLocation,
-      filterStatus,
-      filterOwner,
-      settings.showSearch,
-    ]
+    [search, filterEventType, filterLocation, filterStatus, filterOwner, settings.showSearch]
   )
 
-  const filteredItems = useMemo(
-    () => {
-      const filtered = filterEventItems(allItems, filters, currentUserId)
-      return maxItems != null && maxItems > 0 ? filtered.slice(0, maxItems) : filtered
-    },
-    [allItems, filters, currentUserId, maxItems]
-  )
+  const filteredItems = useMemo(() => {
+    const filtered = filterEventItems(audienceItems, filters, currentUserId)
+    return maxItems != null && maxItems > 0 ? filtered.slice(0, maxItems) : filtered
+  }, [audienceItems, filters, currentUserId, maxItems])
 
   const calendarEvents = useMemo(
     () => buildEventCalendarEvents(filteredItems),
@@ -150,71 +181,157 @@ export function EventCalendarCore({
     [filteredItems, selectedEventId]
   )
 
-  const panelOpen = !!selectedEventId && !!selectedEvent
-  const useInlineDetailPanel = !embeddedInBlock && !isEditing
+  const detailOpen = !!selectedEventId && !!selectedEvent && !isEditing
+
+  const effectiveDetailMode = useMemo(() => {
+    const mode = settings.detailMode === "panel" ? "drawer" : settings.detailMode
+    if (embeddedInBlock && mode === "inline") return "drawer"
+    return mode
+  }, [settings.detailMode, embeddedInBlock])
+
+  const useInlineDetailPanel =
+    !embeddedInBlock && effectiveDetailMode === "inline" && !isEditing
+
+  const openRecordForEvent = useCallback(
+    (id: string) => {
+      if (!tableIds?.contentTableId) return
+      openRecordModal({
+        tableId: tableIds.contentTableId,
+        recordId: id,
+        supabaseTableName: tableIds.contentSupabaseTable,
+        onRecordUpdated: () => reload(),
+      })
+    },
+    [tableIds, openRecordModal, reload]
+  )
 
   const handleEventClick = useCallback(
     (id: string) => {
       if (isEditing) return
-      if (embeddedInBlock && tableIds?.contentTableId) {
-        openRecordModal({
-          tableId: tableIds.contentTableId,
-          recordId: id,
-          supabaseTableName: tableIds.contentSupabaseTable,
-          onRecordUpdated: () => reload(),
-        })
+      if (settings.clickAction === "none") return
+
+      const useRecord =
+        settings.clickAction === "open_record" || effectiveDetailMode === "record"
+
+      if (useRecord) {
+        openRecordForEvent(id)
         return
       }
       setSelectedEventId(id)
     },
-    [isEditing, embeddedInBlock, tableIds, openRecordModal, reload]
+    [isEditing, settings.clickAction, effectiveDetailMode, openRecordForEvent]
   )
 
   const handleAddEvent = useCallback(() => {
-    if (!tableIds?.contentTableId) return
+    if (isEditing) return
+    if (!tableIds?.contentTableId) {
+      toast({
+        title: "Add event unavailable",
+        description: "Connect a source table in block settings.",
+      })
+      return
+    }
+
+    const isMemberSubmit = !canEdit && settings.allowMemberSubmissions
+    const initialData: Record<string, unknown> = fields?.contentType
+      ? { [fields.contentType]: "Event" }
+      : { content_type: "Event" }
+
+    if (isMemberSubmit) {
+      // TODO: dedicated member submission form — RecordModal with Submitted status for now.
+      if (fields?.status) {
+        initialData[fields.status] = "Submitted"
+      } else {
+        initialData.status = "Submitted"
+      }
+    }
+
     openRecordModal({
       tableId: tableIds.contentTableId,
       recordId: null,
       supabaseTableName: tableIds.contentSupabaseTable,
-      initialData: fields?.contentType
-        ? { [fields.contentType]: "Event" }
-        : { content_type: "Event" },
+      initialData,
       onRecordUpdated: () => reload(),
     })
-  }, [tableIds, fields?.contentType, openRecordModal, reload])
+  }, [
+    isEditing,
+    tableIds,
+    fields,
+    canEdit,
+    settings.allowMemberSubmissions,
+    openRecordModal,
+    reload,
+    toast,
+  ])
 
   const handleEditEvent = useCallback(() => {
-    if (!tableIds?.contentTableId || !selectedEventId) return
-    openRecordModal({
-      tableId: tableIds.contentTableId,
-      recordId: selectedEventId,
-      supabaseTableName: tableIds.contentSupabaseTable,
-      onRecordUpdated: () => reload(),
-    })
-  }, [tableIds, selectedEventId, openRecordModal, reload])
+    if (!selectedEventId) return
+    openRecordForEvent(selectedEventId)
+  }, [selectedEventId, openRecordForEvent])
 
-  const handleToggleAttending = useCallback(async () => {
-    if (!settings.showAttendanceControls) return
-    if (!selectedEvent || !currentUserId) {
-      toast({ title: "Sign in required", description: "You must be signed in to mark attendance." })
-      return
-    }
-    try {
-      const next = selectedEvent.currentUserAttending
-        ? selectedEvent.attendeeIds.filter((id) => id !== currentUserId)
-        : [...new Set([...selectedEvent.attendeeIds, currentUserId])]
-      await updateAttendees(selectedEvent.id, next)
-      toast({
-        title: selectedEvent.currentUserAttending ? "Removed from attendees" : "Marked as attending",
-      })
-    } catch (e) {
-      toast({
-        title: "Could not update attendance",
-        description: e instanceof Error ? e.message : "Try again",
-        variant: "destructive",
-      })
-    }
-  }, [selectedEvent, currentUserId, updateAttendees, toast, settings.showAttendanceControls])
+  const handleAttendanceChange = useCallback(
+    async (status: EventAttendanceStatus) => {
+      if (isEditing || !settings.allowAttendanceUpdates || !settings.showAttendanceControls) {
+        return
+      }
+      if (!selectedEvent || !currentUserId) {
+        toast({
+          title: "Sign in required",
+          description: "You must be signed in to update attendance.",
+        })
+        return
+      }
+
+      if (status === "maybe" || status === "not_attending" || status === "interested") {
+        // TODO: persist via Event Attendance table when available.
+        setAttendanceOverrides((prev) => ({ ...prev, [selectedEvent.id]: status }))
+        toast({
+          title: "Attendance noted",
+          description:
+            "Maybe / Not attending will sync when Event Attendance is configured. Only Attending is saved to the record today.",
+        })
+        if (status === "not_attending" && selectedEvent.currentUserAttending) {
+          try {
+            const next = selectedEvent.attendeeIds.filter((id) => id !== currentUserId)
+            await updateAttendees(selectedEvent.id, next)
+          } catch {
+            /* ignore */
+          }
+        }
+        return
+      }
+
+      try {
+        const next = selectedEvent.currentUserAttending
+          ? selectedEvent.attendeeIds.filter((id) => id !== currentUserId)
+          : [...new Set([...selectedEvent.attendeeIds, currentUserId])]
+        await updateAttendees(selectedEvent.id, next)
+        setAttendanceOverrides((prev) => {
+          const copy = { ...prev }
+          delete copy[selectedEvent.id]
+          return copy
+        })
+        toast({
+          title: selectedEvent.currentUserAttending ? "Removed from attendees" : "Marked as attending",
+        })
+      } catch (e) {
+        toast({
+          title: "Could not update attendance",
+          description: e instanceof Error ? e.message : "Try again",
+          variant: "destructive",
+        })
+      }
+    },
+    [
+      isEditing,
+      settings.allowAttendanceUpdates,
+      settings.showAttendanceControls,
+      selectedEvent,
+      currentUserId,
+      updateAttendees,
+      toast,
+    ]
+  )
 
   const handleManageAttendees = useCallback(() => {
     handleEditEvent()
@@ -231,21 +348,35 @@ export function EventCalendarCore({
   const onToday = () => setCursorDate(new Date())
 
   const handleExport = () => {
-    toast({ title: "Export", description: "Calendar export coming soon." })
+    toast({
+      title: "Calendar feed",
+      description: "Subscribe to calendar feed — coming in a later phase.",
+    })
   }
 
-  const panelProps = {
-    event: selectedEvent,
-    open: panelOpen,
-    onClose: () => setSelectedEventId(null),
-    canEdit,
+  const showAddButton =
+    settings.showAddButton &&
+    !isEditing &&
+    (canEdit || settings.allowMemberSubmissions) &&
+    !!tableIds?.contentTableId
+
+  const detailContentProps = {
+    canEdit: canEdit && !externalMode,
+    isExternalView: externalMode,
     onEdit: handleEditEvent,
-    onToggleAttending: settings.showAttendanceControls ? handleToggleAttending : () => {},
+    onViewRecord: tableIds?.contentTableId ? () => selectedEventId && openRecordForEvent(selectedEventId) : undefined,
+    onAttendanceChange: handleAttendanceChange,
     onManageAttendees: canEdit && settings.showAttendanceControls ? handleManageAttendees : undefined,
     showScheduleTab: settings.showScheduleTab,
     showResourcesTab: settings.showResourcesTab,
     showNotesTab: settings.showNotesTab,
-    showAttendanceControls: settings.showAttendanceControls,
+    showAttendanceControls:
+      settings.showAttendanceControls && settings.allowAttendanceUpdates && !isEditing,
+    allowCalendarExport: settings.allowCalendarExport && !isEditing,
+    attendanceStatus: selectedEvent
+      ? attendanceOverrides[selectedEvent.id] ?? selectedEvent.currentUserAttendanceStatus
+      : null,
+    isEditingBlock: isEditing,
   }
 
   if (loading) {
@@ -292,22 +423,47 @@ export function EventCalendarCore({
       )}
       data-event-calendar-core
       data-block-selectable
+      data-editing={isEditing ? "true" : undefined}
     >
       {demoState.showDemoBanner ? (
         <MarketingDemoDataBanner message={demoState.bannerMessage} />
       ) : null}
-      {settings.showPageHeader ? (
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between shrink-0">
-          <div>
-            <h1 className="text-page-title text-foreground">{settings.title}</h1>
+
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between shrink-0">
+        <div className="min-w-0">
+          <h1 className="text-page-title text-foreground">{settings.title}</h1>
+          {settings.subtitle ? (
             <p className="text-sm text-muted-foreground mt-1 max-w-xl">{settings.subtitle}</p>
-          </div>
+          ) : null}
+        </div>
+        {settings.showActions ? (
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            {canEdit && settings.showAddButton ? (
-              <Button type="button" className="gap-2 h-9" onClick={handleAddEvent}>
-                <Plus className="h-4 w-4" aria-hidden />
-                Add event
+            {settings.allowCalendarExport && !isEditing ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="gap-2 h-9 text-sm"
+                onClick={handleExport}
+              >
+                <Calendar className="h-4 w-4" aria-hidden />
+                Export / Sync
               </Button>
+            ) : null}
+            {showAddButton ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" className="gap-2 h-9">
+                    <Plus className="h-4 w-4" aria-hidden />
+                    Add event
+                    <ChevronDown className="h-3.5 w-3.5 opacity-70" aria-hidden />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleAddEvent}>
+                    {canEdit ? "Create full event" : "Submit event for approval"}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : null}
             {settings.showSearch ? (
               <div className="relative">
@@ -325,12 +481,12 @@ export function EventCalendarCore({
               </div>
             ) : null}
           </div>
-        </header>
-      ) : null}
+        ) : null}
+      </header>
 
       {settings.showToolbar ? (
         <EventCalendarToolbar
-          title={settings.title}
+          title={undefined}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           cursorDate={cursorDate}
@@ -362,7 +518,10 @@ export function EventCalendarCore({
       ) : null}
 
       {showEmpty ? (
-        <EventEmptyState onAddEvent={handleAddEvent} canEdit={canEdit && settings.showAddButton} />
+        <EventEmptyState
+          onAddEvent={showAddButton ? handleAddEvent : undefined}
+          canEdit={showAddButton}
+        />
       ) : (
         <div className="flex flex-col lg:flex-row gap-0 lg:gap-4 min-h-0 min-w-0 flex-1">
           <div className="flex-1 min-w-0 min-h-0 flex flex-col">
@@ -375,24 +534,47 @@ export function EventCalendarCore({
               onEventClick={handleEventClick}
               onDatesChange={setCursorDate}
               compact={settings.density === "compact"}
+              isEditing={isEditing}
             />
           </div>
 
           {useInlineDetailPanel && !isMobile ? (
-            <EventDetailPanel {...panelProps} />
+            <EventDetailPanel
+              event={selectedEvent}
+              open={detailOpen}
+              onClose={() => setSelectedEventId(null)}
+              contentProps={detailContentProps}
+            />
           ) : null}
 
           {useInlineDetailPanel && isMobile ? (
-            <EventDetailPanel {...panelProps} isMobile />
-          ) : null}
-
-          {useInlineDetailPanel && !isMobile ? (
-            <div className="hidden md:block lg:hidden">
-              <EventDetailPanelOverlay {...panelProps} />
-            </div>
+            <EventDetailPanelOverlay
+              event={selectedEvent}
+              open={detailOpen}
+              onClose={() => setSelectedEventId(null)}
+              contentProps={detailContentProps}
+            />
           ) : null}
         </div>
       )}
+
+      {effectiveDetailMode === "drawer" && embeddedInBlock && selectedEvent ? (
+        <EventDetailDrawer
+          open={detailOpen}
+          onClose={() => setSelectedEventId(null)}
+          event={selectedEvent}
+          {...detailContentProps}
+        />
+      ) : null}
+
+      {effectiveDetailMode === "modal" ? (
+        <EventDetailModal
+          event={selectedEvent}
+          open={detailOpen}
+          onClose={() => setSelectedEventId(null)}
+          contentProps={detailContentProps}
+        />
+      ) : null}
 
       {!showEmpty && settings.showMetrics ? (
         <EventMetricStrip
@@ -406,14 +588,7 @@ export function EventCalendarCore({
 
       {!showEmpty && settings.showLegend ? (
         <div className="flex flex-wrap items-center gap-3 text-[10px] text-muted-foreground pt-1 shrink-0">
-          {[
-            ["Boat Show", "#3B82F6"],
-            ["Racing / Sport", "#10B981"],
-            ["Experience / Events", "#8B5CF6"],
-            ["Hospitality", "#F97316"],
-            ["International", "#14B8A6"],
-            ["Other", "#EC4899"],
-          ].map(([label, color]) => (
+          {EVENT_TYPE_LEGEND.map(({ label, color }) => (
             <span key={label} className="inline-flex items-center gap-1">
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} aria-hidden />
               {label}
@@ -425,7 +600,6 @@ export function EventCalendarCore({
   )
 }
 
-/** Convenience wrapper when only block config is available. */
 export function EventCalendarFromConfig({
   config,
   canEdit,

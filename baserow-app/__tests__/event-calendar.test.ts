@@ -13,6 +13,12 @@ import {
   DEFAULT_EVENT_CALENDAR_BLOCK_CONFIG,
   type MarketingEventItem,
 } from "@/lib/marketing/events"
+import { buildEventIcs } from "@/lib/marketing/event-calendar-ics"
+import {
+  filterEventsByAudience,
+  normalizeEventVisibility,
+} from "@/lib/marketing/event-calendar-visibility"
+import { eventCalendarOverridesFromConfig } from "@/lib/marketing/block-config-resolver"
 
 function sampleItem(overrides: Partial<MarketingEventItem> = {}): MarketingEventItem {
   return {
@@ -43,6 +49,9 @@ function sampleItem(overrides: Partial<MarketingEventItem> = {}): MarketingEvent
     attendeeLabels: ["Alice", "Bob"],
     attendeeCount: 2,
     currentUserAttending: false,
+    currentUserAttendanceStatus: null,
+    visibility: "public",
+    venueLabel: null,
     scheduleItems: [],
     resources: [],
     accentColor: "#3B82F6",
@@ -176,6 +185,82 @@ describe("computeEventMetrics", () => {
     expect(metrics.teamAttending).toBe(3)
     expect(metrics.countries).toBe(2)
     expect(metrics.thisMonth).toBeGreaterThanOrEqual(1)
+  })
+})
+
+describe("eventCalendarSettingsFromConfig behaviour", () => {
+  it("defaults to open_detail drawer and export enabled", () => {
+    const settings = eventCalendarSettingsFromConfig(DEFAULT_EVENT_CALENDAR_BLOCK_CONFIG)
+    expect(settings.clickAction).toBe("open_detail")
+    expect(settings.detailMode).toBe("drawer")
+    expect(settings.allowCalendarExport).toBe(true)
+    expect(settings.allowMemberSubmissions).toBe(false)
+    expect(settings.externalMode).toBe(false)
+  })
+
+  it("respects external mode and click action overrides", () => {
+    const settings = eventCalendarSettingsFromConfig({
+      event_calendar_external_mode: true,
+      event_calendar_click_action: "none",
+      event_calendar_allow_attendance_updates: false,
+    })
+    expect(settings.externalMode).toBe(true)
+    expect(settings.clickAction).toBe("none")
+    expect(settings.allowAttendanceUpdates).toBe(false)
+  })
+})
+
+describe("event calendar field mapping config keys", () => {
+  it("includes table_id and field_id overrides in resolver", () => {
+    const overrides = eventCalendarOverridesFromConfig({
+      table_id: "tbl-1",
+      event_calendar_title_field_id: "f-title",
+      event_calendar_visibility_field_id: "f-vis",
+      event_calendar_venue_field_id: "f-venue",
+    })
+    expect(overrides.eventName?.fieldId).toBe("f-title")
+    expect(overrides.visibility?.fieldId).toBe("f-vis")
+    expect(overrides.venue?.fieldId).toBe("f-venue")
+  })
+})
+
+describe("visibility filtering", () => {
+  it("hides internal-only events in external mode", () => {
+    const items = [
+      sampleItem({ id: "a", visibility: "public" }),
+      sampleItem({ id: "b", visibility: "internal_only", eventName: "Staff only" }),
+    ]
+    const filtered = filterEventsByAudience(items, { externalMode: true, isAdminView: false })
+    expect(filtered).toHaveLength(1)
+    expect(filtered[0].id).toBe("a")
+  })
+
+  it("normalizes visibility labels", () => {
+    expect(normalizeEventVisibility("Members Only")).toBe("members_only")
+    expect(normalizeEventVisibility("internal")).toBe("internal_only")
+  })
+})
+
+describe("buildEventIcs", () => {
+  it("returns valid VCALENDAR with VEVENT", () => {
+    const ics = buildEventIcs(sampleItem())
+    expect(ics).toContain("BEGIN:VCALENDAR")
+    expect(ics).toContain("BEGIN:VEVENT")
+    expect(ics).toContain("SUMMARY:Monaco Yacht Show")
+    expect(ics).toContain("END:VEVENT")
+    expect(ics).toContain("END:VCALENDAR")
+  })
+})
+
+describe("EventCalendarCore edit vs view click", () => {
+  it("documents edit-mode guard in source", () => {
+    const src = readFileSync(
+      join(process.cwd(), "components/interface/EventCalendarCore.tsx"),
+      "utf8"
+    )
+    expect(src).toContain("if (isEditing) return")
+    expect(src).toContain("settings.clickAction")
+    expect(src).toContain("EventDetailDrawer")
   })
 })
 

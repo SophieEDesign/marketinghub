@@ -55,9 +55,9 @@ export function EventCalendarEventCard({ arg }: { arg: EventContentArg }) {
       <span className="text-xs font-semibold leading-tight text-foreground line-clamp-2">
         {arg.event.title}
       </span>
-      {dateRangeLabel && arg.view.type.includes("dayGrid") ? (
+      {arg.view.type.includes("dayGrid") ? (
         <span className="text-[10px] leading-tight text-muted-foreground truncate">
-          {dateRangeLabel}
+          {(arg.event.extendedProps?.locationLabel as string) || dateRangeLabel || ""}
         </span>
       ) : null}
       {eventType ? (

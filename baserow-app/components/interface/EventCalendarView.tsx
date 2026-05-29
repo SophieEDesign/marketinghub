@@ -36,6 +36,7 @@ interface EventCalendarViewProps {
   onDatesChange?: (date: Date) => void
   className?: string
   compact?: boolean
+  isEditing?: boolean
 }
 
 export default function EventCalendarView({
@@ -48,6 +49,7 @@ export default function EventCalendarView({
   onDatesChange,
   className,
   compact = false,
+  isEditing = false,
 }: EventCalendarViewProps) {
   const panelMinH = compact ? "min-h-[420px]" : "min-h-[min(72vh,620px)]"
 
@@ -109,8 +111,9 @@ export default function EventCalendarView({
   return (
     <div
       className={cn(
-        "overflow-hidden flex-1 rounded-xl border border-border/40 bg-card shadow-sm",
+        "overflow-hidden flex-1 rounded-xl border border-border/40 bg-card shadow-sm w-full",
         panelMinH,
+        isEditing && "pointer-events-none opacity-90",
         className
       )}
     >

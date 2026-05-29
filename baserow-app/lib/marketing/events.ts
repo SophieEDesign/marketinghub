@@ -47,15 +47,35 @@ export type EventStatusLabel = (typeof EVENT_STATUSES)[number] | string
 
 const EVENT_TYPE_COLORS: Record<string, string> = {
   "boat show": "#3B82F6",
-  "racing / sport": "#10B981",
-  "racing": "#10B981",
-  "sport": "#10B981",
+  exhibition: "#10B981",
+  conference: "#3B82F6",
+  "racing / sport": "#8B5CF6",
+  racing: "#8B5CF6",
+  sport: "#8B5CF6",
   "experience / events": "#8B5CF6",
   experience: "#8B5CF6",
   hospitality: "#F97316",
+  sponsorship: "#EC4899",
+  internal: "#64748B",
   international: "#14B8A6",
   other: "#EC4899",
 }
+
+/** Legend entries for event type colours (design-token friendly hex). */
+export const EVENT_TYPE_LEGEND: { label: string; color: string }[] = [
+  { label: "Racing / Sport", color: "#8B5CF6" },
+  { label: "Exhibition", color: "#10B981" },
+  { label: "Conference", color: "#3B82F6" },
+  { label: "Hospitality", color: "#F97316" },
+  { label: "Sponsorship", color: "#EC4899" },
+  { label: "Internal", color: "#64748B" },
+  { label: "Other", color: "#EC4899" },
+]
+
+export type EventAttendanceStatus = "attending" | "maybe" | "not_attending" | "interested"
+
+export type EventCalendarClickAction = "open_detail" | "open_record" | "none"
+export type EventCalendarDetailMode = "drawer" | "modal" | "inline" | "record" | "panel"
 
 const STATUS_COLORS: Record<string, string> = {
   idea: "#94A3B8",
@@ -83,6 +103,8 @@ export interface EventFieldMap {
   city: string | null
   country: string | null
   website: string | null
+  visibility: string | null
+  venue: string | null
   description: string | null
   heroImage: string | null
   linkedTheme: string | null
@@ -155,6 +177,10 @@ export interface MarketingEventItem {
   attendeeLabels: string[]
   attendeeCount: number
   currentUserAttending: boolean
+  /** Resolved from attendees field; extended statuses need Event Attendance table (TODO). */
+  currentUserAttendanceStatus: EventAttendanceStatus | null
+  visibility: string | null
+  venueLabel: string | null
   scheduleItems: EventScheduleItem[]
   resources: EventResourceItem[]
   accentColor: string
@@ -196,11 +222,13 @@ export interface EventCalendarBlockSettings {
   title: string
   subtitle: string
   defaultView: EventCalendarViewMode
+  mobileDefaultView: EventCalendarViewMode
   showToolbar: boolean
   showMetrics: boolean
   showFilters: boolean
   showSearch: boolean
   showAddButton: boolean
+  showActions: boolean
   showAttendanceControls: boolean
   showScheduleTab: boolean
   showResourcesTab: boolean
@@ -208,6 +236,12 @@ export interface EventCalendarBlockSettings {
   showLegend: boolean
   showPageHeader: boolean
   density: EventCalendarDensity
+  detailMode: EventCalendarDetailMode
+  clickAction: EventCalendarClickAction
+  allowAttendanceUpdates: boolean
+  allowMemberSubmissions: boolean
+  allowCalendarExport: boolean
+  externalMode: boolean
 }
 
 export function eventCalendarSettingsFromConfig(
@@ -217,19 +251,42 @@ export function eventCalendarSettingsFromConfig(
   const view = c.event_calendar_default_view
   const validView =
     view === "week" || view === "list" || view === "timeline" ? view : "month"
+  const mobileView = c.event_calendar_mobile_default_view
+  const validMobileView =
+    mobileView === "week" || mobileView === "month" || mobileView === "timeline"
+      ? mobileView
+      : "list"
+
+  const detailRaw = c.event_calendar_detail_mode
+  const detailMode: EventCalendarDetailMode =
+    detailRaw === "modal" ||
+    detailRaw === "inline" ||
+    detailRaw === "record" ||
+    detailRaw === "panel"
+      ? detailRaw
+      : "drawer"
+
+  const clickRaw = c.event_calendar_click_action
+  const clickAction: EventCalendarClickAction =
+    clickRaw === "open_record" || clickRaw === "none" ? clickRaw : "open_detail"
+
+  const showStats =
+    c.event_calendar_show_stats !== false && c.event_calendar_show_metrics !== false
 
   return {
     title: String(c.title || "Event Calendar"),
     subtitle: String(
       c.event_calendar_subtitle ||
-        "Plan, manage and track marketing events, trade shows and activations."
+        "Discover events, manage attendance and sync to your calendar."
     ),
     defaultView: validView,
+    mobileDefaultView: validMobileView,
     showToolbar: c.event_calendar_show_toolbar !== false,
-    showMetrics: c.event_calendar_show_metrics !== false,
+    showMetrics: showStats,
     showFilters: c.event_calendar_show_filters !== false,
     showSearch: c.event_calendar_show_search !== false,
     showAddButton: c.event_calendar_show_add_button !== false,
+    showActions: c.event_calendar_show_actions !== false,
     showAttendanceControls: c.event_calendar_show_attendance_controls !== false,
     showScheduleTab: c.event_calendar_show_schedule !== false,
     showResourcesTab: c.event_calendar_show_resources !== false,
@@ -237,19 +294,34 @@ export function eventCalendarSettingsFromConfig(
     showLegend: c.event_calendar_show_legend !== false,
     showPageHeader: c.event_calendar_show_page_header === true,
     density: c.event_calendar_density === "compact" ? "compact" : "comfortable",
+    detailMode,
+    clickAction,
+    allowAttendanceUpdates: c.event_calendar_allow_attendance_updates !== false,
+    allowMemberSubmissions: c.event_calendar_allow_member_submissions === true,
+    allowCalendarExport: c.event_calendar_allow_calendar_export !== false,
+    externalMode: c.event_calendar_external_mode === true,
   }
 }
 
 export const DEFAULT_EVENT_CALENDAR_BLOCK_CONFIG: Record<string, unknown> = {
   title: "Event Calendar",
   event_calendar_subtitle:
-    "Plan, manage and track marketing events, trade shows and activations.",
+    "Discover events, manage attendance and sync to your calendar.",
   event_calendar_default_view: "month",
+  event_calendar_mobile_default_view: "list",
+  event_calendar_detail_mode: "drawer",
+  event_calendar_click_action: "open_detail",
+  event_calendar_allow_attendance_updates: true,
+  event_calendar_allow_member_submissions: false,
+  event_calendar_allow_calendar_export: true,
+  event_calendar_external_mode: false,
   event_calendar_show_toolbar: true,
   event_calendar_show_metrics: true,
+  event_calendar_show_stats: true,
   event_calendar_show_filters: true,
   event_calendar_show_search: true,
   event_calendar_show_add_button: true,
+  event_calendar_show_actions: true,
   event_calendar_show_attendance_controls: true,
   event_calendar_show_schedule: true,
   event_calendar_show_resources: true,
@@ -374,6 +446,8 @@ export function resolveEventFields(fields: FieldRow[]): EventFieldMap {
     city: pickFieldName(fields, [/city/i], null),
     country: pickFieldName(fields, [/country/i], null),
     website: pickFieldName(fields, [/website/i, /url/i, /link/i], null),
+    visibility: pickFieldName(fields, [/visibility/i, /audience/i, /access/i], null),
+    venue: pickFieldName(fields, [/venue/i, /hall/i], null),
     description: pickFieldName(fields, [/description/i, /summary/i], null),
     heroImage: pickFieldName(fields, [/hero/i, /image/i, /photo/i, /banner/i], null),
     linkedTheme: pickFieldName(fields, [/linked.?theme/i, /theme/i, /quarterly/i], null),
@@ -587,6 +661,12 @@ export function buildEventItems(params: {
       fields.attendees ? row[fields.attendees] : row.attendee_user_ids
     )
     const attendeeLabels = attendeeIds.map((id) => profileLabelById.get(id) || id.slice(0, 8))
+    const userAttending = currentUserId ? attendeeIds.includes(currentUserId) : false
+    const currentUserAttendanceStatus: EventAttendanceStatus | null = userAttending
+      ? "attending"
+      : null
+    const visibility = fields.visibility ? formatDisplayValue(row[fields.visibility]) : null
+    const venueLabel = fields.venue ? formatDisplayValue(row[fields.venue]) : null
 
     const eventType = fields.eventType ? formatDisplayValue(row[fields.eventType]) : null
     const status = fields.status ? formatDisplayValue(row[fields.status]) : null
@@ -635,7 +715,10 @@ export function buildEventItems(params: {
       attendeeIds,
       attendeeLabels,
       attendeeCount: attendeeIds.length,
-      currentUserAttending: currentUserId ? attendeeIds.includes(currentUserId) : false,
+      currentUserAttending: userAttending,
+      currentUserAttendanceStatus,
+      visibility,
+      venueLabel,
       scheduleItems: parseScheduleItems(
         fields.scheduleItems ? row[fields.scheduleItems] : row.schedule_items
       ),
