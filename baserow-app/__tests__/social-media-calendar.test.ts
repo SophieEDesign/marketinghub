@@ -11,6 +11,7 @@ import {
   normalizeExternalUrl,
   normalizeSocialStatus,
   parseContentMediaThumbnail,
+  socialCalendarDateFieldValue,
   socialCalendarSettingsFromConfig,
   type SocialCalendarFieldMap,
   type SocialCalendarItem,
@@ -203,6 +204,12 @@ describe("filterSocialCalendarItems", () => {
     })
     expect(filtered).toHaveLength(1)
     expect(filtered[0].id).toBe("a")
+  })
+})
+
+describe("socialCalendarDateFieldValue", () => {
+  it("formats as local yyyy-MM-dd", () => {
+    expect(socialCalendarDateFieldValue(new Date(2026, 5, 15, 14, 30))).toBe("2026-06-15")
   })
 })
 

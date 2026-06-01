@@ -621,7 +621,7 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       social_media_calendar_show_media_preview: true,
       social_media_calendar_show_approval_status: true,
       social_media_calendar_show_platform_icons: true,
-      is_full_page: false,
+      is_full_page: true,
       appearance: { showTitle: true },
     },
     applicableSettings: {
@@ -634,7 +634,7 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       conditionalFormatting: false,
     },
     supportsFullPage: true,
-    defaultFullPage: false,
+    defaultFullPage: true,
   },
   campaigns_overview: {
     type: 'campaigns_overview',

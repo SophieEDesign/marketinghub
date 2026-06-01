@@ -1,6 +1,8 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { createClient } from "@/lib/supabase/client"
+import type { RecordEditorCascadeContext } from "@/lib/interface/record-editor-core"
 import { Plus, Search } from "lucide-react"
 import SocialMediaCalendarView from "@/components/interface/SocialMediaCalendarView"
 import DashboardEmpty from "@/components/interface/primitives/DashboardEmpty"
@@ -38,6 +40,7 @@ import {
   type QuarterNum,
   type SocialCalendarFilters,
   type SocialCalendarViewMode,
+  socialCalendarDateFieldValue,
   socialCalendarSettingsFromConfig,
   type SocialMediaCalendarBlockSettings,
   type SocialPlatform,
@@ -142,7 +145,7 @@ export function SocialMediaCalendarCore({
 }) {
   const blockConfig = config ?? undefined
   const { openRecordModal } = useRecordModal()
-  const { openRecord } = useRecordPanel()
+  const { openRecord, state: recordPanelState } = useRecordPanel()
   const {
     loading,
     error,
@@ -186,6 +189,22 @@ export function SocialMediaCalendarCore({
     if (!fields || contentFields.length === 0) return null
     return extendSocialCalendarFieldMap(fields, contentFields, blockConfig)
   }, [fields, contentFields, blockConfig])
+
+  /** Overlay record panel (like grid calendar) so opening a post does not squeeze the calendar. */
+  const recordPanelCascade = useMemo((): RecordEditorCascadeContext => {
+    const dateField =
+      socialFields?.contentDate ??
+      fields?.contentDate ??
+      blockConfig?.social_media_calendar_publish_date_field ??
+      "date"
+    return {
+      blockConfig: {
+        ...(blockConfig ?? {}),
+        view_type: "calendar",
+        calendar_date_field: dateField,
+      },
+    }
+  }, [blockConfig, fields?.contentDate, socialFields?.contentDate])
 
   const campaignLabelById = useMemo(() => {
     const map = new Map<string, string>()
@@ -284,13 +303,53 @@ export function SocialMediaCalendarCore({
         tableIds.contentSupabaseTable,
         undefined,
         undefined,
-        undefined,
+        recordPanelCascade,
         "view",
         reload,
         reload
       )
     }
   }
+
+  useEffect(() => {
+    if (!recordPanelState.isOpen) {
+      setSelectedId(null)
+    }
+  }, [recordPanelState.isOpen])
+
+  const calendarEditable =
+    canEdit &&
+    !isEditing &&
+    demoState.useLiveData &&
+    !forceMock &&
+    !!tableIds?.contentSupabaseTable &&
+    !!socialFields?.contentDate
+
+  const handleEventDateChange = useCallback(
+    async (recordId: string, newDate: Date): Promise<boolean> => {
+      if (!calendarEditable || !tableIds?.contentSupabaseTable || !socialFields?.contentDate) {
+        return false
+      }
+      const dateField = socialFields.contentDate
+      const updates = { [dateField]: socialCalendarDateFieldValue(newDate) }
+      try {
+        const supabase = createClient()
+        const { error } = await supabase
+          .from(tableIds.contentSupabaseTable)
+          .update(updates)
+          .eq("id", recordId)
+        if (error) throw error
+        reload()
+        return true
+      } catch (err) {
+        console.error("Social calendar: failed to reschedule post", err)
+        const message = err instanceof Error ? err.message : "Could not save the new date"
+        window.alert(`Failed to reschedule post: ${message}`)
+        return false
+      }
+    },
+    [calendarEditable, tableIds?.contentSupabaseTable, socialFields?.contentDate, reload]
+  )
 
   if (loading && !demoState.useLiveData && !forceMock) {
     return (
@@ -534,18 +593,20 @@ export function SocialMediaCalendarCore({
           ) : viewMode === "month" || viewMode === "week" ? (
             <div
               className={cn(
-                "rounded-card border border-border/30 overflow-hidden flex-1 min-h-0",
+                "rounded-card border border-border/30 flex-1 min-h-0 overflow-y-auto overflow-x-hidden",
                 embeddedInBlock
                   ? isCompact
                     ? "min-h-[360px]"
                     : "min-h-[400px]"
-                  : "min-h-0 overflow-y-auto"
+                  : "min-h-0"
               )}
             >
               <SocialMediaCalendarView
                 events={calendarEvents}
                 viewMode={calendarView}
                 onEventClick={handleSelectPost}
+                onEventDateChange={calendarEditable ? handleEventDateChange : undefined}
+                editable={calendarEditable}
                 compact={isCompact}
                 showPlatformIcons={settings.showPlatformIcons}
                 showApprovalStatus={settings.showApprovalStatus}

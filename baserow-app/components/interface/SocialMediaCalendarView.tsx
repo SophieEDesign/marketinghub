@@ -1,11 +1,12 @@
 "use client"
 
-import { useCallback, useMemo } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import FullCalendar from "@fullcalendar/react"
 import dayGridPlugin from "@fullcalendar/daygrid"
 import interactionPlugin from "@fullcalendar/interaction"
-import type { EventClickArg, EventContentArg, EventInput } from "@fullcalendar/core"
+import type { EventClickArg, EventContentArg, EventDropArg, EventInput } from "@fullcalendar/core"
 import { SocialCalendarEventCard } from "@/components/interface/social/SocialCalendarEventCard"
+import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { SocialCalendarEvent } from "@/lib/marketing/social-media-calendar"
 import { cn } from "@/lib/utils"
 
@@ -15,6 +16,9 @@ interface SocialMediaCalendarViewProps {
   events: SocialCalendarEvent[]
   viewMode: "month" | "week"
   onEventClick?: (id: string) => void
+  /** When set and editable is true, dropping an event updates the record schedule date. */
+  onEventDateChange?: (recordId: string, newDate: Date) => Promise<boolean>
+  editable?: boolean
   compact?: boolean
   showPlatformIcons?: boolean
   showApprovalStatus?: boolean
@@ -25,11 +29,54 @@ export default function SocialMediaCalendarView({
   events,
   viewMode,
   onEventClick,
+  onEventDateChange,
+  editable = false,
   compact = false,
   showPlatformIcons = true,
   showApprovalStatus = true,
   className,
 }: SocialMediaCalendarViewProps) {
+  const { state: recordPanelState } = useRecordPanel()
+  const [mounted, setMounted] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const fullCalendarRef = useRef<{ getApi?: () => { updateSize: () => void } } | null>(null)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const requestCalendarResize = useCallback(() => {
+    const api = fullCalendarRef.current?.getApi?.()
+    if (!api?.updateSize) return
+    requestAnimationFrame(() => {
+      api.updateSize()
+      requestAnimationFrame(() => api.updateSize())
+    })
+  }, [])
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el || !mounted) return
+    const ro = new ResizeObserver(() => requestCalendarResize())
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [mounted, requestCalendarResize])
+
+  useEffect(() => {
+    if (!mounted) return
+    requestCalendarResize()
+  }, [mounted, recordPanelState.isOpen, recordPanelState.width, requestCalendarResize])
+
+  useEffect(() => {
+    const onLayoutResize = () => requestCalendarResize()
+    window.addEventListener("app:layout-resize", onLayoutResize)
+    window.addEventListener("resize", onLayoutResize)
+    return () => {
+      window.removeEventListener("app:layout-resize", onLayoutResize)
+      window.removeEventListener("resize", onLayoutResize)
+    }
+  }, [requestCalendarResize])
+
   const fcEvents: EventInput[] = useMemo(
     () =>
       events.map((e) => ({
@@ -73,6 +120,20 @@ export default function SocialMediaCalendarView({
     [onEventClick]
   )
 
+  const handleEventDrop = useCallback(
+    async (info: EventDropArg) => {
+      const recordId = info.event.id ? String(info.event.id) : null
+      const newStart = info.event.start
+      if (!recordId || !newStart || !onEventDateChange) {
+        info.revert()
+        return
+      }
+      const ok = await onEventDateChange(recordId, newStart)
+      if (!ok) info.revert()
+    },
+    [onEventDateChange]
+  )
+
   const eventContent = useCallback(
     (arg: EventContentArg) => (
       <SocialCalendarEventCard
@@ -93,29 +154,48 @@ export default function SocialMediaCalendarView({
     []
   )
 
+  const isMonth = viewMode === "month"
+  const canDrag = editable && !!onEventDateChange
+
   return (
     <div
+      ref={containerRef}
       className={cn(
-        "social-calendar-embed social-calendar-embed--hero h-full min-h-0",
+        "social-calendar-embed social-calendar-embed--hero h-full min-h-0 w-full min-w-0",
+        canDrag && "social-calendar-embed--draggable",
         className
       )}
     >
-      <FullCalendar
-        key={viewMode}
-        plugins={CALENDAR_PLUGINS}
-        initialView={viewMode === "week" ? "dayGridWeek" : "dayGridMonth"}
-        views={calendarViews}
-        headerToolbar={headerToolbar}
-        events={fcEvents}
-        firstDay={1}
-        height="auto"
-        aspectRatio={compact ? 0.9 : viewMode === "week" ? 1.05 : 1.2}
-        eventClick={handleEventClick}
-        eventContent={eventContent}
-        dayMaxEvents={viewMode === "month" ? 1 : compact ? 2 : 3}
-        moreLinkClick="popover"
-        fixedWeekCount={viewMode === "month"}
-      />
+      {mounted ? (
+        <FullCalendar
+          ref={fullCalendarRef}
+          key={viewMode}
+          plugins={CALENDAR_PLUGINS}
+          initialView={viewMode === "week" ? "dayGridWeek" : "dayGridMonth"}
+          views={calendarViews}
+          headerToolbar={headerToolbar}
+          events={fcEvents}
+          firstDay={1}
+          height="auto"
+          contentHeight="auto"
+          expandRows={isMonth}
+          aspectRatio={isMonth ? undefined : compact ? 0.9 : 1.05}
+          eventClick={handleEventClick}
+          eventContent={eventContent}
+          editable={canDrag}
+          eventDrop={canDrag ? handleEventDrop : undefined}
+          eventDurationEditable={false}
+          eventStartEditable={canDrag}
+          eventDragMinDistance={8}
+          dayMaxEvents={false}
+          fixedWeekCount={isMonth}
+          handleWindowResize
+        />
+      ) : (
+        <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
+          Loading calendar…
+        </div>
+      )}
     </div>
   )
 }

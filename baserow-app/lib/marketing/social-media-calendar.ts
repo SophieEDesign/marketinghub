@@ -26,7 +26,7 @@ import { normalizeHexColor } from "@/lib/field-colors"
 import type { BlockConfig } from "@/lib/interface/types"
 import { plainTextFromHtml } from "@/lib/sanitize"
 import type { FieldOptions } from "@/types/fields"
-import { format } from "date-fns"
+import { format, startOfDay } from "date-fns"
 
 export type SocialPlatform =
   | "instagram"
@@ -694,6 +694,11 @@ export function buildSocialStatusSummary(items: SocialCalendarItem[]): SocialSta
   }
 
   return { scheduled, needsReview, drafts, approved, overdue, missingMedia }
+}
+
+/** Value written to the content publish/schedule date field on drag-and-drop. */
+export function socialCalendarDateFieldValue(date: Date): string {
+  return format(startOfDay(date), "yyyy-MM-dd")
 }
 
 export function formatSocialDateTime(item: SocialCalendarItem): string {

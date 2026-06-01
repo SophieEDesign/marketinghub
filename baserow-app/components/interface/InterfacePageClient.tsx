@@ -36,6 +36,7 @@ import { isAbortError } from "@/lib/api/error-handling"
 import PageActionsRegistrar from "./PageActionsRegistrar"
 import { debugLog, debugWarn, debugError } from "@/lib/debug"
 import { blockLayoutSignature } from "@/lib/interface/block-config-signature"
+import { pageUsesFullPageLayout } from "@/lib/interface/full-page-layout"
 import { ErrorBoundary } from "@/components/interface/ErrorBoundary"
 import type { PageBlock } from "@/lib/interface/types"
 import { useRealtimeViewBlocks } from "@/lib/realtime/useRealtimeViewBlocks"
@@ -1291,8 +1292,7 @@ function InterfacePageClientInternal({
       blocks[0]?.type === "grid" &&
       blocks[0]?.config?.view_type === "calendar"
     const isFullPage =
-      (isContentPage && blocks.length === 1 && blocks[0]?.config?.is_full_page === true) ||
-      isSingleCalendar
+      (isContentPage && pageUsesFullPageLayout(blocks)) || isSingleCalendar
     // Suppress main scroll for: (1) full-page content blocks, (2) record_view/record_review two-panel layout
     // Both layouts fill viewport; panels scroll internally.
     const shouldSuppress = !!isFullPage || !!useRecordReviewLayout

@@ -28,7 +28,10 @@ export default function FullPageLayoutSettings({
   onApplyImmediate,
 }: FullPageLayoutSettingsProps) {
   const effectiveConfig = draftConfig ?? block.config
-  const isFullPage = effectiveConfig?.is_full_page === true
+  const isFullPage =
+    effectiveConfig?.is_full_page === true ||
+    (block.type === "social_media_calendar" &&
+      effectiveConfig?.social_media_calendar_mode === "full")
   const otherBlocksCount = allBlocks.filter((b) => b.id !== block.id).length
   const canTurnOnFullPage = otherBlocksCount === 0
   const isValidForFullPage =

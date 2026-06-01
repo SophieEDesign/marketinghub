@@ -1034,7 +1034,22 @@
 }
 
 .social-calendar-embed--hero .fc .fc-daygrid-day-frame {
-  min-height: 11.5rem;
+  min-height: 6rem;
+}
+
+/* Show every post in the cell — no “+N more” popover */
+.social-calendar-embed--hero .fc-more-link {
+  display: none !important;
+}
+
+.social-calendar-embed--draggable .fc-event.fc-event-draggable .fc-social-event {
+  cursor: grab;
+}
+
+.social-calendar-embed--draggable .fc-event.fc-event-dragging .fc-social-event {
+  cursor: grabbing;
+  opacity: 0.9;
+  box-shadow: 0 8px 24px hsl(var(--foreground) / 0.12);
 }
 
 .social-calendar-embed--hero .fc-daygrid-event {

@@ -165,6 +165,21 @@ describe("buildEventCalendarEvents", () => {
     ])
     expect(events[0].end).toBeUndefined()
   })
+
+  it("forces all-day span for multi-day events even when start_time is set", () => {
+    const events = buildEventCalendarEvents([
+      sampleItem({
+        startDate: new Date("2026-06-09"),
+        endDate: new Date("2026-06-11"),
+        allDay: false,
+        startTime: "09:00",
+        endTime: "17:00",
+      }),
+    ])
+    expect(events[0].start).toBe("2026-06-09")
+    expect(events[0].end).toBe("2026-06-12")
+    expect(events[0].allDay).toBe(true)
+  })
 })
 
 describe("formatEventDateRange", () => {

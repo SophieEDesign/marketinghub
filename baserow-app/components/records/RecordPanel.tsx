@@ -103,13 +103,22 @@ export default function RecordPanel() {
     }
   }, [useOverlayLayout, state.isPinned, state.isOpen])
 
+  // FullCalendar and other flex canvases need a layout pass after the panel opens/closes or resizes.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      window.dispatchEvent(new Event("app:layout-resize"))
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [state.isOpen, state.width, state.isFullscreen, state.isPinned, useOverlayLayout])
+
   if (!state.isOpen) return null
 
   const panelContent = (
     <>
       {useOverlayLayout && !state.isPinned && state.isOpen && (
         <div
-          className="fixed inset-0 md:left-sidebar bg-black/20 z-40 transition-opacity"
+          className="fixed inset-0 md:left-64 bg-black/20 z-40 transition-opacity"
+          onClick={closeRecord}
           aria-hidden="true"
         />
       )}

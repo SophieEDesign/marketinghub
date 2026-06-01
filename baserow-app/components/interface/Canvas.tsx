@@ -199,8 +199,9 @@ export default function Canvas({
   )
   const fullPageBlock = isFullPageMode ? blocks[0] : null
 
-  // Measured canvas height so full-page grid item matches viewport (not a fixed h: 50)
-  const [fullPageContainerHeight, setFullPageContainerHeight] = useState(600)
+  // Full-page grid row count (stable updates only when row count changes — avoids ResizeObserver loops in edit)
+  const [fullPageGridRows, setFullPageGridRows] = useState(20)
+  const fullPageGridRowsRef = useRef(20)
 
   /**
    * CRITICAL: Grid layout must never be empty when blocks exist.
@@ -217,13 +218,7 @@ export default function Canvas({
     const minWidthForBlock = (blockId: string) => (blockTypeById.get(blockId) === "kpi" ? 3 : 2)
     // Full-page mode: single full-width item (grid always used; full-page content rendered inside)
     if (isFullPageMode && fullPageBlock) {
-      // Calendar: use dynamic h to fill viewport (Airtable-style). Others: fixed h.
-      const rowHeight = layoutSettings?.rowHeight ?? 30
-      const marginY = (layoutSettings?.margin ?? [10, 10])[1]
-      const dynamicH =
-        fullPageContainerHeight > 0
-          ? Math.max(2, Math.floor((fullPageContainerHeight + marginY) / (rowHeight + marginY)))
-          : 50
+      const dynamicH = fullPageGridRows
       return [{
         i: fullPageBlock.id,
         x: 0,
@@ -286,7 +281,7 @@ export default function Canvas({
         maxW: Math.max(itemMinW, maxW),
       }
     })
-  }, [blocks, layout, ephemeralDeltas, layoutSettings?.cols, layoutSettings?.rowHeight, layoutSettings?.margin, isFullPageMode, fullPageBlock, fullPageContainerHeight])
+  }, [blocks, layout, ephemeralDeltas, layoutSettings?.cols, layoutSettings?.rowHeight, layoutSettings?.margin, isFullPageMode, fullPageBlock, fullPageGridRows])
   
   // Layout version for preventing stale sync overwrites
   const layoutVersionRef = useRef<number>(0)
@@ -1790,20 +1785,31 @@ export default function Canvas({
   // CRITICAL: Must be declared before any early returns (Rules of Hooks)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Measure container height for full-page blocks (list/kanban/grid/calendar fill available viewport)
+  // Measure container height for full-page blocks; update grid rows only when row count changes
   useEffect(() => {
     if (!isFullPageMode || !containerRef.current) return
     const el = containerRef.current
+    const rowHeight = layoutSettings?.rowHeight ?? 30
+    const marginY = (layoutSettings?.margin ?? [10, 10])[1]
+    const rowPx = rowHeight + marginY
+
+    const applyMeasuredHeight = (pxHeight: number) => {
+      if (pxHeight <= 0 || rowPx <= 0) return
+      const rows = Math.max(2, Math.floor((pxHeight + marginY) / rowPx))
+      if (rows === fullPageGridRowsRef.current) return
+      fullPageGridRowsRef.current = rows
+      setFullPageGridRows(rows)
+    }
+
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        const h = entry.contentRect.height
-        if (h > 0) setFullPageContainerHeight(h)
+        applyMeasuredHeight(entry.contentRect.height)
       }
     })
     ro.observe(el)
-    setFullPageContainerHeight(el.getBoundingClientRect().height || 600)
+    applyMeasuredHeight(el.getBoundingClientRect().height || 600)
     return () => ro.disconnect()
-  }, [isFullPageMode])
+  }, [isFullPageMode, layoutSettings?.rowHeight, layoutSettings?.margin])
 
   // Auto-scroll during resize/drag when cursor near viewport edge (react-grid-layout's built-in is unreliable with nested scroll)
   const scrollListenerActiveRef = useRef(false)
@@ -2604,7 +2610,7 @@ export default function Canvas({
               className={`block-content relative z-0 h-full w-full max-w-full min-h-0 min-w-0 rounded-lg ${block.config?.locked ? 'pointer-events-none opacity-75' : ''} ${
                 block.type === 'field' ? 'overflow-visible' :
                 'overflow-hidden'
-              } ${isEditing && isFullPageMode && fullPageBlock && block.id === fullPageBlock.id ? 'pt-10' : ''}`}
+              }`}
               data-block-id={block.id}
             >
               {isFullPageMode && fullPageBlock && block.id === fullPageBlock.id ? (

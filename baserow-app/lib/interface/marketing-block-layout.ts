@@ -1,8 +1,19 @@
-import type { BlockConfig } from "@/lib/interface/types"
+import type { BlockConfig, BlockType } from "@/lib/interface/types"
 import { cn } from "@/lib/utils"
 
-export function isConfigFullPage(config?: BlockConfig | null): boolean {
-  return config?.is_full_page === true
+export function isConfigFullPage(
+  config?: BlockConfig | null,
+  blockType?: BlockType
+): boolean {
+  if (!config) return false
+  if (config.is_full_page === true) return true
+  if (
+    blockType === "social_media_calendar" &&
+    config.social_media_calendar_mode === "full"
+  ) {
+    return true
+  }
+  return false
 }
 
 /**

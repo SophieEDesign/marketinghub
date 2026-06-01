@@ -31,6 +31,15 @@ describe("marketing-block-layout", () => {
     expect(isConfigFullPage({})).toBe(false)
   })
 
+  it("isConfigFullPage treats social calendar mode full as full-page", () => {
+    expect(
+      isConfigFullPage(
+        { social_media_calendar_mode: "full", is_full_page: false },
+        "social_media_calendar"
+      )
+    ).toBe(true)
+  })
+
   it("marketingBlockRootClass strips card chrome in full-page mode", () => {
     expect(marketingBlockRootClass(true, "rounded-2xl border")).toContain("rounded-none")
     expect(marketingBlockRootClass(true, "rounded-2xl border")).not.toContain("rounded-2xl")

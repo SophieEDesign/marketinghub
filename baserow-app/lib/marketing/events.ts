@@ -960,15 +960,20 @@ export function buildEventCalendarEvents(items: MarketingEventItem[]): EventCale
     .filter((item) => item.startDate)
     .map((item) => {
       const start = format(item.startDate!, "yyyy-MM-dd")
+      const isMultiDay = Boolean(
+        item.endDate && item.startDate && !isSameDay(item.startDate, item.endDate)
+      )
+      // FullCalendar month grid only spans multiple cells for all-day events.
+      // Timed events (allDay: false) appear on the start day only, even with an end date.
       let end: string | undefined
-      if (item.endDate && item.startDate && !isSameDay(item.startDate, item.endDate)) {
+      if (isMultiDay && item.endDate) {
         end = format(addDays(item.endDate, 1), "yyyy-MM-dd")
       }
       const fc: EventCalendarEvent = {
         id: item.id,
         title: item.eventName,
         start,
-        allDay: item.allDay,
+        allDay: isMultiDay ? true : item.allDay,
         accentColor: item.accentColor,
         backgroundColor: item.backgroundColor,
         extendedProps: {
@@ -976,19 +981,24 @@ export function buildEventCalendarEvents(items: MarketingEventItem[]): EventCale
           status: item.status,
           locationLabel: item.locationLabel,
           dateRangeLabel: item.dateRangeLabel,
+          startTime: item.startTime,
+          endTime: item.endTime,
           attendeeLabels: item.attendeeLabels,
           attendeeCount: item.attendeeCount,
           accentColor: item.accentColor,
         },
       }
       if (end) fc.end = end
-      if (!item.allDay && item.startTime) {
-        const startIso = `${start}T${item.startTime.length === 5 ? item.startTime : item.startTime.slice(0, 5)}:00`
+      const useTimedSingleDay = !isMultiDay && !item.allDay && item.startTime
+      if (useTimedSingleDay) {
+        const startIso = `${start}T${item.startTime!.length === 5 ? item.startTime : item.startTime!.slice(0, 5)}:00`
         fc.start = startIso
         fc.allDay = false
         if (item.endTime) {
           const endDay = item.endDate ? format(item.endDate, "yyyy-MM-dd") : start
           fc.end = `${endDay}T${item.endTime.length === 5 ? item.endTime : item.endTime.slice(0, 5)}:00`
+        } else {
+          delete fc.end
         }
       }
       return fc

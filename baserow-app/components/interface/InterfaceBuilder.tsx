@@ -43,13 +43,11 @@ import type { FilterTree } from "@/lib/filters/canonical-model"
 import { debugLog, debugError } from "@/lib/debug"
 import { ViewErrorBoundary } from "@/components/ViewErrorBoundary"
 
-function isBlockEligibleForFullPage(block: PageBlock): boolean {
-  if (!block.config?.is_full_page) return false
-  if (block.type === 'record_context') {
-    return Boolean(block.config?.table_id)
-  }
-  return true
-}
+import {
+  canUseFullPageBlock,
+  isBlockEligibleForFullPage,
+  resolveFullPageBlockId,
+} from "@/lib/interface/full-page-layout"
 
 interface InterfaceBuilderProps {
   page: Page
@@ -911,9 +909,10 @@ function InterfaceBuilderInner({
       const def = BLOCK_REGISTRY[type]
 
       // If page already has an eligible full-page block, prevent adding a second block
-      const currentFullPageBlock = blocks.find(
-        (b) => b.config?.is_full_page === true && isBlockEligibleForFullPage(b)
-      )
+      const currentFullPageBlockId = resolveFullPageBlockId(blocks)
+      const currentFullPageBlock = currentFullPageBlockId
+        ? blocks.find((b) => b.id === currentFullPageBlockId)
+        : undefined
       if (currentFullPageBlock && blocks.length >= 1) {
         toast({
           variant: "default",
@@ -972,7 +971,7 @@ function InterfaceBuilderInner({
         setBlocksDirty(false)
 
         // When adding the first block and type supports full-page, prompt to use as full-page view only if block is eligible (e.g. record_context needs table_id)
-        if (wasEmpty && def.supportsFullPage && isBlockEligibleForFullPage(block)) {
+        if (wasEmpty && def.supportsFullPage && canUseFullPageBlock(block)) {
           const defaultYes = def.defaultFullPage === true
           const message = defaultYes
             ? "Use this block as a full-page view? (You can change this in block settings.)"
@@ -1373,17 +1372,7 @@ function InterfaceBuilderInner({
 
   // Derive full-page block for canvas: when exactly one block and (1) it has is_full_page and is eligible,
   // or (2) it's a grid block with calendar view (Airtable-style: calendar fills viewport).
-  const fullPageBlockId = useMemo(() => {
-    if (blocks.length !== 1) return null
-    const block = blocks[0]
-    const isCalendarBlock =
-      block?.type === "grid" && block?.config?.view_type === "calendar"
-    if (isCalendarBlock) return block.id
-    const eligibleFullPageBlocks = blocks.filter(
-      (b) => b.config?.is_full_page === true && isBlockEligibleForFullPage(b)
-    )
-    return eligibleFullPageBlocks.length === 1 ? eligibleFullPageBlocks[0].id : null
-  }, [blocks])
+  const fullPageBlockId = useMemo(() => resolveFullPageBlockId(blocks), [blocks])
 
   const fullPageBlock = fullPageBlockId ? blocks.find((b) => b.id === fullPageBlockId) : null
 
