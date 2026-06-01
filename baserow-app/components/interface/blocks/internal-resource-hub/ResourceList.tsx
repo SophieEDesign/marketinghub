@@ -61,16 +61,18 @@ export default function ResourceList({
           </li>
         ))}
       </ul>
-      <div className="shrink-0 border-t border-[#E6E6EF] px-4 py-3">
-        <button
-          type="button"
-          onClick={onAddResource}
-          className="flex w-full items-center justify-center gap-1.5 text-xs font-medium text-[#6D4AFF] hover:underline"
-        >
-          <Plus className="h-3.5 w-3.5" aria-hidden />
-          Add resource
-        </button>
-      </div>
+      {onAddResource ? (
+        <div className="shrink-0 border-t border-[#E6E6EF] px-4 py-3">
+          <button
+            type="button"
+            onClick={onAddResource}
+            className="flex w-full items-center justify-center gap-1.5 text-xs font-medium text-[#6D4AFF] hover:underline"
+          >
+            <Plus className="h-3.5 w-3.5" aria-hidden />
+            Add resource
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -79,10 +81,12 @@ export function ResourceListHeader({
   title,
   subtitle,
   onViewAll,
+  onCreate,
 }: {
   title: string
   subtitle: string
   onViewAll?: () => void
+  onCreate?: () => void
 }) {
   return (
     <header className="shrink-0 border-b border-[#E6E6EF] bg-white px-4 py-4">
@@ -96,15 +100,27 @@ export function ResourceListHeader({
             <p className="text-xs text-[#6B7280]">{subtitle}</p>
           </div>
         </div>
-        {onViewAll ? (
-          <button
-            type="button"
-            onClick={onViewAll}
-            className="shrink-0 text-xs font-medium text-[#6D4AFF] hover:underline"
-          >
-            View all
-          </button>
-        ) : null}
+        <div className="flex shrink-0 items-center gap-3">
+          {onCreate ? (
+            <button
+              type="button"
+              onClick={onCreate}
+              className="inline-flex items-center gap-1.5 rounded-md bg-[#6D4AFF] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#5a3de6]"
+            >
+              <Plus className="h-3.5 w-3.5" aria-hidden />
+              Create
+            </button>
+          ) : null}
+          {onViewAll ? (
+            <button
+              type="button"
+              onClick={onViewAll}
+              className="text-xs font-medium text-[#6D4AFF] hover:underline"
+            >
+              View all
+            </button>
+          ) : null}
+        </div>
       </div>
     </header>
   )

@@ -52,7 +52,7 @@ export default function KpiSummaryCardEditor({
   const numericFields = tableFields.filter(
     (f) => ["number", "currency", "percent"].includes(f.type) || f.type === "formula"
   )
-  const dateFields = tableFields.filter((f) => f.type === "date" || f.type === "datetime")
+  const dateFields = tableFields.filter((f) => f.type === "date")
 
   const patch = (updates: Partial<KpiSummaryCardConfig>) => {
     onChange({ ...card, ...updates })

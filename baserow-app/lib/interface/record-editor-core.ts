@@ -102,6 +102,8 @@ export interface RecordEditorCoreResult {
   restoreDraft: () => void
   /** Clear draft from localStorage (call after save or discard) */
   clearDraft: () => void
+  /** Reload field metadata from the API (e.g. after select option edits). */
+  refreshFields: () => Promise<void>
 }
 
 function normalizeLinkValue(

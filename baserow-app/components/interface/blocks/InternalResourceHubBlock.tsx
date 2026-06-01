@@ -2,14 +2,14 @@
 
 /**
  * Internal Resource Hub — visual media library block for internal staff.
- *
- * TODO: connect resources to Supabase/storage/media table (see useInternalStaffHubData)
- * TODO: add permission checks for internal staff only (isAdmin / role gate)
  */
 
 import { useCallback, useMemo, useState } from "react"
 import type { PageBlock } from "@/lib/interface/types"
 import { useResourceHubData } from "@/hooks/useResourceHubData"
+import { useRecordModal } from "@/contexts/RecordModalContext"
+import { useEffectiveUserRole } from "@/contexts/MemberPreviewContext"
+import { useUserRole } from "@/lib/hooks/useUserRole"
 import {
   isMarketingMockEnabled,
   marketingDemoState,
@@ -80,7 +80,10 @@ export default function InternalResourceHubBlock({
   const maxItems =
     typeof config.resource_hub_max_items === "number" ? config.resource_hub_max_items : undefined
   const showDetailPanel = config.resource_hub_show_detail_panel !== false
-  const { loading, error, fromLiveData, hasTable, resources: liveResources } =
+  const { openRecordModal } = useRecordModal()
+  const { role: clientRole } = useUserRole()
+  const effectiveRole = useEffectiveUserRole(clientRole)
+  const { loading, error, fromLiveData, hasTable, tableIds, resources: liveResources, reload } =
     useResourceHubData({ config })
 
   const [category, setCategory] = useState<CategoryFilter>(() =>
@@ -155,6 +158,24 @@ export default function InternalResourceHubBlock({
     [resources]
   )
 
+  const canCreateResource =
+    effectiveRole === "admin" &&
+    !isEditing &&
+    demoState.useLiveData &&
+    !forceMock &&
+    !!tableIds?.mediaTableId
+
+  const handleCreateResource = useCallback(() => {
+    if (!canCreateResource || !tableIds) return
+    openRecordModal({
+      tableId: tableIds.mediaTableId,
+      recordId: null,
+      supabaseTableName: tableIds.mediaSupabaseTable,
+      onSave: () => reload(),
+      onRecordUpdated: () => reload(),
+    })
+  }, [canCreateResource, tableIds, openRecordModal, reload])
+
   if (demoState.showEmptyState && !demoState.useDemoData) {
     return (
       <div
@@ -170,6 +191,7 @@ export default function InternalResourceHubBlock({
           showSearch={showSearch}
           searchQuery=""
           onSearchChange={() => {}}
+          onCreate={canCreateResource ? handleCreateResource : undefined}
         />
         <DashboardEmpty title="No resources" description={demoState.bannerMessage} variant="default" />
       </div>
@@ -210,6 +232,7 @@ export default function InternalResourceHubBlock({
           title={title}
           subtitle={subtitle}
           onViewAll={() => mockAction("View all resources")}
+          onCreate={canCreateResource ? handleCreateResource : undefined}
         />
         <div
           className={cn(
@@ -220,7 +243,7 @@ export default function InternalResourceHubBlock({
           <ResourceList
             resources={resources}
             onSelect={openResourceUrl}
-            onAddResource={() => mockAction("Add resource")}
+            onAddResource={canCreateResource ? handleCreateResource : undefined}
           />
         </div>
       </div>
@@ -247,6 +270,7 @@ export default function InternalResourceHubBlock({
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onFilterClick={() => mockAction("Filter (stub)")}
+        onCreate={canCreateResource ? handleCreateResource : undefined}
       />
 
       {showFilters ? (

@@ -209,7 +209,7 @@ export function useKpiSummaryData(options?: {
           let trend_direction: KpiSummaryTrendDirection = "neutral"
           if (hasComparison && raw) {
             const trendInfo = formatKpiSummaryTrend(
-              raw as ComparisonResult,
+              raw as unknown as ComparisonResult,
               resolvedEntry.comparisonPreset
             )
             trend = trendInfo.trend

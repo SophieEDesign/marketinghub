@@ -44,7 +44,7 @@ export interface CanvasFullPageBlockProps {
   editingBlockCanvasId?: string | null
   layoutSettings?: { rowHeight?: number }
   openRecordInEditModeForBlock?: { blockId: string; recordId: string; tableId: string } | null
-  onFieldBlockSelect?: (blockId: string, fieldId: string) => void
+  onFieldBlockSelect?: (blockId: string, fieldId: string, tableId: string) => void
   selectedFieldBlockId?: string | null
   onBlockClick?: (blockId: string) => void
   onBlockDelete?: (blockId: string) => void

@@ -94,20 +94,6 @@ export default function InlineSelectDropdown({
     }
   }, [isOpen, editingChoice, editingColor])
 
-  // Filter choices based on search term
-  const filteredChoices = useMemo(() => {
-    if (!searchTerm.trim()) return effectiveChoices
-    const term = searchTerm.toLowerCase()
-    return effectiveChoices.filter((choice) => choice.toLowerCase().includes(term))
-  }, [effectiveChoices, searchTerm])
-
-  // Check if search term matches a new option to create
-  const canCreateNewOption = useMemo(() => {
-    if (!canEditOptions || !allowOptionEditing || !searchTerm.trim()) return false
-    const term = searchTerm.trim()
-    return !effectiveChoices.some((c) => c.toLowerCase() === term.toLowerCase())
-  }, [canEditOptions, allowOptionEditing, searchTerm, effectiveChoices])
-
   // Merge choiceColors into fieldOptions for proper resolution
   const mergedOptions: FieldOptions = useMemo(() => {
     const base = optimisticFieldOptions ?? fieldOptions
@@ -122,6 +108,20 @@ export default function InlineSelectDropdown({
     if (fromOptions.length > 0) return fromOptions
     return choices
   }, [fieldType, mergedOptions, choices])
+
+  // Filter choices based on search term
+  const filteredChoices = useMemo(() => {
+    if (!searchTerm.trim()) return effectiveChoices
+    const term = searchTerm.toLowerCase()
+    return effectiveChoices.filter((choice) => choice.toLowerCase().includes(term))
+  }, [effectiveChoices, searchTerm])
+
+  // Check if search term matches a new option to create
+  const canCreateNewOption = useMemo(() => {
+    if (!canEditOptions || !allowOptionEditing || !searchTerm.trim()) return false
+    const term = searchTerm.trim()
+    return !effectiveChoices.some((c) => c.toLowerCase() === term.toLowerCase())
+  }, [canEditOptions, allowOptionEditing, searchTerm, effectiveChoices])
 
   const applyOptimisticFieldOptions = (next: FieldOptions) => {
     setOptimisticFieldOptions(next)

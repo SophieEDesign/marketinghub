@@ -1,6 +1,6 @@
 "use client"
 
-import { Lock, Search, Filter, ShieldCheck } from "lucide-react"
+import { Lock, Search, Filter, ShieldCheck, Plus } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -12,6 +12,7 @@ interface HubHeaderProps {
   searchQuery: string
   onSearchChange: (q: string) => void
   onFilterClick?: () => void
+  onCreate?: () => void
   className?: string
 }
 
@@ -22,6 +23,7 @@ export default function HubHeader({
   searchQuery,
   onSearchChange,
   onFilterClick,
+  onCreate,
   className,
 }: HubHeaderProps) {
   return (
@@ -46,30 +48,43 @@ export default function HubHeader({
           <p className="text-sm text-muted-foreground">{subtitle}</p>
         </div>
 
-        {showSearch && (
-          <div className="flex shrink-0 items-center gap-2 lg:mt-1">
-            <div className="relative w-full min-w-[200px] sm:w-56">
-              <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Search resources…"
-                value={searchQuery}
-                onChange={(e) => onSearchChange(e.target.value)}
-                className="h-9 pl-9 text-sm border-border/60 bg-muted/20"
-              />
-            </div>
+        <div className="flex shrink-0 items-center gap-2 lg:mt-1">
+          {showSearch && (
+            <>
+              <div className="relative w-full min-w-[200px] sm:w-56">
+                <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Search resources…"
+                  value={searchQuery}
+                  onChange={(e) => onSearchChange(e.target.value)}
+                  className="h-9 pl-9 text-sm border-border/60 bg-muted/20"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9 shrink-0 gap-1.5 border-border/60"
+                onClick={onFilterClick}
+              >
+                <Filter className="h-4 w-4" />
+                <span className="hidden sm:inline">Filter</span>
+              </Button>
+            </>
+          )}
+          {onCreate ? (
             <Button
               type="button"
-              variant="outline"
               size="sm"
-              className="h-9 shrink-0 gap-1.5 border-border/60"
-              onClick={onFilterClick}
+              className="h-9 shrink-0 gap-1.5"
+              onClick={onCreate}
             >
-              <Filter className="h-4 w-4" />
-              <span className="hidden sm:inline">Filter</span>
+              <Plus className="h-4 w-4" />
+              Create
             </Button>
-          </div>
-        )}
+          ) : null}
+        </div>
       </div>
     </header>
   )

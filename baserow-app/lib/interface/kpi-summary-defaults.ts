@@ -2,7 +2,7 @@
  * KPI Summary block — card defaults and types.
  */
 
-import type { FilterConfig } from "@/lib/interface/filters"
+import type { BlockFilter } from "@/lib/interface/types"
 
 export type KpiSummaryAccent = "purple" | "blue" | "red"
 
@@ -32,7 +32,7 @@ export interface KpiSummaryCardConfig {
   kpi_aggregate?: "count" | "sum" | "avg" | "min" | "max"
   kpi_field?: string
   kpi_field_id?: string
-  filters?: FilterConfig[]
+  filters?: BlockFilter[]
   comparison_preset?: KpiSummaryComparisonPreset
   comparison_date_field?: string
   comparison_date_field_id?: string
