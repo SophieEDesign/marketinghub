@@ -14,6 +14,7 @@ import {
 import { supabase } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { useMemberPreviewOptional } from "@/contexts/MemberPreviewContext"
+import { useUserRole } from "@/lib/hooks/useUserRole"
 
 function getInitials(name: string | null, email: string | null): string {
   if (name) {
@@ -30,10 +31,9 @@ function getInitials(name: string | null, email: string | null): string {
 export default function UserMenu() {
   const router = useRouter()
   const memberPreview = useMemberPreviewOptional()
+  const { role: clientRole } = useUserRole()
   const [displayName, setDisplayName] = useState<string | null>(null)
   const [email, setEmail] = useState<string | null>(null)
-  const [role, setRole] = useState<string | null>(null)
-  const [isAdminUser, setIsAdminUser] = useState(false)
 
   useEffect(() => {
     const loadUser = async () => {
@@ -44,23 +44,19 @@ export default function UserMenu() {
       setDisplayName(
         meta?.full_name || meta?.name || user.email?.split("@")[0] || null
       )
-      setRole(meta?.role === "admin" ? "Admin" : null)
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .maybeSingle()
-      if (profile?.role === "admin") {
-        setRole("Admin")
-        setIsAdminUser(true)
-      } else if (profile?.role === "member") {
-        setRole("Member")
-        setIsAdminUser(false)
-      }
     }
     loadUser()
   }, [])
+
+  const isAdminUser =
+    memberPreview?.userIsAdmin ?? clientRole === "admin"
+  const effectiveRole = memberPreview?.effectiveUserRole ?? clientRole
+  const roleLabel =
+    effectiveRole === "admin"
+      ? "Admin"
+      : effectiveRole === "member"
+        ? "Member"
+        : null
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -93,9 +89,9 @@ export default function UserMenu() {
             <span className="truncate text-sm font-medium text-foreground leading-tight">
               {displayName ?? "Account"}
             </span>
-            {role ? (
+            {roleLabel ? (
               <span className="truncate text-[11px] text-muted-foreground leading-tight">
-                {previewActive ? "Preview · Member" : role}
+                {previewActive ? "Preview · Member" : roleLabel}
               </span>
             ) : null}
           </span>
