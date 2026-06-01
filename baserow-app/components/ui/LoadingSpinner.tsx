@@ -23,10 +23,21 @@ export function LoadingSpinner({
     lg: "h-8 w-8",
   }
 
+  const statusText = text ?? "Loading"
+
   return (
-    <div className={cn("flex items-center justify-center gap-2", className)}>
-      <Loader2 className={cn("animate-spin", sizeClasses[size])} />
-      {text && <span className="text-sm text-muted-foreground">{text}</span>}
+    <div
+      className={cn("flex items-center justify-center gap-2", className)}
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <Loader2 className={cn("animate-spin", sizeClasses[size])} aria-hidden />
+      {text ? (
+        <span className="text-sm text-muted-foreground">{text}</span>
+      ) : (
+        <span className="sr-only">{statusText}</span>
+      )}
     </div>
   )
 }

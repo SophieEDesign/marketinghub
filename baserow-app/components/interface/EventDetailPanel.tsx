@@ -449,7 +449,7 @@ export function EventDetailFloatingShell({
   return (
     <>
       <div
-        className="fixed inset-0 md:left-64 bg-black/25 z-[80]"
+        className="fixed inset-0 md:left-sidebar bg-black/25 z-[80]"
         onClick={onClose}
         aria-hidden
       />

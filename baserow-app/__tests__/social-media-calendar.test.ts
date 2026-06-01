@@ -4,6 +4,7 @@ import { join } from "path"
 import { BLOCK_REGISTRY, getAllBlockTypes } from "@/lib/interface/registry"
 import {
   applyContentScope,
+  buildSocialCalendarCreateInitialData,
   buildSocialCalendarItems,
   derivePlatforms,
   externalLinkLabel,
@@ -204,6 +205,50 @@ describe("filterSocialCalendarItems", () => {
     })
     expect(filtered).toHaveLength(1)
     expect(filtered[0].id).toBe("a")
+  })
+})
+
+describe("buildSocialCalendarCreateInitialData", () => {
+  it("applies block filters and social content type when scope is social_only", () => {
+    const initial = buildSocialCalendarCreateInitialData({
+      config: {
+        filters: [{ field: "content_type", operator: "equal", value: "Social Media" }],
+      },
+      contentScope: "social_only",
+      fields: baseFields,
+      contentFields: [{ name: "content_type", type: "single_select" }],
+      tableFields: [
+        {
+          id: "f-type",
+          name: "content_type",
+          type: "single_select",
+          table_id: "t1",
+        },
+      ],
+    })
+    expect(initial.content_type).toBe("Social Media")
+  })
+
+  it("prefills publish date from day click", () => {
+    const initial = buildSocialCalendarCreateInitialData({
+      config: {},
+      contentScope: "social_only",
+      fields: baseFields,
+      contentFields: [],
+      scheduleDate: "2026-06-20",
+    })
+    expect(initial.date).toBe("2026-06-20")
+  })
+
+  it("does not force content type when scope is all_content and no filters", () => {
+    const initial = buildSocialCalendarCreateInitialData({
+      config: {},
+      contentScope: "all_content",
+      fields: baseFields,
+      contentFields: [{ name: "content_type", type: "single_select" }],
+      tableFields: [],
+    })
+    expect(initial.content_type).toBeUndefined()
   })
 })
 

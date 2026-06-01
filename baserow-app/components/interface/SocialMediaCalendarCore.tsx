@@ -28,6 +28,7 @@ import { useSocialMediaCalendarData } from "@/hooks/useSocialMediaCalendarData"
 import { formatDisplayValue } from "@/lib/marketing/field-utils"
 import {
   applyContentScope,
+  buildSocialCalendarCreateInitialData,
   buildSocialCalendarEvents,
   buildSocialCalendarItems,
   buildSocialStatusSummary,
@@ -154,6 +155,7 @@ export function SocialMediaCalendarCore({
     tableIds,
     fields,
     contentFields,
+    contentTableFields,
     contentRows,
     allItems,
     campaignRows,
@@ -281,17 +283,65 @@ export function SocialMediaCalendarCore({
     [filteredItems]
   )
 
-  const openPost = (recordId: string | null) => {
-    if (!tableIds) return
-    openRecordModal({
-      tableId: tableIds.contentTableId,
-      recordId,
-      supabaseTableName: tableIds.contentSupabaseTable,
-      onRecordUpdated: reload,
-      onDeleted: reload,
-      onSave: () => reload(),
-    })
-  }
+  const canCreatePost =
+    canEdit &&
+    !isEditing &&
+    demoState.useLiveData &&
+    !forceMock &&
+    !!tableIds?.contentTableId
+
+  const openPost = useCallback(
+    (recordId: string | null, scheduleDate?: string) => {
+      if (!tableIds) return
+      const common = {
+        tableId: tableIds.contentTableId,
+        supabaseTableName: tableIds.contentSupabaseTable,
+        onRecordUpdated: reload,
+        onDeleted: reload,
+        onSave: () => reload(),
+        cascadeContext: recordPanelCascade,
+        tableFields: contentTableFields,
+      }
+      if (recordId === null) {
+        openRecordModal({
+          ...common,
+          recordId: null,
+          initialData: buildSocialCalendarCreateInitialData({
+            config: blockConfig,
+            contentScope,
+            fields,
+            contentFields,
+            tableFields: contentTableFields,
+            scheduleDate,
+          }),
+        })
+      } else {
+        openRecordModal({
+          ...common,
+          recordId,
+        })
+      }
+    },
+    [
+      tableIds,
+      reload,
+      recordPanelCascade,
+      contentTableFields,
+      blockConfig,
+      contentScope,
+      fields,
+      contentFields,
+      openRecordModal,
+    ]
+  )
+
+  const handleCalendarDateClick = useCallback(
+    (dateStr: string) => {
+      if (!canCreatePost) return
+      openPost(null, dateStr)
+    },
+    [canCreatePost, openPost]
+  )
 
   const handleSelectPost = (id: string) => {
     if (isEditing) return
@@ -606,6 +656,7 @@ export function SocialMediaCalendarCore({
                 events={calendarEvents}
                 viewMode={calendarView}
                 onEventClick={handleSelectPost}
+                onDateClick={canCreatePost ? handleCalendarDateClick : undefined}
                 onEventDateChange={calendarEditable ? handleEventDateChange : undefined}
                 editable={calendarEditable}
                 compact={isCompact}

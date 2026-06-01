@@ -90,7 +90,7 @@ export default function EventMemberSubmissionSheet({
     <>
       {open ? (
         <div
-          className="fixed inset-0 md:left-64 bg-black/20 z-40"
+          className="fixed inset-0 md:left-sidebar bg-black/20 z-40"
           onClick={onClose}
           aria-hidden
         />

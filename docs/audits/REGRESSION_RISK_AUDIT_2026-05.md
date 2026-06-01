@@ -19,7 +19,7 @@ Ongoing gate for stabilisation PRs. Extends [TESTING_THE_FIXES.md](../guides/TES
 | REG-001 | Core data grid | Bulk bar / bulk edit only when **2+** checkboxes selected | `__tests__/bulk-action-bar.test.ts` |
 | REG-002 | Core data grid | Open chevron opens record; no bulk edit | Manual + e2e when authed |
 | REG-003 | Core data grid | Row background click does **not** bulk-select | `AirtableGridView` row onClick |
-| REG-004 | Interface pages | Sidebar clickable with record panel (`md:left-64`) | Manual |
+| REG-004 | Interface pages | Sidebar clickable with record panel (`md:left-sidebar`) | Manual |
 | REG-005 | Interface pages | Blocks visible after settings save with block selected | Manual |
 | REG-006 | Records | Single record open path via modal context → panel | Manual |
 | REG-007 | Edit mode | Right panel width from UIMode `isEdit()` only | `.cursor/rules/layout-width-authority.mdc` |
@@ -41,7 +41,7 @@ Copy into PR description:
 - [ ] Listed REG-ids exercised: ___
 - [ ] `npm test` green
 - [ ] `npm run build` green (if UI/routes touched)
-- [ ] No new `fixed inset-0` without `md:left-64` (desktop)
+- [ ] No new `fixed inset-0` without `md:left-sidebar` (desktop)
 - [ ] No ungated `console.log` in changed files
 ```
 

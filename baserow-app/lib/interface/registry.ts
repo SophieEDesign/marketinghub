@@ -616,6 +616,7 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
         'Visual planning for social posts — platforms, media, and approval status at a glance.',
       social_media_calendar_default_view: 'month',
       social_media_calendar_content_scope: 'social_only',
+      social_media_calendar_content_type_default: 'Social Media',
       social_media_calendar_mode: 'full',
       social_media_calendar_show_status_bar: true,
       social_media_calendar_show_filters: true,

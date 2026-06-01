@@ -4,7 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import FullCalendar from "@fullcalendar/react"
 import dayGridPlugin from "@fullcalendar/daygrid"
 import interactionPlugin from "@fullcalendar/interaction"
-import type { EventClickArg, EventContentArg, EventDropArg, EventInput } from "@fullcalendar/core"
+import type {
+  DateClickArg,
+  EventClickArg,
+  EventContentArg,
+  EventDropArg,
+  EventInput,
+} from "@fullcalendar/core"
 import { SocialCalendarEventCard } from "@/components/interface/social/SocialCalendarEventCard"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { SocialCalendarEvent } from "@/lib/marketing/social-media-calendar"
@@ -16,6 +22,8 @@ interface SocialMediaCalendarViewProps {
   events: SocialCalendarEvent[]
   viewMode: "month" | "week"
   onEventClick?: (id: string) => void
+  /** Click empty day cell to create a post (dateStr is yyyy-MM-dd). */
+  onDateClick?: (dateStr: string) => void
   /** When set and editable is true, dropping an event updates the record schedule date. */
   onEventDateChange?: (recordId: string, newDate: Date) => Promise<boolean>
   editable?: boolean
@@ -31,6 +39,7 @@ export default function SocialMediaCalendarView({
   events,
   viewMode,
   onEventClick,
+  onDateClick,
   onEventDateChange,
   editable = false,
   compact = false,
@@ -128,6 +137,15 @@ export default function SocialMediaCalendarView({
     [onEventClick]
   )
 
+  const onDateClickRef = useRef(onDateClick)
+  onDateClickRef.current = onDateClick
+
+  const handleDateClick = useCallback((arg: DateClickArg) => {
+    if (onDateClickRef.current && arg.dateStr) {
+      onDateClickRef.current(arg.dateStr)
+    }
+  }, [])
+
   const handleEventDrop = useCallback(
     async (info: EventDropArg) => {
       const recordId = info.event.id ? String(info.event.id) : null
@@ -164,6 +182,7 @@ export default function SocialMediaCalendarView({
 
   const isMonth = viewMode === "month"
   const canDrag = editable && !!onEventDateChange
+  const canDayClick = !!onDateClick
 
   return (
     <div
@@ -172,6 +191,7 @@ export default function SocialMediaCalendarView({
         "social-calendar-embed social-calendar-embed--hero w-full min-w-0",
         fillContainer ? "h-full min-h-0 flex-1" : "h-full min-h-0",
         canDrag && "social-calendar-embed--draggable",
+        canDayClick && "social-calendar-embed--day-clickable",
         className
       )}
     >
@@ -190,6 +210,7 @@ export default function SocialMediaCalendarView({
           expandRows={isMonth && !fillContainer}
           aspectRatio={isMonth ? undefined : compact ? 0.9 : 1.05}
           eventClick={handleEventClick}
+          dateClick={canDayClick ? handleDateClick : undefined}
           eventContent={eventContent}
           editable={canDrag}
           eventDrop={canDrag ? handleEventDrop : undefined}

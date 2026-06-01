@@ -18,7 +18,7 @@ import {
 import { applyMarketingBlockDataQuery } from "@/lib/marketing/block-data-query"
 import { findCampaignsTable, findContentTable, findQuarterlyThemesTable } from "@/lib/marketing/marketing-tables"
 import type { BlockConfig } from "@/lib/interface/types"
-import type { FieldOptions } from "@/types/fields"
+import type { FieldOptions, TableField } from "@/types/fields"
 
 type PlanningFieldRow = { name: string; type?: string; options?: FieldOptions }
 
@@ -42,6 +42,7 @@ export interface UseSocialMediaCalendarDataResult {
   tableIds: ContentPlanningTableIds | null
   fields: ContentPlanningFieldMap | null
   contentFields: PlanningFieldRow[]
+  contentTableFields: TableField[]
   contentRows: Record<string, unknown>[]
   allItems: ContentPlanningItem[]
   campaignRows: Record<string, unknown>[]
@@ -61,6 +62,7 @@ export function useSocialMediaCalendarData(options?: {
   const [tableIds, setTableIds] = useState<ContentPlanningTableIds | null>(null)
   const [fields, setFields] = useState<ContentPlanningFieldMap | null>(null)
   const [contentFields, setContentFields] = useState<PlanningFieldRow[]>([])
+  const [contentTableFields, setContentTableFields] = useState<TableField[]>([])
   const [contentRows, setContentRows] = useState<Record<string, unknown>[]>([])
   const [campaignRows, setCampaignRows] = useState<Record<string, unknown>[]>([])
   const [themeRows, setThemeRows] = useState<Record<string, unknown>[]>([])
@@ -173,6 +175,15 @@ export function useSocialMediaCalendarData(options?: {
         setTableIds(ids)
         setFields(fieldMap)
         setContentFields(contentFieldRows)
+        setContentTableFields(
+          (fieldRows?.filter((f) => f.table_id === content.id) || []).map((f) => ({
+            id: f.id,
+            name: f.name,
+            type: f.type,
+            options: f.options,
+            table_id: content.id,
+          })) as TableField[]
+        )
         setThemeRows((themesRes.data || []) as Record<string, unknown>[])
         setContentRows((contentRes.data || []) as Record<string, unknown>[])
         setCampaignRows((campaignsRes.data || []) as Record<string, unknown>[])
@@ -183,6 +194,7 @@ export function useSocialMediaCalendarData(options?: {
           setTableIds(null)
           setFields(null)
           setContentRows([])
+          setContentTableFields([])
           setThemeRows([])
           setCampaignRows([])
           setFromLiveData(false)
@@ -222,6 +234,7 @@ export function useSocialMediaCalendarData(options?: {
     tableIds,
     fields,
     contentFields,
+    contentTableFields,
     contentRows,
     allItems,
     campaignRows,

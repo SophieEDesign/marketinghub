@@ -32,6 +32,7 @@ import {
 import type { TableField } from "@/types/fields"
 import { normalizeUuid } from "@/lib/utils/ids"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
+import { ErrorState } from "@/components/ui/ErrorState"
 import { isAbortError } from "@/lib/api/error-handling"
 import PageActionsRegistrar from "./PageActionsRegistrar"
 import { debugLog, debugWarn, debugError } from "@/lib/debug"
@@ -180,6 +181,9 @@ function InterfacePageClientInternal({
 
   const [blocks, setBlocks] = useState<PageBlock[]>(initialBlocks)
   const [blocksLoading, setBlocksLoading] = useState(false)
+  const [blocksLoadError, setBlocksLoadError] = useState<string | null>(null)
+  /** Which pageId the current `blocks` array belongs to (for stale-while-navigate). */
+  const blocksPageIdRef = useRef<string | null>(initialBlocks.length > 0 ? pageId : null)
   const [dataLoading, setDataLoading] = useState(false)
   const [pageTableId, setPageTableId] = useState<string | null>(null)
   const tableResolutionSeqRef = useRef(0)
@@ -303,16 +307,17 @@ function InterfacePageClientInternal({
     }
   }, [page?.id, page?.base_table, page?.saved_view_id])
 
-  // CRITICAL: When route pageId changes (navigation), reset page state so we refetch and remount.
-  // Do NOT call exitPageEdit/exitBlockEdit - edit state persists across navigation.
-  // Only change edit state when user explicitly calls enter/exit via UI.
+  // REG-005 / navigation: refetch on route pageId change without blanking the canvas.
+  // InterfaceBuilder owns live block state while mounted; parent mirrors via onBlocksMirror for
+  // loadBlocks/right panel. Do NOT clear blocks to [] here — keep stale blocks until the new
+  // page's fetch completes (blocksLoading overlay). Do NOT call exitPageEdit/exitBlockEdit.
   useEffect(() => {
     if (previousRoutePageIdRef.current !== null && previousRoutePageIdRef.current !== pageId) {
       if (process.env.NODE_ENV === "development") {
         debugLog("[Nav] Route pageId changed:", { from: previousRoutePageIdRef.current, to: pageId })
       }
-      setPage(null)
-      setBlocks([])
+      setBlocksLoading(true)
+      setBlocksLoadError(null)
       setLoading(true)
       pageLoadedRef.current = false
       initialPageRef.current = null // so loadPage() runs for the new page
@@ -579,37 +584,39 @@ function InterfacePageClientInternal({
   // Removing block reload on exit edit mode - this was causing flicker and layout resets
 
   async function loadPage() {
+    const requestedPageId = pageId
+    if (!requestedPageId) return
     // CRITICAL: Only load if not already loaded (prevent overwriting initial data)
     if (pageLoadedRef.current) return
 
     setLoading(true)
     try {
-      const res = await fetch(`/api/interface-pages/${pageId}`)
+      const res = await fetch(`/api/interface-pages/${requestedPageId}`)
       if (!res.ok) {
         if (res.status === 404) {
-          // Page not found - set page to null so UI shows "not found" message
-          // DO NOT redirect - let the component render the error state
+          if (requestedPageId !== pageId) return
           setPage(null)
           pageLoadedRef.current = true
           return
         }
         throw new Error('Failed to load page')
       }
-      
+
       const pageData = await res.json()
-      // CRITICAL: Only update if page hasn't been loaded yet (preserve initial data)
+      if (requestedPageId !== pageId) return
       if (!pageLoadedRef.current) {
         setPage(pageData)
         pageLoadedRef.current = true
       }
     } catch (error) {
       debugError("Error loading page:", error)
-      // Set page to null on error - component will show error UI
-      // DO NOT redirect - always render UI
+      if (requestedPageId !== pageId) return
       setPage(null)
       pageLoadedRef.current = true
     } finally {
-      setLoading(false)
+      if (requestedPageId === pageId) {
+        setLoading(false)
+      }
     }
   }
 
@@ -884,8 +891,9 @@ function InterfacePageClientInternal({
   }
 
   async function loadBlocks(forceReload = false, signal?: AbortSignal) {
-    debugLog('🔥 loadBlocks CALLED', { pageId, forceReload, previousPageId: previousPageIdRef.current, alreadyLoading: blocksLoadingRef.current })
-    if (!pageId) {
+    const requestedPageId = pageId
+    debugLog('🔥 loadBlocks CALLED', { pageId: requestedPageId, forceReload, previousPageId: previousPageIdRef.current, alreadyLoading: blocksLoadingRef.current })
+    if (!requestedPageId) {
       blocksLoadingRef.current = false
       return
     }
@@ -911,8 +919,9 @@ function InterfacePageClientInternal({
     blocksLoadingRef.current = true
 
     setBlocksLoading(true)
+    setBlocksLoadError(null)
     try {
-      const res = await fetch(`/api/pages/${pageId}/blocks`, { signal })
+      const res = await fetch(`/api/pages/${requestedPageId}/blocks`, { signal })
       if (signal?.aborted) return
 
       if (!res.ok) {
@@ -927,9 +936,10 @@ function InterfacePageClientInternal({
       
       const data = await res.json()
       if (signal?.aborted) return
+      if (requestedPageId !== pageId) return
 
       // CRITICAL: Log API response for debugging - show full response structure
-      debugLog(`[loadBlocks] API returned: pageId=${pageId}`, {
+      debugLog(`[loadBlocks] API returned: pageId=${requestedPageId}`, {
         responseStatus: res.status,
         responseOk: res.ok,
         apiResponseRaw: data,
@@ -987,18 +997,25 @@ function InterfacePageClientInternal({
       })
       // CRITICAL: Database is source of truth - always replace state entirely when loading from DB
       // Preview state is only valid before save completes - after reload, DB state must be used
-      // Exception: If reload returns empty blocks and we have existing blocks, preserve them
-      // (prevents clearing blocks due to race conditions or temporary API issues)
-      if (pageBlocks.length === 0 && blocks.length > 0 && !forceReload) {
+      // If reload returns empty but we still show blocks from another page (nav in flight), allow swap.
+      // Otherwise preserve blocks on empty API response (race / transient API).
+      const blocksAreStaleFromOtherPage =
+        blocksPageIdRef.current != null && blocksPageIdRef.current !== requestedPageId
+      if (
+        pageBlocks.length === 0 &&
+        blocks.length > 0 &&
+        !forceReload &&
+        !blocksAreStaleFromOtherPage
+      ) {
         if (!signal?.aborted) {
           if (process.env.NODE_ENV === 'development') {
             debugWarn('[Blocks] Reload returned empty blocks, preserving existing blocks', {
               prevBlocksCount: blocks.length,
               forceReload,
-              pageId
+              pageId: requestedPageId,
             })
           }
-          blocksLoadedRef.current = { pageId, loaded: true }
+          blocksLoadedRef.current = { pageId: requestedPageId, loaded: true }
         }
         return
       }
@@ -1049,8 +1066,8 @@ function InterfacePageClientInternal({
         willUpdate: blocksChanged || forceReload,
       })
       
-      // Phase 4: Guard - do not overwrite blocks when user has unsaved changes (same page, forceReload)
-      if (!signal?.aborted) {
+      // REG-005: Do not overwrite local block/layout edits from realtime or background reload.
+      if (!signal?.aborted && requestedPageId === pageId) {
         if (blocksDirty && forceReload) {
           if (process.env.NODE_ENV === 'development') {
             debugLog('[loadBlocks] Skipping setBlocks - blocks dirty, save before reloading')
@@ -1060,21 +1077,27 @@ function InterfacePageClientInternal({
             title: "Unsaved changes",
             description: "You have unsaved changes. Save before reloading.",
           })
-        } else if (blocksChanged || forceReload) {
+        } else if (blocksChanged || forceReload || blocksAreStaleFromOtherPage) {
           setBlocks(pageBlocks)
+          blocksPageIdRef.current = requestedPageId
         } else if (process.env.NODE_ENV === 'development') {
           debugLog(`[loadBlocks] Blocks unchanged - skipping setBlocks to prevent re-render`)
         }
-        blocksLoadedRef.current = { pageId, loaded: true }
+        blocksLoadedRef.current = { pageId: requestedPageId, loaded: true }
       }
     } catch (error) {
       // Ignore abort errors (expected during navigation/unmount) - prevents "Uncaught (in promise)"
       if (!isAbortError(error)) {
         debugError("Error loading blocks:", error)
+        if (!signal?.aborted && requestedPageId === pageId) {
+          setBlocksLoadError(
+            error instanceof Error ? error.message : "Failed to load page blocks"
+          )
+        }
       }
       // CRITICAL: Never clear blocks on error - preserve existing blocks
-      if (!signal?.aborted) {
-        blocksLoadedRef.current = { pageId, loaded: true }
+      if (!signal?.aborted && requestedPageId === pageId) {
+        blocksLoadedRef.current = { pageId: requestedPageId, loaded: true }
       }
     } finally {
       if (!signal?.aborted) {
@@ -1093,11 +1116,13 @@ function InterfacePageClientInternal({
   loadBlocksRef.current = loadBlocks
   loadSqlViewDataRef.current = loadSqlViewData
 
+  /** REG-005: Builder is source of truth while mounted; mirror keeps parent in sync for panel/API reload. */
   const handleBlocksMirror = useCallback((nextBlocks: PageBlock[]) => {
+    blocksPageIdRef.current = pageId
     setBlocks(nextBlocks)
-  }, [])
+  }, [pageId])
 
-  // Realtime: when another user adds/edits/deletes blocks, reload from API
+  // Realtime: reload from API; loadBlocks skips setBlocks when blocksDirty (unsaved layout).
   useRealtimeViewBlocks(pageId, () => loadBlocksRef.current(true))
 
   const handleGridToggle = () => {
@@ -1424,8 +1449,12 @@ function InterfacePageClientInternal({
   return (
     <div className="relative flex w-full flex-1 min-h-0 min-w-0 max-w-full flex-col overflow-hidden">
       {/* Loading overlay: single scroll surface; do not unmount tree */}
-      {loading && !hasPage && (
-        <div className="absolute inset-0 flex items-center justify-center z-20 bg-background">
+      {loading && !hasPage && blocks.length === 0 && (
+        <div
+          className="absolute inset-0 flex items-center justify-center z-20 bg-background"
+          aria-busy="true"
+          aria-live="polite"
+        >
           <LoadingSpinner size="lg" text="Loading interface page..." />
         </div>
       )}
@@ -1563,8 +1592,24 @@ function InterfacePageClientInternal({
             isAdmin={isAdmin}
             onBlocksMirror={handleBlocksMirror}
           />
+          {blocksLoadError && !blocksLoading && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/95">
+              <ErrorState
+                title="Could not load blocks"
+                message={blocksLoadError}
+                onRetry={() => {
+                  setBlocksLoadError(null)
+                  void loadBlocksRef.current(true)
+                }}
+              />
+            </div>
+          )}
           {blocksLoading && (
-            <div className="absolute inset-0 bg-white/60 flex items-center justify-center z-10 pointer-events-none">
+            <div
+              className="absolute inset-0 bg-white/60 flex items-center justify-center z-10 pointer-events-none"
+              aria-busy="true"
+              aria-live="polite"
+            >
               <LoadingSpinner size="lg" text="Loading blocks..." />
             </div>
           )}

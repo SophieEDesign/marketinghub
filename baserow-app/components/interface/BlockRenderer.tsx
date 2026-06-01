@@ -19,7 +19,6 @@ import ButtonBlock from "./blocks/ButtonBlock"
 import ActionBlock from "./blocks/ActionBlock"
 import LinkPreviewBlock from "./blocks/LinkPreviewBlock"
 import HtmlBlock from "./blocks/HtmlBlock"
-import InternalResourceHubBlock from "./blocks/InternalResourceHubBlock"
 import FilterBlock from "./blocks/FilterBlock"
 import FieldBlock from "./blocks/FieldBlock"
 import FieldSectionBlock from "./blocks/FieldSectionBlock"
@@ -133,6 +132,10 @@ const SocialMediaCalendarBlock = dynamic(() => import("./blocks/SocialMediaCalen
   ),
 })
 const CampaignsOverviewBlock = dynamic(() => import("./blocks/CampaignsOverviewBlock"), {
+  ssr: false,
+  loading: () => <BlockLoadingPlaceholder />,
+})
+const InternalResourceHubBlock = dynamic(() => import("./blocks/InternalResourceHubBlock"), {
   ssr: false,
   loading: () => <BlockLoadingPlaceholder />,
 })
@@ -725,12 +728,14 @@ export default function BlockRenderer({
 
       case "internal_resource_hub":
         return (
-          <InternalResourceHubBlock
-            block={safeBlock}
-            isEditing={canEdit}
-            onUpdate={onUpdate ? (u) => handleUpdate(u) : undefined}
-            isFullPage={isFullPage}
-          />
+          <LazyBlockWrapper enabled={true}>
+            <InternalResourceHubBlock
+              block={safeBlock}
+              isEditing={canEdit}
+              onUpdate={onUpdate ? (u) => handleUpdate(u) : undefined}
+              isFullPage={isFullPage}
+            />
+          </LazyBlockWrapper>
         )
 
       default:

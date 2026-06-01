@@ -20,8 +20,14 @@ import {
   pickFieldName,
   formatDisplayValue,
   choiceLabelsForFieldNames,
+  choiceLabelsFromField,
   mergeFilterOptionLists,
 } from "@/lib/marketing/field-utils"
+import {
+  deriveDefaultValuesFromFilters,
+  type FilterConfig,
+} from "@/lib/interface/filters"
+import type { TableField } from "@/types/fields"
 import { normalizeHexColor } from "@/lib/field-colors"
 import type { BlockConfig } from "@/lib/interface/types"
 import { plainTextFromHtml } from "@/lib/sanitize"
@@ -160,6 +166,104 @@ export function isSocialContentType(contentType: string | null): boolean {
   return SOCIAL_TYPE_PATTERN.test(contentType)
 }
 
+/** Fallback label when schema has no social-like select option. */
+export const DEFAULT_SOCIAL_CONTENT_TYPE_LABEL = "Social Media"
+
+function filterValueAsString(value: unknown): string | null {
+  if (value == null) return null
+  if (typeof value === "string") {
+    const t = value.trim()
+    return t || null
+  }
+  if (Array.isArray(value) && value.length > 0) {
+    return filterValueAsString(value[0])
+  }
+  return null
+}
+
+/**
+ * Content type prefilled on "Create post" when scope is social-only.
+ * Order: block setting → block filter on type field → first social-like schema option → default label.
+ */
+export function resolveSocialContentTypeDefault(params: {
+  config?: BlockConfig | null
+  contentScope: ContentScopeMode
+  contentTypeFieldName: string | null
+  contentFields: FieldRow[]
+}): string | null {
+  const { config, contentScope, contentTypeFieldName, contentFields } = params
+  if (contentScope !== "social_only" || !contentTypeFieldName) return null
+
+  const configured = config?.social_media_calendar_content_type_default?.trim()
+  if (configured) return configured
+
+  const filters = Array.isArray(config?.filters) ? config.filters : []
+  for (const f of filters) {
+    if (f.field !== contentTypeFieldName) continue
+    if (f.operator !== "equal" && f.operator !== "contains") continue
+    const v = filterValueAsString(f.value)
+    if (v && isSocialContentType(v)) return v
+  }
+
+  const fieldMeta = contentFields.find((f) => f.name === contentTypeFieldName)
+  if (fieldMeta) {
+    for (const label of choiceLabelsFromField(fieldMeta)) {
+      if (isSocialContentType(label)) return label
+    }
+  }
+
+  return DEFAULT_SOCIAL_CONTENT_TYPE_LABEL
+}
+
+/**
+ * Initial field values for new content rows — block filters first, then social scope type default.
+ */
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/
+
+export function buildSocialCalendarCreateInitialData(params: {
+  config?: BlockConfig | null
+  contentScope: ContentScopeMode
+  fields: ContentPlanningFieldMap | null
+  contentFields: FieldRow[]
+  tableFields?: TableField[]
+  /** Publish/schedule date from day click (yyyy-MM-dd or Date). */
+  scheduleDate?: string | Date | null
+}): Record<string, unknown> {
+  const { config, contentScope, fields, contentFields, tableFields = [], scheduleDate } = params
+  const blockFilters = (Array.isArray(config?.filters) ? config.filters : []) as FilterConfig[]
+  const initial: Record<string, unknown> = {
+    ...deriveDefaultValuesFromFilters(blockFilters, tableFields),
+  }
+
+  const contentTypeField = fields?.contentType ?? null
+  if (contentTypeField && initial[contentTypeField] === undefined) {
+    const typeDefault = resolveSocialContentTypeDefault({
+      config,
+      contentScope,
+      contentTypeFieldName: contentTypeField,
+      contentFields,
+    })
+    if (typeDefault) initial[contentTypeField] = typeDefault
+  }
+
+  const dateField = fields?.contentDate ?? null
+  if (dateField && scheduleDate != null) {
+    if (typeof scheduleDate === "string" && DATE_ONLY_RE.test(scheduleDate.trim())) {
+      initial[dateField] = scheduleDate.trim()
+    } else {
+      const d =
+        typeof scheduleDate === "string"
+          ? new Date(`${scheduleDate.trim()}T00:00:00`)
+          : scheduleDate
+      if (!isNaN(d.getTime())) {
+        initial[dateField] = socialCalendarDateFieldValue(d)
+      }
+    }
+  }
+
+  return initial
+}
+
 export function resolveSocialCalendarFields(
   contentFields: FieldRow[],
   campaignFields: FieldRow[],
@@ -286,6 +390,7 @@ export const DEFAULT_SOCIAL_MEDIA_CALENDAR_BLOCK_CONFIG: BlockConfig = {
     "Visual planning for social posts — platforms, media, and approval status at a glance.",
   social_media_calendar_default_view: "month",
   social_media_calendar_content_scope: "social_only",
+  social_media_calendar_content_type_default: DEFAULT_SOCIAL_CONTENT_TYPE_LABEL,
   social_media_calendar_mode: "full",
   social_media_calendar_show_status_bar: true,
   social_media_calendar_show_filters: true,

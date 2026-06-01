@@ -33,7 +33,6 @@ import {
   guardAgainstAutoSave,
   markUserInteraction,
 } from "@/lib/interface/editor-safety"
-import { usePageAggregates } from "@/lib/dashboard/usePageAggregates"
 import { useFilterState } from "@/lib/interface/filter-state"
 import SaveStatusIndicator from "@/components/save-status/SaveStatusIndicator"
 import { MarketingDashboardCanvasShell } from "@/components/interface/MarketingDashboardLayout"

@@ -1088,6 +1088,14 @@
   box-shadow: 0 8px 24px hsl(var(--foreground) / 0.12);
 }
 
+.social-calendar-embed--day-clickable .fc-daygrid-day-frame {
+  cursor: pointer;
+}
+
+.social-calendar-embed--day-clickable .fc-daygrid-day-frame:hover {
+  background: hsl(var(--muted) / 0.35);
+}
+
 .social-calendar-embed--hero .fc-daygrid-event {
   background: transparent !important;
   border: none !important;

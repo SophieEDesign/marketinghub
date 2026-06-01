@@ -82,6 +82,16 @@ export default function SocialMediaCalendarDataSettings({
             )}
           />
           <MarketingFieldSelect
+            label="Content type"
+            fieldId={config.social_media_calendar_type_field_id}
+            fieldName={config.social_media_calendar_type_field}
+            fields={tableFields}
+            onChange={setField(
+              "social_media_calendar_type_field_id",
+              "social_media_calendar_type_field"
+            )}
+          />
+          <MarketingFieldSelect
             label="Caption"
             fieldId={config.social_media_calendar_caption_field_id}
             fieldName={config.social_media_calendar_caption_field}
@@ -212,6 +222,24 @@ export default function SocialMediaCalendarDataSettings({
             <SelectItem value="feed">Feed</SelectItem>
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="smc-content-type-default">Content type default (new posts)</Label>
+        <Input
+          id="smc-content-type-default"
+          value={config.social_media_calendar_content_type_default || ""}
+          onChange={(e) =>
+            onUpdate({
+              social_media_calendar_content_type_default: e.target.value || undefined,
+            })
+          }
+          placeholder="Social Media"
+        />
+        <p className="text-[11px] text-muted-foreground leading-snug">
+          Used when content scope is Social only. Block filters still apply first (e.g. content
+          type = Social Media).
+        </p>
       </div>
 
       <div className="space-y-2">
