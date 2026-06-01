@@ -260,7 +260,7 @@ export function resolveContentTimelineExtraFields(
     channel: pick([/^channels$/i, /channel/i, /platform/i]),
     images: pick([/^images$/i, /media/i, /attachment/i]),
     notes: pick([/notes_detail/i, /^description$/i, /brief/i]),
-    dateTo: pick([/^date_to$/i, /end_date/i]),
+    dateTo: pick([/^date_to$/i, /^date_due$/i, /end_date/i, /due_date/i]),
     division: pick([/primary_division/i, /^division$/i, /team/i]),
   }
   if (!overrides || Object.keys(overrides).length === 0) return base
@@ -271,11 +271,7 @@ export function contentTimelineOverridesFromConfig(
   config?: BlockConfig
 ): Partial<Record<keyof ContentPlanningFieldMap, FieldOverridePair>> {
   const c = config || {}
-  return {
-    ...contentPlanningOverridesFromConfig(c, "content_timeline"),
-    contentTheme: overridePair(c, "content_timeline_theme_field_id", "content_timeline_theme_field"),
-    contentType: overridePair(c, "content_timeline_type_field_id", "content_timeline_type_field"),
-  }
+  return contentPlanningOverridesFromConfig(c, "content_timeline")
 }
 
 export function upcomingSummaryOverridesFromConfig(

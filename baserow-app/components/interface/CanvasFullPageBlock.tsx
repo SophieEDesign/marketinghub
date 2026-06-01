@@ -8,7 +8,7 @@ import {
 } from "@/components/interface/primitives/BuilderBlockFrame"
 import { shouldShowBlockChromeToolbar } from "@/lib/interface/canvas-edit-chrome"
 import type { BlockDefinition } from "@/lib/interface/registry"
-import type { PageBlock } from "@/lib/interface/types"
+import type { PageBlock, RecordContext } from "@/lib/interface/types"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import type { FilterConfig } from "@/lib/interface/filters"
 import { Settings2 } from "lucide-react"
@@ -25,16 +25,16 @@ export interface CanvasFullPageBlockProps {
   onShowRecordSettings?: () => void
   recordId?: string | null
   recordTableId?: string | null
-  pageId: string
+  pageId?: string | null
   pageTableId?: string | null
   interfaceMode: "view" | "edit"
   onBlockUpdate?: (blockId: string, config: Partial<PageBlock["config"]>) => void
-  mode?: string
+  mode?: "view" | "edit" | "review"
   getFiltersForBlock: (blockId: string, tableId?: string | null) => FilterConfig[]
   getFilterTreeForBlock: (blockId: string, tableId?: string | null) => FilterTree | undefined
-  onRecordClick?: (recordId: string, tableId: string) => void
-  onRecordContextChange?: (context: unknown) => void
-  aggregateData: Record<string, unknown>
+  onRecordClick?: (recordId: string, tableId?: string) => void
+  onRecordContextChange?: (context: RecordContext) => void
+  aggregateData: Record<string, { data: unknown; error: string | null; isLoading: boolean }>
   pageShowAddRecord?: boolean
   pageEditable?: boolean
   editableFieldNames?: string[]
@@ -43,7 +43,7 @@ export interface CanvasFullPageBlockProps {
   allBlocks: PageBlock[]
   editingBlockCanvasId?: string | null
   layoutSettings?: { rowHeight?: number }
-  openRecordInEditModeForBlock?: (blockId: string) => void
+  openRecordInEditModeForBlock?: { blockId: string; recordId: string; tableId: string } | null
   onFieldBlockSelect?: (blockId: string, fieldId: string) => void
   selectedFieldBlockId?: string | null
   onBlockClick?: (blockId: string) => void

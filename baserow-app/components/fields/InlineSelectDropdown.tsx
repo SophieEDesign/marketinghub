@@ -11,7 +11,7 @@ import {
 } from '@/lib/field-colors'
 import type { FieldOptions, SelectOption } from '@/types/fields'
 import { ChoicePill } from '@/components/fields/ChoicePill'
-import { normalizeSelectOptionsForUi } from '@/lib/fields/select-options'
+import { getManualChoiceLabels, normalizeSelectOptionsForUi } from '@/lib/fields/select-options'
 
 interface InlineSelectDropdownProps {
   value: string | string[] | null
@@ -54,7 +54,14 @@ export default function InlineSelectDropdown({
   const [editingColor, setEditingColor] = useState<string | null>(null)
   const [newChoiceName, setNewChoiceName] = useState('')
   const [updatingOptions, setUpdatingOptions] = useState(false)
+  /** Optimistic field options after create/rename/color/delete until parent refreshes. */
+  const [optimisticFieldOptions, setOptimisticFieldOptions] = useState<FieldOptions | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Drop optimistic cache when server-provided options change.
+  useEffect(() => {
+    setOptimisticFieldOptions(null)
+  }, [fieldOptions, choiceColors, fieldId])
 
   const isMulti = fieldType === 'multi_select'
   const selectedValues = useMemo((): string[] => {
@@ -89,25 +96,60 @@ export default function InlineSelectDropdown({
 
   // Filter choices based on search term
   const filteredChoices = useMemo(() => {
-    if (!searchTerm.trim()) return choices
+    if (!searchTerm.trim()) return effectiveChoices
     const term = searchTerm.toLowerCase()
-    return choices.filter(choice => choice.toLowerCase().includes(term))
-  }, [choices, searchTerm])
+    return effectiveChoices.filter((choice) => choice.toLowerCase().includes(term))
+  }, [effectiveChoices, searchTerm])
 
   // Check if search term matches a new option to create
   const canCreateNewOption = useMemo(() => {
     if (!canEditOptions || !allowOptionEditing || !searchTerm.trim()) return false
     const term = searchTerm.trim()
-    return !choices.some(c => c.toLowerCase() === term.toLowerCase())
-  }, [canEditOptions, allowOptionEditing, searchTerm, choices])
+    return !effectiveChoices.some((c) => c.toLowerCase() === term.toLowerCase())
+  }, [canEditOptions, allowOptionEditing, searchTerm, effectiveChoices])
 
   // Merge choiceColors into fieldOptions for proper resolution
   const mergedOptions: FieldOptions = useMemo(() => {
+    const base = optimisticFieldOptions ?? fieldOptions
     return {
-      ...fieldOptions,
-      choiceColors: choiceColors || fieldOptions?.choiceColors,
+      ...base,
+      choiceColors: choiceColors || base?.choiceColors,
     }
-  }, [choiceColors, fieldOptions])
+  }, [choiceColors, fieldOptions, optimisticFieldOptions])
+
+  const effectiveChoices = useMemo(() => {
+    const fromOptions = getManualChoiceLabels(fieldType, mergedOptions)
+    if (fromOptions.length > 0) return fromOptions
+    return choices
+  }, [fieldType, mergedOptions, choices])
+
+  const applyOptimisticFieldOptions = (next: FieldOptions) => {
+    setOptimisticFieldOptions(next)
+  }
+
+  const findSelectOptionForChoice = (
+    selectOptions: SelectOption[],
+    choice: string
+  ): SelectOption | undefined => {
+    const trimmed = String(choice ?? '').trim()
+    if (!trimmed) return undefined
+    const direct = selectOptions.find((o) => o.label === trimmed || o.id === trimmed)
+    if (direct) return direct
+    const lower = trimmed.toLowerCase()
+    return selectOptions.find((o) => o.label.toLowerCase() === lower)
+  }
+
+  const storedValueAfterRename = (
+    stored: string,
+    oldChoice: string,
+    newLabel: string,
+    matched?: SelectOption
+  ): string => {
+    if (matched?.id && stored === matched.id) return matched.id
+    if (stored === oldChoice) return newLabel
+    if (matched && stored === matched.label) return newLabel
+    return stored
+  }
 
   const safeId = () =>
     typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -207,6 +249,8 @@ export default function InlineSelectDropdown({
         throw new Error(error.error || 'Failed to create option')
       }
 
+      applyOptimisticFieldOptions(nextOptions)
+
       // Select the newly created option
       if (isMulti) {
         await onValueChange([...selectedValues, newChoice])
@@ -240,8 +284,9 @@ export default function InlineSelectDropdown({
       const base =
         normalizeSelectOptionsForUi(fieldType, mergedOptions).repairedFieldOptions || mergedOptions
       const { selectOptions } = normalizeSelectOptionsForUi(fieldType, base)
+      const matched = findSelectOptionForChoice(selectOptions, oldChoice)
       const nextSelectOptions = selectOptions.map((o) =>
-        o.label === oldChoice ? { ...o, label: trimmed } : o
+        matched ? (o.id === matched.id ? { ...o, label: trimmed } : o) : o.label === oldChoice ? { ...o, label: trimmed } : o
       )
       const nextOptions = buildSelectOptionsPayload(base, nextSelectOptions)
 
@@ -262,12 +307,20 @@ export default function InlineSelectDropdown({
         throw new Error(error.error || 'Failed to rename option')
       }
 
+      applyOptimisticFieldOptions(nextOptions)
+
       // Update selected values if the renamed choice was selected
       if (isMulti) {
-        const newSelected: string[] = selectedValues.map(v => v === oldChoice ? newName.trim() : v)
-        await onValueChange(newSelected)
-      } else if (selectedValues[0] === oldChoice) {
-        await onValueChange(newName.trim())
+        const newSelected: string[] = selectedValues.map((v) =>
+          storedValueAfterRename(v, oldChoice, trimmed, matched)
+        )
+        const changed = newSelected.some((v, i) => v !== selectedValues[i])
+        if (changed) await onValueChange(newSelected)
+      } else if (selectedValues.length > 0) {
+        const stored = selectedValues[0]
+        if (stored === oldChoice || stored === matched?.id || stored === matched?.label) {
+          await onValueChange(storedValueAfterRename(stored, oldChoice, trimmed, matched))
+        }
       }
 
       setEditingChoice(null)
@@ -291,8 +344,15 @@ export default function InlineSelectDropdown({
       const base =
         normalizeSelectOptionsForUi(fieldType, mergedOptions).repairedFieldOptions || mergedOptions
       const { selectOptions } = normalizeSelectOptionsForUi(fieldType, base)
+      const matched = findSelectOptionForChoice(selectOptions, choice)
       const nextSelectOptions = selectOptions.map((o) =>
-        o.label === choice ? { ...o, color: newColor } : o
+        matched
+          ? o.id === matched.id
+            ? { ...o, color: newColor }
+            : o
+          : o.label === choice
+            ? { ...o, color: newColor }
+            : o
       )
       const nextOptions = buildSelectOptionsPayload(base, nextSelectOptions)
 
@@ -312,6 +372,7 @@ export default function InlineSelectDropdown({
         throw new Error(error.error || 'Failed to update color')
       }
 
+      applyOptimisticFieldOptions(nextOptions)
       setEditingColor(null)
       onFieldOptionsUpdate?.()
     } catch (error: any) {
@@ -333,7 +394,10 @@ export default function InlineSelectDropdown({
       const base =
         normalizeSelectOptionsForUi(fieldType, mergedOptions).repairedFieldOptions || mergedOptions
       const { selectOptions } = normalizeSelectOptionsForUi(fieldType, base)
-      const nextSelectOptions = selectOptions.filter((o) => o.label !== choiceToDelete)
+      const matched = findSelectOptionForChoice(selectOptions, choiceToDelete)
+      const nextSelectOptions = selectOptions.filter((o) =>
+        matched ? o.id !== matched.id : o.label !== choiceToDelete
+      )
       const nextOptions = buildSelectOptionsPayload(base, nextSelectOptions)
 
       const response = await fetch(`/api/tables/${tableId}/fields`, {
@@ -352,11 +416,19 @@ export default function InlineSelectDropdown({
         throw new Error(error.error || 'Failed to delete option')
       }
 
+      applyOptimisticFieldOptions(nextOptions)
+
       // Remove from selected values if it was selected
       if (isMulti) {
-        const filteredValues: string[] = selectedValues.filter(v => v !== choiceToDelete)
-        await onValueChange(filteredValues)
-      } else if (selectedValues[0] === choiceToDelete) {
+        const filteredValues: string[] = selectedValues.filter(
+          (v) => v !== choiceToDelete && v !== matched?.id && v !== matched?.label
+        )
+        if (filteredValues.length !== selectedValues.length) await onValueChange(filteredValues)
+      } else if (
+        selectedValues[0] === choiceToDelete ||
+        selectedValues[0] === matched?.id ||
+        selectedValues[0] === matched?.label
+      ) {
         await onValueChange(null)
       }
 

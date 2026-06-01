@@ -295,7 +295,8 @@ export function useEventCalendarData(options?: {
             items = mergeAttendanceIntoEventItems(
               items,
               attendanceRows as EventAttendanceRow[],
-              userId
+              userId,
+              profileLabelById
             )
           }
         }

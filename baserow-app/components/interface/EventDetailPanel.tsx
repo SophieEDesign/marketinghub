@@ -280,7 +280,21 @@ export function EventDetailContent({
                 </button>
               ) : null}
             </div>
-            <EventAvatarStack labels={event.attendeeLabels} max={8} />
+            {event.attendeeLabels.length > 0 ? (
+              <ul className="mt-2 space-y-1">
+                {event.attendeeLabels.map((name, i) => (
+                  <li
+                    key={event.attendeeIds[i] ?? `${name}-${i}`}
+                    className="flex items-center gap-2 text-xs text-foreground"
+                  >
+                    <EventAvatarStack labels={[name]} max={1} />
+                    <span className="font-medium">{name}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-1 text-xs text-muted-foreground">No attendees yet.</p>
+            )}
           </div>
         </TabsContent>
 

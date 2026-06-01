@@ -404,16 +404,9 @@ export interface BlockConfig {
   content_timeline_preset?: 'marketing_home' | 'default'
   content_timeline_show_footer_link?: boolean
   content_timeline_footer_link_label?: string
-  // KPI Summary block (mock metrics until Supabase wiring)
-  kpi_summary_cards?: Array<{
-    id: string
-    label: string
-    value: string
-    trend: string
-    trend_direction: 'up' | 'down' | 'neutral'
-    icon: string
-    accent: 'purple' | 'blue' | 'red'
-  }>
+  // KPI Summary block
+  kpi_summary_use_mock?: boolean
+  kpi_summary_cards?: import('@/lib/interface/kpi-summary-defaults').KpiSummaryCardConfig[]
   // Internal Resource Hub block
   resource_hub_subtitle?: string
   resource_hub_default_category?: string

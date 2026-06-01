@@ -62,7 +62,12 @@ export async function POST(
         { status: 400 }
       )
     }
-    if (!isMultiLinkField(field)) {
+    if (
+      !isMultiLinkField({
+        type: field.type,
+        options: field.options as Record<string, unknown> | undefined,
+      })
+    ) {
       return NextResponse.json(
         {
           error:

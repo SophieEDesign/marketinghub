@@ -9,12 +9,11 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { PageBlock } from "@/lib/interface/types"
-import {
-  DEFAULT_KPI_SUMMARY_CARDS,
-  type KpiSummaryAccent,
-  type KpiSummaryCardConfig,
-  type KpiSummaryTrendDirection,
+import type {
+  KpiSummaryAccent,
+  KpiSummaryTrendDirection,
 } from "@/lib/interface/kpi-summary-defaults"
+import { useKpiSummaryData } from "@/hooks/useKpiSummaryData"
 
 interface KPISummaryBlockProps {
   block: PageBlock
@@ -59,9 +58,23 @@ function trendColor(direction: KpiSummaryTrendDirection): string {
   return "text-[#6B7280]"
 }
 
-function KpiCard({ card }: { card: KpiSummaryCardConfig }) {
-  const Icon = resolveIcon(card.icon)
-  const accent = ACCENT_STYLES[card.accent] ?? ACCENT_STYLES.purple
+function KpiCard({
+  label,
+  value,
+  trend,
+  trendDirection,
+  icon,
+  accent,
+}: {
+  label: string
+  value: string
+  trend: string
+  trendDirection: KpiSummaryTrendDirection
+  icon: string
+  accent: KpiSummaryAccent
+}) {
+  const Icon = resolveIcon(icon)
+  const accentStyle = ACCENT_STYLES[accent] ?? ACCENT_STYLES.purple
 
   return (
     <div className="flex min-h-[100px] flex-col rounded-xl border border-[#E6E6EF] bg-white p-4 shadow-sm">
@@ -70,37 +83,65 @@ function KpiCard({ card }: { card: KpiSummaryCardConfig }) {
           <div
             className={cn(
               "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
-              accent.iconWrap
+              accentStyle.iconWrap
             )}
           >
-            <Icon className={cn("h-4 w-4", accent.icon)} aria-hidden />
+            <Icon className={cn("h-4 w-4", accentStyle.icon)} aria-hidden />
           </div>
         ) : null}
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium text-[#6B7280]">{card.label}</p>
-          <p className="mt-1 text-3xl font-bold tracking-tight text-[#111827]">
-            {card.value}
-          </p>
-          <p className={cn("mt-1 text-xs font-medium", trendColor(card.trend_direction))}>
-            {card.trend}
-          </p>
+          <p className="text-xs font-medium text-[#6B7280]">{label}</p>
+          <p className="mt-1 text-3xl font-bold tracking-tight text-[#111827]">{value}</p>
+          {trend ? (
+            <p className={cn("mt-1 text-xs font-medium", trendColor(trendDirection))}>
+              {trend}
+            </p>
+          ) : null}
         </div>
       </div>
     </div>
   )
 }
 
-export default function KPISummaryBlock({ block }: KPISummaryBlockProps) {
-  const cards =
-    (block.config?.kpi_summary_cards?.length
-      ? block.config.kpi_summary_cards
-      : DEFAULT_KPI_SUMMARY_CARDS) as KpiSummaryCardConfig[]
+export default function KPISummaryBlock({ block, isEditing = false }: KPISummaryBlockProps) {
+  const { loading, error, showDemoBanner, bannerMessage, cards } = useKpiSummaryData({
+    config: block.config,
+  })
+
+  if (loading) {
+    return (
+      <div className="flex h-full min-h-[100px] items-center justify-center text-sm text-muted-foreground">
+        <div className="text-center">
+          <div className="mx-auto mb-2 h-6 w-6 animate-spin rounded-full border-b-2 border-muted-foreground" />
+          Loading metrics…
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="h-full min-h-0 w-full">
-      <div className="grid h-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="flex h-full min-h-0 w-full flex-col gap-2">
+      {showDemoBanner ? (
+        <p className="rounded-md border border-amber-200/80 bg-amber-50 px-3 py-1.5 text-xs text-amber-900">
+          {bannerMessage}
+        </p>
+      ) : null}
+      {!showDemoBanner && error && isEditing ? (
+        <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-1.5 text-xs text-destructive">
+          {error}
+        </p>
+      ) : null}
+      <div className="grid h-full min-h-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((card) => (
-          <KpiCard key={card.id} card={card} />
+          <KpiCard
+            key={card.id}
+            label={card.label}
+            value={card.value}
+            trend={card.trend}
+            trendDirection={card.trend_direction}
+            icon={card.icon}
+            accent={card.accent}
+          />
         ))}
       </div>
     </div>

@@ -64,6 +64,8 @@ interface RecordFieldsProps {
   onFieldSelect?: (fieldId: string) => void
   /** When in layout mode with grid columns, called to toggle field span (single/full width) */
   onFieldSpanToggle?: (fieldName: string) => void
+  /** Refetch field metadata after select option create/rename/color/delete */
+  onFieldOptionsUpdate?: () => void
 }
 
 const DEFAULT_GROUP_NAME = "General"
@@ -98,6 +100,7 @@ export default function RecordFields({
   forceStackedLayout = false,
   onFieldSelect,
   onFieldSpanToggle,
+  onFieldOptionsUpdate,
 }: RecordFieldsProps) {
   const { navigateToLinkedRecord, openRecordByTableId, state: recordPanelState } = useRecordPanel()
   const { toast } = useToast()
@@ -804,6 +807,7 @@ export default function RecordFields({
               tableName={tableName}
               disableClickToEdit={layoutMode}
               displayMode="list"
+              onFieldOptionsUpdate={onFieldOptionsUpdate}
             />
             {helperText && (
               <p className="text-xs text-gray-500">{helperText}</p>

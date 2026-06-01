@@ -232,6 +232,7 @@ export function useContentTimelineData(options?: {
               contentFields: contentFieldRows,
               extraFields: extraFieldMap,
               planningItems,
+              themeLabelById,
               campaignLabelById,
               profileLabelById,
               contentTableId: sourceTable.id,

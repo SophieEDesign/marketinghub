@@ -78,14 +78,14 @@ function sampleItem(overrides: Partial<MarketingEventItem> = {}): MarketingEvent
 }
 
 describe("event_calendar block registration", () => {
-  it("is registered in BLOCK_REGISTRY with full-page defaults", () => {
+  it("is registered in BLOCK_REGISTRY with full-page support (opt-in via is_full_page)", () => {
     const def = BLOCK_REGISTRY.event_calendar
     expect(def).toBeDefined()
     expect(def?.type).toBe("event_calendar")
     expect(def?.label).toBe("Event Calendar")
     expect(def?.defaultWidth).toBe(12)
     expect(def?.supportsFullPage).toBe(true)
-    expect(def?.defaultFullPage).toBe(true)
+    expect(def?.defaultFullPage).toBe(false)
   })
 
   it("is included in getAllBlockTypes", () => {
@@ -332,6 +332,13 @@ describe("isPendingApprovalStatus", () => {
   })
 })
 
+describe("profileLabelFromEmail", () => {
+  it("formats email local parts as full names", async () => {
+    const { profileLabelFromEmail } = await import("@/lib/users/profile-labels")
+    expect(profileLabelFromEmail("sophie.edgerley@petersandmay.com")).toBe("Sophie Edgerley")
+  })
+})
+
 describe("mergeAttendanceIntoEventItems", () => {
   it("merges attending rows and current user status", () => {
     const item = sampleItem({ id: "e1", attendeeIds: [], currentUserAttending: false })
@@ -368,6 +375,18 @@ describe("mergeAttendanceIntoEventItems", () => {
       null
     )
     expect(merged[0].attendeeCount).toBe(2)
+  })
+
+  it("uses profile labels for attendance-only users", () => {
+    const item = sampleItem({ id: "e1", attendeeIds: [], attendeeLabels: [] })
+    const labels = new Map([["u1", "Sophie Edgerley"]])
+    const merged = mergeAttendanceIntoEventItems(
+      [item],
+      [{ event_id: "e1", user_id: "u1", attendance_status: "attending" }],
+      null,
+      labels
+    )
+    expect(merged[0].attendeeLabels).toEqual(["Sophie Edgerley"])
   })
 })
 

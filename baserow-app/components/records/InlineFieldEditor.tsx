@@ -25,6 +25,7 @@ import {
   normalizeHexColor,
 } from "@/lib/field-colors"
 import { getFieldDisplayName } from "@/lib/fields/display"
+import { getManualChoiceLabels } from "@/lib/fields/select-options"
 import { sanitizeRichText } from "@/lib/sanitize"
 import { FIELD_LABEL_CLASS_NO_MARGIN, FIELD_LABEL_GAP_CLASS } from "@/lib/fields/field-label"
 
@@ -49,6 +50,8 @@ interface InlineFieldEditorProps {
   displayMode?: 'compact' | 'inline' | 'expanded' | 'list' // Linked field layout (default: list — stacked pills in interfaces)
   /** When true, display boxes do not call onEditStart on click; parent handles click for selection (layout mode) */
   disableClickToEdit?: boolean
+  /** Refetch field metadata after select option create/rename/color/delete */
+  onFieldOptionsUpdate?: () => void
 }
 
 export default function InlineFieldEditor({
@@ -70,6 +73,7 @@ export default function InlineFieldEditor({
   tableName,
   displayMode = 'list',
   disableClickToEdit = false,
+  onFieldOptionsUpdate,
 }: InlineFieldEditorProps) {
   const linkedPillLayout: LinkedPillLayout =
     displayMode === 'compact'
@@ -333,8 +337,11 @@ export default function InlineFieldEditor({
 
   // Select fields
   if (field.type === "single_select" || field.type === "multi_select") {
-    const choices = field.options?.choices || []
-    const isMulti = field.type === "multi_select"
+    const selectFieldType = field.type
+    const fromSelectOptions = getManualChoiceLabels(selectFieldType, field.options)
+    const choices =
+      fromSelectOptions.length > 0 ? fromSelectOptions : field.options?.choices || []
+    const isMulti = selectFieldType === "multi_select"
 
     return (
       <div className={containerClassName}>
@@ -353,7 +360,7 @@ export default function InlineFieldEditor({
           choices={choices}
           choiceColors={field.options?.choiceColors}
           fieldOptions={field.options}
-          fieldType={field.type}
+          fieldType={selectFieldType}
           fieldId={field.id}
           tableId={field.table_id}
           editable={!isReadOnly}
@@ -361,6 +368,7 @@ export default function InlineFieldEditor({
           onValueChange={async (newValue) => {
             onChange(newValue)
           }}
+          onFieldOptionsUpdate={onFieldOptionsUpdate}
           placeholder="Click to select..."
         />
       </div>

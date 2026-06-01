@@ -28,10 +28,10 @@ export default function EmptyInterfaceState({
             <button
               key={block.type}
               onClick={() => onAddBlock(block.type)}
-              className="flex flex-col items-center gap-2 p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
+              className="flex flex-col items-center gap-2 p-4 border border-border rounded-lg hover:border-primary/50 hover:bg-muted/50 transition-colors"
             >
               {block.icon}
-              <span className="text-sm font-medium text-gray-900">{block.label}</span>
+              <span className="text-sm font-medium text-foreground">{block.label}</span>
             </button>
           ))}
         </div>

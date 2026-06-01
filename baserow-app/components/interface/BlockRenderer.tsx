@@ -728,7 +728,7 @@ export default function BlockRenderer({
 
       case "internal_resource_hub":
         return (
-          <LazyBlockWrapper enabled={!isFullPage}>
+          <LazyBlockWrapper enabled={true}>
             <InternalResourceHubBlock
               block={safeBlock}
               isEditing={canEdit}

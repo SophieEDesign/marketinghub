@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { forbiddenResponse, isPermissionDeniedError, requireAdmin } from '@/lib/api/authz'
+import { normalizeGroupIdForApi } from '@/lib/interface/interface-group-utils'
 
 /**
  * POST /api/interfaces/reorder - Reorder interfaces within or between groups
@@ -23,7 +24,9 @@ export async function POST(request: NextRequest) {
     // Get or create "Ungrouped" group for null group_id values
     // The schema requires group_id to be NOT NULL, so we need to use a system group
     let ungroupedGroupId: string | null = null
-    const hasNullGroupId = interfaceUpdates.some((u: { group_id: string | null }) => u.group_id === null)
+    const hasNullGroupId = interfaceUpdates.some(
+      (u: { group_id: string | null }) => normalizeGroupIdForApi(u.group_id) === null
+    )
     
     if (hasNullGroupId) {
       // Try to find existing "Ungrouped" group
@@ -70,8 +73,9 @@ export async function POST(request: NextRequest) {
     // Update each interface page's group_id and order_index
     // Interface pages are stored in interface_pages table, not views
     const updatePromises = interfaceUpdates.map(async (update: { id: string; group_id: string | null; order_index: number }) => {
-      // Replace null group_id with ungrouped group ID
-      const finalGroupId = update.group_id === null ? ungroupedGroupId : update.group_id
+      // Replace null / virtual UI group_id with the real Ungrouped group ID
+      const normalizedGroupId = normalizeGroupIdForApi(update.group_id)
+      const finalGroupId = normalizedGroupId === null ? ungroupedGroupId : normalizedGroupId
       
       if (!finalGroupId) {
         throw new Error(`Cannot update interface page ${update.id}: group_id is required`)

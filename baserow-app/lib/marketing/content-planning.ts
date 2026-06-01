@@ -163,16 +163,34 @@ export function resolveContentPlanningFields(
     )!,
     contentDate: pickFieldName(
       contentFields,
-      [/^date$/i, /publish_date/i, /post_date/i, /scheduled_date/i, /go_live/i, /scheduled_for/i],
+      [
+        /^date$/i,
+        /^date_from$/i,
+        /^from_date$/i,
+        /^start_date$/i,
+        /date_from/i,
+        /from_date/i,
+        /start_date/i,
+        /content_date/i,
+        /publish_date/i,
+        /post_date/i,
+        /scheduled_date/i,
+        /go_live/i,
+        /scheduled_for/i,
+      ],
       null
     ),
     contentDueDate: pickFieldName(
       contentFields,
-      [/date_due/i, /due_date/i, /scheduled_date/i, /post_date/i],
+      [/^date_to$/i, /^date_due$/i, /^due_date$/i, /date_to/i, /date_due/i, /due_date/i, /end_date/i],
       null
     ),
     contentStatus: pickFieldName(contentFields, [/^status$/i], null),
-    contentType: pickFieldName(contentFields, [/content_type/i, /^type$/i], null),
+    contentType: pickFieldName(
+      contentFields,
+      [/content_type/i, /post_type/i, /^type$/i],
+      null
+    ),
     contentTheme: pickFieldName(contentFields, [/quarterly_theme/i, /^theme$/i], null),
     contentCampaign: pickFieldName(contentFields, [/campaigns?/i], null),
     contentOwner: pickFieldName(contentFields, [/owner/i, /assignee/i], null),
@@ -301,7 +319,13 @@ export function buildContentItems(params: {
         ? formatDisplayValue(row[fields.contentType])
         : null
       const themeId = fields.contentTheme ? extractLinkedId(row[fields.contentTheme]) : null
-      const themeLabel = themeId ? themeLabelById.get(themeId) ?? null : null
+      const themeLabel = fields.contentTheme
+        ? themeId
+          ? themeLabelById.get(themeId) ??
+            formatDisplayValue(row[fields.contentTheme]) ??
+            null
+          : formatDisplayValue(row[fields.contentTheme])
+        : null
       const campaignIds = fields.contentCampaign
         ? extractLinkedIds(row[fields.contentCampaign])
         : []

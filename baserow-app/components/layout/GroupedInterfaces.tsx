@@ -51,6 +51,12 @@ import PageCreationWizard from "@/components/interface/PageCreationWizard"
 import { useToast } from "@/components/ui/use-toast"
 import { useMemberPreview } from "@/contexts/MemberPreviewContext"
 import { withMemberPreviewHref } from "@/lib/navigation/member-preview"
+import {
+  VIRTUAL_UNGROUPED_GROUP_ID,
+  groupsMatchForReorder,
+  isVirtualUngroupedGroupId,
+  normalizeGroupIdForApi,
+} from "@/lib/interface/interface-group-utils"
 
 interface InterfacePage {
   id: string
@@ -108,18 +114,18 @@ export default function GroupedInterfaces({
     const hasUngroupedPages = pages.some(p => !p.group_id)
     if (hasUngroupedPages) {
       // Return virtual ID - we'll create the group in allGroups
-      return 'ungrouped-system-virtual'
+      return VIRTUAL_UNGROUPED_GROUP_ID
     }
     
     // Default fallback ID (shouldn't happen, but ensures we always have an ID)
-    return 'ungrouped-system-virtual'
+    return VIRTUAL_UNGROUPED_GROUP_ID
   }, [groups, pages])
   
   // Add virtual "Ungrouped" group to groups list if needed
   const allGroups = useMemo(() => {
-    if (ungroupedGroupId === 'ungrouped-system-virtual' && !groups.some(g => g.id === 'ungrouped-system-virtual')) {
+    if (ungroupedGroupId === VIRTUAL_UNGROUPED_GROUP_ID && !groups.some(g => g.id === VIRTUAL_UNGROUPED_GROUP_ID)) {
       return [...groups, {
-        id: 'ungrouped-system-virtual',
+        id: VIRTUAL_UNGROUPED_GROUP_ID,
         name: 'Ungrouped',
         order_index: 9999,
         collapsed: false,
@@ -197,7 +203,7 @@ export default function GroupedInterfaces({
   }, [])
 
   function browseGroupLabel(group: InterfaceGroup): string {
-    if (group.id === "ungrouped-system-virtual") return "Other"
+    if (isVirtualUngroupedGroupId(group.id)) return "Other"
     if (group.is_system === true && group.name === "Ungrouped") return "Other"
     if (group.name === "Ungrouped" && group.id === ungroupedGroupId) return "Other"
     return group.name
@@ -208,7 +214,7 @@ export default function GroupedInterfaces({
     if (editMode || !currentPageId) return
     const page = pages.find((p) => p.id === currentPageId)
     if (!page) return
-    const gid = page.group_id || ungroupedGroupId || "ungrouped-system-virtual"
+    const gid = page.group_id || ungroupedGroupId || VIRTUAL_UNGROUPED_GROUP_ID
     setCollapsedGroups((prev) => {
       if (!prev.has(gid)) return prev
       const next = new Set(prev)
@@ -231,7 +237,7 @@ export default function GroupedInterfaces({
     
     pagesForDisplay.forEach(page => {
       // If page has no group_id, assign to "Ungrouped" system group
-      const groupId = page.group_id || ungroupedGroupId || 'ungrouped-system-virtual'
+      const groupId = page.group_id || ungroupedGroupId || VIRTUAL_UNGROUPED_GROUP_ID
       if (!result[groupId]) {
         result[groupId] = []
       }
@@ -620,7 +626,9 @@ export default function GroupedInterfaces({
         const [removed] = newGroups.splice(activeIndex, 1)
         newGroups.splice(overIndex, 0, removed)
 
-        const groupIds = newGroups.map((g) => g.id)
+        const groupIds = newGroups
+          .map((g) => g.id)
+          .filter((id) => !isVirtualUngroupedGroupId(id))
         try {
           const response = await fetch("/api/interface-groups/reorder", {
             method: "POST",
@@ -679,6 +687,8 @@ export default function GroupedInterfaces({
         }
       }
 
+      const apiTargetGroupId = normalizeGroupIdForApi(targetGroupId)
+
       // Build updates: reorder all pages in target group
       const updates: Array<{ id: string; group_id: string | null; order_index: number }> = []
       
@@ -686,7 +696,7 @@ export default function GroupedInterfaces({
       for (let i = 0; i < insertIndex; i++) {
         updates.push({
           id: targetPages[i].id,
-          group_id: targetGroupId,
+          group_id: apiTargetGroupId,
           order_index: i,
         })
       }
@@ -694,7 +704,7 @@ export default function GroupedInterfaces({
       // Insert the moved page
       updates.push({
         id: pageId,
-        group_id: targetGroupId,
+        group_id: apiTargetGroupId,
         order_index: insertIndex,
       })
 
@@ -702,21 +712,22 @@ export default function GroupedInterfaces({
       for (let i = insertIndex; i < targetPages.length; i++) {
         updates.push({
           id: targetPages[i].id,
-          group_id: targetGroupId,
+          group_id: apiTargetGroupId,
           order_index: i + 1,
         })
       }
 
       // Update pages in old group (if different)
-      if (activePage.group_id !== targetGroupId) {
-        const oldGroupPages = (activePage.group_id
-          ? pagesByGroup[activePage.group_id] || []
-          : uncategorizedPages).filter((p) => p.id !== pageId)
+      if (!groupsMatchForReorder(activePage.group_id, targetGroupId)) {
+        const oldGroupKey = activePage.group_id || ungroupedGroupId
+        const oldGroupPages = (pagesByGroup[oldGroupKey] || uncategorizedPages).filter(
+          (p) => p.id !== pageId
+        )
 
         oldGroupPages.forEach((p, i) => {
           updates.push({
             id: p.id,
-            group_id: activePage.group_id ?? null,
+            group_id: normalizeGroupIdForApi(activePage.group_id),
             order_index: i,
           })
         })
@@ -1120,7 +1131,7 @@ export default function GroupedInterfaces({
     sortedGroups.length === 1 &&
     Boolean(sortedGroups[0]?.is_system) &&
     (sortedGroups[0].name === "Ungrouped" ||
-      sortedGroups[0].id === "ungrouped-system-virtual" ||
+      isVirtualUngroupedGroupId(sortedGroups[0].id) ||
       sortedGroups[0].id === ungroupedGroupId)
 
   // Render based on mode

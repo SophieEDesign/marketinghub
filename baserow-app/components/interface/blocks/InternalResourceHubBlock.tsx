@@ -38,7 +38,11 @@ import {
 import type { CategoryFilter } from "./internal-resource-hub/types"
 import { debugLog } from "@/lib/debug"
 import MarketingDemoDataBanner from "@/components/interface/primitives/MarketingDemoDataBanner"
-import { marketingBlockRootClass } from "@/lib/interface/marketing-block-layout"
+import {
+  marketingBlockRootClass,
+  marketingBlockScrollPanelClass,
+} from "@/lib/interface/marketing-block-layout"
+import { cn } from "@/lib/utils"
 
 interface InternalResourceHubBlockProps {
   block: PageBlock
@@ -153,7 +157,13 @@ export default function InternalResourceHubBlock({
 
   if (demoState.showEmptyState && !demoState.useDemoData) {
     return (
-      <div data-block-selectable className="flex h-full min-h-[200px] flex-col rounded-2xl border border-border/40 bg-background p-6">
+      <div
+        data-block-selectable
+        className={marketingBlockRootClass(
+          isFullPage,
+          "min-h-[200px] rounded-2xl border border-border/40 bg-background p-6"
+        )}
+      >
         <HubHeader
           title={title}
           subtitle={subtitle}
@@ -168,7 +178,15 @@ export default function InternalResourceHubBlock({
 
   if (loading && !demoState.useLiveData && !forceMock) {
     return (
-      <div className="flex h-full min-h-[200px] items-center justify-center rounded-xl border border-border/40 bg-background">
+      <div
+        className={cn(
+          marketingBlockRootClass(
+            isFullPage,
+            "min-h-[200px] rounded-xl border border-border/40 bg-background"
+          ),
+          "items-center justify-center"
+        )}
+      >
         <LoadingSpinner size="lg" text="Loading resources…" />
       </div>
     )
@@ -183,17 +201,28 @@ export default function InternalResourceHubBlock({
           "rounded-xl border border-[#E6E6EF] bg-white shadow-sm"
         )}
       >
-        {isDemoData ? <MarketingDemoDataBanner message={demoBannerMessage} /> : null}
+        {isDemoData ? (
+          <div className="shrink-0">
+            <MarketingDemoDataBanner message={demoBannerMessage} />
+          </div>
+        ) : null}
         <ResourceListHeader
           title={title}
           subtitle={subtitle}
           onViewAll={() => mockAction("View all resources")}
         />
-        <ResourceList
-          resources={resources}
-          onSelect={openResourceUrl}
-          onAddResource={() => mockAction("Add resource")}
-        />
+        <div
+          className={cn(
+            "min-h-0 flex-1 flex flex-col",
+            marketingBlockScrollPanelClass(isFullPage)
+          )}
+        >
+          <ResourceList
+            resources={resources}
+            onSelect={openResourceUrl}
+            onAddResource={() => mockAction("Add resource")}
+          />
+        </div>
       </div>
     )
   }
@@ -206,7 +235,11 @@ export default function InternalResourceHubBlock({
         "rounded-card-lg border border-border/60 bg-background shadow-card"
       )}
     >
-      {isDemoData ? <MarketingDemoDataBanner message={demoBannerMessage} /> : null}
+      {isDemoData ? (
+        <div className="shrink-0">
+          <MarketingDemoDataBanner message={demoBannerMessage} />
+        </div>
+      ) : null}
       <HubHeader
         title={title}
         subtitle={subtitle}
@@ -218,16 +251,22 @@ export default function InternalResourceHubBlock({
 
       {showFilters ? (
         <CategoryPills
+          className="shrink-0"
           category={category}
           counts={counts}
           onCategoryChange={setCategory}
         />
       ) : null}
 
-      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+      <div
+        className={cn(
+          "flex min-h-0 flex-1 flex-col md:flex-row md:min-h-0",
+          isFullPage && "h-full"
+        )}
+      >
         {showFilters ? (
           <CategorySidebar
-            className="hidden md:flex"
+            className={cn("hidden md:flex", isFullPage && "h-full min-h-0")}
             category={category}
             counts={counts}
             recent={recent}
@@ -238,7 +277,12 @@ export default function InternalResourceHubBlock({
           />
         ) : null}
 
-        <main className="min-h-0 flex-1 overflow-y-auto bg-muted/5">
+        <main
+          className={cn(
+            "min-h-0 flex-1 bg-muted/5",
+            marketingBlockScrollPanelClass(isFullPage) || "overflow-y-auto"
+          )}
+        >
           {showPreview && selected ? (
             <AssetPreviewView
               resource={selected}
@@ -270,7 +314,10 @@ export default function InternalResourceHubBlock({
             }}
             onViewFull={() => openResourceUrl(selectedId!)}
             onCopyLink={() => mockAction(`Copy link: ${selected?.title}`)}
-            className={showPreview ? undefined : "hidden md:flex"}
+            className={cn(
+              showPreview ? undefined : "hidden md:flex",
+              isFullPage && "md:h-full md:min-h-0 md:overflow-y-auto"
+            )}
           />
         ) : null}
       </div>

@@ -270,6 +270,20 @@ export function useRecordEditorCore(
     }
   }, [tableId, tableFieldsProp])
 
+  /** Reload field metadata (e.g. after editing select options in a record panel). */
+  const refreshFields = useCallback(async () => {
+    if (!tableId) return
+    try {
+      const res = await fetch(`/api/tables/${tableId}/fields`)
+      const data = await res.json()
+      if (data?.fields) {
+        setFields(data.fields)
+      }
+    } catch (e) {
+      if (!isAbortError(e)) console.error('Error refreshing fields:', e)
+    }
+  }, [tableId])
+
   const clearDraft = useCallback(() => {
     if (typeof window === 'undefined') return
     try {
@@ -731,5 +745,6 @@ export function useRecordEditorCore(
     hasDraftToRestore,
     restoreDraft,
     clearDraft,
+    refreshFields,
   }
 }

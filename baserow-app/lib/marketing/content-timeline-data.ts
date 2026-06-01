@@ -102,12 +102,53 @@ function deriveAssetStatus(row: Record<string, unknown>, imagesField: string | n
   return undefined
 }
 
+function resolveThemeLabel(
+  row: Record<string, unknown>,
+  fields: ContentPlanningFieldMap,
+  planning: ContentPlanningItem | undefined,
+  themeLabelById: Map<string, string>
+): string {
+  if (planning?.themeLabel?.trim()) return planning.themeLabel.trim()
+  if (!fields.contentTheme) return "Unassigned"
+  const raw = row[fields.contentTheme]
+  const linkedId =
+    typeof raw === "string" && /^[0-9a-f-]{36}$/i.test(raw.trim()) ? raw.trim() : null
+  const fromMap = linkedId ? themeLabelById.get(linkedId) : null
+  if (fromMap?.trim()) return fromMap.trim()
+  const display = formatDisplayValue(raw)
+  return display?.trim() || "Unassigned"
+}
+
+function resolveTimelineStartIso(
+  row: Record<string, unknown>,
+  fields: ContentPlanningFieldMap,
+  extraFields: ContentTimelineExtraFieldMap,
+  planning: ContentPlanningItem | undefined
+): string | null {
+  if (planning?.date) return format(planning.date, "yyyy-MM-dd")
+  if (planning?.dueDate) return format(planning.dueDate, "yyyy-MM-dd")
+  if (fields.contentDate) {
+    const fromStart = toIsoDate(row[fields.contentDate])
+    if (fromStart) return fromStart
+  }
+  if (fields.contentDueDate) {
+    const fromDue = toIsoDate(row[fields.contentDueDate])
+    if (fromDue) return fromDue
+  }
+  if (extraFields.dateTo) {
+    const fromRangeEnd = toIsoDate(row[extraFields.dateTo])
+    if (fromRangeEnd) return fromRangeEnd
+  }
+  return null
+}
+
 export function buildContentTimelineItems(params: {
   contentRows: Record<string, unknown>[]
   fields: ContentPlanningFieldMap
   contentFields: FieldRow[]
   extraFields: ContentTimelineExtraFieldMap
   planningItems: ContentPlanningItem[]
+  themeLabelById: Map<string, string>
   campaignLabelById: Map<string, string>
   profileLabelById: Map<string, string>
   contentTableId: string
@@ -122,6 +163,7 @@ export function buildContentTimelineItems(params: {
     contentFields,
     extraFields,
     planningItems,
+    themeLabelById,
     campaignLabelById,
     profileLabelById,
     contentTableId,
@@ -131,6 +173,7 @@ export function buildContentTimelineItems(params: {
   } = params
 
   const planningById = new Map(planningItems.map((p) => [p.id, p]))
+  const planningIds = new Set(planningItems.map((p) => p.id))
   const imagesField = extraFields.images
   const divisionField = extraFields.division ?? fields.contentDivision
   const notesField = extraFields.notes
@@ -142,9 +185,13 @@ export function buildContentTimelineItems(params: {
 
   for (const row of contentRows) {
     const id = String(row.id)
+    if (!planningIds.has(id)) continue
+
     const planning = planningById.get(id)
-    const title = planning?.title ?? formatDisplayValue(row[fields.contentName]) ?? ""
-    if (!title.trim()) continue
+    const title =
+      planning?.title?.trim() ||
+      formatDisplayValue(row[fields.contentName])?.trim() ||
+      "Untitled content"
 
     const contentType =
       planning?.contentType ??
@@ -153,10 +200,7 @@ export function buildContentTimelineItems(params: {
       continue
     }
 
-    const startIso =
-      (planning?.date ? format(planning.date, "yyyy-MM-dd") : null) ??
-      (fields.contentDate ? toIsoDate(row[fields.contentDate]) : null) ??
-      (fields.contentDueDate ? toIsoDate(row[fields.contentDueDate]) : null)
+    const startIso = resolveTimelineStartIso(row, fields, extraFields, planning)
     if (!startIso) continue
 
     const endFromRow = extraFields.dateTo ? toIsoDate(row[extraFields.dateTo]) : null
@@ -188,7 +232,7 @@ export function buildContentTimelineItems(params: {
     const statusRaw =
       planning?.status ??
       (fields.contentStatus ? formatDisplayValue(row[fields.contentStatus]) : null)
-    const themeLabel = planning?.themeLabel?.trim() || "Unassigned"
+    const themeLabel = resolveThemeLabel(row, fields, planning, themeLabelById)
     const division =
       (divisionField ? formatDisplayValue(row[divisionField]) : null) ??
       planning?.division ??

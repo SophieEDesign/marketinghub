@@ -1,59 +1,95 @@
 /**
- * Default mock KPI cards for KPI Summary block.
- *
- * TODO: Connect KPI metrics to Supabase/data tables.
- * TODO: Add permissions.
+ * KPI Summary block — card defaults and types.
  */
+
+import type { FilterConfig } from "@/lib/interface/filters"
 
 export type KpiSummaryAccent = "purple" | "blue" | "red"
 
 export type KpiSummaryTrendDirection = "up" | "down" | "neutral"
 
+export type KpiSummaryTableSource =
+  | "campaigns"
+  | "content"
+  | "social_posts"
+  | "events"
+  | "media"
+
+export type KpiSummaryComparisonPreset = "none" | "last_7_days" | "month_over_month"
+
 export interface KpiSummaryCardConfig {
   id: string
   label: string
-  value: string
-  trend: string
-  trend_direction: KpiSummaryTrendDirection
   icon: string
   accent: KpiSummaryAccent
+  /** Static display when demo mode or live data unavailable */
+  value?: string
+  trend?: string
+  trend_direction?: KpiSummaryTrendDirection
+  /** Live data source */
+  table_id?: string
+  table_source?: KpiSummaryTableSource
+  kpi_aggregate?: "count" | "sum" | "avg" | "min" | "max"
+  kpi_field?: string
+  kpi_field_id?: string
+  filters?: FilterConfig[]
+  comparison_preset?: KpiSummaryComparisonPreset
+  comparison_date_field?: string
+  comparison_date_field_id?: string
+  number_format?: "standard" | "compact"
 }
 
 export const DEFAULT_KPI_SUMMARY_CARDS: KpiSummaryCardConfig[] = [
   {
     id: "active-campaigns",
     label: "Active Campaigns",
-    value: "12",
-    trend: "↑ 20% vs last 7 days",
-    trend_direction: "up",
+    value: "—",
+    trend: "",
+    trend_direction: "neutral",
     icon: "rocket",
     accent: "purple",
+    table_source: "campaigns",
+    kpi_aggregate: "count",
+    comparison_preset: "last_7_days",
+    number_format: "standard",
   },
   {
     id: "content-scheduled",
     label: "Content Scheduled",
-    value: "48",
-    trend: "↑ 16% vs last 7 days",
-    trend_direction: "up",
+    value: "—",
+    trend: "",
+    trend_direction: "neutral",
     icon: "calendar",
     accent: "blue",
+    table_source: "content",
+    kpi_aggregate: "count",
+    comparison_preset: "last_7_days",
+    number_format: "standard",
   },
   {
-    id: "engagement",
-    label: "Engagement",
-    value: "8.3K",
-    trend: "↑ 12% vs last 7 days",
-    trend_direction: "up",
+    id: "social-posts",
+    label: "Social Posts",
+    value: "—",
+    trend: "",
+    trend_direction: "neutral",
     icon: "barchart",
     accent: "purple",
+    table_source: "social_posts",
+    kpi_aggregate: "count",
+    comparison_preset: "last_7_days",
+    number_format: "compact",
   },
   {
     id: "events-month",
     label: "Events This Month",
-    value: "5",
-    trend: "↓ 10% vs last month",
-    trend_direction: "down",
+    value: "—",
+    trend: "",
+    trend_direction: "neutral",
     icon: "calendardays",
     accent: "red",
+    table_source: "events",
+    kpi_aggregate: "count",
+    comparison_preset: "month_over_month",
+    number_format: "standard",
   },
 ]

@@ -199,12 +199,15 @@ export function EventCalendarCore({
     !embeddedInBlock && effectiveDetailMode === "inline" && !isEditing
 
   const openRecordForEvent = useCallback(
-    (id: string) => {
+    (id: string, options?: { interfaceMode?: "view" | "edit" }) => {
       if (!tableIds?.contentTableId) return
+      // Close event drawer/modal first — it sits above RecordPanel (z-90 vs z-50).
+      setSelectedEventId(null)
       openRecordModal({
         tableId: tableIds.contentTableId,
         recordId: id,
         supabaseTableName: tableIds.contentSupabaseTable,
+        interfaceMode: options?.interfaceMode ?? "view",
         onRecordUpdated: () => reload(),
       })
     },
@@ -271,7 +274,7 @@ export function EventCalendarCore({
 
   const handleEditEvent = useCallback(() => {
     if (!selectedEventId) return
-    openRecordForEvent(selectedEventId)
+    openRecordForEvent(selectedEventId, { interfaceMode: "edit" })
   }, [selectedEventId, openRecordForEvent])
 
   const handleAttendanceChange = useCallback(
@@ -395,7 +398,7 @@ export function EventCalendarCore({
     isExternalView: externalMode,
     onEdit: handleEditEvent,
     onViewRecord: tableIds?.contentTableId
-      ? () => selectedEventId && openRecordForEvent(selectedEventId)
+      ? () => selectedEventId && openRecordForEvent(selectedEventId, { interfaceMode: "view" })
       : undefined,
     onAttendanceChange: handleAttendanceChange,
     onManageAttendees: canEdit && settings.showAttendanceControls ? handleManageAttendees : undefined,

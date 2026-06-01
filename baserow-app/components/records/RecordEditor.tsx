@@ -148,6 +148,7 @@ export default function RecordEditor({
     hasDraftToRestore,
     restoreDraft,
     clearDraft,
+    refreshFields,
   } = core
 
   const canSave = recordId ? canEditRecords : canCreateRecords
@@ -475,6 +476,7 @@ export default function RecordEditor({
             visibilityContext={visibilityContext}
             selectedFieldId={selectedContext?.type === "field" ? selectedContext.fieldId : null}
             forceStackedLayout={!useGridLayout}
+            onFieldOptionsUpdate={refreshFields}
           />
           </div>
         </div>
@@ -497,6 +499,7 @@ export default function RecordEditor({
             fieldLayout={resolvedFieldLayout}
             allFields={filteredFields}
             pageEditable={effectiveEditable}
+            onFieldOptionsUpdate={refreshFields}
             onFieldLabelClick={handleFieldLabelClick}
             layoutMode={false}
             visibilityContext={visibilityContext}

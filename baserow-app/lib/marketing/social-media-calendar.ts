@@ -475,6 +475,14 @@ export function derivePlatforms(params: {
     }
   }
 
+  const platformCopy = row.platform_copy
+  if (platformCopy && typeof platformCopy === "object" && !Array.isArray(platformCopy)) {
+    for (const key of Object.keys(platformCopy as Record<string, unknown>)) {
+      const p = platformFromString(key)
+      if (p) found.add(p)
+    }
+  }
+
   if (found.size === 0 && contentType) {
     const p = platformFromString(contentType)
     if (p) found.add(p)

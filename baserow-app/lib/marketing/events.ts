@@ -9,6 +9,7 @@ import {
 } from "@/lib/marketing/block-config-resolver"
 import { isPendingApprovalStatus } from "@/lib/marketing/event-calendar-config"
 import { formatDisplayValue, pickFieldName } from "@/lib/marketing/field-utils"
+import { profileLabelForId } from "@/lib/users/profile-labels"
 import { normalizeHexColor } from "@/lib/field-colors"
 import type { FieldOptions } from "@/types/fields"
 import {
@@ -739,7 +740,7 @@ export function buildEventItems(params: {
     const attendeeIds = parseUuidArray(
       fields.attendees ? row[fields.attendees] : row.attendee_user_ids
     )
-    const attendeeLabels = attendeeIds.map((id) => profileLabelById.get(id) || id.slice(0, 8))
+    const attendeeLabels = attendeeIds.map((id) => profileLabelForId(profileLabelById, id))
     const userAttending = currentUserId ? attendeeIds.includes(currentUserId) : false
     const currentUserAttendanceStatus: EventAttendanceStatus | null = userAttending
       ? "attending"

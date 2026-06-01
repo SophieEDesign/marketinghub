@@ -13,7 +13,8 @@ export interface EventAttendanceRow {
 export function mergeAttendanceIntoEventItems(
   items: MarketingEventItem[],
   rows: EventAttendanceRow[],
-  currentUserId: string | null
+  currentUserId: string | null,
+  profileLabelById?: Map<string, string>
 ): MarketingEventItem[] {
   const byEvent = new Map<string, EventAttendanceRow[]>()
   for (const row of rows) {
@@ -38,16 +39,22 @@ export function mergeAttendanceIntoEventItems(
       item.currentUserAttendanceStatus ??
       (item.currentUserAttending ? "attending" : null)
 
-    const attendeeLabels = item.attendeeLabels
-    while (attendeeLabels.length < attendingIds.length) {
-      attendeeLabels.push(attendingIds[attendeeLabels.length]?.slice(0, 8) || "?")
+    const labelFor = (id: string) => {
+      const fromProfile = profileLabelById?.get(id)
+      if (fromProfile) return fromProfile
+      const prevIndex = item.attendeeIds.indexOf(id)
+      const existing = prevIndex >= 0 ? item.attendeeLabels[prevIndex] : undefined
+      if (existing && existing.length > 2 && !/^[0-9a-f-]{8}$/i.test(existing)) {
+        return existing
+      }
+      return existing || id.slice(0, 8)
     }
 
     return {
       ...item,
       attendeeIds: attendingIds,
       attendeeCount: attendingIds.length,
-      attendeeLabels: attendingIds.map((id, i) => item.attendeeLabels[i] || id.slice(0, 8)),
+      attendeeLabels: attendingIds.map((id) => labelFor(id)),
       currentUserAttending: currentUserId ? attendingIds.includes(currentUserId) : false,
       currentUserAttendanceStatus,
     }

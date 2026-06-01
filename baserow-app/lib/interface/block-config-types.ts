@@ -452,7 +452,7 @@ export function validateBlockConfig(
       break
 
     case 'kpi_summary':
-      // KPI summary uses mock data; no required fields
+      // Optional per-card table_id; auto-discovery when table_source is set
       break
 
     case 'things_to_do':
