@@ -39,7 +39,7 @@ export default function SocialMediaCalendarView({
   const { state: recordPanelState } = useRecordPanel()
   const [mounted, setMounted] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
-  const fullCalendarRef = useRef<{ getApi?: () => { updateSize: () => void } } | null>(null)
+  const fullCalendarRef = useRef<FullCalendar | null>(null)
 
   useEffect(() => {
     setMounted(true)
