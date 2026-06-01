@@ -5,7 +5,6 @@ import FullCalendar from "@fullcalendar/react"
 import dayGridPlugin from "@fullcalendar/daygrid"
 import interactionPlugin from "@fullcalendar/interaction"
 import type {
-  DateClickArg,
   EventClickArg,
   EventContentArg,
   EventDropArg,
@@ -140,7 +139,7 @@ export default function SocialMediaCalendarView({
   const onDateClickRef = useRef(onDateClick)
   onDateClickRef.current = onDateClick
 
-  const handleDateClick = useCallback((arg: DateClickArg) => {
+  const handleDateClick = useCallback((arg: { dateStr: string }) => {
     if (onDateClickRef.current && arg.dateStr) {
       onDateClickRef.current(arg.dateStr)
     }
