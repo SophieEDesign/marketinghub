@@ -39,6 +39,7 @@ import type { CategoryFilter } from "./internal-resource-hub/types"
 import { debugLog } from "@/lib/debug"
 import MarketingDemoDataBanner from "@/components/interface/primitives/MarketingDemoDataBanner"
 import { marketingBlockRootClass } from "@/lib/interface/marketing-block-layout"
+import { resolveBlockUsesFullPageLayout } from "@/lib/interface/full-page-layout"
 
 interface InternalResourceHubBlockProps {
   block: PageBlock
@@ -56,6 +57,7 @@ export default function InternalResourceHubBlock({
   isEditing = false,
   isFullPage = false,
 }: InternalResourceHubBlockProps) {
+  const useFullPage = resolveBlockUsesFullPageLayout(block, isFullPage)
   const { config } = block
   const title = config.title || "Brand & Media Resources"
   const subtitle =
@@ -179,7 +181,7 @@ export default function InternalResourceHubBlock({
       <div
         data-block-selectable
         className={marketingBlockRootClass(
-          isFullPage,
+          useFullPage,
           "rounded-xl border border-[#E6E6EF] bg-white shadow-sm"
         )}
       >
@@ -202,7 +204,7 @@ export default function InternalResourceHubBlock({
     <div
       data-block-selectable
       className={marketingBlockRootClass(
-        isFullPage,
+        useFullPage,
         "rounded-card-lg border border-border/60 bg-background shadow-card"
       )}
     >

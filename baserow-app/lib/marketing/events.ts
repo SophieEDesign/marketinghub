@@ -955,14 +955,17 @@ export function getEventTimelineTodayPct(range: EventTimelineRange, today = new 
   return ((t - start) / (end - start)) * 100
 }
 
+export function eventSpansMultipleDays(item: Pick<MarketingEventItem, "startDate" | "endDate">): boolean {
+  if (!item.startDate || !item.endDate) return false
+  return differenceInDays(startOfDay(item.endDate), startOfDay(item.startDate)) >= 1
+}
+
 export function buildEventCalendarEvents(items: MarketingEventItem[]): EventCalendarEvent[] {
   return items
     .filter((item) => item.startDate)
     .map((item) => {
       const start = format(item.startDate!, "yyyy-MM-dd")
-      const isMultiDay = Boolean(
-        item.endDate && item.startDate && !isSameDay(item.startDate, item.endDate)
-      )
+      const isMultiDay = eventSpansMultipleDays(item)
       // FullCalendar month grid only spans multiple cells for all-day events.
       // Timed events (allDay: false) appear on the start day only, even with an end date.
       let end: string | undefined

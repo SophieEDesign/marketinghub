@@ -34,6 +34,7 @@ import { Responsive, Layout } from "react-grid-layout"
 import "react-grid-layout/css/styles.css"
 import "react-resizable/css/styles.css"
 import withResizeObserverWidthProvider from "@/lib/interface/ResizeObserverWidthProvider"
+import { FULL_PAGE_GRID_MIN_ROWS } from "@/lib/interface/full-page-layout"
 import BlockRenderer from "./BlockRenderer"
 import BlockAppearanceWrapper from "./BlockAppearanceWrapper"
 import RecordPreviewSurface from "./record-preview/RecordPreviewSurface"
@@ -218,7 +219,7 @@ export default function Canvas({
     const minWidthForBlock = (blockId: string) => (blockTypeById.get(blockId) === "kpi" ? 3 : 2)
     // Full-page mode: single full-width item (grid always used; full-page content rendered inside)
     if (isFullPageMode && fullPageBlock) {
-      const dynamicH = fullPageGridRows
+      const dynamicH = Math.max(fullPageGridRows, FULL_PAGE_GRID_MIN_ROWS)
       return [{
         i: fullPageBlock.id,
         x: 0,
@@ -1785,7 +1786,35 @@ export default function Canvas({
   // CRITICAL: Must be declared before any early returns (Rules of Hooks)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Measure container height for full-page blocks; update grid rows only when row count changes
+  // Full-page grid: CSS fills viewport; row count is a floor so edit-mode layout shifts do not collapse the block.
+  useEffect(() => {
+    if (!isFullPageMode) return
+    const id = "canvas-full-page-grid-css"
+    let style = document.getElementById(id) as HTMLStyleElement | null
+    if (!style) {
+      style = document.createElement("style")
+      style.id = id
+      document.head.appendChild(style)
+    }
+    style.textContent = `
+      [data-canvas-full-page="true"] .react-grid-layout {
+        height: 100% !important;
+        min-height: 0 !important;
+      }
+      [data-canvas-full-page="true"] .react-grid-item {
+        height: 100% !important;
+        min-height: 0 !important;
+      }
+      [data-canvas-full-page="true"] .react-grid-item > div:first-child {
+        height: 100% !important;
+        min-height: 0 !important;
+      }
+    `
+    return () => {
+      style?.remove()
+    }
+  }, [isFullPageMode])
+
   useEffect(() => {
     if (!isFullPageMode || !containerRef.current) return
     const el = containerRef.current
@@ -1795,21 +1824,26 @@ export default function Canvas({
 
     const applyMeasuredHeight = (pxHeight: number) => {
       if (pxHeight <= 0 || rowPx <= 0) return
-      const rows = Math.max(2, Math.floor((pxHeight + marginY) / rowPx))
+      const measured = Math.floor((pxHeight + marginY) / rowPx)
+      const rows = Math.max(FULL_PAGE_GRID_MIN_ROWS, measured)
       if (rows === fullPageGridRowsRef.current) return
       fullPageGridRowsRef.current = rows
       setFullPageGridRows(rows)
     }
 
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        applyMeasuredHeight(entry.contentRect.height)
-      }
-    })
+    const measure = () => {
+      applyMeasuredHeight(el.getBoundingClientRect().height)
+    }
+
+    const ro = new ResizeObserver(() => measure())
     ro.observe(el)
-    applyMeasuredHeight(el.getBoundingClientRect().height || 600)
+    measure()
+    requestAnimationFrame(() => {
+      measure()
+      requestAnimationFrame(measure)
+    })
     return () => ro.disconnect()
-  }, [isFullPageMode, layoutSettings?.rowHeight, layoutSettings?.margin])
+  }, [isFullPageMode, isEditing, layoutSettings?.rowHeight, layoutSettings?.margin])
 
   // Auto-scroll during resize/drag when cursor near viewport edge (react-grid-layout's built-in is unreliable with nested scroll)
   const scrollListenerActiveRef = useRef(false)
@@ -1956,6 +1990,7 @@ export default function Canvas({
       {/* flex-1 flex flex-col min-h-0: fill parent flex; min-h-0 prevents flex collapse; flex flex-col for block list. */}
       <div
         ref={containerRef}
+        data-canvas-full-page={isFullPageMode ? "true" : undefined}
         className={`flex flex-col w-full max-w-full min-w-0 relative ${isFullPageMode ? "flex-1 min-h-0 overflow-hidden h-full" : "min-h-0"}`}
         style={
           isFullPageMode

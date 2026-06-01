@@ -2,6 +2,7 @@
 
 import type { PageBlock } from "@/lib/interface/types"
 import { SocialMediaCalendarFromConfig } from "@/components/interface/SocialMediaCalendarCore"
+import { resolveBlockUsesFullPageLayout } from "@/lib/interface/full-page-layout"
 import { cn } from "@/lib/utils"
 
 interface SocialMediaCalendarBlockProps {
@@ -24,13 +25,14 @@ export default function SocialMediaCalendarBlock({
   isFullPage = false,
 }: SocialMediaCalendarBlockProps) {
   const canEdit = pageEditable !== false
-  const embeddedInBlock = !isFullPage
+  const useFullPage = resolveBlockUsesFullPageLayout(block, isFullPage)
+  const embeddedInBlock = !useFullPage
 
   return (
     <div
       className={cn(
         "flex h-full min-h-0 min-w-0 w-full flex-col overflow-hidden",
-        isFullPage
+        useFullPage
           ? "rounded-none border-0 shadow-none"
           : "rounded-2xl border border-border/40 bg-background"
       )}

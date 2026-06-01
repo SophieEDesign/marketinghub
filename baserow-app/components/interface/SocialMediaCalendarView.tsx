@@ -23,6 +23,8 @@ interface SocialMediaCalendarViewProps {
   showPlatformIcons?: boolean
   showApprovalStatus?: boolean
   className?: string
+  /** Full-page: fill parent height (viewport) instead of content-sized auto height. */
+  fillContainer?: boolean
 }
 
 export default function SocialMediaCalendarView({
@@ -35,6 +37,7 @@ export default function SocialMediaCalendarView({
   showPlatformIcons = true,
   showApprovalStatus = true,
   className,
+  fillContainer = false,
 }: SocialMediaCalendarViewProps) {
   const { state: recordPanelState } = useRecordPanel()
   const [mounted, setMounted] = useState(false)
@@ -66,6 +69,11 @@ export default function SocialMediaCalendarView({
     if (!mounted) return
     requestCalendarResize()
   }, [mounted, recordPanelState.isOpen, recordPanelState.width, requestCalendarResize])
+
+  useEffect(() => {
+    if (!mounted) return
+    requestCalendarResize()
+  }, [mounted, fillContainer, viewMode, requestCalendarResize])
 
   useEffect(() => {
     const onLayoutResize = () => requestCalendarResize()
@@ -161,7 +169,8 @@ export default function SocialMediaCalendarView({
     <div
       ref={containerRef}
       className={cn(
-        "social-calendar-embed social-calendar-embed--hero h-full min-h-0 w-full min-w-0",
+        "social-calendar-embed social-calendar-embed--hero w-full min-w-0",
+        fillContainer ? "h-full min-h-0 flex-1" : "h-full min-h-0",
         canDrag && "social-calendar-embed--draggable",
         className
       )}
@@ -176,9 +185,9 @@ export default function SocialMediaCalendarView({
           headerToolbar={headerToolbar}
           events={fcEvents}
           firstDay={1}
-          height="auto"
-          contentHeight="auto"
-          expandRows={isMonth}
+          height={fillContainer ? "100%" : "auto"}
+          contentHeight={fillContainer ? undefined : "auto"}
+          expandRows={isMonth && !fillContainer}
           aspectRatio={isMonth ? undefined : compact ? 0.9 : 1.05}
           eventClick={handleEventClick}
           eventContent={eventContent}

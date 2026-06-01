@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { marketingBlockRootClass } from "@/lib/interface/marketing-block-layout"
+import { resolveBlockUsesFullPageLayout } from "@/lib/interface/full-page-layout"
 
 interface CampaignsOverviewBlockProps {
   block: PageBlock
@@ -71,6 +72,7 @@ export default function CampaignsOverviewBlock({
     }
   }, [items])
 
+  const useFullPage = resolveBlockUsesFullPageLayout(block, isFullPage)
   const dense = config?.campaigns_density === "compact"
   const subtitle = campaignsOverviewSubtitle(config)
   const appearance = config?.appearance || {}
@@ -110,7 +112,7 @@ export default function CampaignsOverviewBlock({
     <div
       data-block-selectable
       className={marketingBlockRootClass(
-        isFullPage,
+        useFullPage,
         "rounded-2xl border border-border/40 bg-background shadow-sm"
       )}
     >

@@ -593,12 +593,13 @@ export function SocialMediaCalendarCore({
           ) : viewMode === "month" || viewMode === "week" ? (
             <div
               className={cn(
-                "rounded-card border border-border/30 flex-1 min-h-0 overflow-y-auto overflow-x-hidden",
+                "rounded-card border border-border/30 flex-1 min-h-0 overflow-x-hidden",
                 embeddedInBlock
-                  ? isCompact
-                    ? "min-h-[360px]"
-                    : "min-h-[400px]"
-                  : "min-h-0"
+                  ? cn(
+                      "overflow-y-auto",
+                      isCompact ? "min-h-[360px]" : "min-h-[400px]"
+                    )
+                  : "min-h-0 overflow-hidden"
               )}
             >
               <SocialMediaCalendarView
@@ -610,6 +611,7 @@ export function SocialMediaCalendarCore({
                 compact={isCompact}
                 showPlatformIcons={settings.showPlatformIcons}
                 showApprovalStatus={settings.showApprovalStatus}
+                fillContainer={!embeddedInBlock}
               />
             </div>
           ) : viewMode === "list" ? (

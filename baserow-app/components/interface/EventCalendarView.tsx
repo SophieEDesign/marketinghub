@@ -62,16 +62,19 @@ export default function EventCalendarView({
 
   const fcEvents: EventInput[] = useMemo(
     () =>
-      events.map((e) => ({
-        id: e.id,
-        title: e.title,
-        start: e.start,
-        end: e.end,
-        allDay: e.allDay,
-        backgroundColor: "transparent",
-        borderColor: "transparent",
-        extendedProps: e.extendedProps,
-      })),
+      events.map((e) => {
+        const input: EventInput = {
+          id: e.id,
+          title: e.title,
+          start: e.start,
+          allDay: e.allDay,
+          backgroundColor: "transparent",
+          borderColor: "transparent",
+          extendedProps: e.extendedProps,
+        }
+        if (e.end) input.end = e.end
+        return input
+      }),
     [events]
   )
 
@@ -138,6 +141,8 @@ export default function EventCalendarView({
           aspectRatio={viewMode === "week" ? 1.1 : 1.35}
           eventClick={handleEventClick}
           eventContent={eventContent}
+          eventDisplay="block"
+          displayEventEnd={false}
           dayMaxEvents={viewMode === "month" ? 2 : 8}
           moreLinkText={(n) => `+${n} more`}
           moreLinkClick="popover"

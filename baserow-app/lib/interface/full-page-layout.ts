@@ -96,3 +96,14 @@ export function resolveFullPageBlockId(blocks: PageBlock[]): string | null {
 export function pageUsesFullPageLayout(blocks: PageBlock[]): boolean {
   return resolveFullPageBlockId(blocks) != null
 }
+
+/** Minimum react-grid-layout row count so full-page blocks do not collapse in edit mode. */
+export const FULL_PAGE_GRID_MIN_ROWS = 18
+
+/** Canvas prop and/or block config (marketing defaults, legacy social mode). */
+export function resolveBlockUsesFullPageLayout(
+  block: PageBlock,
+  isFullPageFromCanvas = false
+): boolean {
+  return isFullPageFromCanvas || blockWantsFullPageLayout(block)
+}

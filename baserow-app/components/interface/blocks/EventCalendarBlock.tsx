@@ -2,6 +2,7 @@
 
 import type { PageBlock } from "@/lib/interface/types"
 import { EventCalendarFromConfig } from "@/components/interface/EventCalendarCore"
+import { resolveBlockUsesFullPageLayout } from "@/lib/interface/full-page-layout"
 import { cn } from "@/lib/utils"
 
 interface EventCalendarBlockProps {
@@ -25,13 +26,14 @@ export default function EventCalendarBlock({
   isFullPage = false,
 }: EventCalendarBlockProps) {
   const canEdit = pageEditable !== false
-  const embeddedInBlock = !isFullPage
+  const useFullPage = resolveBlockUsesFullPageLayout(block, isFullPage)
+  const embeddedInBlock = !useFullPage
 
   return (
     <div
       className={cn(
         "flex h-full min-h-0 min-w-0 w-full flex-col overflow-hidden",
-        isFullPage && "rounded-none border-0 shadow-none"
+        useFullPage && "rounded-none border-0 shadow-none"
       )}
       data-block-type="event_calendar"
       data-block-selectable

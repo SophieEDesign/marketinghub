@@ -7,6 +7,7 @@ import {
   isEventCalendarPage,
   isEventContentRecord,
   buildEventCalendarEvents,
+  eventSpansMultipleDays,
   formatEventDateRange,
   computeEventMetrics,
   filterEventItems,
@@ -145,6 +146,26 @@ describe("isEventContentRecord", () => {
 
   it("matches events plural", () => {
     expect(isEventContentRecord({ type: "events" }, "type")).toBe(true)
+  })
+})
+
+describe("eventSpansMultipleDays", () => {
+  it("returns true when end is after start by at least one day", () => {
+    expect(
+      eventSpansMultipleDays({
+        startDate: new Date("2026-06-01"),
+        endDate: new Date("2026-06-05"),
+      })
+    ).toBe(true)
+  })
+
+  it("returns false for single-day events", () => {
+    expect(
+      eventSpansMultipleDays({
+        startDate: new Date("2026-06-01"),
+        endDate: new Date("2026-06-01"),
+      })
+    ).toBe(false)
   })
 })
 

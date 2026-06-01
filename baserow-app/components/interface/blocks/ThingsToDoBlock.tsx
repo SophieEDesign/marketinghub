@@ -39,6 +39,7 @@ import { ThingsToDoPlaceholderView } from "@/components/interface/things-to-do/T
 import { ThingsToDoViewTabs } from "@/components/interface/things-to-do/ThingsToDoViewTabs"
 import MarketingDemoDataBanner from "@/components/interface/primitives/MarketingDemoDataBanner"
 import { marketingBlockRootClass } from "@/lib/interface/marketing-block-layout"
+import { resolveBlockUsesFullPageLayout } from "@/lib/interface/full-page-layout"
 
 interface ThingsToDoBlockProps {
   block: PageBlock
@@ -52,6 +53,7 @@ export default function ThingsToDoBlock({
   isEditing = false,
   isFullPage = false,
 }: ThingsToDoBlockProps) {
+  const useFullPage = resolveBlockUsesFullPageLayout(block, isFullPage)
   const { config } = block
   const { openRecordModal } = useRecordModal()
   const { loading, error, fromLiveData, hasTable, items: liveItems, reload } =
@@ -219,7 +221,7 @@ export default function ThingsToDoBlock({
     <div
       data-block-selectable
       className={marketingBlockRootClass(
-        isFullPage,
+        useFullPage,
         "rounded-2xl border border-border/40 bg-background shadow-sm"
       )}
     >
