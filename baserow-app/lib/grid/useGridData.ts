@@ -9,22 +9,9 @@ import { buildSelectClause, toPostgrestColumn } from '@/lib/supabase/postgrest'
 import { isAbortError } from '@/lib/api/error-handling'
 import { useToast } from '@/components/ui/use-toast'
 import { syncLinkedFieldBidirectional } from '@/lib/dataView/linkedFields'
+import { migrateLinkColumnToUuidArray } from '@/lib/fields/migrateLinkColumn'
 import { computeLookupValues } from '@/lib/grid/computeLookupValues'
 import { useRealtimeTable } from '@/lib/realtime/useRealtimeTable'
-
-// Helper functions for SQL quoting (inline to avoid circular dependencies)
-function quoteIdent(ident: string): string {
-  return `"${String(ident ?? '').replace(/"/g, '""')}"`
-}
-
-function quoteMaybeQualifiedName(name: string): string {
-  const raw = String(name ?? '')
-  const parts = raw.split('.')
-  if (parts.length === 2 && parts[0] && parts[1]) {
-    return `${quoteIdent(parts[0])}.${quoteIdent(parts[1])}`
-  }
-  return quoteIdent(raw)
-}
 
 export interface GridRow {
   id: string
@@ -788,30 +775,17 @@ export function useGridData({
           } else if (isMultiLink && tableId) {
             // Field is configured as multi-link but column is uuid - auto-migrate to uuid[]
             try {
-              const migrateSql = `ALTER TABLE ${quoteMaybeQualifiedName(tableName)} ALTER COLUMN ${quoteIdent(safeColumn)} TYPE uuid[] USING CASE WHEN ${quoteIdent(safeColumn)} IS NULL THEN ARRAY[]::uuid[] ELSE ARRAY[${quoteIdent(safeColumn)}] END;`
-              
-              const { error: migrateError } = await supabase.rpc('execute_sql_safe', { sql_text: migrateSql })
-              
-              if (migrateError) {
-                console.error('[useGridData] Failed to migrate column from uuid to uuid[]:', migrateError)
-                throw new Error(
-                  `This field is configured to allow multiple linked records, but the underlying column ` +
-                    `is a single uuid and could not be automatically migrated. Error: ${migrateError.message}`
-                )
-              }
+              await migrateLinkColumnToUuidArray(supabase, tableId, tableName, safeColumn)
 
-              // Brief wait for PostgREST cache to refresh (reduced from 500ms for faster select UX)
-              await new Promise(resolve => setTimeout(resolve, 150))
-              
-              // Retry the update with the array value
               const retry = await doUpdate(finalSavedValue)
               updateError = retry.error
-              
+
               if (!retry.error) {
                 console.log(`[useGridData] Successfully migrated column "${safeColumn}" from uuid to uuid[] and saved value`)
               }
             } catch (migrateErr: unknown) {
               const migrateErrorMsg = migrateErr instanceof Error ? migrateErr.message : String(migrateErr)
+              console.error('[useGridData] Failed to migrate column from uuid to uuid[]:', migrateErr)
               throw new Error(
                 `This field is configured to allow multiple linked records, but the underlying column ` +
                   `is a single uuid and could not be automatically migrated. ${migrateErrorMsg}`

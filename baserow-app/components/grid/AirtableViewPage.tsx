@@ -432,6 +432,7 @@ export default function AirtableViewPage({
             onTableFieldsRefresh={loadFields}
             onAddField={handleAddField}
             onEditField={handleEditField}
+            onDeleteField={handleDeleteField}
             groupBy={groupBy || undefined}
             userRole={userRole}
             disableRecordPanel={false}

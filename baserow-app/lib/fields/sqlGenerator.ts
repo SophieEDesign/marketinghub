@@ -149,6 +149,21 @@ export function generateChangeColumnTypeSQL(
 }
 
 /**
+ * Migrate a single-link `uuid` column to `uuid[]` for multi-link fields.
+ * Preserves existing values by wrapping each uuid in a one-element array.
+ */
+export function generateMigrateLinkColumnToUuidArraySQL(
+  tableName: string,
+  columnName: string
+): string {
+  const col = quoteIdent(columnName)
+  return (
+    `ALTER TABLE ${quoteMaybeQualifiedName(tableName)} ALTER COLUMN ${col} TYPE uuid[] ` +
+    `USING CASE WHEN ${col} IS NULL THEN ARRAY[]::uuid[] ELSE ARRAY[${col}] END;`
+  )
+}
+
+/**
  * Generate SQL to drop a column
  */
 export function generateDropColumnSQL(

@@ -23,6 +23,7 @@ import { getFieldDisplayName } from "@/lib/fields/display"
 import { FIELD_LABEL_CLASS } from "@/lib/fields/field-label"
 import { isAbortError } from "@/lib/api/error-handling"
 import { syncLinkedFieldBidirectional } from "@/lib/dataView/linkedFields"
+import { migrateLinkColumnToUuidArray } from "@/lib/fields/migrateLinkColumn"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 
 interface FieldConfig {
@@ -296,43 +297,22 @@ export default function RecordFieldPanel({
           } else if (isMultiLink && tableId && table) {
             // Field is configured as multi-link but column is uuid - auto-migrate to uuid[]
             try {
-              // Helper functions for SQL quoting
-              const quoteIdent = (ident: string): string => {
-                return `"${String(ident ?? '').replace(/"/g, '""')}"`
-              }
-              const quoteMaybeQualifiedName = (name: string): string => {
-                const raw = String(name ?? '')
-                const parts = raw.split('.')
-                if (parts.length === 2 && parts[0] && parts[1]) {
-                  return `${quoteIdent(parts[0])}.${quoteIdent(parts[1])}`
-                }
-                return quoteIdent(raw)
-              }
+              await migrateLinkColumnToUuidArray(
+                supabase,
+                tableId,
+                table.supabase_table,
+                fieldName
+              )
 
-              const migrateSql = `ALTER TABLE ${quoteMaybeQualifiedName(table.supabase_table)} ALTER COLUMN ${quoteIdent(fieldName)} TYPE uuid[] USING CASE WHEN ${quoteIdent(fieldName)} IS NULL THEN ARRAY[]::uuid[] ELSE ARRAY[${quoteIdent(fieldName)}] END;`
-              
-              const { error: migrateError } = await supabase.rpc('execute_sql_safe', { sql_text: migrateSql })
-              
-              if (migrateError) {
-                console.error('[RecordFieldPanel] Failed to migrate column from uuid to uuid[]:', migrateError)
-                throw new Error(
-                  `This field is configured to allow multiple linked records, but the underlying column ` +
-                    `is a single uuid and could not be automatically migrated. Error: ${migrateError.message}`
-                )
-              }
-
-              // Wait a moment for PostgREST cache to refresh
-              await new Promise(resolve => setTimeout(resolve, 500))
-              
-              // Retry the update with the array value
               const retry = await doUpdate(finalSavedValue)
               error = retry.error
-              
+
               if (!retry.error) {
                 console.log(`[RecordFieldPanel] Successfully migrated column "${fieldName}" from uuid to uuid[] and saved value`)
               }
             } catch (migrateErr: unknown) {
               const migrateErrorMsg = migrateErr instanceof Error ? migrateErr.message : String(migrateErr)
+              console.error('[RecordFieldPanel] Failed to migrate column from uuid to uuid[]:', migrateErr)
               throw new Error(
                 `This field is configured to allow multiple linked records, but the underlying column ` +
                   `is a single uuid and could not be automatically migrated. ${migrateErrorMsg}`

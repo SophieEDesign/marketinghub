@@ -204,6 +204,13 @@ export default function GridColumnHeader({
           }
         }
       }}
+      onContextMenu={(e) => {
+        const target = e.target as HTMLElement
+        if (target.closest('.resize-handle') || target.closest('[data-drag-handle]')) return
+        e.preventDefault()
+        e.stopPropagation()
+        setDropdownOpen(true)
+      }}
     >
       {/* Drag handle */}
       <div

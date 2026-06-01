@@ -79,6 +79,7 @@ interface AirtableGridViewProps {
   fields?: TableField[]
   onAddField?: () => void
   onEditField?: (fieldName: string) => void
+  onDeleteField?: (fieldName: string) => void
   groupBy?: string
   /** Nested grouping rules (preferred). If omitted, falls back to `groupBy`. */
   groupByRules?: GroupRule[]
@@ -153,6 +154,7 @@ export default function AirtableGridView({
   fields = [],
   onAddField,
   onEditField,
+  onDeleteField,
   groupBy,
   groupByRules,
   userRole = "editor",
@@ -1791,6 +1793,7 @@ export default function AirtableGridView({
                     onResize={handleResize}
                     onResizeEnd={handleResizeEnd}
                     onEdit={onEditField}
+                    onDelete={onDeleteField}
                     onToggleWrapText={handleToggleWrapText}
                     onSelect={(fieldId) => {
                       // Toggle selection - if already selected, deselect; otherwise select

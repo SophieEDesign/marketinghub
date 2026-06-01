@@ -35,7 +35,7 @@ import { getFieldDisplayName } from "@/lib/fields/display"
 import type { TableField, FieldType, FieldOptions } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
 import FormulaEditor from "@/components/fields/FormulaEditor"
-import { useSelectionContext } from "@/contexts/SelectionContext"
+import FieldSettingsDrawer from "@/components/layout/FieldSettingsDrawer"
 import { getTableSections, reorderSections, upsertSectionSettings, ensureSectionExists } from "@/lib/core-data/section-settings"
 import type { SectionSettings } from "@/lib/core-data/types"
 import { ChevronUp, ChevronDown } from "lucide-react"
@@ -153,8 +153,8 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
   const [primaryFieldName, setPrimaryFieldName] = useState<string | null>(null)
   const [savingPrimary, setSavingPrimary] = useState(false)
   const [showNewField, setShowNewField] = useState(false)
+  const [editingField, setEditingField] = useState<TableField | null>(null)
   const [sections, setSections] = useState<SectionSettings[]>([])
-  const { setSelectedContext } = useSelectionContext()
   const [loadingSections, setLoadingSections] = useState(false)
   const [reorderingSections, setReorderingSections] = useState(false)
   const [showAddSection, setShowAddSection] = useState(false)
@@ -814,7 +814,7 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
                       key={field.id}
                       field={field}
                       orderIndex={orderIndex + 1}
-                      onEdit={() => setSelectedContext({ type: "field", fieldId: field.id, tableId })}
+                      onEdit={() => setEditingField(field)}
                       onDelete={() => handleDeleteField(field.id, field.name)}
                     />
                   )
@@ -836,7 +836,7 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
                       key={field.id}
                       field={field}
                       orderIndex={orderIndex + 1}
-                      onEdit={() => setSelectedContext({ type: "field", fieldId: field.id, tableId })}
+                      onEdit={() => setEditingField(field)}
                       onDelete={() => handleDeleteField(field.id, field.name)}
                     />
                   )
@@ -846,6 +846,23 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
           </div>
         </SortableContext>
       </DndContext>
+
+      <FieldSettingsDrawer
+        field={editingField}
+        open={editingField !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditingField(null)
+        }}
+        tableId={tableId}
+        tableFields={fields}
+        sections={allSections}
+        overlayMode
+        onSave={async () => {
+          await loadFields()
+          onFieldsUpdated()
+          setEditingField(null)
+        }}
+      />
 
     </div>
   )
@@ -1449,7 +1466,12 @@ function SortableFieldItem({
           <Button
             size="sm"
             variant="ghost"
-            onClick={onEdit}
+            onClick={(e) => {
+              e.stopPropagation()
+              e.preventDefault()
+              onEdit()
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
             className="h-7 w-7 p-0"
           >
             <Edit className="h-3.5 w-3.5 text-gray-500" />
@@ -1457,7 +1479,12 @@ function SortableFieldItem({
           <Button
             size="sm"
             variant="ghost"
-            onClick={onDelete}
+            onClick={(e) => {
+              e.stopPropagation()
+              e.preventDefault()
+              onDelete()
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
             className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
           >
             <Trash2 className="h-3.5 w-3.5" />
