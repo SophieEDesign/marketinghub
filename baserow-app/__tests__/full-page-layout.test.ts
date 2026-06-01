@@ -36,9 +36,27 @@ describe("full-page-layout", () => {
     expect(resolveFullPageBlockId([b])).toBe("b1")
   })
 
+  it("resolveFullPageBlockId uses defaultFullPage for campaigns without saved flag", () => {
+    const b = block({
+      id: "b1",
+      type: "campaigns_overview",
+      config: { table_id: "t1" },
+    })
+    expect(resolveFullPageBlockId([b])).toBe("b1")
+  })
+
   it("resolveFullPageBlockId returns null when multiple blocks", () => {
     const a = block({ id: "a", type: "text", config: { is_full_page: true } })
     const b = block({ id: "b", type: "text", config: {} })
     expect(resolveFullPageBlockId([a, b])).toBeNull()
+  })
+
+  it("explicit is_full_page false opts out of marketing defaultFullPage", () => {
+    const b = block({
+      id: "b1",
+      type: "campaigns_overview",
+      config: { is_full_page: false },
+    })
+    expect(resolveFullPageBlockId([b])).toBeNull()
   })
 })

@@ -530,6 +530,7 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       content_timeline_show_owner_initials: true,
       content_timeline_enable_detail_panel: true,
       content_timeline_compact_mode: false,
+      is_full_page: true,
       appearance: { showTitle: false },
     },
     applicableSettings: {
@@ -542,7 +543,7 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       conditionalFormatting: false,
     },
     supportsFullPage: true,
-    defaultFullPage: false,
+    defaultFullPage: true,
   },
   event_calendar: {
     type: 'event_calendar',
@@ -585,6 +586,7 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       event_calendar_member_default_visibility: 'members_only',
       event_calendar_content_type_default: 'Event',
       event_calendar_density: 'comfortable',
+      is_full_page: true,
       appearance: { showTitle: true },
     },
     applicableSettings: {
@@ -659,6 +661,7 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       campaigns_max_items: 100,
       campaigns_click_action: 'open_record',
       campaigns_open_record_mode: 'modal',
+      is_full_page: true,
       appearance: { showTitle: false },
     },
     applicableSettings: {
@@ -734,6 +737,7 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       things_to_do_enable_detail_panel: true,
       things_to_do_date_range: 'next_30_days',
       things_to_do_compact_mode: false,
+      is_full_page: true,
       appearance: { showTitle: false },
     },
     applicableSettings: {
@@ -746,7 +750,7 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       conditionalFormatting: false,
     },
     supportsFullPage: true,
-    defaultFullPage: false,
+    defaultFullPage: true,
   },
   content_theme: {
     type: 'content_theme',
@@ -802,6 +806,7 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       resource_hub_layout_mode: 'gallery',
       resource_hub_internal_notice:
         'For internal use only. Please follow brand guidelines in all communications.',
+      is_full_page: true,
     },
     applicableSettings: {
       fields: false,
@@ -813,7 +818,7 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       conditionalFormatting: false,
     },
     supportsFullPage: true,
-    defaultFullPage: false,
+    defaultFullPage: true,
   },
   record_context: {
     type: 'record_context',

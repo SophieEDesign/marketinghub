@@ -40,6 +40,13 @@ describe("marketing-block-layout", () => {
     ).toBe(true)
   })
 
+  it("isConfigFullPage treats campaigns overview defaultFullPage as full-page", () => {
+    expect(isConfigFullPage({ table_id: "t1" }, "campaigns_overview")).toBe(true)
+    expect(
+      isConfigFullPage({ table_id: "t1", is_full_page: false }, "campaigns_overview")
+    ).toBe(false)
+  })
+
   it("marketingBlockRootClass strips card chrome in full-page mode", () => {
     expect(marketingBlockRootClass(true, "rounded-2xl border")).toContain("rounded-none")
     expect(marketingBlockRootClass(true, "rounded-2xl border")).not.toContain("rounded-2xl")

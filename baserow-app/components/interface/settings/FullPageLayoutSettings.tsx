@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import type { PageBlock } from "@/lib/interface/types"
 import type { BlockConfig } from "@/lib/interface/types"
+import { configWantsFullPageLayout } from "@/lib/interface/full-page-layout"
 
 interface FullPageLayoutSettingsProps {
   block: PageBlock
@@ -28,10 +29,7 @@ export default function FullPageLayoutSettings({
   onApplyImmediate,
 }: FullPageLayoutSettingsProps) {
   const effectiveConfig = draftConfig ?? block.config
-  const isFullPage =
-    effectiveConfig?.is_full_page === true ||
-    (block.type === "social_media_calendar" &&
-      effectiveConfig?.social_media_calendar_mode === "full")
+  const isFullPage = configWantsFullPageLayout(block.type, effectiveConfig)
   const otherBlocksCount = allBlocks.filter((b) => b.id !== block.id).length
   const canTurnOnFullPage = otherBlocksCount === 0
   const isValidForFullPage =
