@@ -483,6 +483,7 @@ export default function FilterBlockSettings({
                                 }}
                                 config={lookupConfig}
                                 placeholder="Select value..."
+                                pillLayout="compact"
                               />
                             )
                           }

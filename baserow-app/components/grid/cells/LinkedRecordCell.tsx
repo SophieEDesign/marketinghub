@@ -219,7 +219,7 @@ export default function LinkedRecordCell({
           onRecordClick={handleLinkedRecordClick}
           onCreateRecord={lookupConfig.allowCreate && !isDisabled ? handleCreateLinkedRecord : undefined}
           isLookupField={false}
-          compact={true}
+          pillLayout="compact"
         />
       </div>
       

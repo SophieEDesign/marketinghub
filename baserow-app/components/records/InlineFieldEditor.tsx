@@ -7,7 +7,10 @@ import { formatDateByField, formatNumericValue } from "@/lib/fields/format"
 import { cn, toISODateString } from "@/lib/utils"
 import type { TableField } from "@/types/fields"
 import { useToast } from "@/components/ui/use-toast"
-import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/LookupFieldPicker"
+import LookupFieldPicker, {
+  type LookupFieldConfig,
+  type LinkedPillLayout,
+} from "@/components/fields/LookupFieldPicker"
 import RichTextEditor from "@/components/fields/RichTextEditor"
 import AttachmentPreview, { type Attachment } from "@/components/attachments/AttachmentPreview"
 import InlineSelectDropdown from "@/components/fields/InlineSelectDropdown"
@@ -43,7 +46,7 @@ interface InlineFieldEditorProps {
   tableId?: string // For attachment uploads
   recordId?: string // For attachment uploads
   tableName?: string // For attachment uploads (supabase table name)
-  displayMode?: 'compact' | 'inline' | 'expanded' | 'list' // Display mode for linked fields (default: 'compact'); 'list' shows as vertical list (same as expanded)
+  displayMode?: 'compact' | 'inline' | 'expanded' | 'list' // Linked field layout (default: list — stacked pills in interfaces)
   /** When true, display boxes do not call onEditStart on click; parent handles click for selection (layout mode) */
   disableClickToEdit?: boolean
 }
@@ -65,9 +68,15 @@ export default function InlineFieldEditor({
   tableId,
   recordId,
   tableName,
-  displayMode = 'compact',
+  displayMode = 'list',
   disableClickToEdit = false,
 }: InlineFieldEditorProps) {
+  const linkedPillLayout: LinkedPillLayout =
+    displayMode === 'compact'
+      ? 'compact'
+      : displayMode === 'inline'
+        ? 'inline'
+        : 'list'
   const { toast } = useToast()
   const [localValue, setLocalValue] = useState(value)
   const [userDisplayName, setUserDisplayName] = useState<string | null>(null)
@@ -269,7 +278,7 @@ export default function InlineFieldEditor({
               placeholder="No linked records"
               onRecordClick={onLinkedRecordClick}
               isLookupField={true}
-              compact={displayMode === 'compact' || displayMode === 'inline'}
+              pillLayout={linkedPillLayout}
             />
           ) : (
             <div className={readOnlyBoxClassName}>
@@ -280,8 +289,7 @@ export default function InlineFieldEditor({
       )
     }
 
-    // LINKED FIELDS (editable) - Show as editable with clear affordances
-    // list and expanded both use non-compact (vertical list) display
+    // LINKED FIELDS (editable)
     return (
       <>
         <div className={containerClassName} onPaste={handlePaste}>
@@ -299,7 +307,7 @@ export default function InlineFieldEditor({
               onRecordClick={onLinkedRecordClick}
               onCreateRecord={lookupConfig.allowCreate ? (onCreateRecordProp || handleCreateRecord) : undefined}
               isLookupField={false}
-              compact={displayMode === 'compact' || displayMode === 'inline'}
+              pillLayout={linkedPillLayout}
             />
           ) : (
             <div className={readOnlyBoxClassName}>

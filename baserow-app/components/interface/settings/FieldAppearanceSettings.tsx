@@ -79,7 +79,7 @@ export default function FieldAppearanceSettings({
   const attachmentDisplayStyle = appearance.attachment_display_style || field?.options?.attachment_display_style || 'thumbnails'
   const attachmentSize = appearance.attachment_size || field?.options?.attachment_preview_size || 'medium'
   const attachmentMaxVisible = appearance.attachment_max_visible || field?.options?.attachment_max_visible || 10
-  const linkedFieldDisplayMode = appearance.linked_field_display_mode || 'compact'
+  const linkedFieldDisplayMode = appearance.linked_field_display_mode || 'list'
 
   return (
     <div className="space-y-6">

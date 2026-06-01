@@ -493,6 +493,7 @@ export default function FilterValueInput({
           }}
           config={lookupConfig}
           placeholder={placeholder}
+          pillLayout="compact"
         />
       )
     }

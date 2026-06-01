@@ -494,6 +494,7 @@ export default function FieldEditor({
               placeholder="No linked records"
               onRecordClick={onLinkedRecordClick}
               isLookupField={true}
+              pillLayout="list"
             />
           ) : (
             <div className={`px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-500 italic ${inputClassName}`}>
@@ -525,6 +526,7 @@ export default function FieldEditor({
               onRecordClick={onLinkedRecordClick}
               onCreateRecord={onCreateRecord || (lookupConfig.allowCreate ? handleCreateRecord : undefined)}
               isLookupField={false}
+              pillLayout="list"
             />
           ) : (
             <div className={`px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-500 ${inputClassName}`}>
