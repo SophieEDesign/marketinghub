@@ -996,6 +996,11 @@
 .calendar-embed--events .fc-daygrid-event {
   margin-top: 3px;
   border-radius: 0.5rem;
+  cursor: pointer;
+}
+
+.calendar-embed--events .fc-daygrid-event .fc-event-main {
+  cursor: pointer;
 }
 
 .calendar-embed--events .fc-daygrid-block-event .fc-event-main {
@@ -1007,6 +1012,11 @@
   font-size: 0.6875rem;
   font-weight: 600;
   padding: 0.125rem 0.25rem;
+  cursor: pointer;
+}
+
+.calendar-embed--events .fc .fc-daygrid-more-link:hover {
+  text-decoration: underline;
 }
 
 .calendar-embed--events .fc-timegrid-event {
@@ -1014,6 +1024,7 @@
   border-left-width: 4px !important;
   background: hsl(var(--card)) !important;
   border-color: hsl(var(--border) / 0.5) !important;
+  cursor: pointer;
 }
 
 /* Social media calendar block */
