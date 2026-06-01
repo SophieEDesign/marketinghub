@@ -44,11 +44,20 @@ describe("full-page-layout", () => {
     })
   })
 
-  it("resolveFullPageBlockId uses defaultFullPage for campaigns without saved flag", () => {
+  it("campaigns without is_full_page does not auto-enter full-page", () => {
     const b = block({
       id: "b1",
       type: "campaigns_overview",
       config: { table_id: "t1" },
+    })
+    expect(resolveFullPageBlockId([b])).toBeNull()
+  })
+
+  it("campaigns with is_full_page true uses full-page", () => {
+    const b = block({
+      id: "b1",
+      type: "campaigns_overview",
+      config: { table_id: "t1", is_full_page: true },
     })
     expect(resolveFullPageBlockId([b])).toBe("b1")
   })

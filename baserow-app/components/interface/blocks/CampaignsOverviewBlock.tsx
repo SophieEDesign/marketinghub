@@ -19,7 +19,10 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
-import { marketingBlockRootClass } from "@/lib/interface/marketing-block-layout"
+import {
+  marketingBlockRootClass,
+  marketingBlockScrollPanelClass,
+} from "@/lib/interface/marketing-block-layout"
 
 interface CampaignsOverviewBlockProps {
   block: PageBlock
@@ -115,7 +118,7 @@ export default function CampaignsOverviewBlock({
       )}
     >
       {showDemoBanner ? <MarketingDemoDataBanner message={demoMessage} /> : null}
-      <div className="border-b border-border/40 px-5 py-4">
+      <div className="shrink-0 border-b border-border/40 px-5 py-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           {showTitle ? (
             <div>
@@ -150,7 +153,7 @@ export default function CampaignsOverviewBlock({
       </div>
 
       {config?.campaigns_show_kpis !== false ? (
-        <div className="grid grid-cols-1 gap-3 border-b border-border/40 p-4 md:grid-cols-5">
+        <div className="grid shrink-0 grid-cols-1 gap-3 border-b border-border/40 p-4 md:grid-cols-5">
           {[
             ["Active campaigns", kpis.active],
             ["Planned campaigns", kpis.planned],
@@ -167,7 +170,7 @@ export default function CampaignsOverviewBlock({
       ) : null}
 
       {config?.campaigns_show_filters !== false ? (
-        <div className="flex flex-wrap gap-2 border-b border-border/40 p-3">
+        <div className="flex shrink-0 flex-wrap gap-2 border-b border-border/40 p-3">
           {[
             ["Status", "status", options.status],
             ["Stage", "stage", options.stage],
@@ -211,7 +214,12 @@ export default function CampaignsOverviewBlock({
         </div>
       ) : null}
 
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div
+        className={cn(
+          "min-h-0 flex-1 overflow-auto",
+          marketingBlockScrollPanelClass(isFullPage)
+        )}
+      >
         <table className="w-full border-collapse">
           <thead>
             <tr className="border-b border-border/40 text-left text-xs text-muted-foreground">

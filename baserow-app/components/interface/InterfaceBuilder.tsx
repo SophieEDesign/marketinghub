@@ -1790,7 +1790,7 @@ function InterfaceBuilderInner({
           ref={canvasScrollContainerRef}
           className={`flex flex-col min-h-0 min-w-0 w-full max-w-full ${
             fullPageBlockId
-              ? "flex-1 overflow-hidden p-0"
+              ? "flex-1 min-h-0 h-full overflow-hidden p-0"
               : marketingDashboard
                 ? "overflow-x-clip overflow-y-visible p-0"
                 : "overflow-x-clip overflow-y-visible p-4"

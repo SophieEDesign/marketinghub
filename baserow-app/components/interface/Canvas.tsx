@@ -58,6 +58,7 @@ import {
 } from "@/components/interface/primitives/BuilderBlockFrame"
 import { shouldShowBlockChromeToolbar } from "@/lib/interface/canvas-edit-chrome"
 import { cn } from "@/lib/utils"
+import CanvasFullPageBlock from "@/components/interface/CanvasFullPageBlock"
 
 const ResponsiveGridLayout = withResizeObserverWidthProvider(Responsive)
 
@@ -1797,17 +1798,19 @@ export default function Canvas({
       document.head.appendChild(style)
     }
     style.textContent = `
-      [data-canvas-full-page="true"] .react-grid-layout {
-        height: 100% !important;
-        min-height: 0 !important;
+      [data-canvas-full-page="true"] .canvas-full-page-host {
+        display: flex;
+        flex-direction: column;
+        flex: 1 1 auto;
+        min-height: 0;
+        height: 100%;
+        width: 100%;
       }
-      [data-canvas-full-page="true"] .react-grid-item {
-        height: 100% !important;
-        min-height: 0 !important;
-      }
-      [data-canvas-full-page="true"] .react-grid-item > div:first-child {
-        height: 100% !important;
-        min-height: 0 !important;
+      [data-canvas-full-page="true"] .canvas-full-page-host > div {
+        flex: 1 1 auto;
+        min-height: 0;
+        height: 100%;
+        width: 100%;
       }
     `
     return () => {
@@ -2037,8 +2040,50 @@ export default function Canvas({
             containerWidth={containerRef.current.offsetWidth}
           />
         )}
+        {isFullPageMode && fullPageBlock ? (
+          <div className="canvas-full-page-host relative flex min-h-0 flex-1 flex-col h-full w-full overflow-hidden">
+            <CanvasFullPageBlock
+              block={fullPageBlock}
+              isEditing={isEditing}
+              isBlockSelected={
+                selectedBlockId === fullPageBlock.id ||
+                (selectedBlockIds != null && selectedBlockIds.has(fullPageBlock.id))
+              }
+              isRail={isRail}
+              showPreview={showPreview}
+              fullPageDef={fullPageDef}
+              onConfigureLeftPanel={onConfigureLeftPanel}
+              onShowRecordSettings={onShowRecordSettings}
+              recordId={recordId}
+              recordTableId={recordTableId}
+              pageId={pageId}
+              pageTableId={pageTableId}
+              interfaceMode={interfaceMode}
+              onBlockUpdate={onBlockUpdate}
+              mode={mode}
+              getFiltersForBlock={getFiltersForBlock}
+              getFilterTreeForBlock={getFilterTreeForBlock}
+              onRecordClick={onRecordClick}
+              onRecordContextChange={onRecordContextChange}
+              aggregateData={aggregateData}
+              pageShowAddRecord={pageShowAddRecord}
+              pageEditable={pageEditable}
+              editableFieldNames={editableFieldNames}
+              pageShowFieldNames={pageShowFieldNames}
+              hideEditButton={topTwoFieldBlockIds.has(fullPageBlock.id)}
+              allBlocks={blocks}
+              editingBlockCanvasId={editingBlockCanvasId}
+              layoutSettings={layoutSettings}
+              openRecordInEditModeForBlock={openRecordInEditModeForBlock}
+              onFieldBlockSelect={onFieldBlockSelect}
+              selectedFieldBlockId={selectedFieldBlockId}
+              onBlockClick={onBlockClick}
+              onBlockDelete={onBlockDelete}
+            />
+          </div>
+        ) : (
         <ResponsiveGridLayout
-          className={`layout flex-1 min-h-0 min-w-0 ${isFullPageMode ? "h-full" : ""}`} // CRITICAL: flex-1 min-h-0 prevents flex collapse; identical in edit and public
+          className="layout flex-1 min-h-0 min-w-0"
           layouts={{ lg: gridLayout }}
           breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
           // CRITICAL: All layout-affecting props come from GRID_CONFIG constant
@@ -2422,6 +2467,9 @@ export default function Canvas({
           resizeHandles={['se', 'sw', 'ne', 'nw', 'e', 'w', 's', 'n']}
         >
           {blocks.map((block) => {
+            if (isFullPageMode && fullPageBlock && block.id === fullPageBlock.id) {
+              return null
+            }
             // Log each block being rendered via BlockRenderer
             debugLog('LAYOUT', `[Canvas] Rendering block via BlockRenderer: pageId=${pageId}, blockId=${block.id}, type=${block.type}`, {
               block,
@@ -2816,6 +2864,7 @@ export default function Canvas({
           </div>
         )})}
         </ResponsiveGridLayout>
+        )}
         </div>
       </div>
     </ErrorBoundary>

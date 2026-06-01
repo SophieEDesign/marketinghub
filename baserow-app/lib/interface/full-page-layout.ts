@@ -39,9 +39,9 @@ export function canUseFullPageBlock(block: PageBlock): boolean {
 
 /**
  * Whether the page canvas should use full-page layout for this block.
- * Explicit `is_full_page: false` always opts out (user toggle wins).
- * Explicit `is_full_page: true` opts in.
- * When unset: sole calendar grid + marketing blocks with registry `defaultFullPage`.
+ * - `is_full_page: false` → always off (user opt-out).
+ * - `is_full_page: true` → on (user opt-in; required for marketing blocks).
+ * - unset → only legacy sole calendar grid defaults to on.
  */
 export function blockWantsFullPageLayout(block: PageBlock): boolean {
   const flag = block.config?.is_full_page
@@ -49,9 +49,6 @@ export function blockWantsFullPageLayout(block: PageBlock): boolean {
   if (flag === true) return true
   if (isCalendarGridBlock(block)) {
     return true
-  }
-  if (isMarketingDashboardBlockType(block.type)) {
-    return getBlockDefinition(block.type).defaultFullPage === true
   }
   return false
 }

@@ -1184,7 +1184,8 @@ function InterfacePageClientInternal({
   // CRITICAL: Only depend on page.id and essential props - NOT page_type, NOT config changes
   // This ensures the page object reference is stable and doesn't cause remounts
   const interfaceBuilderPage = useMemo(() => {
-    if (!page) return null
+    // During client nav, `page` may still be the previous route until loadPage completes.
+    if (!page || page.id !== pageId) return null
     const pageConfig = page.config || {}
     return {
       id: page.id,

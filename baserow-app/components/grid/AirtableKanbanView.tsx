@@ -51,7 +51,14 @@ import { CellFactory } from "./CellFactory"
 import { buildSelectClause, toPostgrestColumn } from "@/lib/supabase/postgrest"
 import { normalizeSelectOptionsForUi } from "@/lib/fields/select-options"
 import { getFieldDisplayName } from "@/lib/fields/display"
+import { getPrimaryField } from "@/lib/fields/primary"
 import { isAbortError } from "@/lib/api/error-handling"
+import { applyFiltersToQuery, type FilterConfig } from "@/lib/interface/filters"
+import {
+  applySoftDeleteFilter,
+  fetchPhysicalColumns,
+  filterConfigsToQueryableColumns,
+} from "@/lib/supabase/physical-columns"
 
 // PostgREST expects unquoted identifiers in select/order clauses; see `lib/supabase/postgrest`.
 
@@ -151,33 +158,41 @@ export default function AirtableKanbanView({
     }
   }, [kanbanGroupField, tableFields])
 
+  const standardizedFilters = useMemo<FilterConfig[]>(() => {
+    const safe = Array.isArray(viewFilters) ? viewFilters : []
+    return safe
+      .filter((f) => !!f && typeof f.field_name === "string" && typeof f.operator === "string")
+      .map((f) => ({
+        field: f.field_name,
+        operator: f.operator as FilterConfig["operator"],
+        value: f.value ?? "",
+      }))
+  }, [viewFilters])
+
   const loadRows = useCallback(async () => {
     if (!supabaseTableName || !groupField) return
 
     setLoading(true)
     try {
-      let query = supabase.from(supabaseTableName).select("*")
+      const physicalColumns = await fetchPhysicalColumns(supabase, supabaseTableName)
+      const safeFields = Array.isArray(tableFields) ? tableFields : []
+      const normalizedFields = safeFields.map((f) => ({
+        name: f.name,
+        type: f.type,
+        id: f.id,
+        options: f.options,
+      }))
 
-      // Apply filters
-      for (const filter of viewFilters) {
-        const fieldValue = filter.value
-        switch (filter.operator) {
-          case "equal":
-            query = query.eq(filter.field_name, fieldValue)
-            break
-          case "not_equal":
-            query = query.neq(filter.field_name, fieldValue)
-            break
-          case "contains":
-            query = query.ilike(filter.field_name, `%${fieldValue}%`)
-            break
-          case "is_empty":
-            query = query.or(`${filter.field_name}.is.null,${filter.field_name}.eq.`)
-            break
-          case "is_not_empty":
-            query = query.not(filter.field_name, "is", null)
-            break
-        }
+      let query = supabase.from(supabaseTableName).select("*")
+      query = applySoftDeleteFilter(query, physicalColumns)
+
+      const queryableFilters = filterConfigsToQueryableColumns(
+        standardizedFilters,
+        safeFields,
+        physicalColumns
+      )
+      if (queryableFilters.length > 0) {
+        query = applyFiltersToQuery(query, queryableFilters, normalizedFields as any)
       }
 
       // Check if we need client-side sorting (for single_select by order, multi_select by first value)
@@ -237,7 +252,7 @@ export default function AirtableKanbanView({
     } finally {
       setLoading(false)
     }
-  }, [supabaseTableName, groupField, viewFilters, viewSorts, tableFields])
+  }, [supabaseTableName, groupField, standardizedFilters, viewSorts, tableFields])
 
   // Load rows
   useEffect(() => {
@@ -439,30 +454,45 @@ export default function AirtableKanbanView({
     })
   }
 
-  // Get card fields to display (match by name, id, or display name; dedupe by id to avoid duplicate title/labels)
+  // Card fields: primary field (record label) first, then configured/visible fields.
   const displayCardFields = useMemo(() => {
     const safeCardFields = Array.isArray(cardFields) ? cardFields : []
     const safeTableFields = Array.isArray(tableFields) ? tableFields : []
 
-    let fields: TableField[]
+    const resolveField = (key: string): TableField | undefined =>
+      safeTableFields.find(
+        (f) =>
+          f &&
+          (f.name === key || f.id === key || getFieldDisplayName(f) === key)
+      )
+
+    const isCardField = (f: TableField) =>
+      !!f &&
+      f.name !== "id" &&
+      f.name !== groupField?.name &&
+      f.type !== "formula"
+
+    let fields: TableField[] = []
     if (safeCardFields.length > 0) {
       fields = safeCardFields
-        .map((key) =>
-          safeTableFields.find(
-            (f) =>
-              f &&
-              (f.name === key ||
-                f.id === key ||
-                getFieldDisplayName(f) === key)
-          )
-        )
-        .filter((f): f is TableField => f !== undefined && f !== null)
+        .map((key) => resolveField(key))
+        .filter((f): f is TableField => !!f && isCardField(f))
+    } else if (visibleFieldNames.length > 0) {
+      fields = visibleFieldNames
+        .map((key) => resolveField(key))
+        .filter((f): f is TableField => !!f && isCardField(f))
     } else {
-      fields = safeTableFields
-        .filter((f) => f && f.name !== groupField?.name)
-        .slice(0, 3)
+      fields = safeTableFields.filter(isCardField).slice(0, 3)
     }
-    // Dedupe by field id so the same field never appears twice (avoids duplicate title on card)
+
+    const primary = getPrimaryField(safeTableFields)
+    if (primary && isCardField(primary)) {
+      fields = [
+        primary,
+        ...fields.filter((f) => f.id !== primary.id && f.name !== primary.name),
+      ]
+    }
+
     const seen = new Set<string>()
     return fields.filter((f) => {
       const key = f.id ?? f.name
@@ -470,7 +500,7 @@ export default function AirtableKanbanView({
       seen.add(key)
       return true
     })
-  }, [cardFields, tableFields, groupField])
+  }, [cardFields, tableFields, groupField, visibleFieldNames])
 
   const handleCellSave = useCallback(
     async (rowId: string, fieldName: string, value: any) => {
