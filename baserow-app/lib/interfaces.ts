@@ -1,6 +1,10 @@
 import { createClient } from './supabase/server'
 import { getUserRole, isAdmin } from './roles'
 import { pickMarketingHomePageId } from './marketing/marketing-home'
+import {
+  LANDING_DEFAULT_COLUMNS,
+  pickWorkspaceLandingPageId,
+} from './workspace-defaults'
 
 export interface InterfaceCategory {
   id: string
@@ -331,7 +335,7 @@ async function findMarketingHomePageId(userIsAdmin: boolean): Promise<string | n
 /**
  * Resolve landing page with priority order:
  * 1. User default page (if exists and user has access)
- * 2. Workspace default page (if exists and user has access)
+ * 2. Workspace role default (admin_default_interface_id / member_default_interface_id, legacy default_interface_id)
  * 3. Marketing home / dashboard (`is_home` or canonical name)
  * 4. First accessible interface page
  */
@@ -384,75 +388,67 @@ export async function resolveLandingPage(): Promise<{ pageId: string | null; rea
     }
   }
   
-  // Priority 2: Check workspace default page
+  // Priority 2: Workspace role default (admin vs member)
   try {
     const { data: workspaceSettings, error: settingsError } = await supabase
       .from('workspace_settings')
-      .select('default_interface_id')
-      // Single-workspace app: pick the most recently created row to avoid PGRST116
-      // when duplicates exist (NULL workspace_id allows multiple rows under the UNIQUE constraint).
+      .select(LANDING_DEFAULT_COLUMNS)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
-    
+
+    const workspaceDefaultPageId = pickWorkspaceLandingPageId(workspaceSettings, userIsAdmin)
+
     if (isDev) {
-      console.log('[Landing Page] Workspace settings query:', { 
-        hasSettings: !!workspaceSettings, 
-        defaultInterfaceId: workspaceSettings?.default_interface_id,
-        error: settingsError?.message 
+      console.log('[Landing Page] Workspace settings query:', {
+        hasSettings: !!workspaceSettings,
+        workspaceDefaultPageId,
+        adminDefault: workspaceSettings?.admin_default_interface_id,
+        memberDefault: workspaceSettings?.member_default_interface_id,
+        legacyDefault: workspaceSettings?.default_interface_id,
+        userIsAdmin,
+        error: settingsError?.message,
       })
     }
-    
+
     if (settingsError) {
       if (isDev) {
         console.warn('[Landing Page] Error querying workspace_settings:', {
           error: settingsError.message,
           code: settingsError.code,
-          details: settingsError
+          details: settingsError,
         })
       }
-    } else if (workspaceSettings?.default_interface_id) {
-      let workspaceDefaultPageId = workspaceSettings.default_interface_id
-      if (typeof workspaceDefaultPageId !== "string") {
-        if (isDev) {
-          console.warn("[resolveLandingPage] default_interface_id is not a string, skipping:", typeof workspaceDefaultPageId)
-        }
-      } else if (isDev) {
-        console.log('[Landing Page] Found workspace default page ID:', workspaceDefaultPageId)
-      }
+    } else if (workspaceDefaultPageId) {
+      const validation = await validatePageAccess(workspaceDefaultPageId, userIsAdmin)
 
-      if (typeof workspaceDefaultPageId === "string") {
-        const validation = await validatePageAccess(workspaceDefaultPageId, userIsAdmin)
-      
       if (isDev) {
         console.log('[Landing Page] Workspace default page validation:', {
           pageId: workspaceDefaultPageId,
           valid: validation.valid,
           reason: validation.reason,
-          userIsAdmin
+          userIsAdmin,
         })
       }
-      
-        if (validation.valid) {
-          console.log('[resolveLandingPage] returning workspace_default:', workspaceDefaultPageId)
-          if (isDev) {
-            console.log('[Landing Page] ✓ Using workspace default page:', workspaceDefaultPageId)
-          }
-          return { pageId: workspaceDefaultPageId, reason: 'workspace_default' }
-        } else {
-          if (isDev) {
-            console.error('[Landing Page] ✗ Workspace default page validation FAILED:', {
-              pageId: workspaceDefaultPageId,
-              reason: validation.reason,
-              userIsAdmin,
-              note: 'Will fall back to first accessible page'
-            })
-          }
+
+      if (validation.valid) {
+        const reason = userIsAdmin ? 'workspace_admin_default' : 'workspace_member_default'
+        console.log('[resolveLandingPage] returning', reason + ':', workspaceDefaultPageId)
+        if (isDev) {
+          console.log('[Landing Page] ✓ Using workspace role default page:', workspaceDefaultPageId)
         }
+        return { pageId: workspaceDefaultPageId, reason }
+      } else if (isDev) {
+        console.error('[Landing Page] ✗ Workspace default page validation FAILED:', {
+          pageId: workspaceDefaultPageId,
+          reason: validation.reason,
+          userIsAdmin,
+          note: 'Will fall back to marketing home or first accessible page',
+        })
       }
     } else if (isDev) {
-      if (workspaceSettings && !workspaceSettings.default_interface_id) {
-        console.log('[Landing Page] Workspace settings found but no default_interface_id set')
+      if (workspaceSettings) {
+        console.log('[Landing Page] Workspace settings found but no role default set')
       } else {
         console.log('[Landing Page] No workspace_settings row found')
       }
@@ -493,18 +489,18 @@ export async function resolveLandingPage(): Promise<{ pageId: string | null; rea
     try {
       const { data: workspaceSettings } = await supabase
         .from('workspace_settings')
-        .select('default_interface_id')
+        .select(LANDING_DEFAULT_COLUMNS)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
-      
-      if (workspaceSettings?.default_interface_id) {
-        // Workspace default was set but validation failed - this is a problem
+
+      const configuredDefault = pickWorkspaceLandingPageId(workspaceSettings, userIsAdmin)
+      if (configuredDefault) {
         if (isDev) {
           console.warn('[Landing Page] WARNING: Workspace default page was set but validation failed:', {
-            defaultPageId: workspaceSettings.default_interface_id,
+            defaultPageId: configuredDefault,
             fallingBackTo: accessiblePages[0].id,
-            accessiblePagesCount: accessiblePages.length
+            accessiblePagesCount: accessiblePages.length,
           })
         }
       }

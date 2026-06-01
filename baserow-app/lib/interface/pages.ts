@@ -4,6 +4,10 @@
  */
 
 import { createClient } from '@/lib/supabase/server'
+import {
+  buildClearLandingDefaultsUpdate,
+  LANDING_DEFAULT_COLUMNS,
+} from '@/lib/workspace-defaults'
 import { PageType, getPageTypeDefinition, validatePageConfig, validatePageAnchor, getRequiredAnchorType } from './page-types'
 import { PageConfig, getDefaultPageConfig } from './page-config'
 
@@ -348,17 +352,19 @@ export async function deleteInterfacePage(pageId: string): Promise<void> {
   try {
     const { data: workspaceSettings } = await supabase
       .from('workspace_settings')
-      .select('id, default_interface_id')
+      .select(`id, ${LANDING_DEFAULT_COLUMNS}`)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
 
-    if (workspaceSettings?.default_interface_id === pageId) {
-      // Clear the default_interface_id before deleting
+    const clearUpdate = workspaceSettings
+      ? buildClearLandingDefaultsUpdate(pageId, workspaceSettings)
+      : null
+    if (clearUpdate) {
       await supabase
         .from('workspace_settings')
-        .update({ default_interface_id: null })
-        .eq('id', workspaceSettings.id)
+        .update(clearUpdate)
+        .eq('id', workspaceSettings!.id)
     }
   } catch (settingsError: any) {
     // Silently ignore errors - column might not exist or RLS might block

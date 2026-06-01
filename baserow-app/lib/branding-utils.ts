@@ -57,6 +57,8 @@ export interface WorkspaceSettings {
   sidebar_color: string | null
   sidebar_text_color: string | null
   default_interface_id?: string | null
+  admin_default_interface_id?: string | null
+  member_default_interface_id?: string | null
   created_at: string
   updated_at?: string
 }

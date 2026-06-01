@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { formatDateTimeUK } from '@/lib/utils'
 import { TimeoutError, withTimeout } from '@/lib/with-timeout'
 import { debugLog } from '@/lib/debug'
+import { LANDING_DEFAULT_COLUMNS } from '@/lib/workspace-defaults'
 
 const SETTINGS_LOAD_TIMEOUT_MS = 15_000
 
@@ -26,8 +27,10 @@ export default function SettingsWorkspaceTab() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [originalName, setOriginalName] = useState('Marketing Hub')
   const [originalIcon, setOriginalIcon] = useState('📊')
-  const [defaultPageId, setDefaultPageId] = useState<string>('__none__')
-  const [originalDefaultPageId, setOriginalDefaultPageId] = useState<string>('__none__')
+  const [adminDefaultPageId, setAdminDefaultPageId] = useState<string>('__none__')
+  const [memberDefaultPageId, setMemberDefaultPageId] = useState<string>('__none__')
+  const [originalAdminDefaultPageId, setOriginalAdminDefaultPageId] = useState<string>('__none__')
+  const [originalMemberDefaultPageId, setOriginalMemberDefaultPageId] = useState<string>('__none__')
   const [interfacePages, setInterfacePages] = useState<Array<{ id: string; name: string; is_admin_only?: boolean | null }>>([])
   const [loadingPages, setLoadingPages] = useState(false)
 
@@ -37,10 +40,25 @@ export default function SettingsWorkspaceTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  function applyDefaultPageSetting(
-    settings: { default_interface_id?: string | null } | null,
+  function toSelectValue(id: string | null | undefined): string {
+    return id && id.length > 0 ? id : '__none__'
+  }
+
+  function applyDefaultPageSettings(
+    settings: {
+      default_interface_id?: string | null
+      admin_default_interface_id?: string | null
+      member_default_interface_id?: string | null
+    } | null,
     settingsError: { code?: string; message?: string } | null
   ) {
+    const reset = () => {
+      setAdminDefaultPageId('__none__')
+      setMemberDefaultPageId('__none__')
+      setOriginalAdminDefaultPageId('__none__')
+      setOriginalMemberDefaultPageId('__none__')
+    }
+
     if (settingsError) {
       if (
         settingsError.code === '42P01' ||
@@ -49,23 +67,23 @@ export default function SettingsWorkspaceTab() {
         settingsError.message?.includes('does not exist') ||
         settingsError.message?.includes('relation')
       ) {
-        setDefaultPageId('__none__')
-        setOriginalDefaultPageId('__none__')
+        reset()
       } else {
-        console.warn('Error loading default page setting:', settingsError)
-        setDefaultPageId('__none__')
-        setOriginalDefaultPageId('__none__')
+        console.warn('Error loading default page settings:', settingsError)
+        reset()
       }
       return
     }
 
-    if (settings?.default_interface_id) {
-      setDefaultPageId(settings.default_interface_id)
-      setOriginalDefaultPageId(settings.default_interface_id)
-    } else {
-      setDefaultPageId('__none__')
-      setOriginalDefaultPageId('__none__')
-    }
+    const legacy = settings?.default_interface_id ?? null
+    const adminId = settings?.admin_default_interface_id ?? legacy
+    const memberId = settings?.member_default_interface_id ?? legacy
+    const adminValue = toSelectValue(adminId)
+    const memberValue = toSelectValue(memberId)
+    setAdminDefaultPageId(adminValue)
+    setMemberDefaultPageId(memberValue)
+    setOriginalAdminDefaultPageId(adminValue)
+    setOriginalMemberDefaultPageId(memberValue)
   }
 
   async function loadWorkspace() {
@@ -89,7 +107,7 @@ export default function SettingsWorkspaceTab() {
               .maybeSingle(),
             supabase
               .from('workspace_settings')
-              .select('default_interface_id')
+              .select(LANDING_DEFAULT_COLUMNS)
               .order('created_at', { ascending: false })
               .limit(1)
               .maybeSingle(),
@@ -122,7 +140,7 @@ export default function SettingsWorkspaceTab() {
             setCreatedAt(new Date().toISOString())
           }
 
-          applyDefaultPageSetting(settingsResult.data, settingsResult.error)
+          applyDefaultPageSettings(settingsResult.data, settingsResult.error)
         })(),
         SETTINGS_LOAD_TIMEOUT_MS,
         'Loading workspace settings timed out'
@@ -257,13 +275,16 @@ export default function SettingsWorkspaceTab() {
       // Save default page setting to workspace_settings
       let defaultPageSaveSuccess = false
       try {
-        // Convert "__none__" to null for database storage
-        const defaultInterfaceId = defaultPageId === "__none__" ? null : (defaultPageId || null)
-        
-        debugLog('[WorkspaceTab] Saving default page:', { 
-          defaultPageId, 
-          defaultInterfaceId,
-          convertingToNull: defaultPageId === "__none__"
+        const adminInterfaceId =
+          adminDefaultPageId === '__none__' ? null : adminDefaultPageId || null
+        const memberInterfaceId =
+          memberDefaultPageId === '__none__' ? null : memberDefaultPageId || null
+
+        debugLog('[WorkspaceTab] Saving default pages:', {
+          adminDefaultPageId,
+          memberDefaultPageId,
+          adminInterfaceId,
+          memberInterfaceId,
         })
         
         // Get the first workspace_settings row (single-workspace app); avoid .single() to prevent 406/PGRST116 masking
@@ -317,8 +338,10 @@ export default function SettingsWorkspaceTab() {
           }
           
           debugLog('[WorkspaceTab] Updating existing workspace_settings row:', existingSettings.id, 'with workspace_id:', workspaceId)
-          const updateData: any = {
-            default_interface_id: defaultInterfaceId,
+          const updateData: Record<string, unknown> = {
+            admin_default_interface_id: adminInterfaceId,
+            member_default_interface_id: memberInterfaceId,
+            default_interface_id: adminInterfaceId,
             updated_at: new Date().toISOString(),
           }
           
@@ -331,7 +354,7 @@ export default function SettingsWorkspaceTab() {
             .from('workspace_settings')
             .update(updateData)
             .eq('id', existingSettings.id)
-            .select('default_interface_id')
+            .select(LANDING_DEFAULT_COLUMNS)
           
           if (updateError) {
             console.error('[WorkspaceTab] Update error:', {
@@ -342,9 +365,10 @@ export default function SettingsWorkspaceTab() {
             throw updateError
           } else if (updatedRows && updatedRows.length > 0) {
             const updatedData = updatedRows[0]
-            debugLog('[WorkspaceTab] Successfully updated default_interface_id:', {
-              saved: updatedData?.default_interface_id,
-              expected: defaultInterfaceId
+            debugLog('[WorkspaceTab] Successfully updated landing defaults:', {
+              saved: updatedData,
+              expectedAdmin: adminInterfaceId,
+              expectedMember: memberInterfaceId,
             })
             defaultPageSaveSuccess = true
           } else {
@@ -399,9 +423,11 @@ export default function SettingsWorkspaceTab() {
             .from('workspace_settings')
             .insert({
               workspace_id: workspaceId,
-              default_interface_id: defaultInterfaceId,
+              admin_default_interface_id: adminInterfaceId,
+              member_default_interface_id: memberInterfaceId,
+              default_interface_id: adminInterfaceId,
             })
-            .select('id, default_interface_id')
+            .select(`id, ${LANDING_DEFAULT_COLUMNS}`)
           
           if (insertError) {
             console.error('[WorkspaceTab] Insert error:', {
@@ -415,8 +441,9 @@ export default function SettingsWorkspaceTab() {
             const insertedData = insertedRows[0]
             debugLog('[WorkspaceTab] Successfully inserted workspace_settings:', {
               id: insertedData?.id,
-              default_interface_id: insertedData?.default_interface_id,
-              expected: defaultInterfaceId
+              saved: insertedData,
+              expectedAdmin: adminInterfaceId,
+              expectedMember: memberInterfaceId,
             })
             defaultPageSaveSuccess = true
           } else {
@@ -428,17 +455,21 @@ export default function SettingsWorkspaceTab() {
         if (defaultPageSaveSuccess) {
           const { data: verifyData, error: verifyError } = await supabase
             .from('workspace_settings')
-            .select('default_interface_id')
+            .select(LANDING_DEFAULT_COLUMNS)
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle()
           
           if (!verifyError && verifyData) {
-            debugLog('[WorkspaceTab] Verified save - default_interface_id in DB:', verifyData.default_interface_id)
-            if (verifyData.default_interface_id !== defaultInterfaceId) {
+            debugLog('[WorkspaceTab] Verified save - landing defaults in DB:', verifyData)
+            if (
+              verifyData.admin_default_interface_id !== adminInterfaceId ||
+              verifyData.member_default_interface_id !== memberInterfaceId
+            ) {
               console.warn('[WorkspaceTab] WARNING: Saved value does not match!', {
-                expected: defaultInterfaceId,
-                actual: verifyData.default_interface_id
+                expectedAdmin: adminInterfaceId,
+                expectedMember: memberInterfaceId,
+                actual: verifyData,
               })
             }
           } else if (verifyError) {
@@ -455,7 +486,7 @@ export default function SettingsWorkspaceTab() {
         } else if (settingsError?.code === '23503') {
           // Foreign key constraint violation - the page ID doesn't exist in interface_pages
           console.error('[WorkspaceTab] Foreign key constraint violation - page ID not found:', {
-            pageId: defaultPageId,
+            pageId: adminDefaultPageId,
             error: settingsError
           })
           setMessage({ 
@@ -511,8 +542,13 @@ export default function SettingsWorkspaceTab() {
     )
   }
 
-  const hasUnsavedChanges = workspaceName !== originalName || workspaceIcon !== originalIcon || defaultPageId !== originalDefaultPageId
-  const selectedPage = interfacePages.find(p => p.id === defaultPageId)
+  const hasUnsavedChanges =
+    workspaceName !== originalName ||
+    workspaceIcon !== originalIcon ||
+    adminDefaultPageId !== originalAdminDefaultPageId ||
+    memberDefaultPageId !== originalMemberDefaultPageId
+  const selectedAdminPage = interfacePages.find((p) => p.id === adminDefaultPageId)
+  const selectedMemberPage = interfacePages.find((p) => p.id === memberDefaultPageId)
 
   return (
     <Card>
@@ -539,42 +575,101 @@ export default function SettingsWorkspaceTab() {
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="default-page">Default Page at Login</Label>
-            <Select
-              value={defaultPageId || "__none__"}
-              onValueChange={(value) => setDefaultPageId(value === "__none__" ? "__none__" : value)}
-              disabled={loadingPages}
-            >
-              <SelectTrigger id="default-page" className="max-w-md">
-                <SelectValue placeholder={loadingPages ? "Loading pages..." : interfacePages.length === 0 ? "No pages available" : "Select a default page"} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">None (use first available)</SelectItem>
-                {interfacePages.length === 0 ? (
-                  <SelectItem value="__no_pages__" disabled>
-                    No pages available
-                  </SelectItem>
-                ) : (
-                  interfacePages.map((page) => (
-                    <SelectItem key={page.id} value={page.id}>
-                      {page.name}{page.is_admin_only ? ' (admin-only)' : ''}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              The page users will be redirected to after logging in
-            </p>
-            {selectedPage?.is_admin_only && (
-              <p className="text-xs text-amber-600">
-                This page is admin-only. Non-admin users will be redirected to the first page they can access.
+          <div className="space-y-4 pt-2">
+            <div>
+              <h3 className="text-sm font-medium">Default pages at login</h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                Choose where admins and members land after signing in. Per-user defaults in their profile still take priority.
               </p>
-            )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="admin-default-page">Admin default page</Label>
+              <Select
+                value={adminDefaultPageId || '__none__'}
+                onValueChange={(value) =>
+                  setAdminDefaultPageId(value === '__none__' ? '__none__' : value)
+                }
+                disabled={loadingPages}
+              >
+                <SelectTrigger id="admin-default-page" className="max-w-md">
+                  <SelectValue
+                    placeholder={
+                      loadingPages
+                        ? 'Loading pages...'
+                        : interfacePages.length === 0
+                          ? 'No pages available'
+                          : 'Select admin default page'
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None (use Marketing Home or first available)</SelectItem>
+                  {interfacePages.map((page) => (
+                    <SelectItem key={page.id} value={page.id}>
+                      {page.name}
+                      {page.is_admin_only ? ' (admin-only)' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="member-default-page">Member default page</Label>
+              <Select
+                value={memberDefaultPageId || '__none__'}
+                onValueChange={(value) =>
+                  setMemberDefaultPageId(value === '__none__' ? '__none__' : value)
+                }
+                disabled={loadingPages}
+              >
+                <SelectTrigger id="member-default-page" className="max-w-md">
+                  <SelectValue
+                    placeholder={
+                      loadingPages
+                        ? 'Loading pages...'
+                        : interfacePages.length === 0
+                          ? 'No pages available'
+                          : 'Select member default page'
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None (use Marketing Home or first available)</SelectItem>
+                  {interfacePages.length === 0 ? (
+                    <SelectItem value="__no_member_pages__" disabled>
+                      No pages available
+                    </SelectItem>
+                  ) : (
+                    interfacePages.map((page) => (
+                      <SelectItem
+                        key={page.id}
+                        value={page.id}
+                        disabled={!!page.is_admin_only}
+                      >
+                        {page.name}
+                        {page.is_admin_only ? ' (admin-only)' : ''}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              {selectedMemberPage?.is_admin_only && (
+                <p className="text-xs text-amber-600">
+                  This page is admin-only. Members cannot open it — pick a page they can access.
+                </p>
+              )}
+              {selectedAdminPage?.is_admin_only && (
+                <p className="text-xs text-muted-foreground">
+                  Admin default can be any page, including admin-only interfaces.
+                </p>
+              )}
+            </div>
+
             {!loadingPages && interfacePages.length === 0 && (
               <p className="text-xs text-amber-600">
-                No interface pages found. Create pages in the Pages tab to set a default page.
+                No interface pages found. Create pages in the Pages tab to set defaults.
               </p>
             )}
           </div>

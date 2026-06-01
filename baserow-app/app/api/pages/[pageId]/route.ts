@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { forbiddenResponse, isPermissionDeniedError, requireAdmin } from '@/lib/api/authz'
+import {
+  buildClearLandingDefaultsUpdate,
+  LANDING_DEFAULT_COLUMNS,
+} from '@/lib/workspace-defaults'
 
 interface PageConfigShape {
   settings?: {
@@ -215,16 +219,19 @@ export async function DELETE(
     try {
       const { data: workspaceSettings } = await supabase
         .from('workspace_settings')
-        .select('id, default_interface_id')
+        .select(`id, ${LANDING_DEFAULT_COLUMNS}`)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
 
-      if (workspaceSettings?.default_interface_id === params.pageId) {
+      const clearUpdate = workspaceSettings
+        ? buildClearLandingDefaultsUpdate(params.pageId, workspaceSettings)
+        : null
+      if (clearUpdate) {
         await supabase
           .from('workspace_settings')
-          .update({ default_interface_id: null })
-          .eq('id', workspaceSettings.id)
+          .update(clearUpdate)
+          .eq('id', workspaceSettings!.id)
       }
     } catch (settingsError) {
       // Silently ignore errors - column might not exist or RLS might block

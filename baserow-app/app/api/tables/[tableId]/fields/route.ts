@@ -15,6 +15,7 @@ import { getTableFields } from '@/lib/fields/schema'
 import { isTableNotFoundError, createErrorResponse, type ApiError } from '@/lib/api/error-handling'
 import type { TableField, FieldType, FieldOptions } from '@/types/fields'
 import { debugLog } from '@/lib/debug'
+import { addPhysicalTableColumn, dropPhysicalTableColumn } from '@/lib/fields/physicalTableColumns'
 import { notifyPostgrestSchemaReload, runTableSqlAdmin } from '@/lib/fields/runTableSqlAdmin'
 
 const SYSTEM_FIELD_NAMES = new Set(['created_at', 'created_by', 'updated_at', 'updated_by'])
@@ -264,9 +265,13 @@ export async function POST(
           }
         }
         
-        const sql = generateAddColumnSQL(table.supabase_table, finalSanitizedName, type as FieldType, normalizedOptions)
-        
-        const { error: sqlError } = await runTableSqlAdmin(sql)
+        const { error: sqlError } = await addPhysicalTableColumn(
+          supabase,
+          table.supabase_table,
+          finalSanitizedName,
+          type as FieldType,
+          normalizedOptions
+        )
 
         if (sqlError) {
           // Rollback: Delete metadata
@@ -320,8 +325,7 @@ export async function POST(
       if (targetTableId === tableId) {
         // Rollback: best-effort cleanup of created metadata + column.
         try {
-          const dropSql = generateDropColumnSQL(table.supabase_table, finalSanitizedName)
-          await runTableSqlAdmin(dropSql)
+          await dropPhysicalTableColumn(supabase, table.supabase_table, finalSanitizedName)
         } catch {
           // ignore
         }
@@ -338,8 +342,7 @@ export async function POST(
       if (!targetTable) {
         // Rollback the source field.
         try {
-          const dropSql = generateDropColumnSQL(table.supabase_table, finalSanitizedName)
-          await runTableSqlAdmin(dropSql)
+          await dropPhysicalTableColumn(supabase, table.supabase_table, finalSanitizedName)
         } catch {
           // ignore
         }
@@ -383,8 +386,7 @@ export async function POST(
         if (attempt > 50) {
           // Rollback the source field.
           try {
-            const dropSql = generateDropColumnSQL(table.supabase_table, finalSanitizedName)
-            await runTableSqlAdmin(dropSql)
+            await dropPhysicalTableColumn(supabase, table.supabase_table, finalSanitizedName)
           } catch {
             // ignore
           }
@@ -432,8 +434,7 @@ export async function POST(
       if (reciprocalFieldError || !reciprocalFieldData) {
         // Rollback the source field.
         try {
-          const dropSql = generateDropColumnSQL(table.supabase_table, finalSanitizedName)
-          await runTableSqlAdmin(dropSql)
+          await dropPhysicalTableColumn(supabase, table.supabase_table, finalSanitizedName)
         } catch {
           // ignore
         }
@@ -448,19 +449,18 @@ export async function POST(
 
       // Add reciprocal SQL column to the target physical table.
       try {
-        const reciprocalSql = generateAddColumnSQL(
+        const { error: reciprocalSqlError } = await addPhysicalTableColumn(
+          supabase,
           (targetTable as any).supabase_table,
           reciprocalSanitizedName,
           'link_to_table',
           reciprocalOptions
         )
-        const { error: reciprocalSqlError } = await runTableSqlAdmin(reciprocalSql)
         if (reciprocalSqlError) {
           // Rollback both sides best-effort.
           await supabase.from('table_fields').delete().eq('id', reciprocalFieldData.id)
           try {
-            const dropSql = generateDropColumnSQL(table.supabase_table, finalSanitizedName)
-            await runTableSqlAdmin(dropSql)
+            await dropPhysicalTableColumn(supabase, table.supabase_table, finalSanitizedName)
           } catch {
             // ignore
           }
@@ -475,8 +475,7 @@ export async function POST(
         // Rollback both sides best-effort.
         await supabase.from('table_fields').delete().eq('id', reciprocalFieldData.id)
         try {
-          const dropSql = generateDropColumnSQL(table.supabase_table, finalSanitizedName)
-          await runTableSqlAdmin(dropSql)
+          await dropPhysicalTableColumn(supabase, table.supabase_table, finalSanitizedName)
         } catch {
           // ignore
         }
@@ -500,15 +499,17 @@ export async function POST(
       if (updateSourceLinkError) {
         // Rollback best-effort: remove reciprocal + source metadata + columns.
         try {
-          const dropRecSql = generateDropColumnSQL((targetTable as any).supabase_table, reciprocalSanitizedName)
-          await runTableSqlAdmin(dropRecSql)
+          await dropPhysicalTableColumn(
+            supabase,
+            (targetTable as any).supabase_table,
+            reciprocalSanitizedName
+          )
         } catch {
           // ignore
         }
         await supabase.from('table_fields').delete().eq('id', reciprocalFieldData.id)
         try {
-          const dropSql = generateDropColumnSQL(table.supabase_table, finalSanitizedName)
-          await runTableSqlAdmin(dropSql)
+          await dropPhysicalTableColumn(supabase, table.supabase_table, finalSanitizedName)
         } catch {
           // ignore
         }
@@ -1250,8 +1251,11 @@ export async function DELETE(
             // Drop column if physical
             if (reciprocal.type !== 'formula' && reciprocal.type !== 'lookup') {
               try {
-                const sql = generateDropColumnSQL((reciprocalTable as any).supabase_table, reciprocal.name)
-                await runTableSqlAdmin(sql)
+                await dropPhysicalTableColumn(
+                  supabase,
+                  (reciprocalTable as any).supabase_table,
+                  reciprocal.name
+                )
               } catch {
                 // ignore
               }
@@ -1285,8 +1289,11 @@ export async function DELETE(
         }
       } else {
         // Table exists - proceed with dropping column
-        const sql = generateDropColumnSQL(table.supabase_table, field.name)
-        const { error: sqlError } = await runTableSqlAdmin(sql)
+        const { error: sqlError } = await dropPhysicalTableColumn(
+          supabase,
+          table.supabase_table,
+          field.name
+        )
 
         if (sqlError) {
           console.error('Error dropping column:', sqlError)

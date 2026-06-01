@@ -313,7 +313,7 @@ export default function InterfacesTab() {
     try {
       const { data: defaultInterface, error: settingsError } = await supabase
         .from('workspace_settings')
-        .select('default_interface_id')
+        .select('default_interface_id, admin_default_interface_id, member_default_interface_id')
         // Single-workspace app: choose deterministic row even if duplicates exist
         .order('created_at', { ascending: false })
         .limit(1)
@@ -331,7 +331,10 @@ export default function InterfacesTab() {
           console.warn('Error checking default interface:', settingsError)
         }
       } else if (defaultInterface) {
-        defaultId = defaultInterface.default_interface_id || null
+        defaultId =
+          defaultInterface.admin_default_interface_id ||
+          defaultInterface.default_interface_id ||
+          null
       }
     } catch (error: any) {
       if (error?.code !== 'PGRST116' && error?.code !== '42P01' && error?.code !== '42703') {
@@ -516,14 +519,20 @@ export default function InterfacesTab() {
         if (existing) {
           const { error: updateError } = await supabase
             .from('workspace_settings')
-            .update({ default_interface_id: interfaceId })
+            .update({
+              default_interface_id: interfaceId,
+              admin_default_interface_id: interfaceId,
+            })
             .eq('id', existing.id)
 
           if (updateError) throw updateError
         } else {
           const { error: insertError } = await supabase
             .from('workspace_settings')
-            .insert({ default_interface_id: interfaceId })
+            .insert({
+              default_interface_id: interfaceId,
+              admin_default_interface_id: interfaceId,
+            })
 
           if (insertError) throw insertError
         }

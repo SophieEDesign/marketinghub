@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getTable } from '@/lib/crud/tables'
 import { getTableFields } from '@/lib/fields/schema'
-import { generateAddColumnSQL } from '@/lib/fields/sqlGenerator'
-import { notifyPostgrestSchemaReload, runTableSqlAdmin } from '@/lib/fields/runTableSqlAdmin'
+import { addPhysicalTableColumn } from '@/lib/fields/physicalTableColumns'
+import { notifyPostgrestSchemaReload } from '@/lib/fields/runTableSqlAdmin'
 import type { TableField } from '@/types/fields'
 
 const SYSTEM_FIELD_NAMES = new Set(['created_at', 'created_by', 'updated_at', 'updated_by'])
@@ -179,20 +179,13 @@ export async function POST(
     }
 
     try {
-      // Generate SQL - this can throw if field type is invalid
-      let sql: string
-      try {
-        sql = generateAddColumnSQL(`public.${tableName}`, colName, f.type, f.options)
-      } catch (sqlGenError: unknown) {
-        console.warn(
-          `[sync-schema] Failed to generate SQL for column "${colName}" (type: ${f.type}) in "${tableName}":`,
-          sqlGenError
-        )
-        // Skip this field - can't generate valid SQL for it
-        continue
-      }
-
-      const { error: addError } = await runTableSqlAdmin(sql)
+      const { error: addError } = await addPhysicalTableColumn(
+        supabase,
+        tableName,
+        colName,
+        f.type,
+        f.options
+      )
       if (!addError) {
         addedColumns.push(colName)
         physical.add(colName)
