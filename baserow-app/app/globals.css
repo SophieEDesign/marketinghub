@@ -936,6 +936,28 @@
   --fc-today-bg-color: hsl(var(--accent-link) / 0.06);
 }
 
+/*
+ * Multi-day bars use fc-daygrid-event-harness-abs inside the start cell and paint
+ * across following columns. Parent .calendar-embed hides overflow on day cells,
+ * which clips the bar to a single day even when FullCalendar sets end correctly.
+ */
+.calendar-embed--events .fc .fc-daygrid-day {
+  overflow: visible;
+}
+
+.calendar-embed--events .fc .fc-daygrid-day-frame {
+  overflow: visible;
+}
+
+.calendar-embed--events .fc .fc-daygrid-day-events {
+  overflow-x: visible;
+  overflow-y: visible;
+}
+
+.calendar-embed--events .fc .fc-daygrid-event-harness-abs {
+  z-index: 3;
+}
+
 .calendar-embed--events .fc .fc-scrollgrid {
   border: 1px solid hsl(var(--border) / 0.35);
   border-radius: 0.625rem;

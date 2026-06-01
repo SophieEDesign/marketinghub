@@ -31,20 +31,12 @@ describe("marketing-block-layout", () => {
     expect(isConfigFullPage({})).toBe(false)
   })
 
-  it("isConfigFullPage treats social calendar mode full as full-page", () => {
+  it("isConfigFullPage only uses explicit is_full_page flag", () => {
     expect(
-      isConfigFullPage(
-        { social_media_calendar_mode: "full", is_full_page: false },
-        "social_media_calendar"
-      )
-    ).toBe(true)
-  })
-
-  it("isConfigFullPage treats campaigns overview defaultFullPage as full-page", () => {
-    expect(isConfigFullPage({ table_id: "t1" }, "campaigns_overview")).toBe(true)
-    expect(
-      isConfigFullPage({ table_id: "t1", is_full_page: false }, "campaigns_overview")
+      isConfigFullPage({ social_media_calendar_mode: "full", is_full_page: false })
     ).toBe(false)
+    expect(isConfigFullPage({ table_id: "t1" })).toBe(false)
+    expect(isConfigFullPage({ is_full_page: true })).toBe(true)
   })
 
   it("marketingBlockRootClass strips card chrome in full-page mode", () => {

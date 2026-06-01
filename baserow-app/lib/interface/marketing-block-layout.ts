@@ -1,13 +1,8 @@
-import type { BlockConfig, BlockType } from "@/lib/interface/types"
-import { configWantsFullPageLayout } from "@/lib/interface/full-page-layout"
+import type { BlockConfig } from "@/lib/interface/types"
 import { cn } from "@/lib/utils"
 
-export function isConfigFullPage(
-  config?: BlockConfig | null,
-  blockType?: BlockType
-): boolean {
-  if (!blockType) return config?.is_full_page === true
-  return configWantsFullPageLayout(blockType, config)
+export function isConfigFullPage(config?: BlockConfig | null): boolean {
+  return config?.is_full_page === true
 }
 
 /**

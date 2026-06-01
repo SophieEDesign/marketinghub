@@ -2459,7 +2459,8 @@ export default function Canvas({
                     ),
                     isKeyboardHighlighted: keyboardMoveHighlight === block.id,
                   }),
-                  "h-full w-full min-h-0 flex flex-col"
+                  "h-full w-full min-h-0 flex flex-col",
+                  isThisFullPageBlock && "!h-full"
                 )}
                 onMouseDownCapture={(e) => {
                   // Capture runs before child stopPropagation — required for marketing blocks (buttons, rows, timeline bars)

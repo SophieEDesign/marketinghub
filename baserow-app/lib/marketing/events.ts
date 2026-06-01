@@ -208,6 +208,8 @@ export interface EventCalendarEvent {
   start: string
   end?: string
   allDay: boolean
+  /** Force block layout in month grid (required for multi-day horizontal bars). */
+  display?: "auto" | "block" | "list-item"
   accentColor: string
   backgroundColor: string
   extendedProps: Record<string, unknown>
@@ -977,6 +979,7 @@ export function buildEventCalendarEvents(items: MarketingEventItem[]): EventCale
         title: item.eventName,
         start,
         allDay: isMultiDay ? true : item.allDay,
+        ...(isMultiDay ? { display: "block" as const } : {}),
         accentColor: item.accentColor,
         backgroundColor: item.backgroundColor,
         extendedProps: {

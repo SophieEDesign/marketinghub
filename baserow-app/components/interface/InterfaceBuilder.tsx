@@ -1799,7 +1799,10 @@ function InterfaceBuilderInner({
         >
           <FilterStateProvider>
             {/* Blocks always render - no conditional visibility. Edit mode changes behaviour only. */}
-            <MarketingDashboardCanvasShell enabled={marketingDashboard}>
+            <MarketingDashboardCanvasShell
+              enabled={marketingDashboard}
+              fullPage={Boolean(fullPageBlockId)}
+            >
             <Canvas
               blocks={blocks}
               isEditing={effectiveIsEditing}

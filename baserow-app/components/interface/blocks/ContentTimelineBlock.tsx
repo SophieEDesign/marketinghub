@@ -30,7 +30,6 @@ import { ContentTimelineHeader } from "@/components/interface/content-timeline/C
 import { ContentTimelineStatusLegend } from "@/components/interface/content-timeline/ContentTimelineStatusLegend"
 import MarketingDemoDataBanner from "@/components/interface/primitives/MarketingDemoDataBanner"
 import { marketingBlockRootClass } from "@/lib/interface/marketing-block-layout"
-import { resolveBlockUsesFullPageLayout } from "@/lib/interface/full-page-layout"
 
 interface ContentTimelineBlockProps {
   block: PageBlock
@@ -55,7 +54,6 @@ export default function ContentTimelineBlock({
   interfaceMode = "view",
   isFullPage = false,
 }: ContentTimelineBlockProps) {
-  const useFullPage = resolveBlockUsesFullPageLayout(block, isFullPage)
   const { config } = block
   const { openRecordModal } = useRecordModal()
   const {
@@ -219,7 +217,7 @@ export default function ContentTimelineBlock({
     <div
       data-block-selectable
       className={marketingBlockRootClass(
-        useFullPage,
+        isFullPage,
         "rounded-2xl border border-border/40 bg-background shadow-sm"
       )}
     >

@@ -1,5 +1,6 @@
 import {
   blockWantsFullPageLayout,
+  fullPageToggleConfigUpdates,
   resolveFullPageBlockId,
 } from "@/lib/interface/full-page-layout"
 import type { PageBlock } from "@/lib/interface/types"
@@ -26,14 +27,21 @@ describe("full-page-layout", () => {
     expect(resolveFullPageBlockId([b])).toBe("b1")
   })
 
-  it("resolveFullPageBlockId treats social mode full as full-page layout", () => {
+  it("explicit is_full_page false opts out even when social mode is full", () => {
     const b = block({
       id: "b1",
       type: "social_media_calendar",
       config: { social_media_calendar_mode: "full", is_full_page: false },
     })
-    expect(blockWantsFullPageLayout(b)).toBe(true)
-    expect(resolveFullPageBlockId([b])).toBe("b1")
+    expect(blockWantsFullPageLayout(b)).toBe(false)
+    expect(resolveFullPageBlockId([b])).toBeNull()
+  })
+
+  it("fullPageToggleConfigUpdates sets compact mode when disabling social calendar", () => {
+    expect(fullPageToggleConfigUpdates("social_media_calendar", false)).toEqual({
+      is_full_page: false,
+      social_media_calendar_mode: "compact",
+    })
   })
 
   it("resolveFullPageBlockId uses defaultFullPage for campaigns without saved flag", () => {

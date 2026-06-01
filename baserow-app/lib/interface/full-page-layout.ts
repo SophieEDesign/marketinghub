@@ -34,13 +34,22 @@ export function canUseFullPageBlock(block: PageBlock): boolean {
 }
 
 /**
- * Whether this block should use full-page canvas layout.
- * - Explicit `is_full_page: false` always opts out.
- * - Explicit `is_full_page: true` opts in.
- * - Legacy social `mode: 'full'` opts in.
- * - Marketing dashboard types use registry `defaultFullPage` when flag is unset (existing pages).
+ * Whether the page canvas should use full-page layout for this block.
+ * Explicit `is_full_page: false` always opts out (user toggle wins).
+ * Explicit `is_full_page: true` opts in.
+ * When unset, marketing dashboard types use registry `defaultFullPage` (legacy pages).
  */
-/** Resolve full-page from type + config only (settings panel / layout helpers). */
+export function blockWantsFullPageLayout(block: PageBlock): boolean {
+  const flag = block.config?.is_full_page
+  if (flag === false) return false
+  if (flag === true) return true
+  if (isMarketingDashboardBlockType(block.type)) {
+    return getBlockDefinition(block.type).defaultFullPage === true
+  }
+  return false
+}
+
+/** Resolve full-page from type + config only (settings panel helpers). */
 export function configWantsFullPageLayout(
   type: BlockType,
   config?: BlockConfig | null
@@ -56,19 +65,6 @@ export function configWantsFullPageLayout(
     h: 12,
     config,
   } as PageBlock)
-}
-
-export function blockWantsFullPageLayout(block: PageBlock): boolean {
-  const socialLegacyFull =
-    block.type === "social_media_calendar" &&
-    block.config?.social_media_calendar_mode === "full"
-  const flag = block.config?.is_full_page
-  if (flag === false && !socialLegacyFull) return false
-  if (flag === true || socialLegacyFull) return true
-  if (isMarketingDashboardBlockType(block.type)) {
-    return getBlockDefinition(block.type).defaultFullPage === true
-  }
-  return false
 }
 
 /** Used when filtering blocks that already have the full-page flag set (invariant cleanup). */
@@ -100,10 +96,22 @@ export function pageUsesFullPageLayout(blocks: PageBlock[]): boolean {
 /** Minimum react-grid-layout row count so full-page blocks do not collapse in edit mode. */
 export const FULL_PAGE_GRID_MIN_ROWS = 18
 
-/** Canvas prop and/or block config (marketing defaults, legacy social mode). */
+/** Block chrome/layout: only when canvas is in full-page mode (not config defaults alone). */
 export function resolveBlockUsesFullPageLayout(
-  block: PageBlock,
+  _block: PageBlock,
   isFullPageFromCanvas = false
 ): boolean {
-  return isFullPageFromCanvas || blockWantsFullPageLayout(block)
+  return isFullPageFromCanvas
+}
+
+/** Config updates when toggling full-page in block settings. */
+export function fullPageToggleConfigUpdates(
+  blockType: BlockType,
+  enabled: boolean
+): Partial<BlockConfig> {
+  const updates: Partial<BlockConfig> = { is_full_page: enabled }
+  if (blockType === "social_media_calendar") {
+    updates.social_media_calendar_mode = enabled ? "full" : "compact"
+  }
+  return updates
 }

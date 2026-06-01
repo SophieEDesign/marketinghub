@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Plus, X } from "lucide-react"
 import type { BlockType } from "@/lib/interface/types"
+import { SHELL_RIGHT_SETTINGS_WIDTH_PX } from "@/lib/interface/layout-constants"
 import BlockPickerPanel from "@/components/interface/BlockPickerPanel"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
@@ -17,9 +18,13 @@ export default function FloatingBlockPicker({ onSelectBlock }: FloatingBlockPick
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
-          className="fixed bottom-24 right-6 z-30 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-colors flex items-center justify-center"
+          className="fixed bottom-24 z-30 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-colors flex items-center justify-center"
           title="Add block"
-          style={{ zIndex: 30 }}
+          style={{
+            zIndex: 30,
+            // Stay on the canvas: offset by the right settings panel (edit mode only).
+            right: `calc(${SHELL_RIGHT_SETTINGS_WIDTH_PX}px + 1.5rem)`,
+          }}
         >
           <Plus className="h-6 w-6" />
         </button>

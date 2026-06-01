@@ -4,7 +4,10 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import type { PageBlock } from "@/lib/interface/types"
 import type { BlockConfig } from "@/lib/interface/types"
-import { configWantsFullPageLayout } from "@/lib/interface/full-page-layout"
+import {
+  configWantsFullPageLayout,
+  fullPageToggleConfigUpdates,
+} from "@/lib/interface/full-page-layout"
 
 interface FullPageLayoutSettingsProps {
   block: PageBlock
@@ -33,14 +36,18 @@ export default function FullPageLayoutSettings({
   const otherBlocksCount = allBlocks.filter((b) => b.id !== block.id).length
   const canTurnOnFullPage = otherBlocksCount === 0
   const isValidForFullPage =
-    block.type !== 'record_context' || Boolean((effectiveConfig ?? block.config)?.table_id)
+    block.type !== "record_context" ||
+    Boolean((effectiveConfig ?? block.config)?.table_id)
 
   const handleToggle = (checked: boolean) => {
     if (checked && !canTurnOnFullPage) return
     if (checked && !isValidForFullPage) return
-    const updates = { is_full_page: checked }
+    const updates = fullPageToggleConfigUpdates(block.type, checked)
     onUpdate(updates)
     onApplyImmediate?.(updates)
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("app:layout-resize"))
+    }
   }
 
   return (
