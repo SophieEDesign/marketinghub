@@ -20,6 +20,7 @@ interface KanbanBlockProps {
   pageShowAddRecord?: boolean
   onModalLayoutSave?: (fieldLayout: FieldLayoutItem[]) => void
   canEditLayout?: boolean
+  isFullPage?: boolean
 }
 
 /**
@@ -40,6 +41,7 @@ export default function KanbanBlock({
   pageShowAddRecord = false,
   onModalLayoutSave,
   canEditLayout = false,
+  isFullPage = false,
 }: KanbanBlockProps) {
   // Create a modified block config with view_type='kanban'
   const kanbanBlock: PageBlock = {
@@ -65,6 +67,7 @@ export default function KanbanBlock({
       pageShowAddRecord={pageShowAddRecord}
       onModalLayoutSave={onModalLayoutSave}
       canEditLayout={canEditLayout}
+      isFullPage={isFullPage}
     />
   )
 }

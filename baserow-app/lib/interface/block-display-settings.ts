@@ -51,3 +51,26 @@ export function resolveBlockDisplaySettings(
     overflowBehaviour,
   }
 }
+
+/** When true, block uses fixed+scroll display settings (internal scrollbar). */
+export function allowInternalScrollFromDisplaySettings(
+  displayMode: BlockDisplayMode,
+  overflowBehaviour: BlockOverflowBehaviour
+): boolean {
+  return displayMode === "fixed" && overflowBehaviour === "scroll"
+}
+
+/**
+ * Full-page mode suppresses main page scroll; overflowing content must scroll inside the block.
+ */
+export function shouldUseFullPageInternalScroll(isFullPage: boolean): boolean {
+  return isFullPage
+}
+
+export function effectiveAllowInternalScroll(
+  isFullPage: boolean,
+  displayMode: BlockDisplayMode,
+  overflowBehaviour: BlockOverflowBehaviour
+): boolean {
+  return shouldUseFullPageInternalScroll(isFullPage) || allowInternalScrollFromDisplaySettings(displayMode, overflowBehaviour)
+}

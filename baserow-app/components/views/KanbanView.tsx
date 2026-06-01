@@ -78,6 +78,8 @@ interface KanbanViewProps {
   displayMode?: 'fit' | 'fixed'
   overflowBehaviour?: 'view_all' | 'scroll' | 'paginate'
   recordLimit?: number
+  /** Full-page mode: scroll inside the block when content overflows. */
+  forceInternalScroll?: boolean
 }
 
 function KanbanView({ 
@@ -106,6 +108,7 @@ function KanbanView({
   displayMode = 'fit',
   overflowBehaviour = 'view_all',
   recordLimit = 20,
+  forceInternalScroll = false,
 }: KanbanViewProps) {
   // All hooks must be at the top level, before any conditional returns
   const router = useRouter()
@@ -524,7 +527,8 @@ function KanbanView({
     )
   }
 
-  const allowInternalScroll = displayMode === "fixed" && overflowBehaviour === "scroll"
+  const allowInternalScroll =
+    forceInternalScroll || (displayMode === "fixed" && overflowBehaviour === "scroll")
 
   return (
     <div className={cn("w-full min-w-0 min-h-0 flex flex-col bg-background", allowInternalScroll ? "h-full overflow-hidden" : "h-auto overflow-visible")}>

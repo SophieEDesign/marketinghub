@@ -99,6 +99,8 @@ interface ListViewProps {
   recordLimit?: number
   displayMode?: "fit" | "fixed"
   overflowBehaviour?: BlockOverflowBehaviour
+  /** Full-page mode: scroll inside the block when content overflows. */
+  forceInternalScroll?: boolean
 }
 
 function ListViewInner({
@@ -138,7 +140,11 @@ function ListViewInner({
   recordLimit = 20,
   displayMode = "fit",
   overflowBehaviour = "view_all",
+  forceInternalScroll = false,
 }: ListViewProps) {
+  const useInternalScroll =
+    forceInternalScroll || (displayMode === "fixed" && overflowBehaviour === "scroll")
+
   const router = useRouter()
   const { openRecord } = useRecordPanel()
   const viewUuid = useMemo(() => normalizeUuid(viewId), [viewId])
@@ -573,6 +579,7 @@ function ListViewInner({
   useEffect(() => {
     // Marketing dashboard cards should keep a fixed internal viewport and never auto-expand.
     if (marketingDashboardStyle) return
+    if (forceInternalScroll) return
     if (!onHeightChange || !contentRef.current) return
 
     const timeoutId = setTimeout(() => {
@@ -594,7 +601,7 @@ function ListViewInner({
     }, 100)
 
     return () => clearTimeout(timeoutId)
-  }, [collapsedGroups, effectiveGroupRules.length, currentGroupBy, onHeightChange, rowHeight, filteredRows.length])
+  }, [collapsedGroups, effectiveGroupRules.length, currentGroupBy, onHeightChange, rowHeight, filteredRows.length, forceInternalScroll])
 
   // Handle group change
   const handleGroupChange = useCallback(async (fieldName: string | null) => {
@@ -1030,7 +1037,9 @@ function ListViewInner({
           className={
             marketingDashboardStyle
               ? "h-[360px] max-h-[360px] min-h-0 min-w-0 overflow-y-auto overflow-x-hidden"
-            : (displayMode === "fit" || onHeightChange)
+            : useInternalScroll
+              ? "flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden"
+              : (displayMode === "fit" || onHeightChange)
               ? "min-h-0 min-w-0 overflow-visible"
               : "flex-1 min-h-0 min-w-0 overflow-y-auto"
           }
@@ -1228,8 +1237,6 @@ function ListViewInner({
   // Render ungrouped list
   const hasMoreRows = !isShowingAll && filteredRows.length > recordLimit
   const rowsToRender = hasMoreRows ? filteredRows.slice(0, recordLimit) : filteredRows
-  const allowInternalScroll = displayMode === "fixed" && overflowBehaviour === "scroll"
-
   if (rowsToRender.length === 0) {
     return (
       <div ref={contentRef} className={cn(displayMode === "fit" ? "h-auto" : "h-full", "flex flex-col")}>
@@ -1261,12 +1268,19 @@ function ListViewInner({
   }
 
   return (
-    <div ref={contentRef} className={cn(BLOCK_EMBED_CLASSNAME, displayMode === "fit" ? "h-auto" : "h-full", "flex flex-col")}>
+    <div
+      ref={contentRef}
+      className={cn(
+        BLOCK_EMBED_CLASSNAME,
+        useInternalScroll || displayMode === "fixed" ? "h-full" : "h-auto",
+        "flex flex-col"
+      )}
+    >
       <div
         className={
             marketingDashboardStyle
             ? "h-[360px] max-h-[360px] min-h-0 min-w-0 overflow-y-auto overflow-x-hidden"
-            : allowInternalScroll
+            : useInternalScroll
             ? "flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden"
             : onHeightChange || displayMode === "fit"
             ? "min-h-0 min-w-0 overflow-visible overflow-x-hidden"

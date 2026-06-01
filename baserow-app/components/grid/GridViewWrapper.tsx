@@ -115,6 +115,7 @@ interface GridViewWrapperProps {
   recordLimit?: number
   overflowBehaviour?: 'view_all' | 'scroll' | 'paginate'
   displayMode?: 'fit' | 'fixed'
+  forceInternalScroll?: boolean
 }
 
 export default function GridViewWrapper({
@@ -153,6 +154,7 @@ export default function GridViewWrapper({
   recordLimit = 20,
   overflowBehaviour = 'view_all',
   displayMode = 'fit',
+  forceInternalScroll = false,
 }: GridViewWrapperProps) {
   const router = useRouter()
   // CRITICAL: Normalize all inputs at wrapper entry point
@@ -899,6 +901,7 @@ export default function GridViewWrapper({
           recordLimit={recordLimit}
           overflowBehaviour={overflowBehaviour}
           displayMode={displayMode}
+          forceInternalScroll={forceInternalScroll}
         onRecordClick={onRecordClick}
           rowHeight={rowHeight}
           wrapText={wrapText}

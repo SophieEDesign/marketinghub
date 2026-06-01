@@ -57,7 +57,7 @@ export default function FullPageLayoutSettings({
       </div>
       {isFullPage ? (
         <p className="text-xs text-muted-foreground">
-          This block fills the entire page. Turn off to use the grid and add more blocks.
+          This block fills the entire page. Content scrolls inside the block when it exceeds the page height. Turn off to use the grid and add more blocks.
         </p>
       ) : !isValidForFullPage ? (
         <p className="text-xs text-muted-foreground">

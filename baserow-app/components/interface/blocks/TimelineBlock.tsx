@@ -20,6 +20,7 @@ interface TimelineBlockProps {
   pageShowAddRecord?: boolean
   onModalLayoutSave?: (fieldLayout: FieldLayoutItem[]) => void
   canEditLayout?: boolean
+  isFullPage?: boolean
 }
 
 /**
@@ -40,6 +41,7 @@ export default function TimelineBlock({
   pageShowAddRecord = false,
   onModalLayoutSave,
   canEditLayout = false,
+  isFullPage = false,
 }: TimelineBlockProps) {
   // Create a modified block config with view_type='timeline'
   const timelineBlock: PageBlock = {
@@ -65,6 +67,7 @@ export default function TimelineBlock({
       pageShowAddRecord={pageShowAddRecord}
       onModalLayoutSave={onModalLayoutSave}
       canEditLayout={canEditLayout}
+      isFullPage={isFullPage}
     />
   )
 }

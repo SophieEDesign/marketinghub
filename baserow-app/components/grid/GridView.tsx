@@ -159,6 +159,8 @@ export interface GridViewProps {
   recordLimit?: number
   overflowBehaviour?: 'view_all' | 'scroll' | 'paginate'
   displayMode?: 'fit' | 'fixed'
+  /** Full-page mode: scroll inside the block when content overflows. */
+  forceInternalScroll?: boolean
 }
 
 function shallowEqualRecordNumber(a: Record<string, number>, b: Record<string, number>): boolean {
@@ -603,6 +605,7 @@ function GridViewInner({
   recordLimit = 20,
   overflowBehaviour = 'view_all',
   displayMode = 'fit',
+  forceInternalScroll = false,
 }: GridViewProps) {
   const router = useRouter()
   const { openRecord } = useRecordPanel()
@@ -2898,10 +2901,12 @@ function GridViewInner({
   
   // Measure content height and report ephemeral delta (not total height)
   // When onHeightChange provided and grouped: use overflow-visible so content grows; contentRef scrollHeight reflects full content
-  const usePushDown = Boolean(
-    (displayMode === "fit" && onHeightChange) ||
-    (onHeightChange && effectiveGroupRules.length > 0)
-  )
+  const usePushDown =
+    !forceInternalScroll &&
+    Boolean(
+      (displayMode === "fit" && onHeightChange) ||
+      (onHeightChange && effectiveGroupRules.length > 0)
+    )
   useEffect(() => {
     if (!onHeightChange || !contentRef.current) {
       baseHeightRef.current = null

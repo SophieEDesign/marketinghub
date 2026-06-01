@@ -531,6 +531,7 @@ export default function BlockRenderer({
               pageShowAddRecord={pageShowAddRecord}
               onModalLayoutSave={onUpdate ? (fieldLayout) => onUpdate(block.id, { field_layout: fieldLayout }) : undefined}
               canEditLayout={canEdit}
+              isFullPage={isFullPage}
             />
           </LazyBlockWrapper>
         )
@@ -553,6 +554,7 @@ export default function BlockRenderer({
               pageShowAddRecord={pageShowAddRecord}
               onModalLayoutSave={onUpdate ? (fieldLayout) => onUpdate(block.id, { field_layout: fieldLayout }) : undefined}
               canEditLayout={canEdit}
+              isFullPage={isFullPage}
             />
           </LazyBlockWrapper>
         )

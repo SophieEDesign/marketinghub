@@ -39,7 +39,7 @@ import { getVisibleFieldsFromLayout } from "@/lib/interface/field-layout-helpers
 import type { FieldLayoutItem } from "@/lib/interface/field-layout-utils"
 import { buildRecordContextFilters } from "@/lib/interface/record-context-filters"
 import { cn } from "@/lib/utils"
-import { resolveBlockDisplaySettings } from "@/lib/interface/block-display-settings"
+import { effectiveAllowInternalScroll, resolveBlockDisplaySettings } from "@/lib/interface/block-display-settings"
 import BlockHeader from "@/components/interface/blocks/shared/BlockHeader"
 
 interface GridBlockProps {
@@ -90,7 +90,12 @@ export default function GridBlock({
   const marketingDashboardStyle = useMarketingDashboard()
 const { config } = block
   const displaySettings = resolveBlockDisplaySettings(block.type, config)
-  const isFitMode = displaySettings.displayMode === "fit"
+  const isFitMode = displaySettings.displayMode === "fit" && !isFullPage
+  const allowInternalScroll = effectiveAllowInternalScroll(
+    isFullPage,
+    displaySettings.displayMode,
+    displaySettings.overflowBehaviour
+  )
 
   // CRITICAL: block.config is often a new object each render (from CalendarBlock/BlockRenderer).
   // Passing unstable blockConfig to CalendarView → blockConfigRef changes → handleEventClick deps
@@ -148,7 +153,7 @@ const previousMeasuredHeightPxRef = useRef<number | null>(null)
   }, [onEphemeralHeightDelta, block.id, rowHeight])
 
   useEffect(() => {
-    if (!onEphemeralHeightDelta) return
+    if (!onEphemeralHeightDelta || isFullPage) return
 
     if (!isFitMode) {
       lastReportedDeltaPxRef.current = 0
@@ -178,7 +183,7 @@ const previousMeasuredHeightPxRef = useRef<number | null>(null)
     })
     observer.observe(element)
     return () => observer.disconnect()
-  }, [onEphemeralHeightDelta, isFitMode, block.id, block.h, rowHeight, configContentKey, viewType])
+  }, [onEphemeralHeightDelta, isFitMode, isFullPage, block.id, block.h, rowHeight, configContentKey, viewType])
 // Grid block table_id resolution: use config.table_id first, fallback to pageTableId
   // This ensures calendar/list/kanban pages work even if table_id isn't explicitly set in block config
   // Backward compatibility: some legacy data used camelCase `tableId`
@@ -593,8 +598,7 @@ useEffect(() => {
     }
     return groupBy
   })()
-  const isGridWithPushDown = viewType === 'grid' && !!effectiveGroupByForPushDown
-  const allowInternalScroll = displaySettings.displayMode === "fixed" && displaySettings.overflowBehaviour === "scroll"
+  const isGridWithPushDown = viewType === 'grid' && !!effectiveGroupByForPushDown && !isFullPage
 
   const { canCreateRecord, isAddRecordDisabled, handleAddRecord } = (() => {
     const permissions = config.permissions || {}
@@ -896,6 +900,7 @@ useEffect(() => {
             displayMode={displaySettings.displayMode}
             overflowBehaviour={displaySettings.overflowBehaviour}
             recordLimit={displaySettings.recordLimit}
+            forceInternalScroll={allowInternalScroll}
           />
         )
       }
@@ -1073,8 +1078,7 @@ useEffect(() => {
               direction: s.direction as 'asc' | 'desc',
             }))
 
-        // Let ListView report content height so the block can grow instead of scrolling internally.
-        const canAutoSizeListHeight = true
+        const canAutoSizeListHeight = !isFullPage
 
         return (
           <ListView
@@ -1111,6 +1115,7 @@ useEffect(() => {
             recordLimit={displaySettings.recordLimit}
             displayMode={displaySettings.displayMode}
             overflowBehaviour={displaySettings.overflowBehaviour}
+            forceInternalScroll={allowInternalScroll}
           />
         )
       }
@@ -1179,8 +1184,8 @@ useEffect(() => {
           groupBy: !!effectiveGroupBy && (!!config.group_by_field || !!config.group_by || !!(config as any).group_by_rules), // GroupBy from block config (including nested groups)
         }
 
-        // In fit mode, always report measured content height so layout can reflow.
-        const shouldReportHeight = displaySettings.displayMode === "fit" || !!effectiveGroupBy
+        const shouldReportHeight =
+          !isFullPage && (displaySettings.displayMode === "fit" || !!effectiveGroupBy)
 
         return (
           <GridViewWrapper
@@ -1229,6 +1234,7 @@ useEffect(() => {
             recordLimit={displaySettings.recordLimit}
             overflowBehaviour={displaySettings.overflowBehaviour}
             displayMode={displaySettings.displayMode}
+            forceInternalScroll={allowInternalScroll}
             openRecordInEditMode={
               openRecordInEditModeForBlock &&
               openRecordInEditModeForBlock.blockId === block.id &&
@@ -1247,6 +1253,7 @@ useEffect(() => {
       ref={containerRef}
       className={cn(
         isFitMode ? "h-auto" : "h-full",
+        isFullPage && "h-full",
         "w-full max-w-full min-h-0 min-w-0 flex flex-col",
         (isGridWithPushDown || viewType === "calendar" || !allowInternalScroll) ? "overflow-visible" : "overflow-hidden"
       )}
@@ -1385,6 +1392,7 @@ useEffect(() => {
       {/* When grid uses push-down (grouping), overflow-visible so content can grow and flow to page scroll. */}
       <div className={cn(
         isFitMode ? "h-auto" : "flex-1",
+        isFullPage && "flex-1 min-h-0",
         "flex flex-col min-w-0 w-full min-h-0",
         (isGridWithPushDown || marketingDashboardStyle || viewType === "calendar" || !allowInternalScroll) ? "overflow-visible" : "overflow-hidden"
       )}>
