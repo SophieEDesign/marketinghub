@@ -14,7 +14,9 @@ import {
   DEFAULT_EVENT_CALENDAR_BLOCK_CONFIG,
   resolveContentEventFields,
   buildEventTimelineRange,
+  buildEventItems,
   positionEventOnTimeline,
+  resolveEventRowDates,
   type MarketingEventItem,
 } from "@/lib/marketing/events"
 import { buildCalendarIcs, buildEventIcs } from "@/lib/marketing/event-calendar-ics"
@@ -360,6 +362,101 @@ describe("EventCalendarCore edit vs view click", () => {
     expect(src).toContain("if (isEditing) return")
     expect(src).toContain("settings.clickAction")
     expect(src).toContain("EventDetailDrawer")
+  })
+})
+
+describe("resolveEventRowDates", () => {
+  it("uses date and date_to for Content-style rows", () => {
+    const fields = {
+      eventName: "content_name",
+      startDate: "date",
+      endDate: "date_to",
+      allDay: null,
+      startTime: null,
+      endTime: null,
+      timezone: null,
+      eventType: null,
+      status: null,
+      location: null,
+      locationName: null,
+      city: null,
+      country: null,
+      website: null,
+      visibility: null,
+      venue: null,
+      description: null,
+      heroImage: null,
+      linkedTheme: null,
+      campaign: null,
+      owner: null,
+      budget: null,
+      notes: null,
+      attendees: null,
+      scheduleItems: null,
+      resources: null,
+      deletedAt: null,
+    }
+    const { startDate, endDate } = resolveEventRowDates(
+      {
+        date: "2026-01-14",
+        date_to: "2026-01-18",
+      },
+      fields
+    )
+    expect(startDate).not.toBeNull()
+    expect(endDate).not.toBeNull()
+    expect(format(startDate!, "yyyy-MM-dd")).toBe("2026-01-14")
+    expect(format(endDate!, "yyyy-MM-dd")).toBe("2026-01-18")
+  })
+
+  it("buildEventItems shows a date range label when date_to differs from date", () => {
+    const fields = {
+      eventName: "content_name",
+      startDate: "date",
+      endDate: "date_to",
+      allDay: null,
+      startTime: null,
+      endTime: null,
+      timezone: null,
+      eventType: null,
+      status: null,
+      location: null,
+      locationName: null,
+      city: null,
+      country: null,
+      website: null,
+      visibility: null,
+      venue: null,
+      description: null,
+      heroImage: null,
+      linkedTheme: null,
+      campaign: null,
+      owner: null,
+      budget: null,
+      notes: null,
+      attendees: null,
+      scheduleItems: null,
+      resources: null,
+      deletedAt: null,
+    }
+    const items = buildEventItems({
+      rows: [
+        {
+          id: "e1",
+          content_name: "Kings Cup",
+          date: "2026-01-14T00:00:00+00:00",
+          date_to: "2026-01-18T00:00:00+00:00",
+        },
+      ],
+      fields,
+      locationById: new Map(),
+      themeLabelById: new Map(),
+      profileLabelById: new Map(),
+      currentUserId: null,
+    })
+    expect(items[0].dateRangeLabel).toMatch(/14.*18.*Jan.*2026/i)
+    expect(items[0].endDate).not.toBeNull()
+    expect(items[0].startDate?.getTime()).not.toBe(items[0].endDate?.getTime())
   })
 })
 

@@ -356,14 +356,14 @@ export function resolveContentEventFields(
     startDate:
       pickFieldName(
         fields,
-        [/^date$/i, /start.?date/i, /publish/i, /from/i, /begin/i, /^dates$/i],
-        base.startDate
+        [/^date$/i, /^start_date$/i, /start.?date/i, /publish/i, /from/i, /begin/i, /^dates$/i],
+        "date"
       ) || base.startDate,
     endDate:
       pickFieldName(
         fields,
-        [/end.?date/i, /due.?date/i, /to/i, /until/i],
-        base.endDate
+        [/^date_to$/i, /^end_date$/i, /^date_due$/i, /end.?date/i, /until/i],
+        "date_to"
       ) || base.endDate,
     contentType: pickFieldName(
       fields,
@@ -452,8 +452,8 @@ function parseDatesField(raw: unknown): { start: Date | null; end: Date | null }
 export function resolveEventFields(fields: FieldRow[]): EventFieldMap {
   return {
     eventName: pickFieldName(fields, [/event.?name/i, /^name$/i, /^title$/i], "name") || "name",
-    startDate: pickFieldName(fields, [/start.?date/i, /^start$/i, /from/i, /begin/i], null),
-    endDate: pickFieldName(fields, [/end.?date/i, /^end$/i, /to/i, /until/i], null),
+    startDate: pickFieldName(fields, [/start.?date/i, /^start$/i, /^date$/i, /from/i, /begin/i], null),
+    endDate: pickFieldName(fields, [/^date_to$/i, /^end_date$/i, /end.?date/i, /^end$/i, /until/i], null),
     allDay: pickFieldName(fields, [/all.?day/i], null),
     startTime: pickFieldName(fields, [/start.?time/i], null),
     endTime: pickFieldName(fields, [/end.?time/i], null),
@@ -493,6 +493,72 @@ function parseDateValue(raw: unknown): Date | null {
   } catch {
     return null
   }
+}
+
+const EVENT_END_DATE_FALLBACK_COLUMNS = [
+  "date_to",
+  "date_due",
+  "end_date",
+  "event_end",
+  "event_end_date",
+] as const
+
+const EVENT_START_DATE_FALLBACK_COLUMNS = [
+  "date",
+  "start_date",
+  "event_start",
+  "event_start_date",
+] as const
+
+/** Resolve start/end from mapped fields plus common Content / Events column names. */
+export function resolveEventRowDates(
+  row: Record<string, unknown>,
+  fields: EventFieldMap
+): { startDate: Date | null; endDate: Date | null } {
+  let startDate = fields.startDate ? parseDateValue(row[fields.startDate]) : null
+  let endDate = fields.endDate ? parseDateValue(row[fields.endDate]) : null
+
+  if (!startDate && fields.startDate === "dates") {
+    const range = parseDatesField(row.dates ?? row.Dates)
+    startDate = range.start
+    endDate = endDate ?? range.end
+  }
+
+  if (!startDate) {
+    for (const col of EVENT_START_DATE_FALLBACK_COLUMNS) {
+      if (col === fields.startDate || col === fields.endDate) continue
+      const parsed = parseDateValue(row[col])
+      if (parsed) {
+        startDate = parsed
+        break
+      }
+    }
+  }
+
+  if (startDate && (!endDate || isSameDay(startDate, endDate))) {
+    for (const col of EVENT_END_DATE_FALLBACK_COLUMNS) {
+      if (col === fields.startDate || col === fields.endDate) continue
+      const parsed = parseDateValue(row[col])
+      if (parsed && !isSameDay(parsed, startDate)) {
+        endDate = parsed
+        break
+      }
+    }
+  }
+
+  if (startDate && (!endDate || isSameDay(startDate, endDate))) {
+    const range = parseDatesField(row.dates ?? row.Dates ?? row.date_range)
+    if (range.end && !isSameDay(range.end, startDate)) endDate = range.end
+  }
+
+  if (!endDate && startDate) endDate = startDate
+  if (startDate && endDate && isBefore(endDate, startDate)) {
+    const swap = startDate
+    startDate = endDate
+    endDate = swap
+  }
+
+  return { startDate, endDate }
 }
 
 function parseUuidArray(raw: unknown): string[] {
@@ -639,16 +705,8 @@ export function buildEventItems(params: {
     if (filterContentEvents && !isEventContentRecord(row, contentTypeField)) continue
     if (fields.deletedAt && row[fields.deletedAt]) continue
 
-    let startDate = fields.startDate ? parseDateValue(row[fields.startDate]) : null
-    let endDate = fields.endDate ? parseDateValue(row[fields.endDate]) : null
-
-    if (!startDate && fields.startDate === "dates") {
-      const range = parseDatesField(row.dates ?? row.Dates)
-      startDate = range.start
-      endDate = range.end
-    }
-    if (!endDate) endDate = startDate
-    const effectiveEnd = endDate ?? startDate
+    const { startDate, endDate: resolvedEnd } = resolveEventRowDates(row, fields)
+    const effectiveEnd = resolvedEnd ?? startDate
 
     const locationId = fields.location ? row[fields.location] : null
     const loc =
