@@ -68,6 +68,7 @@ export default function EventCalendarView({
           title: e.title,
           start: e.start,
           allDay: e.allDay,
+          display: e.display,
           backgroundColor: "transparent",
           borderColor: "transparent",
           extendedProps: e.extendedProps,
@@ -123,7 +124,7 @@ export default function EventCalendarView({
   return (
     <div
       className={cn(
-        "overflow-hidden flex-1 rounded-xl border border-border/40 bg-card shadow-sm w-full",
+        "flex-1 rounded-xl border border-border/40 bg-card shadow-sm w-full min-h-0 overflow-x-hidden overflow-y-auto",
         panelMinH,
         isEditing && "pointer-events-none opacity-90",
         className

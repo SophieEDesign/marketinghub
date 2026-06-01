@@ -200,6 +200,7 @@ describe("buildEventCalendarEvents", () => {
     expect(events[0].start).toBe("2026-06-09")
     expect(events[0].end).toBe("2026-06-12")
     expect(events[0].allDay).toBe(true)
+    expect(events[0].display).toBe("block")
   })
 })
 
