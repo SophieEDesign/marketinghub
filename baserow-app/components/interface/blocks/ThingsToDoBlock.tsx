@@ -38,16 +38,19 @@ import { ThingsToDoListToolbar } from "@/components/interface/things-to-do/Thing
 import { ThingsToDoPlaceholderView } from "@/components/interface/things-to-do/ThingsToDoPlaceholderView"
 import { ThingsToDoViewTabs } from "@/components/interface/things-to-do/ThingsToDoViewTabs"
 import MarketingDemoDataBanner from "@/components/interface/primitives/MarketingDemoDataBanner"
+import { marketingBlockRootClass } from "@/lib/interface/marketing-block-layout"
 
 interface ThingsToDoBlockProps {
   block: PageBlock
   isEditing?: boolean
   interfaceMode?: "view" | "edit"
+  isFullPage?: boolean
 }
 
 export default function ThingsToDoBlock({
   block,
   isEditing = false,
+  isFullPage = false,
 }: ThingsToDoBlockProps) {
   const { config } = block
   const { openRecordModal } = useRecordModal()
@@ -215,7 +218,10 @@ export default function ThingsToDoBlock({
   return (
     <div
       data-block-selectable
-      className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border/40 bg-background shadow-sm"
+      className={marketingBlockRootClass(
+        isFullPage,
+        "rounded-2xl border border-border/40 bg-background shadow-sm"
+      )}
     >
       {isDemoData ? <MarketingDemoDataBanner message={demoBannerMessage} /> : null}
 

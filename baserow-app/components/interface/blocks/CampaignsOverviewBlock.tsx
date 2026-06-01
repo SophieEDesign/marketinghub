@@ -19,10 +19,12 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
+import { marketingBlockRootClass } from "@/lib/interface/marketing-block-layout"
 
 interface CampaignsOverviewBlockProps {
   block: PageBlock
   isEditing?: boolean
+  isFullPage?: boolean
 }
 
 function Badge({ value }: { value?: string }) {
@@ -42,7 +44,11 @@ function ProgressPill({ value }: { value: number | null | undefined }) {
   )
 }
 
-export default function CampaignsOverviewBlock({ block, isEditing = false }: CampaignsOverviewBlockProps) {
+export default function CampaignsOverviewBlock({
+  block,
+  isEditing = false,
+  isFullPage = false,
+}: CampaignsOverviewBlockProps) {
   const { config } = block
   const { openRecordModal } = useRecordModal()
   const { loading, items, demoMessage, showDemoBanner, showEmptyState } = useCampaignsOverviewData(config)
@@ -101,7 +107,13 @@ export default function CampaignsOverviewBlock({ block, isEditing = false }: Cam
   }
 
   return (
-    <div data-block-selectable className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border/40 bg-background shadow-sm">
+    <div
+      data-block-selectable
+      className={marketingBlockRootClass(
+        isFullPage,
+        "rounded-2xl border border-border/40 bg-background shadow-sm"
+      )}
+    >
       {showDemoBanner ? <MarketingDemoDataBanner message={demoMessage} /> : null}
       <div className="border-b border-border/40 px-5 py-4">
         <div className="flex flex-wrap items-start justify-between gap-3">

@@ -1,7 +1,12 @@
 "use client"
 
-import { EventDetailContent } from "@/components/interface/EventDetailPanel"
-import type { EventDetailContentProps } from "@/components/interface/EventDetailPanel"
+import { useEffect, useState } from "react"
+import { createPortal } from "react-dom"
+import {
+  EventDetailContent,
+  EventDetailFloatingShell,
+  type EventDetailContentProps,
+} from "@/components/interface/EventDetailPanel"
 
 export interface EventDetailDrawerProps extends EventDetailContentProps {
   open: boolean
@@ -10,7 +15,7 @@ export interface EventDetailDrawerProps extends EventDetailContentProps {
 
 /**
  * Right-side event detail drawer for block-embedded calendars.
- * Overlay excludes the app sidebar on md+ (REG-004).
+ * Portaled to document.body so the dim overlay covers the full main area (not clipped by block transforms).
  */
 export default function EventDetailDrawer({
   open,
@@ -18,23 +23,15 @@ export default function EventDetailDrawer({
   event,
   ...contentProps
 }: EventDetailDrawerProps) {
-  if (!open || !event) return null
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
 
-  return (
-    <>
-      <div
-        className="fixed inset-0 md:left-64 bg-black/20 z-40"
-        onClick={onClose}
-        aria-hidden
-      />
-      <aside
-        className="fixed top-0 right-0 bottom-0 z-50 w-full max-w-md bg-background border-l border-border/40 shadow-xl flex flex-col"
-        role="dialog"
-        aria-modal="true"
-        aria-label={`Event: ${event.eventName}`}
-      >
-        <EventDetailContent event={event} onClose={onClose} {...contentProps} />
-      </aside>
-    </>
+  if (!open || !event || !mounted) return null
+
+  return createPortal(
+    <EventDetailFloatingShell onClose={onClose} ariaLabel={`Event: ${event.eventName}`}>
+      <EventDetailContent event={event} onClose={onClose} fitContent {...contentProps} />
+    </EventDetailFloatingShell>,
+    document.body
   )
 }

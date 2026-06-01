@@ -580,6 +580,7 @@ export function EventCalendarCore({
               onDatesChange={setCursorDate}
               compact={settings.density === "compact"}
               isEditing={isEditing}
+              fillContainer={!embeddedInBlock}
             />
           </div>
 

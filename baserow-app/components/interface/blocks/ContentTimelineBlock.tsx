@@ -29,11 +29,13 @@ import { ContentTimelineGrid } from "@/components/interface/content-timeline/Con
 import { ContentTimelineHeader } from "@/components/interface/content-timeline/ContentTimelineHeader"
 import { ContentTimelineStatusLegend } from "@/components/interface/content-timeline/ContentTimelineStatusLegend"
 import MarketingDemoDataBanner from "@/components/interface/primitives/MarketingDemoDataBanner"
+import { marketingBlockRootClass } from "@/lib/interface/marketing-block-layout"
 
 interface ContentTimelineBlockProps {
   block: PageBlock
   isEditing?: boolean
   interfaceMode?: "view" | "edit"
+  isFullPage?: boolean
 }
 
 const EMPTY_FILTERS: ContentTimelineFilters = {
@@ -50,6 +52,7 @@ export default function ContentTimelineBlock({
   block,
   isEditing = false,
   interfaceMode = "view",
+  isFullPage = false,
 }: ContentTimelineBlockProps) {
   const { config } = block
   const { openRecordModal } = useRecordModal()
@@ -213,7 +216,10 @@ export default function ContentTimelineBlock({
   return (
     <div
       data-block-selectable
-      className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border/40 bg-background shadow-sm"
+      className={marketingBlockRootClass(
+        isFullPage,
+        "rounded-2xl border border-border/40 bg-background shadow-sm"
+      )}
     >
       {isDemoData ? <MarketingDemoDataBanner message={demoBannerMessage} /> : null}
 
@@ -246,7 +252,7 @@ export default function ContentTimelineBlock({
       )}
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-        <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {visibleItems.length === 0 ? (
             <div className="flex h-full min-h-[200px] items-center justify-center p-6">
               <DashboardEmpty

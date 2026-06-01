@@ -10,6 +10,7 @@ interface EventCalendarBlockProps {
   interfaceMode?: "view" | "edit"
   /** Page-level permission to add/edit events (admins on view-mode pages). */
   pageEditable?: boolean
+  isFullPage?: boolean
 }
 
 /**
@@ -21,15 +22,16 @@ export default function EventCalendarBlock({
   isEditing = false,
   interfaceMode: _interfaceMode = "view",
   pageEditable,
+  isFullPage = false,
 }: EventCalendarBlockProps) {
   const canEdit = pageEditable !== false
-  const embeddedInBlock = block.config?.is_full_page !== true
+  const embeddedInBlock = !isFullPage
 
   return (
     <div
       className={cn(
         "flex h-full min-h-0 min-w-0 w-full flex-col overflow-hidden",
-        block.config?.is_full_page && "rounded-none border-0 shadow-none"
+        isFullPage && "rounded-none border-0 shadow-none"
       )}
       data-block-type="event_calendar"
       data-block-selectable

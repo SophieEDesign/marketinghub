@@ -532,7 +532,7 @@ function KanbanView({
 
   return (
     <div className={cn("w-full min-w-0 min-h-0 flex flex-col bg-background", allowInternalScroll ? "h-full overflow-hidden" : "h-auto overflow-visible")}>
-      <div className={cn("min-h-0 overflow-x-auto snap-x snap-proximity", allowInternalScroll ? "flex-1 overflow-y-hidden" : "overflow-y-visible")}>
+      <div className={cn("min-h-0 flex flex-col", allowInternalScroll ? "flex-1 overflow-x-auto overflow-y-hidden snap-x snap-proximity" : "overflow-x-auto snap-x snap-proximity overflow-y-visible")}>
         <div className="flex gap-4 min-w-max p-4">
         {groups.map((groupName) => {
           const displayName =

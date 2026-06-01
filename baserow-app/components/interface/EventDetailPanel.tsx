@@ -1,5 +1,7 @@
 "use client"
 
+import { useEffect, useState, type ReactNode } from "react"
+import { createPortal } from "react-dom"
 import {
   X,
   MapPin,
@@ -52,6 +54,8 @@ export interface EventDetailContentProps {
   onApprove?: () => void
   onReject?: () => void
   showApprovalActions?: boolean
+  /** Drawer/modal: natural height; inline panel: fill available column height */
+  fitContent?: boolean
 }
 
 export function EventDetailContent({
@@ -73,6 +77,7 @@ export function EventDetailContent({
   onApprove,
   onReject,
   showApprovalActions = false,
+  fitContent = false,
 }: EventDetailContentProps) {
   const { toast } = useToast()
   const statusColor = statusAccentColor(event.status)
@@ -93,7 +98,7 @@ export function EventDetailContent({
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className={cn("flex flex-col min-h-0", fitContent ? "h-auto" : "h-full")}>
       <div className="flex items-start justify-between gap-2 px-4 pt-4 pb-2 shrink-0">
         <button
           type="button"
@@ -181,7 +186,10 @@ export function EventDetailContent({
         </div>
       ) : null}
 
-      <Tabs defaultValue="overview" className="flex flex-col flex-1 min-h-0 px-4">
+      <Tabs
+        defaultValue="overview"
+        className={cn("flex flex-col px-4", fitContent ? "pb-2" : "flex-1 min-h-0")}
+      >
         <TabsList
           className={cn(
             "w-full h-8 shrink-0",
@@ -214,42 +222,45 @@ export function EventDetailContent({
           ) : null}
         </TabsList>
 
-        <TabsContent value="overview" className="flex-1 overflow-y-auto mt-3 space-y-4 text-sm">
-          <dl className="space-y-2 text-xs">
+        <TabsContent
+          value="overview"
+          className={cn("mt-3 space-y-4 text-sm", fitContent ? "" : "flex-1 overflow-y-auto")}
+        >
+          <dl className="space-y-3 text-xs">
             {event.eventType ? (
-              <div className="flex justify-between gap-2">
+              <div>
                 <dt className="text-muted-foreground">Event type</dt>
-                <dd className="font-medium text-foreground">{event.eventType}</dd>
+                <dd className="mt-0.5 font-medium text-foreground">{event.eventType}</dd>
               </div>
             ) : null}
             {event.status ? (
-              <div className="flex justify-between gap-2">
+              <div>
                 <dt className="text-muted-foreground">Status</dt>
-                <dd className="font-medium text-foreground">{event.status}</dd>
+                <dd className="mt-0.5 font-medium text-foreground">{event.status}</dd>
               </div>
             ) : null}
             {!isExternalView && event.visibility ? (
-              <div className="flex justify-between gap-2">
+              <div>
                 <dt className="text-muted-foreground">Visibility</dt>
-                <dd className="font-medium text-foreground">{event.visibility}</dd>
+                <dd className="mt-0.5 font-medium text-foreground">{event.visibility}</dd>
               </div>
             ) : null}
             {event.campaignLabel ? (
-              <div className="flex justify-between gap-2">
+              <div>
                 <dt className="text-muted-foreground">Linked campaign</dt>
-                <dd className="font-medium text-accent-link">{event.campaignLabel}</dd>
+                <dd className="mt-0.5 font-medium text-accent-link">{event.campaignLabel}</dd>
               </div>
             ) : null}
             {event.ownerLabel ? (
-              <div className="flex justify-between gap-2">
+              <div>
                 <dt className="text-muted-foreground">Organiser</dt>
-                <dd className="font-medium text-foreground">{event.ownerLabel}</dd>
+                <dd className="mt-0.5 font-medium text-foreground">{event.ownerLabel}</dd>
               </div>
             ) : null}
             {showBudget ? (
-              <div className="flex justify-between gap-2">
+              <div>
                 <dt className="text-muted-foreground">Budget</dt>
-                <dd className="font-medium text-foreground">{event.budget}</dd>
+                <dd className="mt-0.5 font-medium text-foreground">{event.budget}</dd>
               </div>
             ) : null}
           </dl>
@@ -274,7 +285,10 @@ export function EventDetailContent({
         </TabsContent>
 
         {showScheduleTab ? (
-          <TabsContent value="schedule" className="flex-1 overflow-y-auto mt-3">
+          <TabsContent
+            value="schedule"
+            className={cn("mt-3", fitContent ? "" : "flex-1 overflow-y-auto")}
+          >
             {event.scheduleItems.length === 0 ? (
               <p className="text-xs text-muted-foreground">No schedule items yet.</p>
             ) : (
@@ -294,7 +308,10 @@ export function EventDetailContent({
         ) : null}
 
         {showResourcesTab ? (
-          <TabsContent value="resources" className="flex-1 overflow-y-auto mt-3">
+          <TabsContent
+            value="resources"
+            className={cn("mt-3", fitContent ? "" : "flex-1 overflow-y-auto")}
+          >
             {event.resources.length === 0 ? (
               <p className="text-xs text-muted-foreground">No resources linked.</p>
             ) : (
@@ -321,7 +338,10 @@ export function EventDetailContent({
         ) : null}
 
         {showInternalNotes ? (
-          <TabsContent value="notes" className="flex-1 overflow-y-auto mt-3">
+          <TabsContent
+            value="notes"
+            className={cn("mt-3", fitContent ? "" : "flex-1 overflow-y-auto")}
+          >
             <p className="text-xs text-muted-foreground whitespace-pre-wrap">
               {event.notes || "No internal notes."}
             </p>
@@ -377,7 +397,12 @@ export function EventDetailContent({
         </div>
       ) : null}
 
-      <div className="shrink-0 border-t border-border/40 p-4 flex flex-col gap-2 mt-auto">
+      <div
+        className={cn(
+          "shrink-0 border-t border-border/40 p-4 flex flex-col gap-2",
+          fitContent ? "" : "mt-auto"
+        )}
+      >
         {showApprovalActions && onApprove ? (
           <div className="flex flex-col gap-2 pb-2">
             <Button type="button" className="w-full" onClick={onApprove}>
@@ -411,6 +436,56 @@ export function EventDetailContent({
   )
 }
 
+/** Portaled drawer chrome — full viewport overlay + content-height panel (REG-004). */
+export function EventDetailFloatingShell({
+  children,
+  onClose,
+  ariaLabel,
+}: {
+  children: ReactNode
+  onClose: () => void
+  ariaLabel: string
+}) {
+  return (
+    <>
+      <div
+        className="fixed inset-0 md:left-64 bg-black/25 z-[80]"
+        onClick={onClose}
+        aria-hidden
+      />
+      <aside
+        className="fixed z-[90] right-0 top-0 w-full max-w-md h-auto max-h-[100dvh] overflow-y-auto overscroll-contain bg-background border-l border-border/40 shadow-xl md:right-4 md:top-4 md:max-h-[calc(100dvh-2rem)] md:w-[min(100%,24rem)] md:rounded-xl md:border"
+        role="dialog"
+        aria-modal="true"
+        aria-label={ariaLabel}
+      >
+        {children}
+      </aside>
+    </>
+  )
+}
+
+function EventDetailPortaledOverlay({
+  event,
+  onClose,
+  contentProps,
+}: {
+  event: MarketingEventItem
+  onClose: () => void
+  contentProps: Omit<EventDetailContentProps, "event" | "onClose">
+}) {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+  if (!mounted) return null
+
+  return createPortal(
+    <EventDetailFloatingShell onClose={onClose} ariaLabel={`Event: ${event.eventName}`}>
+      <EventDetailContent event={event} onClose={onClose} fitContent {...contentProps} />
+    </EventDetailFloatingShell>,
+    document.body
+  )
+}
+
 interface EventDetailPanelProps {
   event: MarketingEventItem | null
   open: boolean
@@ -440,18 +515,8 @@ export function EventDetailPanelOverlay({
   contentProps,
 }: EventDetailPanelProps) {
   if (!event || !open) return null
-
   return (
-    <>
-      <div
-        className="fixed inset-0 md:left-64 bg-black/20 z-40"
-        onClick={onClose}
-        aria-hidden
-      />
-      <aside className="fixed top-0 right-0 bottom-0 z-50 w-full max-w-md bg-background border-l border-border/40 shadow-xl flex flex-col">
-        <EventDetailContent event={event} onClose={onClose} {...contentProps} />
-      </aside>
-    </>
+    <EventDetailPortaledOverlay event={event} onClose={onClose} contentProps={contentProps} />
   )
 }
 
@@ -465,7 +530,9 @@ export function EventDetailModal({
   return (
     <Sheet open={open && !!event} onOpenChange={(v) => !v && onClose()}>
       <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">
-        {event ? <EventDetailContent event={event} onClose={onClose} {...contentProps} /> : null}
+        {event ? (
+          <EventDetailContent event={event} onClose={onClose} fitContent {...contentProps} />
+        ) : null}
       </SheetContent>
     </Sheet>
   )

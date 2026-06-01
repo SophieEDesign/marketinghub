@@ -992,7 +992,14 @@ function ListViewInner({
   // Render grouped (nested) or ungrouped
   if (flattenedGroups && flattenedGroups.length > 0) {
     return (
-      <div ref={contentRef} className={cn(BLOCK_EMBED_CLASSNAME, displayMode === "fit" ? "h-auto" : "h-full", "flex flex-col")}>
+      <div
+        ref={contentRef}
+        className={cn(
+          BLOCK_EMBED_CLASSNAME,
+          useInternalScroll ? "h-full" : displayMode === "fit" ? "h-auto" : "h-full",
+          "flex flex-col min-h-0"
+        )}
+      >
         {/* Toolbar */}
         <div className={cn("flex-shrink-0 flex flex-wrap items-center gap-1.5 px-3 border-b bg-background", marketingDashboardStyle ? "py-2 border-border/35" : "py-2.5 border-border/55")}>
           <Button

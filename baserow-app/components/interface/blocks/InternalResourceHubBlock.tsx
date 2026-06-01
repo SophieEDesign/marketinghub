@@ -38,11 +38,13 @@ import {
 import type { CategoryFilter } from "./internal-resource-hub/types"
 import { debugLog } from "@/lib/debug"
 import MarketingDemoDataBanner from "@/components/interface/primitives/MarketingDemoDataBanner"
+import { marketingBlockRootClass } from "@/lib/interface/marketing-block-layout"
 
 interface InternalResourceHubBlockProps {
   block: PageBlock
   isEditing?: boolean
   onUpdate?: (updates: Partial<PageBlock["config"]>) => void
+  isFullPage?: boolean
 }
 
 function mockAction(label: string) {
@@ -52,6 +54,7 @@ function mockAction(label: string) {
 export default function InternalResourceHubBlock({
   block,
   isEditing = false,
+  isFullPage = false,
 }: InternalResourceHubBlockProps) {
   const { config } = block
   const title = config.title || "Brand & Media Resources"
@@ -175,7 +178,10 @@ export default function InternalResourceHubBlock({
     return (
       <div
         data-block-selectable
-        className="flex h-full min-h-[320px] w-full min-w-0 flex-col overflow-hidden rounded-xl border border-[#E6E6EF] bg-white shadow-sm"
+        className={marketingBlockRootClass(
+          isFullPage,
+          "rounded-xl border border-[#E6E6EF] bg-white shadow-sm"
+        )}
       >
         {isDemoData ? <MarketingDemoDataBanner message={demoBannerMessage} /> : null}
         <ResourceListHeader
@@ -195,7 +201,10 @@ export default function InternalResourceHubBlock({
   return (
     <div
       data-block-selectable
-      className="flex h-full min-h-[400px] w-full min-w-0 flex-col overflow-hidden rounded-card-lg border border-border/60 bg-background shadow-card"
+      className={marketingBlockRootClass(
+        isFullPage,
+        "rounded-card-lg border border-border/60 bg-background shadow-card"
+      )}
     >
       {isDemoData ? <MarketingDemoDataBanner message={demoBannerMessage} /> : null}
       <HubHeader

@@ -3152,7 +3152,10 @@ function GridViewInner({
   return (
     <div 
       ref={contentRef}
-      className={cn(displayMode === "fit" ? "h-auto" : "h-full", "w-full flex flex-col relative min-h-0 min-w-0")} 
+      className={cn(
+        forceInternalScroll ? "h-full" : displayMode === "fit" ? "h-auto" : "h-full",
+        "w-full flex flex-col relative min-h-0 min-w-0"
+      )} 
       style={{ paddingBottom: isEditing ? '60px' : '0' }}
     >
       {/* Toolbar - Only show builder controls in edit mode */}

@@ -13,6 +13,7 @@ export function SocialMediaListView({
   compact = false,
   showPlatformIcons = true,
   showApprovalStatus = true,
+  fillContainer = false,
 }: {
   items: SocialCalendarItem[]
   selectedId: string | null
@@ -20,6 +21,7 @@ export function SocialMediaListView({
   compact?: boolean
   showPlatformIcons?: boolean
   showApprovalStatus?: boolean
+  fillContainer?: boolean
 }) {
   const sorted = [...items]
     .filter((i) => i.date ?? i.dueDate)
@@ -54,7 +56,7 @@ export function SocialMediaListView({
     <div
       className={cn(
         "flex flex-col gap-4 min-h-0 overflow-y-auto pr-1",
-        compact ? "max-h-[420px]" : "max-h-[min(68vh,580px)]"
+        fillContainer ? "flex-1" : compact ? "max-h-[420px]" : "max-h-[min(68vh,580px)]"
       )}
     >
       {groups.map((group) => (

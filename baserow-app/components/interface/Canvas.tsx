@@ -198,13 +198,9 @@ export default function Canvas({
     fullPageBlockId && blocks.length === 1 && blocks[0].id === fullPageBlockId
   )
   const fullPageBlock = isFullPageMode ? blocks[0] : null
-  const isFullPageCalendar =
-    isFullPageMode &&
-    fullPageBlock?.type === "grid" &&
-    fullPageBlock?.config?.view_type === "calendar"
 
-  // Measured container height for full-page calendar (fills viewport like Airtable)
-  const [fullPageCalendarContainerHeight, setFullPageCalendarContainerHeight] = useState(600)
+  // Measured canvas height so full-page grid item matches viewport (not a fixed h: 50)
+  const [fullPageContainerHeight, setFullPageContainerHeight] = useState(600)
 
   /**
    * CRITICAL: Grid layout must never be empty when blocks exist.
@@ -225,8 +221,8 @@ export default function Canvas({
       const rowHeight = layoutSettings?.rowHeight ?? 30
       const marginY = (layoutSettings?.margin ?? [10, 10])[1]
       const dynamicH =
-        isFullPageCalendar && fullPageCalendarContainerHeight > 0
-          ? Math.max(2, Math.floor((fullPageCalendarContainerHeight + marginY) / (rowHeight + marginY)))
+        fullPageContainerHeight > 0
+          ? Math.max(2, Math.floor((fullPageContainerHeight + marginY) / (rowHeight + marginY)))
           : 50
       return [{
         i: fullPageBlock.id,
@@ -290,7 +286,7 @@ export default function Canvas({
         maxW: Math.max(itemMinW, maxW),
       }
     })
-  }, [blocks, layout, ephemeralDeltas, layoutSettings?.cols, layoutSettings?.rowHeight, layoutSettings?.margin, isFullPageMode, fullPageBlock, isFullPageCalendar, fullPageCalendarContainerHeight])
+  }, [blocks, layout, ephemeralDeltas, layoutSettings?.cols, layoutSettings?.rowHeight, layoutSettings?.margin, isFullPageMode, fullPageBlock, fullPageContainerHeight])
   
   // Layout version for preventing stale sync overwrites
   const layoutVersionRef = useRef<number>(0)
@@ -1794,20 +1790,20 @@ export default function Canvas({
   // CRITICAL: Must be declared before any early returns (Rules of Hooks)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Measure container height for full-page calendar (fills viewport like Airtable)
+  // Measure container height for full-page blocks (list/kanban/grid/calendar fill available viewport)
   useEffect(() => {
-    if (!isFullPageCalendar || !containerRef.current) return
+    if (!isFullPageMode || !containerRef.current) return
     const el = containerRef.current
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const h = entry.contentRect.height
-        if (h > 0) setFullPageCalendarContainerHeight(h)
+        if (h > 0) setFullPageContainerHeight(h)
       }
     })
     ro.observe(el)
-    setFullPageCalendarContainerHeight(el.getBoundingClientRect().height || 600)
+    setFullPageContainerHeight(el.getBoundingClientRect().height || 600)
     return () => ro.disconnect()
-  }, [isFullPageCalendar])
+  }, [isFullPageMode])
 
   // Auto-scroll during resize/drag when cursor near viewport edge (react-grid-layout's built-in is unreliable with nested scroll)
   const scrollListenerActiveRef = useRef(false)
@@ -1954,7 +1950,7 @@ export default function Canvas({
       {/* flex-1 flex flex-col min-h-0: fill parent flex; min-h-0 prevents flex collapse; flex flex-col for block list. */}
       <div
         ref={containerRef}
-        className={`flex flex-col w-full max-w-full min-w-0 relative ${isFullPageMode ? "flex-1 overflow-hidden min-h-[100vh]" : "min-h-0"}`}
+        className={`flex flex-col w-full max-w-full min-w-0 relative ${isFullPageMode ? "flex-1 min-h-0 overflow-hidden h-full" : "min-h-0"}`}
         style={
           isFullPageMode
             ? undefined
@@ -1972,7 +1968,7 @@ export default function Canvas({
         }}
       >
         {/* CRITICAL: ResponsiveGridLayout is ALWAYS rendered - no conditional wrapping or early return */}
-        <div className={`${isFullPageMode ? "flex-1" : ""} flex flex-col min-h-0 min-w-0`}>
+        <div className={`${isFullPageMode ? "flex-1 min-h-0 h-full" : ""} flex flex-col min-h-0 min-w-0`}>
         {/* Drag ghost/preview */}
         {isEditing && dragGhost && containerRef.current && (
           <CanvasDragGhostOverlay
@@ -2001,7 +1997,7 @@ export default function Canvas({
           />
         )}
         <ResponsiveGridLayout
-          className="layout flex-1 min-h-0 min-w-0" // CRITICAL: flex-1 min-h-0 prevents flex collapse; identical in edit and public
+          className={`layout flex-1 min-h-0 min-w-0 ${isFullPageMode ? "h-full" : ""}`} // CRITICAL: flex-1 min-h-0 prevents flex collapse; identical in edit and public
           layouts={{ lg: gridLayout }}
           breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
           // CRITICAL: All layout-affecting props come from GRID_CONFIG constant

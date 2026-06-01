@@ -9,6 +9,7 @@ interface SocialMediaCalendarBlockProps {
   isEditing?: boolean
   interfaceMode?: "view" | "edit"
   pageEditable?: boolean
+  isFullPage?: boolean
 }
 
 /**
@@ -20,15 +21,16 @@ export default function SocialMediaCalendarBlock({
   isEditing = false,
   interfaceMode: _interfaceMode = "view",
   pageEditable,
+  isFullPage = false,
 }: SocialMediaCalendarBlockProps) {
   const canEdit = pageEditable !== false
-  const embeddedInBlock = block.config?.is_full_page !== true
+  const embeddedInBlock = !isFullPage
 
   return (
     <div
       className={cn(
         "flex h-full min-h-0 min-w-0 w-full flex-col overflow-hidden",
-        block.config?.is_full_page
+        isFullPage
           ? "rounded-none border-0 shadow-none"
           : "rounded-2xl border border-border/40 bg-background"
       )}

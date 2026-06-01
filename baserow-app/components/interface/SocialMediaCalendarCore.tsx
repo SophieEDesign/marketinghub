@@ -535,7 +535,11 @@ export function SocialMediaCalendarCore({
             <div
               className={cn(
                 "rounded-card border border-border/30 overflow-hidden flex-1 min-h-0",
-                isCompact ? "min-h-[360px]" : "min-h-[400px]"
+                embeddedInBlock
+                  ? isCompact
+                    ? "min-h-[360px]"
+                    : "min-h-[400px]"
+                  : "min-h-0 overflow-y-auto"
               )}
             >
               <SocialMediaCalendarView
@@ -555,6 +559,7 @@ export function SocialMediaCalendarCore({
               compact={isCompact}
               showPlatformIcons={settings.showPlatformIcons}
               showApprovalStatus={settings.showApprovalStatus}
+              fillContainer={!embeddedInBlock}
             />
           ) : (
             <SocialMediaFeedView
@@ -564,6 +569,7 @@ export function SocialMediaCalendarCore({
               compact={isCompact}
               showPlatformIcons={settings.showPlatformIcons}
               showApprovalStatus={settings.showApprovalStatus}
+              fillContainer={!embeddedInBlock}
             />
           )}
 

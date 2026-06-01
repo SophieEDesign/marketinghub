@@ -669,6 +669,7 @@ export default function BlockRenderer({
               block={safeBlock}
               isEditing={canEdit}
               interfaceMode={interfaceMode}
+              isFullPage={isFullPage}
             />
           </LazyBlockWrapper>
         )
@@ -680,6 +681,7 @@ export default function BlockRenderer({
               block={safeBlock}
               isEditing={canEdit}
               interfaceMode={interfaceMode}
+              isFullPage={isFullPage}
             />
           </LazyBlockWrapper>
         )
@@ -692,6 +694,7 @@ export default function BlockRenderer({
               isEditing={canEdit}
               interfaceMode={interfaceMode}
               pageEditable={pageEditable}
+              isFullPage={isFullPage}
             />
           </LazyBlockWrapper>
         )
@@ -704,6 +707,7 @@ export default function BlockRenderer({
               isEditing={canEdit}
               interfaceMode={interfaceMode}
               pageEditable={pageEditable}
+              isFullPage={isFullPage}
             />
           </LazyBlockWrapper>
         )
@@ -711,7 +715,11 @@ export default function BlockRenderer({
       case "campaigns_overview":
         return (
           <LazyBlockWrapper enabled={true}>
-            <CampaignsOverviewBlock block={safeBlock} isEditing={canEdit} />
+            <CampaignsOverviewBlock
+              block={safeBlock}
+              isEditing={canEdit}
+              isFullPage={isFullPage}
+            />
           </LazyBlockWrapper>
         )
 
@@ -721,6 +729,7 @@ export default function BlockRenderer({
             block={safeBlock}
             isEditing={canEdit}
             onUpdate={onUpdate ? (u) => handleUpdate(u) : undefined}
+            isFullPage={isFullPage}
           />
         )
 

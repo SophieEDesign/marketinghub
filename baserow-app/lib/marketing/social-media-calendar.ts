@@ -373,7 +373,6 @@ export function derivePlatforms(params: {
   if (found.size === 0 && contentType) {
     const p = platformFromString(contentType)
     if (p) found.add(p)
-    else if (isSocialContentType(contentType)) found.add("other")
   }
 
   return Array.from(found)

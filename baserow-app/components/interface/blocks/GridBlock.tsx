@@ -1255,7 +1255,7 @@ useEffect(() => {
         isFitMode ? "h-auto" : "h-full",
         isFullPage && "h-full",
         "w-full max-w-full min-h-0 min-w-0 flex flex-col",
-        (isGridWithPushDown || viewType === "calendar" || !allowInternalScroll) ? "overflow-visible" : "overflow-hidden"
+        (isGridWithPushDown || (viewType === "calendar" && !isFullPage) || !allowInternalScroll) ? "overflow-visible" : "overflow-hidden"
       )}
       style={blockStyle}
     >
@@ -1394,7 +1394,7 @@ useEffect(() => {
         isFitMode ? "h-auto" : "flex-1",
         isFullPage && "flex-1 min-h-0",
         "flex flex-col min-w-0 w-full min-h-0",
-        (isGridWithPushDown || marketingDashboardStyle || viewType === "calendar" || !allowInternalScroll) ? "overflow-visible" : "overflow-hidden"
+        (isGridWithPushDown || marketingDashboardStyle || (viewType === "calendar" && !isFullPage) || !allowInternalScroll) ? "overflow-visible" : "overflow-hidden"
       )}>
         {renderView()}
       </div>

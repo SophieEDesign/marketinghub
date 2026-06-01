@@ -12,11 +12,13 @@ export function EventListView({
   selectedId,
   onSelect,
   cursorDate,
+  fillContainer = false,
 }: {
   items: MarketingEventItem[]
   selectedId: string | null
   onSelect: (id: string) => void
   cursorDate: Date
+  fillContainer?: boolean
 }) {
   const sorted = [...items].filter((i) => i.startDate).sort((a, b) => {
     const ta = a.startDate!.getTime()
@@ -50,7 +52,12 @@ export function EventListView({
   }
 
   return (
-    <div className="flex flex-col gap-3 min-h-0 overflow-y-auto max-h-[min(68vh,580px)] pr-1">
+    <div
+      className={cn(
+        "flex flex-col gap-3 min-h-0 overflow-y-auto pr-1",
+        fillContainer ? "h-full flex-1" : "max-h-[min(68vh,580px)]"
+      )}
+    >
       {groups.map((group) => (
         <section key={group.label}>
           <h3 className="text-xs font-semibold text-muted-foreground mb-2 sticky top-0 bg-background/90 py-1 backdrop-blur-sm z-[1]">

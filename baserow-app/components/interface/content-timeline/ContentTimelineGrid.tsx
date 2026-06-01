@@ -47,7 +47,7 @@ export function ContentTimelineGrid({
   const rowHeight = compact ? 40 : 52
 
   return (
-    <div className="min-h-0 min-w-0 overflow-auto">
+    <div className="min-h-0 min-w-0 flex-1 overflow-auto">
       <div
         className="relative"
         style={{ minWidth: `min(100%, ${GROUP_COL_WIDTH + MIN_TIMELINE_WIDTH}px)` }}

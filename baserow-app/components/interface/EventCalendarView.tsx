@@ -37,6 +37,8 @@ interface EventCalendarViewProps {
   className?: string
   compact?: boolean
   isEditing?: boolean
+  /** Full-page: fill parent and scroll inside instead of fixed viewport min-heights. */
+  fillContainer?: boolean
 }
 
 export default function EventCalendarView({
@@ -50,8 +52,13 @@ export default function EventCalendarView({
   className,
   compact = false,
   isEditing = false,
+  fillContainer = false,
 }: EventCalendarViewProps) {
-  const panelMinH = compact ? "min-h-[420px]" : "min-h-[min(72vh,620px)]"
+  const panelMinH = fillContainer
+    ? "min-h-0 flex-1 overflow-y-auto"
+    : compact
+      ? "min-h-[420px]"
+      : "min-h-[min(72vh,620px)]"
 
   const fcEvents: EventInput[] = useMemo(
     () =>
@@ -88,6 +95,7 @@ export default function EventCalendarView({
           selectedId={selectedId}
           onSelect={(id) => onEventClick?.(id)}
           cursorDate={cursorDate}
+          fillContainer={fillContainer}
         />
       </div>
     )
@@ -101,6 +109,7 @@ export default function EventCalendarView({
           selectedId={selectedId}
           onSelect={(id) => onEventClick?.(id)}
           rangeStart={cursorDate}
+          fillContainer={fillContainer}
         />
       </div>
     )

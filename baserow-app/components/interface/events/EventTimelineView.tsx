@@ -20,11 +20,13 @@ export function EventTimelineView({
   selectedId,
   onSelect,
   rangeStart,
+  fillContainer = false,
 }: {
   items: MarketingEventItem[]
   selectedId: string | null
   onSelect: (id: string) => void
   rangeStart: Date
+  fillContainer?: boolean
 }) {
   const withDates = useMemo(() => items.filter((i) => i.startDate), [items])
 
@@ -69,7 +71,12 @@ export function EventTimelineView({
   }
 
   return (
-    <div className="min-h-[min(68vh,520px)] overflow-auto">
+    <div
+      className={cn(
+        "overflow-auto",
+        fillContainer ? "min-h-0 h-full flex-1" : "min-h-[min(68vh,520px)]"
+      )}
+    >
       <div
         className="relative"
         style={{ minWidth: `min(100%, ${LABEL_COL_WIDTH + MIN_TRACK_WIDTH}px)` }}

@@ -4,6 +4,7 @@ import {
   effectiveAllowInternalScroll,
   shouldUseFullPageInternalScroll,
 } from "@/lib/interface/block-display-settings"
+import { isConfigFullPage, marketingBlockRootClass } from "@/lib/interface/marketing-block-layout"
 
 describe("block-display-settings full-page scroll", () => {
   it("shouldUseFullPageInternalScroll is true only when isFullPage", () => {
@@ -21,5 +22,18 @@ describe("block-display-settings full-page scroll", () => {
     expect(effectiveAllowInternalScroll(true, "fit", "view_all")).toBe(true)
     expect(effectiveAllowInternalScroll(false, "fit", "view_all")).toBe(false)
     expect(effectiveAllowInternalScroll(false, "fixed", "scroll")).toBe(true)
+  })
+})
+
+describe("marketing-block-layout", () => {
+  it("isConfigFullPage reads is_full_page from config", () => {
+    expect(isConfigFullPage({ is_full_page: true })).toBe(true)
+    expect(isConfigFullPage({})).toBe(false)
+  })
+
+  it("marketingBlockRootClass strips card chrome in full-page mode", () => {
+    expect(marketingBlockRootClass(true, "rounded-2xl border")).toContain("rounded-none")
+    expect(marketingBlockRootClass(true, "rounded-2xl border")).not.toContain("rounded-2xl")
+    expect(marketingBlockRootClass(false, "rounded-2xl border")).toContain("rounded-2xl")
   })
 })

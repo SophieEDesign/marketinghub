@@ -1,6 +1,5 @@
 "use client"
 
-import { Globe } from "lucide-react"
 import type { SocialPlatform } from "@/lib/marketing/social-media-calendar"
 import { cn } from "@/lib/utils"
 
@@ -56,6 +55,15 @@ const PLATFORM_COLORS: Record<SocialPlatform, string> = {
   other: "text-muted-foreground",
 }
 
+/** Platforms with a dedicated brand icon — excludes generic "other". */
+const ICON_PLATFORMS = new Set<SocialPlatform>([
+  "instagram",
+  "linkedin",
+  "twitter",
+  "facebook",
+  "tiktok",
+])
+
 export function PlatformIcon({
   platform,
   size = "sm",
@@ -78,7 +86,7 @@ export function PlatformIcon({
     case "tiktok":
       return <TikTokIcon className={iconClass} />
     default:
-      return <Globe className={iconClass} aria-hidden />
+      return null
   }
 }
 
@@ -91,7 +99,7 @@ export function PlatformIconRow({
   max?: number
   size?: keyof typeof SIZE
 }) {
-  const shown = platforms.slice(0, max)
+  const shown = platforms.filter((p) => ICON_PLATFORMS.has(p)).slice(0, max)
   if (shown.length === 0) {
     return null
   }
