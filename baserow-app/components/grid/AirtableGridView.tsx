@@ -762,10 +762,11 @@ export default function AirtableGridView({
 
     // Save to database if viewId is available
     if (viewUuid) {
+      const resolvedViewId = viewUuid
       async function saveToDatabase() {
         try {
           const supabase = createClient()
-          await upsertGridViewSettings(supabase, viewUuid, {
+          await upsertGridViewSettings(supabase, resolvedViewId, {
             column_widths: columnWidths,
             column_order: columnOrder,
             column_wrap_text: columnWrapText,

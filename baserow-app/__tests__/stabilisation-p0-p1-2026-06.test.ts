@@ -25,6 +25,12 @@ describe("P0 overlay sidebar offset (REG-004)", () => {
     expect(src).not.toMatch(/md:left-64\b/)
   })
 
+  it("RecordPanel excludes right settings panel from backdrop in edit mode", () => {
+    const src = readSource("components/records/RecordPanel.tsx")
+    expect(src).toContain("md:right-right-settings")
+    expect(src).toContain("offsetForRightSettings")
+  })
+
   it("dialog overlay uses md:left-sidebar", () => {
     const src = readSource("components/ui/dialog.tsx")
     expect(src).toContain("md:left-sidebar")

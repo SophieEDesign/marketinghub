@@ -42,6 +42,7 @@
     --hub-nav-active: 252 100% 97%;
     --hub-nav-active-fg: 252 70% 55%;
     --shell-sidebar-width: 260px;
+    --shell-right-settings-width: 360px;
     /* Chart series (HSL components for hsl(var(--chart-N))) */
     --chart-1: 262 83% 58%;
     --chart-2: 173 58% 42%;

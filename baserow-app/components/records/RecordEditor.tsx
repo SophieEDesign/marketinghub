@@ -429,7 +429,7 @@ export default function RecordEditor({
       )
     }
 
-    if (mode === "review") {
+    if (mode === "review" || (mode === "modal" && isEditingLayout)) {
       const hasVisibleFields = (isEditingLayout ? layoutModeFields : visibleFields).length > 0
       if (!hasVisibleFields && !isEditingLayout) {
         return (

@@ -10,6 +10,8 @@ import { createPortal } from "react-dom"
 import RecordEditor from "./RecordEditor"
 import { useIsMobile } from "@/hooks/useResponsive"
 import { resolveRecordEditMode } from "@/lib/interface/resolve-record-edit-mode"
+import { SHELL_RIGHT_SETTINGS_WIDTH_PX } from "@/lib/interface/layout-constants"
+import { cn } from "@/lib/utils"
 
 const MIN_WIDTH = 320
 const MAX_WIDTH = 1200
@@ -69,6 +71,8 @@ export default function RecordPanel() {
   // Desktop edit mode keeps the shell as a stable 3-region layout (sidebar, canvas, settings).
   // Record panel overlays in edit mode to avoid starving center width with multiple fixed side columns.
   const useOverlayLayout = isMobile || isEdit() || calendarOrigin
+  /** In page edit mode, leave the right settings column clickable and place the panel beside it. */
+  const offsetForRightSettings = useOverlayLayout && isEdit() && !isMobile
   const panelWidth = state.isFullscreen ? "100%" : `${state.width}px`
   // In edit mode, always show Back so user can close (X is hidden). Otherwise show when we can go to previous record.
   const canGoBack = state.isFullscreen || state.history.length > 1 || isEdit()
@@ -117,7 +121,10 @@ export default function RecordPanel() {
     <>
       {useOverlayLayout && !state.isPinned && state.isOpen && (
         <div
-          className="fixed inset-0 md:left-sidebar bg-black/20 z-40 transition-opacity"
+          className={cn(
+            "fixed inset-0 md:left-sidebar bg-black/20 z-40 transition-opacity",
+            offsetForRightSettings && "md:right-right-settings"
+          )}
           onClick={closeRecord}
           aria-hidden="true"
         />
@@ -126,16 +133,23 @@ export default function RecordPanel() {
       {/* Key: remount on record change only; interfaceMode is a prop, not a key */}
       <div
         key={`record-panel-${state.recordId ?? "new"}`}
-        className={`${
+        className={cn(
           useOverlayLayout
-            ? "fixed right-0 top-0 h-full z-50"
-            : "flex-shrink-0 border-l border-border"
-        } bg-card border-border/50 flex flex-col transition-all duration-300 ease-out`}
+            ? cn(
+                "fixed top-0 h-full z-50",
+                offsetForRightSettings ? "md:right-right-settings right-0" : "right-0"
+              )
+            : "flex-shrink-0 border-l border-border",
+          "bg-card border-border/50 flex flex-col transition-all duration-300 ease-out"
+        )}
         style={{
           width: state.isOpen ? panelWidth : "0px",
           minWidth: !useOverlayLayout && state.isOpen ? `${state.width}px` : undefined,
           maxWidth: !useOverlayLayout && state.isOpen ? `${state.width}px` : undefined,
           overflow: state.isOpen ? undefined : "hidden",
+          ...(offsetForRightSettings && useOverlayLayout
+            ? { maxWidth: `min(${state.width}px, calc(100vw - var(--shell-sidebar-width) - ${SHELL_RIGHT_SETTINGS_WIDTH_PX}px))` }
+            : {}),
         }}
       >
         {!state.isFullscreen && !isMobile && state.isOpen && (

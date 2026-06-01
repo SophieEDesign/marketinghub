@@ -32,6 +32,7 @@ const config = {
     extend: {
       spacing: {
         sidebar: "var(--shell-sidebar-width)",
+        "right-settings": "var(--shell-right-settings-width)",
       },
       colors: {
         hub: {

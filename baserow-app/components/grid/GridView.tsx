@@ -641,7 +641,8 @@ function GridViewInner({
   // Open record in edit mode when openRecordInEditMode is set (e.g. from block settings)
   // CRITICAL: Use loadRowsRef instead of loadRows in deps - loadRows is recreated each render and would cause React #185 infinite loop
   useEffect(() => {
-    if (openRecordInEditMode && recordOpenStyle === 'modal') {
+    if (!openRecordInEditMode) return
+    if (recordOpenStyle === "modal") {
       openRecordModal({
         tableId,
         recordId: openRecordInEditMode,
@@ -660,8 +661,39 @@ function GridViewInner({
         onRecordUpdated: () => loadRowsRef.current?.(),
         keySuffix: blockId ?? undefined,
       })
+      return
     }
-  }, [openRecordInEditMode, recordOpenStyle, openRecordModal, tableId, tableFields, modalFields, modalLayout, fieldLayout, supabaseTableName, cascadeContext, canEditLayout, onModalLayoutSave, interfaceMode, blockId])
+    openRecord(
+      tableId,
+      openRecordInEditMode,
+      supabaseTableName,
+      modalFields,
+      modalLayout,
+      cascadeContext,
+      interfaceMode,
+      () => loadRowsRef.current(),
+      () => loadRowsRef.current?.(),
+      fieldLayout,
+      onModalLayoutSave,
+      tableFields
+    )
+  }, [
+    openRecordInEditMode,
+    recordOpenStyle,
+    openRecordModal,
+    openRecord,
+    tableId,
+    tableFields,
+    modalFields,
+    modalLayout,
+    fieldLayout,
+    supabaseTableName,
+    cascadeContext,
+    canEditLayout,
+    onModalLayoutSave,
+    interfaceMode,
+    blockId,
+  ])
 
   // Track previous groupBy to detect changes
   const prevGroupByRef = useRef<string | undefined>(groupBy)
