@@ -75,11 +75,11 @@ describe("InterfacePageClient — layout edit follows navigation", () => {
     expect(src).toContain("enterWorkspaceEdit()")
   })
 
-  it("shows InterfaceBuilder toolbar when page layout editing", () => {
+  it("hides InterfaceBuilder toolbar (shell EditModeBanner + sidebar)", () => {
     const src = readFileSync(
       join(process.cwd(), "components/interface/InterfacePageClient.tsx"),
       "utf8"
     )
-    expect(src).toContain("hideHeader={!isPageLayoutEditing}")
+    expect(src).toContain("hideHeader={true}")
   })
 })

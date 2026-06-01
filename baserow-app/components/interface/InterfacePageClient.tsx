@@ -76,7 +76,6 @@ function InterfacePageContent({
   showShellPlaceholder,
   isAdmin,
   onBlocksMirror,
-  isPageLayoutEditing,
 }: {
   useRecordReviewLayout: boolean
   hasPage: boolean
@@ -95,8 +94,6 @@ function InterfacePageContent({
   showShellPlaceholder?: boolean
   /** When InterfaceBuilder is mounted it owns blocks; mirror updates to parent for loadBlocks/sync (REG-005). */
   onBlocksMirror?: (blocks: PageBlock[]) => void
-  /** Page layout edit (UIMode editPages / block scope) — shows builder toolbar when header is hidden. */
-  isPageLayoutEditing?: boolean
 }) {
   if (showShellPlaceholder && hasPage) {
     return (
@@ -126,7 +123,7 @@ function InterfacePageContent({
         page={(interfaceBuilderPage ?? fallbackPage) as any}
         initialBlocks={memoizedBlocks}
         isViewer={isViewer}
-        hideHeader={!isPageLayoutEditing}
+        hideHeader={true}
         pageTableId={pageTableId}
         recordId={recordContext?.recordId ?? null}
         recordTableId={recordContext?.tableId ?? null}
@@ -1286,13 +1283,7 @@ function InterfacePageClientInternal({
     const isRecordReview = page?.page_type === 'record_review'
     const useRecordReviewLayout = isRecordReview || isRecordView
     const isContentPage = !useRecordReviewLayout
-    const isSingleCalendar =
-      isContentPage &&
-      blocks.length === 1 &&
-      blocks[0]?.type === "grid" &&
-      blocks[0]?.config?.view_type === "calendar"
-    const isFullPage =
-      (isContentPage && pageUsesFullPageLayout(blocks)) || isSingleCalendar
+    const isFullPage = isContentPage && pageUsesFullPageLayout(blocks)
     // Suppress main scroll for: (1) full-page content blocks, (2) record_view/record_review two-panel layout
     // Both layouts fill viewport; panels scroll internally.
     const shouldSuppress = !!isFullPage || !!useRecordReviewLayout
@@ -1571,7 +1562,6 @@ function InterfacePageClientInternal({
             showShellPlaceholder={showShellPlaceholder}
             isAdmin={isAdmin}
             onBlocksMirror={handleBlocksMirror}
-            isPageLayoutEditing={isEditing}
           />
           {blocksLoading && (
             <div className="absolute inset-0 bg-white/60 flex items-center justify-center z-10 pointer-events-none">

@@ -59,6 +59,25 @@ describe("full-page-layout", () => {
     expect(resolveFullPageBlockId([a, b])).toBeNull()
   })
 
+  it("calendar grid defaults to full page when is_full_page unset", () => {
+    const b = block({
+      id: "b1",
+      type: "grid",
+      config: { view_type: "calendar", table_id: "t1" },
+    })
+    expect(resolveFullPageBlockId([b])).toBe("b1")
+  })
+
+  it("calendar grid respects is_full_page false (Planning Calendar opt-out)", () => {
+    const b = block({
+      id: "b1",
+      type: "grid",
+      config: { view_type: "calendar", is_full_page: false, table_id: "t1" },
+    })
+    expect(blockWantsFullPageLayout(b)).toBe(false)
+    expect(resolveFullPageBlockId([b])).toBeNull()
+  })
+
   it("explicit is_full_page false opts out of marketing defaultFullPage", () => {
     const b = block({
       id: "b1",

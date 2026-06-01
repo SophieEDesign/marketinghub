@@ -19,6 +19,10 @@ export function isMarketingDashboardBlockType(
   return (MARKETING_DASHBOARD_BLOCK_TYPES as readonly string[]).includes(type)
 }
 
+export function isCalendarGridBlock(block: Pick<PageBlock, "type" | "config">): boolean {
+  return block.type === "grid" && block.config?.view_type === "calendar"
+}
+
 /** Block type supports full-page layout in the registry. */
 export function blockSupportsFullPage(block: PageBlock): boolean {
   return getBlockDefinition(block.type).supportsFullPage === true
@@ -37,12 +41,15 @@ export function canUseFullPageBlock(block: PageBlock): boolean {
  * Whether the page canvas should use full-page layout for this block.
  * Explicit `is_full_page: false` always opts out (user toggle wins).
  * Explicit `is_full_page: true` opts in.
- * When unset, marketing dashboard types use registry `defaultFullPage` (legacy pages).
+ * When unset: sole calendar grid + marketing blocks with registry `defaultFullPage`.
  */
 export function blockWantsFullPageLayout(block: PageBlock): boolean {
   const flag = block.config?.is_full_page
   if (flag === false) return false
   if (flag === true) return true
+  if (isCalendarGridBlock(block)) {
+    return true
+  }
   if (isMarketingDashboardBlockType(block.type)) {
     return getBlockDefinition(block.type).defaultFullPage === true
   }
@@ -80,9 +87,6 @@ export function isBlockEligibleForFullPage(block: PageBlock): boolean {
 export function resolveFullPageBlockId(blocks: PageBlock[]): string | null {
   if (blocks.length !== 1) return null
   const block = blocks[0]
-  if (block?.type === "grid" && block?.config?.view_type === "calendar") {
-    return block.id
-  }
   if (blockWantsFullPageLayout(block) && canUseFullPageBlock(block)) {
     return block.id
   }

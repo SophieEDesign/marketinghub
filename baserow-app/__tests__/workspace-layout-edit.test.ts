@@ -84,12 +84,12 @@ describe("unified workspace layout edit", () => {
     expect(src).toContain("enterWorkspaceEdit()")
   })
 
-  it("InterfaceBuilder receives editing when layout edit is active", () => {
+  it("InterfaceBuilder keeps header hidden (shell provides edit chrome)", () => {
     const src = readFileSync(
       join(process.cwd(), "components/interface/InterfacePageClient.tsx"),
       "utf8"
     )
-    expect(src).toContain("hideHeader={!isPageLayoutEditing}")
-    expect(src).toContain("isPageLayoutEditing={isEditing}")
+    expect(src).toContain("hideHeader={true}")
+    expect(src).not.toContain("isPageLayoutEditing")
   })
 })
