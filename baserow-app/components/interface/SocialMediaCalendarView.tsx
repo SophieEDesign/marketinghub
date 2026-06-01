@@ -47,6 +47,7 @@ export default function SocialMediaCalendarView({
           thumbnailUrl: e.thumbnailUrl,
           normalizedStatus: e.normalizedStatus,
           statusLabel: e.statusLabel,
+          postUrl: e.postUrl,
         },
       })),
     [events]

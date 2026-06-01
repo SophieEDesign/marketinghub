@@ -75,11 +75,12 @@ export default function InternalResourceHubDataSettings({
             )}
           />
           <MarketingFieldSelect
-            label="Category / status"
+            label="Hub category"
             fieldId={config.resource_hub_category_field_id}
             fieldName={config.resource_hub_category_field}
             fields={tableFields}
             onChange={setField("resource_hub_category_field_id", "resource_hub_category_field")}
+            fieldTypes={["single_select"]}
           />
           <MarketingFieldSelect
             label="Uploaded by"

@@ -4,8 +4,11 @@ import { join } from "path"
 import { BLOCK_REGISTRY, getAllBlockTypes } from "@/lib/interface/registry"
 import {
   applyContentScope,
+  buildSocialCalendarItems,
   derivePlatforms,
+  externalLinkLabel,
   filterSocialCalendarItems,
+  normalizeExternalUrl,
   normalizeSocialStatus,
   parseContentMediaThumbnail,
   socialCalendarSettingsFromConfig,
@@ -44,6 +47,7 @@ const baseFields: SocialCalendarFieldMap = {
   twitter: "twitter",
   facebook: "facebook",
   tiktok: "tiktok",
+  postUrl: "planable_url",
 }
 
 function makeItem(overrides: Partial<SocialCalendarItem> = {}): SocialCalendarItem {
@@ -75,6 +79,7 @@ function makeItem(overrides: Partial<SocialCalendarItem> = {}): SocialCalendarIt
     statusLabel: "Draft",
     missingMedia: true,
     needsReview: false,
+    postUrl: null,
     ...overrides,
   }
 }
@@ -198,5 +203,46 @@ describe("filterSocialCalendarItems", () => {
     })
     expect(filtered).toHaveLength(1)
     expect(filtered[0].id).toBe("a")
+  })
+})
+
+describe("Planable / post URL", () => {
+  it("normalizes bare domains to https", () => {
+    expect(normalizeExternalUrl("app.planable.io/post/abc")).toBe(
+      "https://app.planable.io/post/abc"
+    )
+  })
+
+  it("labels Planable hosts", () => {
+    expect(externalLinkLabel("https://app.planable.io/post/abc")).toBe("Open in Planable")
+    expect(externalLinkLabel("https://example.com/post")).toBe("Open post link")
+  })
+
+  it("reads post URL from content rows", () => {
+    const baseItems = [
+      {
+        id: "1",
+        title: "Post",
+        date: new Date(2026, 4, 15),
+        dueDate: null,
+        status: "Draft",
+        contentType: "Social Media",
+        themeId: null,
+        themeLabel: null,
+        campaignIds: [],
+        assignee: null,
+        division: null,
+        accentColor: "#7c3aed",
+        isOverdue: false,
+        isUpcoming: true,
+      },
+    ]
+    const items = buildSocialCalendarItems({
+      baseItems,
+      contentRows: [{ id: "1", planable_url: "https://app.planable.io/post/xyz" }],
+      fields: baseFields,
+      campaignLabelById: new Map(),
+    })
+    expect(items[0].postUrl).toBe("https://app.planable.io/post/xyz")
   })
 })

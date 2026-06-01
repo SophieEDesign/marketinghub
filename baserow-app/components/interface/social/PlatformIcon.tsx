@@ -1,6 +1,6 @@
 "use client"
 
-import { Share2 } from "lucide-react"
+import { Globe } from "lucide-react"
 import type { SocialPlatform } from "@/lib/marketing/social-media-calendar"
 import { cn } from "@/lib/utils"
 
@@ -78,7 +78,7 @@ export function PlatformIcon({
     case "tiktok":
       return <TikTokIcon className={iconClass} />
     default:
-      return <Share2 className={iconClass} aria-hidden />
+      return <Globe className={iconClass} aria-hidden />
   }
 }
 
@@ -93,7 +93,7 @@ export function PlatformIconRow({
 }) {
   const shown = platforms.slice(0, max)
   if (shown.length === 0) {
-    return <Share2 className={cn(SIZE[size], "text-muted-foreground/60")} aria-hidden />
+    return null
   }
   return (
     <span className="inline-flex items-center gap-0.5 shrink-0">

@@ -63,6 +63,7 @@ export interface SocialCalendarFieldMap extends ContentPlanningFieldMap {
   twitter: string | null
   facebook: string | null
   tiktok: string | null
+  postUrl: string | null
 }
 
 export interface SocialCalendarItem extends ContentPlanningItem {
@@ -79,6 +80,7 @@ export interface SocialCalendarItem extends ContentPlanningItem {
   statusLabel: string | null
   missingMedia: boolean
   needsReview: boolean
+  postUrl: string | null
 }
 
 export interface SocialCalendarFilters extends ContentPlanningFilters {
@@ -103,6 +105,7 @@ export interface SocialCalendarEvent {
   hasMedia: boolean
   missingMedia: boolean
   needsReview: boolean
+  postUrl: string | null
 }
 
 export interface SocialStatusSummary {
@@ -203,6 +206,11 @@ export function resolveSocialCalendarFields(
     twitter: pickFieldName(contentFields, [/^twitter$/i, /^x$/i], null),
     facebook: pickFieldName(contentFields, [/^facebook$/i], null),
     tiktok: pickFieldName(contentFields, [/^tiktok$/i], null),
+    postUrl: pickFieldName(
+      contentFields,
+      [/planable/i, /post_url/i, /post_link/i, /planable_url/i],
+      null
+    ),
   }
 }
 
@@ -234,6 +242,7 @@ export function extendSocialCalendarFieldMap(
     twitter: extra.twitter,
     facebook: extra.facebook,
     tiktok: extra.tiktok,
+    postUrl: resolved.postUrl ?? extra.postUrl,
   }
 }
 
@@ -440,6 +449,22 @@ function decodeCommonHtmlEntities(text: string): string {
     .replace(/&#39;/gi, "'")
 }
 
+export function normalizeExternalUrl(url: string | null | undefined): string | null {
+  if (url == null) return null
+  const trimmed = url.trim()
+  if (!trimmed) return null
+  if (/^https?:\/\//i.test(trimmed)) return trimmed
+  return `https://${trimmed}`
+}
+
+export function isPlanableUrl(url: string): boolean {
+  return /planable\./i.test(url)
+}
+
+export function externalLinkLabel(url: string): string {
+  return isPlanableUrl(url) ? "Open in Planable" : "Open post link"
+}
+
 function normalizeCaptionText(raw: string): string {
   const trimmed = raw.trim()
   if (!trimmed) return ""
@@ -486,6 +511,9 @@ export function buildSocialCalendarItems(params: {
     const approvalNotes = fields.approvalNotes
       ? formatDisplayValue(row[fields.approvalNotes])?.trim() || null
       : null
+    const postUrl = fields.postUrl
+      ? normalizeExternalUrl(formatDisplayValue(row[fields.postUrl]))
+      : null
 
     const campaignId = fields.contentCampaign ? extractLinkedId(row[fields.contentCampaign]) : null
     const campaignLabel = campaignId ? campaignLabelById.get(campaignId) ?? null : null
@@ -510,6 +538,7 @@ export function buildSocialCalendarItems(params: {
       statusLabel: item.status,
       missingMedia,
       needsReview,
+      postUrl,
     }
   })
 }
@@ -631,6 +660,7 @@ export function buildSocialCalendarEvents(items: SocialCalendarItem[]): SocialCa
       hasMedia: item.hasMedia,
       missingMedia: item.missingMedia,
       needsReview: item.needsReview,
+      postUrl: item.postUrl,
     }))
 }
 

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest"
+import { format } from "date-fns"
 import { readFileSync } from "fs"
 import { join } from "path"
 import { BLOCK_REGISTRY, getAllBlockTypes } from "@/lib/interface/registry"
@@ -12,6 +13,8 @@ import {
   eventCalendarSettingsFromConfig,
   DEFAULT_EVENT_CALENDAR_BLOCK_CONFIG,
   resolveContentEventFields,
+  buildEventTimelineRange,
+  positionEventOnTimeline,
   type MarketingEventItem,
 } from "@/lib/marketing/events"
 import { buildCalendarIcs, buildEventIcs } from "@/lib/marketing/event-calendar-ics"
@@ -360,6 +363,33 @@ describe("EventCalendarCore edit vs view click", () => {
   })
 })
 
+describe("event timeline range", () => {
+  it("spans all event dates, not only the cursor month", () => {
+    const items = [
+      sampleItem({
+        id: "e1",
+        startDate: new Date("2025-11-28"),
+        endDate: new Date("2025-11-28"),
+      }),
+      sampleItem({
+        id: "e2",
+        startDate: new Date("2026-01-14"),
+        endDate: new Date("2026-01-18"),
+      }),
+    ]
+    const range = buildEventTimelineRange(items, new Date("2026-06-01"))
+    expect(format(range.months[0], "yyyy-MM")).toBe("2025-10")
+    expect(range.months[range.months.length - 1].getFullYear()).toBe(2026)
+
+    const pos1 = positionEventOnTimeline(items[0], range)
+    const pos2 = positionEventOnTimeline(items[1], range)
+    expect(pos1).not.toBeNull()
+    expect(pos2).not.toBeNull()
+    expect(pos1!.leftPct).toBeLessThan(pos2!.leftPct)
+    expect(pos2!.widthPct).toBeGreaterThan(1)
+  })
+})
+
 describe("filterEventItems", () => {
   it("filters by search query", () => {
     const filtered = filterEventItems(
@@ -384,5 +414,26 @@ describe("filterEventItems", () => {
     )
     expect(filtered).toHaveLength(1)
     expect(filtered[0].eventName).toContain("Monaco")
+  })
+
+  it("filters by status (mapped status field values)", () => {
+    const filtered = filterEventItems(
+      [
+        sampleItem({ id: "e1", status: "Confirmed" }),
+        sampleItem({ id: "e2", status: "draft", eventName: "Draft event" }),
+        sampleItem({ id: "e3", status: null, eventName: "No status" }),
+      ],
+      {
+        search: "",
+        eventTypes: [],
+        locations: [],
+        statuses: ["draft"],
+        owners: [],
+        attendeeFilter: "all",
+      },
+      null
+    )
+    expect(filtered).toHaveLength(1)
+    expect(filtered[0].id).toBe("e2")
   })
 })

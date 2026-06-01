@@ -58,7 +58,10 @@ function FilterSelect({
   if (options.length === 0) return null
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className={cn(FILTER_CONTROL, "min-w-[140px]", className)} aria-label={label}>
+      <SelectTrigger
+        className={cn(FILTER_CONTROL, "w-auto min-w-[140px] max-w-[200px]", className)}
+        aria-label={label}
+      >
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
@@ -157,9 +160,9 @@ export default function EventCalendarToolbar({
           <h2 className="text-lg font-semibold text-foreground tracking-tight shrink-0">{title}</h2>
         ) : null}
 
-        <div className="flex flex-wrap items-center gap-2 lg:flex-1 lg:justify-center">
+        <div className="flex flex-wrap items-center gap-2 lg:flex-1 lg:justify-center min-w-0">
           <div
-            className="inline-flex rounded-lg border border-border/50 bg-muted/30 p-0.5"
+            className="inline-flex rounded-lg border border-border/50 bg-muted/30 p-0.5 shrink-0"
             role="tablist"
             aria-label="Calendar view"
           >
@@ -186,6 +189,49 @@ export default function EventCalendarToolbar({
               )
             })}
           </div>
+          {filtersVisible ? (
+            <div className="flex flex-row flex-wrap items-center gap-2 min-w-0">
+              <FilterSelect
+                label="Event type"
+                options={eventTypes}
+                value={filterEventType}
+                onChange={onFilterEventType}
+                placeholder="All event types"
+              />
+              <FilterSelect
+                label="Location"
+                options={locations}
+                value={filterLocation}
+                onChange={onFilterLocation}
+                placeholder="All locations"
+              />
+              <FilterSelect
+                label="Status"
+                options={statuses}
+                value={filterStatus}
+                onChange={onFilterStatus}
+                placeholder="All statuses"
+              />
+              {filtersExpanded && owners.length > 0 ? (
+                <FilterSelect
+                  label="Owner"
+                  options={owners}
+                  value={filterOwner}
+                  onChange={onFilterOwner}
+                  placeholder="All owners"
+                />
+              ) : null}
+              {hasActiveFilters && onClearFilters ? (
+                <button
+                  type="button"
+                  onClick={onClearFilters}
+                  className="text-xs font-medium text-accent-link hover:underline shrink-0"
+                >
+                  Clear
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5 shrink-0 lg:justify-end">
@@ -256,50 +302,6 @@ export default function EventCalendarToolbar({
         </div>
       </div>
 
-      {filtersVisible ? (
-        <div className="flex flex-wrap items-center gap-2 border-t border-border/30 pt-3">
-          <SlidersHorizontal className="h-3.5 w-3.5 text-muted-foreground shrink-0" aria-hidden />
-          <FilterSelect
-            label="Event type"
-            options={eventTypes}
-            value={filterEventType}
-            onChange={onFilterEventType}
-            placeholder="All event types"
-          />
-          <FilterSelect
-            label="Location"
-            options={locations}
-            value={filterLocation}
-            onChange={onFilterLocation}
-            placeholder="All locations"
-          />
-          <FilterSelect
-            label="Status"
-            options={statuses}
-            value={filterStatus}
-            onChange={onFilterStatus}
-            placeholder="All statuses"
-          />
-          {filtersExpanded && owners.length > 0 ? (
-            <FilterSelect
-              label="Owner"
-              options={owners}
-              value={filterOwner}
-              onChange={onFilterOwner}
-              placeholder="All owners"
-            />
-          ) : null}
-          {hasActiveFilters && onClearFilters ? (
-            <button
-              type="button"
-              onClick={onClearFilters}
-              className="text-xs font-medium text-accent-link hover:underline ml-1"
-            >
-              Clear filters
-            </button>
-          ) : null}
-        </div>
-      ) : null}
     </div>
   )
 }

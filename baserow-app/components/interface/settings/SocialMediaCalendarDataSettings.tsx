@@ -142,7 +142,7 @@ export default function SocialMediaCalendarDataSettings({
             )}
           />
           <MarketingFieldSelect
-            label="Post URL"
+            label="Planable / post URL"
             fieldId={config.social_media_calendar_post_url_field_id}
             fieldName={config.social_media_calendar_post_url_field}
             fields={tableFields}

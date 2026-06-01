@@ -333,6 +333,7 @@ export interface SocialCalendarExtraFieldMap {
   platform: string | null
   channels: string | null
   images: string | null
+  postUrl: string | null
 }
 
 export function socialCalendarExtraOverridesFromConfig(
@@ -360,6 +361,11 @@ export function socialCalendarExtraOverridesFromConfig(
       "social_media_calendar_images_field_id",
       "social_media_calendar_images_field"
     ),
+    postUrl: overridePair(
+      c,
+      "social_media_calendar_post_url_field_id",
+      "social_media_calendar_post_url_field"
+    ),
   }
 }
 
@@ -379,6 +385,7 @@ export function resolveSocialCalendarExtraFields(
     platform: pick([/^platform$/i, /^channels$/i]),
     channels: pick([/^channels$/i]),
     images: pick([/^images$/i, /media/i]),
+    postUrl: pick([/planable/i, /post_url/i, /post_link/i, /planable_url/i]),
   }
   if (!overrides || Object.keys(overrides).length === 0) return base
   return applyFieldOverrides(base, overrides, fields)
@@ -388,7 +395,13 @@ export function resourceHubOverridesFromConfig(
   config?: BlockConfig
 ): Partial<
   Record<
-    "name" | "notes" | "status" | "documentLink" | "assignee" | "updatedAt",
+    | "name"
+    | "notes"
+    | "hubCategory"
+    | "status"
+    | "documentLink"
+    | "assignee"
+    | "updatedAt",
     FieldOverridePair
   >
 > {
@@ -396,7 +409,7 @@ export function resourceHubOverridesFromConfig(
   return {
     name: overridePair(c, "resource_hub_title_field_id", "resource_hub_title_field"),
     notes: overridePair(c, "resource_hub_description_field_id", "resource_hub_description_field"),
-    status: overridePair(c, "resource_hub_category_field_id", "resource_hub_category_field"),
+    hubCategory: overridePair(c, "resource_hub_category_field_id", "resource_hub_category_field"),
     documentLink: overridePair(c, "resource_hub_file_url_field_id", "resource_hub_file_url_field"),
     assignee: overridePair(c, "resource_hub_uploaded_by_field_id", "resource_hub_uploaded_by_field"),
     updatedAt: overridePair(c, "resource_hub_updated_at_field_id", "resource_hub_updated_at_field"),

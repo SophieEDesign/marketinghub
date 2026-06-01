@@ -21,7 +21,7 @@ export function EventCalendarEventCard({ arg }: { arg: EventContentArg }) {
       </span>
       {arg.view.type.includes("dayGrid") ? (
         <span className="relative text-[10px] leading-tight text-muted-foreground truncate">
-          {(arg.event.extendedProps?.locationLabel as string) || dateRangeLabel || ""}
+          {dateRangeLabel || (arg.event.extendedProps?.locationLabel as string) || ""}
         </span>
       ) : null}
       {eventType ? (

@@ -3,6 +3,7 @@
 import type { EventContentArg } from "@fullcalendar/core"
 import { ImageIcon } from "lucide-react"
 import { PlatformIconRow } from "@/components/interface/social/PlatformIcon"
+import { SocialPostExternalLink } from "@/components/interface/social/SocialPostExternalLink"
 import { SocialStatusPill } from "@/components/interface/social/SocialStatusPill"
 import type { SocialPlatform, SocialWorkflowStatus } from "@/lib/marketing/social-media-calendar"
 
@@ -23,6 +24,7 @@ export function SocialCalendarEventCard({
   const thumbnailUrl = props.thumbnailUrl as string | null
   const normalizedStatus = (props.normalizedStatus as SocialWorkflowStatus) || "unknown"
   const statusLabel = props.statusLabel as string | null
+  const postUrl = props.postUrl as string | null
 
   return (
     <div
@@ -44,11 +46,14 @@ export function SocialCalendarEventCard({
           ) : (
             <span />
           )}
-          {scheduledTime ? (
-            <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
-              {scheduledTime}
-            </span>
-          ) : null}
+          <span className="flex items-center gap-1 shrink-0">
+            <SocialPostExternalLink url={postUrl} />
+            {scheduledTime ? (
+              <span className="text-[10px] text-muted-foreground tabular-nums">
+                {scheduledTime}
+              </span>
+            ) : null}
+          </span>
         </div>
         <p className="text-xs font-medium leading-snug line-clamp-3 text-foreground">
           {captionSnippet}

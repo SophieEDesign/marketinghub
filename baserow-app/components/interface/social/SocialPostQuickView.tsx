@@ -1,11 +1,12 @@
 "use client"
 
-import { ImageIcon, X } from "lucide-react"
+import { ExternalLink, ImageIcon, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import PanelShell from "@/components/interface/primitives/PanelShell"
 import { PlatformIconRow } from "@/components/interface/social/PlatformIcon"
 import { SocialStatusPill } from "@/components/interface/social/SocialStatusPill"
 import {
+  externalLinkLabel,
   formatSocialDateTime,
   type SocialCalendarItem,
 } from "@/lib/marketing/social-media-calendar"
@@ -159,6 +160,14 @@ export function SocialPostQuickView({
       </div>
 
       <div className="flex flex-col gap-2 p-3 border-t border-border/30 shrink-0">
+        {item.postUrl ? (
+          <Button type="button" variant="outline" size="sm" className="w-full gap-2" asChild>
+            <a href={item.postUrl} target="_blank" rel="noopener noreferrer">
+              <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+              {externalLinkLabel(item.postUrl)}
+            </a>
+          </Button>
+        ) : null}
         <Button type="button" size="sm" className="w-full" onClick={onEdit}>
           Edit post
         </Button>

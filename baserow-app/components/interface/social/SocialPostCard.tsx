@@ -3,6 +3,7 @@
 import { ImageIcon } from "lucide-react"
 import AccentCard from "@/components/interface/primitives/AccentCard"
 import { PlatformIconRow } from "@/components/interface/social/PlatformIcon"
+import { SocialPostExternalLink } from "@/components/interface/social/SocialPostExternalLink"
 import { SocialStatusPill } from "@/components/interface/social/SocialStatusPill"
 import {
   formatSocialDateTime,
@@ -55,15 +56,18 @@ export function SocialPostCard({
         <div className={cn("flex flex-col gap-1 min-w-0 flex-1", compact ? "p-2" : "p-2.5")}>
           <div className="flex items-center justify-between gap-1">
             {showPlatformIcons ? (
-              <PlatformIconRow platforms={item.platforms} size="sm" />
+              <PlatformIconRow platforms={item.platforms} max={3} size="sm" />
             ) : (
               <span />
             )}
-            {item.scheduledTime ? (
-              <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
-                {item.scheduledTime}
-              </span>
-            ) : null}
+            <span className="flex items-center gap-1 shrink-0">
+              <SocialPostExternalLink url={item.postUrl} />
+              {item.scheduledTime ? (
+                <span className="text-[10px] text-muted-foreground tabular-nums">
+                  {item.scheduledTime}
+                </span>
+              ) : null}
+            </span>
           </div>
           <p className="text-xs font-medium leading-snug line-clamp-2 text-foreground">
             {item.captionSnippet}

@@ -13,6 +13,8 @@ import { normalizeHexColor } from "@/lib/field-colors"
 import type { FieldOptions } from "@/types/fields"
 import {
   addDays,
+  addMonths,
+  differenceInDays,
   endOfMonth,
   format,
   isAfter,
@@ -775,18 +777,24 @@ export function filterEventItems(
         .toLowerCase()
       if (!hay.includes(q)) return false
     }
-    if (filters.eventTypes.length && item.eventType && !filters.eventTypes.includes(item.eventType)) {
-      return false
+    if (filters.eventTypes.length) {
+      const type = (item.eventType || "").trim().toLowerCase()
+      const allowed = filters.eventTypes.map((t) => t.trim().toLowerCase())
+      if (!type || !allowed.includes(type)) return false
     }
-    if (filters.statuses.length && item.status && !filters.statuses.includes(item.status)) {
-      return false
+    if (filters.statuses.length) {
+      const status = (item.status || "").trim().toLowerCase()
+      const allowed = filters.statuses.map((s) => s.trim().toLowerCase())
+      if (!status || !allowed.includes(status)) return false
     }
     if (filters.locations.length) {
-      const loc = item.locationLabel || item.country || ""
-      if (!filters.locations.some((l) => loc.toLowerCase().includes(l.toLowerCase()))) return false
+      const loc = (item.locationLabel || item.country || "").trim().toLowerCase()
+      const allowed = filters.locations.map((l) => l.trim().toLowerCase())
+      if (!loc || !allowed.some((l) => loc === l || loc.includes(l))) return false
     }
-    if (filters.owners.length && item.ownerLabel && !filters.owners.includes(item.ownerLabel)) {
-      return false
+    if (filters.owners.length) {
+      const owner = (item.ownerLabel || "").trim()
+      if (!owner || !filters.owners.includes(owner)) return false
     }
     if (filters.attendeeFilter === "attending" && currentUserId && !item.attendeeIds.includes(currentUserId)) {
       return false
@@ -796,6 +804,97 @@ export function filterEventItems(
     }
     return true
   })
+}
+
+export interface EventTimelineRange {
+  months: Date[]
+  rangeStart: Date
+  rangeEnd: Date
+  totalDays: number
+}
+
+/** Month columns spanning all dated events (±1 month padding), not only the cursor month. */
+export function buildEventTimelineRange(
+  items: MarketingEventItem[],
+  cursorDate: Date = new Date()
+): EventTimelineRange {
+  const dated = items.filter((i) => i.startDate)
+  const cursorMonth = startOfMonth(cursorDate)
+
+  if (dated.length === 0) {
+    const months = [0, 1, 2, 3, 4, 5].map((i) => startOfMonth(addMonths(cursorMonth, i)))
+    const rangeStart = months[0]
+    const rangeEnd = addMonths(months[months.length - 1], 1)
+    return {
+      months,
+      rangeStart,
+      rangeEnd,
+      totalDays: Math.max(differenceInDays(rangeEnd, rangeStart), 1),
+    }
+  }
+
+  let minDate = dated[0].startDate!
+  let maxDate = dated[0].endDate ?? dated[0].startDate!
+  for (const item of dated) {
+    const s = item.startDate!
+    const e = item.endDate ?? s
+    if (s < minDate) minDate = s
+    if (e > maxDate) maxDate = e
+  }
+
+  const rangeStart = startOfMonth(addMonths(minDate, -1))
+  const lastMonth = startOfMonth(addMonths(maxDate, 1))
+  const months: Date[] = []
+  let cur = rangeStart
+  while (cur <= lastMonth && months.length < 36) {
+    months.push(cur)
+    cur = addMonths(cur, 1)
+  }
+  if (months.length === 0) months.push(startOfMonth(minDate))
+
+  const rangeEnd = addMonths(months[months.length - 1], 1)
+  return {
+    months,
+    rangeStart: months[0],
+    rangeEnd,
+    totalDays: Math.max(differenceInDays(rangeEnd, months[0]), 1),
+  }
+}
+
+export function positionEventOnTimeline(
+  item: MarketingEventItem,
+  range: EventTimelineRange
+): { leftPct: number; widthPct: number; isSingleDay: boolean } | null {
+  if (!item.startDate) return null
+
+  const start = startOfDay(item.startDate)
+  const end = startOfDay(item.endDate ?? item.startDate)
+  const rangeStartMs = range.rangeStart.getTime()
+  const rangeEndMs = range.rangeEnd.getTime()
+  const itemStartMs = start.getTime()
+  const itemEndExclusive = addDays(end, 1).getTime()
+
+  if (itemEndExclusive <= rangeStartMs || itemStartMs >= rangeEndMs) return null
+
+  const clippedStart = Math.max(itemStartMs, rangeStartMs)
+  const clippedEnd = Math.min(itemEndExclusive, rangeEndMs)
+  const startOff = differenceInDays(new Date(clippedStart), range.rangeStart)
+  const widthDays = Math.max(differenceInDays(new Date(clippedEnd), new Date(clippedStart)), 1)
+  const isSingleDay = isSameDay(start, end)
+
+  return {
+    leftPct: (startOff / range.totalDays) * 100,
+    widthPct: Math.max((widthDays / range.totalDays) * 100, isSingleDay ? 2.5 : 1.5),
+    isSingleDay,
+  }
+}
+
+export function getEventTimelineTodayPct(range: EventTimelineRange, today = new Date()): number | null {
+  const t = startOfDay(today).getTime()
+  const start = range.rangeStart.getTime()
+  const end = range.rangeEnd.getTime()
+  if (t < start || t >= end) return null
+  return ((t - start) / (end - start)) * 100
 }
 
 export function buildEventCalendarEvents(items: MarketingEventItem[]): EventCalendarEvent[] {

@@ -1045,6 +1045,7 @@ CREATE TABLE IF NOT EXISTS public.table_media_1768074185692 (
   notes text,
   assignee text,
   status text,
+  hub_category text,
   document text,
   sponsorships text,
   content_calendar text,

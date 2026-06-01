@@ -1,9 +1,19 @@
 "use client"
 
-import { addMonths, differenceInDays, format, startOfMonth } from "date-fns"
+import { useMemo } from "react"
+import { format } from "date-fns"
 import DashboardEmpty from "@/components/interface/primitives/DashboardEmpty"
-import type { MarketingEventItem } from "@/lib/marketing/events"
+import {
+  buildEventTimelineRange,
+  getEventTimelineTodayPct,
+  positionEventOnTimeline,
+  type MarketingEventItem,
+} from "@/lib/marketing/events"
 import { cn } from "@/lib/utils"
+
+const LABEL_COL_WIDTH = 200
+const ROW_HEIGHT = 44
+const MIN_TRACK_WIDTH = 720
 
 export function EventTimelineView({
   items,
@@ -16,7 +26,26 @@ export function EventTimelineView({
   onSelect: (id: string) => void
   rangeStart: Date
 }) {
-  const withDates = items.filter((i) => i.startDate)
+  const withDates = useMemo(() => items.filter((i) => i.startDate), [items])
+
+  const timeline = useMemo(
+    () => buildEventTimelineRange(withDates, rangeStart),
+    [withDates, rangeStart]
+  )
+
+  const todayPct = useMemo(() => getEventTimelineTodayPct(timeline), [timeline])
+
+  const rows = useMemo(() => {
+    return withDates
+      .map((item) => ({
+        item,
+        position: positionEventOnTimeline(item, timeline),
+      }))
+      .filter((r): r is { item: MarketingEventItem; position: NonNullable<typeof r.position> } =>
+        Boolean(r.position)
+      )
+  }, [withDates, timeline])
+
   if (withDates.length === 0) {
     return (
       <DashboardEmpty
@@ -28,69 +57,119 @@ export function EventTimelineView({
     )
   }
 
-  const months = [0, 1, 2, 3, 4, 5].map((i) => startOfMonth(addMonths(rangeStart, i)))
-  const timelineStart = months[0]
-  const timelineEnd = addMonths(months[months.length - 1], 1)
-  const totalDays = Math.max(differenceInDays(timelineEnd, timelineStart), 1)
-
-  function barStyle(item: MarketingEventItem): { left: string; width: string } | null {
-    if (!item.startDate) return null
-    const end = item.endDate ?? item.startDate
-    const startOff = Math.max(0, differenceInDays(item.startDate, timelineStart))
-    const endOff = Math.min(totalDays, differenceInDays(addMonths(end, 0), timelineStart) + 1)
-    const widthDays = Math.max(endOff - startOff, 1)
-    return {
-      left: `${(startOff / totalDays) * 100}%`,
-      width: `${(widthDays / totalDays) * 100}%`,
-    }
+  if (rows.length === 0) {
+    return (
+      <DashboardEmpty
+        title="No events in this period"
+        description="Try adjusting filters or navigating to months that include your events."
+        variant="compact"
+        className="py-12"
+      />
+    )
   }
 
   return (
-    <div className="min-h-[min(68vh,520px)] overflow-x-auto overflow-y-auto pr-1">
-      <div className="min-w-[640px]">
-        <div className="flex border-b border-border/40 pb-2 mb-3">
-          {months.map((m) => (
-            <div
-              key={m.toISOString()}
-              className="flex-1 text-center text-[10px] font-semibold text-muted-foreground uppercase tracking-wide"
-            >
-              {format(m, "MMM yyyy")}
-            </div>
-          ))}
+    <div className="min-h-[min(68vh,520px)] overflow-auto">
+      <div
+        className="relative"
+        style={{ minWidth: `min(100%, ${LABEL_COL_WIDTH + MIN_TRACK_WIDTH}px)` }}
+      >
+        {/* Month header */}
+        <div className="sticky top-0 z-20 flex border-b border-border/50 bg-background/95 backdrop-blur-sm">
+          <div
+            className="sticky left-0 z-30 shrink-0 border-r border-border/40 bg-background/95 px-3 py-2"
+            style={{ width: LABEL_COL_WIDTH }}
+          >
+            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Event
+            </span>
+          </div>
+          <div className="relative flex flex-1">
+            {timeline.months.map((m) => (
+              <div
+                key={m.toISOString()}
+                className="flex-1 min-w-[52px] border-r border-border/30 px-1 py-2 text-center"
+              >
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {format(m, "MMM yyyy")}
+                </div>
+              </div>
+            ))}
+            {todayPct != null ? (
+              <div
+                className="pointer-events-none absolute top-0 bottom-0 z-10 border-l-2 border-dashed border-accent-link/70"
+                style={{ left: `${todayPct}%` }}
+                aria-hidden
+              />
+            ) : null}
+          </div>
         </div>
-        <ul className="flex flex-col gap-2">
-          {withDates.map((item) => {
-            const pos = barStyle(item)
-            if (!pos) return null
-            return (
-              <li key={item.id}>
-                <button
-                  type="button"
-                  onClick={() => onSelect(item.id)}
-                  className={cn(
-                    "w-full text-left rounded-lg border border-border/30 px-2 py-2 hover:bg-muted/20 transition-colors",
-                    selectedId === item.id && "ring-1 ring-accent-link/30 bg-muted/15"
-                  )}
-                >
-                  <div className="flex items-center gap-3 mb-1.5 min-w-0">
-                    <span className="text-xs font-medium truncate flex-1">{item.eventName}</span>
-                    <span className="text-[10px] text-muted-foreground shrink-0">{item.dateRangeLabel}</span>
-                  </div>
-                  <div className="relative h-6 rounded-md bg-muted/25 overflow-hidden">
-                    <span
-                      className="absolute top-0 bottom-0 rounded-md opacity-90"
-                      style={{
-                        ...pos,
-                        backgroundColor: item.backgroundColor,
-                        borderLeft: `3px solid ${item.accentColor}`,
-                      }}
-                    />
-                  </div>
-                </button>
-              </li>
-            )
-          })}
-        </ul>
+
+        {/* Event rows */}
+        {rows.map(({ item, position }) => (
+          <div
+            key={item.id}
+            className="flex border-b border-border/30 hover:bg-muted/10"
+            style={{ minHeight: ROW_HEIGHT }}
+          >
+            <div
+              className="sticky left-0 z-10 flex shrink-0 items-center border-r border-border/40 bg-background/95 px-3"
+              style={{ width: LABEL_COL_WIDTH }}
+            >
+              <button
+                type="button"
+                onClick={() => onSelect(item.id)}
+                className={cn(
+                  "min-w-0 text-left text-xs font-medium text-foreground truncate hover:text-accent-link",
+                  selectedId === item.id && "text-accent-link"
+                )}
+              >
+                {item.eventName}
+              </button>
+            </div>
+            <div className="relative flex flex-1" style={{ minHeight: ROW_HEIGHT }}>
+              {timeline.months.map((m) => (
+                <div
+                  key={m.toISOString()}
+                  className="flex-1 min-w-[52px] border-r border-border/15"
+                  aria-hidden
+                />
+              ))}
+              {todayPct != null ? (
+                <div
+                  className="pointer-events-none absolute top-0 bottom-0 z-[1] border-l-2 border-dashed border-accent-link/50"
+                  style={{ left: `${todayPct}%` }}
+                  aria-hidden
+                />
+              ) : null}
+              <button
+                type="button"
+                title={`${item.eventName}\n${item.dateRangeLabel}`}
+                onClick={() => onSelect(item.id)}
+                className={cn(
+                  "absolute top-1/2 z-[2] flex h-7 -translate-y-1/2 items-center overflow-hidden rounded-md border px-2 text-left text-[10px] font-medium shadow-sm transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-link",
+                  selectedId === item.id && "ring-2 ring-accent-link ring-offset-1"
+                )}
+                style={{
+                  left: `${position.leftPct}%`,
+                  width: `${position.widthPct}%`,
+                  minWidth: position.isSingleDay ? 56 : 72,
+                  maxWidth: position.isSingleDay ? 120 : undefined,
+                  backgroundColor: item.backgroundColor,
+                  borderColor: item.accentColor,
+                  color: item.accentColor,
+                }}
+              >
+                <span
+                  className="absolute inset-y-0 left-0 w-1 rounded-l-md"
+                  style={{ backgroundColor: item.accentColor }}
+                  aria-hidden
+                />
+                <span className="relative truncate pl-1.5">{item.dateRangeLabel}</span>
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )
