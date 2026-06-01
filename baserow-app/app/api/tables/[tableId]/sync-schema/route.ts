@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getTable } from '@/lib/crud/tables'
 import { getTableFields } from '@/lib/fields/schema'
 import { generateAddColumnSQL } from '@/lib/fields/sqlGenerator'
+import { notifyPostgrestSchemaReload, runTableSqlAdmin } from '@/lib/fields/runTableSqlAdmin'
 import type { TableField } from '@/types/fields'
 
 const SYSTEM_FIELD_NAMES = new Set(['created_at', 'created_by', 'updated_at', 'updated_by'])
@@ -191,7 +192,7 @@ export async function POST(
         continue
       }
 
-      const { error: addError } = await supabase.rpc('execute_sql_safe', { sql_text: sql })
+      const { error: addError } = await runTableSqlAdmin(sql)
       if (!addError) {
         addedColumns.push(colName)
         physical.add(colName)
@@ -210,25 +211,11 @@ export async function POST(
 
   // 5) Best-effort: ask PostgREST to reload schema cache so new tables/columns are queryable immediately.
   if (addedColumns.length > 0) {
-    // If we added columns, try multiple times to ensure PostgREST picks them up
     for (let i = 0; i < 3; i++) {
-      try {
-        await supabase.rpc('execute_sql_safe', { sql_text: "NOTIFY pgrst, 'reload schema';" })
-        // Small delay between notifications
-        if (i < 2) {
-          await new Promise(resolve => setTimeout(resolve, 200))
-        }
-      } catch {
-        // best-effort only
-      }
+      await notifyPostgrestSchemaReload()
     }
   } else {
-    // Still try once even if no columns were added
-    try {
-      await supabase.rpc('execute_sql_safe', { sql_text: "NOTIFY pgrst, 'reload schema';" })
-    } catch {
-      // best-effort only
-    }
+    await notifyPostgrestSchemaReload()
   }
 
   // 6) Identify fields in metadata that don't have physical columns (for reporting)

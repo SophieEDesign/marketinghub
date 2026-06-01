@@ -48,6 +48,7 @@ import CellContextMenu from './CellContextMenu'
 import { formatCellValue } from '@/lib/dataView/clipboard'
 import FieldBuilderModal from './FieldBuilderModal'
 import { getFieldDisplayName } from '@/lib/fields/display'
+import { upsertGridViewSettings } from '@/lib/grid/upsertGridViewSettings'
 import { debugLog, debugWarn, debugError } from '@/lib/debug'
 import { attachScrollSyncListener } from '@/lib/immediate-phase/guards'
 
@@ -764,33 +765,13 @@ export default function AirtableGridView({
       async function saveToDatabase() {
         try {
           const supabase = createClient()
-          const { data: existing } = await supabase
-            .from('grid_view_settings')
-            .select('id')
-            .eq('view_id', viewUuid)
-            .maybeSingle()
-
-          const settingsData = {
+          await upsertGridViewSettings(supabase, viewUuid, {
             column_widths: columnWidths,
             column_order: columnOrder,
             column_wrap_text: columnWrapText,
-          }
-
-          if (existing) {
-            await supabase
-              .from('grid_view_settings')
-              .update(settingsData)
-              .eq('view_id', viewUuid)
-          } else {
-            await supabase
-              .from('grid_view_settings')
-              .insert([{
-                view_id: viewUuid,
-                ...settingsData,
-                row_height: 'medium',
-                frozen_columns: 0,
-              }])
-          }
+            row_height: 'medium',
+            frozen_columns: 0,
+          })
         } catch (error) {
           debugError('Error saving grid view settings:', error)
           // Non-critical, continue
@@ -816,37 +797,17 @@ export default function AirtableGridView({
     if (!viewUuid) return
     try {
       const supabase = createClient()
-      const { data: existing } = await supabase
-        .from('grid_view_settings')
-        .select('id')
-        .eq('view_id', viewUuid)
-        .maybeSingle()
-
-      if (existing) {
-        const res = await supabase
-          .from('grid_view_settings')
-          .update({ row_heights: next })
-          .eq('view_id', viewUuid)
-        // Backward compatibility: older schemas won't have row_heights yet.
-        if (res.error && ((res.error as any)?.code === '42703' || String((res.error as any)?.message || '').includes('row_heights'))) {
-          return
-        }
-      } else {
-        const res = await supabase
-          .from('grid_view_settings')
-          .insert([{
-            view_id: viewUuid,
-            column_widths: columnWidths,
-            column_order: columnOrder,
-            column_wrap_text: columnWrapText,
-            row_height: 'medium',
-            frozen_columns: 0,
-            row_heights: next,
-          }])
-        if (res.error && ((res.error as any)?.code === '42703' || String((res.error as any)?.message || '').includes('row_heights'))) {
-          // Can't persist row heights in DB yet; localStorage still works.
-          return
-        }
+      const res = await upsertGridViewSettings(supabase, viewUuid, {
+        column_widths: columnWidths,
+        column_order: columnOrder,
+        column_wrap_text: columnWrapText,
+        row_height: 'medium',
+        frozen_columns: 0,
+        row_heights: next,
+      })
+      // Backward compatibility: older schemas won't have row_heights yet.
+      if (res.error && ((res.error as any)?.code === '42703' || String((res.error as any)?.message || '').includes('row_heights'))) {
+        return
       }
     } catch (error) {
       debugError('Error saving row heights:', error)

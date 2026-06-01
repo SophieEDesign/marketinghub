@@ -15,6 +15,7 @@ import { getTableFields } from '@/lib/fields/schema'
 import { isTableNotFoundError, createErrorResponse, type ApiError } from '@/lib/api/error-handling'
 import type { TableField, FieldType, FieldOptions } from '@/types/fields'
 import { debugLog } from '@/lib/debug'
+import { notifyPostgrestSchemaReload, runTableSqlAdmin } from '@/lib/fields/runTableSqlAdmin'
 
 const SYSTEM_FIELD_NAMES = new Set(['created_at', 'created_by', 'updated_at', 'updated_by'])
 function isSystemFieldName(name: string) {
@@ -265,9 +266,7 @@ export async function POST(
         
         const sql = generateAddColumnSQL(table.supabase_table, finalSanitizedName, type as FieldType, normalizedOptions)
         
-        const { error: sqlError } = await supabase.rpc('execute_sql_safe', {
-          sql_text: sql
-        })
+        const { error: sqlError } = await runTableSqlAdmin(sql)
 
         if (sqlError) {
           // Rollback: Delete metadata
@@ -290,13 +289,7 @@ export async function POST(
         }
 
         // Trigger PostgREST schema cache refresh so the new column is immediately queryable
-        try {
-          await supabase.rpc('execute_sql_safe', { sql_text: "NOTIFY pgrst, 'reload schema';" })
-          // Small delay to allow PostgREST to process the notification
-          await new Promise(resolve => setTimeout(resolve, 200))
-        } catch {
-          // Non-fatal: PostgREST will eventually pick up the new column
-        }
+        await notifyPostgrestSchemaReload()
       } catch (sqlErr: unknown) {
         // Rollback: Delete metadata
         await supabase.from('table_fields').delete().eq('id', fieldData.id)
@@ -328,7 +321,7 @@ export async function POST(
         // Rollback: best-effort cleanup of created metadata + column.
         try {
           const dropSql = generateDropColumnSQL(table.supabase_table, finalSanitizedName)
-          await supabase.rpc('execute_sql_safe', { sql_text: dropSql })
+          await runTableSqlAdmin(dropSql)
         } catch {
           // ignore
         }
@@ -346,7 +339,7 @@ export async function POST(
         // Rollback the source field.
         try {
           const dropSql = generateDropColumnSQL(table.supabase_table, finalSanitizedName)
-          await supabase.rpc('execute_sql_safe', { sql_text: dropSql })
+          await runTableSqlAdmin(dropSql)
         } catch {
           // ignore
         }
@@ -391,7 +384,7 @@ export async function POST(
           // Rollback the source field.
           try {
             const dropSql = generateDropColumnSQL(table.supabase_table, finalSanitizedName)
-            await supabase.rpc('execute_sql_safe', { sql_text: dropSql })
+            await runTableSqlAdmin(dropSql)
           } catch {
             // ignore
           }
@@ -440,7 +433,7 @@ export async function POST(
         // Rollback the source field.
         try {
           const dropSql = generateDropColumnSQL(table.supabase_table, finalSanitizedName)
-          await supabase.rpc('execute_sql_safe', { sql_text: dropSql })
+          await runTableSqlAdmin(dropSql)
         } catch {
           // ignore
         }
@@ -461,13 +454,13 @@ export async function POST(
           'link_to_table',
           reciprocalOptions
         )
-        const { error: reciprocalSqlError } = await supabase.rpc('execute_sql_safe', { sql_text: reciprocalSql })
+        const { error: reciprocalSqlError } = await runTableSqlAdmin(reciprocalSql)
         if (reciprocalSqlError) {
           // Rollback both sides best-effort.
           await supabase.from('table_fields').delete().eq('id', reciprocalFieldData.id)
           try {
             const dropSql = generateDropColumnSQL(table.supabase_table, finalSanitizedName)
-            await supabase.rpc('execute_sql_safe', { sql_text: dropSql })
+            await runTableSqlAdmin(dropSql)
           } catch {
             // ignore
           }
@@ -477,19 +470,13 @@ export async function POST(
           return NextResponse.json(errorResponse, { status: 500 })
         }
 
-        // Trigger PostgREST schema cache refresh for the target table
-        try {
-          await supabase.rpc('execute_sql_safe', { sql_text: "NOTIFY pgrst, 'reload schema';" })
-          await new Promise(resolve => setTimeout(resolve, 200))
-        } catch {
-          // Non-fatal: PostgREST will eventually pick up the new column
-        }
+        await notifyPostgrestSchemaReload()
       } catch (e: unknown) {
         // Rollback both sides best-effort.
         await supabase.from('table_fields').delete().eq('id', reciprocalFieldData.id)
         try {
           const dropSql = generateDropColumnSQL(table.supabase_table, finalSanitizedName)
-          await supabase.rpc('execute_sql_safe', { sql_text: dropSql })
+          await runTableSqlAdmin(dropSql)
         } catch {
           // ignore
         }
@@ -514,14 +501,14 @@ export async function POST(
         // Rollback best-effort: remove reciprocal + source metadata + columns.
         try {
           const dropRecSql = generateDropColumnSQL((targetTable as any).supabase_table, reciprocalSanitizedName)
-          await supabase.rpc('execute_sql_safe', { sql_text: dropRecSql })
+          await runTableSqlAdmin(dropRecSql)
         } catch {
           // ignore
         }
         await supabase.from('table_fields').delete().eq('id', reciprocalFieldData.id)
         try {
           const dropSql = generateDropColumnSQL(table.supabase_table, finalSanitizedName)
-          await supabase.rpc('execute_sql_safe', { sql_text: dropSql })
+          await runTableSqlAdmin(dropSql)
         } catch {
           // ignore
         }
@@ -1115,9 +1102,7 @@ export async function PATCH(
 
     // Execute SQL operations
     for (const sql of sqlOperations) {
-      const { error: sqlError } = await supabase.rpc('execute_sql_safe', {
-        sql_text: sql
-      })
+      const { error: sqlError } = await runTableSqlAdmin(sql)
 
       if (sqlError) {
         if (isTableNotFoundError(sqlError)) {
@@ -1266,7 +1251,7 @@ export async function DELETE(
             if (reciprocal.type !== 'formula' && reciprocal.type !== 'lookup') {
               try {
                 const sql = generateDropColumnSQL((reciprocalTable as any).supabase_table, reciprocal.name)
-                await supabase.rpc('execute_sql_safe', { sql_text: sql })
+                await runTableSqlAdmin(sql)
               } catch {
                 // ignore
               }
@@ -1301,9 +1286,7 @@ export async function DELETE(
       } else {
         // Table exists - proceed with dropping column
         const sql = generateDropColumnSQL(table.supabase_table, field.name)
-        const { error: sqlError } = await supabase.rpc('execute_sql_safe', {
-          sql_text: sql
-        })
+        const { error: sqlError } = await runTableSqlAdmin(sql)
 
         if (sqlError) {
           console.error('Error dropping column:', sqlError)
@@ -1379,9 +1362,9 @@ export async function DELETE(
           console.warn('[Field Delete] Admin client returned 0 rows, trying SQL fallback...')
           try {
             // Use simple SQL delete - execute_sql_safe will handle errors
-            const sqlResult = await supabase.rpc('execute_sql_safe', {
-              sql_text: `DELETE FROM public.table_fields WHERE id = '${fieldId}'::uuid;`
-            })
+            const sqlResult = await runTableSqlAdmin(
+              `DELETE FROM public.table_fields WHERE id = '${fieldId}'::uuid;`
+            )
             
             if (sqlResult.error) {
               console.error('[Field Delete] SQL fallback error:', sqlResult.error)
