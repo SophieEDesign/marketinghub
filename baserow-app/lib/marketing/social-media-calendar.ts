@@ -716,7 +716,6 @@ export function collectSocialFilterOptions(
   const owners = new Set<string>()
   const statuses = new Set<string>()
   const years = new Set<number>()
-  years.add(new Date().getFullYear())
 
   for (const item of items) {
     item.platforms.forEach((p) => platforms.add(p))
@@ -725,6 +724,11 @@ export function collectSocialFilterOptions(
     if (item.status) statuses.add(item.status)
     const d = item.date ?? item.dueDate
     if (d) years.add(d.getFullYear())
+  }
+
+  // Only fall back to current year when no records expose a date year.
+  if (years.size === 0) {
+    years.add(new Date().getFullYear())
   }
 
   const platformOrder: SocialPlatform[] = [

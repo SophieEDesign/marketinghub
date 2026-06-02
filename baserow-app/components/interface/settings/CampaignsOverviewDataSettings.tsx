@@ -218,9 +218,9 @@ export default function CampaignsOverviewDataSettings({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="list">List</SelectItem>
-            <SelectItem value="kanban">Kanban (coming soon)</SelectItem>
-            <SelectItem value="calendar">Calendar (coming soon)</SelectItem>
-            <SelectItem value="timeline">Timeline (coming soon)</SelectItem>
+            <SelectItem value="kanban">Kanban</SelectItem>
+            <SelectItem value="calendar">Calendar</SelectItem>
+            <SelectItem value="timeline">Timeline</SelectItem>
           </SelectContent>
         </Select>
       </div>

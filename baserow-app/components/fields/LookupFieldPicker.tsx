@@ -106,12 +106,27 @@ function resolveEffectiveLabelFields(args: {
       ? String((table as any).primary_field_name).trim()
       : null
 
+  const fallbackDisplayField =
+    lookupFields.find(
+      (f) =>
+        f.name !== "id" &&
+        ["text", "long_text", "email", "url", "single_select", "number"].includes(f.type)
+    )?.name ||
+    lookupFields.find((f) => f.name !== "id")?.name ||
+    "id"
+
+  const inferredPrimary = getPrimaryFieldName(lookupFields as any)
+  const safeInferredPrimary =
+    inferredPrimary && inferredPrimary !== "id" && hasField(inferredPrimary)
+      ? inferredPrimary
+      : fallbackDisplayField
+
   const candidatePrimary =
-    requestedPrimaryLabelField && hasField(requestedPrimaryLabelField)
+    requestedPrimaryLabelField && requestedPrimaryLabelField !== "id" && hasField(requestedPrimaryLabelField)
       ? requestedPrimaryLabelField
       : configuredPrimary && configuredPrimary !== "id" && hasField(configuredPrimary)
         ? configuredPrimary
-        : getPrimaryFieldName(lookupFields as any) || "id"
+        : safeInferredPrimary
 
   const safePrimary = toPostgrestColumn(candidatePrimary)
   const primary =
@@ -124,6 +139,13 @@ function resolveEffectiveLabelFields(args: {
     .slice(0, 2)
 
   return { primary, secondary }
+}
+
+function getOptionPrimaryLabel(record: Record<string, any>, primaryField: string): string {
+  const raw = record?.[primaryField]
+  if (raw == null) return "Untitled"
+  const s = String(raw).trim()
+  return s.length > 0 ? s : "Untitled"
 }
 
 export interface LookupFieldConfig {
@@ -410,7 +432,7 @@ export default function LookupFieldPicker({
         }
 
         const transformedOptions: RecordOption[] = (records || []).map((record: any) => {
-          const primaryLabel = record[effectivePrimaryLabelField] ? String(record[effectivePrimaryLabelField]) : "Untitled"
+          const primaryLabel = getOptionPrimaryLabel(record, effectivePrimaryLabelField)
           const secondaryLabels = effectiveSecondaryLabelFields
             .map((fieldName) => record[fieldName])
             .filter(Boolean)
@@ -520,7 +542,7 @@ export default function LookupFieldPicker({
 
       const transformed: RecordOption[] = (records || []).map((record: any) => ({
         id: record.id,
-        primaryLabel: record[effectivePrimaryLabelField] ? String(record[effectivePrimaryLabelField]) : "Untitled",
+        primaryLabel: getOptionPrimaryLabel(record, effectivePrimaryLabelField),
         secondaryLabels: effectiveSecondaryLabelFields
           .map((fieldName) => record[fieldName])
           .filter(Boolean)

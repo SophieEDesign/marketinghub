@@ -246,6 +246,13 @@ export function SocialMediaCalendarCore({
     [scopedItems, contentFields, fields?.contentStatus]
   )
 
+  useEffect(() => {
+    if (filterOptions.years.length === 0) return
+    if (!filterOptions.years.includes(year)) {
+      setYear(filterOptions.years[0])
+    }
+  }, [filterOptions.years, year])
+
   const filters: SocialCalendarFilters = useMemo(
     () => ({
       year,

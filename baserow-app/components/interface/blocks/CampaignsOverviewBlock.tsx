@@ -214,45 +214,45 @@ export default function CampaignsOverviewBlock({
         </div>
       ) : null}
 
-      {config?.campaigns_show_filters !== false ? (
-        <div className="flex shrink-0 flex-wrap gap-2 border-b border-border/40 p-3">
-          {[
-            ["Status", "status", options.status],
-            ["Stage", "stage", options.stage],
-            ["Type", "campaignType", options.type],
-            ["Division", "division", options.division],
-            ["Owner", "owner", options.owner],
-            ["Priority", "priority", options.priority],
-          ].map(([label, key, list]) => (
-            <select
-              key={String(key)}
-              className="h-8 rounded-md border border-border/50 bg-background px-2 text-xs"
-              value={filters[key as keyof CampaignOverviewFilters]}
-              onChange={(e) => updateFilter(key as keyof CampaignOverviewFilters, e.target.value)}
-            >
-              <option value="all">{label}: All</option>
-              {(list as string[]).map((v) => (
-                <option key={v} value={v}>
-                  {v}
-                </option>
-              ))}
-            </select>
-          ))}
-          <div className="ml-auto flex items-center gap-2">
-            {(["list", "kanban", "calendar", "timeline"] as CampaignView[]).map((mode) => (
-              <Button
-                key={mode}
-                variant={view === mode ? "default" : "outline"}
-                size="sm"
-                className="h-8 capitalize"
-                onClick={() => setView(mode)}
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border/40 p-3">
+        {config?.campaigns_show_filters !== false
+          ? [
+              ["Status", "status", options.status],
+              ["Stage", "stage", options.stage],
+              ["Type", "campaignType", options.type],
+              ["Division", "division", options.division],
+              ["Owner", "owner", options.owner],
+              ["Priority", "priority", options.priority],
+            ].map(([label, key, list]) => (
+              <select
+                key={String(key)}
+                className="h-8 rounded-md border border-border/50 bg-background px-2 text-xs"
+                value={filters[key as keyof CampaignOverviewFilters]}
+                onChange={(e) => updateFilter(key as keyof CampaignOverviewFilters, e.target.value)}
               >
-                {mode}
-              </Button>
-            ))}
-          </div>
+                <option value="all">{label}: All</option>
+                {(list as string[]).map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+            ))
+          : null}
+        <div className="ml-auto flex items-center gap-2">
+          {(["list", "kanban", "calendar", "timeline"] as CampaignView[]).map((mode) => (
+            <Button
+              key={mode}
+              variant={view === mode ? "default" : "outline"}
+              size="sm"
+              className="h-8 capitalize"
+              onClick={() => setView(mode)}
+            >
+              {mode}
+            </Button>
+          ))}
         </div>
-      ) : null}
+      </div>
 
       <div className={cn("min-h-0 flex-1 overflow-auto", marketingBlockScrollPanelClass(isFullPage))}>
         {view === "list" ? (
