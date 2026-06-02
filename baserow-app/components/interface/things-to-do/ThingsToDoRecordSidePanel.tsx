@@ -14,6 +14,7 @@ interface ThingsToDoRecordSidePanelProps {
   recordId: string
   supabaseTableName: string
   title: string
+  interfaceMode?: "view" | "edit"
   onClose: () => void
   onRecordUpdated?: () => void
 }
@@ -27,6 +28,7 @@ export function ThingsToDoRecordSidePanel({
   recordId,
   supabaseTableName,
   title,
+  interfaceMode = "view",
   onClose,
   onRecordUpdated,
 }: ThingsToDoRecordSidePanelProps) {
@@ -63,6 +65,7 @@ export function ThingsToDoRecordSidePanel({
       recordId,
       supabaseTableName,
       tableFields,
+      interfaceMode,
       onRecordUpdated,
     })
   }
@@ -113,7 +116,7 @@ export function ThingsToDoRecordSidePanel({
             visibilityContext="canvas"
             onOpenModal={handleOpenFullPanel}
             onRecordUpdate={onRecordUpdated ? () => onRecordUpdated() : undefined}
-            interfaceMode="view"
+            interfaceMode={interfaceMode}
             renderHeaderActions={false}
             showComments={false}
           />

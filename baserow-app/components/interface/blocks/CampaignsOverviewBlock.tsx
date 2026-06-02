@@ -20,6 +20,14 @@ import DashboardEmpty from "@/components/interface/primitives/DashboardEmpty"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { ChoicePill } from "@/components/fields/ChoicePill"
 import { cn } from "@/lib/utils"
 import {
   marketingBlockRootClass,
@@ -35,7 +43,14 @@ interface CampaignsOverviewBlockProps {
 
 function Badge({ value }: { value?: string }) {
   if (!value) return <span className="text-xs text-muted-foreground">-</span>
-  return <span className="rounded-full border border-border/50 px-2 py-0.5 text-xs">{value}</span>
+  return (
+    <ChoicePill
+      label={value}
+      fieldType="single_select"
+      className="max-w-[140px] truncate"
+      truncate
+    />
+  )
 }
 
 function ProgressPill({ value }: { value: number | null | undefined }) {
@@ -224,19 +239,25 @@ export default function CampaignsOverviewBlock({
               ["Owner", "owner", options.owner],
               ["Priority", "priority", options.priority],
             ].map(([label, key, list]) => (
-              <select
+              <Select
                 key={String(key)}
-                className="h-8 rounded-md border border-border/50 bg-background px-2 text-xs"
                 value={filters[key as keyof CampaignOverviewFilters]}
-                onChange={(e) => updateFilter(key as keyof CampaignOverviewFilters, e.target.value)}
+                onValueChange={(value) =>
+                  updateFilter(key as keyof CampaignOverviewFilters, value)
+                }
               >
-                <option value="all">{label}: All</option>
-                {(list as string[]).map((v) => (
-                  <option key={v} value={v}>
-                    {v}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="h-8 min-w-[120px] rounded-md border border-border/50 bg-background px-2 text-xs">
+                  <SelectValue placeholder={`${label}: All`} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{label}: All</SelectItem>
+                  {(list as string[]).map((v) => (
+                    <SelectItem key={v} value={v}>
+                      {v}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             ))
           : null}
         <div className="ml-auto flex items-center gap-2">

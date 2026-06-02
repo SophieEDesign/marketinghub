@@ -1,7 +1,7 @@
 "use client"
 
-import { getContentTimelineStatusClasses, getStatusLabel, type ContentTimelineStatus } from "@/lib/marketing/content-timeline"
-import { cn } from "@/lib/utils"
+import { getStatusLabel, type ContentTimelineStatus } from "@/lib/marketing/content-timeline"
+import { ChoicePill } from "@/components/fields/ChoicePill"
 
 export function ContentTimelineStatusBadge({
   status,
@@ -10,17 +10,12 @@ export function ContentTimelineStatusBadge({
   status: ContentTimelineStatus
   className?: string
 }) {
-  const { bg, text } = getContentTimelineStatusClasses(status)
   return (
-    <span
-      className={cn(
-        "inline-flex max-w-full shrink-0 truncate rounded-full px-1.5 py-px text-[10px] font-medium leading-tight",
-        bg,
-        text,
-        className
-      )}
-    >
-      {getStatusLabel(status)}
-    </span>
+    <ChoicePill
+      label={getStatusLabel(status)}
+      fieldType="single_select"
+      className={className}
+      truncate
+    />
   )
 }
