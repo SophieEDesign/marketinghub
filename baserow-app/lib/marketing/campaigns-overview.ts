@@ -115,15 +115,7 @@ export function filterCampaigns(
   })
 }
 
-export function computeCampaignKpis(items: CampaignOverviewItem[]) {
-  return {
-    active: items.filter((i) => normalizeText(i.status) === "active").length,
-    planned: items.filter((i) => normalizeText(i.status) === "planning").length,
-    completed: items.filter((i) => normalizeText(i.status) === "completed").length,
-    contentItems: items.reduce((sum, i) => sum + i.linkedContentCount, 0),
-    openTasks: items.reduce((sum, i) => sum + i.openTasksCount, 0),
-  }
-}
+export { computeCampaignKpis } from "@/lib/marketing/campaigns-overview-kpi"
 
 export const CAMPAIGNS_OVERVIEW_MOCK: CampaignOverviewItem[] = [
   { id: "c1", title: "Admirals Cup & Fastnet Race 2027", type: "Event", division: "Racing Logistics", status: "Planning", priority: "High", stage: "Planning", startDate: "2026-04-01", endDate: "2027-08-01", owner: "SO", progress: 20, openTasksCount: 4, linkedContentCount: 8, needsAttention: false },

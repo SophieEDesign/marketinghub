@@ -33,6 +33,7 @@ Any full-screen overlay (`fixed inset-0` or similar) that dims the background **
 ## Related Components
 
 - `RecordPanel` - overlay when record detail is open
+- Custom contextual record drawers in Marketing Hub blocks - must use the same `RecordPanel` overlay path
 - `RightSettingsPanel` - conditionally rendered when isEditMode; not an overlay
 - Mobile sidebar overlay - `desktop:hidden` so only on mobile
 
@@ -41,3 +42,6 @@ Any full-screen overlay (`fixed inset-0` or similar) that dims the background **
 If adding a new overlay or changing overlay behavior, verify:
 1. Sidebar links remain clickable when overlay is open
 2. Use `md:left-sidebar` for any overlay that covers the main content area (not `md:left-64`, which is 256px)
+3. RecordPanel and contextual custom block drawers preserve sidebar clickability
+4. New custom drawer layouts must not introduce fixed overlays that cover the sidebar
+5. Do not use `md:left-64` in custom record drawer paths; use `md:left-sidebar` / sidebar width token

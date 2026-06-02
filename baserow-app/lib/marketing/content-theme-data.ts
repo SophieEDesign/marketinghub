@@ -62,6 +62,32 @@ export function buildContentThemeItems(
   fields: ThemeFieldMap,
   opts: { selectedQuarter: string; selectedYear: number }
 ): ContentThemeItem[] {
+  const parseYear = (raw: unknown): number | undefined => {
+    const value = formatDisplayValue(raw)
+    if (!value) return undefined
+    const parsed = parseInt(value.replace(/[^\d]/g, ""), 10)
+    return Number.isFinite(parsed) ? parsed : undefined
+  }
+
+  const parseDivisions = (raw: unknown): string[] => {
+    if (Array.isArray(raw)) {
+      const labels = raw
+        .map((item) => formatDisplayValue(item))
+        .filter(Boolean) as string[]
+      return Array.from(new Set(labels))
+    }
+    const value = formatDisplayValue(raw)
+    if (!value) return []
+    return Array.from(
+      new Set(
+        value
+          .split(",")
+          .map((part) => part.trim())
+          .filter(Boolean)
+      )
+    )
+  }
+
   return rows.map((row, index) => {
     const title = formatDisplayValue(row[fields.name]) || "Theme"
     const quarter =
@@ -69,15 +95,17 @@ export function buildContentThemeItems(
       opts.selectedQuarter
     const status = statusFromQuarter(quarter, opts.selectedQuarter, opts.selectedYear)
     const colorRaw = fields.color ? formatDisplayValue(row[fields.color]) : null
+    const year = fields.year ? parseYear(row[fields.year]) : undefined
+    const divisions = fields.divisions ? parseDivisions(row[fields.divisions]) : []
     return {
       id: String(row.id),
       title,
       quarter: quarter || "Q1",
+      year,
       status,
       themeType: "Quarterly theme",
-      description: fields.divisions
-        ? formatDisplayValue(row[fields.divisions]) ?? undefined
-        : undefined,
+      description: divisions.length ? divisions.join(", ") : undefined,
+      divisions,
       ideas: [],
       accent: accentFromColor(colorRaw, index),
     }

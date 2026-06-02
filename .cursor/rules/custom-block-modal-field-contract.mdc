@@ -1,0 +1,69 @@
+# Custom block panels must reuse the shared field system
+
+Custom Marketing Hub panels and drawers may use custom layouts for summaries, tabs, previews, grouping and actions, but they must not create a separate field interaction system.
+
+Canonical field behaviour comes from:
+- RecordPanel
+- RecordEditor
+- RecordFields
+- FieldEditor
+- InlineFieldEditor where already used
+- ChoicePill
+- shared Select controls
+- existing linked-record, date, media, validation, permission, save and draft handling
+
+## Rules
+
+1. Do not introduce bespoke field controls for custom Marketing Hub panels unless no shared field component exists.
+
+2. Selects, pills, status badges and linked-record controls should reuse existing shared components.
+
+3. Custom layouts may change:
+- field grouping
+- field order
+- tabs
+- collapsed sections
+- preview areas
+- summary cards
+- contextual actions
+
+4. Custom layouts must not change:
+- how a field edits
+- how options are added/edited
+- how linked records behave
+- how media fields behave
+- how validation works
+- how permissions are enforced
+- how save/discard works
+- how unsaved draft restore works
+
+5. If a custom panel needs real editing, it should route through the shared RecordEditor/FieldEditor path.
+
+6. Unknown or unmatched fields must remain accessible in More Fields.
+
+7. No field should be duplicated or hidden permanently.
+
+8. Custom block record-open flows must pass interfaceMode through to preserve edit/view behaviour.
+
+9. In page layout edit mode, custom panels must not open from normal item clicks unless explicitly allowed.
+
+10. Overlay safety still applies:
+- use md:left-sidebar
+- do not use md:left-64
+- do not block sidebar navigation
+- do not interfere with RightSettingsPanel
+
+11. Intentional exceptions:
+- ContentTimelineDetailPanel
+- ThingsToDoDetailPanel
+- EventDetailPanel
+
+These may remain custom summary layouts, but field editing semantics must still defer to the shared record drawer/editor.
+
+## Regression checklist
+
+- Campaign filters use shared Select.
+- Status/type/priority pills use ChoicePill or shared pill styling.
+- Things To Do side panel passes interfaceMode.
+- No bespoke select/pill systems are introduced.
+- Custom panels preserve save, dirty state, draft restore, linked records, comments and activity.

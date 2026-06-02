@@ -447,6 +447,11 @@ export default function RecordEditor({
     [recordId, recordLayoutType, filteredFieldsIdSig]
   )
 
+  const customLayoutSectionIdsSig = useMemo(() => {
+    if (!useCustomLayout) return ""
+    return customLayout.sections.map((section) => section.id).join(",")
+  }, [useCustomLayout, customLayoutCollapseInitSig, defaultCustomCollapsedIds])
+
   const customLayoutCollapseInitRef = useRef("")
 
   // Initialise collapsed sections when record/layout changes only — never depend on
@@ -469,7 +474,9 @@ export default function RecordEditor({
 
   useEffect(() => {
     if (!useCustomLayout) return
-    const baseSectionIds = customLayout.sections.map((section) => section.id)
+    const baseSectionIds = customLayoutSectionIdsSig
+      ? customLayoutSectionIdsSig.split(",")
+      : []
     const first = showTaskActivityTab ? "task" : baseSectionIds[0]
     if (!first) return
     setActiveCustomTab((prev) =>
@@ -481,7 +488,7 @@ export default function RecordEditor({
           ? prev
           : first
     )
-  }, [useCustomLayout, customLayoutCollapseInitSig, showTaskActivityTab, customLayout.sections])
+  }, [useCustomLayout, customLayoutCollapseInitSig, showTaskActivityTab, customLayoutSectionIdsSig])
 
   useEffect(() => {
     if (!useCustomLayout || recordLayoutType !== "asset" || !formData) return
@@ -530,7 +537,7 @@ export default function RecordEditor({
     return () => {
       cancelled = true
     }
-  }, [useCustomLayout, recordLayoutType, formData, customLayout.sections])
+  }, [useCustomLayout, recordLayoutType, formData, customLayoutSectionIdsSig, customLayoutCollapseInitSig])
 
   const handleCustomDiscard = useCallback(() => {
     discardChanges()
@@ -652,6 +659,9 @@ export default function RecordEditor({
           payload={eventContextual}
           onClose={() => onClose?.()}
           onEdit={handleCustomEdit}
+          onDelete={recordId && onDeleted ? handleDelete : undefined}
+          canDelete={canDeleteRecords}
+          deleting={deleting}
         />
       )
     }

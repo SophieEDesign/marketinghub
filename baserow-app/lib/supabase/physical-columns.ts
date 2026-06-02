@@ -97,13 +97,31 @@ function hasPhysicalColumn(physicalColumns: Set<string>, name: string): boolean 
   return false
 }
 
+export const SOFT_DELETE_COLUMN = 'deleted_at'
+
+/** Whether the table supports soft delete (unknown physical schema → assume yes). */
+export function supportsSoftDelete(physicalColumns: Set<string> | null): boolean {
+  if (!physicalColumns) return true
+  return hasPhysicalColumn(physicalColumns, SOFT_DELETE_COLUMN)
+}
+
+/** Payload for soft-deleting a row via UPDATE (not hard DELETE). */
+export function buildSoftDeletePatch(): Record<string, string> {
+  return { [SOFT_DELETE_COLUMN]: new Date().toISOString() }
+}
+
+export function softDeleteNotSupportedMessage(tableName?: string | null): string {
+  const target = tableName ? ` "${tableName}"` : ''
+  return `This table${target} does not have a deleted_at column. Run database migrations or add deleted_at to enable record deletion.`
+}
+
 /** Apply soft-delete filter only when the column exists (or when unknown). */
 export function applySoftDeleteFilter<T extends { is: (col: string, val: null) => T }>(
   query: T,
   physicalColumns: Set<string> | null
 ): T {
-  if (physicalColumns && !hasPhysicalColumn(physicalColumns, 'deleted_at')) return query
-  return query.is('deleted_at', null)
+  if (physicalColumns && !hasPhysicalColumn(physicalColumns, SOFT_DELETE_COLUMN)) return query
+  return query.is(SOFT_DELETE_COLUMN, null)
 }
 
 export function extractMissingColumnFromPostgrestError(err: unknown): string | null {

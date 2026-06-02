@@ -42,7 +42,10 @@ export function fieldNameFromConfig(
   if (name) {
     const byName = fields.find((f) => f.name === name)
     if (byName?.name) return byName.name
-    return name
+    // Avoid carrying stale names across table switches.
+    // If a saved fallback name is not present on the selected table,
+    // return null so callers can use heuristic resolution on current fields.
+    return null
   }
   return null
 }

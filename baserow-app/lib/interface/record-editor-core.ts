@@ -32,6 +32,13 @@ import {
   convertModalLayoutToFieldLayout,
   convertModalFieldsToFieldLayout,
 } from '@/lib/interface/field-layout-helpers'
+import {
+  applySoftDeleteFilter,
+  buildSoftDeletePatch,
+  fetchPhysicalColumns,
+  softDeleteNotSupportedMessage,
+  supportsSoftDelete,
+} from '@/lib/supabase/physical-columns'
 
 function normalizeCampaignStatusForConstraint(
   tableName: string | null | undefined,
@@ -224,6 +231,7 @@ export function useRecordEditorCore(
   const formDataRef = useRef<Record<string, any>>({})
   const baselineFormDataRef = useRef<Record<string, any>>({})
   const draftSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const physicalColumnsRef = useRef<Set<string> | null>(null)
 
   const getDraftKey = useCallback(() => {
     if (recordId) return `record-draft-${recordId}`
@@ -288,6 +296,23 @@ export function useRecordEditorCore(
     }
   }, [tableId, supabaseTableNameProp])
 
+  useEffect(() => {
+    const tableToUse = supabaseTableNameProp ?? effectiveTableName
+    if (!tableToUse) {
+      physicalColumnsRef.current = null
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const supabase = createClient()
+      const cols = await fetchPhysicalColumns(supabase, tableToUse)
+      if (!cancelled) physicalColumnsRef.current = cols
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [supabaseTableNameProp, effectiveTableName])
+
   const loadFields = useCallback(async () => {
     if (tableFieldsProp != null || !tableId) return
     try {
@@ -331,12 +356,9 @@ export function useRecordEditorCore(
     setLoading(true)
     try {
       const supabase = createClient()
-      const { data, error } = await supabase
-        .from(tableToUse)
-        .select('*')
-        .eq('id', recordId)
-        .is('deleted_at', null)
-        .single()
+      let query = supabase.from(tableToUse).select('*').eq('id', recordId)
+      query = applySoftDeleteFilter(query, physicalColumnsRef.current)
+      const { data, error } = await query.single()
       if (!error && data) {
         setFormData(data)
         const baseline = { ...data }
@@ -721,10 +743,13 @@ export function useRecordEditorCore(
       }
       setDeleting(true)
       try {
+        if (!supportsSoftDelete(physicalColumnsRef.current)) {
+          throw new Error(softDeleteNotSupportedMessage(effectiveTableName))
+        }
         const supabase = createClient()
         const { error } = await supabase
           .from(effectiveTableName)
-          .update({ deleted_at: new Date().toISOString() })
+          .update(buildSoftDeletePatch())
           .eq('id', recordId)
         if (error) throw error
         triggerRecordAutomations(tableId, 'row_deleted', { ...formData, id: recordId })

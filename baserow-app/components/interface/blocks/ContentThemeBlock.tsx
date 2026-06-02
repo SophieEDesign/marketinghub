@@ -1,6 +1,6 @@
 "use client"
 
-import type { ReactNode } from "react"
+import { useMemo, useState } from "react"
 import type { PageBlock } from "@/lib/interface/types"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -16,9 +16,15 @@ import {
   ClipboardList,
   AlertTriangle,
   Info,
-  ChevronDown,
   type LucideIcon,
 } from "lucide-react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   MOCK_CONTENT_THEMES,
   type ContentThemeItem,
@@ -104,29 +110,6 @@ const STATUS_BADGE: Record<ContentThemeStatus, string> = {
   Upcoming: "bg-gray-50 text-gray-500 border border-[#E6E6EF]",
 }
 
-function HeaderButton({
-  children,
-  className,
-  disabled,
-}: {
-  children: ReactNode
-  className?: string
-  disabled?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-lg border border-[#E6E6EF] bg-white px-2.5 py-1.5 text-xs font-medium text-[#111827] shadow-sm transition-colors hover:bg-[#F8F8FC] disabled:opacity-60",
-        className
-      )}
-    >
-      {children}
-    </button>
-  )
-}
-
 export default function ContentThemeBlock({ block, isEditing = false }: ContentThemeBlockProps) {
   const { config } = block
   const forceMock = isMarketingMockEnabled(config, "content_theme_use_mock")
@@ -157,7 +140,63 @@ export default function ContentThemeBlock({ block, isEditing = false }: ContentT
       : demoState.useLiveData
         ? liveThemes
         : []
-  ).slice(0, Math.max(1, maxThemes))
+  )
+
+  const [quarterFilter, setQuarterFilter] = useState<string>("all")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [divisionFilter, setDivisionFilter] = useState<string>("all")
+  const [sortBy, setSortBy] = useState<string>("quarter_asc")
+
+  const quarterOptions = useMemo(() => {
+    return Array.from(new Set(themes.map((theme) => theme.quarter).filter(Boolean))).sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
+    )
+  }, [themes])
+
+  const divisionOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        themes
+          .flatMap((theme) => theme.divisions || [])
+          .map((value) => value.trim())
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))
+  }, [themes])
+
+  const displayedThemes = useMemo(() => {
+    const quarterRank = (quarter: string) => {
+      const parsed = parseInt((quarter || "").replace(/\D/g, ""), 10)
+      return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER
+    }
+
+    const filtered = themes.filter((theme) => {
+      if (quarterFilter !== "all" && theme.quarter !== quarterFilter) return false
+      if (statusFilter !== "all" && theme.status !== statusFilter) return false
+      if (divisionFilter !== "all" && !(theme.divisions || []).includes(divisionFilter)) return false
+      return true
+    })
+
+    const sorted = [...filtered].sort((a, b) => {
+      switch (sortBy) {
+        case "quarter_desc":
+          return quarterRank(b.quarter) - quarterRank(a.quarter)
+        case "title_asc":
+          return a.title.localeCompare(b.title, undefined, { sensitivity: "base" })
+        case "title_desc":
+          return b.title.localeCompare(a.title, undefined, { sensitivity: "base" })
+        case "ideas_desc":
+          return b.ideas.length - a.ideas.length
+        case "ideas_asc":
+          return a.ideas.length - b.ideas.length
+        case "quarter_asc":
+        default:
+          return quarterRank(a.quarter) - quarterRank(b.quarter)
+      }
+    })
+
+    return sorted.slice(0, Math.max(1, maxThemes))
+  }, [themes, quarterFilter, statusFilter, divisionFilter, sortBy, maxThemes])
 
   const isCompact = cardDensity === "compact"
   const cardPadding = isCompact ? "p-3" : "p-4"
@@ -228,22 +267,84 @@ export default function ContentThemeBlock({ block, isEditing = false }: ContentT
           {(showFilters || showViewToggle) && (
             <div className="flex shrink-0 flex-wrap items-center gap-2">
               {showFilters && (
-                <HeaderButton disabled={isEditing}>
-                  <Filter className="h-3.5 w-3.5 text-[#6B7280]" />
-                  Filter
-                  <ChevronDown className="h-3 w-3 text-[#6B7280]" />
-                </HeaderButton>
+                <>
+                  <Select value={quarterFilter} onValueChange={setQuarterFilter} disabled={isEditing}>
+                    <SelectTrigger className="h-8 w-[138px] text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <Filter className="h-3.5 w-3.5 text-[#6B7280]" />
+                        <SelectValue placeholder="Quarter" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All quarters</SelectItem>
+                      {quarterOptions.map((quarterOption) => (
+                        <SelectItem key={quarterOption} value={quarterOption}>
+                          {quarterOption}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={statusFilter} onValueChange={setStatusFilter} disabled={isEditing}>
+                    <SelectTrigger className="h-8 w-[132px] text-xs">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All statuses</SelectItem>
+                      <SelectItem value="Previous">Previous</SelectItem>
+                      <SelectItem value="Active">Active</SelectItem>
+                      <SelectItem value="Upcoming">Upcoming</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={divisionFilter} onValueChange={setDivisionFilter} disabled={isEditing}>
+                    <SelectTrigger className="h-8 w-[140px] text-xs">
+                      <SelectValue placeholder="Division" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All divisions</SelectItem>
+                      {divisionOptions.map((divisionOption) => (
+                        <SelectItem key={divisionOption} value={divisionOption}>
+                          {divisionOption}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </>
               )}
               {showViewToggle && (
-                <HeaderButton disabled={isEditing}>
-                  <LayoutGrid className="h-3.5 w-3.5 text-[#6B7280]" />
-                  View
-                  <ChevronDown className="h-3 w-3 text-[#6B7280]" />
-                </HeaderButton>
+                <Select value={sortBy} onValueChange={setSortBy} disabled={isEditing}>
+                  <SelectTrigger className="h-8 w-[162px] text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <LayoutGrid className="h-3.5 w-3.5 text-[#6B7280]" />
+                      <SelectValue placeholder="Sort" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="quarter_asc">Quarter: earliest</SelectItem>
+                    <SelectItem value="quarter_desc">Quarter: latest</SelectItem>
+                    <SelectItem value="title_asc">Title: A-Z</SelectItem>
+                    <SelectItem value="title_desc">Title: Z-A</SelectItem>
+                    <SelectItem value="ideas_desc">Ideas: most first</SelectItem>
+                    <SelectItem value="ideas_asc">Ideas: least first</SelectItem>
+                  </SelectContent>
+                </Select>
               )}
-              <HeaderButton className="px-2" disabled={isEditing} aria-label="More options">
-                <MoreHorizontal className="h-4 w-4 text-[#6B7280]" />
-              </HeaderButton>
+              {(quarterFilter !== "all" || statusFilter !== "all" || divisionFilter !== "all") && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isEditing}
+                  className="h-8 px-2 text-xs"
+                  onClick={() => {
+                    setQuarterFilter("all")
+                    setStatusFilter("all")
+                    setDivisionFilter("all")
+                  }}
+                >
+                  <MoreHorizontal className="mr-1 h-3.5 w-3.5 text-[#6B7280]" />
+                  Reset
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -251,7 +352,7 @@ export default function ContentThemeBlock({ block, isEditing = false }: ContentT
         {/* Theme cards */}
         <div className={cn(isCompact ? "p-3" : "p-4", "flex-1")}>
           <div className={gridClass}>
-            {themes.map((theme) => {
+            {displayedThemes.map((theme) => {
               const styles = ACCENT_STYLES[theme.accent]
               const Icon = THEME_ICONS[theme.accent]
               const active = isThemeActive(theme)

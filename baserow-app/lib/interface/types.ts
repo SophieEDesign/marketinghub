@@ -649,6 +649,15 @@ export interface BlockConfig {
   campaigns_show_filters?: boolean
   campaigns_show_search?: boolean
   campaigns_show_kpis?: boolean
+  /** Status values (comma-separated in UI) counted as active campaigns KPI */
+  campaigns_kpi_active_statuses?: string[] | string
+  campaigns_kpi_planned_statuses?: string[] | string
+  campaigns_kpi_completed_statuses?: string[] | string
+  campaigns_kpi_active_label?: string
+  campaigns_kpi_planned_label?: string
+  campaigns_kpi_completed_label?: string
+  campaigns_kpi_content_label?: string
+  campaigns_kpi_tasks_label?: string
   campaigns_show_progress?: boolean
   campaigns_show_thumbnails?: boolean
   campaigns_density?: "comfortable" | "compact"

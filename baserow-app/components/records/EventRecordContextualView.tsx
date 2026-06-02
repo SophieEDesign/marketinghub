@@ -7,6 +7,9 @@ export interface EventRecordContextualViewProps {
   payload: EventRecordContextualPayload
   onClose: () => void
   onEdit: () => void
+  onDelete?: () => void
+  canDelete?: boolean
+  deleting?: boolean
 }
 
 /**
@@ -16,6 +19,9 @@ export default function EventRecordContextualView({
   payload,
   onClose,
   onEdit,
+  onDelete,
+  canDelete = false,
+  deleting = false,
 }: EventRecordContextualViewProps) {
   const {
     event,
@@ -53,6 +59,9 @@ export default function EventRecordContextualView({
       onManageAttendees={onManageAttendees}
       onApprove={onApprove}
       onReject={onReject}
+      onDelete={onDelete}
+      canDelete={canDelete}
+      deleting={deleting}
     />
   )
 }

@@ -13,9 +13,11 @@ export interface ContentThemeItem {
   id: string
   title: string
   quarter: string
+  year?: number
   status: ContentThemeStatus
   themeType: string
   description?: string
+  divisions?: string[]
   ideas: ContentThemeIdea[]
   accent: 'blue' | 'purple' | 'green' | 'red'
 }

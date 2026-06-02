@@ -11,6 +11,7 @@ import {
   Pencil,
   Share2,
   Download,
+  Trash2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -24,6 +25,7 @@ import {
   googleCalendarAddUrl,
   outlookCalendarAddUrl,
 } from "@/lib/marketing/event-calendar-ics"
+import { sanitizeRichText } from "@/lib/sanitize"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 
@@ -54,6 +56,9 @@ export interface EventDetailContentProps {
   showApprovalActions?: boolean
   /** Drawer/modal: natural height; inline panel: fill available column height */
   fitContent?: boolean
+  onDelete?: () => void
+  canDelete?: boolean
+  deleting?: boolean
 }
 
 export function EventDetailContent({
@@ -75,6 +80,9 @@ export function EventDetailContent({
   onReject,
   showApprovalActions = false,
   fitContent = false,
+  onDelete,
+  canDelete = false,
+  deleting = false,
 }: EventDetailContentProps) {
   const { toast } = useToast()
   const statusColor = statusAccentColor(event.status)
@@ -167,9 +175,12 @@ export function EventDetailContent({
       </div>
 
       {event.description ? (
-        <p className="px-4 py-2 text-sm text-muted-foreground leading-relaxed shrink-0 line-clamp-4">
-          {event.description}
-        </p>
+        <div className="px-4 py-2 text-sm text-muted-foreground leading-relaxed shrink-0">
+          <div
+            className="rich-text-view max-w-none line-clamp-4"
+            dangerouslySetInnerHTML={{ __html: sanitizeRichText(event.description) }}
+          />
+        </div>
       ) : null}
 
       {event.heroImageUrl ? (
@@ -430,6 +441,18 @@ export function EventDetailContent({
           <Button type="button" className="w-full gap-2" onClick={onEdit}>
             <Pencil className="h-4 w-4" aria-hidden />
             Edit event
+          </Button>
+        ) : null}
+        {onDelete && canDelete ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full gap-2 text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+            onClick={onDelete}
+            disabled={deleting}
+          >
+            <Trash2 className="h-4 w-4" aria-hidden />
+            {deleting ? "Deleting…" : "Delete event"}
           </Button>
         ) : null}
         <Button type="button" variant="outline" className="w-full gap-2 text-xs" onClick={share}>

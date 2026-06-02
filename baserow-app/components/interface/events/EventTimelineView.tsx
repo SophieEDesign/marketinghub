@@ -1,10 +1,11 @@
 "use client"
 
-import { useMemo } from "react"
+import { useLayoutEffect, useMemo, useRef } from "react"
 import { format } from "date-fns"
 import DashboardEmpty from "@/components/interface/primitives/DashboardEmpty"
 import {
   buildEventTimelineRange,
+  getEventTimelineMonthScrollPct,
   getEventTimelineTodayPct,
   positionEventOnTimeline,
   type MarketingEventItem,
@@ -14,6 +15,19 @@ import { cn } from "@/lib/utils"
 const LABEL_COL_WIDTH = 200
 const ROW_HEIGHT = 44
 const MIN_TRACK_WIDTH = 720
+
+function scrollTimelineToMonth(
+  container: HTMLElement,
+  pct: number,
+  labelWidth = LABEL_COL_WIDTH
+) {
+  const maxScroll = container.scrollWidth - container.clientWidth
+  if (maxScroll <= 0) return
+  const trackWidth = Math.max(container.scrollWidth - labelWidth, 1)
+  const monthLeft = labelWidth + (pct / 100) * trackWidth
+  const offset = Math.min(container.clientWidth * 0.2, 120)
+  container.scrollLeft = Math.max(0, Math.min(monthLeft - offset, maxScroll))
+}
 
 export function EventTimelineView({
   items,
@@ -36,6 +50,18 @@ export function EventTimelineView({
   )
 
   const todayPct = useMemo(() => getEventTimelineTodayPct(timeline), [timeline])
+
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const pct = getEventTimelineMonthScrollPct(timeline, rangeStart)
+    if (pct == null) return
+    const run = () => scrollTimelineToMonth(el, pct)
+    run()
+    requestAnimationFrame(run)
+  }, [timeline, rangeStart])
 
   const rows = useMemo(() => {
     return withDates
@@ -72,6 +98,7 @@ export function EventTimelineView({
 
   return (
     <div
+      ref={scrollRef}
       className={cn(
         "overflow-auto",
         fillContainer ? "min-h-0 h-full flex-1" : "min-h-[min(68vh,520px)]"

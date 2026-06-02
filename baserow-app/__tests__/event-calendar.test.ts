@@ -15,6 +15,7 @@ import {
   DEFAULT_EVENT_CALENDAR_BLOCK_CONFIG,
   resolveContentEventFields,
   buildEventTimelineRange,
+  getEventTimelineMonthScrollPct,
   buildEventItems,
   positionEventOnTimeline,
   resolveEventRowDates,
@@ -541,6 +542,27 @@ describe("event timeline range", () => {
     expect(pos2).not.toBeNull()
     expect(pos1!.leftPct).toBeLessThan(pos2!.leftPct)
     expect(pos2!.widthPct).toBeGreaterThan(1)
+  })
+
+  it("includes cursor month in range when events end before cursor", () => {
+    const items = [
+      sampleItem({
+        id: "e1",
+        startDate: new Date("2025-11-28"),
+        endDate: new Date("2025-11-28"),
+      }),
+      sampleItem({
+        id: "e2",
+        startDate: new Date("2026-01-14"),
+        endDate: new Date("2026-01-18"),
+      }),
+    ]
+    const cursor = new Date("2026-06-01")
+    const range = buildEventTimelineRange(items, cursor)
+    const juneIdx = range.months.findIndex((m) => format(m, "yyyy-MM") === "2026-06")
+    expect(juneIdx).toBeGreaterThanOrEqual(0)
+    const pct = getEventTimelineMonthScrollPct(range, cursor)
+    expect(pct).toBeCloseTo((juneIdx / range.months.length) * 100, 5)
   })
 })
 

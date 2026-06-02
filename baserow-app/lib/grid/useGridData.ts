@@ -12,6 +12,12 @@ import { syncLinkedFieldBidirectional } from '@/lib/dataView/linkedFields'
 import { migrateLinkColumnToUuidArray } from '@/lib/fields/migrateLinkColumn'
 import { computeLookupValues } from '@/lib/grid/computeLookupValues'
 import { useRealtimeTable } from '@/lib/realtime/useRealtimeTable'
+import {
+  applySoftDeleteFilter,
+  buildSoftDeletePatch,
+  softDeleteNotSupportedMessage,
+  supportsSoftDelete,
+} from '@/lib/supabase/physical-columns'
 
 export interface GridRow {
   id: string
@@ -410,10 +416,8 @@ export function useGridData({
 
         const selectClause = buildSelectClause(existingPhysicalFieldNames, { includeId: true, fallback: '*' })
 
-        let query = supabase
-          .from(tableName)
-          .select(selectClause)
-          .is('deleted_at', null)
+        let query = supabase.from(tableName).select(selectClause)
+        query = applySoftDeleteFilter(query, physicalCols)
 
       // Apply filters: support both flat FilterConfig[] and FilterTree (from view_filter_groups)
         const isFilterTree = currentFilters && typeof currentFilters === 'object' && !Array.isArray(currentFilters) && 'operator' in (currentFilters as object)
@@ -936,9 +940,12 @@ export function useGridData({
   const deleteRow = useCallback(
     async (rowId: string) => {
       try {
+        if (!supportsSoftDelete(physicalColumnsRef.current)) {
+          throw new Error(softDeleteNotSupportedMessage(tableName))
+        }
         const { error: deleteError } = await supabase
           .from(tableName)
-          .update({ deleted_at: new Date().toISOString() })
+          .update(buildSoftDeletePatch())
           .eq('id', rowId)
 
         if (deleteError) {

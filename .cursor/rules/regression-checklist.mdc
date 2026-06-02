@@ -21,3 +21,35 @@ Before merging changes under the globs above:
 - **REG-001:** Bulk action bar only when 2+ checkbox-selected rows in core data (`BULK_ACTION_MIN_SELECTED_COUNT`)
 - **REG-003:** Do not call bulk `handleRowSelect` from row background click — checkbox column only
 - **REG-004:** Content overlays use `md:left-sidebar` on desktop so sidebar stays clickable
+- **MH-RECORD-DRAWERS:** Custom block record drawers must satisfy `.cursor/rules/custom-block-record-drawers.mdc` and pass `npm test -- --run custom-block-record-drawer-regression`
+
+## Custom block record drawer regressions
+
+- Social Calendar item opens `social_post` layout
+- Event Calendar item opens `event` layout
+- Things To Do item opens `task` layout
+- Campaigns Overview row opens `campaign` layout
+- Content Timeline item opens `content` layout
+- Resource Hub primary click opens file URL
+- Resource Hub Manage asset opens `asset` layout
+- Generic Grid/List/Calendar record opens generic drawer
+- View/Edit does not stack drawers
+- More fields contains unmatched fields
+- Comments/activity still render
+- Unsaved draft warning still appears
+- Drawer uses `md:left-sidebar`
+- In page edit mode, item click selects block instead of opening drawer
+
+## Manual QA (custom record drawers)
+
+- Open Social Calendar, click a social post, and verify social drawer opens
+- Click Edit in social drawer and verify edit is in the same drawer (no second panel)
+- Open Event Calendar, click an event, and verify event drawer opens
+- Click Edit in event drawer and verify edit is in the same drawer
+- Open Things To Do and verify task click opens task drawer
+- Open Campaigns Overview and verify row click opens campaign drawer
+- Open Content Timeline and verify item click opens content drawer
+- In Resource Hub, verify primary asset click opens file URL/preview
+- In Resource Hub, verify Manage asset opens asset drawer
+- In Grid/List/Calendar, verify record opens generic drawer behavior
+- Confirm comments/activity, draft warning, save, and delete still work

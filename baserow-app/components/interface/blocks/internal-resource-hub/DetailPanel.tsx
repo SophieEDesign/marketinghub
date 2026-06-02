@@ -265,7 +265,7 @@ export default function DetailPanel({
               className="gap-2 border-border/60 px-2"
               onClick={onEditDetails}
             >
-              Manage
+              Manage asset
             </Button>
           ) : (
             <div />

@@ -6,7 +6,6 @@ import type { PageBlock } from "@/lib/interface/types"
 import { useCampaignsOverviewData } from "@/hooks/useCampaignsOverviewData"
 import {
   EMPTY_CAMPAIGN_FILTERS,
-  computeCampaignKpis,
   filterCampaigns,
   formatDateRange,
   normalizeText,
@@ -14,6 +13,10 @@ import {
   type CampaignOverviewFilters,
 } from "@/lib/marketing/campaigns-overview"
 import { campaignsOverviewSubtitle } from "@/lib/marketing/campaigns-overview-config"
+import {
+  campaignsKpiConfigFromBlock,
+  computeCampaignKpis,
+} from "@/lib/marketing/campaigns-overview-kpi"
 import { useRecordModal } from "@/contexts/RecordModalContext"
 import MarketingDemoDataBanner from "@/components/interface/primitives/MarketingDemoDataBanner"
 import DashboardEmpty from "@/components/interface/primitives/DashboardEmpty"
@@ -27,7 +30,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { ChoicePill } from "@/components/fields/ChoicePill"
 import { cn } from "@/lib/utils"
 import {
   marketingBlockRootClass,
@@ -41,25 +43,54 @@ interface CampaignsOverviewBlockProps {
   isFullPage?: boolean
 }
 
+function toneForValue(value?: string): string {
+  const v = (value || "").toLowerCase().trim()
+  if (!v) return "border-border/50 bg-muted/40 text-muted-foreground"
+  if (["active", "live", "in progress", "complete", "completed"].includes(v)) {
+    return "border-emerald-200/70 bg-emerald-50 text-emerald-700"
+  }
+  if (["planning", "planned", "draft", "review"].includes(v)) {
+    return "border-blue-200/70 bg-blue-50 text-blue-700"
+  }
+  if (["urgent", "high", "on hold", "blocked", "risk"].includes(v)) {
+    return "border-amber-200/70 bg-amber-50 text-amber-700"
+  }
+  if (["low", "backlog", "idea"].includes(v)) {
+    return "border-slate-200/70 bg-slate-50 text-slate-600"
+  }
+  return "border-violet-200/70 bg-violet-50 text-violet-700"
+}
+
 function Badge({ value }: { value?: string }) {
   if (!value) return <span className="text-xs text-muted-foreground">-</span>
   return (
-    <ChoicePill
-      label={value}
-      fieldType="single_select"
-      className="max-w-[140px] truncate"
-      truncate
-    />
+    <span
+      className={cn(
+        "inline-flex max-w-[140px] items-center truncate rounded-full border px-2 py-0.5 text-[11px] font-medium",
+        toneForValue(value)
+      )}
+      title={value}
+    >
+      {value}
+    </span>
   )
 }
 
 function ProgressPill({ value }: { value: number | null | undefined }) {
   if (value == null) return <span className="text-xs text-muted-foreground">-</span>
+  const barTone =
+    value >= 75
+      ? "bg-emerald-500"
+      : value >= 45
+        ? "bg-blue-500"
+        : value >= 20
+          ? "bg-amber-500"
+          : "bg-rose-500"
   return (
     <div className="flex items-center gap-2">
-      <span className="w-8 text-xs text-muted-foreground">{value}%</span>
+      <span className="w-8 text-xs font-medium text-muted-foreground">{value}%</span>
       <div className="h-1.5 w-20 rounded-full bg-muted">
-        <div className="h-full rounded-full bg-blue-500" style={{ width: `${value}%` }} />
+        <div className={cn("h-full rounded-full", barTone)} style={{ width: `${value}%` }} />
       </div>
     </div>
   )
@@ -99,7 +130,11 @@ export default function CampaignsOverviewBlock({
   const [view, setView] = useState<CampaignView>((config?.campaigns_default_view || "list") as CampaignView)
 
   const filteredItems = useMemo(() => filterCampaigns(items, filters, query), [items, filters, query])
-  const kpis = useMemo(() => computeCampaignKpis(filteredItems), [filteredItems])
+  const kpiConfig = useMemo(() => campaignsKpiConfigFromBlock(config), [config])
+  const kpis = useMemo(
+    () => computeCampaignKpis(filteredItems, kpiConfig),
+    [filteredItems, kpiConfig]
+  )
   const groupBy = (config?.campaigns_group_by || "none") as CampaignGroupBy
   const groupedItems = useMemo(() => {
     if (groupBy === "none") return [{ label: "All campaigns", items: filteredItems }]
@@ -215,13 +250,13 @@ export default function CampaignsOverviewBlock({
       {config?.campaigns_show_kpis !== false ? (
         <div className="grid shrink-0 grid-cols-1 gap-3 border-b border-border/40 p-4 md:grid-cols-5">
           {[
-            ["Active campaigns", kpis.active],
-            ["Planned campaigns", kpis.planned],
-            ["Completed campaigns", kpis.completed],
-            ["Content items", kpis.contentItems],
-            ["Open tasks", kpis.openTasks],
-          ].map(([label, value]) => (
-            <div key={label} className="rounded-xl border border-border/40 bg-muted/10 p-3">
+            [kpis.labels.active, kpis.active, "border-emerald-200/60 bg-emerald-500/10"],
+            [kpis.labels.planned, kpis.planned, "border-blue-200/60 bg-blue-500/10"],
+            [kpis.labels.completed, kpis.completed, "border-violet-200/60 bg-violet-500/10"],
+            [kpis.labels.contentItems, kpis.contentItems, "border-indigo-200/60 bg-indigo-500/10"],
+            [kpis.labels.openTasks, kpis.openTasks, "border-amber-200/60 bg-amber-500/10"],
+          ].map(([label, value, tone]) => (
+            <div key={String(label)} className={cn("rounded-xl border p-3", String(tone))}>
               <p className="text-xs text-muted-foreground">{label}</p>
               <p className="mt-1 text-2xl font-semibold">{value}</p>
             </div>
@@ -306,7 +341,7 @@ export default function CampaignsOverviewBlock({
                     <tr
                       key={item.id}
                       className={cn(
-                        "cursor-pointer border-b border-border/20 hover:bg-muted/20",
+                        "cursor-pointer border-b border-border/20 transition-colors even:bg-muted/[0.06] hover:bg-muted/30",
                         dense ? "h-10" : "h-14"
                       )}
                       onClick={() => {

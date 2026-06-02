@@ -1,0 +1,76 @@
+---
+description: Custom Marketing Hub blocks must open a single contextual RecordPanel drawer path
+globs:
+  - baserow-app/components/interface/blocks/**
+  - baserow-app/components/interface/*Calendar*.tsx
+  - baserow-app/components/interface/blocks/internal-resource-hub/**
+  - baserow-app/components/records/**
+  - baserow-app/contexts/Record*.tsx
+  - baserow-app/lib/records/**
+alwaysApply: true
+---
+
+# Custom block record drawers must use one contextual drawer
+
+For Marketing Hub custom blocks, record opening must preserve one contextual drawer flow through `RecordPanel` and `RecordEditor`.
+
+## Required behavior
+
+1. Custom Marketing Hub blocks must not open multiple record drawers or panels for the same item.
+
+2. For custom blocks, clicking an item opens one contextual drawer in the standard right-side `RecordPanel` position.
+
+3. View and edit happen inside the same drawer:
+   - View mode shows contextual summary.
+   - Edit mode uses existing field components.
+   - Edit must not open a second generic drawer.
+
+4. Custom block record opens must pass `recordLayoutType`:
+   - Social Calendar -> `social_post`
+   - Event Calendar -> `event`
+   - Things To Do -> `task`
+   - Campaigns Overview -> `campaign`
+   - Content Timeline -> `content`
+   - Resource Hub secondary Manage asset -> `asset`
+
+5. Generic Grid/List/Calendar record opens must not receive `recordLayoutType` unless explicitly migrated later.
+
+6. Generic drawer fallback behavior must remain unchanged when `recordLayoutType` is missing or `generic`.
+
+7. All fields remain accessible:
+   - Priority fields first
+   - Unknown or unmatched fields in `More fields`
+   - No duplicated fields
+   - No field removal
+
+8. Preserve existing drawer functionality:
+   - save
+   - unsaved draft warning
+   - restore/discard draft
+   - delete
+   - linked records
+   - comments
+   - activity
+   - permissions
+
+9. Resource Hub behavior:
+   - Primary asset click opens file URL/preview
+   - Secondary Manage asset opens record drawer with `asset` layout
+   - Do not replace primary asset click with record editing
+
+10. Page layout edit mode behavior:
+    - Item clicks select the block instead of opening record drawers
+    - Drawers must not interfere with `RightSettingsPanel`
+
+11. Overlay behavior:
+    - Record drawers and panels must use `md:left-sidebar`
+    - Do not use `md:left-64`
+
+12. Do not create separate modal systems per custom block.
+    Reuse the existing `RecordPanel` and `RecordEditor` pathway.
+
+## Related rules
+
+- `.cursor/rules/record-open-edit-mode-propagation.mdc`
+- `.cursor/rules/navigation-overlay-must-not-block-sidebar.mdc`
+- `.cursor/rules/layout-width-authority.mdc`

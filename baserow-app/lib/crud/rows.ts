@@ -108,8 +108,8 @@ export async function deleteRow(tableId: string, id: string) {
   const physicalTable = await resolveSupabaseTableName(tableId)
   const { error } = await supabase
     .from(physicalTable)
-    .delete()
+    .update({ deleted_at: new Date().toISOString() })
     .eq('id', id)
-  
+
   if (error) throw error
 }

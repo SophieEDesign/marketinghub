@@ -293,7 +293,7 @@ export default function ThingsToDoBlock({
                       variant="default"
                     />
                   ) : (
-                    <div className="mx-auto flex h-full w-full max-w-4xl min-w-0">
+                    <div className="flex h-full w-full min-w-0">
                       <ThingsToDoGroupedList
                         sections={sections}
                         selectedId={selectedId}

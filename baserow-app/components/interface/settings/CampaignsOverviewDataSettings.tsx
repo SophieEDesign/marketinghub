@@ -17,6 +17,12 @@ import MarketingFieldMappingSection from "./shared/MarketingFieldMappingSection"
 import MarketingFieldSelect from "./shared/MarketingFieldSelect"
 import BlockFilterEditor from "./BlockFilterEditor"
 import SortSelector from "./shared/SortSelector"
+import {
+  DEFAULT_CAMPAIGNS_KPI_STATUS_BUCKETS,
+  formatCampaignsKpiStatuses,
+} from "@/lib/marketing/campaigns-overview-kpi"
+import { choiceLabelsFromField } from "@/lib/marketing/field-utils"
+import type { FieldOptions } from "@/types/fields"
 
 export default function CampaignsOverviewDataSettings({
   config,
@@ -37,6 +43,25 @@ export default function CampaignsOverviewDataSettings({
         [nameKey]: fieldName,
       } as Partial<BlockConfig>)
     }
+
+  const statusField = tableFields.find(
+    (f) => f.id === config.campaigns_status_field_id || f.name === config.campaigns_status_field
+  )
+  const statusChoices = statusField
+    ? choiceLabelsFromField({
+        name: statusField.name,
+        type: statusField.type,
+        options: statusField.options as FieldOptions | undefined,
+      })
+    : []
+
+  const parseStatusInput = (raw: string): string[] | undefined => {
+    const parsed = raw
+      .split(",")
+      .map((v) => v.trim())
+      .filter(Boolean)
+    return parsed.length ? parsed : undefined
+  }
 
   return (
     <div className="space-y-4">
@@ -177,6 +202,135 @@ export default function CampaignsOverviewDataSettings({
             onChange={(filters) => onUpdate({ filters })}
             onConfigUpdate={(updates) => onUpdate(updates)}
           />
+
+          <div className="space-y-3 border-t border-border/40 pt-4">
+            <div>
+              <p className="text-sm font-medium">KPI mapping</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Status KPIs use your mapped Status field. Content items and open tasks sum the
+                mapped linked fields above. Enter comma-separated status labels to match your
+                table choices.
+              </p>
+              {statusChoices.length > 0 ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Status choices in table: {statusChoices.join(", ")}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="campaigns-kpi-active-label">Active KPI label</Label>
+              <Input
+                id="campaigns-kpi-active-label"
+                value={config.campaigns_kpi_active_label || ""}
+                onChange={(e) =>
+                  onUpdate({
+                    campaigns_kpi_active_label: e.target.value.trim() || undefined,
+                  })
+                }
+                placeholder="Active campaigns"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="campaigns-kpi-active-statuses">Active status values</Label>
+              <Input
+                id="campaigns-kpi-active-statuses"
+                value={formatCampaignsKpiStatuses(
+                  config.campaigns_kpi_active_statuses,
+                  DEFAULT_CAMPAIGNS_KPI_STATUS_BUCKETS.active
+                )}
+                onChange={(e) =>
+                  onUpdate({ campaigns_kpi_active_statuses: parseStatusInput(e.target.value) })
+                }
+                placeholder="active, live, in progress"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="campaigns-kpi-planned-label">Planned KPI label</Label>
+              <Input
+                id="campaigns-kpi-planned-label"
+                value={config.campaigns_kpi_planned_label || ""}
+                onChange={(e) =>
+                  onUpdate({
+                    campaigns_kpi_planned_label: e.target.value.trim() || undefined,
+                  })
+                }
+                placeholder="Planned campaigns"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="campaigns-kpi-planned-statuses">Planned status values</Label>
+              <Input
+                id="campaigns-kpi-planned-statuses"
+                value={formatCampaignsKpiStatuses(
+                  config.campaigns_kpi_planned_statuses,
+                  DEFAULT_CAMPAIGNS_KPI_STATUS_BUCKETS.planned
+                )}
+                onChange={(e) =>
+                  onUpdate({ campaigns_kpi_planned_statuses: parseStatusInput(e.target.value) })
+                }
+                placeholder="planning, planned, draft"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="campaigns-kpi-completed-label">Completed KPI label</Label>
+              <Input
+                id="campaigns-kpi-completed-label"
+                value={config.campaigns_kpi_completed_label || ""}
+                onChange={(e) =>
+                  onUpdate({
+                    campaigns_kpi_completed_label: e.target.value.trim() || undefined,
+                  })
+                }
+                placeholder="Completed campaigns"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="campaigns-kpi-completed-statuses">Completed status values</Label>
+              <Input
+                id="campaigns-kpi-completed-statuses"
+                value={formatCampaignsKpiStatuses(
+                  config.campaigns_kpi_completed_statuses,
+                  DEFAULT_CAMPAIGNS_KPI_STATUS_BUCKETS.completed
+                )}
+                onChange={(e) =>
+                  onUpdate({
+                    campaigns_kpi_completed_statuses: parseStatusInput(e.target.value),
+                  })
+                }
+                placeholder="completed, complete, done"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="campaigns-kpi-content-label">Content items KPI label</Label>
+              <Input
+                id="campaigns-kpi-content-label"
+                value={config.campaigns_kpi_content_label || ""}
+                onChange={(e) =>
+                  onUpdate({
+                    campaigns_kpi_content_label: e.target.value.trim() || undefined,
+                  })
+                }
+                placeholder="Content items"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="campaigns-kpi-tasks-label">Open tasks KPI label</Label>
+              <Input
+                id="campaigns-kpi-tasks-label"
+                value={config.campaigns_kpi_tasks_label || ""}
+                onChange={(e) =>
+                  onUpdate({
+                    campaigns_kpi_tasks_label: e.target.value.trim() || undefined,
+                  })
+                }
+                placeholder="Open tasks"
+              />
+            </div>
+          </div>
         </>
       ) : null}
 

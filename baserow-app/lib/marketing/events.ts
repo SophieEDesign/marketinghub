@@ -21,6 +21,7 @@ import {
   isAfter,
   isBefore,
   isSameDay,
+  isSameMonth,
   isWithinInterval,
   parseISO,
   startOfDay,
@@ -903,8 +904,21 @@ export function buildEventTimelineRange(
     if (e > maxDate) maxDate = e
   }
 
-  const rangeStart = startOfMonth(addMonths(minDate, -1))
-  const lastMonth = startOfMonth(addMonths(maxDate, 1))
+  let rangeStart = startOfMonth(addMonths(minDate, -1))
+  let lastMonth = startOfMonth(addMonths(maxDate, 1))
+  const todayMonth = startOfMonth(new Date())
+  if (cursorMonth < rangeStart) {
+    rangeStart = startOfMonth(addMonths(cursorMonth, -1))
+  }
+  if (cursorMonth > lastMonth) {
+    lastMonth = startOfMonth(addMonths(cursorMonth, 1))
+  }
+  if (todayMonth < rangeStart) {
+    rangeStart = startOfMonth(addMonths(todayMonth, -1))
+  }
+  if (todayMonth > lastMonth) {
+    lastMonth = startOfMonth(addMonths(todayMonth, 1))
+  }
   const months: Date[] = []
   let cur = rangeStart
   while (cur <= lastMonth && months.length < 36) {
@@ -956,6 +970,19 @@ export function getEventTimelineTodayPct(range: EventTimelineRange, today = new 
   const end = range.rangeEnd.getTime()
   if (t < start || t >= end) return null
   return ((t - start) / (end - start)) * 100
+}
+
+/** Horizontal scroll anchor (% of track width) for a month column; falls back to today line. */
+export function getEventTimelineMonthScrollPct(
+  range: EventTimelineRange,
+  targetDate: Date
+): number | null {
+  const targetMonth = startOfMonth(targetDate)
+  const index = range.months.findIndex((m) => isSameMonth(m, targetMonth))
+  if (index >= 0) {
+    return (index / range.months.length) * 100
+  }
+  return getEventTimelineTodayPct(range, targetDate)
 }
 
 export function eventSpansMultipleDays(item: Pick<MarketingEventItem, "startDate" | "endDate">): boolean {
