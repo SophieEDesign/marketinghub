@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Search, SlidersHorizontal, Plus, MoreHorizontal } from "lucide-react"
 import type { PageBlock } from "@/lib/interface/types"
 import { useCampaignsOverviewData } from "@/hooks/useCampaignsOverviewData"
@@ -9,6 +9,8 @@ import {
   computeCampaignKpis,
   filterCampaigns,
   formatDateRange,
+  normalizeText,
+  type CampaignOverviewItem,
   type CampaignOverviewFilters,
 } from "@/lib/marketing/campaigns-overview"
 import { campaignsOverviewSubtitle } from "@/lib/marketing/campaigns-overview-config"
@@ -48,6 +50,26 @@ function ProgressPill({ value }: { value: number | null | undefined }) {
   )
 }
 
+type CampaignView = "list" | "kanban" | "calendar" | "timeline"
+type CampaignGroupBy = NonNullable<PageBlock["config"]["campaigns_group_by"]>
+
+function campaignGroupLabel(item: CampaignOverviewItem, groupBy: CampaignGroupBy): string {
+  if (groupBy === "none") return "All campaigns"
+  const value =
+    groupBy === "status"
+      ? item.status
+      : groupBy === "stage"
+        ? item.stage
+        : groupBy === "type"
+          ? item.type
+          : groupBy === "division"
+            ? item.division
+            : groupBy === "owner"
+              ? item.owner
+              : item.priority
+  return value && value.trim() ? value : "Unassigned"
+}
+
 export default function CampaignsOverviewBlock({
   block,
   isEditing = false,
@@ -59,10 +81,31 @@ export default function CampaignsOverviewBlock({
   const { loading, items, demoMessage, showDemoBanner, showEmptyState } = useCampaignsOverviewData(config)
   const [query, setQuery] = useState("")
   const [filters, setFilters] = useState(EMPTY_CAMPAIGN_FILTERS)
-  const [view, setView] = useState(config?.campaigns_default_view || "list")
+  const [view, setView] = useState<CampaignView>((config?.campaigns_default_view || "list") as CampaignView)
 
   const filteredItems = useMemo(() => filterCampaigns(items, filters, query), [items, filters, query])
   const kpis = useMemo(() => computeCampaignKpis(filteredItems), [filteredItems])
+  const groupBy = (config?.campaigns_group_by || "none") as CampaignGroupBy
+  const groupedItems = useMemo(() => {
+    if (groupBy === "none") return [{ label: "All campaigns", items: filteredItems }]
+    const groups = new Map<string, CampaignOverviewItem[]>()
+    filteredItems.forEach((item) => {
+      const label = campaignGroupLabel(item, groupBy)
+      const key = normalizeText(label) || "unassigned"
+      if (!groups.has(key)) groups.set(key, [])
+      groups.get(key)!.push(item)
+    })
+    return Array.from(groups.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, grouped]) => ({
+        label: campaignGroupLabel(grouped[0], groupBy),
+        items: grouped,
+      }))
+  }, [filteredItems, groupBy])
+
+  useEffect(() => {
+    setView((config?.campaigns_default_view || "list") as CampaignView)
+  }, [config?.campaigns_default_view])
 
   const options = useMemo(() => {
     const uniq = (vals: string[]) => Array.from(new Set(vals.filter(Boolean))).sort((a, b) => a.localeCompare(b))
@@ -196,99 +239,151 @@ export default function CampaignsOverviewBlock({
             </select>
           ))}
           <div className="ml-auto flex items-center gap-2">
-            {["list", "kanban", "calendar", "timeline"].map((mode) => {
-              const supported = mode === "list"
-              return (
-                <Button
-                  key={mode}
-                  variant={view === mode ? "default" : "outline"}
-                  size="sm"
-                  className="h-8 capitalize"
-                  onClick={() => supported && setView(mode)}
-                  disabled={!supported}
-                  title={!supported ? "Coming soon" : ""}
-                >
-                  {mode}
-                </Button>
-              )
-            })}
+            {(["list", "kanban", "calendar", "timeline"] as CampaignView[]).map((mode) => (
+              <Button
+                key={mode}
+                variant={view === mode ? "default" : "outline"}
+                size="sm"
+                className="h-8 capitalize"
+                onClick={() => setView(mode)}
+              >
+                {mode}
+              </Button>
+            ))}
           </div>
         </div>
       ) : null}
 
-      <div
-        className={cn(
-          "min-h-0 flex-1 overflow-auto",
-          marketingBlockScrollPanelClass(isFullPage)
-        )}
-      >
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="border-b border-border/40 text-left text-xs text-muted-foreground">
-              <th className="px-4 py-2">Campaign</th>
-              <th className="px-3 py-2">Type</th>
-              <th className="px-3 py-2">Division</th>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2">Priority</th>
-              <th className="px-3 py-2">Stage</th>
-              <th className="px-3 py-2">Dates</th>
-              <th className="px-3 py-2">Owner</th>
-              {config?.campaigns_show_progress !== false ? <th className="px-3 py-2">Progress</th> : null}
-              <th className="px-3 py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {filteredItems.map((item) => (
-              <tr
-                key={item.id}
-                className={cn(
-                  "cursor-pointer border-b border-border/20 hover:bg-muted/20",
-                  dense ? "h-10" : "h-14"
-                )}
-                onClick={() => {
-                  if (isEditing || clickAction === "none") return
-                  if (!item.recordTableId || !item.recordSupabaseTable) return
-                  openRecordModal({
-                    tableId: item.recordTableId,
-                    recordId: item.id,
-                    supabaseTableName: item.recordSupabaseTable,
-                    interfaceMode,
-                    recordLayoutType: "campaign",
-                  })
-                }}
-              >
-                <td className="px-4 py-2">
-                  <div className="flex items-center gap-2">
-                    {config?.campaigns_show_thumbnails !== false ? (
-                      <div className="h-8 w-10 rounded-md bg-muted/60" />
+      <div className={cn("min-h-0 flex-1 overflow-auto", marketingBlockScrollPanelClass(isFullPage))}>
+        {view === "list" ? (
+          groupedItems.map((group) => (
+            <div key={group.label} className="border-b border-border/20">
+              {groupBy !== "none" ? (
+                <div className="sticky top-0 z-10 border-b border-border/30 bg-muted/20 px-4 py-2 text-xs font-medium text-muted-foreground">
+                  {group.label} ({group.items.length})
+                </div>
+              ) : null}
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b border-border/40 text-left text-xs text-muted-foreground">
+                    <th className="px-4 py-2">Campaign</th>
+                    <th className="px-3 py-2">Type</th>
+                    <th className="px-3 py-2">Division</th>
+                    <th className="px-3 py-2">Status</th>
+                    <th className="px-3 py-2">Priority</th>
+                    <th className="px-3 py-2">Stage</th>
+                    <th className="px-3 py-2">Dates</th>
+                    <th className="px-3 py-2">Owner</th>
+                    {config?.campaigns_show_progress !== false ? (
+                      <th className="px-3 py-2">Progress</th>
                     ) : null}
-                    <div>
-                      <p className="text-sm font-medium">{item.title}</p>
-                      {item.needsAttention ? (
-                        <p className="text-[11px] text-amber-700">Needs attention</p>
+                    <th className="px-3 py-2" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {group.items.map((item) => (
+                    <tr
+                      key={item.id}
+                      className={cn(
+                        "cursor-pointer border-b border-border/20 hover:bg-muted/20",
+                        dense ? "h-10" : "h-14"
+                      )}
+                      onClick={() => {
+                        if (isEditing || clickAction === "none") return
+                        if (!item.recordTableId || !item.recordSupabaseTable) return
+                        openRecordModal({
+                          tableId: item.recordTableId,
+                          recordId: item.id,
+                          supabaseTableName: item.recordSupabaseTable,
+                          interfaceMode,
+                          recordLayoutType: "campaign",
+                        })
+                      }}
+                    >
+                      <td className="px-4 py-2">
+                        <div className="flex items-center gap-2">
+                          {config?.campaigns_show_thumbnails !== false ? (
+                            <div className="h-8 w-10 rounded-md bg-muted/60" />
+                          ) : null}
+                          <div>
+                            <p className="text-sm font-medium">{item.title}</p>
+                            {item.needsAttention ? (
+                              <p className="text-[11px] text-amber-700">Needs attention</p>
+                            ) : null}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2"><Badge value={item.type} /></td>
+                      <td className="px-3 py-2"><Badge value={item.division} /></td>
+                      <td className="px-3 py-2"><Badge value={item.status} /></td>
+                      <td className="px-3 py-2"><Badge value={item.priority} /></td>
+                      <td className="px-3 py-2"><Badge value={item.stage} /></td>
+                      <td className="px-3 py-2 text-xs text-muted-foreground">
+                        {formatDateRange(item.startDate, item.endDate)}
+                      </td>
+                      <td className="px-3 py-2 text-xs">{item.owner || "-"}</td>
+                      {config?.campaigns_show_progress !== false ? (
+                        <td className="px-3 py-2"><ProgressPill value={item.progress} /></td>
+                      ) : null}
+                      <td className="px-3 py-2 text-right">
+                        <button type="button" className="rounded p-1 text-muted-foreground hover:bg-muted">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))
+        ) : (
+          <div className="space-y-4 p-4">
+            {groupedItems.map((group) => (
+              <div key={group.label}>
+                {groupBy !== "none" ? (
+                  <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {group.label} ({group.items.length})
+                  </h3>
+                ) : null}
+                <div className={cn("grid gap-3", view === "kanban" ? "md:grid-cols-3" : "md:grid-cols-2")}>
+                  {group.items.map((item) => (
+                    <div
+                      key={item.id}
+                      className="cursor-pointer rounded-lg border border-border/40 bg-muted/10 p-3 hover:bg-muted/20"
+                      onClick={() => {
+                        if (isEditing || clickAction === "none") return
+                        if (!item.recordTableId || !item.recordSupabaseTable) return
+                        openRecordModal({
+                          tableId: item.recordTableId,
+                          recordId: item.id,
+                          supabaseTableName: item.recordSupabaseTable,
+                          interfaceMode,
+                          recordLayoutType: "campaign",
+                        })
+                      }}
+                    >
+                      <p className="text-sm font-semibold">{item.title}</p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        <Badge value={item.status} />
+                        <Badge value={item.stage} />
+                        <Badge value={item.priority} />
+                      </div>
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        {view === "calendar" ? "Dates" : view === "timeline" ? "Timeline" : "Period"}:{" "}
+                        {formatDateRange(item.startDate, item.endDate)}
+                      </p>
+                      {config?.campaigns_show_progress !== false ? (
+                        <div className="mt-2">
+                          <ProgressPill value={item.progress} />
+                        </div>
                       ) : null}
                     </div>
-                  </div>
-                </td>
-                <td className="px-3 py-2"><Badge value={item.type} /></td>
-                <td className="px-3 py-2"><Badge value={item.division} /></td>
-                <td className="px-3 py-2"><Badge value={item.status} /></td>
-                <td className="px-3 py-2"><Badge value={item.priority} /></td>
-                <td className="px-3 py-2"><Badge value={item.stage} /></td>
-                <td className="px-3 py-2 text-xs text-muted-foreground">{formatDateRange(item.startDate, item.endDate)}</td>
-                <td className="px-3 py-2 text-xs">{item.owner || "-"}</td>
-                {config?.campaigns_show_progress !== false ? (
-                  <td className="px-3 py-2"><ProgressPill value={item.progress} /></td>
-                ) : null}
-                <td className="px-3 py-2 text-right">
-                  <button type="button" className="rounded p-1 text-muted-foreground hover:bg-muted">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </button>
-                </td>
-              </tr>
+                  ))}
+                </div>
+              </div>
             ))}
-          </tbody>
-        </table>
+          </div>
+        )}
       </div>
       {/* TODO: later open dedicated Campaign Detail page or Campaign Workspace. */}
     </div>

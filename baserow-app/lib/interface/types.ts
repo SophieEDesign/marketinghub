@@ -642,6 +642,7 @@ export interface BlockConfig {
   campaigns_use_mock?: boolean
   campaigns_max_items?: number
   campaigns_default_view?: "list" | "kanban" | "calendar" | "timeline"
+  campaigns_group_by?: "none" | "status" | "stage" | "type" | "division" | "owner" | "priority"
   campaigns_show_filters?: boolean
   campaigns_show_search?: boolean
   campaigns_show_kpis?: boolean

@@ -653,6 +653,7 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       table_id: '',
       campaigns_use_mock: false,
       campaigns_default_view: 'list',
+      campaigns_group_by: 'status',
       campaigns_show_search: true,
       campaigns_show_filters: true,
       campaigns_show_kpis: true,

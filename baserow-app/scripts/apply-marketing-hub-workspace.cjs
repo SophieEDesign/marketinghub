@@ -597,6 +597,7 @@ function buildCampaignsBlocks() {
         title: "Campaigns",
         subtitle: "Plan, manage and track all marketing campaigns.",
         campaigns_default_view: "list",
+        campaigns_group_by: "status",
         campaigns_show_search: true,
         campaigns_show_filters: true,
         campaigns_show_kpis: true,

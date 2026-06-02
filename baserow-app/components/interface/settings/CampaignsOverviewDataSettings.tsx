@@ -226,6 +226,29 @@ export default function CampaignsOverviewDataSettings({
       </div>
 
       <div className="space-y-2">
+        <Label>Group by</Label>
+        <Select
+          value={config.campaigns_group_by || "none"}
+          onValueChange={(v) =>
+            onUpdate({ campaigns_group_by: v as BlockConfig["campaigns_group_by"] })
+          }
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">None</SelectItem>
+            <SelectItem value="status">Status</SelectItem>
+            <SelectItem value="stage">Stage</SelectItem>
+            <SelectItem value="type">Type</SelectItem>
+            <SelectItem value="division">Division</SelectItem>
+            <SelectItem value="owner">Owner</SelectItem>
+            <SelectItem value="priority">Priority</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
         <Label htmlFor="campaigns-max-items">Max items</Label>
         <Input
           id="campaigns-max-items"
