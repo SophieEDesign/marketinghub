@@ -182,6 +182,18 @@ export default function ThingsToDoBlock({
     [selectedItem, openRecordModal, reload]
   )
 
+  const handleSelectItem = useCallback(
+    (itemId: string) => {
+      const item = sourceItems.find((candidate) => candidate.id === itemId)
+      if (item?.recordTableId && item.recordSupabaseTable) {
+        handleOpenRecord(item)
+        return
+      }
+      setSelectedId(itemId)
+    },
+    [sourceItems, handleOpenRecord]
+  )
+
   const showDetail = enableDetailPanel && selectedItem != null && !isEditing
   const showRecordSidePanel =
     showDetail && Boolean(selectedItem?.recordTableId && selectedItem.recordSupabaseTable)
@@ -289,7 +301,7 @@ export default function ThingsToDoBlock({
                       selectedId={selectedId}
                       compact={compact}
                       checkedIds={checkedIds}
-                      onSelect={setSelectedId}
+                      onSelect={handleSelectItem}
                       onCheckedChange={handleCheckedChange}
                       onOpenRecord={(item) => {
                         if (!enableDetailPanel) {

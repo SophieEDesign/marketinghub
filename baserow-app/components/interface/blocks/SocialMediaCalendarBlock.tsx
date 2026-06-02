@@ -19,7 +19,7 @@ interface SocialMediaCalendarBlockProps {
 export default function SocialMediaCalendarBlock({
   block,
   isEditing = false,
-  interfaceMode: _interfaceMode = "view",
+  interfaceMode = "view",
   pageEditable,
   isFullPage = false,
 }: SocialMediaCalendarBlockProps) {
@@ -41,6 +41,7 @@ export default function SocialMediaCalendarBlock({
         config={block.config}
         canEdit={canEdit}
         isEditing={isEditing}
+        interfaceMode={interfaceMode}
         embeddedInBlock={embeddedInBlock}
         className="flex-1 min-h-0 p-3 md:p-4"
       />

@@ -169,6 +169,15 @@ export default function ContentTimelineBlock({
     })
   }
 
+  const handleSelectItem = (id: string) => {
+    const item = allItems.find((candidate) => candidate.id === id)
+    if (item?.recordTableId && item.recordSupabaseTable) {
+      handleOpenRecord(id)
+      return
+    }
+    setSelectedId((prev) => (prev === id ? null : id))
+  }
+
   const handleAddContent = () => {
     const first = liveItems[0]
     if (!first?.recordTableId || !first.recordSupabaseTable) return
@@ -271,7 +280,7 @@ export default function ContentTimelineBlock({
               compact={compact}
               showStatusBadges={showStatusBadges}
               showOwnerInitials={showOwnerInitials}
-              onSelect={(id) => setSelectedId((prev) => (prev === id ? null : id))}
+              onSelect={handleSelectItem}
             />
           )}
         </div>

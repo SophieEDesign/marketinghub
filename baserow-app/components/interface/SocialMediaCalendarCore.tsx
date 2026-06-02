@@ -110,12 +110,14 @@ export function SocialMediaCalendarFromConfig({
   config,
   canEdit = false,
   isEditing = false,
+  interfaceMode = "view",
   embeddedInBlock = true,
   className,
 }: {
   config?: import("@/lib/interface/types").BlockConfig | null
   canEdit?: boolean
   isEditing?: boolean
+  interfaceMode?: "view" | "edit"
   /** When true, preview panel stays inline (dashboard block). When false, full-page may use a drawer on small screens. */
   embeddedInBlock?: boolean
   className?: string
@@ -127,6 +129,7 @@ export function SocialMediaCalendarFromConfig({
       config={config}
       canEdit={canEdit}
       isEditing={isEditing}
+      interfaceMode={interfaceMode}
       embeddedInBlock={embeddedInBlock}
       className={className}
     />
@@ -138,10 +141,12 @@ export function SocialMediaCalendarCore({
   config,
   canEdit = false,
   isEditing = false,
+  interfaceMode = "view",
   embeddedInBlock = true,
   className,
 }: SocialMediaCalendarCoreProps & {
   isEditing?: boolean
+  interfaceMode?: "view" | "edit"
   embeddedInBlock?: boolean
 }) {
   const blockConfig = config ?? undefined
@@ -301,6 +306,7 @@ export function SocialMediaCalendarCore({
         onSave: () => reload(),
         cascadeContext: recordPanelCascade,
         tableFields: contentTableFields,
+        interfaceMode,
       }
       if (recordId === null) {
         openRecordModal({
@@ -332,6 +338,7 @@ export function SocialMediaCalendarCore({
       fields,
       contentFields,
       openRecordModal,
+      interfaceMode,
     ]
   )
 
@@ -344,7 +351,6 @@ export function SocialMediaCalendarCore({
   )
 
   const handleSelectPost = (id: string) => {
-    if (isEditing) return
     setSelectedId(id)
     if (settings.showMediaPreview && tableIds) {
       openRecord(
@@ -354,7 +360,7 @@ export function SocialMediaCalendarCore({
         undefined,
         undefined,
         recordPanelCascade,
-        "view",
+        interfaceMode,
         reload,
         reload
       )
