@@ -5,11 +5,6 @@ import { addMonths, addWeeks, subMonths, subWeeks } from "date-fns"
 import { Calendar, ChevronDown, Plus, Search } from "lucide-react"
 import EventCalendarView from "@/components/interface/EventCalendarView"
 import EventCalendarToolbar from "@/components/interface/EventCalendarToolbar"
-import EventDetailDrawer from "@/components/interface/EventDetailDrawer"
-import EventDetailPanel, {
-  EventDetailModal,
-  EventDetailPanelOverlay,
-} from "@/components/interface/EventDetailPanel"
 import EventMetricStrip from "@/components/interface/EventMetricStrip"
 import EventEmptyState from "@/components/interface/EventEmptyState"
 import EventMemberSubmissionSheet from "@/components/interface/EventMemberSubmissionSheet"
@@ -23,6 +18,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useRecordModal } from "@/contexts/RecordModalContext"
+import { useRecordPanel } from "@/contexts/RecordPanelContext"
+import type { EventRecordContextualPayload } from "@/lib/records/record-drawer-mode"
+import type { MarketingEventItem } from "@/lib/marketing/events"
 import { useEventCalendarData } from "@/hooks/useEventCalendarData"
 import {
   isMarketingMockEnabled,
@@ -89,6 +87,7 @@ export function EventCalendarCore({
   embeddedInBlock?: boolean
 }) {
   const { openRecordModal } = useRecordModal()
+  const { state: recordPanelState, setRecordDrawerMode, closeRecord } = useRecordPanel()
   const { toast } = useToast()
   const {
     loading,
@@ -187,54 +186,41 @@ export function EventCalendarCore({
     [filteredItems, cursorDate]
   )
 
-  const selectedEvent = useMemo(
-    () => filteredItems.find((e) => e.id === selectedEventId) ?? null,
-    [filteredItems, selectedEventId]
-  )
-
-  const detailOpen = !!selectedEventId && !!selectedEvent && !isEditing
-
-  const effectiveDetailMode = useMemo(() => {
-    const mode = settings.detailMode === "panel" ? "drawer" : settings.detailMode
-    if (embeddedInBlock && mode === "inline") return "drawer"
-    return mode
-  }, [settings.detailMode, embeddedInBlock])
-
-  const useInlineDetailPanel =
-    !embeddedInBlock && effectiveDetailMode === "inline" && !isEditing
-
   const openRecordForEvent = useCallback(
-    (id: string, options?: { interfaceMode?: "view" | "edit" }) => {
+    (
+      id: string,
+      options?: {
+        initialDrawerMode?: "view" | "edit"
+        event?: MarketingEventItem | null
+      }
+    ) => {
       if (!tableIds?.contentTableId) return
-      // Close event drawer/modal first — it sits above RecordPanel (z-90 vs z-50).
-      setSelectedEventId(null)
+      const event =
+        options?.event ?? filteredItems.find((item) => item.id === id) ?? null
+      setSelectedEventId(id)
       openRecordModal({
         tableId: tableIds.contentTableId,
         recordId: id,
         supabaseTableName: tableIds.contentSupabaseTable,
-        interfaceMode: options?.interfaceMode ?? interfaceMode,
+        interfaceMode,
         recordLayoutType: "event",
+        initialDrawerMode: options?.initialDrawerMode ?? "view",
+        eventContextual: event ? makeEventContextual(event) : null,
         onRecordUpdated: () => reload(),
       })
     },
-    [tableIds, openRecordModal, interfaceMode, reload]
+    // makeEventContextual is rebuilt each render so attendance/approval callbacks stay fresh
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tableIds, filteredItems, openRecordModal, interfaceMode, reload]
   )
 
   const handleEventClick = useCallback(
     (id: string) => {
       if (isEditing) return
       if (settings.clickAction === "none") return
-
-      const useRecord =
-        settings.clickAction === "open_record" || effectiveDetailMode === "record"
-
-      if (useRecord) {
-        openRecordForEvent(id)
-        return
-      }
-      setSelectedEventId(id)
+      openRecordForEvent(id, { initialDrawerMode: "view" })
     },
-    [isEditing, settings.clickAction, effectiveDetailMode, openRecordForEvent]
+    [isEditing, settings.clickAction, openRecordForEvent]
   )
 
   const handleAddEvent = useCallback(() => {
@@ -281,17 +267,13 @@ export function EventCalendarCore({
     toast,
   ])
 
-  const handleEditEvent = useCallback(() => {
-    if (!selectedEventId) return
-    openRecordForEvent(selectedEventId, { interfaceMode: "edit" })
-  }, [selectedEventId, openRecordForEvent])
-
   const handleAttendanceChange = useCallback(
     async (status: EventAttendanceStatus) => {
       if (isEditing || !settings.allowAttendanceUpdates || !settings.showAttendanceControls) {
         return
       }
-      if (!selectedEvent || !currentUserId) {
+      const eventId = recordPanelState.recordId ?? selectedEventId
+      if (!eventId || !currentUserId) {
         toast({
           title: "Sign in required",
           description: "You must be signed in to update attendance.",
@@ -300,7 +282,7 @@ export function EventCalendarCore({
       }
 
       try {
-        await upsertAttendance(selectedEvent.id, status)
+        await upsertAttendance(eventId, status)
         const labels: Record<EventAttendanceStatus, string> = {
           attending: "Marked as attending",
           maybe: "Marked as maybe",
@@ -308,6 +290,7 @@ export function EventCalendarCore({
           interested: "Marked as interested",
         }
         toast({ title: labels[status] })
+        reload()
       } catch (e) {
         toast({
           title: "Could not update attendance",
@@ -320,19 +303,23 @@ export function EventCalendarCore({
       isEditing,
       settings.allowAttendanceUpdates,
       settings.showAttendanceControls,
-      selectedEvent,
+      recordPanelState.recordId,
+      selectedEventId,
       currentUserId,
       upsertAttendance,
       toast,
+      reload,
     ]
   )
 
   const handleApproveEvent = useCallback(async () => {
-    if (!selectedEventId) return
+    const eventId = recordPanelState.recordId ?? selectedEventId
+    if (!eventId) return
     try {
-      await updateEventStatus(selectedEventId, workflow.approvedStatus)
+      await updateEventStatus(eventId, workflow.approvedStatus)
       toast({ title: "Event approved", description: workflow.approvedStatus })
       setSelectedEventId(null)
+      closeRecord()
     } catch (e) {
       toast({
         title: "Could not approve",
@@ -340,14 +327,16 @@ export function EventCalendarCore({
         variant: "destructive",
       })
     }
-  }, [selectedEventId, updateEventStatus, workflow.approvedStatus, toast])
+  }, [recordPanelState.recordId, selectedEventId, updateEventStatus, workflow.approvedStatus, toast, closeRecord])
 
   const handleRejectEvent = useCallback(async () => {
-    if (!selectedEventId) return
+    const eventId = recordPanelState.recordId ?? selectedEventId
+    if (!eventId) return
     try {
-      await updateEventStatus(selectedEventId, workflow.rejectedStatus)
+      await updateEventStatus(eventId, workflow.rejectedStatus)
       toast({ title: "Event rejected" })
       setSelectedEventId(null)
+      closeRecord()
     } catch (e) {
       toast({
         title: "Could not reject",
@@ -355,11 +344,31 @@ export function EventCalendarCore({
         variant: "destructive",
       })
     }
-  }, [selectedEventId, updateEventStatus, workflow.rejectedStatus, toast])
+  }, [recordPanelState.recordId, selectedEventId, updateEventStatus, workflow.rejectedStatus, toast, closeRecord])
 
-  const handleManageAttendees = useCallback(() => {
-    handleEditEvent()
-  }, [handleEditEvent])
+  function makeEventContextual(event: MarketingEventItem): EventRecordContextualPayload {
+    return {
+      event,
+      canEdit: canEdit && !externalMode,
+      isExternalView: externalMode,
+      showScheduleTab: settings.showScheduleTab,
+      showResourcesTab: settings.showResourcesTab,
+      showNotesTab: settings.showNotesTab,
+      showAttendanceControls:
+        settings.showAttendanceControls && settings.allowAttendanceUpdates && !isEditing,
+      allowCalendarExport: settings.allowCalendarExport && !isEditing,
+      attendanceStatus: event.currentUserAttendanceStatus ?? null,
+      showApprovalActions:
+        canEdit && !externalMode && !isEditing && !!event.isPendingApproval,
+      onAttendanceChange: handleAttendanceChange,
+      onManageAttendees:
+        canEdit && settings.showAttendanceControls
+          ? () => setRecordDrawerMode("edit")
+          : undefined,
+      onApprove: handleApproveEvent,
+      onReject: handleRejectEvent,
+    }
+  }
 
   const onPrev = () => {
     if (viewMode === "week") setCursorDate((d) => subWeeks(d, 1))
@@ -401,32 +410,6 @@ export function EventCalendarCore({
     !isEditing &&
     (canEdit || settings.allowMemberSubmissions) &&
     !!tableIds?.contentTableId
-
-  const detailContentProps = {
-    canEdit: canEdit && !externalMode,
-    isExternalView: externalMode,
-    onEdit: handleEditEvent,
-    onViewRecord: tableIds?.contentTableId
-      ? () => selectedEventId && openRecordForEvent(selectedEventId, { interfaceMode: "view" })
-      : undefined,
-    onAttendanceChange: handleAttendanceChange,
-    onManageAttendees: canEdit && settings.showAttendanceControls ? handleManageAttendees : undefined,
-    showScheduleTab: settings.showScheduleTab,
-    showResourcesTab: settings.showResourcesTab,
-    showNotesTab: settings.showNotesTab,
-    showAttendanceControls:
-      settings.showAttendanceControls && settings.allowAttendanceUpdates && !isEditing,
-    allowCalendarExport: settings.allowCalendarExport && !isEditing,
-    attendanceStatus: selectedEvent?.currentUserAttendanceStatus ?? null,
-    isEditingBlock: isEditing,
-    showApprovalActions:
-      canEdit &&
-      !externalMode &&
-      !isEditing &&
-      !!selectedEvent?.isPendingApproval,
-    onApprove: handleApproveEvent,
-    onReject: handleRejectEvent,
-  }
 
   if (loading) {
     return (
@@ -596,43 +579,8 @@ export function EventCalendarCore({
             />
           </div>
 
-          {useInlineDetailPanel && !isMobile ? (
-            <EventDetailPanel
-              event={selectedEvent}
-              open={detailOpen}
-              onClose={() => setSelectedEventId(null)}
-              contentProps={detailContentProps}
-            />
-          ) : null}
-
-          {useInlineDetailPanel && isMobile ? (
-            <EventDetailPanelOverlay
-              event={selectedEvent}
-              open={detailOpen}
-              onClose={() => setSelectedEventId(null)}
-              contentProps={detailContentProps}
-            />
-          ) : null}
         </div>
       )}
-
-      {effectiveDetailMode === "drawer" && embeddedInBlock && selectedEvent ? (
-        <EventDetailDrawer
-          open={detailOpen}
-          onClose={() => setSelectedEventId(null)}
-          event={selectedEvent}
-          {...detailContentProps}
-        />
-      ) : null}
-
-      {effectiveDetailMode === "modal" ? (
-        <EventDetailModal
-          event={selectedEvent}
-          open={detailOpen}
-          onClose={() => setSelectedEventId(null)}
-          contentProps={detailContentProps}
-        />
-      ) : null}
 
       {!showEmpty && settings.showMetrics ? (
         <EventMetricStrip

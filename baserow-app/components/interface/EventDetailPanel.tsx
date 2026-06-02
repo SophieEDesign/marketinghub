@@ -10,7 +10,6 @@ import {
   Users,
   Pencil,
   Share2,
-  ChevronRight,
   Download,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -41,7 +40,6 @@ export interface EventDetailContentProps {
   canEdit: boolean
   isExternalView?: boolean
   onEdit: () => void
-  onViewRecord?: () => void
   onAttendanceChange?: (status: EventAttendanceStatus) => void
   onManageAttendees?: () => void
   showScheduleTab?: boolean
@@ -64,7 +62,6 @@ export function EventDetailContent({
   canEdit,
   isExternalView = false,
   onEdit,
-  onViewRecord,
   onAttendanceChange,
   onManageAttendees,
   showScheduleTab = true,
@@ -429,14 +426,8 @@ export function EventDetailContent({
             ) : null}
           </div>
         ) : null}
-        {onViewRecord ? (
-          <Button type="button" className="w-full gap-2" onClick={onViewRecord}>
-            View details
-            <ChevronRight className="h-4 w-4" aria-hidden />
-          </Button>
-        ) : null}
         {canEdit ? (
-          <Button type="button" variant={onViewRecord ? "outline" : "default"} className="w-full gap-2" onClick={onEdit}>
+          <Button type="button" className="w-full gap-2" onClick={onEdit}>
             <Pencil className="h-4 w-4" aria-hidden />
             Edit event
           </Button>

@@ -16,15 +16,14 @@ export function SocialPostQuickView({
   item,
   onClose,
   onEdit,
-  onOpenFullRecord,
   showMediaPreview = true,
   showApprovalStatus = true,
   showPlatformIcons = true,
 }: {
   item: SocialCalendarItem | null
   onClose: () => void
+  /** Switches the same record drawer into edit mode (no second drawer). */
   onEdit: () => void
-  onOpenFullRecord: () => void
   showMediaPreview?: boolean
   showApprovalStatus?: boolean
   showPlatformIcons?: boolean
@@ -171,9 +170,6 @@ export function SocialPostQuickView({
         ) : null}
         <Button type="button" size="sm" className="w-full" onClick={onEdit}>
           Edit post
-        </Button>
-        <Button type="button" variant="outline" size="sm" className="w-full" onClick={onOpenFullRecord}>
-          Open full record
         </Button>
       </div>
     </PanelShell>

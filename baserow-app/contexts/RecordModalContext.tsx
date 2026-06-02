@@ -14,6 +14,10 @@ import type { BlockConfig } from "@/lib/interface/types"
 import type { RecordEditorCascadeContext } from "@/lib/interface/record-editor-core"
 import type { FieldLayoutItem } from "@/lib/interface/field-layout-utils"
 import type { RecordLayoutType } from "@/lib/records/record-layout-presets"
+import type {
+  EventRecordContextualPayload,
+  RecordDrawerMode,
+} from "@/lib/records/record-drawer-mode"
 
 /** State for opening record (RecordPanel for edit, RecordModal for create). */
 export interface RecordModalOpenState {
@@ -32,6 +36,10 @@ export interface RecordModalOpenState {
   initialEditMode?: boolean
   interfaceMode?: "view" | "edit"
   recordLayoutType?: RecordLayoutType
+  /** Contextual drawer mode when opening custom layouts (event calendar defaults to view). */
+  initialDrawerMode?: RecordDrawerMode
+  /** Rich event overview payload from Event Calendar block. */
+  eventContextual?: EventRecordContextualPayload | null
   onSave?: (createdRecordId?: string | null) => void
   onDeleted?: () => void | Promise<void>
   /** Called when a field is updated (edit mode); use to refresh parent view. */
@@ -68,7 +76,11 @@ export function RecordModalProvider({ children }: { children: ReactNode }) {
           openState.fieldLayout,
           openState.onLayoutSave ?? undefined,
           openState.tableFields,
-          openState.recordLayoutType
+          openState.recordLayoutType,
+          {
+            initialDrawerMode: openState.initialDrawerMode,
+            eventContextual: openState.eventContextual,
+          }
         )
       } else {
         openRecordForCreate({

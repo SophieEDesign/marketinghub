@@ -102,6 +102,8 @@ export interface RecordEditorCoreResult {
   restoreDraft: () => void
   /** Clear draft from localStorage (call after save or discard) */
   clearDraft: () => void
+  /** Revert unsaved edits to last loaded/saved baseline and clear draft storage. */
+  discardChanges: () => void
   /** Reload field metadata from the API (e.g. after select option edits). */
   refreshFields: () => Promise<void>
 }
@@ -723,6 +725,13 @@ export function useRecordEditorCore(
     }
   }, [formData, baselineFormData])
 
+  const discardChanges = useCallback(() => {
+    const baseline = baselineFormDataRef.current
+    setFormData({ ...baseline })
+    setBaselineFormData({ ...baseline })
+    clearDraft()
+  }, [clearDraft])
+
   return {
     loading,
     formData,
@@ -747,6 +756,7 @@ export function useRecordEditorCore(
     hasDraftToRestore,
     restoreDraft,
     clearDraft,
+    discardChanges,
     refreshFields,
   }
 }

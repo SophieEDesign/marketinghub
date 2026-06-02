@@ -10,6 +10,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { Maximize2, ChevronDown, ChevronRight, ArrowLeft, Save, Trash2, X, Copy } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import FieldEditor from "@/components/fields/FieldEditor"
 import RecordFields from "@/components/records/RecordFields"
 import RecordActivity from "@/components/records/RecordActivity"
@@ -33,6 +34,12 @@ import { createClient } from "@/lib/supabase/client"
 import type { TableField } from "@/types/fields"
 import { resolveRecordLayout } from "@/lib/records/record-layout-resolver"
 import type { RecordLayoutType } from "@/lib/records/record-layout-presets"
+import {
+  usesContextualDrawerView,
+  type EventRecordContextualPayload,
+  type RecordDrawerMode,
+} from "@/lib/records/record-drawer-mode"
+import EventRecordContextualView from "@/components/records/EventRecordContextualView"
 
 export interface RecordEditorProps {
   recordId: string | null
@@ -65,6 +72,9 @@ export interface RecordEditorProps {
   /** Interface mode: 'edit' allows layout editing when canEditLayout */
   interfaceMode?: "view" | "edit"
   recordLayoutType?: RecordLayoutType
+  recordDrawerMode?: RecordDrawerMode
+  eventContextual?: EventRecordContextualPayload | null
+  onRecordDrawerModeChange?: (mode: RecordDrawerMode) => void
   /** For modal: render header actions (close, delete, save) - set false when shell provides them */
   renderHeaderActions?: boolean
   /** @deprecated Use fieldLayoutConfig. Backward compat: custom modal layout. */
@@ -103,6 +113,9 @@ export default function RecordEditor({
   forceFlatLayout = false,
   interfaceMode = "view",
   recordLayoutType,
+  recordDrawerMode = "edit",
+  eventContextual = null,
+  onRecordDrawerModeChange,
   renderHeaderActions = true,
   modalLayout,
   modalFields = [],
@@ -113,7 +126,7 @@ export default function RecordEditor({
 }: RecordEditorProps) {
   const { selectedContext, setSelectedContext } = useSelectionContext()
   const { toast } = useToast()
-  const { setFieldLayout: setLiveFieldLayout } = useRecordPanel()
+  const { setFieldLayout: setLiveFieldLayout, setRecordDrawerMode } = useRecordPanel()
 
   const core = useRecordEditorCore({
     tableId,
@@ -153,15 +166,25 @@ export default function RecordEditor({
     hasDraftToRestore,
     restoreDraft,
     clearDraft,
+    discardChanges,
     refreshFields,
   } = core
 
   const canSave = recordId ? canEditRecords : canCreateRecords
-  // Allow field editing when permissions allow, in both view and edit mode (Airtable-style).
+  const isCustomMarketingLayout = Boolean(
+    recordLayoutType && recordLayoutType !== "generic"
+  )
+  const showEventContextualView =
+    mode === "review" &&
+    usesContextualDrawerView(recordLayoutType, recordDrawerMode) &&
+    Boolean(eventContextual?.event)
+  // Custom marketing layouts: fields editable only in drawer edit mode (generic stays Airtable-style).
   const effectiveEditable =
     !allowEdit
       ? false
-      : canSave
+      : isCustomMarketingLayout
+        ? recordDrawerMode === "edit" && canSave
+        : canSave
   const [contentReady, setContentReady] = useState(false)
   const contentReadyRef = useRef(false)
 
@@ -227,11 +250,38 @@ export default function RecordEditor({
     return getFieldGroupsFromLayout(resolvedFieldLayout, filteredFields, visibilityContext)
   }, [recordId, resolvedFieldLayout, filteredFields, visibilityContext])
 
+  const filteredFieldsIdSig = useMemo(
+    () => filteredFields.map((f) => f.id).join(","),
+    [filteredFields]
+  )
+
   const customLayout = useMemo(
     () => resolveRecordLayout(filteredFields, recordLayoutType),
     [filteredFields, recordLayoutType]
   )
-  const useCustomLayout = mode === "review" && customLayout.isCustom && customLayout.sections.length > 0
+  const useCustomLayout =
+    mode === "review" &&
+    customLayout.isCustom &&
+    customLayout.sections.length > 0 &&
+    !showEventContextualView
+  const customLayoutReadOnly = isCustomMarketingLayout
+    ? recordDrawerMode === "view"
+    : interfaceMode === "view"
+  const customEditLabel =
+    recordLayoutType === "event"
+      ? "Edit event"
+      : recordLayoutType === "social_post"
+        ? "Edit post"
+        : recordLayoutType === "task"
+          ? "Edit task"
+          : recordLayoutType === "campaign"
+            ? "Edit campaign"
+            : recordLayoutType === "content"
+              ? "Edit content"
+              : recordLayoutType === "asset"
+                ? "Edit details"
+                : "Edit"
+  const [activeCustomTab, setActiveCustomTab] = useState<string>("overview")
   const mediaPreviewValue =
     customLayout.mediaPreviewField && formData
       ? formData[customLayout.mediaPreviewField.name]
@@ -357,19 +407,70 @@ export default function RecordEditor({
 
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => new Set())
 
+  const defaultCustomCollapsedIds = useMemo(() => {
+    if (!useCustomLayout) return [] as string[]
+    return customLayout.sections
+      .filter((section) => section.collapsedByDefault)
+      .map((section) => section.id)
+  }, [useCustomLayout, recordId, recordLayoutType, filteredFieldsIdSig])
+
+  const customLayoutCollapseInitSig = useMemo(
+    () => `${recordId ?? ""}:${recordLayoutType ?? "generic"}:${filteredFieldsIdSig}`,
+    [recordId, recordLayoutType, filteredFieldsIdSig]
+  )
+
+  const customLayoutCollapseInitRef = useRef("")
+
+  // Initialise collapsed sections when record/layout changes only — never depend on
+  // customLayout.sections (new array every resolve) or React #185 update loops occur.
+  useEffect(() => {
+    if (!useCustomLayout) {
+      customLayoutCollapseInitRef.current = ""
+      return
+    }
+    if (customLayoutCollapseInitRef.current === customLayoutCollapseInitSig) return
+    customLayoutCollapseInitRef.current = customLayoutCollapseInitSig
+    const defaults = new Set(defaultCustomCollapsedIds)
+    setCollapsedSections((prev) => {
+      if (prev.size === defaults.size && [...prev].every((id) => defaults.has(id))) {
+        return prev
+      }
+      return defaults
+    })
+  }, [useCustomLayout, customLayoutCollapseInitSig, defaultCustomCollapsedIds])
+
   useEffect(() => {
     if (!useCustomLayout) return
-    const defaults = new Set(
-      customLayout.sections
-        .filter((section) => section.collapsedByDefault)
-        .map((section) => section.id)
+    const first = customLayout.sections[0]?.id
+    if (!first) return
+    setActiveCustomTab((prev) =>
+      customLayout.sections.some((section) => section.id === prev) ? prev : first
     )
-    setCollapsedSections(defaults)
-  }, [useCustomLayout, customLayout.sections, recordId])
+  }, [useCustomLayout, customLayoutCollapseInitSig])
+
+  const handleCustomDiscard = useCallback(() => {
+    discardChanges()
+    if (isCustomMarketingLayout) {
+      setRecordDrawerMode("view")
+      onRecordDrawerModeChange?.("view")
+    }
+  }, [discardChanges, isCustomMarketingLayout, setRecordDrawerMode, onRecordDrawerModeChange])
+
+  const handleCustomEdit = useCallback(() => {
+    setRecordDrawerMode("edit")
+    onRecordDrawerModeChange?.("edit")
+  }, [setRecordDrawerMode, onRecordDrawerModeChange])
 
   const handleSave = useCallback(async () => {
     try {
       await save()
+      if (
+        (recordLayoutType === "event" || recordLayoutType === "social_post") &&
+        recordDrawerMode === "edit"
+      ) {
+        setRecordDrawerMode("view")
+        onRecordDrawerModeChange?.("view")
+      }
     } catch (e: any) {
       if (!isAbortError(e)) {
         const message = e?.message || "Unknown error"
@@ -381,7 +482,14 @@ export default function RecordEditor({
         })
       }
     }
-  }, [save, toast])
+  }, [
+    save,
+    toast,
+    recordLayoutType,
+    recordDrawerMode,
+    setRecordDrawerMode,
+    onRecordDrawerModeChange,
+  ])
 
   const handleDuplicate = useCallback(async () => {
     if (!recordId || !effectiveTableName || !formData || Object.keys(formData).length === 0) return
@@ -454,6 +562,16 @@ export default function RecordEditor({
       )
     }
 
+    if (showEventContextualView && eventContextual) {
+      return (
+        <EventRecordContextualView
+          payload={eventContextual}
+          onClose={() => onClose?.()}
+          onEdit={handleCustomEdit}
+        />
+      )
+    }
+
     if (useCustomLayout) {
       const statusValue =
         customLayout.statusField && formData
@@ -473,67 +591,116 @@ export default function RecordEditor({
             ? (previewCandidate as any).url
             : null
 
-      return (
-        <div className="px-4 py-3 space-y-3">
-          <div className="sticky top-0 z-10 rounded-card-lg border border-border/45 bg-background/95 backdrop-blur px-4 py-3">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-base font-semibold truncate">{String(titleValue || recordTitle || "Record Details")}</h3>
-              {statusValue != null && statusValue !== "" ? (
-                <Badge variant="secondary" className="max-w-[40%] truncate">{String(statusValue)}</Badge>
-              ) : null}
-            </div>
-          </div>
-
-          {previewUrl ? (
-            <div className="rounded-card-lg border border-border/35 bg-card p-3">
-              <p className="text-xs text-muted-foreground mb-2">Preview</p>
-              <img
-                src={previewUrl}
-                alt="Media preview"
-                className="w-full max-h-56 object-cover rounded-md border border-border/30"
+      const renderCustomSectionFields = (sectionId: string) => {
+        const section = customLayout.sections.find((item) => item.id === sectionId)
+        if (!section) return null
+        return (
+          <div className="px-1 py-2 space-y-3">
+            {section.fields.map((field) => (
+              <FieldEditor
+                key={field.id}
+                field={field}
+                value={formData[field.name]}
+                onChange={(v) => handleFieldChange(field.name, v)}
+                onBlur={(v) => handleFieldBlur(field.name, v)}
+                required={field.required || false}
+                recordId={recordId || undefined}
+                tableName={effectiveTableName || undefined}
+                isReadOnly={customLayoutReadOnly || !isFieldEditable(field.name)}
               />
-            </div>
-          ) : null}
+            ))}
+          </div>
+        )
+      }
 
-          {customLayout.sections.map((section) => {
-            const isCollapsed = collapsedSections.has(section.id)
-            return (
-              <div key={section.id} className="rounded-card-lg border border-border/35 bg-card overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setCollapsedSections((prev) => {
-                      const next = new Set(prev)
-                      if (next.has(section.id)) next.delete(section.id)
-                      else next.add(section.id)
-                      return next
-                    })
-                  }
-                  className="w-full px-4 py-2.5 flex items-center justify-between text-left border-b border-border/25 bg-muted/10"
-                >
-                  <span className="text-sm font-medium">{section.label}</span>
-                  {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                </button>
-                {!isCollapsed ? (
-                  <div className="px-4 py-3 space-y-3">
-                    {section.fields.map((field) => (
-                      <FieldEditor
-                        key={field.id}
-                        field={field}
-                        value={formData[field.name]}
-                        onChange={(v) => handleFieldChange(field.name, v)}
-                        onBlur={(v) => handleFieldBlur(field.name, v)}
-                        required={field.required || false}
-                        recordId={recordId || undefined}
-                        tableName={effectiveTableName || undefined}
-                        isReadOnly={!isFieldEditable(field.name)}
-                      />
-                    ))}
-                  </div>
+      const tabSections = customLayout.sections.filter((section) => section.id !== "more_fields")
+      const moreFieldsSection = customLayout.sections.find((section) => section.id === "more_fields")
+      const tabsForUi =
+        moreFieldsSection != null
+          ? [...tabSections, moreFieldsSection]
+          : tabSections
+
+      return (
+        <div className="flex flex-col min-h-0">
+          <div className="px-4 py-3 space-y-3">
+            <div className="rounded-card-lg border border-border/45 bg-background px-4 py-3">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-base font-semibold truncate">
+                  {String(titleValue || recordTitle || "Record Details")}
+                </h3>
+                {statusValue != null && statusValue !== "" ? (
+                  <Badge variant="secondary" className="max-w-[40%] truncate">
+                    {String(statusValue)}
+                  </Badge>
                 ) : null}
               </div>
-            )
-          })}
+            </div>
+
+            {(activeCustomTab === "overview" || activeCustomTab === "media") && previewUrl ? (
+              <div className="rounded-card-lg border border-border/35 bg-card p-3">
+                <p className="text-xs text-muted-foreground mb-2">Preview</p>
+                <img
+                  src={previewUrl}
+                  alt="Media preview"
+                  className="w-full max-h-56 object-cover rounded-md border border-border/30"
+                />
+              </div>
+            ) : null}
+
+            <Tabs value={activeCustomTab} onValueChange={setActiveCustomTab} className="w-full">
+              <TabsList className="h-9 w-full justify-start flex-wrap gap-0.5 bg-muted/30 p-1">
+                {tabsForUi.map((section) => (
+                  <TabsTrigger
+                    key={section.id}
+                    value={section.id}
+                    className="text-xs px-2.5 py-1 h-7 data-[state=active]:bg-background"
+                  >
+                    {section.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              {tabsForUi.map((section) => (
+                <TabsContent key={section.id} value={section.id} className="mt-3 focus-visible:outline-none">
+                  {renderCustomSectionFields(section.id)}
+                </TabsContent>
+              ))}
+            </Tabs>
+          </div>
+
+          {mode === "review" && recordId ? (
+            <div className="sticky bottom-0 z-10 border-t border-border/40 bg-background/95 backdrop-blur px-4 py-3 flex flex-col gap-2 shrink-0">
+              {customLayoutReadOnly && canEditRecords ? (
+                <Button type="button" size="sm" className="w-full" onClick={handleCustomEdit}>
+                  {customEditLabel}
+                </Button>
+              ) : null}
+              {!customLayoutReadOnly && canEditRecords ? (
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={handleCustomDiscard}
+                    disabled={saving || loading}
+                  >
+                    Discard changes
+                  </Button>
+                  {(!saveOnFieldChange || isDirty) && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="flex-1"
+                      onClick={handleSave}
+                      disabled={saving || loading || !canSave}
+                    >
+                      {saving ? "Saving…" : "Save changes"}
+                    </Button>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       )
     }
@@ -682,7 +849,7 @@ export default function RecordEditor({
   }
 
   const showHeader = mode === "modal" && renderHeaderActions
-  const showReviewHeader = mode === "review"
+  const showReviewHeader = mode === "review" && !showEventContextualView
 
   return (
     <div className="flex flex-col min-h-full w-full">
@@ -806,7 +973,7 @@ export default function RecordEditor({
         </div>
       )}
 
-      {mode === "review" && recordId && (
+      {mode === "review" && recordId && !showEventContextualView && (
         <>
           {renderExtraContent && (
             <div className="border-t flex-shrink-0 overflow-visible">

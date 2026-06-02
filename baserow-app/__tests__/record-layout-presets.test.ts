@@ -32,6 +32,22 @@ describe("record layout resolver", () => {
     expect(result.sections.some((section) => section.label === "More fields")).toBe(true)
   })
 
+  it("exposes social_post tab sections including Overview and Channels", () => {
+    const fields = [
+      field("f1", "Content Name"),
+      field("f2", "status"),
+      field("f3", "Caption"),
+      field("f4", "Instagram"),
+      field("f5", "orphan_field"),
+    ]
+    const result = resolveRecordLayout(fields, "social_post")
+    const labels = result.sections.map((s) => s.label)
+    expect(labels).toContain("Overview")
+    expect(labels).toContain("Caption")
+    expect(labels).toContain("Channels")
+    expect(labels).toContain("More fields")
+  })
+
   it("prioritises summary fields in section ordering", () => {
     const fields = [
       field("f1", "status"),

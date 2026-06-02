@@ -7,6 +7,11 @@ import type { BlockConfig } from "@/lib/interface/types"
 import type { RecordEditorCascadeContext } from "@/lib/interface/record-editor-core"
 import type { FieldLayoutItem } from "@/lib/interface/field-layout-utils"
 import type { RecordLayoutType } from "@/lib/records/record-layout-presets"
+import {
+  defaultRecordDrawerMode,
+  type EventRecordContextualPayload,
+  type RecordDrawerMode,
+} from "@/lib/records/record-drawer-mode"
 import type { TableField } from "@/types/fields"
 
 interface RecordPanelState {
@@ -28,6 +33,10 @@ interface RecordPanelState {
   /** Interface mode: 'view' | 'edit'. When 'edit', RecordPanel opens in edit mode (Airtable-style). */
   interfaceMode?: 'view' | 'edit'
   recordLayoutType?: RecordLayoutType
+  /** Contextual drawer mode for custom layouts (event calendar uses view + edit in one panel). */
+  recordDrawerMode: RecordDrawerMode
+  /** Rich event overview when opened from Event Calendar (optional). */
+  eventContextual?: EventRecordContextualPayload | null
   /** Called when the record is deleted; blocks use this to refresh core data (grid/calendar). */
   onRecordDeleted?: () => void
   /** Called when a field is updated; views use this to refresh row data (e.g. card color from status). */
@@ -38,9 +47,29 @@ interface RecordPanelState {
   onRecordCreated?: (createdRecordId: string) => void
 }
 
+export interface OpenRecordOptions {
+  initialDrawerMode?: RecordDrawerMode
+  eventContextual?: EventRecordContextualPayload | null
+}
+
 interface RecordPanelContextType {
   state: RecordPanelState
-  openRecord: (tableId: string, recordId: string, tableName: string | null, modalFields?: string[], modalLayout?: BlockConfig["modal_layout"], cascadeContext?: RecordEditorCascadeContext | null, interfaceMode?: "view" | "edit", onRecordDeleted?: () => void, onRecordUpdated?: () => void, fieldLayout?: FieldLayoutItem[], onLayoutSave?: (layout: FieldLayoutItem[]) => void | Promise<void>, tableFields?: TableField[], recordLayoutType?: RecordLayoutType) => void
+  openRecord: (
+    tableId: string,
+    recordId: string,
+    tableName: string | null,
+    modalFields?: string[],
+    modalLayout?: BlockConfig["modal_layout"],
+    cascadeContext?: RecordEditorCascadeContext | null,
+    interfaceMode?: "view" | "edit",
+    onRecordDeleted?: () => void,
+    onRecordUpdated?: () => void,
+    fieldLayout?: FieldLayoutItem[],
+    onLayoutSave?: (layout: FieldLayoutItem[]) => void | Promise<void>,
+    tableFields?: TableField[],
+    recordLayoutType?: RecordLayoutType,
+    drawerOptions?: OpenRecordOptions
+  ) => void
   /** Open panel in create mode (same UI as edit). */
   openRecordForCreate: (params: {
     tableId: string
@@ -65,6 +94,8 @@ interface RecordPanelContextType {
   setInterfaceMode: (interfaceMode: 'view' | 'edit') => void
   /** Live layout update: immediately reflects in RecordEditor without save. Right panel calls this when draft changes. */
   setFieldLayout: (layout: FieldLayoutItem[]) => void
+  /** Switch contextual drawer between overview and edit without reopening. */
+  setRecordDrawerMode: (mode: RecordDrawerMode) => void
 }
 
 const RecordPanelContext = createContext<RecordPanelContextType | undefined>(undefined)
@@ -85,6 +116,8 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
     isFullscreen: false,
     history: [],
     interfaceMode: 'view', // Default to view mode
+    recordDrawerMode: "edit",
+    eventContextual: null,
   })
 
   const openRecord = useCallback((
@@ -100,11 +133,14 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
     fieldLayout?: FieldLayoutItem[],
     onLayoutSave?: (layout: FieldLayoutItem[]) => void | Promise<void>,
     tableFields?: TableField[],
-    recordLayoutType?: RecordLayoutType
+    recordLayoutType?: RecordLayoutType,
+    drawerOptions?: OpenRecordOptions
   ) => {
     if (process.env.NODE_ENV === "development" && cascadeContext === undefined) {
       console.warn("[RecordPanel] Opened without cascadeContext; block-level permissions will not be enforced.")
     }
+    const layoutType = recordLayoutType ?? "generic"
+    const drawerMode = defaultRecordDrawerMode(layoutType, drawerOptions?.initialDrawerMode)
     setSelectedContext({ type: "record", recordId, tableId })
     setState((prev) => ({
       ...prev,
@@ -121,7 +157,10 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
       interfaceMode: interfaceMode ?? prev.interfaceMode ?? "view",
       onRecordDeleted,
       onRecordUpdated,
-      recordLayoutType: recordLayoutType ?? "generic",
+      recordLayoutType: layoutType,
+      recordDrawerMode: drawerMode,
+      eventContextual:
+        layoutType === "event" ? drawerOptions?.eventContextual ?? null : null,
       history:
         prev.isOpen && prev.tableId === tableId && prev.recordId === recordId
           ? prev.history
@@ -170,6 +209,9 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
       tableName,
       cascadeContext: undefined, // Clear when navigating; caller can pass again if needed
       interfaceMode: interfaceMode ?? prev.interfaceMode ?? 'view', // Preserve interfaceMode when navigating
+      recordLayoutType: "generic",
+      recordDrawerMode: "edit",
+      eventContextual: null,
       history: [...prev.history, { tableId, recordId, tableName }],
     }))
   }, [])
@@ -200,9 +242,22 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
       initialData: params.initialData,
       onRecordCreated: params.onRecordCreated,
       recordLayoutType: params.recordLayoutType ?? "generic",
+      recordDrawerMode: defaultRecordDrawerMode(
+        params.recordLayoutType ?? "generic",
+        "edit"
+      ),
+      eventContextual: null,
       history: [],
     }))
   }, [setSelectedContext])
+
+  const setRecordDrawerMode = useCallback((mode: RecordDrawerMode) => {
+    setState((prev) => {
+      if (!prev.isOpen) return prev
+      if (prev.recordDrawerMode === mode) return prev
+      return { ...prev, recordDrawerMode: mode }
+    })
+  }, [])
 
   const openRecordByTableId = useCallback(async (tableId: string, recordId: string, interfaceMode?: 'view' | 'edit') => {
     try {
@@ -265,6 +320,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
     goBack,
     setInterfaceMode,
     setFieldLayout,
+    setRecordDrawerMode,
   }), [
     state,
     openRecord,
@@ -278,6 +334,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
     goBack,
     setInterfaceMode,
     setFieldLayout,
+    setRecordDrawerMode,
   ])
 
   return (

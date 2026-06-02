@@ -417,7 +417,8 @@ describe("EventCalendarCore edit vs view click", () => {
     )
     expect(src).toContain("if (isEditing) return")
     expect(src).toContain("settings.clickAction")
-    expect(src).toContain("EventDetailDrawer")
+    expect(src).toContain("openRecordForEvent")
+    expect(src).not.toContain("EventDetailDrawer")
   })
 })
 

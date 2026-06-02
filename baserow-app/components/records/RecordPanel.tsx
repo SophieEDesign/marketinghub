@@ -25,6 +25,7 @@ export default function RecordPanel() {
     togglePin,
     toggleFullscreen,
     goBack,
+    setRecordDrawerMode,
   } = useRecordPanel()
   const { isEdit, state: uiModeState } = useUIMode()
   const { toast } = useToast()
@@ -275,7 +276,11 @@ export default function RecordPanel() {
                   state.fieldLayout,
                   state.onLayoutSave,
                   state.tableFields,
-                  state.recordLayoutType
+                  state.recordLayoutType,
+                  {
+                    initialDrawerMode: state.recordDrawerMode,
+                    eventContextual: state.eventContextual ?? null,
+                  }
                 )
               } else {
                 closeRecord()
@@ -289,6 +294,10 @@ export default function RecordPanel() {
             onRecordUpdate={() => state.onRecordUpdated?.()}
             interfaceMode={interfaceMode}
             recordLayoutType={state.recordLayoutType}
+            recordDrawerMode={state.recordDrawerMode}
+            eventContextual={state.eventContextual ?? null}
+            onRecordDrawerModeChange={setRecordDrawerMode}
+            onClose={closeRecord}
             renderHeaderActions={false}
             modalLayout={state.modalLayout}
             modalFields={state.modalFields}

@@ -7,10 +7,11 @@ function read(filePath: string) {
 }
 
 describe("custom block record layout routing", () => {
-  it("passes social_post layout type from Social calendar", () => {
+  it("passes social_post layout type from Social calendar via single openPost path", () => {
     const src = read("components/interface/SocialMediaCalendarCore.tsx")
     expect(src).toContain('recordLayoutType: "social_post"')
-    expect(src).toContain('"social_post"')
+    expect(src).toContain("openPost(")
+    expect(src).not.toMatch(/\bopenRecord\s*\(/)
   })
 
   it("passes event layout type from Event calendar", () => {

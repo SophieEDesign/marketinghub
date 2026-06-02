@@ -151,7 +151,7 @@ export function SocialMediaCalendarCore({
 }) {
   const blockConfig = config ?? undefined
   const { openRecordModal } = useRecordModal()
-  const { openRecord, state: recordPanelState } = useRecordPanel()
+  const { state: recordPanelState } = useRecordPanel()
   const {
     loading,
     error,
@@ -296,7 +296,11 @@ export function SocialMediaCalendarCore({
     !!tableIds?.contentTableId
 
   const openPost = useCallback(
-    (recordId: string | null, scheduleDate?: string) => {
+    (
+      recordId: string | null,
+      scheduleDate?: string,
+      initialDrawerMode: "view" | "edit" = "view"
+    ) => {
       if (!tableIds) return
       const common = {
         tableId: tableIds.contentTableId,
@@ -313,6 +317,7 @@ export function SocialMediaCalendarCore({
         openRecordModal({
           ...common,
           recordId: null,
+          initialDrawerMode: "edit",
           initialData: buildSocialCalendarCreateInitialData({
             config: blockConfig,
             contentScope,
@@ -326,6 +331,7 @@ export function SocialMediaCalendarCore({
         openRecordModal({
           ...common,
           recordId,
+          initialDrawerMode,
         })
       }
     },
@@ -340,6 +346,7 @@ export function SocialMediaCalendarCore({
       contentFields,
       openRecordModal,
       interfaceMode,
+      isEditing,
     ]
   )
 
@@ -351,26 +358,14 @@ export function SocialMediaCalendarCore({
     [canCreatePost, openPost]
   )
 
-  const handleSelectPost = (id: string) => {
-    setSelectedId(id)
-    if (settings.showMediaPreview && tableIds) {
-      openRecord(
-        tableIds.contentTableId,
-        id,
-        tableIds.contentSupabaseTable,
-        undefined,
-        undefined,
-        recordPanelCascade,
-        interfaceMode,
-        reload,
-        reload,
-        undefined,
-        undefined,
-        undefined,
-        "social_post"
-      )
-    }
-  }
+  const handleSelectPost = useCallback(
+    (id: string) => {
+      setSelectedId(id)
+      if (isEditing) return
+      openPost(id, undefined, "view")
+    },
+    [isEditing, openPost]
+  )
 
   useEffect(() => {
     if (!recordPanelState.isOpen) {
