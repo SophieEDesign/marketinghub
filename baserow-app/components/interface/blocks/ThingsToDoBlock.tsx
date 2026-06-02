@@ -230,7 +230,7 @@ export default function ThingsToDoBlock({
         subtitle={subtitle}
         stats={stats}
         showStats={showStats}
-        isEditing={isEditing}
+        showAddButton
       />
 
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">

@@ -17,7 +17,9 @@ interface CellContextMenuProps {
   editable?: boolean
   onCopy?: () => void
   onPaste?: () => void
+  onDuplicateRecord?: () => void
   onDelete?: () => void
+  canDuplicateRecord?: boolean
   canDelete?: boolean
   formatValue?: (value: any) => string
 }
@@ -29,7 +31,9 @@ export default function CellContextMenu({
   editable = true,
   onCopy,
   onPaste,
+  onDuplicateRecord,
   onDelete,
+  canDuplicateRecord = false,
   canDelete = false,
   formatValue,
 }: CellContextMenuProps) {
@@ -84,6 +88,12 @@ export default function CellContextMenu({
           <ContextMenuItem onClick={handlePaste}>
             <ClipboardPaste className="h-4 w-4 mr-2" />
             Paste
+          </ContextMenuItem>
+        )}
+        {canDuplicateRecord && onDuplicateRecord && (
+          <ContextMenuItem onClick={onDuplicateRecord}>
+            <Copy className="h-4 w-4 mr-2" />
+            Duplicate record
           </ContextMenuItem>
         )}
         {canDelete && onDelete && (

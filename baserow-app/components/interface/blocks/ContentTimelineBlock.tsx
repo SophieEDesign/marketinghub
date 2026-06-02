@@ -129,7 +129,7 @@ export default function ContentTimelineBlock({
     }
   }, [isMarketingHomePreset, demoState.useLiveData])
 
-  const showAddButton = isEditing || interfaceMode === "edit"
+  const showAddButton = demoState.useLiveData
 
   const filterOptions = useMemo(
     () => collectFilterOptions(allItems),
@@ -228,7 +228,7 @@ export default function ContentTimelineBlock({
         subtitle={subtitle}
         periodLabel={periodLabel}
         view={view}
-        showAddButton={showAddButton && demoState.useLiveData}
+        showAddButton={showAddButton}
         onViewChange={setView}
         onPrevPeriod={() => setAnchorDate((d) => shiftAnchorDate(view, d, -1))}
         onNextPeriod={() => setAnchorDate((d) => shiftAnchorDate(view, d, 1))}

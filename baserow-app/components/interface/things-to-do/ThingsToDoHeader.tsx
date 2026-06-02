@@ -11,7 +11,7 @@ interface ThingsToDoHeaderProps {
   subtitle: string
   stats: ThingsToDoStats
   showStats: boolean
-  isEditing?: boolean
+  showAddButton?: boolean
 }
 
 const STAT_CARDS: {
@@ -31,7 +31,7 @@ export function ThingsToDoHeader({
   subtitle,
   stats,
   showStats,
-  isEditing,
+  showAddButton = false,
 }: ThingsToDoHeaderProps) {
   const handleAdd = () => {
     // TODO: connect work items to a Marketing Hub tasks/actions table.
@@ -50,16 +50,12 @@ export function ThingsToDoHeader({
             <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>
           </div>
         </div>
-        <Button
-          type="button"
-          size="sm"
-          className="shrink-0"
-          onClick={handleAdd}
-          disabled={!isEditing}
-        >
-          <Plus className="mr-1.5 h-4 w-4" />
-          Add item
-        </Button>
+        {showAddButton ? (
+          <Button type="button" size="sm" className="shrink-0" onClick={handleAdd}>
+            <Plus className="mr-1.5 h-4 w-4" />
+            Add item
+          </Button>
+        ) : null}
       </div>
 
       {showStats ? (

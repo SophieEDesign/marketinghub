@@ -333,7 +333,7 @@ export default function AirtableGridView({
 
   // Use local sorts so column-header sort triggers refetch; menu sort updates viewSorts -> standardizedSorts -> syncs to sorts
   const sortsForData = useMemo(() => sorts.map(s => ({ field: s.field, direction: s.direction })), [sorts])
-  const { rows: allRows, loading, error, updateCell, refresh, retry, insertRow, deleteRow, physicalColumns } = useGridData({
+  const { rows: allRows, loading, error, updateCell, refresh, retry, insertRow, duplicateRow, deleteRow, physicalColumns } = useGridData({
     tableName,
     tableId: tableIdState || tableId,
     fields,
@@ -2107,6 +2107,18 @@ export default function AirtableGridView({
                             setRowToDelete(row.id)
                             setShowDeleteRowConfirm(true)
                           }}
+                          onDuplicateRecord={async () => {
+                            try {
+                              await duplicateRow(row.id)
+                            } catch (error: any) {
+                              handleError(
+                                error,
+                                "Failed to duplicate record",
+                                error?.message || "An error occurred while duplicating the record"
+                              )
+                            }
+                          }}
+                          canDuplicateRecord={editable}
                           canDelete={editable && userRole === 'admin'}
                           formatValue={(val) => formatCellValue(val, fields.find(f => f.name === field.name))}
                         >

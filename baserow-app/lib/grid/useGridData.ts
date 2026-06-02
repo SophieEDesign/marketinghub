@@ -39,6 +39,7 @@ export interface UseGridDataReturn {
   retry: () => Promise<void> // Retry loading data after an error
   updateCell: (rowId: string, fieldName: string, value: unknown) => Promise<void>
   insertRow: (data: Record<string, any>) => Promise<GridRow | null>
+  duplicateRow: (rowId: string) => Promise<GridRow | null>
   deleteRow: (rowId: string) => Promise<void>
   /** Physical columns that exist in the database (null if not yet loaded) */
   physicalColumns: Set<string> | null
@@ -912,6 +913,26 @@ export function useGridData({
     [tableName]
   )
 
+  const duplicateRow = useCallback(
+    async (rowId: string): Promise<GridRow | null> => {
+      const sourceRow = rows.find((row) => row.id === rowId)
+      if (!sourceRow) {
+        throw new Error('Record not found')
+      }
+
+      // Never carry over system-managed columns when duplicating a row.
+      const { id, created_at, updated_at, deleted_at, ...duplicatePayload } = sourceRow as GridRow & {
+        created_at?: unknown
+        updated_at?: unknown
+        deleted_at?: unknown
+      }
+      void id
+
+      return await insertRow(duplicatePayload as Record<string, any>)
+    },
+    [rows, insertRow]
+  )
+
   const deleteRow = useCallback(
     async (rowId: string) => {
       try {
@@ -960,6 +981,7 @@ export function useGridData({
     retry,
     updateCell,
     insertRow,
+    duplicateRow,
     deleteRow,
     physicalColumns: physicalColumnsRef.current,
   }
