@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Paperclip, Download } from 'lucide-react'
+import { Paperclip, Download, Plus } from 'lucide-react'
 import AttachmentPreview, { type Attachment } from '@/components/attachments/AttachmentPreview'
 
 // Using crypto.randomUUID() instead of uuid package for browser compatibility
@@ -200,12 +200,27 @@ export default function AttachmentCell({
           <div className="flex items-center gap-1.5 flex-1 min-w-0" data-attachment-preview>
             <AttachmentPreview
               attachments={attachments}
-              maxVisible={fieldOptions?.attachment_max_visible || 1}
+              maxVisible={fieldOptions?.attachment_max_visible || 3}
               size={fieldOptions?.attachment_preview_size || 'small'}
               compact={true}
               onPreviewClick={handlePreviewClick}
               className="flex-1"
             />
+            {editable && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  openFilePicker()
+                }}
+                className="inline-flex items-center gap-1 rounded border border-gray-200 px-1.5 py-0.5 text-xs text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                title="Add files"
+                aria-label="Add files"
+              >
+                <Plus className="h-3 w-3" />
+                Add
+              </button>
+            )}
             {uploading && <span className="text-xs text-gray-500 whitespace-nowrap">Uploading...</span>}
           </div>
         )}
