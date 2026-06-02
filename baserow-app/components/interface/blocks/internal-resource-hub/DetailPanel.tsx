@@ -189,7 +189,7 @@ export default function DetailPanel({
       <div className="shrink-0 space-y-2 border-t border-border/60 p-4">
         <Button type="button" className="w-full gap-2" onClick={onDownload}>
           <Download className="h-4 w-4" />
-          Download
+          {resource.fileType === "LINK" ? "Open link" : "Download"}
         </Button>
         <Button
           type="button"
@@ -198,7 +198,7 @@ export default function DetailPanel({
           onClick={onViewFull}
         >
           <ExternalLink className="h-4 w-4" />
-          View full size
+          {resource.fileType === "LINK" ? "Open in new tab" : "View full size"}
         </Button>
         <Button
           type="button"

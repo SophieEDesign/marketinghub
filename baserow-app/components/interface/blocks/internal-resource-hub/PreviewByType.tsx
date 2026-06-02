@@ -4,6 +4,7 @@ import {
   File,
   FileText,
   Image as ImageIcon,
+  Link as LinkIcon,
   Presentation,
   Video,
   Archive,
@@ -36,8 +37,18 @@ export default function PreviewByType({
   className,
   large = false,
 }: PreviewByTypeProps) {
-  const { fileType, title, thumbnailUrl } = resource
+  const { fileType, title, thumbnailUrl, url } = resource
   const isLogo = resource.category === "logos" || title.toLowerCase().includes("logo")
+  const provider =
+    typeof url === "string" && url.length > 0
+      ? (() => {
+          try {
+            return new URL(url).hostname.replace(/^www\./, "")
+          } catch {
+            return "external link"
+          }
+        })()
+      : null
 
   if (thumbnailUrl && isImageType(fileType)) {
     return (
@@ -143,6 +154,23 @@ export default function PreviewByType({
       >
         <Archive className={cn(large ? "h-16 w-16" : "h-10 w-10", "text-amber-600")} />
         <span className="text-sm text-amber-800/70">Archive</span>
+      </div>
+    )
+  }
+
+  if (fileType === "LINK") {
+    return (
+      <div
+        className={cn(
+          "flex h-full w-full flex-col items-center justify-center gap-3 bg-gradient-to-br from-sky-50/70 to-white p-4 text-center",
+          className
+        )}
+      >
+        <LinkIcon className={cn(large ? "h-16 w-16" : "h-10 w-10", "text-sky-600")} />
+        <span className="text-sm font-medium text-sky-800/90">External Resource</span>
+        {!large && provider && (
+          <span className="max-w-[90%] truncate text-xs text-sky-700/70">{provider}</span>
+        )}
       </div>
     )
   }

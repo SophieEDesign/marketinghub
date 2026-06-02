@@ -24,7 +24,7 @@ BEGIN
   </div>
   <div class="overflow-hidden rounded-lg border border-[#E5E7EB] bg-[#F9FAFB]">
     <iframe
-      src="https://drive.google.com/embeddedfolderview?id=REPLACE_WITH_PUBLIC_FOLDER_ID#grid"
+      src="https://drive.google.com/embeddedfolderview?id=1-pHl-DXNlOPC4LuWneYmHB-fzHscofyS#grid"
       title="Google Drive Resource Gallery"
       width="100%"
       height="420"
@@ -36,7 +36,7 @@ BEGIN
   <p class="mt-3 text-xs text-[#6B7280]">
     If the gallery does not load, open it directly:
     <a
-      href="https://drive.google.com/drive/folders/REPLACE_WITH_PUBLIC_FOLDER_ID?usp=sharing"
+      href="https://drive.google.com/drive/folders/1-pHl-DXNlOPC4LuWneYmHB-fzHscofyS?usp=sharing"
       target="_blank"
       rel="noopener noreferrer"
       class="font-medium text-[#2563EB] underline"

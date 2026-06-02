@@ -30,6 +30,7 @@ export type ResourceFileType =
   | "MP4"
   | "SVG"
   | "ZIP"
+  | "LINK"
 
 export interface MockResource {
   id: string
@@ -87,6 +88,8 @@ export function getFileTypeBadgeClasses(fileType: ResourceFileType): string {
       return "bg-violet-100 text-violet-700"
     case "ZIP":
       return "bg-amber-100 text-amber-700"
+    case "LINK":
+      return "bg-sky-100 text-sky-700"
     default:
       return "bg-muted text-muted-foreground"
   }

@@ -26,8 +26,9 @@ export default function ResourceCard({
       onClick={() => onSelect(resource.id)}
       className="group flex flex-col overflow-hidden rounded-2xl border border-border/60 bg-card text-left shadow-card transition-shadow duration-200 hover:shadow-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
     >
-      <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted/20">
+      <div className="relative aspect-[5/4] w-full overflow-hidden bg-muted/20">
         <PreviewByType resource={resource} className="h-full w-full" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/45 to-transparent" />
         <span
           className={cn(
             "absolute left-2 top-2 rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase",
@@ -39,11 +40,11 @@ export default function ResourceCard({
         {isFavourite && (
           <Star className="absolute right-2 top-2 h-4 w-4 fill-amber-400 text-amber-400" />
         )}
-      </div>
-      <div className="space-y-0.5 p-3">
-        <p className="truncate text-sm font-semibold text-[#1e3a5f] group-hover:text-blue-700">
+        <p className="absolute inset-x-3 bottom-2 truncate text-sm font-semibold text-white">
           {resource.title}
         </p>
+      </div>
+      <div className="space-y-0.5 px-3 pb-3 pt-2">
         <p className="truncate text-xs text-muted-foreground">
           {resource.description ?? categoryLabel(resource.category)}
         </p>

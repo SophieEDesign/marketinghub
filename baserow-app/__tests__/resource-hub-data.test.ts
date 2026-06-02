@@ -12,6 +12,7 @@ const FIELDS: MediaFieldMap = {
   hubCategory: "hub_category",
   status: "status",
   documentLink: "document_link",
+  attachments: "attachments",
   assignee: null,
   updatedAt: null,
 }
@@ -75,5 +76,70 @@ describe("buildResourceHubItems", () => {
     expect(items).toHaveLength(2)
     expect(items[0].category).toBe("presentations")
     expect(items[1].category).toBe("logos")
+  })
+
+  it("maps extensionless presentation links to presentation type", () => {
+    const items = buildResourceHubItems(
+      [
+        {
+          id: "3",
+          name: "Quarterly deck",
+          hub_category: null,
+          status: null,
+          document_link: "https://present.petersandmay.com/general",
+        },
+      ],
+      FIELDS,
+      "media-table"
+    )
+
+    expect(items).toHaveLength(1)
+    expect(items[0].fileType).toBe("PPTX")
+    expect(items[0].category).toBe("presentations")
+  })
+
+  it("maps extensionless non-presentation links to generic link type", () => {
+    const items = buildResourceHubItems(
+      [
+        {
+          id: "4",
+          name: "Partner portal",
+          hub_category: null,
+          status: null,
+          document_link: "https://example.com/resource-center",
+        },
+      ],
+      FIELDS,
+      "media-table"
+    )
+
+    expect(items).toHaveLength(1)
+    expect(items[0].fileType).toBe("LINK")
+    expect(items[0].category).toBe("documents")
+  })
+
+  it("uses attachment URL for preview and file type when no document link exists", () => {
+    const items = buildResourceHubItems(
+      [
+        {
+          id: "5",
+          name: "Brand hero image",
+          hub_category: "Images",
+          document_link: null,
+          attachments: [
+            {
+              url: "https://cdn.example.com/assets/hero.jpg",
+            },
+          ],
+        },
+      ],
+      FIELDS,
+      "media-table"
+    )
+
+    expect(items).toHaveLength(1)
+    expect(items[0].thumbnailUrl).toBe("https://cdn.example.com/assets/hero.jpg")
+    expect(items[0].url).toBe("https://cdn.example.com/assets/hero.jpg")
+    expect(items[0].fileType).toBe("JPG")
   })
 })

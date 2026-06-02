@@ -25,7 +25,7 @@ const nextConfig = {
               "img-src 'self' data: blob: https:",
               "font-src 'self' data:",
               "connect-src 'self' https: wss:",
-              "frame-src 'self' https://vercel.live",
+              "frame-src 'self' https://vercel.live https://drive.google.com https://docs.google.com",
               "frame-ancestors 'self'",
             ].join('; '),
           },

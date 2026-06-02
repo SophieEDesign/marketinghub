@@ -22,6 +22,7 @@ export interface MediaFieldMap {
   hubCategory: string | null
   status: string | null
   documentLink: string | null
+  attachments: string | null
   assignee: string | null
   updatedAt: string | null
 }
@@ -79,6 +80,7 @@ function categoryFromLegacyStatusAndFileType(
   if (/template/i.test(s)) return "templates"
   if (/video/i.test(s)) return "videos"
   if (fileType === "PPTX") return "presentations"
+  if (fileType === "LINK" && /presentation|deck|slides?/i.test(s)) return "presentations"
   if (fileType === "PNG" || fileType === "JPG" || fileType === "SVG") return "images"
   return "documents"
 }
@@ -111,6 +113,7 @@ export function resolveMediaFields(
     hubCategory: pick([/^hub_category$/i, /resource.?hub.?category/i], "hub_category"),
     status: pick([/^status$/i], null),
     documentLink: pick([/document_link/i, /file_url/i, /link/i, /url/i], "document_link"),
+    attachments: pick([/^attachments?$/i, /^images?$/i, /media/i, /attachment/i], "attachments"),
     assignee: pick([/assignee/i, /owned_by/i, /owner/i, /uploaded_by/i], null),
     updatedAt: pick([/^updated_at$/i], "updated_at"),
   }
@@ -120,8 +123,10 @@ export function resolveMediaFields(
 }
 
 function fileTypeFromUrl(url: string | null): ResourceFileType {
-  if (!url) return "PDF"
-  const ext = url.split("?")[0].split(".").pop()?.toLowerCase() ?? ""
+  if (!url) return "LINK"
+  const normalized = url.trim()
+  if (!normalized) return "LINK"
+  const ext = normalized.split("?")[0].split(".").pop()?.toLowerCase() ?? ""
   switch (ext) {
     case "png":
       return "PNG"
@@ -145,8 +150,80 @@ function fileTypeFromUrl(url: string | null): ResourceFileType {
     case "zip":
       return "ZIP"
     default:
-      return "PDF"
+      break
   }
+
+  // URL heuristics for link-based resources without file extensions.
+  try {
+    const parsed = new URL(normalized)
+    const host = parsed.hostname.toLowerCase()
+    const path = parsed.pathname.toLowerCase()
+    const query = parsed.search.toLowerCase()
+    const full = `${host}${path}${query}`
+
+    if (
+      host.includes("docs.google.com") && path.includes("/presentation/") ||
+      host.includes("slides.com") ||
+      host.startsWith("present.") ||
+      full.includes("presentation") ||
+      full.includes("powerpoint") ||
+      full.includes("deck")
+    ) {
+      return "PPTX"
+    }
+  } catch {
+    // Keep generic link type on URL parse failures.
+  }
+
+  return "LINK"
+}
+
+function pushUrlLike(target: string[], value: unknown) {
+  if (typeof value !== "string" || !value.trim()) return
+  const trimmed = value.trim()
+  if (trimmed.startsWith("http") || trimmed.startsWith("/") || trimmed.startsWith("data:")) {
+    target.push(trimmed)
+  }
+}
+
+function parseAttachmentUrls(input: unknown): string[] {
+  const urls: string[] = []
+  if (input == null || input === "") return urls
+
+  if (typeof input === "string") {
+    const s = input.trim()
+    if (s.startsWith("[") || s.startsWith("{")) {
+      try {
+        return parseAttachmentUrls(JSON.parse(s))
+      } catch {
+        pushUrlLike(urls, s)
+        return urls
+      }
+    }
+    pushUrlLike(urls, s)
+    return urls
+  }
+
+  if (Array.isArray(input)) {
+    for (const item of input) {
+      if (typeof item === "string") {
+        pushUrlLike(urls, item)
+        continue
+      }
+      if (item && typeof item === "object") {
+        const obj = item as Record<string, unknown>
+        pushUrlLike(urls, obj.url ?? obj.src ?? obj.href ?? obj.thumbnail ?? obj.file_url)
+      }
+    }
+    return urls
+  }
+
+  if (typeof input === "object") {
+    const obj = input as Record<string, unknown>
+    pushUrlLike(urls, obj.url ?? obj.src ?? obj.href ?? obj.thumbnail ?? obj.file_url)
+  }
+
+  return urls
 }
 
 export function buildResourceHubItems(
@@ -158,7 +235,10 @@ export function buildResourceHubItems(
   for (const row of rows) {
     const title = formatDisplayValue(row[fields.name])
     if (!title?.trim()) continue
-    const url = fields.documentLink ? formatDisplayValue(row[fields.documentLink]) : null
+    const linkUrl = fields.documentLink ? formatDisplayValue(row[fields.documentLink]) : null
+    const attachmentUrls = fields.attachments ? parseAttachmentUrls(row[fields.attachments]) : []
+    const thumbnailUrl = attachmentUrls[0] ?? undefined
+    const url = linkUrl || attachmentUrls[0] || null
     const fileType = fileTypeFromUrl(url)
     const hubCategoryRaw = fields.hubCategory
       ? formatDisplayValue(row[fields.hubCategory])
@@ -182,6 +262,7 @@ export function buildResourceHubItems(
       category,
       fileType,
       url: url ?? undefined,
+      thumbnailUrl,
       description: fields.notes ? formatDisplayValue(row[fields.notes]) ?? undefined : undefined,
       updatedAt,
       owner: fields.assignee ? formatDisplayValue(row[fields.assignee]) ?? undefined : undefined,
