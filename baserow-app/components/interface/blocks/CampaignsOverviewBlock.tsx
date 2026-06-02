@@ -27,6 +27,7 @@ import {
 interface CampaignsOverviewBlockProps {
   block: PageBlock
   isEditing?: boolean
+  interfaceMode?: "view" | "edit"
   isFullPage?: boolean
 }
 
@@ -50,6 +51,7 @@ function ProgressPill({ value }: { value: number | null | undefined }) {
 export default function CampaignsOverviewBlock({
   block,
   isEditing = false,
+  interfaceMode = "view",
   isFullPage = false,
 }: CampaignsOverviewBlockProps) {
   const { config } = block
@@ -250,6 +252,7 @@ export default function CampaignsOverviewBlock({
                     tableId: item.recordTableId,
                     recordId: item.id,
                     supabaseTableName: item.recordSupabaseTable,
+                    interfaceMode,
                   })
                 }}
               >

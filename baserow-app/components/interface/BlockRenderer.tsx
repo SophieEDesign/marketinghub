@@ -663,7 +663,13 @@ export default function BlockRenderer({
         return <ContentThemeBlock block={safeBlock} isEditing={canEdit} />
 
       case "upcoming_summary":
-        return <UpcomingSummaryBlock block={safeBlock} isEditing={canEdit} />
+        return (
+          <UpcomingSummaryBlock
+            block={safeBlock}
+            isEditing={canEdit}
+            interfaceMode={interfaceMode}
+          />
+        )
 
       case "things_to_do":
         return (
@@ -721,6 +727,7 @@ export default function BlockRenderer({
             <CampaignsOverviewBlock
               block={safeBlock}
               isEditing={canEdit}
+              interfaceMode={interfaceMode}
               isFullPage={isFullPage}
             />
           </LazyBlockWrapper>
@@ -732,6 +739,7 @@ export default function BlockRenderer({
             <InternalResourceHubBlock
               block={safeBlock}
               isEditing={canEdit}
+              interfaceMode={interfaceMode}
               onUpdate={onUpdate ? (u) => handleUpdate(u) : undefined}
               isFullPage={isFullPage}
             />

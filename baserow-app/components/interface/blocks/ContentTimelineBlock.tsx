@@ -165,6 +165,7 @@ export default function ContentTimelineBlock({
       tableId: item.recordTableId,
       recordId,
       supabaseTableName: item.recordSupabaseTable,
+      interfaceMode,
       onRecordUpdated: () => reload(),
     })
   }
@@ -185,6 +186,7 @@ export default function ContentTimelineBlock({
       tableId: first.recordTableId,
       recordId: null,
       supabaseTableName: first.recordSupabaseTable,
+      interfaceMode,
       onRecordUpdated: () => reload(),
     })
   }

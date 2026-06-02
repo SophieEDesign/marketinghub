@@ -1,0 +1,25 @@
+---
+description: Ensure new blocks preserve record edit mode
+alwaysApply: true
+---
+
+# Record Open Edit Mode Propagation
+
+For any block/component that opens records (via `openRecordModal` or `openRecord`), preserve interface edit mode end-to-end.
+
+## Required
+
+- Accept `interfaceMode?: "view" | "edit"` in new block wrappers and core components.
+- Forward `interfaceMode` through wrapper -> core -> record-open handler props.
+- Pass `interfaceMode` into `openRecordModal({ interfaceMode })` and `openRecord(..., interfaceMode, ...)`.
+- Default to `"view"` only as a fallback when `interfaceMode` is truly unavailable; never hardcode `"view"` at call sites when the current mode exists.
+
+## Forbidden
+
+- Ignoring/destructuring away `interfaceMode` (e.g. `interfaceMode: _interfaceMode`).
+- Hardcoded `interfaceMode: "view"` in record-open calls for blocks that can run in edit mode.
+
+## Quick check before merge
+
+- In page edit mode, opening a record from the block opens an editable record surface.
+- In view mode, behavior remains unchanged.

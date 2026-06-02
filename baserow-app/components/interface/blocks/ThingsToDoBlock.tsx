@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useMemo, useState } from "react"
-import { Filter } from "lucide-react"
+import { ChevronLeft, ChevronRight, Filter } from "lucide-react"
 import type { PageBlock } from "@/lib/interface/types"
 import {
   collectFilterOptions,
@@ -35,7 +35,6 @@ import { ThingsToDoFilterSidebar } from "@/components/interface/things-to-do/Thi
 import { ThingsToDoGroupedList } from "@/components/interface/things-to-do/ThingsToDoGroupedList"
 import { ThingsToDoHeader } from "@/components/interface/things-to-do/ThingsToDoHeader"
 import { ThingsToDoListToolbar } from "@/components/interface/things-to-do/ThingsToDoListToolbar"
-import { ThingsToDoPlaceholderView } from "@/components/interface/things-to-do/ThingsToDoPlaceholderView"
 import { ThingsToDoViewTabs } from "@/components/interface/things-to-do/ThingsToDoViewTabs"
 import MarketingDemoDataBanner from "@/components/interface/primitives/MarketingDemoDataBanner"
 import { marketingBlockRootClass } from "@/lib/interface/marketing-block-layout"
@@ -50,6 +49,7 @@ interface ThingsToDoBlockProps {
 export default function ThingsToDoBlock({
   block,
   isEditing = false,
+  interfaceMode = "view",
   isFullPage = false,
 }: ThingsToDoBlockProps) {
   const { config } = block
@@ -87,13 +87,14 @@ export default function ThingsToDoBlock({
     : ""
   const showSearch = config?.things_to_do_show_search !== false
 
-  const [view, setView] = useState<ThingsToDoView>(defaultView)
+  const [view, setView] = useState<ThingsToDoView>(defaultView === "list" ? "list" : "list")
   const [filters, setFilters] = useState<ThingsToDoFilters>(EMPTY_THINGS_TO_DO_FILTERS)
   const [searchQuery, setSearchQuery] = useState("")
   const [sortBy, setSortBy] = useState<ThingsToDoSort>("due-date")
   const [statusChip, setStatusChip] = useState("all")
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [desktopFiltersCollapsed, setDesktopFiltersCollapsed] = useState(false)
   const [checkedIds, setCheckedIds] = useState<Set<string>>(() => new Set())
   const [checklistOverrides, setChecklistOverrides] = useState<
     Record<string, ThingsToDoChecklistItem[]>
@@ -176,14 +177,16 @@ export default function ThingsToDoBlock({
         tableId: item.recordTableId,
         recordId: item.id,
         supabaseTableName: item.recordSupabaseTable,
+        interfaceMode,
         onRecordUpdated: () => reload(),
       })
     },
-    [selectedItem, openRecordModal, reload]
+    [selectedItem, openRecordModal, interfaceMode, reload]
   )
 
   const handleSelectItem = useCallback(
     (itemId: string) => {
+      if (isEditing) return
       const item = sourceItems.find((candidate) => candidate.id === itemId)
       if (item?.recordTableId && item.recordSupabaseTable) {
         handleOpenRecord(item)
@@ -191,13 +194,14 @@ export default function ThingsToDoBlock({
       }
       setSelectedId(itemId)
     },
-    [sourceItems, handleOpenRecord]
+    [sourceItems, handleOpenRecord, isEditing]
   )
 
   const showDetail = enableDetailPanel && selectedItem != null && !isEditing
   const showRecordSidePanel =
     showDetail && Boolean(selectedItem?.recordTableId && selectedItem.recordSupabaseTable)
   const showSummaryDetailPanel = showDetail && !showRecordSidePanel
+  const showDetailPlaceholder = enableDetailPanel && !selectedItem && !isEditing
 
   if (demoState.showEmptyState && !demoState.useDemoData) {
     return (
@@ -266,12 +270,38 @@ export default function ThingsToDoBlock({
               showQuickLinks={showQuickLinks}
               onFiltersChange={handleFiltersChange}
               onClear={handleClearFilters}
-              className={cn(!filtersOpen && "hidden lg:flex")}
+              className={cn(
+                !filtersOpen && "hidden lg:flex",
+                desktopFiltersCollapsed && "lg:hidden"
+              )}
             />
           </>
         ) : null}
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {showFilters ? (
+            <div className="hidden border-b border-border/40 px-4 py-2 lg:flex">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => setDesktopFiltersCollapsed((v) => !v)}
+              >
+                {desktopFiltersCollapsed ? (
+                  <>
+                    <ChevronRight className="h-3.5 w-3.5" />
+                    Show filters
+                  </>
+                ) : (
+                  <>
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                    Hide filters
+                  </>
+                )}
+              </Button>
+            </div>
+          ) : null}
           <ThingsToDoViewTabs view={view} onViewChange={setView} />
 
           {view === "list" ? (
@@ -288,7 +318,7 @@ export default function ThingsToDoBlock({
               />
 
               <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-                <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-2 md:p-3">
                   {filtered.length === 0 ? (
                     <DashboardEmpty
                       title="Nothing to do"
@@ -296,20 +326,23 @@ export default function ThingsToDoBlock({
                       variant="default"
                     />
                   ) : (
-                    <ThingsToDoGroupedList
-                      sections={sections}
-                      selectedId={selectedId}
-                      compact={compact}
-                      checkedIds={checkedIds}
-                      onSelect={handleSelectItem}
-                      onCheckedChange={handleCheckedChange}
-                      onOpenRecord={(item) => {
-                        if (!enableDetailPanel) {
-                          setSelectedId(item.id)
-                        }
-                        handleOpenRecord(item)
-                      }}
-                    />
+                    <div className="mx-auto flex h-full w-full max-w-4xl min-w-0">
+                      <ThingsToDoGroupedList
+                        sections={sections}
+                        selectedId={selectedId}
+                        compact={compact}
+                        checkedIds={checkedIds}
+                        onSelect={handleSelectItem}
+                        onCheckedChange={handleCheckedChange}
+                        onOpenRecord={(item) => {
+                          if (isEditing) return
+                          if (!enableDetailPanel) {
+                            setSelectedId(item.id)
+                          }
+                          handleOpenRecord(item)
+                        }}
+                      />
+                    </div>
                   )}
                 </div>
 
@@ -335,11 +368,18 @@ export default function ThingsToDoBlock({
                     }
                   />
                 ) : null}
+
+                {showDetailPlaceholder ? (
+                  <aside className="flex w-full shrink-0 flex-col justify-center border-t border-border/40 bg-muted/10 p-6 text-center md:w-[340px] md:border-l md:border-t-0">
+                    <p className="text-sm font-semibold text-foreground">Select a task to view details</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Pick an item from the queue to see owner, status, due date, checklist, and actions.
+                    </p>
+                  </aside>
+                ) : null}
               </div>
             </>
-          ) : (
-            <ThingsToDoPlaceholderView view={view} />
-          )}
+          ) : null}
         </div>
       </div>
     </div>

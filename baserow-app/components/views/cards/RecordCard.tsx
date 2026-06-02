@@ -1,6 +1,7 @@
 "use client"
 
 import { ChevronRight, Image as ImageIcon } from "lucide-react"
+import Image from "next/image"
 import AccentCard from "@/components/interface/primitives/AccentCard"
 import type { TableField } from "@/types/fields"
 import { formatDateUK } from "@/lib/utils"
@@ -124,7 +125,14 @@ export default function RecordCard({
           {showImageArea && (
             <div className="mb-2 h-10 w-10 overflow-hidden rounded-inner border border-border/40 bg-muted/40">
               {imageUrl ? (
-                <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+                <Image
+                  src={imageUrl}
+                  alt=""
+                  width={40}
+                  height={40}
+                  unoptimized
+                  className="h-full w-full object-cover"
+                />
               ) : (
                 <span className="flex h-full w-full items-center justify-center">
                   <ImageIcon className="h-4 w-4 text-muted-foreground" />

@@ -57,6 +57,7 @@ import { marketingDemoState } from "@/lib/marketing/block-config-resolver"
 interface UpcomingSummaryBlockProps {
   block: PageBlock
   isEditing?: boolean
+  interfaceMode?: "view" | "edit"
 }
 
 const STATUS_DOT: Record<string, string> = {
@@ -166,6 +167,7 @@ function OwnerAvatar({ initials }: { initials: string }) {
 export default function UpcomingSummaryBlock({
   block,
   isEditing = false,
+  interfaceMode = "view",
 }: UpcomingSummaryBlockProps) {
   const { config } = block
   const { openRecordModal } = useRecordModal()
@@ -270,10 +272,11 @@ export default function UpcomingSummaryBlock({
         tableId: item.recordTableId,
         recordId: item.id,
         supabaseTableName: item.recordSupabaseTable,
+        interfaceMode,
         onRecordUpdated: () => reload(),
       })
     },
-    [linksEnabled, isEditing, openRecordModal, reload]
+    [linksEnabled, isEditing, openRecordModal, interfaceMode, reload]
   )
 
   const handleViewAll = useCallback((_section: UpcomingSummarySectionId) => {

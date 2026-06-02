@@ -12,6 +12,9 @@ import {
   X,
 } from "lucide-react"
 import {
+  getTypeLabel,
+  getPriorityLabel,
+  getStatusLabel,
   formatDueDateLong,
   assignRowGroup,
   type ThingsToDoChecklistItem,
@@ -120,6 +123,9 @@ export function ThingsToDoDetailPanel({
         <MetaRow label="Reviewer">
           {item.reviewer ? item.reviewer.name : "—"}
         </MetaRow>
+        <MetaRow label="Type">{getTypeLabel(item.type)}</MetaRow>
+        <MetaRow label="Status">{getStatusLabel(item.status)}</MetaRow>
+        <MetaRow label="Priority">{getPriorityLabel(item.priority)}</MetaRow>
         <MetaRow label="Due date">
           <span className={cn(isOverdue && "font-medium text-red-600")}>
             {formatDueDateLong(item.dueDate)}
@@ -129,10 +135,6 @@ export function ThingsToDoDetailPanel({
         <MetaRow label="Campaign">{item.campaign?.title ?? "—"}</MetaRow>
         <MetaRow label="Theme">{item.theme?.title ?? "—"}</MetaRow>
         <MetaRow label="Channel">{item.channel ?? "—"}</MetaRow>
-        <MetaRow label="Status">
-          <ThingsToDoStatusBadge status={item.status} />
-        </MetaRow>
-
         {item.description ? (
           <div className="mt-4">
             <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -228,9 +230,11 @@ export function ThingsToDoDetailPanel({
         <Button type="button" variant="secondary" size="sm" onClick={handleMarkDone}>
           Mark done
         </Button>
-        <Button type="button" variant="ghost" size="sm" onClick={handleRequestChanges}>
-          Request changes
-        </Button>
+        {item.type === "approval" || item.type === "review" ? (
+          <Button type="button" variant="ghost" size="sm" onClick={handleRequestChanges}>
+            Request review
+          </Button>
+        ) : null}
         <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={handleCopyLink}>
           <Copy className="h-3.5 w-3.5" />
         </Button>

@@ -47,6 +47,7 @@ import { cn } from "@/lib/utils"
 interface InternalResourceHubBlockProps {
   block: PageBlock
   isEditing?: boolean
+  interfaceMode?: "view" | "edit"
   onUpdate?: (updates: Partial<PageBlock["config"]>) => void
   isFullPage?: boolean
 }
@@ -58,6 +59,7 @@ function mockAction(label: string) {
 export default function InternalResourceHubBlock({
   block,
   isEditing = false,
+  interfaceMode = "view",
   isFullPage = false,
 }: InternalResourceHubBlockProps) {
   const { config } = block
@@ -175,10 +177,11 @@ export default function InternalResourceHubBlock({
       tableId: tableIds.mediaTableId,
       recordId: null,
       supabaseTableName: tableIds.mediaSupabaseTable,
+      interfaceMode,
       onSave: () => reload(),
       onRecordUpdated: () => reload(),
     })
-  }, [canCreateResource, tableIds, openRecordModal, reload])
+  }, [canCreateResource, tableIds, openRecordModal, interfaceMode, reload])
 
   if (demoState.showEmptyState && !demoState.useDemoData) {
     return (

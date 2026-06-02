@@ -20,7 +20,7 @@ interface EventCalendarBlockProps {
 export default function EventCalendarBlock({
   block,
   isEditing = false,
-  interfaceMode: _interfaceMode = "view",
+  interfaceMode = "view",
   pageEditable,
   isFullPage = false,
 }: EventCalendarBlockProps) {
@@ -40,6 +40,7 @@ export default function EventCalendarBlock({
         config={block.config}
         canEdit={canEdit}
         isEditing={isEditing}
+        interfaceMode={interfaceMode}
         embeddedInBlock={embeddedInBlock}
         className="flex-1 min-h-0"
       />

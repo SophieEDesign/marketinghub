@@ -80,9 +80,14 @@ export function EventCalendarCore({
   config,
   canEdit = false,
   isEditing = false,
+  interfaceMode = "view",
   embeddedInBlock = true,
   className,
-}: EventCalendarCoreProps & { isEditing?: boolean; embeddedInBlock?: boolean }) {
+}: EventCalendarCoreProps & {
+  isEditing?: boolean
+  interfaceMode?: "view" | "edit"
+  embeddedInBlock?: boolean
+}) {
   const { openRecordModal } = useRecordModal()
   const { toast } = useToast()
   const {
@@ -207,11 +212,11 @@ export function EventCalendarCore({
         tableId: tableIds.contentTableId,
         recordId: id,
         supabaseTableName: tableIds.contentSupabaseTable,
-        interfaceMode: options?.interfaceMode ?? "view",
+        interfaceMode: options?.interfaceMode ?? interfaceMode,
         onRecordUpdated: () => reload(),
       })
     },
-    [tableIds, openRecordModal, reload]
+    [tableIds, openRecordModal, interfaceMode, reload]
   )
 
   const handleEventClick = useCallback(
@@ -257,6 +262,7 @@ export function EventCalendarCore({
       tableId: tableIds.contentTableId,
       recordId: null,
       supabaseTableName: tableIds.contentSupabaseTable,
+      interfaceMode,
       initialData,
       onRecordUpdated: () => reload(),
     })
@@ -268,6 +274,7 @@ export function EventCalendarCore({
     settings.allowMemberSubmissions,
     workflow.contentTypeDefault,
     openRecordModal,
+    interfaceMode,
     reload,
     toast,
   ])
@@ -676,12 +683,14 @@ export function EventCalendarFromConfig({
   config,
   canEdit,
   isEditing = false,
+  interfaceMode = "view",
   embeddedInBlock = true,
   className,
 }: {
   config?: BlockConfig
   canEdit?: boolean
   isEditing?: boolean
+  interfaceMode?: "view" | "edit"
   embeddedInBlock?: boolean
   className?: string
 }) {
@@ -695,6 +704,7 @@ export function EventCalendarFromConfig({
       config={config}
       canEdit={canEdit}
       isEditing={isEditing}
+      interfaceMode={interfaceMode}
       embeddedInBlock={embeddedInBlock}
       className={className}
     />

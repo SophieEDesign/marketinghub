@@ -1,6 +1,7 @@
 "use client"
 
 import { ExternalLink, ImageIcon, X } from "lucide-react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import PanelShell from "@/components/interface/primitives/PanelShell"
 import { PlatformIconRow } from "@/components/interface/social/PlatformIcon"
@@ -74,11 +75,12 @@ export function SocialPostQuickView({
         {showMediaPreview ? (
           <div className="relative aspect-[4/3] w-full rounded-lg overflow-hidden bg-muted/40 flex items-center justify-center">
             {item.thumbnailUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <Image
                 src={item.thumbnailUrl}
                 alt=""
-                className="absolute inset-0 h-full w-full object-cover"
+                fill
+                unoptimized
+                className="absolute inset-0 object-cover"
               />
             ) : (
               <div className="flex flex-col items-center gap-1 text-muted-foreground/60">
@@ -148,10 +150,9 @@ export function SocialPostQuickView({
               {item.mediaUrls.slice(0, 6).map((url, i) => (
                 <div
                   key={url + i}
-                  className="h-12 w-12 rounded overflow-hidden bg-muted/40 shrink-0"
+                  className="relative h-12 w-12 rounded overflow-hidden bg-muted/40 shrink-0"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt="" className="h-full w-full object-cover" />
+                  <Image src={url} alt="" fill unoptimized className="object-cover" />
                 </div>
               ))}
             </div>

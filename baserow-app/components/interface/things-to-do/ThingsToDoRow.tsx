@@ -49,7 +49,7 @@ export function ThingsToDoRow({
   const linkedLabel = item.campaign?.title ?? item.linkedItems?.[0]?.title
 
   return (
-    <div
+    <article
       role="button"
       tabIndex={0}
       aria-label={`View task: ${item.title}`}
@@ -61,98 +61,106 @@ export function ThingsToDoRow({
         }
       }}
       className={cn(
-        "flex cursor-pointer items-center gap-3 px-3 transition-colors",
+        "cursor-pointer rounded-xl border border-border/50 bg-background p-3 transition-colors",
         row,
-        compact ? "py-2" : "py-3",
-        selected && "ring-1 ring-inset ring-primary/30"
+        compact && "p-2.5",
+        selected && "border-primary/40 ring-1 ring-inset ring-primary/30"
       )}
     >
-      <div
-        className="shrink-0"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
-        <Checkbox
-          checked={checked}
-          onCheckedChange={(v) => onCheckedChange?.(v === true)}
-          aria-label={`Mark ${item.title} complete`}
-        />
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-          <span className="text-sm font-medium text-foreground">{item.title}</span>
-          {item.contentType ? (
-            <span className="text-xs text-muted-foreground">{item.contentType}</span>
-          ) : null}
-        </div>
-        {linkedLabel ? (
-          <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-            <Megaphone className="h-3 w-3 shrink-0 opacity-60" />
-            <span className="truncate">{linkedLabel}</span>
-          </div>
-        ) : null}
-      </div>
-
-      <div className="hidden shrink-0 items-center gap-1.5 sm:flex">
-        <ThingsToDoTypeBadge type={item.type} />
-        <ThingsToDoPriorityBadge priority={item.priority} />
-      </div>
-
-      {item.owner ? (
+      <div className="flex items-start gap-3">
         <div
-          className="hidden h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground md:flex"
-          title={item.owner.name}
+          className="mt-0.5 shrink-0"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
         >
-          {item.owner.initials}
+          <Checkbox
+            checked={checked}
+            onCheckedChange={(v) => onCheckedChange?.(v === true)}
+            aria-label={`Mark ${item.title} complete`}
+          />
         </div>
-      ) : null}
 
-      <span
-        className={cn(
-          "hidden shrink-0 text-xs font-medium tabular-nums lg:block",
-          isOverdue && "text-red-600",
-          isToday && "text-amber-600",
-          !isOverdue && !isToday && "text-muted-foreground"
-        )}
-      >
-        {dueLabel}
-      </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-foreground">{item.title}</p>
+              {item.description ? (
+                <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{item.description}</p>
+              ) : null}
+            </div>
 
-      <div className="hidden shrink-0 sm:block">
-        <ThingsToDoStatusBadge status={item.status} />
+            <div className="flex shrink-0 items-center gap-2">
+              <span
+                className={cn(
+                  "text-xs font-medium tabular-nums",
+                  isOverdue && "text-red-600",
+                  isToday && "text-amber-600",
+                  !isOverdue && !isToday && "text-muted-foreground"
+                )}
+              >
+                {dueLabel}
+              </span>
+              <ThingsToDoStatusBadge status={item.status} />
+            </div>
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            {item.contentType ? <span>{item.contentType}</span> : null}
+            {linkedLabel ? (
+              <span className="inline-flex min-w-0 items-center gap-1">
+                <Megaphone className="h-3 w-3 shrink-0 opacity-60" />
+                <span className="max-w-[180px] truncate">{linkedLabel}</span>
+              </span>
+            ) : null}
+            {item.owner ? (
+              <span className="inline-flex items-center gap-1">
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground">
+                  {item.owner.initials}
+                </span>
+                <span className="hidden sm:inline">{item.owner.name}</span>
+              </span>
+            ) : null}
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <ThingsToDoTypeBadge type={item.type} />
+              <ThingsToDoPriorityBadge priority={item.priority} />
+            </div>
+
+            <div
+              className="shrink-0"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-background/80 hover:text-foreground"
+                    aria-label="More actions"
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={() =>
+                      onOpenRecord ? onOpenRecord() : debugLog(`[ThingsToDo] Open: ${item.title}`)
+                    }
+                    disabled={!onOpenRecord && !item.recordTableId}
+                  >
+                    Open record
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => debugLog(`[ThingsToDo] Copy link: ${item.id}`)}>
+                    Copy link
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+        </div>
       </div>
-
-      <div
-        className="shrink-0"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-background/80 hover:text-foreground"
-              aria-label="More actions"
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onClick={() => (onOpenRecord ? onOpenRecord() : debugLog(`[ThingsToDo] Open: ${item.title}`))}
-              disabled={!onOpenRecord && !item.recordTableId}
-            >
-              Open record
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => debugLog(`[ThingsToDo] Copy link: ${item.id}`)}
-            >
-              Copy link
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-    </div>
+    </article>
   )
 }

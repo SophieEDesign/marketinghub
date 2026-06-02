@@ -37,7 +37,7 @@ export function ThingsToDoGroupedList({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="flex-1 overflow-y-auto pr-1">
       {sections.map((section) => {
         const { dot, section: sectionBg } = isThingsToDoRowGroup(String(section.key))
           ? getRowGroupClasses(section.key as ThingsToDoRowGroup)
@@ -46,10 +46,10 @@ export function ThingsToDoGroupedList({
               section: "bg-muted/40",
             }
         return (
-          <section key={String(section.key)} className="mb-1">
+          <section key={String(section.key)} className="mb-3">
             <div
               className={cn(
-                "sticky top-0 z-[1] flex items-center gap-2 px-4 py-2 text-xs font-semibold text-foreground",
+                "sticky top-0 z-[1] flex items-center gap-2 rounded-md px-3 py-2 text-xs font-semibold text-foreground",
                 sectionBg
               )}
             >
@@ -58,7 +58,7 @@ export function ThingsToDoGroupedList({
                 {section.label} ({section.count})
               </span>
             </div>
-            <div className="divide-y divide-border/20">
+            <div className="mt-2 space-y-2">
               {section.items.map((item: ThingsToDoItem) => (
                 <ThingsToDoRow
                   key={item.id}

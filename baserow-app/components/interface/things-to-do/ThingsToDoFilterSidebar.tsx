@@ -113,7 +113,7 @@ export function ThingsToDoFilterSidebar({
   return (
     <aside
       className={cn(
-        "flex w-full shrink-0 flex-col border-b border-border/40 bg-muted/20 lg:w-[220px] lg:border-b-0 lg:border-r",
+        "flex w-full shrink-0 flex-col border-b border-border/30 bg-muted/10 lg:w-[196px] lg:border-b-0 lg:border-r",
         className
       )}
     >
@@ -130,7 +130,7 @@ export function ThingsToDoFilterSidebar({
         ) : null}
       </div>
 
-      <div className="flex-1 space-y-3 overflow-y-auto px-3 pb-4 lg:px-4">
+      <div className="flex-1 space-y-3 overflow-y-auto px-3 pb-4 lg:px-3">
         <SidebarSelect
           label="Type"
           value={filters.types}
