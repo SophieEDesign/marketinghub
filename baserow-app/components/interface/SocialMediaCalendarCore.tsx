@@ -307,6 +307,7 @@ export function SocialMediaCalendarCore({
         cascadeContext: recordPanelCascade,
         tableFields: contentTableFields,
         interfaceMode,
+        recordLayoutType: "social_post" as const,
       }
       if (recordId === null) {
         openRecordModal({
@@ -362,7 +363,11 @@ export function SocialMediaCalendarCore({
         recordPanelCascade,
         interfaceMode,
         reload,
-        reload
+        reload,
+        undefined,
+        undefined,
+        undefined,
+        "social_post"
       )
     }
   }

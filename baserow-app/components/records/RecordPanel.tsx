@@ -274,7 +274,8 @@ export default function RecordPanel() {
                   state.onRecordUpdated,
                   state.fieldLayout,
                   state.onLayoutSave,
-                  state.tableFields
+                  state.tableFields,
+                  state.recordLayoutType
                 )
               } else {
                 closeRecord()
@@ -287,6 +288,7 @@ export default function RecordPanel() {
             }}
             onRecordUpdate={() => state.onRecordUpdated?.()}
             interfaceMode={interfaceMode}
+            recordLayoutType={state.recordLayoutType}
             renderHeaderActions={false}
             modalLayout={state.modalLayout}
             modalFields={state.modalFields}

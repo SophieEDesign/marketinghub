@@ -9,6 +9,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { Maximize2, ChevronDown, ChevronRight, ArrowLeft, Save, Trash2, X, Copy } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import FieldEditor from "@/components/fields/FieldEditor"
 import RecordFields from "@/components/records/RecordFields"
 import RecordActivity from "@/components/records/RecordActivity"
@@ -30,6 +31,8 @@ import { useToast } from "@/components/ui/use-toast"
 import { isAbortError } from "@/lib/api/error-handling"
 import { createClient } from "@/lib/supabase/client"
 import type { TableField } from "@/types/fields"
+import { resolveRecordLayout } from "@/lib/records/record-layout-resolver"
+import type { RecordLayoutType } from "@/lib/records/record-layout-presets"
 
 export interface RecordEditorProps {
   recordId: string | null
@@ -61,6 +64,7 @@ export interface RecordEditorProps {
   forceFlatLayout?: boolean
   /** Interface mode: 'edit' allows layout editing when canEditLayout */
   interfaceMode?: "view" | "edit"
+  recordLayoutType?: RecordLayoutType
   /** For modal: render header actions (close, delete, save) - set false when shell provides them */
   renderHeaderActions?: boolean
   /** @deprecated Use fieldLayoutConfig. Backward compat: custom modal layout. */
@@ -98,6 +102,7 @@ export default function RecordEditor({
   showFieldSections = false,
   forceFlatLayout = false,
   interfaceMode = "view",
+  recordLayoutType,
   renderHeaderActions = true,
   modalLayout,
   modalFields = [],
@@ -222,6 +227,16 @@ export default function RecordEditor({
     return getFieldGroupsFromLayout(resolvedFieldLayout, filteredFields, visibilityContext)
   }, [recordId, resolvedFieldLayout, filteredFields, visibilityContext])
 
+  const customLayout = useMemo(
+    () => resolveRecordLayout(filteredFields, recordLayoutType),
+    [filteredFields, recordLayoutType]
+  )
+  const useCustomLayout = mode === "review" && customLayout.isCustom && customLayout.sections.length > 0
+  const mediaPreviewValue =
+    customLayout.mediaPreviewField && formData
+      ? formData[customLayout.mediaPreviewField.name]
+      : null
+
   const [localFieldLayout, setLocalFieldLayout] = useState<FieldLayoutItem[]>([])
   const resolvedLayoutSignatureRef = useRef<string>("")
   useEffect(() => {
@@ -342,6 +357,16 @@ export default function RecordEditor({
 
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => new Set())
 
+  useEffect(() => {
+    if (!useCustomLayout) return
+    const defaults = new Set(
+      customLayout.sections
+        .filter((section) => section.collapsedByDefault)
+        .map((section) => section.id)
+    )
+    setCollapsedSections(defaults)
+  }, [useCustomLayout, customLayout.sections, recordId])
+
   const handleSave = useCallback(async () => {
     try {
       await save()
@@ -425,6 +450,90 @@ export default function RecordEditor({
       return (
         <div className="flex items-center justify-center py-8">
           <div className="text-gray-500">Preparing fields…</div>
+        </div>
+      )
+    }
+
+    if (useCustomLayout) {
+      const statusValue =
+        customLayout.statusField && formData
+          ? formData[customLayout.statusField.name]
+          : null
+      const titleValue =
+        customLayout.titleField && formData
+          ? formData[customLayout.titleField.name]
+          : recordTitle
+      const previewCandidate = Array.isArray(mediaPreviewValue)
+        ? mediaPreviewValue[0]
+        : mediaPreviewValue
+      const previewUrl =
+        typeof previewCandidate === "string"
+          ? previewCandidate
+          : previewCandidate && typeof previewCandidate === "object" && typeof (previewCandidate as any).url === "string"
+            ? (previewCandidate as any).url
+            : null
+
+      return (
+        <div className="px-4 py-3 space-y-3">
+          <div className="sticky top-0 z-10 rounded-card-lg border border-border/45 bg-background/95 backdrop-blur px-4 py-3">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-base font-semibold truncate">{String(titleValue || recordTitle || "Record Details")}</h3>
+              {statusValue != null && statusValue !== "" ? (
+                <Badge variant="secondary" className="max-w-[40%] truncate">{String(statusValue)}</Badge>
+              ) : null}
+            </div>
+          </div>
+
+          {previewUrl ? (
+            <div className="rounded-card-lg border border-border/35 bg-card p-3">
+              <p className="text-xs text-muted-foreground mb-2">Preview</p>
+              <img
+                src={previewUrl}
+                alt="Media preview"
+                className="w-full max-h-56 object-cover rounded-md border border-border/30"
+              />
+            </div>
+          ) : null}
+
+          {customLayout.sections.map((section) => {
+            const isCollapsed = collapsedSections.has(section.id)
+            return (
+              <div key={section.id} className="rounded-card-lg border border-border/35 bg-card overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCollapsedSections((prev) => {
+                      const next = new Set(prev)
+                      if (next.has(section.id)) next.delete(section.id)
+                      else next.add(section.id)
+                      return next
+                    })
+                  }
+                  className="w-full px-4 py-2.5 flex items-center justify-between text-left border-b border-border/25 bg-muted/10"
+                >
+                  <span className="text-sm font-medium">{section.label}</span>
+                  {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </button>
+                {!isCollapsed ? (
+                  <div className="px-4 py-3 space-y-3">
+                    {section.fields.map((field) => (
+                      <FieldEditor
+                        key={field.id}
+                        field={field}
+                        value={formData[field.name]}
+                        onChange={(v) => handleFieldChange(field.name, v)}
+                        onBlur={(v) => handleFieldBlur(field.name, v)}
+                        required={field.required || false}
+                        recordId={recordId || undefined}
+                        tableName={effectiveTableName || undefined}
+                        isReadOnly={!isFieldEditable(field.name)}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            )
+          })}
         </div>
       )
     }

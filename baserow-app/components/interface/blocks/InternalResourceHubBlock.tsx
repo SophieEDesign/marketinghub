@@ -164,6 +164,28 @@ export default function InternalResourceHubBlock({
     [resources]
   )
 
+  const handleEditResourceDetails = useCallback(
+    (id: string) => {
+      const resource = resources.find((item) => item.id === id) as any
+      if (
+        !resource ||
+        typeof resource.recordTableId !== "string" ||
+        typeof resource.recordSupabaseTable !== "string"
+      ) {
+        return
+      }
+      openRecordModal({
+        tableId: resource.recordTableId,
+        recordId: String(resource.id),
+        supabaseTableName: resource.recordSupabaseTable,
+        interfaceMode,
+        recordLayoutType: "asset",
+        onRecordUpdated: () => reload(),
+      })
+    },
+    [resources, openRecordModal, interfaceMode, reload]
+  )
+
   const canCreateResource =
     effectiveRole === "admin" &&
     !isEditing &&
@@ -345,6 +367,11 @@ export default function InternalResourceHubBlock({
             }}
             onViewFull={() => openResourceUrl(selectedId!)}
             onCopyLink={() => mockAction(`Copy link: ${selected?.title}`)}
+            onEditDetails={
+              !isEditing && selectedId
+                ? () => handleEditResourceDetails(selectedId)
+                : undefined
+            }
             className={cn(
               showPreview ? undefined : "hidden md:flex",
               isFullPage && "md:h-full md:min-h-0 md:overflow-y-auto"

@@ -129,7 +129,24 @@ BEGIN
   INTO v_insert_cols_sql
   FROM unnest(v_common_cols) AS c;
 
-  SELECT string_agg(format('src.%I', c), ', ')
+  SELECT string_agg(
+    CASE
+      WHEN c = 'status' THEN
+        'CASE
+           WHEN src.status IS NULL OR btrim(src.status) = '''' THEN NULL
+           WHEN lower(src.status) IN (''draft'', ''in_progress'', ''pending_approval'', ''approved'', ''scheduled'', ''published'', ''cancelled'') THEN lower(src.status)
+           WHEN lower(src.status) IN (''in progress'', ''wip'', ''working'', ''in review'', ''review'', ''date confirmed'') THEN ''in_progress''
+           WHEN lower(src.status) IN (''pending approval'', ''needs approval'', ''awaiting approval'', ''needs review'', ''for review'') THEN ''pending_approval''
+           WHEN lower(src.status) IN (''complete'', ''completed'', ''done'', ''live'', ''posted'') THEN ''published''
+           WHEN lower(src.status) IN (''planned'', ''queued'', ''ready'') THEN ''scheduled''
+           WHEN lower(src.status) IN (''canceled'', ''cancelled'', ''archived'') THEN ''cancelled''
+           ELSE ''draft''
+         END AS status'
+      ELSE
+        format('src.%I', c)
+    END,
+    ', '
+  )
   INTO v_select_cols_sql
   FROM unnest(v_common_cols) AS c;
 

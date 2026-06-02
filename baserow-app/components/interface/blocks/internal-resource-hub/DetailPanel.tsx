@@ -34,6 +34,7 @@ interface DetailPanelProps {
   onDownload: () => void
   onViewFull: () => void
   onCopyLink: () => void
+  onEditDetails?: () => void
   className?: string
 }
 
@@ -65,6 +66,7 @@ export default function DetailPanel({
   onDownload,
   onViewFull,
   onCopyLink,
+  onEditDetails,
   className,
 }: DetailPanelProps) {
   if (!resource) {
@@ -225,6 +227,16 @@ export default function DetailPanel({
           <Link className="h-4 w-4" />
           Copy link
         </Button>
+        {onEditDetails ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full gap-2 border-border/60"
+            onClick={onEditDetails}
+          >
+            Manage asset
+          </Button>
+        ) : null}
       </div>
     </aside>
   )

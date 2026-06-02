@@ -178,6 +178,7 @@ export default function ThingsToDoBlock({
         recordId: item.id,
         supabaseTableName: item.recordSupabaseTable,
         interfaceMode,
+        recordLayoutType: "task",
         onRecordUpdated: () => reload(),
       })
     },

@@ -253,6 +253,7 @@ export default function CampaignsOverviewBlock({
                     recordId: item.id,
                     supabaseTableName: item.recordSupabaseTable,
                     interfaceMode,
+                    recordLayoutType: "campaign",
                   })
                 }}
               >

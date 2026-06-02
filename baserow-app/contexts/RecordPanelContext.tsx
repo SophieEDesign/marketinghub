@@ -6,6 +6,7 @@ import { useSelectionContext } from "@/contexts/SelectionContext"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { RecordEditorCascadeContext } from "@/lib/interface/record-editor-core"
 import type { FieldLayoutItem } from "@/lib/interface/field-layout-utils"
+import type { RecordLayoutType } from "@/lib/records/record-layout-presets"
 import type { TableField } from "@/types/fields"
 
 interface RecordPanelState {
@@ -26,6 +27,7 @@ interface RecordPanelState {
   cascadeContext?: RecordEditorCascadeContext | null
   /** Interface mode: 'view' | 'edit'. When 'edit', RecordPanel opens in edit mode (Airtable-style). */
   interfaceMode?: 'view' | 'edit'
+  recordLayoutType?: RecordLayoutType
   /** Called when the record is deleted; blocks use this to refresh core data (grid/calendar). */
   onRecordDeleted?: () => void
   /** Called when a field is updated; views use this to refresh row data (e.g. card color from status). */
@@ -38,7 +40,7 @@ interface RecordPanelState {
 
 interface RecordPanelContextType {
   state: RecordPanelState
-  openRecord: (tableId: string, recordId: string, tableName: string | null, modalFields?: string[], modalLayout?: BlockConfig["modal_layout"], cascadeContext?: RecordEditorCascadeContext | null, interfaceMode?: "view" | "edit", onRecordDeleted?: () => void, onRecordUpdated?: () => void, fieldLayout?: FieldLayoutItem[], onLayoutSave?: (layout: FieldLayoutItem[]) => void | Promise<void>, tableFields?: TableField[]) => void
+  openRecord: (tableId: string, recordId: string, tableName: string | null, modalFields?: string[], modalLayout?: BlockConfig["modal_layout"], cascadeContext?: RecordEditorCascadeContext | null, interfaceMode?: "view" | "edit", onRecordDeleted?: () => void, onRecordUpdated?: () => void, fieldLayout?: FieldLayoutItem[], onLayoutSave?: (layout: FieldLayoutItem[]) => void | Promise<void>, tableFields?: TableField[], recordLayoutType?: RecordLayoutType) => void
   /** Open panel in create mode (same UI as edit). */
   openRecordForCreate: (params: {
     tableId: string
@@ -49,6 +51,7 @@ interface RecordPanelContextType {
     initialData?: Record<string, any>
     cascadeContext?: RecordEditorCascadeContext | null
     onRecordCreated?: (createdRecordId: string) => void
+    recordLayoutType?: RecordLayoutType
   }) => void
   /** Fetches table supabase_table by id and opens the record in the panel. Use when only tableId + recordId are available (e.g. linked record click). */
   openRecordByTableId: (tableId: string, recordId: string, interfaceMode?: 'view' | 'edit') => Promise<void>
@@ -96,7 +99,8 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
     onRecordUpdated?: () => void,
     fieldLayout?: FieldLayoutItem[],
     onLayoutSave?: (layout: FieldLayoutItem[]) => void | Promise<void>,
-    tableFields?: TableField[]
+    tableFields?: TableField[],
+    recordLayoutType?: RecordLayoutType
   ) => {
     if (process.env.NODE_ENV === "development" && cascadeContext === undefined) {
       console.warn("[RecordPanel] Opened without cascadeContext; block-level permissions will not be enforced.")
@@ -117,6 +121,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
       interfaceMode: interfaceMode ?? prev.interfaceMode ?? "view",
       onRecordDeleted,
       onRecordUpdated,
+      recordLayoutType: recordLayoutType ?? "generic",
       history:
         prev.isOpen && prev.tableId === tableId && prev.recordId === recordId
           ? prev.history
@@ -178,6 +183,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
     initialData?: Record<string, any>
     cascadeContext?: RecordEditorCascadeContext | null
     onRecordCreated?: (createdRecordId: string) => void
+    recordLayoutType?: RecordLayoutType
   }) => {
     setSelectedContext({ type: "record", recordId: "__create__", tableId: params.tableId })
     setState((prev) => ({
@@ -193,6 +199,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
       interfaceMode: "edit",
       initialData: params.initialData,
       onRecordCreated: params.onRecordCreated,
+      recordLayoutType: params.recordLayoutType ?? "generic",
       history: [],
     }))
   }, [setSelectedContext])

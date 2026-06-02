@@ -213,6 +213,7 @@ export function EventCalendarCore({
         recordId: id,
         supabaseTableName: tableIds.contentSupabaseTable,
         interfaceMode: options?.interfaceMode ?? interfaceMode,
+        recordLayoutType: "event",
         onRecordUpdated: () => reload(),
       })
     },
@@ -263,6 +264,7 @@ export function EventCalendarCore({
       recordId: null,
       supabaseTableName: tableIds.contentSupabaseTable,
       interfaceMode,
+      recordLayoutType: "event",
       initialData,
       onRecordUpdated: () => reload(),
     })
