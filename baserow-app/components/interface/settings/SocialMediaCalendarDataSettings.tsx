@@ -263,6 +263,42 @@ export default function SocialMediaCalendarDataSettings({
         </Select>
       </div>
 
+      {config.table_id ? (
+        <div className="space-y-3 rounded-md border border-border/40 p-3">
+          <p className="text-xs font-medium text-muted-foreground">Social-only matching rule</p>
+          <MarketingFieldSelect
+            label="Match field (optional)"
+            fieldId={config.social_media_calendar_social_marker_field_id}
+            fieldName={config.social_media_calendar_social_marker_field}
+            fields={tableFields}
+            onChange={setField(
+              "social_media_calendar_social_marker_field_id",
+              "social_media_calendar_social_marker_field"
+            )}
+          />
+          <div className="space-y-2">
+            <Label htmlFor="smc-social-marker-value">Match value</Label>
+            <Input
+              id="smc-social-marker-value"
+              value={config.social_media_calendar_social_marker_value || ""}
+              onChange={(e) =>
+                onUpdate({
+                  social_media_calendar_social_marker_value: e.target.value || undefined,
+                })
+              }
+              placeholder="e.g. Social Media"
+            />
+            <p className="text-[11px] text-muted-foreground leading-snug">
+              When Social only is active, records are included when this field contains this value.
+              Leave blank to use automatic social detection.
+            </p>
+            <p className="text-[11px] text-muted-foreground leading-snug">
+              Default: Auto detect using content type/platform signals (no explicit match rule).
+            </p>
+          </div>
+        </div>
+      ) : null}
+
       <div className="space-y-2">
         <Label>Mode</Label>
         <Select

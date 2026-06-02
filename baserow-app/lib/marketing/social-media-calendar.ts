@@ -504,6 +504,13 @@ export function parseContentMediaThumbnail(images: unknown): {
       urls.push(trimmed)
     }
   }
+  const pushSplitUrls = (raw: string) => {
+    raw
+      .split(/[\n,;|]+/)
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .forEach((part) => pushUrl(part))
+  }
 
   if (images == null || images === "") {
     return { thumbnailUrl: null, mediaUrls: [] }
@@ -515,10 +522,11 @@ export function parseContentMediaThumbnail(images: unknown): {
       try {
         return parseContentMediaThumbnail(JSON.parse(s))
       } catch {
-        pushUrl(s)
+        pushSplitUrls(s)
       }
     } else {
-      pushUrl(s)
+      // Support comma/newline-separated URL lists from text fields.
+      pushSplitUrls(s)
     }
   } else if (Array.isArray(images)) {
     for (const item of images) {

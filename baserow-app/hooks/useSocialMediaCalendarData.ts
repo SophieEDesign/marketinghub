@@ -18,9 +18,46 @@ import {
 import { applyMarketingBlockDataQuery } from "@/lib/marketing/block-data-query"
 import { findCampaignsTable, findContentTable, findQuarterlyThemesTable } from "@/lib/marketing/marketing-tables"
 import type { BlockConfig } from "@/lib/interface/types"
+import type { FilterConfig } from "@/lib/interface/filters"
 import type { FieldOptions, TableField } from "@/types/fields"
 
 type PlanningFieldRow = { name: string; type?: string; options?: FieldOptions }
+
+function sourceTableLooksSocial(tableName: string | null | undefined): boolean {
+  const name = tableName?.trim().toLowerCase()
+  if (!name) return false
+  return /social/.test(name) && /(post|media)/.test(name)
+}
+
+function sanitizeSocialCalendarFilters(
+  config: BlockConfig | undefined,
+  contentFields: PlanningFieldRow[],
+  tableName: string | null | undefined
+): BlockConfig | undefined {
+  if (!config) return config
+  const filters = Array.isArray(config.filters) ? config.filters : []
+  if (filters.length === 0) return config
+
+  const existingFields = new Set(contentFields.map((f) => f.name))
+  const isSocialTable = sourceTableLooksSocial(tableName)
+
+  const cleaned = filters.filter((filter) => {
+    const field = typeof filter?.field === "string" ? filter.field.trim() : ""
+    if (!field) return false
+    if (!existingFields.has(field)) return false
+
+    if (isSocialTable && /content[_\s-]*type|^type$/i.test(field)) {
+      const value = String(filter?.value ?? "").trim().toLowerCase()
+      if (value.includes("social")) {
+        return false
+      }
+    }
+    return true
+  }) as FilterConfig[]
+
+  if (cleaned.length === filters.length) return config
+  return { ...config, filters: cleaned }
+}
 
 function mapToPlanningFieldRow(row: {
   name: string
@@ -150,6 +187,8 @@ export function useSocialMediaCalendarData(options?: {
           fieldIds
         )
 
+        const queryConfig = sanitizeSocialCalendarFilters(config, contentFieldRows, content.name)
+
         const [themesRes, contentRes, campaignsRes] = await Promise.all([
           supabase
             .from(quarterlyThemes.supabase_table)
@@ -158,7 +197,7 @@ export function useSocialMediaCalendarData(options?: {
             .order("created_at", { ascending: true }),
           applyMarketingBlockDataQuery(
             supabase.from(content.supabase_table).select("*").is("deleted_at", null),
-            config,
+            queryConfig,
             contentFieldRows
           ),
           supabase

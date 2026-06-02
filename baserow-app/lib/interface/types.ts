@@ -625,6 +625,9 @@ export interface BlockConfig {
   social_media_calendar_status_field?: string
   social_media_calendar_type_field_id?: string
   social_media_calendar_type_field?: string
+  social_media_calendar_social_marker_field_id?: string
+  social_media_calendar_social_marker_field?: string
+  social_media_calendar_social_marker_value?: string
   social_media_calendar_content_type_default?: string
   social_media_calendar_owner_field_id?: string
   social_media_calendar_owner_field?: string

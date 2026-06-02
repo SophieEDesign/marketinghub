@@ -99,6 +99,32 @@ function FilterSelect({
   )
 }
 
+function valueMatchesSocialMarker(raw: unknown, marker: string): boolean {
+  const needle = marker.trim().toLowerCase()
+  if (!needle) return false
+  if (raw == null) return false
+
+  if (Array.isArray(raw)) {
+    return raw.some((entry) => valueMatchesSocialMarker(entry, marker))
+  }
+
+  if (typeof raw === "object") {
+    if ("label" in (raw as Record<string, unknown>)) {
+      const label = String((raw as Record<string, unknown>).label ?? "")
+      return label.toLowerCase().includes(needle)
+    }
+    if ("value" in (raw as Record<string, unknown>)) {
+      const value = String((raw as Record<string, unknown>).value ?? "")
+      return value.toLowerCase().includes(needle)
+    }
+    return Object.values(raw as Record<string, unknown>).some((entry) =>
+      valueMatchesSocialMarker(entry, marker)
+    )
+  }
+
+  return String(raw).toLowerCase().includes(needle)
+}
+
 export interface SocialMediaCalendarCoreProps {
   settings: SocialMediaCalendarBlockSettings
   config?: import("@/lib/interface/types").BlockConfig | null
@@ -229,6 +255,26 @@ export function SocialMediaCalendarCore({
     return /social/.test(name) && /(post|media)/.test(name)
   }, [sourceTableName])
 
+  const socialMarkerFieldName = useMemo(() => {
+    const id = blockConfig?.social_media_calendar_social_marker_field_id?.trim()
+    if (id) {
+      const byId = contentTableFields.find((f) => f.id === id)
+      if (byId?.name) return byId.name
+    }
+    const byName = blockConfig?.social_media_calendar_social_marker_field?.trim()
+    return byName || null
+  }, [
+    blockConfig?.social_media_calendar_social_marker_field,
+    blockConfig?.social_media_calendar_social_marker_field_id,
+    contentTableFields,
+  ])
+
+  const socialMarkerValue = blockConfig?.social_media_calendar_social_marker_value?.trim() || null
+
+  const rowById = useMemo(() => {
+    return new Map(contentRows.map((row) => [String(row.id), row]))
+  }, [contentRows])
+
   const allSocialItems = useMemo(() => {
     if (!socialFields) return []
     return buildSocialCalendarItems({
@@ -240,13 +286,31 @@ export function SocialMediaCalendarCore({
   }, [allItems, contentRows, socialFields, campaignLabelById])
 
   const scopedItems = useMemo(
-    () =>
-      applyContentScope(
+    () => {
+      const autoScoped = applyContentScope(
         allSocialItems,
         contentScope,
         !sourceTableLooksSocial && socialFields?.contentType != null
-      ),
-    [allSocialItems, contentScope, socialFields?.contentType, sourceTableLooksSocial]
+      )
+
+      if (contentScope !== "social_only" || !socialMarkerFieldName || !socialMarkerValue) {
+        return autoScoped
+      }
+
+      return allSocialItems.filter((item) => {
+        const row = rowById.get(item.id)
+        return valueMatchesSocialMarker(row?.[socialMarkerFieldName], socialMarkerValue)
+      })
+    },
+    [
+      allSocialItems,
+      contentScope,
+      socialFields?.contentType,
+      socialMarkerFieldName,
+      socialMarkerValue,
+      sourceTableLooksSocial,
+      rowById,
+    ]
   )
 
   const filterOptions = useMemo(
