@@ -651,7 +651,135 @@ export default function GalleryView({
     )
   }
 
-  const allowInternalScroll = displayMode === "fixed" && overflowBehaviour === "scroll"
+  const allowInternalScroll = overflowBehaviour === "scroll"
+
+  const renderGroupedSection = (group: GroupedNode<GalleryGroupItem>, level = 0): JSX.Element => {
+    const isCollapsed = collapsedGroups.has(group.pathKey)
+    const items = Array.isArray(group.items) ? group.items : []
+    const children = Array.isArray(group.children) ? group.children : []
+    const hasChildren = children.length > 0
+    const hasCards = items.length > 0
+
+    // Get group color - generate for ALL groups
+    let groupColor: string | null = null
+    if (group.rule && group.rule.type === "field") {
+      const groupField = (Array.isArray(tableFields) ? tableFields : []).find(
+        (f: any) => f && (f.name === group.rule.field || f.id === group.rule.field)
+      ) as TableField | undefined
+      if (groupField && (groupField.type === "single_select" || groupField.type === "multi_select")) {
+        groupColor = getPillColor(groupField, group.key)
+      } else {
+        groupColor = getGroupColor(group.key)
+      }
+    } else if (group.rule && group.rule.type === "date") {
+      groupColor = getGroupColor(group.key)
+    }
+
+    // Evaluate conditional formatting rules for group headers
+    const groupMockRow: Record<string, any> = {}
+    if (group.rule && group.rule.type === "field") {
+      const groupField = (Array.isArray(tableFields) ? tableFields : []).find(
+        (f: any) => f && (f.name === group.rule.field || f.id === group.rule.field)
+      ) as TableField | undefined
+      if (groupField && group.key) {
+        groupMockRow[groupField.name] = group.key
+      }
+    }
+    const groupMatchingRule =
+      highlightRules && highlightRules.length > 0 && Object.keys(groupMockRow).length > 0
+        ? evaluateHighlightRules(
+            highlightRules.filter((r) => r.scope === "group"),
+            groupMockRow,
+            Array.isArray(tableFields) ? tableFields : []
+          )
+        : null
+
+    const groupFormattingStyle = groupMatchingRule ? getFormattingStyle(groupMatchingRule) : {}
+
+    const hexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+      return result
+        ? {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16),
+          }
+        : null
+    }
+
+    const bgColorStyle = groupFormattingStyle.backgroundColor
+      ? {
+          backgroundColor: groupFormattingStyle.backgroundColor,
+          borderColor: groupFormattingStyle.backgroundColor,
+        }
+      : groupColor
+        ? (() => {
+            const rgb = hexToRgb(groupColor)
+            if (rgb) {
+              return {
+                backgroundColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)`,
+                borderColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.4)`,
+              }
+            }
+            return {}
+          })()
+        : {}
+
+    const finalTextColor = groupFormattingStyle.color || undefined
+    const textColorClass = finalTextColor
+      ? ""
+      : groupColor
+        ? getTextColorForBackground(groupColor)
+        : "text-gray-900"
+    const textColorStyle = finalTextColor ? { color: finalTextColor } : groupColor ? {} : { color: undefined }
+
+    return (
+      <div key={group.pathKey} className="space-y-3">
+        <button
+          type="button"
+          onClick={() => toggleGroupCollapsed(group.pathKey)}
+          className={cn(
+            "w-full flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-left transition-colors",
+            groupFormattingStyle.backgroundColor || groupColor ? "" : "border-gray-200 bg-white hover:bg-gray-50"
+          )}
+          style={{
+            ...bgColorStyle,
+            ...textColorStyle,
+          }}
+        >
+          <div className={cn("min-w-0", level > 0 && "pl-1")}>
+            <div className={`text-sm font-semibold truncate ${textColorClass}`} style={textColorStyle}>
+              {group.label}
+            </div>
+            <div
+              className={`text-xs ${groupFormattingStyle.backgroundColor || groupColor ? "opacity-80" : "text-gray-500"}`}
+              style={textColorStyle}
+            >
+              {group.size} {group.size === 1 ? "record" : "records"}
+            </div>
+          </div>
+          <ChevronDown
+            className={`h-4 w-4 transition-transform ${isCollapsed ? "-rotate-90" : ""} ${
+              groupFormattingStyle.backgroundColor || groupColor ? textColorClass : "text-gray-500"
+            }`}
+            style={textColorStyle}
+          />
+        </button>
+
+        {!isCollapsed ? (
+          hasChildren ? (
+            <div className="space-y-3 pl-3">
+              {children.map((child) => renderGroupedSection(child, level + 1))}
+            </div>
+          ) : hasCards ? (
+            <div className="w-full min-w-0 grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
+              {items.map((item) => renderCard(item.__row, `${group.pathKey}:${item.__rowId}`))}
+            </div>
+          ) : null
+        ) : null}
+      </div>
+    )
+  }
 
   return (
     <div
@@ -665,125 +793,7 @@ export default function GalleryView({
     >
       {Array.isArray(groupedRows) && groupedRows.length > 0 ? (
         <div className="p-3 space-y-4">
-          {groupedRows.map((group) => {
-            const isCollapsed = collapsedGroups.has(group.pathKey)
-            const items = Array.isArray(group.items) ? group.items : []
-            
-            // Get group color - generate for ALL groups
-            let groupColor: string | null = null
-            if (group.rule && group.rule.type === 'field') {
-              const groupField = (Array.isArray(tableFields) ? tableFields : []).find(
-                (f: any) => f && (f.name === group.rule.field || f.id === group.rule.field)
-              ) as TableField | undefined
-              if (groupField && (groupField.type === 'single_select' || groupField.type === 'multi_select')) {
-                // Use field-specific color for select fields
-                groupColor = getPillColor(groupField, group.key)
-              } else {
-                // Generate hash-based color for all other field types
-                groupColor = getGroupColor(group.key)
-              }
-            } else if (group.rule && group.rule.type === 'date') {
-              // For date-based grouping, generate color from the date value
-              groupColor = getGroupColor(group.key)
-            }
-
-            // Evaluate conditional formatting rules for group headers
-            // Create a mock row with the group value for evaluation
-            const groupMockRow: Record<string, any> = {}
-            if (group.rule && group.rule.type === 'field') {
-              const groupField = (Array.isArray(tableFields) ? tableFields : []).find(
-                (f: any) => f && (f.name === group.rule.field || f.id === group.rule.field)
-              ) as TableField | undefined
-              if (groupField && group.key) {
-                groupMockRow[groupField.name] = group.key
-              }
-            }
-            const groupMatchingRule = highlightRules && highlightRules.length > 0 && Object.keys(groupMockRow).length > 0
-              ? evaluateHighlightRules(
-                  highlightRules.filter(r => r.scope === 'group'),
-                  groupMockRow,
-                  Array.isArray(tableFields) ? tableFields : []
-                )
-              : null
-            
-            // Get formatting style for group-level rules
-            const groupFormattingStyle = groupMatchingRule
-              ? getFormattingStyle(groupMatchingRule)
-              : {}
-            
-            // Helper to convert hex to RGB
-            const hexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
-              const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
-              return result
-                ? {
-                    r: parseInt(result[1], 16),
-                    g: parseInt(result[2], 16),
-                    b: parseInt(result[3], 16),
-                  }
-                : null
-            }
-            
-            // Background color with opacity (use conditional formatting if available, otherwise use group color)
-            const bgColorStyle = groupFormattingStyle.backgroundColor
-              ? {
-                  backgroundColor: groupFormattingStyle.backgroundColor,
-                  borderColor: groupFormattingStyle.backgroundColor,
-                }
-              : groupColor 
-                ? (() => {
-                    const rgb = hexToRgb(groupColor)
-                    if (rgb) {
-                      return {
-                        backgroundColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)`, // 15% opacity
-                        borderColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.4)`, // 40% opacity for border
-                      }
-                    }
-                    return {}
-                  })()
-                : {}
-            
-            // Determine text color for contrast (conditional formatting takes precedence)
-            const finalTextColor = groupFormattingStyle.color || undefined
-            const textColorClass = finalTextColor ? '' : (groupColor ? getTextColorForBackground(groupColor) : 'text-gray-900')
-            const textColorStyle = finalTextColor ? { color: finalTextColor } : (groupColor ? {} : { color: undefined })
-            
-            return (
-              <div key={group.pathKey} className="space-y-3">
-                <button
-                  type="button"
-                  onClick={() => toggleGroupCollapsed(group.pathKey)}
-                  className={`w-full flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-left transition-colors ${
-                    groupFormattingStyle.backgroundColor || groupColor ? '' : 'border-gray-200 bg-white hover:bg-gray-50'
-                  }`}
-                  style={{
-                    ...bgColorStyle,
-                    ...textColorStyle,
-                  }}
-                >
-                  <div className="min-w-0">
-                    <div className={`text-sm font-semibold truncate ${textColorClass}`} style={textColorStyle}>
-                      {group.label}
-                    </div>
-                    <div className={`text-xs ${groupFormattingStyle.backgroundColor || groupColor ? 'opacity-80' : 'text-gray-500'}`} style={textColorStyle}>
-                      {group.size} {group.size === 1 ? "record" : "records"}
-                    </div>
-                  </div>
-                  <ChevronDown
-                    className={`h-4 w-4 transition-transform ${isCollapsed ? "-rotate-90" : ""} ${
-                      groupFormattingStyle.backgroundColor || groupColor ? textColorClass : 'text-gray-500'
-                    }`}
-                    style={textColorStyle}
-                  />
-                </button>
-
-                {!isCollapsed && (
-                  <div className="w-full min-w-0 grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
-                    {items.map((item) => renderCard(item.__row, `${group.pathKey}:${item.__rowId}`))}
-                  </div>
-                )}
-              </div>
-            )
-          })}
+          {groupedRows.map((group) => renderGroupedSection(group))}
         </div>
       ) : (
         <div className="w-full min-w-0 p-6 grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
