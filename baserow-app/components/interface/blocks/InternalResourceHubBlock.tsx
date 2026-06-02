@@ -166,24 +166,17 @@ export default function InternalResourceHubBlock({
 
   const handleEditResourceDetails = useCallback(
     (id: string) => {
-      const resource = resources.find((item) => item.id === id) as any
-      if (
-        !resource ||
-        typeof resource.recordTableId !== "string" ||
-        typeof resource.recordSupabaseTable !== "string"
-      ) {
-        return
-      }
+      if (!tableIds) return
       openRecordModal({
-        tableId: resource.recordTableId,
-        recordId: String(resource.id),
-        supabaseTableName: resource.recordSupabaseTable,
+        tableId: tableIds.mediaTableId,
+        recordId: String(id),
+        supabaseTableName: tableIds.mediaSupabaseTable,
         interfaceMode,
         recordLayoutType: "asset",
         onRecordUpdated: () => reload(),
       })
     },
-    [resources, openRecordModal, interfaceMode, reload]
+    [tableIds, openRecordModal, interfaceMode, reload]
   )
 
   const canCreateResource =
@@ -192,6 +185,13 @@ export default function InternalResourceHubBlock({
     demoState.useLiveData &&
     !forceMock &&
     !!tableIds?.mediaTableId
+  const canManageSelectedResource =
+    effectiveRole === "admin" &&
+    !isEditing &&
+    demoState.useLiveData &&
+    !forceMock &&
+    !!tableIds?.mediaTableId &&
+    !!selectedId
 
   const handleCreateResource = useCallback(() => {
     if (!canCreateResource || !tableIds) return
@@ -368,7 +368,7 @@ export default function InternalResourceHubBlock({
             onViewFull={() => openResourceUrl(selectedId!)}
             onCopyLink={() => mockAction(`Copy link: ${selected?.title}`)}
             onEditDetails={
-              !isEditing && selectedId
+              canManageSelectedResource && selectedId
                 ? () => handleEditResourceDetails(selectedId)
                 : undefined
             }

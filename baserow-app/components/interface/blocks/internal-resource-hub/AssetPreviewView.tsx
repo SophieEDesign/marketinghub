@@ -141,9 +141,17 @@ export default function AssetPreviewView({
             <button
               key={link.title}
               type="button"
-              className="flex flex-col gap-1 rounded-2xl border border-border/60 bg-card p-3 text-left shadow-sm transition-shadow hover:shadow-card"
+              disabled
+              aria-disabled="true"
+              title="Coming soon"
+              className="flex cursor-not-allowed flex-col gap-1 rounded-2xl border border-border/60 bg-card p-3 text-left opacity-75 shadow-sm"
             >
-              <Icon className="h-4 w-4 text-blue-600" />
+              <div className="flex items-start justify-between gap-2">
+                <Icon className="h-4 w-4 text-blue-600" />
+                <span className="rounded-full border border-border/80 bg-muted/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Coming soon
+                </span>
+              </div>
               <span className="text-sm font-semibold text-[#1e3a5f]">{link.title}</span>
               <span className="text-xs text-muted-foreground">{link.description}</span>
             </button>

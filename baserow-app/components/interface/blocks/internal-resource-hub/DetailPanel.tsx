@@ -42,17 +42,19 @@ function MetaRow({
   icon: Icon,
   label,
   value,
+  valueClassName,
 }: {
   icon: React.ElementType
   label: string
   value: string
+  valueClassName?: string
 }) {
   return (
     <div className="flex items-start gap-2.5 text-sm">
       <Icon className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
       <div className="min-w-0 flex-1">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="font-medium text-foreground/90 break-words">{value}</p>
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground/90">{label}</p>
+        <p className={cn("font-medium text-foreground/90 break-words", valueClassName)}>{value}</p>
       </div>
     </div>
   )
@@ -69,6 +71,18 @@ export default function DetailPanel({
   onEditDetails,
   className,
 }: DetailPanelProps) {
+  const referenceHost = resource?.referenceUrl
+    ? (() => {
+        try {
+          return new URL(resource.referenceUrl).hostname.replace(/^www\./, "")
+        } catch {
+          return null
+        }
+      })()
+    : null
+
+  const usageLabel = resource?.usage?.replace(/^table:/, "table ")
+
   if (!resource) {
     return (
       <aside
@@ -142,26 +156,29 @@ export default function DetailPanel({
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         <div>
           <h3 className="text-base font-bold text-[#1e3a5f] break-words">{resource.title}</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
             {resource.description ?? categoryLabel(resource.category)}
           </p>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-3 rounded-xl border border-border/60 bg-muted/20 p-3">
           <MetaRow icon={FileText} label="File type" value={resource.fileType} />
           {resource.referenceUrl && (
             <div className="flex items-start gap-2.5 text-sm">
               <Link className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
               <div className="min-w-0 flex-1">
-                <p className="text-xs text-muted-foreground">Reference link</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground/90">
+                  Reference link
+                </p>
                 <a
                   href={resource.referenceUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="break-all font-medium text-blue-600 hover:underline"
+                  className="font-medium text-blue-600 hover:underline"
                 >
-                  {resource.referenceUrl}
+                  {referenceHost ?? "Open source"}
                 </a>
+                <p className="mt-0.5 break-all text-xs text-muted-foreground/90">{resource.referenceUrl}</p>
               </div>
             </div>
           )}
@@ -178,7 +195,12 @@ export default function DetailPanel({
             <MetaRow icon={Calendar} label="Updated" value={resource.updatedAt} />
           )}
           {resource.usage && (
-            <MetaRow icon={FileText} label="Usage" value={resource.usage} />
+            <MetaRow
+              icon={FileText}
+              label="Usage"
+              value={usageLabel ?? resource.usage}
+              valueClassName="font-mono text-xs"
+            />
           )}
           {resource.owner && (
             <MetaRow icon={User} label="Uploaded by" value={resource.owner} />
@@ -187,12 +209,14 @@ export default function DetailPanel({
             <div className="flex items-start gap-2.5 text-sm">
               <Tag className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
               <div>
-                <p className="text-xs text-muted-foreground mb-1.5">Tags</p>
+                <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground/90">
+                  Tags
+                </p>
                 <div className="flex flex-wrap gap-1">
                   {resource.tags.map((t) => (
                     <span
                       key={t}
-                      className="rounded-md bg-muted px-2 py-0.5 text-xs text-foreground/80"
+                      className="rounded-md border border-border/60 bg-background px-2 py-0.5 text-xs text-foreground/80"
                     >
                       {t}
                     </span>
