@@ -657,9 +657,14 @@ export function buildSocialCalendarItems(params: {
 
 export function applyContentScope(
   items: SocialCalendarItem[],
-  scope: ContentScopeMode
+  scope: ContentScopeMode,
+  /** Pass false when the source table has no content_type field — all items are treated as social. */
+  contentTypeFieldExists = true
 ): SocialCalendarItem[] {
   if (scope === "all_content") return items
+  // When the table has no content_type column (e.g. a dedicated social posts table),
+  // every row is implicitly social — don't filter them out.
+  if (!contentTypeFieldExists) return items
   return items.filter(
     (i) =>
       isSocialContentType(i.contentType) ||

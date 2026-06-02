@@ -233,8 +233,8 @@ export function SocialMediaCalendarCore({
   }, [allItems, contentRows, socialFields, campaignLabelById])
 
   const scopedItems = useMemo(
-    () => applyContentScope(allSocialItems, contentScope),
-    [allSocialItems, contentScope]
+    () => applyContentScope(allSocialItems, contentScope, socialFields?.contentType != null),
+    [allSocialItems, contentScope, socialFields?.contentType]
   )
 
   const filterOptions = useMemo(
