@@ -396,6 +396,7 @@ export function resourceHubOverridesFromConfig(
     | "hubCategory"
     | "status"
     | "documentLink"
+    | "attachments"
     | "assignee"
     | "updatedAt",
     FieldOverridePair
@@ -407,6 +408,11 @@ export function resourceHubOverridesFromConfig(
     notes: overridePair(c, "resource_hub_description_field_id", "resource_hub_description_field"),
     hubCategory: overridePair(c, "resource_hub_category_field_id", "resource_hub_category_field"),
     documentLink: overridePair(c, "resource_hub_file_url_field_id", "resource_hub_file_url_field"),
+    attachments: overridePair(
+      c,
+      "resource_hub_attachments_field_id",
+      "resource_hub_attachments_field"
+    ),
     assignee: overridePair(c, "resource_hub_uploaded_by_field_id", "resource_hub_uploaded_by_field"),
     updatedAt: overridePair(c, "resource_hub_updated_at_field_id", "resource_hub_updated_at_field"),
   }

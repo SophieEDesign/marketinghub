@@ -17,6 +17,8 @@ import { HUB_CATEGORY_OPTIONS } from "@/components/interface/blocks/internal-res
 import MarketingDataSourceSection from "./shared/MarketingDataSourceSection"
 import MarketingFieldMappingSection from "./shared/MarketingFieldMappingSection"
 import MarketingFieldSelect from "./shared/MarketingFieldSelect"
+import BlockFilterEditor from "./BlockFilterEditor"
+import SortSelector from "./shared/SortSelector"
 
 export default function InternalResourceHubDataSettings({
   config,
@@ -29,6 +31,7 @@ export default function InternalResourceHubDataSettings({
   const tableFields = config.table_id
     ? fields.filter((f) => f.table_id === config.table_id)
     : fields
+  const blockFilters = Array.isArray(config.filters) ? config.filters : []
 
   const setField = (idKey: keyof BlockConfig, nameKey: keyof BlockConfig) =>
     (fieldId: string | undefined, fieldName: string | undefined) => {
@@ -45,7 +48,7 @@ export default function InternalResourceHubDataSettings({
         onTableChange={onTableChange}
         mockConfigKey="resource_hub_use_mock"
         legacyMockKey="resource_hub_use_dashboard_mock"
-        showView={false}
+        showView
       />
 
       {config.table_id ? (
@@ -58,11 +61,21 @@ export default function InternalResourceHubDataSettings({
             onChange={setField("resource_hub_title_field_id", "resource_hub_title_field")}
           />
           <MarketingFieldSelect
-            label="File URL"
+            label="Reference link"
             fieldId={config.resource_hub_file_url_field_id}
             fieldName={config.resource_hub_file_url_field}
             fields={tableFields}
             onChange={setField("resource_hub_file_url_field_id", "resource_hub_file_url_field")}
+          />
+          <MarketingFieldSelect
+            label="Attachments"
+            fieldId={config.resource_hub_attachments_field_id}
+            fieldName={config.resource_hub_attachments_field}
+            fields={tableFields}
+            onChange={setField(
+              "resource_hub_attachments_field_id",
+              "resource_hub_attachments_field"
+            )}
           />
           <MarketingFieldSelect
             label="Description"
@@ -103,6 +116,24 @@ export default function InternalResourceHubDataSettings({
         </MarketingFieldMappingSection>
       ) : null}
 
+      {config.table_id && tableFields.length > 0 ? (
+        <div className="space-y-4 pt-2 border-t border-border/40">
+          <SortSelector
+            value={Array.isArray(config.sorts) ? config.sorts : undefined}
+            onChange={(sorts) => onUpdate({ sorts: sorts as BlockConfig["sorts"] })}
+            fields={tableFields}
+            allowMultiple
+          />
+          <BlockFilterEditor
+            filters={blockFilters}
+            tableFields={tableFields}
+            config={config}
+            onChange={(filters) => onUpdate({ filters })}
+            onConfigUpdate={(updates) => onUpdate(updates)}
+          />
+        </div>
+      ) : null}
+
       <div className="space-y-2">
         <Label htmlFor="resource-hub-title">Block title</Label>
         <Input
@@ -116,8 +147,13 @@ export default function InternalResourceHubDataSettings({
         <Label htmlFor="resource-hub-subtitle">Subtitle</Label>
         <Input
           id="resource-hub-subtitle"
-          value={config.resource_hub_subtitle || ""}
-          onChange={(e) => onUpdate({ resource_hub_subtitle: e.target.value })}
+          value={config.subtitle || config.resource_hub_subtitle || ""}
+          onChange={(e) =>
+            onUpdate({
+              subtitle: e.target.value,
+              resource_hub_subtitle: undefined,
+            })
+          }
         />
       </div>
 
@@ -127,11 +163,12 @@ export default function InternalResourceHubDataSettings({
           id="resource-hub-max"
           type="number"
           min={0}
-          value={config.resource_hub_max_items ?? ""}
+          value={config.record_limit ?? config.resource_hub_max_items ?? ""}
           onChange={(e) =>
             onUpdate({
-              resource_hub_max_items:
+              record_limit:
                 e.target.value === "" ? undefined : Math.max(0, parseInt(e.target.value, 10) || 0),
+              resource_hub_max_items: undefined,
             })
           }
         />

@@ -38,6 +38,7 @@ export interface MockResource {
   category: ResourceCategory
   fileType: ResourceFileType
   url?: string
+  referenceUrl?: string
   thumbnailUrl?: string
   description?: string
   fileSize?: string

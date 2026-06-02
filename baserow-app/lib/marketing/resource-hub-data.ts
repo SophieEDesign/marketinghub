@@ -238,7 +238,9 @@ export function buildResourceHubItems(
     const linkUrl = fields.documentLink ? formatDisplayValue(row[fields.documentLink]) : null
     const attachmentUrls = fields.attachments ? parseAttachmentUrls(row[fields.attachments]) : []
     const thumbnailUrl = attachmentUrls[0] ?? undefined
-    const url = linkUrl || attachmentUrls[0] || null
+    const primaryAttachmentUrl = attachmentUrls[0] ?? null
+    const url = primaryAttachmentUrl || linkUrl || null
+    const referenceUrl = primaryAttachmentUrl && linkUrl ? linkUrl : undefined
     const fileType = fileTypeFromUrl(url)
     const hubCategoryRaw = fields.hubCategory
       ? formatDisplayValue(row[fields.hubCategory])
@@ -262,6 +264,7 @@ export function buildResourceHubItems(
       category,
       fileType,
       url: url ?? undefined,
+      referenceUrl,
       thumbnailUrl,
       description: fields.notes ? formatDisplayValue(row[fields.notes]) ?? undefined : undefined,
       updatedAt,

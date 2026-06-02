@@ -63,6 +63,7 @@ export default function InternalResourceHubBlock({
   const { config } = block
   const title = config.title || "Brand & Media Resources"
   const subtitle =
+    config.subtitle ||
     config.resource_hub_subtitle ||
     "Access official logos, brand assets, images and documents for internal use."
   const showSearch = config.resource_hub_show_search !== false
@@ -77,8 +78,11 @@ export default function InternalResourceHubBlock({
     "resource_hub_use_mock",
     "resource_hub_use_dashboard_mock"
   )
-  const maxItems =
-    typeof config.resource_hub_max_items === "number" ? config.resource_hub_max_items : undefined
+  const maxItems = (() => {
+    if (typeof config.record_limit === "number") return config.record_limit
+    if (typeof config.resource_hub_max_items === "number") return config.resource_hub_max_items
+    return undefined
+  })()
   const showDetailPanel = config.resource_hub_show_detail_panel !== false
   const { openRecordModal } = useRecordModal()
   const { role: clientRole } = useUserRole()

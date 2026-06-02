@@ -147,6 +147,22 @@ export default function DetailPanel({
 
         <div className="space-y-3">
           <MetaRow icon={FileText} label="File type" value={resource.fileType} />
+          {resource.referenceUrl && (
+            <div className="flex items-start gap-2.5 text-sm">
+              <Link className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-muted-foreground">Reference link</p>
+                <a
+                  href={resource.referenceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="break-all font-medium text-blue-600 hover:underline"
+                >
+                  {resource.referenceUrl}
+                </a>
+              </div>
+            </div>
+          )}
           {resource.dimensions && (
             <MetaRow icon={Image} label="Dimensions" value={resource.dimensions} />
           )}

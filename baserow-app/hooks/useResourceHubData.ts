@@ -11,6 +11,7 @@ import {
   buildResourceHubItems,
   resolveMediaFields,
 } from "@/lib/marketing/resource-hub-data"
+import { applyMarketingBlockDataQuery } from "@/lib/marketing/block-data-query"
 import { findMediaTable, type MarketingTableRow } from "@/lib/marketing/marketing-tables"
 import type { MockResource } from "@/components/interface/blocks/internal-resource-hub/types"
 import type { BlockConfig } from "@/lib/interface/types"
@@ -99,10 +100,34 @@ export function useResourceHubData(options?: {
           resourceHubOverridesFromConfig(config)
         )
 
-        const { data: rows, error: rowsErr } = await supabase
-          .from(media.supabase_table)
-          .select("*")
-          .order("updated_at", { ascending: false })
+        const loadRows = async () => {
+          const withSoftDeleteFilter = await applyMarketingBlockDataQuery(
+            supabase
+              .from(media.supabase_table)
+              .select("*")
+              .is("deleted_at", null),
+            config,
+            fieldRows || [],
+            "updated_at"
+          ).order("updated_at", { ascending: false })
+
+          // Some legacy tables may not yet have deleted_at.
+          if (
+            withSoftDeleteFilter.error &&
+            /deleted_at|column .* does not exist/i.test(withSoftDeleteFilter.error.message)
+          ) {
+            return await applyMarketingBlockDataQuery(
+              supabase.from(media.supabase_table).select("*"),
+              config,
+              fieldRows || [],
+              "updated_at"
+            ).order("updated_at", { ascending: false })
+          }
+
+          return withSoftDeleteFilter
+        }
+
+        const { data: rows, error: rowsErr } = await loadRows()
 
         if (rowsErr) throw new Error(rowsErr.message)
 

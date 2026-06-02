@@ -427,6 +427,8 @@ export interface BlockConfig {
   resource_hub_file_type_field?: string
   resource_hub_file_url_field_id?: string
   resource_hub_file_url_field?: string
+  resource_hub_attachments_field_id?: string
+  resource_hub_attachments_field?: string
   resource_hub_thumbnail_url_field_id?: string
   resource_hub_thumbnail_url_field?: string
   resource_hub_description_field_id?: string
