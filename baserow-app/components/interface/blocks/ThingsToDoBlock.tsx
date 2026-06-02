@@ -12,7 +12,6 @@ import {
   groupThingsToDoItems,
   sortThingsToDoItems,
   type ThingsToDoGrouping,
-  type ThingsToDoChecklistItem,
   type ThingsToDoDateRange,
   type ThingsToDoFilters,
   type ThingsToDoSort,
@@ -29,8 +28,6 @@ import DashboardEmpty from "@/components/interface/primitives/DashboardEmpty"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { ThingsToDoDetailPanel } from "@/components/interface/things-to-do/ThingsToDoDetailPanel"
-import { ThingsToDoRecordSidePanel } from "@/components/interface/things-to-do/ThingsToDoRecordSidePanel"
 import { ThingsToDoFilterSidebar } from "@/components/interface/things-to-do/ThingsToDoFilterSidebar"
 import { ThingsToDoGroupedList } from "@/components/interface/things-to-do/ThingsToDoGroupedList"
 import { ThingsToDoHeader } from "@/components/interface/things-to-do/ThingsToDoHeader"
@@ -65,7 +62,6 @@ export default function ThingsToDoBlock({
   const showFilters = config?.things_to_do_show_filters !== false
   const showQuickLinks = config?.things_to_do_show_quick_links !== false
   const showStats = config?.things_to_do_show_stats !== false
-  const enableDetailPanel = config?.things_to_do_enable_detail_panel !== false
   const compact = config?.things_to_do_compact_mode === true
   const maxItems = config?.things_to_do_max_items
   const dateRange = (config?.things_to_do_date_range || "next_30_days") as ThingsToDoDateRange
@@ -96,9 +92,6 @@ export default function ThingsToDoBlock({
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [desktopFiltersCollapsed, setDesktopFiltersCollapsed] = useState(false)
   const [checkedIds, setCheckedIds] = useState<Set<string>>(() => new Set())
-  const [checklistOverrides, setChecklistOverrides] = useState<
-    Record<string, ThingsToDoChecklistItem[]>
-  >({})
 
   const filterOptions = useMemo(() => collectFilterOptions(sourceItems), [sourceItems])
 
@@ -132,11 +125,6 @@ export default function ThingsToDoBlock({
     [sourceItems, selectedId]
   )
 
-  const selectedChecklist = useMemo(() => {
-    if (!selectedItem) return []
-    return checklistOverrides[selectedItem.id] ?? selectedItem.checklist ?? []
-  }, [selectedItem, checklistOverrides])
-
   const handleFiltersChange = useCallback((patch: Partial<ThingsToDoFilters>) => {
     setFilters((prev) => ({ ...prev, ...patch }))
   }, [])
@@ -144,22 +132,6 @@ export default function ThingsToDoBlock({
   const handleClearFilters = useCallback(() => {
     setFilters(EMPTY_THINGS_TO_DO_FILTERS)
   }, [])
-
-  const handleChecklistToggle = useCallback(
-    (checklistId: string, completed: boolean) => {
-      if (!selectedItem) return
-      setChecklistOverrides((prev) => {
-        const base = prev[selectedItem.id] ?? selectedItem.checklist ?? []
-        return {
-          ...prev,
-          [selectedItem.id]: base.map((cl) =>
-            cl.id === checklistId ? { ...cl, completed } : cl
-          ),
-        }
-      })
-    },
-    [selectedItem]
-  )
 
   const handleCheckedChange = useCallback((id: string, checked: boolean) => {
     setCheckedIds((prev) => {
@@ -197,12 +169,6 @@ export default function ThingsToDoBlock({
     },
     [sourceItems, handleOpenRecord, isEditing]
   )
-
-  const showDetail = enableDetailPanel && selectedItem != null && !isEditing
-  const showRecordSidePanel =
-    showDetail && Boolean(selectedItem?.recordTableId && selectedItem.recordSupabaseTable)
-  const showSummaryDetailPanel = showDetail && !showRecordSidePanel
-  const showDetailPlaceholder = enableDetailPanel && !selectedItem && !isEditing
 
   if (demoState.showEmptyState && !demoState.useDemoData) {
     return (
@@ -318,7 +284,7 @@ export default function ThingsToDoBlock({
                 compact={compact}
               />
 
-              <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+              <div className="flex min-h-0 flex-1 flex-col">
                 <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-2 md:p-3">
                   {filtered.length === 0 ? (
                     <DashboardEmpty
@@ -337,47 +303,13 @@ export default function ThingsToDoBlock({
                         onCheckedChange={handleCheckedChange}
                         onOpenRecord={(item) => {
                           if (isEditing) return
-                          if (!enableDetailPanel) {
-                            setSelectedId(item.id)
-                          }
+                          setSelectedId(item.id)
                           handleOpenRecord(item)
                         }}
                       />
                     </div>
                   )}
                 </div>
-
-                {showRecordSidePanel && selectedItem?.recordTableId && selectedItem.recordSupabaseTable ? (
-                  <ThingsToDoRecordSidePanel
-                    tableId={selectedItem.recordTableId}
-                    recordId={selectedItem.id}
-                    supabaseTableName={selectedItem.recordSupabaseTable}
-                    title={selectedItem.title}
-                    onClose={() => setSelectedId(null)}
-                    onRecordUpdated={() => reload()}
-                  />
-                ) : null}
-
-                {showSummaryDetailPanel && selectedItem ? (
-                  <ThingsToDoDetailPanel
-                    item={selectedItem}
-                    checklist={selectedChecklist}
-                    onClose={() => setSelectedId(null)}
-                    onChecklistToggle={handleChecklistToggle}
-                    onOpenRecord={
-                      selectedItem.recordTableId ? () => handleOpenRecord() : undefined
-                    }
-                  />
-                ) : null}
-
-                {showDetailPlaceholder ? (
-                  <aside className="flex w-full shrink-0 flex-col justify-center border-t border-border/40 bg-muted/10 p-6 text-center md:w-[340px] md:border-l md:border-t-0">
-                    <p className="text-sm font-semibold text-foreground">Select a task to view details</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Pick an item from the queue to see owner, status, due date, checklist, and actions.
-                    </p>
-                  </aside>
-                ) : null}
               </div>
             </>
           ) : null}

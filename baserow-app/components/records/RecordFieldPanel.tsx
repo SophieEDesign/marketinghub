@@ -26,6 +26,33 @@ import { syncLinkedFieldBidirectional } from "@/lib/dataView/linkedFields"
 import { migrateLinkColumnToUuidArray } from "@/lib/fields/migrateLinkColumn"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 
+function normalizeCampaignStatusForConstraint(
+  tableName: string | null | undefined,
+  fieldName: string,
+  value: any
+): any {
+  if (!tableName || fieldName !== "status" || tableName !== "table_campaigns_1768074134170") {
+    return value
+  }
+  if (value == null) return null
+
+  const raw =
+    typeof value === "string"
+      ? value
+      : typeof value === "object"
+        ? (value.label ?? value.value ?? value.id ?? "")
+        : String(value)
+
+  const normalized = raw.trim().toLowerCase()
+  if (!normalized) return null
+  if (["planning", "active", "paused", "completed", "cancelled"].includes(normalized)) return normalized
+  if (["planned", "plan"].includes(normalized)) return "planning"
+  if (["on hold", "hold", "blocked"].includes(normalized)) return "paused"
+  if (["complete", "done"].includes(normalized)) return "completed"
+  if (normalized === "canceled") return "cancelled"
+  return normalized
+}
+
 interface FieldConfig {
   field: string // Field name or ID
   editable: boolean
@@ -248,7 +275,11 @@ export default function RecordFieldPanel({
         if (!table) return
 
         // Update record
-        let finalSavedValue: any = normalizedValue
+        let finalSavedValue: any = normalizeCampaignStatusForConstraint(
+          table.supabase_table,
+          fieldName,
+          normalizedValue
+        )
 
         const doUpdate = async (val: any) => {
           return await supabase.from(table.supabase_table).update({ [fieldName]: val }).eq("id", recordId)

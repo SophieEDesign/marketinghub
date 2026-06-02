@@ -14,13 +14,13 @@ describe("Things To Do layout updates", () => {
     expect(src).toContain("disabled")
   })
 
-  it("renders a no-selection detail placeholder and protects edit-mode interactions", () => {
+  it("keeps list-only layout and protects edit-mode interactions", () => {
     const src = readFileSync(
       join(process.cwd(), "components/interface/blocks/ThingsToDoBlock.tsx"),
       "utf8"
     )
 
-    expect(src).toContain("Select a task to view details")
+    expect(src).not.toContain("Select a task to view details")
     expect(src).toContain("if (isEditing) return")
     expect(src).toContain("desktopFiltersCollapsed")
   })

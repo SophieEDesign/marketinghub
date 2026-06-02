@@ -164,6 +164,7 @@ export function SocialMediaCalendarCore({
     contentRows,
     allItems,
     campaignRows,
+    sourceTableName,
     reload,
   } = useSocialMediaCalendarData({ config: blockConfig })
 
@@ -222,6 +223,12 @@ export function SocialMediaCalendarCore({
     return map
   }, [campaignRows, fields])
 
+  const sourceTableLooksSocial = useMemo(() => {
+    const name = sourceTableName?.trim().toLowerCase()
+    if (!name) return false
+    return /social/.test(name) && /(post|media)/.test(name)
+  }, [sourceTableName])
+
   const allSocialItems = useMemo(() => {
     if (!socialFields) return []
     return buildSocialCalendarItems({
@@ -233,8 +240,13 @@ export function SocialMediaCalendarCore({
   }, [allItems, contentRows, socialFields, campaignLabelById])
 
   const scopedItems = useMemo(
-    () => applyContentScope(allSocialItems, contentScope, socialFields?.contentType != null),
-    [allSocialItems, contentScope, socialFields?.contentType]
+    () =>
+      applyContentScope(
+        allSocialItems,
+        contentScope,
+        !sourceTableLooksSocial && socialFields?.contentType != null
+      ),
+    [allSocialItems, contentScope, socialFields?.contentType, sourceTableLooksSocial]
   )
 
   const filterOptions = useMemo(
@@ -284,6 +296,13 @@ export function SocialMediaCalendarCore({
     }
     return base
   }, [scopedItems, filters, settings.maxPosts])
+
+  useEffect(() => {
+    if (quarter === "all") return
+    if (filteredItems.length === 0) {
+      setQuarter("all")
+    }
+  }, [quarter, filteredItems.length])
 
   const calendarEvents = useMemo(
     () => buildSocialCalendarEvents(filteredItems),

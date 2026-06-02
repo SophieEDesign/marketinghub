@@ -33,6 +33,33 @@ import {
   convertModalFieldsToFieldLayout,
 } from '@/lib/interface/field-layout-helpers'
 
+function normalizeCampaignStatusForConstraint(
+  tableName: string | null | undefined,
+  fieldName: string,
+  value: any
+): any {
+  if (!tableName || fieldName !== 'status' || tableName !== 'table_campaigns_1768074134170') {
+    return value
+  }
+  if (value == null) return null
+
+  const raw =
+    typeof value === 'string'
+      ? value
+      : typeof value === 'object'
+        ? (value.label ?? value.value ?? value.id ?? '')
+        : String(value)
+
+  const normalized = raw.trim().toLowerCase()
+  if (!normalized) return null
+  if (['planning', 'active', 'paused', 'completed', 'cancelled'].includes(normalized)) return normalized
+  if (['planned', 'plan'].includes(normalized)) return 'planning'
+  if (['on hold', 'hold', 'blocked'].includes(normalized)) return 'paused'
+  if (['complete', 'done'].includes(normalized)) return 'completed'
+  if (normalized === 'canceled') return 'cancelled'
+  return normalized
+}
+
 /** Optional context for permission cascade (read-only; core does not enforce). */
 export interface RecordEditorCascadeContext {
   pageConfig?: PageConfig | null
@@ -451,7 +478,11 @@ export function useRecordEditorCore(
       const doUpdate = async (val: any) =>
         supabase.from(tableToUse).update({ [fieldName]: val }).eq('id', recordId).select().single()
 
-      let finalSavedValue: any = normalizedValue
+      let finalSavedValue: any = normalizeCampaignStatusForConstraint(
+        tableToUse,
+        fieldName,
+        normalizedValue
+      )
       let updatedRow: any = null
       let error: any
       const res = await doUpdate(finalSavedValue)
@@ -578,6 +609,11 @@ export function useRecordEditorCore(
         if (f.type === 'link_to_table') {
           payload[f.name] = normalizeUpdateValue(f.name, formData[f.name])
         }
+        payload[f.name] = normalizeCampaignStatusForConstraint(
+          effectiveTableName,
+          f.name,
+          payload[f.name]
+        )
       }
       if (recordId) {
         const baseline = baselineFormDataRef.current

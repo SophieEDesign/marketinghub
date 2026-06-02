@@ -46,6 +46,7 @@ export interface UseSocialMediaCalendarDataResult {
   contentRows: Record<string, unknown>[]
   allItems: ContentPlanningItem[]
   campaignRows: Record<string, unknown>[]
+  sourceTableName: string | null
   reload: () => void
 }
 
@@ -66,6 +67,7 @@ export function useSocialMediaCalendarData(options?: {
   const [contentRows, setContentRows] = useState<Record<string, unknown>[]>([])
   const [campaignRows, setCampaignRows] = useState<Record<string, unknown>[]>([])
   const [themeRows, setThemeRows] = useState<Record<string, unknown>[]>([])
+  const [sourceTableName, setSourceTableName] = useState<string | null>(null)
   const [reloadToken, setReloadToken] = useState(0)
 
   const reload = useCallback(() => {
@@ -173,6 +175,7 @@ export function useSocialMediaCalendarData(options?: {
         if (cancelled) return
 
         setTableIds(ids)
+        setSourceTableName(content.name ?? null)
         setFields(fieldMap)
         setContentFields(contentFieldRows)
         setContentTableFields(
@@ -197,6 +200,7 @@ export function useSocialMediaCalendarData(options?: {
           setContentTableFields([])
           setThemeRows([])
           setCampaignRows([])
+          setSourceTableName(null)
           setFromLiveData(false)
         }
       } finally {
@@ -238,6 +242,7 @@ export function useSocialMediaCalendarData(options?: {
     contentRows,
     allItems,
     campaignRows,
+    sourceTableName,
     reload,
   }
 }
