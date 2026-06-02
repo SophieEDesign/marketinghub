@@ -17,8 +17,7 @@ import {
 } from "@/lib/marketing/block-config-resolver"
 import { applyMarketingBlockDataQuery } from "@/lib/marketing/block-data-query"
 import { findCampaignsTable, findContentTable, findQuarterlyThemesTable } from "@/lib/marketing/marketing-tables"
-import type { BlockConfig } from "@/lib/interface/types"
-import type { FilterConfig } from "@/lib/interface/filters"
+import type { BlockConfig, BlockFilter } from "@/lib/interface/types"
 import type { FieldOptions, TableField } from "@/types/fields"
 
 type PlanningFieldRow = { name: string; type?: string; options?: FieldOptions }
@@ -53,7 +52,7 @@ function sanitizeSocialCalendarFilters(
       }
     }
     return true
-  }) as FilterConfig[]
+  }) as BlockFilter[]
 
   if (cleaned.length === filters.length) return config
   return { ...config, filters: cleaned }

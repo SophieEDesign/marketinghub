@@ -7,7 +7,7 @@
  */
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
-import { Maximize2, ChevronDown, ChevronRight, ArrowLeft, Save, Trash2, X, Copy } from "lucide-react"
+import { Maximize2, ChevronDown, ChevronRight, ArrowLeft, Save, Trash2, X, Copy, ExternalLink, Link2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -40,6 +40,27 @@ import {
   type RecordDrawerMode,
 } from "@/lib/records/record-drawer-mode"
 import EventRecordContextualView from "@/components/records/EventRecordContextualView"
+
+function isUuidLike(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+  )
+}
+
+function extractUrlLike(value: unknown): string | null {
+  if (typeof value === "string") {
+    const trimmed = value.trim()
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed
+    return null
+  }
+  if (Array.isArray(value) && value.length > 0) return extractUrlLike(value[0])
+  if (value && typeof value === "object") {
+    const candidate = value as Record<string, unknown>
+    return extractUrlLike(candidate.url ?? candidate.href ?? candidate.src ?? null)
+  }
+  return null
+}
 
 export interface RecordEditorProps {
   recordId: string | null
@@ -264,6 +285,11 @@ export default function RecordEditor({
     customLayout.isCustom &&
     customLayout.sections.length > 0 &&
     !showEventContextualView
+  const showTaskActivityTab =
+    useCustomLayout &&
+    recordLayoutType === "task" &&
+    mode === "review" &&
+    Boolean(recordId)
   const customLayoutReadOnly = isCustomMarketingLayout
     ? recordDrawerMode === "view"
     : interfaceMode === "view"
@@ -288,6 +314,8 @@ export default function RecordEditor({
       : null
 
   const [localFieldLayout, setLocalFieldLayout] = useState<FieldLayoutItem[]>([])
+  const [assetUserNamesById, setAssetUserNamesById] = useState<Record<string, string>>({})
+  const [assetTableNamesById, setAssetTableNamesById] = useState<Record<string, string>>({})
   const resolvedLayoutSignatureRef = useRef<string>("")
   useEffect(() => {
     const visKey = visibilityContext === "canvas" ? "visible_in_canvas" : "visible_in_modal"
@@ -441,12 +469,68 @@ export default function RecordEditor({
 
   useEffect(() => {
     if (!useCustomLayout) return
-    const first = customLayout.sections[0]?.id
+    const baseSectionIds = customLayout.sections.map((section) => section.id)
+    const first = showTaskActivityTab ? "task" : baseSectionIds[0]
     if (!first) return
     setActiveCustomTab((prev) =>
-      customLayout.sections.some((section) => section.id === prev) ? prev : first
+      showTaskActivityTab
+        ? ["task", "ownership", "linked", "activity"].includes(prev)
+          ? prev
+          : first
+        : baseSectionIds.includes(prev)
+          ? prev
+          : first
     )
-  }, [useCustomLayout, customLayoutCollapseInitSig])
+  }, [useCustomLayout, customLayoutCollapseInitSig, showTaskActivityTab, customLayout.sections])
+
+  useEffect(() => {
+    if (!useCustomLayout || recordLayoutType !== "asset" || !formData) return
+    const userIds = new Set<string>()
+    const usageTableIds = new Set<string>()
+    for (const section of customLayout.sections) {
+      for (const field of section.fields) {
+        const fieldName = field.name.toLowerCase()
+        const rawValue = formData[field.name]
+        if ((fieldName.includes("updated_by") || fieldName.includes("uploaded_by")) && isUuidLike(rawValue)) {
+          userIds.add(rawValue)
+        }
+        if (fieldName.includes("usage") && typeof rawValue === "string") {
+          const match = rawValue.match(/^table:([0-9a-f-]{36})$/i)
+          if (match?.[1]) usageTableIds.add(match[1])
+        }
+      }
+    }
+    if (userIds.size === 0 && usageTableIds.size === 0) return
+    let cancelled = false
+    const run = async () => {
+      const supabase = createClient()
+      if (userIds.size > 0) {
+        const { data } = await supabase.from("users").select("id, email").in("id", [...userIds])
+        if (!cancelled && data) {
+          const mapped: Record<string, string> = {}
+          data.forEach((u: any) => {
+            const email = typeof u?.email === "string" ? u.email : ""
+            mapped[String(u.id)] = email.includes("@") ? `${email.split("@")[0]}.` : "Unknown user"
+          })
+          setAssetUserNamesById((prev) => ({ ...prev, ...mapped }))
+        }
+      }
+      if (usageTableIds.size > 0) {
+        const { data } = await supabase.from("tables").select("id, name").in("id", [...usageTableIds])
+        if (!cancelled && data) {
+          const mapped: Record<string, string> = {}
+          data.forEach((t: any) => {
+            if (typeof t?.id === "string" && typeof t?.name === "string") mapped[t.id] = t.name
+          })
+          setAssetTableNamesById((prev) => ({ ...prev, ...mapped }))
+        }
+      }
+    }
+    void run()
+    return () => {
+      cancelled = true
+    }
+  }, [useCustomLayout, recordLayoutType, formData, customLayout.sections])
 
   const handleCustomDiscard = useCallback(() => {
     discardChanges()
@@ -590,6 +674,38 @@ export default function RecordEditor({
           : previewCandidate && typeof previewCandidate === "object" && typeof (previewCandidate as any).url === "string"
             ? (previewCandidate as any).url
             : null
+      const isAssetLayout = recordLayoutType === "asset"
+      const firstAssetUrl =
+        previewUrl ||
+        customLayout.sections
+          .flatMap((section) => section.fields)
+          .map((field) => extractUrlLike(formData[field.name]))
+          .find((url): url is string => Boolean(url)) ||
+        null
+
+      const handleAssetDownload = () => {
+        if (!firstAssetUrl) return
+        window.open(firstAssetUrl, "_blank", "noopener,noreferrer")
+      }
+
+      const handleAssetViewFull = () => {
+        if (!firstAssetUrl) return
+        window.open(firstAssetUrl, "_blank", "noopener,noreferrer")
+      }
+
+      const handleAssetCopyLink = async () => {
+        if (!firstAssetUrl) return
+        try {
+          await navigator.clipboard.writeText(firstAssetUrl)
+          toast({ title: "Link copied", variant: "success" })
+        } catch {
+          toast({
+            title: "Could not copy link",
+            description: "Copy failed. Please copy from the address bar.",
+            variant: "destructive",
+          })
+        }
+      }
 
       const renderCustomSectionFields = (sectionId: string) => {
         const section = customLayout.sections.find((item) => item.id === sectionId)
@@ -597,10 +713,23 @@ export default function RecordEditor({
         return (
           <div className="px-1 py-2 space-y-3">
             {section.fields.map((field) => (
+              (() => {
+                const fieldName = field.name.toLowerCase()
+                let displayValue = formData[field.name]
+                if ((fieldName.includes("updated_by") || fieldName.includes("uploaded_by")) && isUuidLike(displayValue)) {
+                  displayValue = assetUserNamesById[displayValue] ?? displayValue
+                }
+                if (fieldName.includes("usage") && typeof displayValue === "string") {
+                  const match = displayValue.match(/^table:([0-9a-f-]{36})$/i)
+                  if (match?.[1]) {
+                    displayValue = assetTableNamesById[match[1]] ? `Table: ${assetTableNamesById[match[1]]}` : "Table link"
+                  }
+                }
+                return (
               <FieldEditor
                 key={field.id}
                 field={field}
-                value={formData[field.name]}
+                value={displayValue}
                 onChange={(v) => handleFieldChange(field.name, v)}
                 onBlur={(v) => handleFieldBlur(field.name, v)}
                 required={field.required || false}
@@ -608,6 +737,8 @@ export default function RecordEditor({
                 tableName={effectiveTableName || undefined}
                 isReadOnly={customLayoutReadOnly || !isFieldEditable(field.name)}
               />
+                )
+              })()
             ))}
           </div>
         )
@@ -615,25 +746,131 @@ export default function RecordEditor({
 
       const tabSections = customLayout.sections.filter((section) => section.id !== "more_fields")
       const moreFieldsSection = customLayout.sections.find((section) => section.id === "more_fields")
-      const tabsForUi =
+      const defaultTabsForUi =
         moreFieldsSection != null
           ? [...tabSections, moreFieldsSection]
           : tabSections
+      const taskSectionMap = new Map(defaultTabsForUi.map((section) => [section.id, section]))
+      const taskTabsForUi = [
+        {
+          id: "task",
+          label: "Task",
+          sectionIds: ["task_summary", "checklist", "notes", "more_fields"].filter((id) =>
+            taskSectionMap.has(id)
+          ),
+          isActivity: false,
+        },
+        {
+          id: "ownership",
+          label: "Ownership",
+          sectionIds: ["ownership_dates"].filter((id) => taskSectionMap.has(id)),
+          isActivity: false,
+        },
+        {
+          id: "linked",
+          label: "Linked",
+          sectionIds: ["linked_records"].filter((id) => taskSectionMap.has(id)),
+          isActivity: false,
+        },
+        {
+          id: "activity",
+          label: "Activity",
+          sectionIds: [] as string[],
+          isActivity: true,
+        },
+      ].filter((tab) => tab.isActivity || tab.sectionIds.length > 0)
+
+      const tabsForUi =
+        isAssetLayout
+          ? [
+              {
+                id: "details",
+                label: "Details",
+                sectionIds: defaultTabsForUi
+                  .map((section) => section.id)
+                  .filter((id) => !["usage"].includes(id)),
+                isActivity: false,
+              },
+              {
+                id: "usage",
+                label: "Usage",
+                sectionIds: defaultTabsForUi
+                  .map((section) => section.id)
+                  .filter((id) => id === "usage"),
+                isActivity: false,
+              },
+              {
+                id: "activity",
+                label: "Activity",
+                sectionIds: [] as string[],
+                isActivity: true,
+              },
+            ].filter((tab) => tab.isActivity || tab.sectionIds.length > 0)
+          : showTaskActivityTab
+          ? taskTabsForUi
+          : defaultTabsForUi.map((section) => ({
+              id: section.id,
+              label: section.label,
+              sectionIds: [section.id],
+              isActivity: false,
+            }))
 
       return (
         <div className="flex flex-col min-h-0">
           <div className="px-4 py-3 space-y-3">
             <div className="rounded-card-lg border border-border/45 bg-background px-4 py-3">
               <div className="flex items-center justify-between gap-2">
-                <h3 className="text-base font-semibold truncate">
-                  {String(titleValue || recordTitle || "Record Details")}
-                </h3>
-                {statusValue != null && statusValue !== "" ? (
-                  <Badge variant="secondary" className="max-w-[40%] truncate">
-                    {String(statusValue)}
-                  </Badge>
-                ) : null}
+                <div className="min-w-0">
+                  <h3 className="text-base font-semibold truncate">
+                    {String(titleValue || recordTitle || "Record Details")}
+                  </h3>
+                  {statusValue != null && statusValue !== "" ? (
+                    <Badge variant="secondary" className="mt-1 max-w-full truncate">
+                      {String(statusValue)}
+                    </Badge>
+                  ) : null}
+                </div>
+                <div className="flex items-center gap-1">
+                  {firstAssetUrl ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={handleAssetCopyLink}
+                      aria-label="Copy link"
+                    >
+                      <Link2 className="h-4 w-4" />
+                    </Button>
+                  ) : null}
+                  {recordId && onDeleted ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      onClick={handleDelete}
+                      disabled={deleting || saving || loading || !canDeleteRecords}
+                      aria-label="Delete asset"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  ) : null}
+                </div>
               </div>
+              {hasDraftToRestore ? (
+                <div className="mt-3 flex items-center justify-between gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  <span>You have an unsaved draft.</span>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={restoreDraft}>
+                      Restore
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={clearDraft}>
+                      Dismiss
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             {(activeCustomTab === "overview" || activeCustomTab === "media") && previewUrl ? (
@@ -659,9 +896,30 @@ export default function RecordEditor({
                   </TabsTrigger>
                 ))}
               </TabsList>
-              {tabsForUi.map((section) => (
-                <TabsContent key={section.id} value={section.id} className="mt-3 focus-visible:outline-none">
-                  {renderCustomSectionFields(section.id)}
+              {tabsForUi.map((tab) => (
+                <TabsContent key={tab.id} value={tab.id} className="mt-3 focus-visible:outline-none">
+                  {tab.isActivity ? (
+                    <div className="space-y-4 px-1 py-2">
+                      <div className="rounded-card-lg border border-border/35 bg-card p-3">
+                        <RecordActivity record={formData} tableId={tableId} />
+                      </div>
+                      {recordId ? (
+                        <div className="rounded-card-lg border border-border/35 bg-card p-3">
+                          <RecordComments
+                            tableId={tableId}
+                            recordId={recordId}
+                            canAddComment={effectiveEditable}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {tab.sectionIds.map((sectionId) => (
+                        <div key={sectionId}>{renderCustomSectionFields(sectionId)}</div>
+                      ))}
+                    </div>
+                  )}
                 </TabsContent>
               ))}
             </Tabs>
@@ -669,7 +927,31 @@ export default function RecordEditor({
 
           {mode === "review" && recordId ? (
             <div className="sticky bottom-0 z-10 border-t border-border/40 bg-background/95 backdrop-blur px-4 py-3 flex flex-col gap-2 shrink-0">
-              {customLayoutReadOnly && canEditRecords ? (
+              {isAssetLayout && firstAssetUrl ? (
+                <>
+                  <Button type="button" size="sm" className="w-full" onClick={handleAssetDownload}>
+                    Download
+                  </Button>
+                  <div className="grid grid-cols-3 gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={handleAssetViewFull}>
+                      <ExternalLink className="h-4 w-4 mr-1" />
+                      Full size
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={handleAssetCopyLink}>
+                      <Link2 className="h-4 w-4 mr-1" />
+                      Copy link
+                    </Button>
+                    {customLayoutReadOnly && canEditRecords ? (
+                      <Button type="button" variant="outline" size="sm" onClick={handleCustomEdit}>
+                        Edit
+                      </Button>
+                    ) : (
+                      <div />
+                    )}
+                  </div>
+                </>
+              ) : null}
+              {customLayoutReadOnly && canEditRecords && !(isAssetLayout && firstAssetUrl) ? (
                 <Button type="button" size="sm" className="w-full" onClick={handleCustomEdit}>
                   {customEditLabel}
                 </Button>
@@ -951,7 +1233,7 @@ export default function RecordEditor({
 
       {/* Content stacks naturally so section headers + fields push comments down; parent scrolls */}
       <div className="flex-shrink-0 flex flex-col overflow-visible pl-6 pr-0">
-        {hasDraftToRestore && (
+        {hasDraftToRestore && !useCustomLayout && (
           <div className="mb-4 flex items-center justify-between gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
             <span>You have an unsaved draft. Restore it?</span>
             <div className="flex gap-2">
@@ -973,7 +1255,7 @@ export default function RecordEditor({
         </div>
       )}
 
-      {mode === "review" && recordId && !showEventContextualView && (
+      {mode === "review" && recordId && !showEventContextualView && !showTaskActivityTab && (
         <>
           {renderExtraContent && (
             <div className="border-t flex-shrink-0 overflow-visible">

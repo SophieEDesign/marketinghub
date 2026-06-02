@@ -81,7 +81,9 @@ export default function DetailPanel({
       })()
     : null
 
-  const usageLabel = resource?.usage?.replace(/^table:/, "table ")
+  const usageLabel = resource?.usage?.match(/^table:[0-9a-f-]{36}$/i)
+    ? "Linked media table"
+    : resource?.usage
 
   if (!resource) {
     return (
@@ -105,59 +107,64 @@ export default function DetailPanel({
         className
       )}
     >
-      <div className="flex items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
-        <span
-          className={cn(
-            "rounded-md px-2 py-0.5 text-xs font-semibold uppercase",
-            getFileTypeBadgeClasses(resource.fileType)
-          )}
-        >
-          {resource.fileType}
-        </span>
-        <div className="flex items-center gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={onToggleFavourite}
-            aria-label={isFavourite ? "Remove favourite" : "Add favourite"}
+      <div className="border-b border-border/60 px-4 py-3 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <span
+            className={cn(
+              "inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide",
+              getFileTypeBadgeClasses(resource.fileType)
+            )}
           >
-            <Star
-              className={cn(
-                "h-4 w-4",
-                isFavourite ? "fill-amber-400 text-amber-400" : "text-muted-foreground"
-              )}
-            />
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button type="button" variant="ghost" size="icon" className="h-8 w-8">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {isEditing ? (
-                <>
-                  <DropdownMenuItem disabled>Rename (coming soon)</DropdownMenuItem>
-                  <DropdownMenuItem disabled>Move category (coming soon)</DropdownMenuItem>
-                  <DropdownMenuItem disabled className="text-destructive">
-                    Delete (coming soon)
-                  </DropdownMenuItem>
-                </>
-              ) : (
-                <DropdownMenuItem disabled>More actions</DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+            {resource.fileType}
+          </span>
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={onToggleFavourite}
+              aria-label={isFavourite ? "Remove favourite" : "Add favourite"}
+            >
+              <Star
+                className={cn(
+                  "h-4 w-4",
+                  isFavourite ? "fill-amber-400 text-amber-400" : "text-muted-foreground"
+                )}
+              />
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {isEditing ? (
+                  <>
+                    <DropdownMenuItem disabled>Rename (coming soon)</DropdownMenuItem>
+                    <DropdownMenuItem disabled>Move category (coming soon)</DropdownMenuItem>
+                    <DropdownMenuItem disabled className="text-destructive">
+                      Delete (coming soon)
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <DropdownMenuItem disabled>More actions</DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+        <div className="min-w-0">
+          <h3 className="text-base font-semibold text-[#1e3a5f] break-words">{resource.title}</h3>
+          <p className="mt-1 text-xs text-muted-foreground">{categoryLabel(resource.category)}</p>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         <div>
-          <h3 className="text-base font-bold text-[#1e3a5f] break-words">{resource.title}</h3>
-          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-            {resource.description ?? categoryLabel(resource.category)}
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            {resource.description ?? "No description provided."}
           </p>
         </div>
 
@@ -199,7 +206,6 @@ export default function DetailPanel({
               icon={FileText}
               label="Usage"
               value={usageLabel ?? resource.usage}
-              valueClassName="font-mono text-xs"
             />
           )}
           {resource.owner && (
@@ -233,34 +239,38 @@ export default function DetailPanel({
           <Download className="h-4 w-4" />
           {resource.fileType === "LINK" ? "Open link" : "Download"}
         </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full gap-2 border-border/60"
-          onClick={onViewFull}
-        >
-          <ExternalLink className="h-4 w-4" />
-          {resource.fileType === "LINK" ? "Open in new tab" : "View full size"}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full gap-2 border-border/60"
-          onClick={onCopyLink}
-        >
-          <Link className="h-4 w-4" />
-          Copy link
-        </Button>
-        {onEditDetails ? (
+        <div className="grid grid-cols-3 gap-2">
           <Button
             type="button"
             variant="outline"
-            className="w-full gap-2 border-border/60"
-            onClick={onEditDetails}
+            className="gap-2 border-border/60 px-2"
+            onClick={onViewFull}
           >
-            Manage asset
+            <ExternalLink className="h-4 w-4" />
+            <span className="sr-only md:not-sr-only">{resource.fileType === "LINK" ? "Open tab" : "Full size"}</span>
           </Button>
-        ) : null}
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2 border-border/60 px-2"
+            onClick={onCopyLink}
+          >
+            <Link className="h-4 w-4" />
+            <span className="sr-only md:not-sr-only">Copy link</span>
+          </Button>
+          {onEditDetails ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="gap-2 border-border/60 px-2"
+              onClick={onEditDetails}
+            >
+              Manage
+            </Button>
+          ) : (
+            <div />
+          )}
+        </div>
       </div>
     </aside>
   )
