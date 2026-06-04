@@ -164,6 +164,7 @@ describe("marketing-home helpers", () => {
   it("detects workspace pages without layout_style", () => {
     expect(isMarketingHubWorkspacePage({ name: "Content Planning" })).toBe(true)
     expect(isMarketingHubWorkspacePage({ name: "Things To Do" })).toBe(true)
+    expect(isMarketingHubWorkspacePage({ name: "Members Welcome" })).toBe(true)
     expect(isMarketingHubWorkspacePage({ name: "Random Page" })).toBe(false)
   })
 })

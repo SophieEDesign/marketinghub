@@ -24,6 +24,7 @@ import {
   MARKETING_DEMO_BANNER_DEFAULT,
 } from "@/lib/marketing/block-config-resolver"
 import { useRecordModal } from "@/contexts/RecordModalContext"
+import { FilterResultsAnnouncer } from "@/components/a11y/FilterResultsAnnouncer"
 import DashboardEmpty from "@/components/interface/primitives/DashboardEmpty"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 import { Button } from "@/components/ui/button"
@@ -207,6 +208,7 @@ export default function ThingsToDoBlock({
       )}
     >
       {isDemoData ? <MarketingDemoDataBanner message={demoBannerMessage} /> : null}
+      <FilterResultsAnnouncer count={filtered.length} noun="tasks" />
 
       <ThingsToDoHeader
         title={title}

@@ -21,6 +21,7 @@ const WORKSPACE_PAGE_NAMES = new Set([
   "social calendar",
   "social media calendar",
   "event calendar",
+  "members welcome",
   // Legacy names still in nav until reprovisioned
   "internal staff hub",
 ])

@@ -159,7 +159,7 @@ export default function DetailPanel({
 
   useEffect(() => {
     setActiveTab("details")
-  }, [resource.id])
+  }, [resource?.id])
 
   const activityEntries = useMemo(
     () => (resource ? buildActivityEntries(resource) : []),

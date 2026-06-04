@@ -106,11 +106,23 @@ describe("P1 performance cleanup", () => {
     expect(src).not.toContain("usePageAggregates")
   })
 
-  it("InternalResourceHubBlock is dynamically imported", () => {
+  it("defers block mount on dashboard tiles but not full-page layouts", () => {
     const src = readSource("components/interface/BlockRenderer.tsx")
-    expect(src).toContain('dynamic(() => import("./blocks/InternalResourceHubBlock")')
-    expect(src).not.toMatch(
-      /^import InternalResourceHubBlock from/m
-    )
+    expect(src).toContain("const deferBlockMount = !isFullPage")
+    expect(src).toContain("enabled={deferBlockMount}")
+  })
+
+  it("heavy marketing blocks are dynamically imported", () => {
+    const src = readSource("components/interface/BlockRenderer.tsx")
+    const dynamicBlocks = [
+      "InternalResourceHubBlock",
+      "ContentThemeBlock",
+      "UpcomingSummaryBlock",
+      "KPISummaryBlock",
+    ]
+    for (const block of dynamicBlocks) {
+      expect(src).toContain(`dynamic(() => import("./blocks/${block}")`)
+      expect(src).not.toMatch(new RegExp(`^import ${block} from`, "m"))
+    }
   })
 })

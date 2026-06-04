@@ -693,7 +693,6 @@ export interface BlockConfig {
   campaigns_linked_events_field_id?: string
   campaigns_linked_events_field?: string
   campaigns_click_action?: "open_record" | "none"
-  campaigns_open_record_mode?: "modal" | "side_panel"
   // Members Welcome block
   members_welcome_max_events?: number
   members_welcome_max_resources?: number

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useCallback } from "react"
+import { useOverlayPanelA11y } from "@/hooks/useOverlayPanelA11y"
 import { useRouter } from "next/navigation"
 import { X, Pin, PinOff, Maximize2, Minimize2, Link2, ChevronLeft } from "lucide-react"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
@@ -33,6 +34,7 @@ export default function RecordPanel() {
   const isMobile = useIsMobile()
 
   const resizeRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
   const isResizingRef = useRef(false)
   const resizeCleanupRef = useRef<null | (() => void)>(null)
 
@@ -78,15 +80,16 @@ export default function RecordPanel() {
   // In edit mode, always show Back so user can close (X is hidden). Otherwise show when we can go to previous record.
   const canGoBack = state.isFullscreen || state.history.length > 1 || isEdit()
 
-  useEffect(() => {
-    if (!state.isOpen) return
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // In edit mode, panel cannot be closed via Escape (use Back instead)
-      if (e.key === "Escape" && !state.isPinned && !isEdit()) closeRecord()
-    }
-    window.addEventListener("keydown", handleKeyDown)
-    return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [state.isOpen, state.isPinned, isEdit, closeRecord])
+  const overlayA11yActive =
+    state.isOpen && useOverlayLayout && !state.isPinned
+
+  useOverlayPanelA11y({
+    active: overlayA11yActive,
+    panelRef,
+    onEscape: () => {
+      if (!state.isPinned && !isEdit()) closeRecord()
+    },
+  })
 
   useEffect(() => {
     return () => {
@@ -133,7 +136,11 @@ export default function RecordPanel() {
 
       {/* Key: remount on record change only; interfaceMode is a prop, not a key */}
       <div
+        ref={panelRef}
         key={`record-panel-${state.recordId ?? "new"}`}
+        role={overlayA11yActive ? "dialog" : undefined}
+        aria-modal={overlayA11yActive ? true : undefined}
+        aria-label="Record details"
         className={cn(
           useOverlayLayout
             ? cn(
@@ -193,9 +200,11 @@ export default function RecordPanel() {
           <div className="flex items-center gap-2">
             {canGoBack && (
               <button
+                type="button"
                 onClick={handleBack}
                 className="p-1.5 hover:bg-muted rounded-inner transition-colors"
                 title={state.history.length <= 1 && isEdit() ? "Close" : "Go back"}
+                aria-label={state.history.length <= 1 && isEdit() ? "Close record" : "Go back"}
               >
                 <ChevronLeft className="h-4 w-4 text-muted-foreground" />
               </button>
@@ -204,19 +213,23 @@ export default function RecordPanel() {
           <div className="flex items-center gap-1">
             {state.recordId && (
               <button
+                type="button"
                 onClick={handleCopyLink}
                 className="p-1.5 hover:bg-muted rounded-inner transition-colors"
                 title="Copy link"
+                aria-label="Copy record link"
               >
                 <Link2 className="h-4 w-4 text-muted-foreground" />
               </button>
             )}
             <button
+              type="button"
               onClick={togglePin}
               className={`p-1.5 hover:bg-gray-100 rounded transition-colors ${
                 state.isPinned ? "bg-blue-50 text-blue-600" : ""
               }`}
               title={state.isPinned ? "Unpin panel" : "Pin panel"}
+              aria-label={state.isPinned ? "Unpin panel" : "Pin panel"}
             >
               {state.isPinned ? (
                 <Pin className="h-4 w-4" />
@@ -225,9 +238,11 @@ export default function RecordPanel() {
               )}
             </button>
             <button
+              type="button"
               onClick={toggleFullscreen}
               className="p-1.5 hover:bg-gray-100 rounded transition-colors"
               title={state.isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+              aria-label={state.isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
             >
               {state.isFullscreen ? (
                 <Minimize2 className="h-4 w-4 text-muted-foreground" />
@@ -237,9 +252,11 @@ export default function RecordPanel() {
             </button>
             {!state.isPinned && !isEdit() && (
               <button
+                type="button"
                 onClick={closeRecord}
                 className="p-1.5 hover:bg-muted rounded-inner transition-colors"
                 title="Close"
+                aria-label="Close record"
               >
                 <X className="h-4 w-4 text-muted-foreground" />
               </button>

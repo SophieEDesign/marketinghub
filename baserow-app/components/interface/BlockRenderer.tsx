@@ -23,9 +23,6 @@ import FilterBlock from "./blocks/FilterBlock"
 import FieldBlock from "./blocks/FieldBlock"
 import FieldSectionBlock from "./blocks/FieldSectionBlock"
 import NumberBlock from "./blocks/NumberBlock"
-import ContentThemeBlock from "./blocks/ContentThemeBlock"
-import UpcomingSummaryBlock from "./blocks/UpcomingSummaryBlock"
-import KPISummaryBlock from "./blocks/KPISummaryBlock"
 import { ErrorBoundary } from "./ErrorBoundary"
 import LazyBlockWrapper from "./LazyBlockWrapper"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
@@ -140,6 +137,18 @@ const InternalResourceHubBlock = dynamic(() => import("./blocks/InternalResource
   loading: () => <BlockLoadingPlaceholder />,
 })
 const MembersWelcomeBlock = dynamic(() => import("./blocks/MembersWelcomeBlock"), {
+  ssr: false,
+  loading: () => <BlockLoadingPlaceholder />,
+})
+const ContentThemeBlock = dynamic(() => import("./blocks/ContentThemeBlock"), {
+  ssr: false,
+  loading: () => <BlockLoadingPlaceholder />,
+})
+const UpcomingSummaryBlock = dynamic(() => import("./blocks/UpcomingSummaryBlock"), {
+  ssr: false,
+  loading: () => <BlockLoadingPlaceholder />,
+})
+const KPISummaryBlock = dynamic(() => import("./blocks/KPISummaryBlock"), {
   ssr: false,
   loading: () => <BlockLoadingPlaceholder />,
 })
@@ -267,6 +276,8 @@ export default function BlockRenderer({
 
   const renderBlock = () => {
     const canEdit = isEditing && !isLocked
+    /** Dashboard tiles defer mount until near viewport; full-page blocks mount immediately. */
+    const deferBlockMount = !isFullPage
 
     // Hard sizing invariants: catch illegal 'fill' usage early in development.
     if (process.env.NODE_ENV === 'development') {
@@ -329,7 +340,7 @@ export default function BlockRenderer({
         // pageTableId must flow to blocks for base_table fallback
         // Lazy-load GridBlock - below-the-fold blocks load when scrolled into view
         return (
-          <LazyBlockWrapper enabled={true}>
+          <LazyBlockWrapper enabled={deferBlockMount}>
             <GridBlock
               block={safeBlock}
               isEditing={canEdit}
@@ -419,17 +430,32 @@ export default function BlockRenderer({
 
       case "chart":
         return (
-          <LazyBlockWrapper enabled={true}>
+          <LazyBlockWrapper enabled={deferBlockMount}>
             <ChartBlock block={safeBlock} isEditing={canEdit} pageId={pageId} filters={filters} filterTree={filterTree} />
           </LazyBlockWrapper>
         )
 
       case "kpi":
         // CRITICAL: Pass pre-fetched aggregate data to prevent duplicate requests
-        return <KPIBlock block={safeBlock} isEditing={canEdit} pageId={pageId} filters={filters} filterTree={filterTree} aggregateData={aggregateData} />
+        return (
+          <LazyBlockWrapper enabled={deferBlockMount}>
+            <KPIBlock
+              block={safeBlock}
+              isEditing={canEdit}
+              pageId={pageId}
+              filters={filters}
+              filterTree={filterTree}
+              aggregateData={aggregateData}
+            />
+          </LazyBlockWrapper>
+        )
 
       case "kpi_summary":
-        return <KPISummaryBlock block={safeBlock} isEditing={canEdit} />
+        return (
+          <LazyBlockWrapper enabled={deferBlockMount}>
+            <KPISummaryBlock block={safeBlock} isEditing={canEdit} />
+          </LazyBlockWrapper>
+        )
 
       case "filter":
         // Filter block emits filter state via context
@@ -518,7 +544,7 @@ export default function BlockRenderer({
       
       case "multi_calendar":
         return (
-          <LazyBlockWrapper enabled={true}>
+          <LazyBlockWrapper enabled={deferBlockMount}>
             <MultiCalendarBlock
               block={safeBlock}
               isEditing={canEdit}
@@ -535,7 +561,7 @@ export default function BlockRenderer({
       case "kanban":
         // Kanban block - wrapper around GridBlock with view_type='kanban'
         return (
-          <LazyBlockWrapper enabled={true}>
+          <LazyBlockWrapper enabled={deferBlockMount}>
             <KanbanBlock
               block={safeBlock}
               isEditing={canEdit}
@@ -558,7 +584,7 @@ export default function BlockRenderer({
       case "timeline":
         // Timeline block - wrapper around GridBlock with view_type='timeline'
         return (
-          <LazyBlockWrapper enabled={true}>
+          <LazyBlockWrapper enabled={deferBlockMount}>
             <TimelineBlock
               block={safeBlock}
               isEditing={canEdit}
@@ -580,7 +606,7 @@ export default function BlockRenderer({
       
       case "multi_timeline":
         return (
-          <LazyBlockWrapper enabled={true}>
+          <LazyBlockWrapper enabled={deferBlockMount}>
             <MultiTimelineBlock
               block={safeBlock}
               isEditing={canEdit}
@@ -597,7 +623,7 @@ export default function BlockRenderer({
       case "gallery":
         // Gallery block - wrapper around GridBlock with view_type='gallery'
         return (
-          <LazyBlockWrapper enabled={true}>
+          <LazyBlockWrapper enabled={deferBlockMount}>
             <GalleryBlock
               block={safeBlock}
               isEditing={canEdit}
@@ -655,7 +681,7 @@ export default function BlockRenderer({
       case "horizontal_grouped":
         // Tabs block - displays records grouped by field in tabs
         return (
-          <LazyBlockWrapper enabled={true}>
+          <LazyBlockWrapper enabled={deferBlockMount}>
             <HorizontalGroupedBlock
               block={safeBlock}
               isEditing={canEdit}
@@ -676,20 +702,26 @@ export default function BlockRenderer({
         return <NumberBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} recordId={recordId} />
 
       case "content_theme":
-        return <ContentThemeBlock block={safeBlock} isEditing={canEdit} />
+        return (
+          <LazyBlockWrapper enabled={deferBlockMount}>
+            <ContentThemeBlock block={safeBlock} isEditing={canEdit} />
+          </LazyBlockWrapper>
+        )
 
       case "upcoming_summary":
         return (
-          <UpcomingSummaryBlock
-            block={safeBlock}
-            isEditing={canEdit}
-            interfaceMode={interfaceMode}
-          />
+          <LazyBlockWrapper enabled={deferBlockMount}>
+            <UpcomingSummaryBlock
+              block={safeBlock}
+              isEditing={canEdit}
+              interfaceMode={interfaceMode}
+            />
+          </LazyBlockWrapper>
         )
 
       case "things_to_do":
         return (
-          <LazyBlockWrapper enabled={true}>
+          <LazyBlockWrapper enabled={deferBlockMount}>
             <ThingsToDoBlock
               block={safeBlock}
               isEditing={canEdit}
@@ -701,7 +733,7 @@ export default function BlockRenderer({
 
       case "content_timeline":
         return (
-          <LazyBlockWrapper enabled={true}>
+          <LazyBlockWrapper enabled={deferBlockMount}>
             <ContentTimelineBlock
               block={safeBlock}
               isEditing={canEdit}
@@ -713,7 +745,7 @@ export default function BlockRenderer({
 
       case "event_calendar":
         return (
-          <LazyBlockWrapper enabled={true}>
+          <LazyBlockWrapper enabled={deferBlockMount}>
             <EventCalendarBlock
               block={safeBlock}
               isEditing={canEdit}
@@ -726,7 +758,7 @@ export default function BlockRenderer({
 
       case "social_media_calendar":
         return (
-          <LazyBlockWrapper enabled={true}>
+          <LazyBlockWrapper enabled={deferBlockMount}>
             <SocialMediaCalendarBlock
               block={safeBlock}
               isEditing={canEdit}
@@ -739,7 +771,7 @@ export default function BlockRenderer({
 
       case "campaigns_overview":
         return (
-          <LazyBlockWrapper enabled={true}>
+          <LazyBlockWrapper enabled={deferBlockMount}>
             <CampaignsOverviewBlock
               block={safeBlock}
               isEditing={canEdit}
@@ -751,7 +783,7 @@ export default function BlockRenderer({
 
       case "internal_resource_hub":
         return (
-          <LazyBlockWrapper enabled={true}>
+          <LazyBlockWrapper enabled={deferBlockMount}>
             <InternalResourceHubBlock
               block={safeBlock}
               isEditing={canEdit}
@@ -764,7 +796,7 @@ export default function BlockRenderer({
 
       case "members_welcome":
         return (
-          <LazyBlockWrapper enabled={true}>
+          <LazyBlockWrapper enabled={deferBlockMount}>
             <MembersWelcomeBlock
               block={safeBlock}
               isEditing={canEdit}

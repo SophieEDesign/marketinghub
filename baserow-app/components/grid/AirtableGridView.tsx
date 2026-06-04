@@ -1863,15 +1863,18 @@ export default function AirtableGridView({
                   className="flex border-b border-gray-100 bg-gray-50/50"
                   style={{ height: GROUP_HEADER_HEIGHT }}
                 >
-                  <div
-                    className="flex items-center px-4 flex-1 cursor-pointer hover:bg-gray-100/50 transition-colors"
+                  <button
+                    type="button"
+                    className="flex items-center px-4 flex-1 cursor-pointer hover:bg-gray-100/50 transition-colors text-left w-full"
                     style={{ paddingLeft: 16 + (item.level || 0) * 16 }}
                     onClick={() => toggleGroup(node.pathKey)}
+                    aria-expanded={!isCollapsed}
+                    aria-label={`${ruleLabel}: ${node.label}, ${node.size} ${node.size === 1 ? "row" : "rows"}`}
                   >
                     {isCollapsed ? (
-                      <ChevronRight className="h-4 w-4 mr-2 text-gray-400" />
+                      <ChevronRight className="h-4 w-4 mr-2 text-gray-400" aria-hidden />
                     ) : (
-                      <ChevronDown className="h-4 w-4 mr-2 text-gray-400" />
+                      <ChevronDown className="h-4 w-4 mr-2 text-gray-400" aria-hidden />
                     )}
                     <span className="font-medium text-sm text-gray-700">
                       {ruleLabel}: {node.label}
@@ -1879,7 +1882,7 @@ export default function AirtableGridView({
                     <span className="text-gray-500 ml-2 text-sm">
                       ({node.size} {node.size === 1 ? "row" : "rows"})
                     </span>
-                  </div>
+                  </button>
                 </div>
               )
             } else {
@@ -2003,7 +2006,7 @@ export default function AirtableGridView({
                     />
                   </div>
 
-                  {/* Frozen row number */}
+                  {/* Frozen row number — keyboard shortcut to open record */}
                   <div
                     ref={actualIndex === 0 ? frozenColumnRef : null}
                     className={cn(
@@ -2016,8 +2019,23 @@ export default function AirtableGridView({
                       height: effectiveRowHeight,
                       left: OPEN_RECORD_COLUMN_WIDTH + FROZEN_COLUMN_WIDTH,
                     }}
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    {actualIndex + 1}
+                    {!disableRecordPanel ? (
+                      <button
+                        type="button"
+                        className="h-full w-full text-gray-400 hover:text-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/40 rounded-sm"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleOpenRecord(row.id)
+                        }}
+                        aria-label={`Open record, row ${actualIndex + 1}`}
+                      >
+                        {actualIndex + 1}
+                      </button>
+                    ) : (
+                      <span>{actualIndex + 1}</span>
+                    )}
                   </div>
 
                   {/* Cells */}

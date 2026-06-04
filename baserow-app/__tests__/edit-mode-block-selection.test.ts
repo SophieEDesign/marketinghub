@@ -13,6 +13,7 @@ const MARKETING_CUSTOM_BLOCK_TYPES = [
   "event_calendar",
   "social_media_calendar",
   "campaigns_overview",
+  "members_welcome",
 ] as const
 
 describe("edit mode — marketing block settings registry", () => {
@@ -35,6 +36,8 @@ describe("edit mode — assertBlockConfig allows marketing block config keys", (
         resource_hub_layout_mode: "gallery",
         social_media_calendar_default_view: "month",
         event_calendar_show_filters: true,
+        members_welcome_max_events: 5,
+        members_welcome_allow_submit_event: true,
       })
       expect(result.valid).toBe(true)
     }

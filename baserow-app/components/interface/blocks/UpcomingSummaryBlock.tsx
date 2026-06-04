@@ -53,6 +53,7 @@ import {
 import UpcomingSummarySectionCard from "./upcoming-summary/UpcomingSummarySectionCard"
 import MarketingDemoDataBanner from "@/components/interface/primitives/MarketingDemoDataBanner"
 import { marketingDemoState } from "@/lib/marketing/block-config-resolver"
+import { resolveUpcomingSummaryRecordLayoutType } from "@/lib/marketing/upcoming-summary-record-layout"
 
 interface UpcomingSummaryBlockProps {
   block: PageBlock
@@ -264,15 +265,17 @@ export default function UpcomingSummaryBlock({
         recordTableId?: string
         recordSupabaseTable?: string
       },
-      _section: UpcomingSummarySectionId
+      section: UpcomingSummarySectionId
     ) => {
       if (!linksEnabled || isEditing) return
       if (!item.recordTableId || !item.recordSupabaseTable) return
+      const recordLayoutType = resolveUpcomingSummaryRecordLayoutType(section)
       openRecordModal({
         tableId: item.recordTableId,
         recordId: item.id,
         supabaseTableName: item.recordSupabaseTable,
         interfaceMode,
+        ...(recordLayoutType ? { recordLayoutType } : {}),
         onRecordUpdated: () => reload(),
       })
     },

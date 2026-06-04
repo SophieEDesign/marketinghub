@@ -47,7 +47,13 @@ type QuickAction = {
   icon: typeof CalendarDays
 }
 
-function QuickActionCard({ action }: { action: QuickAction }) {
+function QuickActionCard({
+  action,
+  isEditing = false,
+}: {
+  action: QuickAction
+  isEditing?: boolean
+}) {
   const Icon = action.icon
   const body = (
     <article className="flex h-full flex-col rounded-2xl border border-[#E6E6EF] bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
@@ -68,8 +74,8 @@ function QuickActionCard({ action }: { action: QuickAction }) {
     </article>
   )
 
-  if (!action.href) {
-    return body
+  if (!action.href || isEditing) {
+    return <div className="block h-full">{body}</div>
   }
 
   return (
@@ -213,10 +219,13 @@ export default function MembersWelcomeBlock({
     [isEditing, eventTableIds, openRecordModal, interfaceMode, reloadEvents]
   )
 
-  const openResource = useCallback((url?: string) => {
-    if (!url) return
-    window.open(url, "_blank", "noopener,noreferrer")
-  }, [])
+  const openResource = useCallback(
+    (url?: string) => {
+      if (isEditing || !url) return
+      window.open(url, "_blank", "noopener,noreferrer")
+    },
+    [isEditing]
+  )
 
   return (
     <div
@@ -261,7 +270,7 @@ export default function MembersWelcomeBlock({
         ) : (
           <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {quickActions.map((action) => (
-              <QuickActionCard key={action.id} action={action} />
+              <QuickActionCard key={action.id} action={action} isEditing={isEditing} />
             ))}
           </div>
         )}
@@ -410,7 +419,7 @@ export default function MembersWelcomeBlock({
                       variant="outline"
                       size="sm"
                       className="shrink-0 h-8 text-xs"
-                      disabled={!resource.url}
+                      disabled={isEditing || !resource.url}
                       onClick={() => openResource(resource.url)}
                     >
                       Open

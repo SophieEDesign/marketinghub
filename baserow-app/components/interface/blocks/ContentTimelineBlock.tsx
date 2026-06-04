@@ -28,6 +28,7 @@ import { ContentTimelineFilterBar } from "@/components/interface/content-timelin
 import { ContentTimelineGrid } from "@/components/interface/content-timeline/ContentTimelineGrid"
 import { ContentTimelineHeader } from "@/components/interface/content-timeline/ContentTimelineHeader"
 import { ContentTimelineStatusLegend } from "@/components/interface/content-timeline/ContentTimelineStatusLegend"
+import { FilterResultsAnnouncer } from "@/components/a11y/FilterResultsAnnouncer"
 import MarketingDemoDataBanner from "@/components/interface/primitives/MarketingDemoDataBanner"
 import { marketingBlockRootClass } from "@/lib/interface/marketing-block-layout"
 
@@ -235,6 +236,7 @@ export default function ContentTimelineBlock({
       )}
     >
       {isDemoData ? <MarketingDemoDataBanner message={demoBannerMessage} /> : null}
+      <FilterResultsAnnouncer count={visibleItems.length} noun="timeline items" />
 
       <ContentTimelineHeader
         title={title}

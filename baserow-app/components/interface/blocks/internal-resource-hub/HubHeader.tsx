@@ -61,16 +61,18 @@ export default function HubHeader({
                   className="h-9 pl-9 text-sm border-border/60 bg-muted/20"
                 />
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-9 shrink-0 gap-1.5 border-border/60"
-                onClick={onFilterClick}
-              >
-                <Filter className="h-4 w-4" />
-                <span className="hidden sm:inline">Filter</span>
-              </Button>
+              {onFilterClick ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-9 shrink-0 gap-1.5 border-border/60"
+                  onClick={onFilterClick}
+                >
+                  <Filter className="h-4 w-4" />
+                  <span className="hidden sm:inline">Filter</span>
+                </Button>
+              ) : null}
             </>
           )}
           {onCreate ? (

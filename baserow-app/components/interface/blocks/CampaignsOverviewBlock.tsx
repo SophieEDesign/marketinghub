@@ -18,6 +18,7 @@ import {
   computeCampaignKpis,
 } from "@/lib/marketing/campaigns-overview-kpi"
 import { useRecordModal } from "@/contexts/RecordModalContext"
+import { FilterResultsAnnouncer } from "@/components/a11y/FilterResultsAnnouncer"
 import MarketingDemoDataBanner from "@/components/interface/primitives/MarketingDemoDataBanner"
 import DashboardEmpty from "@/components/interface/primitives/DashboardEmpty"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
@@ -213,6 +214,7 @@ export default function CampaignsOverviewBlock({
       )}
     >
       {showDemoBanner ? <MarketingDemoDataBanner message={demoMessage} /> : null}
+      <FilterResultsAnnouncer count={filteredItems.length} noun="campaigns" />
       <div className="shrink-0 border-b border-border/40 px-5 py-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           {showTitle ? (
@@ -231,6 +233,7 @@ export default function CampaignsOverviewBlock({
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search campaigns..."
+                  aria-label="Search campaigns"
                   className="h-8 w-[220px] pl-8"
                 />
               </div>

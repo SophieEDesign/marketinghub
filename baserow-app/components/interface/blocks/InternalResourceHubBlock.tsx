@@ -15,6 +15,7 @@ import {
   marketingDemoState,
   MARKETING_DEMO_BANNER_DEFAULT,
 } from "@/lib/marketing/block-config-resolver"
+import { FilterResultsAnnouncer } from "@/components/a11y/FilterResultsAnnouncer"
 import DashboardEmpty from "@/components/interface/primitives/DashboardEmpty"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 import HubHeader from "./internal-resource-hub/HubHeader"
@@ -36,7 +37,6 @@ import {
   parseDefaultCategory,
 } from "./internal-resource-hub/utils"
 import type { CategoryFilter } from "./internal-resource-hub/types"
-import { debugLog } from "@/lib/debug"
 import MarketingDemoDataBanner from "@/components/interface/primitives/MarketingDemoDataBanner"
 import {
   marketingBlockRootClass,
@@ -50,10 +50,6 @@ interface InternalResourceHubBlockProps {
   interfaceMode?: "view" | "edit"
   onUpdate?: (updates: Partial<PageBlock["config"]>) => void
   isFullPage?: boolean
-}
-
-function mockAction(label: string) {
-  debugLog(`[InternalResourceHub] ${label}`)
 }
 
 export default function InternalResourceHubBlock({
@@ -133,9 +129,13 @@ export default function InternalResourceHubBlock({
 
   const showPreview = selectedId !== null && selected !== null
 
-  const handleSelect = useCallback((id: string) => {
-    setSelectedId(id)
-  }, [])
+  const handleSelect = useCallback(
+    (id: string) => {
+      if (isEditing) return
+      setSelectedId(id)
+    },
+    [isEditing]
+  )
 
   const handleBack = useCallback(() => {
     setSelectedId(null)
@@ -157,16 +157,16 @@ export default function InternalResourceHubBlock({
 
   const openResourceUrl = useCallback(
     (id: string) => {
+      if (isEditing) return
       const r = resources.find((x) => x.id === id)
       if (r?.url) window.open(r.url, "_blank", "noopener,noreferrer")
-      else mockAction(`Open resource: ${id}`)
     },
-    [resources]
+    [resources, isEditing]
   )
 
   const handleEditResourceDetails = useCallback(
     (id: string) => {
-      if (!tableIds) return
+      if (isEditing || !tableIds) return
       openRecordModal({
         tableId: tableIds.mediaTableId,
         recordId: String(id),
@@ -176,7 +176,7 @@ export default function InternalResourceHubBlock({
         onRecordUpdated: () => reload(),
       })
     },
-    [tableIds, openRecordModal, interfaceMode, reload]
+    [isEditing, tableIds, openRecordModal, interfaceMode, reload]
   )
 
   const canCreateResource =
@@ -260,7 +260,6 @@ export default function InternalResourceHubBlock({
         <ResourceListHeader
           title={title}
           subtitle={subtitle}
-          onViewAll={() => mockAction("View all resources")}
           onCreate={canCreateResource ? handleCreateResource : undefined}
         />
         <div
@@ -292,13 +291,13 @@ export default function InternalResourceHubBlock({
           <MarketingDemoDataBanner message={demoBannerMessage} />
         </div>
       ) : null}
+      <FilterResultsAnnouncer count={filtered.length} noun="resources" />
       <HubHeader
         title={title}
         subtitle={subtitle}
         showSearch={showSearch}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        onFilterClick={() => mockAction("Filter (stub)")}
         onCreate={canCreateResource ? handleCreateResource : undefined}
       />
 
@@ -365,20 +364,20 @@ export default function InternalResourceHubBlock({
             onToggleFavourite={toggleFavourite}
             onSelectVariant={handleSelect}
             onDownload={() => {
+              if (isEditing) return
               if (selected?.url) window.open(selected.url, "_blank", "noopener,noreferrer")
-              else mockAction(`Download: ${selected?.title}`)
             }}
-            onViewFull={() => openResourceUrl(selectedId!)}
+            onViewFull={() => {
+              if (isEditing) return
+              openResourceUrl(selectedId!)
+            }}
             onCopyLink={async () => {
               const url = selected?.url
-              if (!url) {
-                mockAction(`Copy link: ${selected?.title}`)
-                return
-              }
+              if (!url) return
               try {
                 await navigator.clipboard.writeText(url)
               } catch {
-                mockAction(`Copy link failed: ${selected?.title}`)
+                // Clipboard unavailable — no-op
               }
             }}
             onEditDetails={

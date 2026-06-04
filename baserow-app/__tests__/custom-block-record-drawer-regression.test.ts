@@ -139,15 +139,17 @@ describe("custom block record drawer regression", () => {
       expect(things).toContain("if (isEditing) return")
       expect(campaigns).toContain("if (isEditing || clickAction === \"none\") return")
       expect(resourceHub).toContain("!isEditing")
+      expect(resourceHub).toMatch(/handleSelect[\s\S]*?if \(isEditing\) return/)
+      expect(resourceHub).toMatch(/openResourceUrl[\s\S]*?if \(isEditing\) return/)
+      expect(resourceHub).toMatch(/handleEditResourceDetails[\s\S]*?if \(isEditing/)
       expect(canvas).toContain("onMouseDownCapture")
       expect(canvas).toContain("selectThisBlock")
     })
 
-    it("documents known custom-block gaps to avoid false confidence in this pass", () => {
-      const social = readSource("components/interface/SocialMediaCalendarCore.tsx")
+    it("documents content timeline edit-mode guard as remaining gap", () => {
       const content = readSource("components/interface/blocks/ContentTimelineBlock.tsx")
-      expect(social).toContain("const handleSelectPost = useCallback(")
       expect(content).toContain("const handleSelectItem = (id: string) =>")
+      expect(content).not.toMatch(/handleSelectItem[\s\S]*?if \(isEditing\) return/)
     })
   })
 })

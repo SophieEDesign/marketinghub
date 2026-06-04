@@ -662,7 +662,6 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       campaigns_density: 'comfortable',
       campaigns_max_items: 100,
       campaigns_click_action: 'open_record',
-      campaigns_open_record_mode: 'modal',
       is_full_page: false,
       appearance: { showTitle: false },
     },

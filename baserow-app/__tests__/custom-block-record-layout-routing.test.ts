@@ -35,4 +35,10 @@ describe("custom block record layout routing", () => {
     expect(src).toContain('recordLayoutType: "asset"')
     expect(detail).toContain("Manage asset")
   })
+
+  it("passes contextual recordLayoutType from Upcoming Summary", () => {
+    const upcoming = read("components/interface/blocks/UpcomingSummaryBlock.tsx")
+    expect(upcoming).toContain("resolveUpcomingSummaryRecordLayoutType")
+    expect(upcoming).toContain("recordLayoutType")
+  })
 })
