@@ -636,8 +636,10 @@ export default function RecordViewPageSettings({
   return (
     <div className="space-y-6">
       <Tabs defaultValue="data" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="data">Data</TabsTrigger>
+          <TabsTrigger value="list_panel">List panel</TabsTrigger>
+          <TabsTrigger value="detail_panel">Detail panel</TabsTrigger>
           <TabsTrigger value="permissions">Permissions</TabsTrigger>
           <TabsTrigger value="layout">Layout</TabsTrigger>
         </TabsList>
@@ -702,6 +704,15 @@ export default function RecordViewPageSettings({
                 The field used to display the record title in the detail panel.
               </p>
             </div>
+          )}
+        </TabsContent>
+
+        {/* Detail panel tab */}
+        <TabsContent value="detail_panel" className="mt-6 space-y-6">
+          {selectedTableId && (
+            <p className="text-xs text-gray-500">
+              Configure which fields appear in the right detail panel when a record is selected.
+            </p>
           )}
 
           {/* Visible Fields */}
@@ -845,17 +856,164 @@ export default function RecordViewPageSettings({
               )}
             </div>
           )}
+        </TabsContent>
 
-          {/* Left Panel Settings */}
+        {/* List panel tab */}
+        <TabsContent value="list_panel" className="mt-6 space-y-6">
           {selectedTableId && (
             <>
-              <div className="border-t my-6"></div>
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-900 mb-1">Card preview (left panel)</h3>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-1">Record list (left panel)</h3>
                   <p className="text-xs text-gray-500">
-                    When no layout is configured, these fields appear on each card. Otherwise, card fields come from the Visible Fields list above.
+                    Configure search, add button, card display, grouping, and sorting for the left record list.
                   </p>
+                </div>
+
+                {/* Search */}
+                <div className="space-y-3 border rounded-lg p-4">
+                  <h4 className="text-xs font-medium text-gray-700 uppercase">Search</h4>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-normal">Show search</Label>
+                    <Switch
+                      checked={leftPanelConfig.show_search !== false}
+                      onCheckedChange={(checked) =>
+                        onUpdate({
+                          left_panel: { ...leftPanelConfig, show_search: checked },
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Search placeholder</Label>
+                    <Input
+                      value={leftPanelConfig.search_placeholder || ""}
+                      onChange={(e) =>
+                        onUpdate({
+                          left_panel: {
+                            ...leftPanelConfig,
+                            search_placeholder: e.target.value || undefined,
+                          },
+                        })
+                      }
+                      placeholder="Search records..."
+                    />
+                  </div>
+                </div>
+
+                {/* Add button */}
+                <div className="space-y-3 border rounded-lg p-4">
+                  <h4 className="text-xs font-medium text-gray-700 uppercase">Add button</h4>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-normal">Show add record button</Label>
+                    <Switch
+                      checked={
+                        leftPanelConfig.show_add_button !== false &&
+                        leftPanelConfig.user_actions?.add_records !== false
+                      }
+                      onCheckedChange={(checked) =>
+                        onUpdate({
+                          left_panel: {
+                            ...leftPanelConfig,
+                            show_add_button: checked,
+                            user_actions: {
+                              ...leftPanelConfig.user_actions,
+                              add_records: checked,
+                            },
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Add button label</Label>
+                    <Input
+                      value={leftPanelConfig.add_button_label || ""}
+                      onChange={(e) =>
+                        onUpdate({
+                          left_panel: {
+                            ...leftPanelConfig,
+                            add_button_label: e.target.value || undefined,
+                          },
+                        })
+                      }
+                      placeholder="Add record"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Who can add records is controlled on the Permissions tab (Create records).
+                  </p>
+                </div>
+
+                {/* Density */}
+                <div className="space-y-2">
+                  <Label>Item density</Label>
+                  <Select
+                    value={leftPanelConfig.density || "comfortable"}
+                    onValueChange={(value: "compact" | "comfortable" | "detailed") =>
+                      onUpdate({
+                        left_panel: { ...leftPanelConfig, density: value },
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="compact">Compact</SelectItem>
+                      <SelectItem value="comfortable">Comfortable</SelectItem>
+                      <SelectItem value="detailed">Detailed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Empty state */}
+                <div className="space-y-3 border rounded-lg p-4">
+                  <h4 className="text-xs font-medium text-gray-700 uppercase">Empty state</h4>
+                  <div className="space-y-2">
+                    <Label>Empty list title</Label>
+                    <Input
+                      value={leftPanelConfig.empty_title || ""}
+                      onChange={(e) =>
+                        onUpdate({
+                          left_panel: {
+                            ...leftPanelConfig,
+                            empty_title: e.target.value || undefined,
+                          },
+                        })
+                      }
+                      placeholder="No records found"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Empty list description</Label>
+                    <Input
+                      value={leftPanelConfig.empty_description || ""}
+                      onChange={(e) =>
+                        onUpdate({
+                          left_panel: {
+                            ...leftPanelConfig,
+                            empty_description: e.target.value || undefined,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Empty search message</Label>
+                    <Input
+                      value={leftPanelConfig.empty_search_message || ""}
+                      onChange={(e) =>
+                        onUpdate({
+                          left_panel: {
+                            ...leftPanelConfig,
+                            empty_search_message: e.target.value || undefined,
+                          },
+                        })
+                      }
+                      placeholder="No records match your search"
+                    />
+                  </div>
                 </div>
 
                 {/* Data Options */}
@@ -1122,9 +1280,9 @@ export default function RecordViewPageSettings({
                       </p>
                     </div>
 
-                    {/* Field 1 */}
+                    {/* Subtitle */}
                     <div className="space-y-2">
-                      <Label>Field 1</Label>
+                      <Label>Subtitle field</Label>
                       <Select 
                         value={leftPanelField1 || "__none__"} 
                         onValueChange={(value) => {
@@ -1152,13 +1310,13 @@ export default function RecordViewPageSettings({
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-gray-500">
-                        First additional field to display in list items.
+                        Secondary line under the title on each list item.
                       </p>
                     </div>
 
-                    {/* Field 2 */}
+                    {/* Secondary subtitle */}
                     <div className="space-y-2">
-                      <Label>Field 2</Label>
+                      <Label>Secondary subtitle field</Label>
                       <Select 
                         value={leftPanelField2 || "__none__"} 
                         onValueChange={(value) => {
@@ -1186,42 +1344,139 @@ export default function RecordViewPageSettings({
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-gray-500">
-                        Second additional field to display in list items.
+                        Optional third line on list items.
+                      </p>
+                    </div>
+
+                    {/* Badge fields */}
+                    <div className="space-y-2">
+                      <Label>Badge fields (max 3)</Label>
+                      <Select
+                        value={(leftPanelConfig.pill_fields?.[0] as string) || "__none__"}
+                        onValueChange={(value) => {
+                          const current = [...(leftPanelConfig.pill_fields || [])]
+                          if (value === "__none__") {
+                            onUpdate({
+                              left_panel: {
+                                ...leftPanelConfig,
+                                pill_fields: current.slice(1).filter(Boolean),
+                              },
+                            })
+                          } else {
+                            current[0] = value
+                            onUpdate({
+                              left_panel: {
+                                ...leftPanelConfig,
+                                pill_fields: current.filter(Boolean).slice(0, 3),
+                              },
+                            })
+                          }
+                        }}
+                        disabled={!selectedTableId || fields.length === 0}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Badge 1" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">None</SelectItem>
+                          {fields.map((field) => (
+                            <SelectItem key={`pill-0-${field.id}`} value={field.name}>
+                              {getFieldDisplayName(field)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={(leftPanelConfig.pill_fields?.[1] as string) || "__none__"}
+                        onValueChange={(value) => {
+                          const current = [...(leftPanelConfig.pill_fields || [])]
+                          if (value === "__none__") {
+                            current.splice(1, 1)
+                          } else {
+                            current[1] = value
+                          }
+                          onUpdate({
+                            left_panel: {
+                              ...leftPanelConfig,
+                              pill_fields: current.filter(Boolean).slice(0, 3),
+                            },
+                          })
+                        }}
+                        disabled={!selectedTableId || fields.length === 0}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Badge 2 (optional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">None</SelectItem>
+                          {fields.map((field) => (
+                            <SelectItem key={`pill-1-${field.id}`} value={field.name}>
+                              {getFieldDisplayName(field)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={(leftPanelConfig.pill_fields?.[2] as string) || "__none__"}
+                        onValueChange={(value) => {
+                          const current = [...(leftPanelConfig.pill_fields || [])]
+                          if (value === "__none__") {
+                            current.splice(2, 1)
+                          } else {
+                            current[2] = value
+                          }
+                          onUpdate({
+                            left_panel: {
+                              ...leftPanelConfig,
+                              pill_fields: current.filter(Boolean).slice(0, 3),
+                            },
+                          })
+                        }}
+                        disabled={!selectedTableId || fields.length === 0}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Badge 3 (optional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">None</SelectItem>
+                          {fields.map((field) => (
+                            <SelectItem key={`pill-2-${field.id}`} value={field.name}>
+                              {getFieldDisplayName(field)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-gray-500">
+                        Shown as colored pills on list items (select fields).
                       </p>
                     </div>
                   </div>
                 </div>
 
-                {/* User Actions */}
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="text-xs font-medium text-gray-700 uppercase mb-3">User Actions</h4>
-                    <p className="text-xs text-gray-500 mb-3">
-                      Enable or disable user actions in the left panel (coming soon).
-                    </p>
-                    
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-sm font-normal">Sort</Label>
-                        <Switch checked={false} onCheckedChange={() => {}} disabled />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <Label className="text-sm font-normal">Filter</Label>
-                        <Switch checked={false} onCheckedChange={() => {}} disabled />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <Label className="text-sm font-normal">Group</Label>
-                        <Switch checked={false} onCheckedChange={() => {}} disabled />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <Label className="text-sm font-normal">Add records through a form</Label>
-                        <Switch checked={false} onCheckedChange={() => {}} disabled />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <Label className="text-sm font-normal">Buttons</Label>
-                        <Switch checked={false} onCheckedChange={() => {}} disabled />
-                      </div>
-                    </div>
+                {/* Grouping options */}
+                <div className="space-y-3 border rounded-lg p-4">
+                  <h4 className="text-xs font-medium text-gray-700 uppercase">Grouping</h4>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-normal">Show group counts</Label>
+                    <Switch
+                      checked={leftPanelConfig.show_group_counts !== false}
+                      onCheckedChange={(checked) =>
+                        onUpdate({
+                          left_panel: { ...leftPanelConfig, show_group_counts: checked },
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-normal">Groups collapsed by default</Label>
+                    <Switch
+                      checked={leftPanelConfig.groups_default_collapsed === true}
+                      onCheckedChange={(checked) =>
+                        onUpdate({
+                          left_panel: { ...leftPanelConfig, groups_default_collapsed: checked },
+                        })
+                      }
+                    />
                   </div>
                 </div>
               </div>
@@ -1324,8 +1579,8 @@ export default function RecordViewPageSettings({
 
             <div className="border-t pt-4">
               <p className="text-xs text-gray-500">
-                Field-level editability settings are configured in the Data tab. Individual fields
-                can be set to view-only even if the page is editable.
+                Field-level editability settings are configured in the Detail panel tab. Individual
+                fields can be set to view-only even if the page is editable.
               </p>
             </div>
           </div>

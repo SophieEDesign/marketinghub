@@ -38,6 +38,7 @@ import type { Table, TableField } from "@/types/database"
 import { createClient } from "@/lib/supabase/client"
 import TableSelector from "./shared/TableSelector"
 import FieldPicker from "./shared/FieldPicker"
+import PermissionsSettings from "./PermissionsSettings"
 
 interface RecordDataSettingsProps {
   config: BlockConfig
@@ -190,13 +191,13 @@ export default function RecordDataSettings({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <div>
-            <Label>Block Permissions</Label>
+            <Label>Field editing</Label>
             <p className="text-xs text-gray-500">
-              Block-level permissions. Cannot exceed page-level permissions.
+              When view-only, inline field editing is disabled in this block.
             </p>
           </div>
           <Select
-            value={config.allow_editing ? "editable" : "view_only"}
+            value={config.allow_editing === false ? "view_only" : "editable"}
             onValueChange={(value) =>
               onUpdate({ allow_editing: value === "editable" })
             }
@@ -211,9 +212,12 @@ export default function RecordDataSettings({
           </Select>
         </div>
         <p className="text-xs text-gray-500">
-          If the page is view-only, this block will also be view-only regardless of this setting.
+          If the page is view-only or block access mode is view, fields render read-only regardless
+          of this setting.
         </p>
       </div>
+
+      <PermissionsSettings config={config} onUpdate={onUpdate} />
     </div>
   )
 }

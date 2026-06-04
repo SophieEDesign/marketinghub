@@ -116,6 +116,34 @@ export interface PageConfig {
       add_records?: boolean // Allow adding records through form
       buttons?: Array<{ label: string; action: string }> // Custom buttons
     }
+
+    // Search & add (list panel)
+    show_search?: boolean
+    search_placeholder?: string
+    search_fields?: string[]
+    show_add_button?: boolean
+    add_button_label?: string
+
+    // Card badges (max 3 in UI)
+    pill_fields?: string[]
+    pill_field_ids?: string[]
+
+    // List density & groups
+    density?: 'compact' | 'comfortable' | 'detailed'
+    groups_default_collapsed?: boolean
+    show_group_counts?: boolean
+
+    // Empty states
+    empty_title?: string
+    empty_description?: string
+    empty_search_message?: string
+
+    // Optional field_id companions (id-first resolution at runtime)
+    title_field_id?: string
+    image_field_id?: string
+    field_1_id?: string
+    field_2_id?: string
+    group_by_field_id?: string
   }
   
   // General

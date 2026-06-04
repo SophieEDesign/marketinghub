@@ -383,7 +383,19 @@ export default function BlockRenderer({
         // Lazy-load RecordBlock - CRITICAL: enabled=false for mount stability
         return (
           <LazyBlockWrapper enabled={false}>
-            <RecordBlock block={safeBlock} isEditing={canEdit} pageId={pageId} pageTableId={pageTableId} recordId={recordId} />
+            <RecordBlock
+              block={safeBlock}
+              isEditing={canEdit}
+              pageId={pageId}
+              pageTableId={pageTableId}
+              recordId={recordId}
+              pageEditable={pageEditable}
+              allowRecordEdit={
+                pageEditable !== false &&
+                safeBlock.config?.allow_editing !== false &&
+                !canEdit
+              }
+            />
           </LazyBlockWrapper>
         )
 

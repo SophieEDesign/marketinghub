@@ -5,6 +5,11 @@ import { createClient } from "@/lib/supabase/client"
 import type { PageBlock } from "@/lib/interface/types"
 import type { TableField } from "@/types/database"
 import { canOpenRecords } from "@/lib/interface/block-permissions"
+import {
+  resolveRecordBlockFields,
+  resolveRecordBlockEditability,
+} from "@/lib/interface/record-block-field-resolution"
+import { isFieldEditableFromLayout } from "@/lib/interface/field-layout-helpers"
 import RecordFieldPanel from "@/components/records/RecordFieldPanel"
 
 interface RecordBlockProps {
@@ -13,11 +18,21 @@ interface RecordBlockProps {
   pageId?: string | null // Page ID
   pageTableId?: string | null // Table ID from page (fallback for record review pages)
   recordId?: string | null // Record ID for record review pages
-  /** When false, all fields are read-only (e.g. when page is view-only). Default true. */
+  /** When false, all fields are read-only (e.g. when page is view-only). When omitted, derived from config + page. */
   allowRecordEdit?: boolean
+  /** Page-level editability ceiling (from BlockRenderer pageEditable). */
+  pageEditable?: boolean
 }
 
-export default function RecordBlock({ block, isEditing = false, pageId = null, pageTableId = null, recordId: pageRecordId = null, allowRecordEdit = true }: RecordBlockProps) {
+export default function RecordBlock({
+  block,
+  isEditing = false,
+  pageId = null,
+  pageTableId = null,
+  recordId: pageRecordId = null,
+  allowRecordEdit: allowRecordEditProp,
+  pageEditable = true,
+}: RecordBlockProps) {
   const { config } = block
   // table_id: config first, then pageTableId (for record review pages where block uses page's table)
   // record_id can come from config OR from page context (for record review pages)
@@ -33,18 +48,10 @@ export default function RecordBlock({ block, isEditing = false, pageId = null, p
   const prevTableIdRef = useRef<string | null>(null)
   const loadingRef = useRef(false)
   
-  // Defensive logging for Record Review pages
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('[RecordBlock] recordId resolution:', {
-        blockId: block.id,
-        configRecordId: config?.record_id,
-        pageRecordId,
-        resolvedRecordId: recordId,
-        tableId,
-      })
-    }
-  }, [block.id, config?.record_id, pageRecordId, recordId, tableId])
+  const allowRecordEdit =
+    allowRecordEditProp !== undefined
+      ? allowRecordEditProp
+      : resolveRecordBlockEditability(config, pageEditable !== false, isEditing)
 
   useEffect(() => {
     if (!tableId) {
@@ -201,19 +208,33 @@ export default function RecordBlock({ block, isEditing = false, pageId = null, p
     )
   }
 
-  const modalFields = (config as any)?.modal_fields
-  const selected = Array.isArray(modalFields) && modalFields.length > 0
-    ? modalFields
-    : tableFields.map((f: any) => f?.name).filter(Boolean)
+  const { fieldNames, missingFieldNames, fieldLayout } = resolveRecordBlockFields(
+    config,
+    tableFields as TableField[]
+  )
 
-  const fieldConfigs = selected.map((f: string, idx: number) => ({
+  const fieldConfigs = fieldNames.map((f: string, idx: number) => ({
     field: f,
-    editable: allowRecordEdit,
+    editable: fieldLayout
+      ? isFieldEditableFromLayout(f, fieldLayout, allowRecordEdit)
+      : allowRecordEdit,
     order: idx,
   }))
 
   return (
-    <div className="h-full overflow-hidden">
+    <div className="h-full overflow-hidden flex flex-col">
+      {missingFieldNames.length > 0 && (
+        <div
+          className="mx-4 mt-3 mb-0 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          role="status"
+        >
+          <div className="font-medium">Some fields in this block layout no longer exist.</div>
+          <p className="text-xs mt-1 text-amber-800">
+            The block still loaded safely. Update Fields to Display in block settings to remove
+            missing fields: {missingFieldNames.join(", ")}.
+          </p>
+        </div>
+      )}
       <RecordFieldPanel
         tableId={tableId}
         recordId={String(recordId)}

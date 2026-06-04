@@ -2,6 +2,7 @@
 
 import { Settings2 } from "lucide-react"
 import type { PageBlock, BlockConfig } from "@/lib/interface/types"
+import { resolveRecordBlockEditability } from "@/lib/interface/record-block-field-resolution"
 import RecordBlock from "@/components/interface/blocks/RecordBlock"
 import RecordDetailCanvas from "./RecordDetailCanvas"
 
@@ -89,9 +90,12 @@ export default function RecordPreviewSurface({
     config: {
       table_id: tableId,
       record_id: recordId,
+      ...(blockConfig?.detail_fields != null && { detail_fields: blockConfig.detail_fields }),
+      ...(blockConfig?.visible_fields != null && { visible_fields: blockConfig.visible_fields }),
+      ...(blockConfig?.allow_editing != null && { allow_editing: blockConfig.allow_editing }),
       ...(blockConfig?.field_layout != null && { field_layout: blockConfig.field_layout }),
-      ...(blockConfig?.modal_fields != null && { modal_fields: blockConfig.modal_fields }),
-      ...(blockConfig?.modal_layout != null && { modal_layout: blockConfig.modal_layout }),
+      ...(blockConfig?.modal_fields != null && { modal_fields: (blockConfig as any).modal_fields }),
+      ...(blockConfig?.modal_layout != null && { modal_layout: (blockConfig as any).modal_layout }),
     },
     order_index: 0,
     created_at: "",
@@ -117,7 +121,12 @@ export default function RecordPreviewSurface({
         isEditing={isEditing}
         pageId={pageId}
         recordId={recordId}
-        allowRecordEdit={pageEditable !== false}
+        pageEditable={pageEditable}
+        allowRecordEdit={resolveRecordBlockEditability(
+          syntheticBlock.config,
+          pageEditable !== false,
+          isEditing
+        )}
       />
     </div>
   )
