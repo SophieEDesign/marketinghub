@@ -269,7 +269,9 @@ export function buildResourceHubItems(
       description: fields.notes ? formatDisplayValue(row[fields.notes]) ?? undefined : undefined,
       updatedAt,
       owner: fields.assignee ? formatDisplayValue(row[fields.assignee]) ?? undefined : undefined,
-      isInternalOnly: true,
+      isInternalOnly:
+        /internal[\s_-]?only/i.test(legacyStatus ?? "") ||
+        /internal[\s_-]?only/i.test(hubCategoryRaw ?? ""),
       tags: tagLabel ? [tagLabel] : undefined,
       usage: `table:${mediaTableId}`,
     })

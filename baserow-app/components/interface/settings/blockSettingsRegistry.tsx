@@ -43,6 +43,7 @@ import EventCalendarDataSettings from "./EventCalendarDataSettings"
 import SocialMediaCalendarDataSettings from "./SocialMediaCalendarDataSettings"
 import KPISummaryDataSettings from "./KPISummaryDataSettings"
 import CampaignsOverviewDataSettings from "./CampaignsOverviewDataSettings"
+import MembersWelcomeDataSettings from "./MembersWelcomeDataSettings"
 import CommonAppearanceSettings from "./CommonAppearanceSettings"
 
 export type DataSettingsCtx = {
@@ -120,6 +121,7 @@ const DATA_SETTINGS_RENDERERS: Partial<Record<BlockType, DataRenderer>> = {
   internal_resource_hub: (ctx) => <InternalResourceHubDataSettings {...ctx} />,
   social_media_calendar: (ctx) => <SocialMediaCalendarDataSettings {...ctx} />,
   campaigns_overview: (ctx) => <CampaignsOverviewDataSettings {...ctx} />,
+  members_welcome: (ctx) => <MembersWelcomeDataSettings {...ctx} />,
 }
 
 const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRenderer>> = {
@@ -259,6 +261,14 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
         fields={ctx.fields}
       />
     </>
+  ),
+  members_welcome: (ctx) => (
+    <CommonAppearanceSettings
+      config={ctx.config}
+      onUpdate={ctx.onUpdateAppearance}
+      blockType={ctx.blockType}
+      fields={ctx.fields}
+    />
   ),
   internal_resource_hub: (ctx) => (
     <>

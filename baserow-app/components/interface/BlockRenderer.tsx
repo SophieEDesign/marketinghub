@@ -139,6 +139,10 @@ const InternalResourceHubBlock = dynamic(() => import("./blocks/InternalResource
   ssr: false,
   loading: () => <BlockLoadingPlaceholder />,
 })
+const MembersWelcomeBlock = dynamic(() => import("./blocks/MembersWelcomeBlock"), {
+  ssr: false,
+  loading: () => <BlockLoadingPlaceholder />,
+})
 
 // Module-level Set to track warned blocks across all component instances
 const warnedBlocks = new Set<string>()
@@ -754,6 +758,17 @@ export default function BlockRenderer({
               interfaceMode={interfaceMode}
               onUpdate={onUpdate ? (u) => handleUpdate(u) : undefined}
               isFullPage={isFullPage}
+            />
+          </LazyBlockWrapper>
+        )
+
+      case "members_welcome":
+        return (
+          <LazyBlockWrapper enabled={true}>
+            <MembersWelcomeBlock
+              block={safeBlock}
+              isEditing={canEdit}
+              interfaceMode={interfaceMode}
             />
           </LazyBlockWrapper>
         )

@@ -50,6 +50,7 @@ const BLOCK_TYPE_CATEGORY: Record<BlockType, BlockCategoryId> = {
   event_calendar: "content",
   social_media_calendar: "content",
   campaigns_overview: "content",
+  members_welcome: "content",
   button: "content",
   action: "content",
   divider: "layout",

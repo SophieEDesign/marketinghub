@@ -36,6 +36,7 @@ export type BlockType =
   | 'event_calendar'
   | 'social_media_calendar'
   | 'campaigns_overview'
+  | 'members_welcome'
 
 export type UpcomingSummarySectionId =
   | 'deadlines'
@@ -693,6 +694,16 @@ export interface BlockConfig {
   campaigns_linked_events_field?: string
   campaigns_click_action?: "open_record" | "none"
   campaigns_open_record_mode?: "modal" | "side_panel"
+  // Members Welcome block
+  members_welcome_max_events?: number
+  members_welcome_max_resources?: number
+  members_welcome_allow_submit_event?: boolean
+  members_welcome_events_page_id?: string
+  members_welcome_resources_page_id?: string
+  members_welcome_contacts_page_id?: string
+  members_welcome_help_page_id?: string
+  members_welcome_events_table_id?: string
+  members_welcome_resources_table_id?: string
   // List block specific config (at root level for backward compatibility)
   list_title_field?: string
   list_subtitle_fields?: string[]

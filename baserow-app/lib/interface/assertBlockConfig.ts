@@ -224,6 +224,7 @@ export function assertBlockConfig(
     case 'things_to_do':
     case 'social_media_calendar':
     case 'campaigns_overview':
+    case 'members_welcome':
       // These blocks don't require config
       return { valid: true }
 

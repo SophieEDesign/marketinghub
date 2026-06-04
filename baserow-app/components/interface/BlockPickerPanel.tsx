@@ -28,6 +28,7 @@ import {
   CalendarDays,
   CheckSquare,
   Share2,
+  Home,
 } from "lucide-react"
 import { BLOCK_REGISTRY } from "@/lib/interface/registry"
 import type { BlockType } from "@/lib/interface/types"
@@ -73,6 +74,7 @@ export const blockPickerIconMap: Record<BlockType, React.ElementType> = {
   event_calendar: CalendarDays,
   social_media_calendar: Share2,
   campaigns_overview: LayoutGrid,
+  members_welcome: Home,
 }
 
 interface BlockPickerPanelProps {

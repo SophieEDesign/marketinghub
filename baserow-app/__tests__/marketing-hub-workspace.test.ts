@@ -116,15 +116,9 @@ describe("apply-marketing-hub-workspace.cjs", () => {
   it("Members Welcome blocks", () => {
     const body = extractBuilder("buildMembersWelcomeBlocks")
     const types = blockTypesInBuilder("buildMembersWelcomeBlocks")
-    expect(body).toContain("members_welcome_hero")
-    expect(body).toContain("members_welcome_quick_actions")
-    expect(body).toContain("members_welcome_guidance")
-    expect(types).toContain("event_calendar")
-    expect(types).toContain("internal_resource_hub")
-    expect(types).not.toContain("campaigns_overview")
-    expect(types).not.toContain("content_timeline")
-    expect(types).not.toContain("things_to_do")
-    expect(body).toContain("event_calendar_external_mode: true")
+    expect(body).toContain("members_welcome_main")
+    expect(types).toEqual(["members_welcome"])
+    expect(body).toContain("is_full_page: true")
   })
 })
 
@@ -138,6 +132,7 @@ describe("Marketing Hub block registry", () => {
     "event_calendar",
     "things_to_do",
     "campaigns_overview",
+    "members_welcome",
     "html",
   ]
 
