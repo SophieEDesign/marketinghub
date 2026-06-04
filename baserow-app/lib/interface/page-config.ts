@@ -144,6 +144,47 @@ export interface PageConfig {
     field_1_id?: string
     field_2_id?: string
     group_by_field_id?: string
+
+    // Canonical list_* keys (mirrored to legacy keys on save via patchLeftPanelConfig)
+    list_show_search?: boolean
+    list_search_placeholder?: string
+    list_search_fields?: string[]
+    list_search_field_ids?: string[]
+    list_show_add_button?: boolean
+    list_add_button_label?: string
+    list_title_field?: string
+    list_title_field_id?: string
+    list_subtitle_field?: string
+    list_subtitle_field_id?: string
+    list_secondary_subtitle_field?: string
+    list_secondary_subtitle_field_id?: string
+    list_image_field?: string
+    list_image_field_id?: string
+    list_badge_fields?: string[]
+    list_badge_field_ids?: string[]
+    list_metadata_fields?: string[]
+    list_metadata_field_ids?: string[]
+    list_group_by_field?: string
+    list_group_by_field_id?: string
+    list_show_group_counts?: boolean
+    list_groups_collapsible?: boolean
+    list_groups_default_collapsed?: boolean
+    list_hide_empty_groups?: boolean
+    list_sort_field?: string
+    list_sort_field_id?: string
+    list_sort_direction?: 'asc' | 'desc'
+    list_density?: 'compact' | 'comfortable' | 'detailed'
+    list_show_badges?: boolean
+    list_show_metadata?: boolean
+    list_show_avatar?: boolean
+    list_empty_title?: string
+    list_empty_description?: string
+    list_no_results_title?: string
+    list_no_results_description?: string
+    hide_empty_groups?: boolean
+    show_badges?: boolean
+    show_metadata?: boolean
+    show_avatar?: boolean
   }
   
   // General

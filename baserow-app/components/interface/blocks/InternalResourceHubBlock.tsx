@@ -358,15 +358,29 @@ export default function InternalResourceHubBlock({
         {showDetailPanel ? (
           <DetailPanel
             resource={showPreview ? selected : null}
+            variants={showPreview ? variants : []}
+            selectedId={selectedId}
             isFavourite={selectedId ? favourites.has(selectedId) : false}
             isEditing={isEditing}
             onToggleFavourite={toggleFavourite}
+            onSelectVariant={handleSelect}
             onDownload={() => {
               if (selected?.url) window.open(selected.url, "_blank", "noopener,noreferrer")
               else mockAction(`Download: ${selected?.title}`)
             }}
             onViewFull={() => openResourceUrl(selectedId!)}
-            onCopyLink={() => mockAction(`Copy link: ${selected?.title}`)}
+            onCopyLink={async () => {
+              const url = selected?.url
+              if (!url) {
+                mockAction(`Copy link: ${selected?.title}`)
+                return
+              }
+              try {
+                await navigator.clipboard.writeText(url)
+              } catch {
+                mockAction(`Copy link failed: ${selected?.title}`)
+              }
+            }}
             onEditDetails={
               canManageSelectedResource && selectedId
                 ? () => handleEditResourceDetails(selectedId)

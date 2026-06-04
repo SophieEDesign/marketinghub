@@ -38,13 +38,32 @@ import type { FieldLayoutItem } from "@/lib/interface/field-layout-utils"
 import type { PageConfig } from "@/lib/interface/page-config"
 import { getVisibleFieldsForCard } from "@/lib/interface/field-layout-helpers"
 import {
-  shouldShowListSearch,
-  shouldShowListAddButton,
   getListPanelDensity,
   hasExplicitListCardConfig,
-  resolveListPanelFieldName,
-  resolveListPanelFieldNames,
 } from "@/lib/interface/record-view-list-panel-helpers"
+import {
+  getListShowSearch,
+  getListSearchPlaceholder,
+  getListSearchFields,
+  getListShowAddButton,
+  getListAddButtonLabel,
+  getListShowGroupCounts,
+  getListGroupsDefaultCollapsed,
+  getListHideEmptyGroups,
+  getListEmptyTitle,
+  getListEmptyDescription,
+  getListNoResultsTitle,
+  getListNoResultsDescription,
+  getListShowBadges,
+  getListShowMetadata,
+  getListShowAvatar,
+  resolveListTitleField,
+  resolveListSubtitleFields,
+  resolveListImageFieldName,
+  resolveListBadgeFields,
+  resolveListMetadataFields,
+} from "@/lib/interface/record-view-left-panel-config"
+import { ChoicePill, ChoicePillList } from "@/components/fields/ChoicePill"
 
 interface RecordReviewLeftColumnProps {
   pageId?: string
@@ -210,31 +229,35 @@ export default function RecordReviewLeftColumn({
   const leftPanelColorField: string | undefined = effectiveLeftPanelConfig?.color_field
   const leftPanelImageField: string | undefined = effectiveLeftPanelConfig?.image_field
 
-  const showListSearch = shouldShowListSearch(effectiveLeftPanelConfig)
+  const pageConfigTyped = (pageConfig || {}) as PageConfig
+  const showListSearch = getListShowSearch(pageConfigTyped)
   const showListAddButton =
     showAddRecord &&
-    shouldShowListAddButton(effectiveLeftPanelConfig, pageConfig || {}) &&
+    getListShowAddButton(pageConfigTyped) &&
     canCreateRecord(userRole, pageConfig)
-  const listSearchPlaceholder =
-    effectiveLeftPanelConfig?.search_placeholder || "Search records..."
-  const showGroupCounts = effectiveLeftPanelConfig?.show_group_counts !== false
-
-  const { resolved: pillFieldNames } = useMemo(
-    () =>
-      resolveListPanelFieldNames(
-        effectiveLeftPanelConfig?.pill_fields,
-        effectiveLeftPanelConfig?.pill_field_ids,
-        fields
-      ),
-    [effectiveLeftPanelConfig?.pill_field_ids, effectiveLeftPanelConfig?.pill_fields, fields]
-  )
+  const listSearchPlaceholder = getListSearchPlaceholder(pageConfigTyped)
+  const listSearchFieldNames = getListSearchFields(pageConfigTyped)
+  const showGroupCounts = getListShowGroupCounts(pageConfigTyped)
+  const showBadgesOnCard = getListShowBadges(pageConfigTyped)
+  const showMetadataOnCard = getListShowMetadata(pageConfigTyped)
+  const showAvatarOnCard = getListShowAvatar(pageConfigTyped)
+  const listAddLabel = getListAddButtonLabel(pageConfigTyped)
+  const hideEmptyGroups = getListHideEmptyGroups(pageConfigTyped)
+  const groupsDefaultCollapsed = getListGroupsDefaultCollapsed(pageConfigTyped)
 
   const pillFieldsForCard = useMemo(
-    () =>
-      pillFieldNames
-        .map((name) => fields.find((f) => f.name === name))
-        .filter((f): f is TableField => f != null),
-    [fields, pillFieldNames]
+    () => resolveListBadgeFields(pageConfigTyped, fields),
+    [fields, pageConfigTyped]
+  )
+
+  const metadataFieldsForCard = useMemo(
+    () => resolveListMetadataFields(pageConfigTyped, fields),
+    [fields, pageConfigTyped]
+  )
+
+  const listImageFieldName = useMemo(
+    () => resolveListImageFieldName(pageConfigTyped, fields),
+    [fields, pageConfigTyped]
   )
 
   const leftPanelFilterTree: FilterTree = useMemo(() => {
@@ -551,10 +574,9 @@ export default function RecordReviewLeftColumn({
 
     const q = searchQuery.trim().toLowerCase()
     if (q) {
-      const searchFields = effectiveLeftPanelConfig?.search_fields
       result = result.filter((record) => {
-        if (Array.isArray(searchFields) && searchFields.length > 0) {
-          return searchFields.some((fieldName) => {
+        if (listSearchFieldNames && listSearchFieldNames.length > 0) {
+          return listSearchFieldNames.some((fieldName) => {
             const v = record[fieldName]
             if (v === null || v === undefined) return false
             if (typeof v === "object") return false
@@ -601,7 +623,7 @@ export default function RecordReviewLeftColumn({
     }
 
     return result
-  }, [effectiveLeftPanelConfig?.search_fields, fields, leftPanelFilterTree, leftPanelSorts, records, searchQuery])
+  }, [fields, leftPanelFilterTree, leftPanelSorts, listSearchFieldNames, records, searchQuery])
 
   // Auto-select first visible record when the visible set changes and none is selected
   useEffect(() => {
@@ -629,16 +651,30 @@ export default function RecordReviewLeftColumn({
     return []
   }, [groupByRules, groupByFields])
 
+  const filterEmptyGroupNodes = useCallback((nodes: any[]): any[] => {
+    if (!hideEmptyGroups) return nodes
+    return nodes
+      .filter((n) => (n?.size ?? 0) > 0)
+      .map((n) => ({
+        ...n,
+        children: n.children?.length ? filterEmptyGroupNodes(n.children) : n.children,
+      }))
+  }, [hideEmptyGroups])
+
   // Build group tree using the grouping library
   const groupModel = useMemo(() => {
     if (effectiveGroupRules.length === 0) return null
-    // Don't build group tree if fields aren't loaded yet (needed to resolve field names)
     if (!fields || fields.length === 0) return null
-    return buildGroupTree(filteredRecords, fields, effectiveGroupRules, {
-      emptyLabel: '(Empty)',
+    const model = buildGroupTree(filteredRecords, fields, effectiveGroupRules, {
+      emptyLabel: "(Empty)",
       emptyLast: true,
     })
-  }, [effectiveGroupRules, filteredRecords, fields])
+    if (!model || !hideEmptyGroups) return model
+    return {
+      ...model,
+      rootGroups: filterEmptyGroupNodes(model.rootGroups),
+    }
+  }, [effectiveGroupRules, filterEmptyGroupNodes, filteredRecords, fields, hideEmptyGroups])
 
   // Flatten the group tree for rendering
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
@@ -660,7 +696,7 @@ export default function RecordReviewLeftColumn({
   }, [groupModel, collapsedGroups])
 
   useEffect(() => {
-    if (!groupModel?.rootGroups?.length || !effectiveLeftPanelConfig?.groups_default_collapsed) {
+    if (!groupModel?.rootGroups?.length || !groupsDefaultCollapsed) {
       return
     }
     const collectKeys = (nodes: typeof groupModel.rootGroups): string[] => {
@@ -672,7 +708,7 @@ export default function RecordReviewLeftColumn({
       return keys
     }
     setCollapsedGroups(new Set(collectKeys(groupModel.rootGroups)))
-  }, [groupModel, effectiveLeftPanelConfig?.groups_default_collapsed])
+  }, [groupModel, groupsDefaultCollapsed])
 
   const renderGroupHeader = useCallback((node: any, level: number) => {
     const fieldName = node.rule?.field || ''
@@ -744,25 +780,9 @@ export default function RecordReviewLeftColumn({
         }
       }
       if (hasExplicitListCardConfig(effectiveLeftPanelConfig)) {
-        const titleName = resolveListPanelFieldName(
-          effectiveLeftPanelConfig?.title_field_id,
-          effectiveLeftPanelConfig?.title_field || pageConfig?.title_field,
-          fields
-        )
-        const sub1 = resolveListPanelFieldName(
-          effectiveLeftPanelConfig?.field_1_id,
-          effectiveLeftPanelConfig?.field_1,
-          fields
-        )
-        const sub2 = resolveListPanelFieldName(
-          effectiveLeftPanelConfig?.field_2_id,
-          effectiveLeftPanelConfig?.field_2,
-          fields
-        )
-        const orderedNames = [titleName, sub1, sub2].filter(Boolean) as string[]
-        return orderedNames
-          .map((name) => fields.find((f) => f.name === name))
-          .filter((f): f is TableField => f != null)
+        const titleField = resolveListTitleField(pageConfigTyped, fields)
+        const subtitles = resolveListSubtitleFields(pageConfigTyped, fields)
+        return [titleField, ...subtitles].filter((f): f is TableField => f != null)
       }
       if (!fieldLayout || fieldLayout.length === 0) {
         return fields.filter((f) => !f.options?.system)
@@ -800,6 +820,7 @@ export default function RecordReviewLeftColumn({
   }, [
     effectiveLeftPanelConfig,
     fieldLayout,
+    pageConfigTyped,
     fieldOrder,
     fields,
     isRecordView,
@@ -820,46 +841,29 @@ export default function RecordReviewLeftColumn({
       return <span>{formatDateUK(String(value), "—")}</span>
     }
 
-    // Multi-select pills
     if (field.type === "multi_select") {
-      const values = Array.isArray(value) ? value : [value]
+      const values = (Array.isArray(value) ? value : [value]).map((v) => String(v ?? "").trim()).filter(Boolean)
       return (
-        <div className="flex flex-wrap gap-1">
-          {values.slice(0, 4).map((v: any, i: number) => {
-            const normalizedColor = normalizeHexColor(
-              resolveChoiceColor(String(v), "multi_select", field.options, false)
-            )
-            const textColor = getTextColorForBackground(normalizedColor)
-            return (
-              <Badge
-                key={`${field.id}-${i}`}
-                className={`text-[11px] font-medium ${textColor} border border-opacity-20`}
-                style={{ backgroundColor: normalizedColor }}
-              >
-                {String(v)}
-              </Badge>
-            )
-          })}
-          {values.length > 4 && (
-            <span className="text-[11px] text-gray-500">+{values.length - 4}</span>
-          )}
-        </div>
+        <ChoicePillList
+          labels={values}
+          fieldType="multi_select"
+          fieldOptions={field.options}
+          max={4}
+          density="compact"
+          truncate
+        />
       )
     }
 
-    // Single select pill
     if (field.type === "single_select") {
-      const normalizedColor = normalizeHexColor(
-        resolveChoiceColor(String(value), "single_select", field.options, true)
-      )
-      const textColor = getTextColorForBackground(normalizedColor)
       return (
-        <Badge
-          className={`text-[11px] font-medium ${textColor} border border-opacity-20`}
-          style={{ backgroundColor: normalizedColor }}
-        >
-          {String(value)}
-        </Badge>
+        <ChoicePill
+          label={String(value)}
+          fieldType="single_select"
+          fieldOptions={field.options}
+          density="compact"
+          truncate
+        />
       )
     }
 
@@ -881,12 +885,16 @@ export default function RecordReviewLeftColumn({
     }
 
     if (isRecordView) {
-      // Use orderedFields (from field_layout.visible_in_card or legacy title/subtitle/additional)
-      const cardFields = orderedFields
-      const titleField = cardFields[0] ?? null
-      const secondaryFields = cardFields.slice(1)
+      const titleField =
+        resolveListTitleField(pageConfigTyped, fields) ?? orderedFields[0] ?? null
+      const subtitleFields =
+        resolveListSubtitleFields(pageConfigTyped, fields).length > 0
+          ? resolveListSubtitleFields(pageConfigTyped, fields)
+          : orderedFields.slice(1)
       const titleValue = titleField ? (record[titleField.name] || "Untitled") : "Untitled"
-      const hasCardFields = cardFields.length > 0
+      const hasCardFields = Boolean(titleField || subtitleFields.length > 0)
+      const imageFieldName = listImageFieldName || leftPanelImageField
+      const imageVal = imageFieldName ? record[imageFieldName] : null
 
       return (
         <button
@@ -897,12 +905,11 @@ export default function RecordReviewLeftColumn({
           } ${compact ? "px-3 py-2" : listPanelDetailed ? "px-4 py-4" : "px-4 py-3"}`}
           style={borderColorStyle}
         >
-          {/* Image (optional) */}
-          {leftPanelImageField && imageValue && (
+          {showAvatarOnCard && imageFieldName && imageVal && (
             <div className="flex-shrink-0 w-9 h-9 rounded overflow-hidden bg-gray-100 mt-0.5">
-              {typeof imageValue === "string" && (imageValue.startsWith("http") || imageValue.startsWith("/")) ? (
+              {typeof imageVal === "string" && (imageVal.startsWith("http") || imageVal.startsWith("/")) ? (
                 <img
-                  src={imageValue}
+                  src={imageVal}
                   alt=""
                   className="w-full h-full object-cover"
                   onError={(e) => {
@@ -911,7 +918,7 @@ export default function RecordReviewLeftColumn({
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
-                  {String(imageValue).substring(0, 2).toUpperCase()}
+                  {String(imageVal).substring(0, 2).toUpperCase()}
                 </div>
               )}
             </div>
@@ -925,7 +932,7 @@ export default function RecordReviewLeftColumn({
                   {String(titleValue || "Untitled")}
                 </div>
                 {/* Secondary fields (from field_layout or legacy field_1, field_2) */}
-                {secondaryFields.map((field) => {
+                {subtitleFields.map((field) => {
               const value = record[field.name]
               if (value === null || value === undefined || value === "") return null
               return (
@@ -934,7 +941,7 @@ export default function RecordReviewLeftColumn({
                 </div>
               )
             })}
-                {pillFieldsForCard.length > 0 && (
+                {showBadgesOnCard && pillFieldsForCard.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1">
                     {pillFieldsForCard.map((field) => {
                       const value = record[field.name]
@@ -947,6 +954,17 @@ export default function RecordReviewLeftColumn({
                     })}
                   </div>
                 )}
+                {showMetadataOnCard &&
+                  (listPanelDetailed || metadataFieldsForCard.length > 0) &&
+                  metadataFieldsForCard.map((field) => {
+                    const value = record[field.name]
+                    if (value === null || value === undefined || value === "") return null
+                    return (
+                      <div key={`meta-${field.id}`} className="mt-1 text-[11px] text-gray-500 truncate">
+                        {renderValue(field, value)}
+                      </div>
+                    )
+                  })}
               </>
             ) : (
               <div className="text-sm text-gray-500 italic">
@@ -1023,11 +1041,17 @@ export default function RecordReviewLeftColumn({
     isRecordView,
     leftPanelColorField,
     leftPanelImageField,
+    listImageFieldName,
     listPanelDetailed,
+    metadataFieldsForCard,
     onRecordSelect,
     orderedFields,
+    pageConfigTyped,
     pillFieldsForCard,
     renderValue,
+    showAvatarOnCard,
+    showBadgesOnCard,
+    showMetadataOnCard,
     selectedRecordId,
     showLabels,
     visibleFieldIds,
@@ -1069,12 +1093,8 @@ export default function RecordReviewLeftColumn({
                 className="h-9 w-9 flex-shrink-0"
                 onClick={handleOpenCreateModal}
                 disabled={creating || !supabaseTableName}
-                aria-label={effectiveLeftPanelConfig?.add_button_label || "Add record"}
-                title={
-                  !supabaseTableName
-                    ? "No table configured"
-                    : effectiveLeftPanelConfig?.add_button_label || "Add a new record"
-                }
+                aria-label={listAddLabel}
+                title={!supabaseTableName ? "No table configured" : listAddLabel}
               >
                 <Plus className="h-4 w-4" />
               </Button>
@@ -1105,11 +1125,18 @@ export default function RecordReviewLeftColumn({
           <div className="p-4 text-sm text-gray-500">
             <p className="font-medium text-gray-700">
               {searchQuery.trim()
-                ? effectiveLeftPanelConfig?.empty_search_message || "No records match your search"
-                : effectiveLeftPanelConfig?.empty_title || "No records found"}
+                ? getListNoResultsTitle(pageConfigTyped)
+                : getListEmptyTitle(pageConfigTyped)}
             </p>
-            {!searchQuery.trim() && effectiveLeftPanelConfig?.empty_description && (
-              <p className="text-xs mt-1 text-gray-500">{effectiveLeftPanelConfig.empty_description}</p>
+            {!searchQuery.trim() && getListEmptyDescription(pageConfigTyped) && (
+              <p className="text-xs mt-1 text-gray-500">
+                {getListEmptyDescription(pageConfigTyped)}
+              </p>
+            )}
+            {searchQuery.trim() && getListNoResultsDescription(pageConfigTyped) && (
+              <p className="text-xs mt-1 text-gray-500">
+                {getListNoResultsDescription(pageConfigTyped)}
+              </p>
             )}
           </div>
         ) : (

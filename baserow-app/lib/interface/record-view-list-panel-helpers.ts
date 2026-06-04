@@ -53,20 +53,21 @@ export function resolveListPanelFieldNames(
 }
 
 export function shouldShowListSearch(leftPanel: PageConfig["left_panel"]): boolean {
-  return leftPanel?.show_search !== false
+  if (leftPanel?.list_show_search === false || leftPanel?.show_search === false) return false
+  return true
 }
 
 export function shouldShowListAddButton(
   leftPanel: PageConfig["left_panel"],
-  pageConfig: PageConfig
+  _pageConfig: PageConfig
 ): boolean {
-  if (leftPanel?.show_add_button === false) return false
+  if (leftPanel?.list_show_add_button === false || leftPanel?.show_add_button === false) return false
   if (leftPanel?.user_actions?.add_records === false) return false
   return true
 }
 
 export function getListPanelDensity(leftPanel: PageConfig["left_panel"]): ListPanelDensity {
-  const d = leftPanel?.density
+  const d = leftPanel?.list_density || leftPanel?.density
   if (d === "compact" || d === "detailed") return d
   return "comfortable"
 }
@@ -74,12 +75,20 @@ export function getListPanelDensity(leftPanel: PageConfig["left_panel"]): ListPa
 export function hasExplicitListCardConfig(leftPanel: PageConfig["left_panel"] | undefined): boolean {
   if (!leftPanel) return false
   return Boolean(
-    leftPanel.title_field ||
+    leftPanel.list_title_field ||
+      leftPanel.list_title_field_id ||
+      leftPanel.title_field ||
       leftPanel.title_field_id ||
+      leftPanel.list_subtitle_field ||
+      leftPanel.list_subtitle_field_id ||
       leftPanel.field_1 ||
       leftPanel.field_1_id ||
+      leftPanel.list_secondary_subtitle_field ||
+      leftPanel.list_secondary_subtitle_field_id ||
       leftPanel.field_2 ||
       leftPanel.field_2_id ||
+      (leftPanel.list_badge_fields && leftPanel.list_badge_fields.length > 0) ||
+      (leftPanel.list_badge_field_ids && leftPanel.list_badge_field_ids.length > 0) ||
       (leftPanel.pill_fields && leftPanel.pill_fields.length > 0) ||
       (leftPanel.pill_field_ids && leftPanel.pill_field_ids.length > 0)
   )
@@ -87,8 +96,11 @@ export function hasExplicitListCardConfig(leftPanel: PageConfig["left_panel"] | 
 
 export const RECORD_VIEW_SETTINGS_TAB_IDS = [
   "data",
-  "list_panel",
+  "left_panel",
   "detail_panel",
   "permissions",
   "layout",
 ] as const
+
+/** @deprecated Use left_panel */
+export const RECORD_VIEW_SETTINGS_TAB_ID_LIST_PANEL = "left_panel" as const
