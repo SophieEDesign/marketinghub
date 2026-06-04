@@ -119,6 +119,31 @@ function introBlock(provisioningKey, title, subtitle, y, h = 2) {
   })
 }
 
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+}
+
+function buildMembersActionCardsHtml(cards) {
+  const cardHtml = cards
+    .map((card) => {
+      const title = escapeHtml(card.title)
+      const description = escapeHtml(card.description)
+      const actionLabel = escapeHtml(card.actionLabel)
+      if (card.url) {
+        return `<article class="rounded-2xl border border-[#E6E6EF] bg-white p-5 shadow-sm"><h3 class="text-base font-semibold text-[#111827]">${title}</h3><p class="mt-2 text-sm text-[#6B7280]">${description}</p><a href="${escapeHtml(card.url)}" class="mt-4 inline-flex text-sm font-semibold text-[#5B3DF5]">${actionLabel} →</a></article>`
+      }
+      return `<article class="rounded-2xl border border-[#E6E6EF] bg-white p-5 shadow-sm"><h3 class="text-base font-semibold text-[#111827]">${title}</h3><p class="mt-2 text-sm text-[#6B7280]">${description}</p><span class="mt-4 inline-flex text-sm font-semibold text-[#9CA3AF]">${actionLabel}</span></article>`
+    })
+    .join("")
+
+  return `<section class="rounded-2xl border border-[#E6E6EF] bg-[#FAF9FF] p-4 md:p-5"><div class="mb-4"><h2 class="text-lg font-semibold text-[#111827]">Quick actions</h2><p class="mt-1 text-sm text-[#6B7280]">Open the areas you can use most often.</p></div><div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">${cardHtml}</div></section>`
+}
+
 function makeBlock({ provisioningKey, type, x, y, w, h, config }) {
   return {
     type,
@@ -137,6 +162,155 @@ function blockMatchKey(row) {
   const cfg = row?.config || {}
   if (cfg.provisioning_key) return String(cfg.provisioning_key)
   return [row?.type || "", cfg.title || ""].join("::")
+}
+
+function buildMembersWelcomeBlocks({
+  eventCalendarUrl,
+  resourceHubUrl,
+  contactsUrl,
+  helpUrl,
+  canSubmitEvent,
+}) {
+  const actionCards = [
+    {
+      title: "View Events",
+      description: "See upcoming boat shows, industry events and member activities.",
+      actionLabel: "Open event calendar",
+      url: eventCalendarUrl,
+    },
+    {
+      title: "My Attendance",
+      description: "Check which events you are attending and update your response.",
+      actionLabel: "View my events",
+      url: eventCalendarUrl,
+    },
+    {
+      title: "Resource Hub",
+      description: "Access approved logos, presentations, documents and shared media.",
+      actionLabel: "Open resources",
+      url: resourceHubUrl,
+    },
+  ]
+
+  if (canSubmitEvent && eventCalendarUrl) {
+    actionCards.push({
+      title: "Submit an Event",
+      description: "Suggest an event for review by the Peters & May team.",
+      actionLabel: "Submit event",
+      url: eventCalendarUrl,
+    })
+  }
+
+  if (contactsUrl) {
+    actionCards.push({
+      title: "Useful Contacts",
+      description: "Find relevant Peters & May contacts for events and collaboration.",
+      actionLabel: "View contacts",
+      url: contactsUrl,
+    })
+  }
+
+  if (helpUrl) {
+    actionCards.push({
+      title: "Help & Guidance",
+      description: "Learn how to use the hub or contact the team for support.",
+      actionLabel: "Get help",
+      url: helpUrl,
+    })
+  }
+
+  const supportButton = helpUrl
+    ? `<a href="${escapeHtml(helpUrl)}" class="inline-flex items-center rounded-lg bg-[#5B3DF5] px-4 py-2 text-sm font-semibold text-white">Contact support</a>`
+    : ""
+
+  return [
+    makeBlock({
+      provisioningKey: "members_welcome_hero",
+      type: "html",
+      x: 0,
+      y: 0,
+      w: 12,
+      h: 4,
+      config: {
+        title: "Members Welcome Hero",
+        html: `<section class="rounded-2xl border border-[#E6E6EF] bg-[#F7F4FF] p-6 md:p-8"><h1 class="text-2xl font-bold tracking-tight text-[#111827] md:text-3xl">Welcome to the Peters &amp; May Marketing Hub</h1><p class="mt-2 text-sm text-[#374151] md:text-base">Access shared events, useful resources and collaboration tools in one place.</p><p class="mt-3 text-sm text-[#6B7280]">Use this space to view upcoming events, manage your attendance, access approved documents and stay aligned with relevant activity.</p></section>`,
+      },
+    }),
+    makeBlock({
+      provisioningKey: "members_welcome_quick_actions",
+      type: "html",
+      x: 0,
+      y: 4,
+      w: 12,
+      h: 6,
+      config: {
+        title: "Members Quick Actions",
+        html: buildMembersActionCardsHtml(actionCards),
+      },
+    }),
+    makeBlock({
+      provisioningKey: "members_welcome_events",
+      type: "event_calendar",
+      x: 0,
+      y: 10,
+      w: 6,
+      h: 8,
+      config: {
+        title: "Upcoming events",
+        subtitle: "Your next 5 visible events",
+        event_calendar_external_mode: true,
+        event_calendar_default_view: "list",
+        event_calendar_mobile_default_view: "list",
+        event_calendar_max_items: 5,
+        event_calendar_show_toolbar: false,
+        event_calendar_show_metrics: false,
+        event_calendar_show_stats: false,
+        event_calendar_show_filters: false,
+        event_calendar_show_search: false,
+        event_calendar_show_actions: false,
+        event_calendar_show_add_button: false,
+        event_calendar_show_attendance_controls: true,
+        event_calendar_allow_attendance_updates: true,
+        event_calendar_allow_member_submissions: canSubmitEvent,
+        event_calendar_density: "compact",
+        appearance: { showTitle: true },
+      },
+    }),
+    makeBlock({
+      provisioningKey: "members_welcome_resources",
+      type: "internal_resource_hub",
+      x: 6,
+      y: 10,
+      w: 6,
+      h: 8,
+      config: {
+        title: "Featured resources",
+        subtitle: "Approved files and guidance for members",
+        resource_hub_subtitle: "Recently added and important resources",
+        resource_hub_layout_mode: "list",
+        resource_hub_show_search: false,
+        resource_hub_show_filters: false,
+        resource_hub_show_recent: false,
+        resource_hub_show_upload: false,
+        resource_hub_show_detail_panel: false,
+        resource_hub_max_items: 5,
+        record_limit: 5,
+        appearance: { showTitle: true },
+      },
+    }),
+    makeBlock({
+      provisioningKey: "members_welcome_guidance",
+      type: "html",
+      x: 0,
+      y: 18,
+      w: 12,
+      h: 3,
+      config: {
+        title: "Members Guidance",
+        html: `<section class="rounded-2xl border border-[#E6E6EF] bg-white p-6"><h2 class="text-lg font-semibold text-[#111827]">How to use this space</h2><p class="mt-2 text-sm text-[#6B7280]">Use the Events area to view upcoming activity and update your attendance. Use the Resource Hub to access approved documents and shared media. If you need help, contact the Peters &amp; May team.</p>${supportButton}</section>`,
+      },
+    }),
+  ]
 }
 
 async function fetchRequiredMetadata() {
@@ -242,6 +416,24 @@ async function upsertPage({ name, aliases = [], page_type, group_id, order_index
     .single()
   if (cErr || !created) throw new Error(`Page create failed for ${name}: ${cErr?.message || "unknown error"}`)
   return created.id
+}
+
+async function findFirstPageIdByNames(names) {
+  if (!Array.isArray(names) || names.length === 0) return null
+  const { data, error } = await supabase
+    .from("interface_pages")
+    .select("id, name")
+    .in("name", names)
+    .eq("is_archived", false)
+    .eq("is_hidden", false)
+    .order("order_index", { ascending: true })
+    .limit(20)
+  if (error) return null
+  for (const name of names) {
+    const hit = (data || []).find((row) => row.name === name)
+    if (hit?.id) return hit.id
+  }
+  return data?.[0]?.id || null
 }
 
 async function syncPageBlocks(pageId, blocks) {
@@ -949,6 +1141,7 @@ async function archiveDeprecatedPages() {
 
 async function applyMarketingNavPriority(pageIds) {
   const orderedIds = [
+    pageIds.membersWelcome,
     pageIds.home,
     pageIds.theme,
     pageIds.campaigns,
@@ -1076,7 +1269,28 @@ async function main() {
     saved_view_id: ctx.anchors.content,
     config: {},
   })
+  const membersWelcomePageId = await upsertPage({
+    name: "Members Welcome",
+    page_type: "content",
+    group_id: publicGroup,
+    order_index: 0,
+    saved_view_id: ctx.anchors.content,
+    config: {},
+  })
 
+  const contactsPageId = await findFirstPageIdByNames(["Contacts"])
+  const helpPageId = await findFirstPageIdByNames(["Help & Guidance", "Help and Guidance", "Help"])
+
+  await syncPageBlocks(
+    membersWelcomePageId,
+    buildMembersWelcomeBlocks({
+      eventCalendarUrl: eventCalendarPageId ? `/pages/${eventCalendarPageId}` : "",
+      resourceHubUrl: resourceHubPageId ? `/pages/${resourceHubPageId}` : "",
+      contactsUrl: contactsPageId ? `/pages/${contactsPageId}` : "",
+      helpUrl: helpPageId ? `/pages/${helpPageId}` : "",
+      canSubmitEvent: true,
+    })
+  )
   await syncPageBlocks(homePageId, buildMarketingHomeBlocks())
   await syncPageBlocks(themePageId, buildThemeWorkspaceBlocks())
   await syncPageBlocks(campaignsPageId, buildCampaignsBlocks())
@@ -1088,6 +1302,7 @@ async function main() {
 
   await archiveDeprecatedPages()
   await applyMarketingNavPriority({
+    membersWelcome: membersWelcomePageId,
     home: homePageId,
     theme: themePageId,
     campaigns: campaignsPageId,
@@ -1101,6 +1316,7 @@ async function main() {
   await setWorkspaceDefaultPage(homePageId)
 
   console.log("Marketing Hub workspace applied successfully.")
+  console.log(`Members Welcome: /pages/${membersWelcomePageId}`)
   console.log(`Marketing Home: /pages/${homePageId}`)
   console.log(`Theme Workspace: /pages/${themePageId}`)
   console.log(`Campaigns: /pages/${campaignsPageId}`)

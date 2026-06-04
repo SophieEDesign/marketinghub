@@ -41,8 +41,9 @@ describe("apply-marketing-hub-workspace.cjs", () => {
     expect(scriptSrc).toContain("Campaign Workspace")
   })
 
-  it("provisions all eight workspace pages", () => {
+  it("provisions all nine workspace pages", () => {
     for (const pageName of [
+      "Members Welcome",
       "Marketing Home",
       "Theme Workspace",
       "Campaigns",
@@ -110,6 +111,20 @@ describe("apply-marketing-hub-workspace.cjs", () => {
   it("Event Calendar blocks", () => {
     const types = blockTypesInBuilder("buildEventCalendarBlocks")
     expect(types).toContain("event_calendar")
+  })
+
+  it("Members Welcome blocks", () => {
+    const body = extractBuilder("buildMembersWelcomeBlocks")
+    const types = blockTypesInBuilder("buildMembersWelcomeBlocks")
+    expect(body).toContain("members_welcome_hero")
+    expect(body).toContain("members_welcome_quick_actions")
+    expect(body).toContain("members_welcome_guidance")
+    expect(types).toContain("event_calendar")
+    expect(types).toContain("internal_resource_hub")
+    expect(types).not.toContain("campaigns_overview")
+    expect(types).not.toContain("content_timeline")
+    expect(types).not.toContain("things_to_do")
+    expect(body).toContain("event_calendar_external_mode: true")
   })
 })
 
