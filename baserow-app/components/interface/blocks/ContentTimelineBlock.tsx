@@ -160,6 +160,7 @@ export default function ContentTimelineBlock({
   }
 
   const handleOpenRecord = (recordId: string) => {
+    if (isEditing) return
     const item = allItems.find((i) => i.id === recordId)
     if (!item?.recordTableId || !item.recordSupabaseTable) return
     openRecordModal({
@@ -173,6 +174,7 @@ export default function ContentTimelineBlock({
   }
 
   const handleSelectItem = (id: string) => {
+    if (isEditing) return
     const item = allItems.find((candidate) => candidate.id === id)
     if (item?.recordTableId && item.recordSupabaseTable) {
       handleOpenRecord(id)
@@ -182,6 +184,7 @@ export default function ContentTimelineBlock({
   }
 
   const handleAddContent = () => {
+    if (isEditing) return
     const first = liveItems[0]
     if (!first?.recordTableId || !first.recordSupabaseTable) return
     openRecordModal({

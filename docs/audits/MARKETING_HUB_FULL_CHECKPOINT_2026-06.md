@@ -11,16 +11,16 @@
 
 ## 1. Executive summary
 
-### Overall health: **~78%** — safe to continue feature work after one remaining P0
+### Overall health: **~82%** — safe to continue feature work
 
 | Pillar | Jun audit (pre-fix) | Checkpoint (now) | Trend |
 |--------|---------------------|------------------|-------|
-| UX / stability | 64% | **80%** | ↑ |
+| UX / stability | 64% | **84%** | ↑ |
 | Layout | 72% | **82%** | ↑ |
 | Performance | 68% | **76%** | ↑ |
-| Accessibility | 52% | **58%** | ↑ slight |
+| Accessibility | 52% | **68%** | ↑ |
 | Data / settings wiring | — | **74%** | — |
-| Regression protection | — | **82%** | ↑ |
+| Regression protection | — | **85%** | ↑ |
 | Design consistency | 70% | **72%** | ↑ slight |
 
 ### What is stable
@@ -31,12 +31,13 @@
 - Custom record drawers: one `RecordPanel` path; contextual `recordLayoutType` for marketing blocks
 - P1 fixes: Resource Hub edit guards, Upcoming Summary layout routing, Members Welcome shell, `members_welcome` union parity
 - P2 polish: dead `campaigns_open_record_mode` removed; Resource Hub `mockAction` stubs removed; KPI/theme/upcoming dynamically imported
+- P0 fix: Content Timeline edit-mode guards on item click, open record, and add content
+- Accessibility pass: `RecordPanel` focus trap + restore; grid group/row keyboard; `FilterResultsAnnouncer` on marketing filters
 - Performance: `deferBlockMount = !isFullPage`; bundle analyzer reports generated locally
-- Tests: **516/516** Vitest pass; `tsc --noEmit` clean via local `node_modules/typescript`
+- Tests: **528/528** Vitest pass (incl. `content-timeline-edit-mode`, `accessibility-marketing-a11y-2026-06`); `tsc --noEmit` clean via local `node_modules/typescript`
 
 ### What is still risky
 
-- **P0:** `ContentTimelineBlock` opens records in page layout edit mode (no `isEditing` guard) — regression test explicitly documents gap
 - **P3:** Linked-record navigation resets to generic drawer layout
 - **P3:** `campaigns_use_mock` vs block-prefixed mock naming contract drift
 - **P3:** Upcoming Summary “View all” handlers are TODO stubs
@@ -44,15 +45,17 @@
 
 ### Safe to continue feature work?
 
-**Yes**, after fixing Content Timeline edit-mode guard (small, rule-aligned change). Do not add new drawer systems or parallel config schemas without updating tests and `.cursor/rules`.
+**Yes.** P0 edit-mode gaps on marketing blocks are closed. Do not add new drawer systems or parallel config schemas without updating tests and `.cursor/rules`.
 
 ---
 
 ## 2. Critical issues (must fix before more features)
 
-| ID | Issue | Evidence | Fix |
-|----|-------|----------|-----|
-| **CHK-P0-001** | Content Timeline item click opens `RecordPanel` in page layout edit mode | [`ContentTimelineBlock.tsx`](../baserow-app/components/interface/blocks/ContentTimelineBlock.tsx) `handleSelectItem` / `handleOpenRecord` lack `if (isEditing) return`; [`custom-block-record-drawer-regression.test.ts`](../baserow-app/__tests__/custom-block-record-drawer-regression.test.ts) documents gap | Add edit guards matching `ThingsToDoBlock`; extend regression test to assert guard |
+| ID | Issue | Status |
+|----|-------|--------|
+| **CHK-P0-001** | Content Timeline item click opened `RecordPanel` in page layout edit mode | **Fixed** — `if (isEditing) return` on `handleSelectItem`, `handleOpenRecord`, `handleAddContent`; [`content-timeline-edit-mode.test.ts`](../baserow-app/__tests__/content-timeline-edit-mode.test.ts) |
+
+_No open P0 items at checkpoint close._
 
 ---
 
@@ -103,7 +106,7 @@ Provisioning: [`apply-marketing-hub-workspace.cjs`](../baserow-app/scripts/apply
 | Purpose | Executive dashboard — clear |
 | Blocks | `kpi_summary`, `things_to_do`, `content_theme`, `content_timeline`, `internal_resource_hub` (compact), `event_calendar` |
 | Layout | Dense but intentional; marketing shell via `isMarketingHomePage` |
-| Edit mode | Strong on most blocks; **Content Timeline gap** |
+| Edit mode | Strong on all marketing blocks (Content Timeline P0 closed) |
 | Mobile | Tiles stack; calendars/timelines need horizontal scroll audit on small screens |
 | Empty/demo | Demo banners when mock/live unavailable; honest empty states |
 | Dead controls | Resource Hub stubs removed (P2) |
@@ -194,7 +197,7 @@ Provisioning: [`apply-marketing-hub-workspace.cjs`](../baserow-app/scripts/apply
 |-------|----------|---------|-----------|-----------|---------------|------|------|--------|
 | `campaigns_overview` | Strong (`table_id`, `view_id`, field_ids, `campaigns_use_mock`) | Wired | OK | OK | Full-page OK | Partial | Dynamic+lazy | **Good** |
 | `content_theme` | `table_id`, `content_theme_use_mock`, max themes | Wired | N/A (no records) | OK | OK | Partial | Dynamic+lazy | **Good** |
-| `content_timeline` | field_ids, mock, max items, filters | Wired | **Gap** | OK | Scroll OK | Partial | Dynamic+lazy | **Needs P0** |
+| `content_timeline` | field_ids, mock, max items, filters | Wired | OK | OK | Scroll OK | Filter `aria-live` | Dynamic+lazy | **Good** |
 | `things_to_do` | field_ids, mock, filters | Wired | OK | OK | Full-page OK | Row keyboard partial | Dynamic+lazy | **Good** |
 | `event_calendar` | field_ids, `view_id`, mock | Wired | OK | OK | Full-page OK | Partial | Dynamic+lazy | **Good** |
 | `social_media_calendar` | field_ids, mock, max posts | Wired | OK | OK | Full-page OK | Partial | Dynamic+lazy | **Good** |
@@ -230,7 +233,6 @@ Provisioning: [`apply-marketing-hub-workspace.cjs`](../baserow-app/scripts/apply
 
 ### Remaining drawer issues
 
-- Content Timeline edit-mode open (P0)
 - Linked records → generic layout
 - Orphan components (dead code): `SocialPostQuickView`, `ThingsToDoDetailPanel`, `ThingsToDoRecordSidePanel`, unused `EventDetailDrawer` import risk
 
@@ -269,7 +271,9 @@ Provisioning: [`apply-marketing-hub-workspace.cjs`](../baserow-app/scripts/apply
 | Suite | Covers |
 |-------|--------|
 | `stabilisation-p0-p1-2026-06.test.ts` | Overlay, nav flash, REG-005, a11y spinner, skip link, dynamic imports, `deferBlockMount` |
-| `custom-block-record-drawer-regression.test.ts` | Drawer contract, edit guards, content timeline gap |
+| `custom-block-record-drawer-regression.test.ts` | Drawer contract, edit guards incl. content timeline |
+| `content-timeline-edit-mode.test.ts` | Content Timeline edit-mode guards |
+| `accessibility-marketing-a11y-2026-06.test.ts` | Drawer focus, grid keyboard, filter live regions |
 | `custom-block-record-layout-routing.test.ts` | Layout types, upcoming summary |
 | `custom-block-modal-field-contract.test.ts` | Overlay + field UI |
 | `resource-hub-edit-mode.test.ts` | Resource Hub edit guards |
@@ -285,7 +289,6 @@ Provisioning: [`apply-marketing-hub-workspace.cjs`](../baserow-app/scripts/apply
 
 ### Missing / recommended tests
 
-- Content Timeline edit-mode guard (after fix, remove “gap” test)
 - E2E: client nav no flash with real browser
 - E2E: sidebar clickable with record panel open
 - Linked-record preserves layout type (when implemented)
@@ -295,7 +298,7 @@ Provisioning: [`apply-marketing-hub-workspace.cjs`](../baserow-app/scripts/apply
 
 | Check | Result |
 |-------|--------|
-| `npm test -- --run` | **516 passed**, 55 files |
+| `npm test -- --run` | **528 passed**, 57 files (post P0 + a11y) |
 | `node node_modules/typescript/lib/tsc.js --noEmit` | **Pass** |
 | `npm run build:analyze` | Prebuild `tsx` path broken globally; direct `ANALYZE=true next build` produced `.next/analyze/*.html` (see [PERFORMANCE_LAZY_BLOCK_AUDIT_2026-06.md](./PERFORMANCE_LAZY_BLOCK_AUDIT_2026-06.md)) |
 | `npm run build` | Intermittent OneDrive `.next` readlink `EINVAL` on Windows — env |
@@ -333,18 +336,15 @@ See [PERFORMANCE_LAZY_BLOCK_AUDIT_2026-06.md](./PERFORMANCE_LAZY_BLOCK_AUDIT_202
 - `LoadingSpinner`: `role="status"`, `aria-live="polite"`, `aria-busy`
 - `InterfacePageClient` block loading overlay: `aria-busy`, `aria-live`
 - `ThingsToDoRow` keyboard coverage in stabilisation tests
+- **Record drawer:** `useOverlayPanelA11y` — initial focus, Tab trap, restore focus on close; `role="dialog"` + `aria-modal` on overlay panel
+- **Grid:** `AirtableGridView` group headers as buttons with `aria-expanded`; row-number buttons open records
+- **Marketing filters:** `FilterResultsAnnouncer` (`aria-live="polite"`) on Campaigns, Content Timeline, Things To Do, Resource Hub
 
-### Backlog (quick wins)
+### Backlog
 
-- Icon-only hub buttons: verify `aria-label` on Resource Hub header actions
-- Filter result counts: `aria-live="polite"` on marketing blocks with search
-- Status pills: ensure text label present (not colour-only) — mostly OK on campaigns/timeline
-
-### Backlog (larger)
-
-- Record drawer focus trap and return focus on close
-- Grid/calendar `role="button"` rows — keyboard parity beyond Things To Do
-- jsx-a11y eslint plugin on `components/interface/**`
+- Calendar view keyboard parity (beyond grid + Things To Do rows)
+- Badge contrast sampling; jsx-a11y eslint plugin on `components/interface/**`
+- Social/Event calendar filter result announcements (if search added)
 
 ---
 
@@ -361,25 +361,22 @@ See [PERFORMANCE_LAZY_BLOCK_AUDIT_2026-06.md](./PERFORMANCE_LAZY_BLOCK_AUDIT_202
 
 ## 14. Recommended fix order
 
-### P0 — stop regressions
-
-1. Content Timeline `isEditing` guards + regression test update
-
 ### P1 — stabilise UX
 
-2. Manual REG-005 + sidebar/overlay QA (§15)
-3. Linked-record contextual layout preservation
-4. Document or reduce Resource Hub gallery double-panel on Manage
+1. Manual REG-005 + sidebar/overlay QA (§15)
+2. Linked-record contextual layout preservation
+3. Document or reduce Resource Hub gallery double-panel on Manage
 
 ### P2 — polish
 
-5. Align `campaigns_use_mock` naming or document exception
-6. Wire or remove Upcoming Summary “View all”
-7. Remove/archive orphan drawer components
+4. Align `campaigns_use_mock` naming or document exception
+5. Wire or remove Upcoming Summary “View all”
+6. Remove/archive orphan drawer components
 
 ### P3 — future
 
-8. PERF-001 prefetch; CI bundle analyze; a11y pass; Content Theme record editing TODOs
+7. PERF-001 prefetch; CI bundle analyze; Content Theme record editing TODOs
+8. Calendar keyboard parity; jsx-a11y lint in CI
 
 ---
 
@@ -392,18 +389,17 @@ See [PERFORMANCE_LAZY_BLOCK_AUDIT_2026-06.md](./PERFORMANCE_LAZY_BLOCK_AUDIT_202
 - [ ] **Event attendance:** RSVP/attendance in event drawer still works
 - [ ] **Resource Hub:** List URL open; gallery preview; Manage asset → `asset` drawer; **in edit mode** click selects block only
 - [ ] **Member visibility:** Member preview / non-admin cannot open admin-only pages; Members Welcome hides internal-only events/resources
-- [ ] **Content Timeline edit mode:** Click item → must select block, **not** open drawer (currently fails — P0)
+- [ ] **Content Timeline edit mode:** Click item → must select block, **not** open drawer
 - [ ] **Mobile:** Marketing Home + one full-page calendar; sidebars/overlays; no horizontal overflow on filters
 
 ---
 
 ## 16. Suggested next prompts
 
-- **P0 only:** “Fix Content Timeline edit-mode guard and update regression tests”
 - **P1 UX:** “Linked-record layout preservation + manual REG-005 verification notes”
 - **P2 polish:** “Wire Upcoming Summary view-all or remove controls; align campaigns mock key naming”
-- **Accessibility pass:** “Drawer focus trap + grid keyboard + aria-live on marketing filters”
 - **Cleanup:** “Archive orphan SocialPostQuickView / ThingsToDoDetailPanel / EventDetailDrawer paths”
+- **QA:** “Run manual checklist §15 on staging and capture results”
 
 ---
 
@@ -424,7 +420,8 @@ See [PERFORMANCE_LAZY_BLOCK_AUDIT_2026-06.md](./PERFORMANCE_LAZY_BLOCK_AUDIT_202
 | Members Welcome shell | Missing from workspace set | **Fixed** |
 | campaigns_open_record_mode | Dead | **Removed** (P2) |
 | mockAction stubs | Misleading | **Removed** (P2) |
-| Content Timeline edit guard | Gap | **Still open** |
+| Content Timeline edit guard | Gap | **Fixed** |
+| Accessibility pass | Backlog | **Fixed** — drawer focus, grid keyboard, filter live regions |
 
 ---
 
@@ -435,6 +432,8 @@ See [PERFORMANCE_LAZY_BLOCK_AUDIT_2026-06.md](./PERFORMANCE_LAZY_BLOCK_AUDIT_202
 | P1 | Resource Hub edit guards; Upcoming Summary `recordLayoutType`; Members Welcome shell; edit-mode registry tests |
 | P2 | Dead setting removal; Resource Hub stub cleanup; dynamic imports for KPI/theme/upcoming |
 | Performance | `deferBlockMount`; KPI lazy wrap; `PERFORMANCE_LAZY_BLOCK_AUDIT_2026-06.md`; `DetailPanel` TS fix |
+| P0 close-out | Content Timeline edit guards; `content-timeline-edit-mode.test.ts` |
+| Accessibility | `useOverlayPanelA11y`, `FilterResultsAnnouncer`, grid keyboard; `accessibility-marketing-a11y-2026-06.test.ts` |
 
 ---
 

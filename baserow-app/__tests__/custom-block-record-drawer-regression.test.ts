@@ -133,6 +133,7 @@ describe("custom block record drawer regression", () => {
       const things = readSource("components/interface/blocks/ThingsToDoBlock.tsx")
       const campaigns = readSource("components/interface/blocks/CampaignsOverviewBlock.tsx")
       const resourceHub = readSource("components/interface/blocks/InternalResourceHubBlock.tsx")
+      const contentTimeline = readSource("components/interface/blocks/ContentTimelineBlock.tsx")
       const canvas = readSource("components/interface/Canvas.tsx")
 
       expect(eventCore).toContain("if (isEditing) return")
@@ -142,14 +143,10 @@ describe("custom block record drawer regression", () => {
       expect(resourceHub).toMatch(/handleSelect[\s\S]*?if \(isEditing\) return/)
       expect(resourceHub).toMatch(/openResourceUrl[\s\S]*?if \(isEditing\) return/)
       expect(resourceHub).toMatch(/handleEditResourceDetails[\s\S]*?if \(isEditing/)
+      expect(contentTimeline).toMatch(/handleSelectItem[\s\S]*?if \(isEditing\) return/)
+      expect(contentTimeline).toMatch(/handleOpenRecord[\s\S]*?if \(isEditing\) return/)
       expect(canvas).toContain("onMouseDownCapture")
       expect(canvas).toContain("selectThisBlock")
-    })
-
-    it("documents content timeline edit-mode guard as remaining gap", () => {
-      const content = readSource("components/interface/blocks/ContentTimelineBlock.tsx")
-      expect(content).toContain("const handleSelectItem = (id: string) =>")
-      expect(content).not.toMatch(/handleSelectItem[\s\S]*?if \(isEditing\) return/)
     })
   })
 })
