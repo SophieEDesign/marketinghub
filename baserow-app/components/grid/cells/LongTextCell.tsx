@@ -116,6 +116,7 @@ export default function LongTextCell({
         <textarea
           value={editValue}
           onChange={(e) => setEditValue(e.target.value)}
+          onMouseDown={(e) => e.stopPropagation()}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
           className="w-full px-2 py-1 text-sm border border-blue-400 outline-none bg-white focus:ring-2 focus:ring-blue-400/20 focus:ring-offset-1 rounded-md resize-none"

@@ -287,6 +287,7 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
             ref={inputRef as React.RefObject<HTMLTextAreaElement>}
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
+            onMouseDown={(e) => e.stopPropagation()}
             onBlur={handleSave}
             onKeyDown={handleKeyDown}
             className="w-full px-2 py-1 text-sm border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
@@ -321,6 +322,7 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
               : e.target.value
             setEditValue(newValue)
           }}
+          onMouseDown={(e) => e.stopPropagation()}
           onBlur={handleSave}
           onKeyDown={handleKeyDown}
           className="w-full px-2 text-sm border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"

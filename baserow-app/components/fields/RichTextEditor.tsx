@@ -93,14 +93,16 @@ export default function RichTextEditor({
       },
       // Paste as plain text so full content (e.g. long emails) is preserved; otherwise
       // TipTap's HTML parser strips email HTML to a few schema-allowed nodes and truncates.
-      handlePaste: (view, event) => {
+      handlePaste: (_view, event) => {
         const plain = event.clipboardData?.getData('text/plain')
         if (plain != null && plain !== '' && editorRef.current) {
           const html = plain
             .split(/\r?\n/)
             .map((line) => `<p>${escapeHtml(line)}</p>`)
             .join('')
-          editorRef.current.chain().focus().insertContent(html).run()
+          // Do not call focus() here — it can collapse the selection so paste inserts
+          // instead of replacing the highlighted text.
+          editorRef.current.chain().insertContent(html).run()
           return true
         }
         return false

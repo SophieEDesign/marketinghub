@@ -100,6 +100,7 @@ export default function UrlCell({
         type="url"
         value={editValue}
         onChange={(e) => setEditValue(e.target.value)}
+        onMouseDown={(e) => e.stopPropagation()}
         onBlur={handleSave}
         onKeyDown={handleKeyDown}
         className="w-full h-full px-2 text-sm border-none outline-none bg-white focus:ring-2 focus:ring-blue-500 rounded"

@@ -2070,20 +2070,11 @@ export default function AirtableGridView({
                           maxHeight: effectiveRowHeight,
                           ...(isFirstDataColumn && { left: FIRST_DATA_COLUMN_LEFT }),
                         }}
-                        onClick={(e) => {
-                          // Single click: select cell and copy value
+                        onClick={() => {
+                          // Single click: select cell (do not copy to clipboard — that overwrote
+                          // the user's clipboard when clicking a cell before pasting).
                           setSelectedCell({ rowId: row.id, fieldName: field.name })
                           setSelectedColumnId(null)
-                          
-                          // Copy cell value to clipboard
-                          const fieldObj = fields.find(f => f.name === field.name)
-                          const textToCopy = formatCellValue(row[field.name], fieldObj)
-                          if (textToCopy) {
-                            navigator.clipboard.writeText(textToCopy).catch(err => {
-                              debugError('Failed to copy:', err)
-                            })
-                          }
-                          
                           // Store for drag-to-fill
                           setFillSource({ rowId: row.id, fieldName: field.name, value: row[field.name] })
                         }}

@@ -95,6 +95,7 @@ export default function NumberCell({
         step={precision !== undefined ? Math.pow(10, -precision) : 'any'}
         value={editValue}
         onChange={(e) => setEditValue(e.target.value)}
+        onMouseDown={(e) => e.stopPropagation()}
         onBlur={handleSave}
         onKeyDown={handleKeyDown}
         className="w-full h-full px-3 text-sm border border-blue-400 outline-none bg-white focus:ring-2 focus:ring-blue-400/20 focus:ring-offset-1 rounded-md text-right"
