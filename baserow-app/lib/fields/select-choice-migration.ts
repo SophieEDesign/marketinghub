@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { FieldOptions } from '@/types/fields'
 import { normalizeSelectOptionsForUi } from '@/lib/fields/select-options'
 
@@ -133,19 +134,8 @@ export function remapStoredSelectValue(
   return { next: nextValues, changed }
 }
 
-type SupabaseLike = {
-  from: (table: string) => {
-    select: (columns: string) => {
-      not: (column: string, operator: string, value: unknown) => Promise<{ data: any[] | null; error: any }>
-    }
-    update: (payload: Record<string, unknown>) => {
-      eq: (column: string, value: string) => Promise<{ error: any }>
-    }
-  }
-}
-
 export async function migrateSelectChoiceRecords(params: {
-  supabase: SupabaseLike
+  supabase: SupabaseClient<any, 'public', any>
   tableName: string
   fieldName: string
   fieldType: 'single_select' | 'multi_select'
@@ -164,10 +154,10 @@ export async function migrateSelectChoiceRecords(params: {
   if (!records?.length) return 0
 
   const updates: Array<{ id: string; value: unknown }> = []
-  for (const record of records) {
+  for (const record of records as unknown as Array<Record<string, unknown>>) {
     const { next, changed } = remapStoredSelectValue(record[fieldName], fieldType, renames, deletions)
     if (changed) {
-      updates.push({ id: record.id, value: next })
+      updates.push({ id: String(record.id), value: next })
     }
   }
 
