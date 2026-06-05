@@ -29,6 +29,8 @@ interface CellFactoryProps {
   isCellSelected?: boolean // Whether the cell is currently selected
   onDelete?: (rowId: string) => void
   canDelete?: boolean
+  onDuplicateRecord?: () => void
+  canDuplicateRecord?: boolean
   /** When true, truncate long pill labels (e.g. for Kanban cards). */
   pillTruncate?: boolean
 }
@@ -46,6 +48,8 @@ export function CellFactory({
   isCellSelected = false,
   onDelete,
   canDelete = false,
+  onDuplicateRecord,
+  canDuplicateRecord = false,
   pillTruncate = false,
 }: CellFactoryProps): ReactNode {
   const commonProps = {
@@ -61,12 +65,17 @@ export function CellFactory({
     ? { onDelete: () => onDelete(rowId), canDelete: true }
     : {}
 
+  const duplicateProps =
+    canDuplicateRecord && onDuplicateRecord
+      ? { onDuplicateRecord, canDuplicateRecord: true }
+      : {}
+
   switch (field.type) {
     case 'text':
-      return <TextCell {...commonProps} {...deleteProps} />
+      return <TextCell {...commonProps} {...deleteProps} {...duplicateProps} />
 
     case 'long_text':
-      return <LongTextCell {...commonProps} {...deleteProps} />
+      return <LongTextCell {...commonProps} {...deleteProps} {...duplicateProps} />
 
     case 'number':
     case 'percent':
@@ -147,7 +156,7 @@ export function CellFactory({
 
     case 'formula':
       // These are read-only or need special handling
-      return <TextCell {...commonProps} {...deleteProps} editable={false} />
+      return <TextCell {...commonProps} {...deleteProps} {...duplicateProps} editable={false} />
 
     case 'lookup':
       return (

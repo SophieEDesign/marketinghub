@@ -2148,6 +2148,18 @@ export default function AirtableGridView({
                                 setShowDeleteRowConfirm(true)
                               }}
                               canDelete={editable && userRole === 'admin'}
+                              onDuplicateRecord={async () => {
+                                try {
+                                  await duplicateRow(row.id)
+                                } catch (error: any) {
+                                  handleError(
+                                    error,
+                                    "Failed to duplicate record",
+                                    error?.message || "An error occurred while duplicating the record"
+                                  )
+                                }
+                              }}
+                              canDuplicateRecord={editable}
                             />
                             {isCellSelected && editable && !field.options?.read_only && (
                               <FillHandle

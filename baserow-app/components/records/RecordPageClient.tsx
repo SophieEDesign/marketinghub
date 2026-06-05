@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Trash2, MoreVertical } from "lucide-react"
+import { ArrowLeft, Copy, Trash2, MoreVertical } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
@@ -51,6 +51,7 @@ export default function RecordPageClient({
   const [fieldGroups, setFieldGroups] = useState<Record<string, string[]>>({})
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [duplicating, setDuplicating] = useState(false)
   
   // Find title field (first text field or first field)
   const titleField = fields.find(f => f.type === 'text') || fields[0]
@@ -111,6 +112,43 @@ export default function RecordPageClient({
       })
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleDuplicate() {
+    if (!record) return
+
+    setDuplicating(true)
+    try {
+      const supabase = createClient()
+      const { id, created_at, updated_at, deleted_at, ...recordData } = record
+      void id
+
+      const { data, error } = await supabase
+        .from(supabaseTableName)
+        .insert([recordData])
+        .select()
+        .single()
+
+      if (error) throw error
+
+      toast({
+        title: "Record duplicated",
+        description: "A copy of this record has been created.",
+      })
+
+      if (data?.id) {
+        router.push(`/tables/${tableId}/records/${data.id}`)
+      }
+    } catch (error: any) {
+      console.error("Error duplicating record:", error)
+      toast({
+        variant: "destructive",
+        title: "Failed to duplicate record",
+        description: error.message || "Please try again",
+      })
+    } finally {
+      setDuplicating(false)
     }
   }
 
@@ -293,6 +331,16 @@ export default function RecordPageClient({
           {/* Desktop actions in header */}
           {!isMobile && (
             <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDuplicate}
+                disabled={duplicating}
+                className="gap-1.5"
+              >
+                <Copy className="h-4 w-4" />
+                Duplicate
+              </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm">
@@ -300,6 +348,10 @@ export default function RecordPageClient({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleDuplicate} disabled={duplicating}>
+                    <Copy className="h-4 w-4 mr-2" />
+                    Duplicate
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => setShowDeleteDialog(true)}
                     className="text-red-600"

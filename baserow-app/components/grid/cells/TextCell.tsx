@@ -24,6 +24,8 @@ interface TextCellProps {
   onCopy?: () => void // Optional callback for copy action
   onDelete?: () => void
   canDelete?: boolean
+  onDuplicateRecord?: () => void
+  canDuplicateRecord?: boolean
 }
 
 export default function TextCell({
@@ -37,6 +39,8 @@ export default function TextCell({
   onCopy,
   onDelete,
   canDelete = false,
+  onDuplicateRecord,
+  canDuplicateRecord = false,
 }: TextCellProps) {
   const [editing, setEditing] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
@@ -251,6 +255,12 @@ export default function TextCell({
                 Edit in modal
               </ContextMenuItem>
             </>
+          )}
+          {canDuplicateRecord && onDuplicateRecord && (
+            <ContextMenuItem onClick={onDuplicateRecord}>
+              <Copy className="h-4 w-4 mr-2" />
+              Duplicate record
+            </ContextMenuItem>
           )}
           {canDelete && onDelete && (
             <>

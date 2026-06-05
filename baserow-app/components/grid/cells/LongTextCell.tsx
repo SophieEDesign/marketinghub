@@ -24,6 +24,8 @@ interface LongTextCellProps {
   onCopy?: () => void // Optional callback for copy action
   onDelete?: () => void
   canDelete?: boolean
+  onDuplicateRecord?: () => void
+  canDuplicateRecord?: boolean
 }
 
 export default function LongTextCell({
@@ -37,6 +39,8 @@ export default function LongTextCell({
   onCopy,
   onDelete,
   canDelete = false,
+  onDuplicateRecord,
+  canDuplicateRecord = false,
 }: LongTextCellProps) {
   const [editing, setEditing] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
@@ -205,6 +209,12 @@ export default function LongTextCell({
                 Edit in rich text editor
               </ContextMenuItem>
             </>
+          )}
+          {canDuplicateRecord && onDuplicateRecord && (
+            <ContextMenuItem onClick={onDuplicateRecord}>
+              <Copy className="h-4 w-4 mr-2" />
+              Duplicate record
+            </ContextMenuItem>
           )}
           {canDelete && onDelete && (
             <>
