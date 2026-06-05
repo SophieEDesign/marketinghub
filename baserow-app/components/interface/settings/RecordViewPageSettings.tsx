@@ -634,9 +634,11 @@ export default function RecordViewPageSettings({
     return { groups, ungrouped }
   }, [visibleFieldConfigs, fields])
 
+  const [activeSettingsTab, setActiveSettingsTab] = useState("data")
+
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="data" className="w-full">
+      <Tabs value={activeSettingsTab} onValueChange={setActiveSettingsTab} className="w-full">
         <TabsList className="flex w-full flex-wrap h-auto gap-1 p-1">
           <TabsTrigger value="data" className="flex-1 min-w-[4.5rem] text-xs sm:text-sm">
             Data

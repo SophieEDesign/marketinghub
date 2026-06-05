@@ -51,6 +51,7 @@ describe("Accessibility pass — marketing filter live regions", () => {
     ["ContentTimelineBlock.tsx", "timeline items"],
     ["ThingsToDoBlock.tsx", "tasks"],
     ["InternalResourceHubBlock.tsx", "resources"],
+    ["ContentThemeBlock.tsx", "themes"],
   ] as const
 
   it.each(blocksWithAnnouncer)(

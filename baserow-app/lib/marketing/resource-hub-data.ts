@@ -122,12 +122,14 @@ export function resolveMediaFields(
   return applyFieldOverrides(base, overrides, fieldIds)
 }
 
-function fileTypeFromUrl(url: string | null): ResourceFileType {
-  if (!url) return "LINK"
-  const normalized = url.trim()
-  if (!normalized) return "LINK"
-  const ext = normalized.split("?")[0].split(".").pop()?.toLowerCase() ?? ""
-  switch (ext) {
+export interface ParsedAttachment {
+  url: string
+  name?: string
+  type?: string | null
+}
+
+function fileTypeFromExtension(ext: string): ResourceFileType | null {
+  switch (ext.toLowerCase()) {
     case "png":
       return "PNG"
     case "jpg":
@@ -135,6 +137,8 @@ function fileTypeFromUrl(url: string | null): ResourceFileType {
       return "JPG"
     case "svg":
       return "SVG"
+    case "pdf":
+      return "PDF"
     case "docx":
     case "doc":
       return "DOCX"
@@ -150,8 +154,32 @@ function fileTypeFromUrl(url: string | null): ResourceFileType {
     case "zip":
       return "ZIP"
     default:
-      break
+      return null
   }
+}
+
+function fileTypeFromMime(type: string | null | undefined): ResourceFileType | null {
+  if (!type?.trim()) return null
+  const mime = type.trim().toLowerCase()
+  if (mime.includes("pdf")) return "PDF"
+  if (mime.includes("word") || mime.includes("msword") || mime.includes("document")) return "DOCX"
+  if (mime.includes("presentation") || mime.includes("powerpoint")) return "PPTX"
+  if (mime.includes("spreadsheet") || mime.includes("excel")) return "XLSX"
+  if (mime.startsWith("image/png")) return "PNG"
+  if (mime.startsWith("image/jpeg") || mime.startsWith("image/jpg")) return "JPG"
+  if (mime.includes("svg")) return "SVG"
+  if (mime.startsWith("video/")) return "MP4"
+  if (mime.includes("zip")) return "ZIP"
+  return null
+}
+
+function fileTypeFromUrl(url: string | null): ResourceFileType {
+  if (!url) return "LINK"
+  const normalized = url.trim()
+  if (!normalized) return "LINK"
+  const ext = normalized.split("?")[0].split(".").pop()?.toLowerCase() ?? ""
+  const fromExt = fileTypeFromExtension(ext)
+  if (fromExt) return fromExt
 
   // URL heuristics for link-based resources without file extensions.
   try {
@@ -178,52 +206,85 @@ function fileTypeFromUrl(url: string | null): ResourceFileType {
   return "LINK"
 }
 
-function pushUrlLike(target: string[], value: unknown) {
-  if (typeof value !== "string" || !value.trim()) return
-  const trimmed = value.trim()
-  if (trimmed.startsWith("http") || trimmed.startsWith("/") || trimmed.startsWith("data:")) {
-    target.push(trimmed)
+function resolveResourceFileType(
+  url: string | null,
+  attachment?: ParsedAttachment | null
+): ResourceFileType {
+  const fromUrl = fileTypeFromUrl(url)
+  if (fromUrl !== "LINK") return fromUrl
+
+  if (attachment?.name) {
+    const ext = attachment.name.split(".").pop() ?? ""
+    const fromName = fileTypeFromExtension(ext)
+    if (fromName) return fromName
+  }
+
+  const fromMime = fileTypeFromMime(attachment?.type)
+  if (fromMime) return fromMime
+
+  // Uploaded storage files should not present as external web links.
+  if (
+    attachment?.url &&
+    (attachment.url.includes("/storage/v1/object/public/attachments/") ||
+      attachment.url.includes("/storage/v1/object/sign/attachments/"))
+  ) {
+    return "DOCX"
+  }
+
+  return "LINK"
+}
+
+function parseAttachmentItem(item: unknown): ParsedAttachment | null {
+  if (typeof item === "string") {
+    const trimmed = item.trim()
+    if (!trimmed) return null
+    if (trimmed.startsWith("http") || trimmed.startsWith("/") || trimmed.startsWith("data:")) {
+      return { url: trimmed }
+    }
+    return null
+  }
+  if (!item || typeof item !== "object") return null
+  const obj = item as Record<string, unknown>
+  const rawUrl = obj.url ?? obj.src ?? obj.href ?? obj.thumbnail ?? obj.file_url
+  if (typeof rawUrl !== "string" || !rawUrl.trim()) return null
+  const url = rawUrl.trim()
+  if (!url.startsWith("http") && !url.startsWith("/") && !url.startsWith("data:")) return null
+  return {
+    url,
+    name: typeof obj.name === "string" ? obj.name : undefined,
+    type: typeof obj.type === "string" ? obj.type : null,
   }
 }
 
-function parseAttachmentUrls(input: unknown): string[] {
-  const urls: string[] = []
-  if (input == null || input === "") return urls
+export function parseAttachments(input: unknown): ParsedAttachment[] {
+  if (input == null || input === "") return []
 
   if (typeof input === "string") {
     const s = input.trim()
     if (s.startsWith("[") || s.startsWith("{")) {
       try {
-        return parseAttachmentUrls(JSON.parse(s))
+        return parseAttachments(JSON.parse(s))
       } catch {
-        pushUrlLike(urls, s)
-        return urls
+        const single = parseAttachmentItem(s)
+        return single ? [single] : []
       }
     }
-    pushUrlLike(urls, s)
-    return urls
+    const single = parseAttachmentItem(s)
+    return single ? [single] : []
   }
 
   if (Array.isArray(input)) {
-    for (const item of input) {
-      if (typeof item === "string") {
-        pushUrlLike(urls, item)
-        continue
-      }
-      if (item && typeof item === "object") {
-        const obj = item as Record<string, unknown>
-        pushUrlLike(urls, obj.url ?? obj.src ?? obj.href ?? obj.thumbnail ?? obj.file_url)
-      }
-    }
-    return urls
+    return input
+      .map((item) => parseAttachmentItem(item))
+      .filter((item): item is ParsedAttachment => item != null)
   }
 
   if (typeof input === "object") {
-    const obj = input as Record<string, unknown>
-    pushUrlLike(urls, obj.url ?? obj.src ?? obj.href ?? obj.thumbnail ?? obj.file_url)
+    const single = parseAttachmentItem(input)
+    return single ? [single] : []
   }
 
-  return urls
+  return []
 }
 
 export function buildResourceHubItems(
@@ -236,12 +297,18 @@ export function buildResourceHubItems(
     const title = formatDisplayValue(row[fields.name])
     if (!title?.trim()) continue
     const linkUrl = fields.documentLink ? formatDisplayValue(row[fields.documentLink]) : null
-    const attachmentUrls = fields.attachments ? parseAttachmentUrls(row[fields.attachments]) : []
-    const thumbnailUrl = attachmentUrls[0] ?? undefined
-    const primaryAttachmentUrl = attachmentUrls[0] ?? null
+    const parsedAttachments = fields.attachments
+      ? parseAttachments(row[fields.attachments])
+      : []
+    const primaryAttachment = parsedAttachments[0] ?? null
+    const primaryAttachmentUrl = primaryAttachment?.url ?? null
+    const thumbnailUrl = primaryAttachmentUrl ?? undefined
     const url = primaryAttachmentUrl || linkUrl || null
     const referenceUrl = primaryAttachmentUrl && linkUrl ? linkUrl : undefined
-    const fileType = fileTypeFromUrl(url)
+    const fileType = resolveResourceFileType(
+      url,
+      primaryAttachmentUrl ? primaryAttachment : null
+    )
     const hubCategoryRaw = fields.hubCategory
       ? formatDisplayValue(row[fields.hubCategory])
       : null

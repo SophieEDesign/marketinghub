@@ -174,7 +174,12 @@ function buildMembersWelcomeBlocks() {
       w: 12,
       h: 22,
       config: {
-        title: "Members Welcome",
+        title: "Welcome to the Peters & May Marketing Hub",
+        subtitle:
+          "Access shared events, useful resources and collaboration tools in one place.",
+        members_welcome_body:
+          "Use this space to view upcoming events, manage your attendance, access approved documents and stay aligned with relevant activity.",
+        members_welcome_show_quick_actions: true,
         is_full_page: true,
         members_welcome_max_events: 5,
         members_welcome_max_resources: 5,

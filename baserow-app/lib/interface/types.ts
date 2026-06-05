@@ -643,6 +643,8 @@ export interface BlockConfig {
   social_media_calendar_post_url_field_id?: string
   social_media_calendar_post_url_field?: string
   // Campaigns Overview block
+  campaigns_overview_use_mock?: boolean
+  /** @deprecated Use campaigns_overview_use_mock */
   campaigns_use_mock?: boolean
   campaigns_max_items?: number
   campaigns_default_view?: "list" | "kanban" | "calendar" | "timeline"
@@ -694,6 +696,8 @@ export interface BlockConfig {
   campaigns_linked_events_field?: string
   campaigns_click_action?: "open_record" | "none"
   // Members Welcome block
+  members_welcome_body?: string
+  members_welcome_show_quick_actions?: boolean
   members_welcome_max_events?: number
   members_welcome_max_resources?: number
   members_welcome_allow_submit_event?: boolean

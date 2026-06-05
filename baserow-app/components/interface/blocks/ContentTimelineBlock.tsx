@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { parseISO } from "date-fns"
 import type { PageBlock } from "@/lib/interface/types"
 import {
@@ -31,6 +32,8 @@ import { ContentTimelineStatusLegend } from "@/components/interface/content-time
 import { FilterResultsAnnouncer } from "@/components/a11y/FilterResultsAnnouncer"
 import MarketingDemoDataBanner from "@/components/interface/primitives/MarketingDemoDataBanner"
 import { marketingBlockRootClass } from "@/lib/interface/marketing-block-layout"
+import { CONTENT_TIMELINE_FOOTER_PAGE_NAMES } from "@/lib/marketing/marketing-page-links"
+import { useMarketingPageLinks } from "@/hooks/useMarketingPageLinks"
 
 interface ContentTimelineBlockProps {
   block: PageBlock
@@ -56,7 +59,9 @@ export default function ContentTimelineBlock({
   isFullPage = false,
 }: ContentTimelineBlockProps) {
   const { config } = block
+  const router = useRouter()
   const { openRecordModal } = useRecordModal()
+  const { resolvePath } = useMarketingPageLinks()
   const {
     loading,
     error,
@@ -148,6 +153,16 @@ export default function ContentTimelineBlock({
     () => allItems.find((i) => i.id === selectedId) ?? null,
     [allItems, selectedId]
   )
+
+  const footerPath = useMemo(
+    () => resolvePath(CONTENT_TIMELINE_FOOTER_PAGE_NAMES),
+    [resolvePath]
+  )
+
+  const handleFooterNavigate = () => {
+    if (isEditing || !footerPath) return
+    router.push(footerPath)
+  }
 
   const periodLabel = formatPeriodLabel(view, anchorDate)
 
@@ -305,14 +320,13 @@ export default function ContentTimelineBlock({
         )}
       </div>
 
-      {showFooterLink ? (
+      {showFooterLink && footerPath ? (
         <div className="shrink-0 border-t border-border/40 px-4 py-2.5">
           <button
             type="button"
-            className="text-xs font-medium text-[#6D4AFF] hover:underline"
-            onClick={() => {
-              // TODO: Navigate to full Content / Social calendar page when wired.
-            }}
+            className="text-xs font-medium text-[#6D4AFF] hover:underline disabled:cursor-default disabled:text-muted-foreground disabled:no-underline"
+            onClick={handleFooterNavigate}
+            disabled={isEditing || !footerPath}
           >
             {footerLabel}
           </button>

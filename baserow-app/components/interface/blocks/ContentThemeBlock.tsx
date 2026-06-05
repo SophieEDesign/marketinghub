@@ -1,7 +1,8 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, useCallback } from "react"
 import type { PageBlock } from "@/lib/interface/types"
+import { useRecordModal } from "@/contexts/RecordModalContext"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -37,12 +38,14 @@ import {
   MARKETING_DEMO_BANNER_DEFAULT,
 } from "@/lib/marketing/block-config-resolver"
 import MarketingDemoDataBanner from "@/components/interface/primitives/MarketingDemoDataBanner"
+import { FilterResultsAnnouncer } from "@/components/a11y/FilterResultsAnnouncer"
 import DashboardEmpty from "@/components/interface/primitives/DashboardEmpty"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 
 interface ContentThemeBlockProps {
   block: PageBlock
   isEditing?: boolean
+  interfaceMode?: "view" | "edit"
 }
 
 type AccentKey = ContentThemeItem["accent"]
@@ -110,10 +113,23 @@ const STATUS_BADGE: Record<ContentThemeStatus, string> = {
   Upcoming: "bg-gray-50 text-gray-500 border border-[#E6E6EF]",
 }
 
-export default function ContentThemeBlock({ block, isEditing = false }: ContentThemeBlockProps) {
+export default function ContentThemeBlock({
+  block,
+  isEditing = false,
+  interfaceMode = "view",
+}: ContentThemeBlockProps) {
   const { config } = block
+  const { openRecordModal } = useRecordModal()
   const forceMock = isMarketingMockEnabled(config, "content_theme_use_mock")
-  const { loading, error, fromLiveData, hasTable, themes: liveThemes } = useContentThemeData({
+  const {
+    loading,
+    error,
+    fromLiveData,
+    hasTable,
+    themes: liveThemes,
+    tableIds,
+    reload,
+  } = useContentThemeData({
     config,
   })
   const demoState = marketingDemoState({ forceMock, fromLiveData, hasTable, error })
@@ -198,6 +214,49 @@ export default function ContentThemeBlock({ block, isEditing = false }: ContentT
     return sorted.slice(0, Math.max(1, maxThemes))
   }, [themes, quarterFilter, statusFilter, divisionFilter, sortBy, maxThemes])
 
+  const canManageRecords =
+    demoState.useLiveData && !forceMock && tableIds != null && !isEditing
+
+  const handleOpenTheme = useCallback(
+    (themeId: string) => {
+      if (!canManageRecords || !tableIds) return
+      openRecordModal({
+        tableId: tableIds.themesTableId,
+        recordId: themeId,
+        supabaseTableName: tableIds.themesSupabaseTable,
+        interfaceMode,
+        onRecordUpdated: () => reload(),
+      })
+    },
+    [canManageRecords, tableIds, openRecordModal, interfaceMode, reload]
+  )
+
+  const handleAddTheme = useCallback(() => {
+    if (!canManageRecords || !tableIds) return
+    openRecordModal({
+      tableId: tableIds.themesTableId,
+      recordId: null,
+      supabaseTableName: tableIds.themesSupabaseTable,
+      interfaceMode,
+      onRecordUpdated: () => reload(),
+    })
+  }, [canManageRecords, tableIds, openRecordModal, interfaceMode, reload])
+
+  const handleAddIdea = useCallback(
+    (theme: ContentThemeItem) => {
+      if (!canManageRecords || !tableIds?.contentTableId || !tableIds.contentSupabaseTable) return
+      openRecordModal({
+        tableId: tableIds.contentTableId,
+        recordId: null,
+        supabaseTableName: tableIds.contentSupabaseTable,
+        interfaceMode,
+        recordLayoutType: "content",
+        onRecordUpdated: () => reload(),
+      })
+    },
+    [canManageRecords, tableIds, openRecordModal, interfaceMode, reload]
+  )
+
   const isCompact = cardDensity === "compact"
   const cardPadding = isCompact ? "p-3" : "p-4"
   const gridClass =
@@ -243,6 +302,7 @@ export default function ContentThemeBlock({ block, isEditing = false }: ContentT
             message={forceMock ? demoState.bannerMessage : MARKETING_DEMO_BANNER_DEFAULT}
           />
         ) : null}
+        <FilterResultsAnnouncer count={displayedThemes.length} noun="themes" />
         {/* Header */}
         <div
           className={cn(
@@ -380,9 +440,19 @@ export default function ContentThemeBlock({ block, isEditing = false }: ContentT
                         <Icon className={cn("h-4 w-4", styles.icon)} aria-hidden />
                       </div>
                       <div className="min-w-0">
-                        <h3 className="text-sm font-semibold leading-snug text-[#111827]">
-                          {theme.title}
-                        </h3>
+                        {canManageRecords ? (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenTheme(theme.id)}
+                            className="text-left text-sm font-semibold leading-snug text-[#111827] hover:text-[#6D4AFF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D4AFF]/40 rounded-sm"
+                          >
+                            {theme.title}
+                          </button>
+                        ) : (
+                          <h3 className="text-sm font-semibold leading-snug text-[#111827]">
+                            {theme.title}
+                          </h3>
+                        )}
                       </div>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1">
@@ -442,13 +512,15 @@ export default function ContentThemeBlock({ block, isEditing = false }: ContentT
                     )}
                   </div>
 
-                  {/* TODO: Add "Add idea" action to open/create linked Content record */}
                   <button
                     type="button"
-                    disabled={isEditing}
-                    onClick={() => {
-                      /* placeholder until RecordModal wiring */
-                    }}
+                    disabled={!canManageRecords || !tableIds?.contentTableId}
+                    onClick={() => handleAddIdea(theme)}
+                    title={
+                      !tableIds?.contentTableId
+                        ? "Connect a Content table to add ideas"
+                        : undefined
+                    }
                     className={cn(
                       "flex w-full items-center justify-center gap-1 rounded-lg border border-dashed border-[#E6E6EF] py-2 text-xs font-medium text-[#6B7280] transition-colors hover:border-[#6D4AFF]/30 hover:bg-[#F8F8FC] hover:text-[#6D4AFF] disabled:opacity-60",
                       isCompact && "py-1.5"
@@ -478,14 +550,12 @@ export default function ContentThemeBlock({ block, isEditing = false }: ContentT
                 most.
               </p>
             </div>
-            {/* TODO: Add "Add theme" action to create Quarterly Theme record */}
-            {/* TODO: Add RecordModal / RecordEditor support for theme editing */}
-            {/* TODO: Add permissions */}
             <Button
               type="button"
               variant="outline"
               size="sm"
-              disabled={isEditing}
+              disabled={!canManageRecords}
+              onClick={handleAddTheme}
               className="shrink-0 border-[#6D4AFF]/30 bg-white text-[#6D4AFF] hover:bg-white hover:text-[#6D4AFF]"
             >
               <Plus className="mr-1 h-3.5 w-3.5" />

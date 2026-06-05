@@ -38,7 +38,7 @@ import { canDeleteRecord } from "@/lib/interface/record-actions"
 import { Button } from "@/components/ui/button"
 import { Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { useSelectionContext } from "@/contexts/SelectionContext"
+import { useSelectionContext, isPageLevelSettingsContext } from "@/contexts/SelectionContext"
 import { useRightSettingsPanelData } from "@/contexts/RightSettingsPanelDataContext"
 
 interface RecordReviewPageProps {
@@ -76,7 +76,7 @@ export default function RecordReviewPage({
   const [tableName, setTableName] = useState<string | null>(null)
   const { toast } = useToast()
   const { role: userRole } = useUserRole()
-  const { setSelectedContext } = useSelectionContext()
+  const { selectedContext, setSelectedContext } = useSelectionContext()
   const { setData: setRightPanelData } = useRightSettingsPanelData()
   const { enterRecordLayoutEdit, exitRecordLayoutEdit, uiMode } = useUIMode()
 
@@ -143,10 +143,9 @@ export default function RecordReviewPage({
     (page.settings as any)?.show_add_record === true ||
     (page.settings as any)?.showAddRecord === true
 
-  // Sync selected record to SelectionContext and RightSettingsPanel (for Record Layout Settings)
+  // Sync record layout data to the right settings panel (independent of which settings tab is open).
   useEffect(() => {
     if (selectedRecordId && pageTableId) {
-      setSelectedContext({ type: "record", recordId: selectedRecordId, tableId: pageTableId })
       setRightPanelData({
         recordId: selectedRecordId,
         recordTableId: pageTableId,
@@ -158,10 +157,64 @@ export default function RecordReviewPage({
         onPageConfigSave: isRecordView && onPageConfigSave ? onPageConfigSave : null,
       })
     } else {
-      setSelectedContext(null)
-      setRightPanelData({ recordId: null, recordTableId: null, fieldLayout: [], onLayoutSave: null, tableFields: [], isEditing: false, pageConfig: null, onPageConfigSave: null })
+      setRightPanelData({
+        recordId: null,
+        recordTableId: null,
+        fieldLayout: [],
+        onLayoutSave: null,
+        tableFields: [],
+        isEditing: false,
+        pageConfig: null,
+        onPageConfigSave: null,
+      })
     }
-  }, [selectedRecordId, pageTableId, fieldLayout, onLayoutSave, tableFields, recordInterfaceMode, isRecordView, pageConfig, onPageConfigSave, setSelectedContext, setRightPanelData])
+  }, [
+    selectedRecordId,
+    pageTableId,
+    fieldLayout,
+    onLayoutSave,
+    tableFields,
+    recordInterfaceMode,
+    isRecordView,
+    pageConfig,
+    onPageConfigSave,
+    setRightPanelData,
+  ])
+
+  // Select record detail settings when the user picks a record — not when page config refreshes.
+  useEffect(() => {
+    if (!selectedRecordId || !pageTableId) {
+      if (selectedContext?.type === "record" || selectedContext?.type === "field") {
+        setSelectedContext(null)
+      }
+      return
+    }
+
+    if (isPageLevelSettingsContext(selectedContext)) {
+      return
+    }
+
+    if (selectedContext?.type === "field") {
+      return
+    }
+
+    if (
+      selectedContext?.type === "record" &&
+      selectedContext.recordId === selectedRecordId &&
+      (selectedContext.tableId == null || selectedContext.tableId === pageTableId)
+    ) {
+      return
+    }
+
+    setSelectedContext({ type: "record", recordId: selectedRecordId, tableId: pageTableId })
+  }, [
+    selectedRecordId,
+    pageTableId,
+    selectedContext?.type,
+    selectedContext?.type === "record" ? selectedContext.recordId : undefined,
+    selectedContext?.type === "record" ? selectedContext.tableId : undefined,
+    setSelectedContext,
+  ])
 
   // Sync UIMode with record layout edit so RightSettingsPanel shows when editing record layout (record_view)
   useEffect(() => {

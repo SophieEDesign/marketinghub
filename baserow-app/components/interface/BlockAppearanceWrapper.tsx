@@ -14,8 +14,10 @@ interface BlockAppearanceWrapperProps {
   isFullPage?: boolean
   /** When true with isFullPage, block is a rail (fixed width); parent constrains width. */
   isRail?: boolean
-  /** Layout edit mode — full-page blocks still show a selectable outline (view mode stays chromeless). */
+  /** Layout edit mode — full-page blocks may show a selectable outline when selected. */
   isLayoutEditing?: boolean
+  /** When true with isLayoutEditing, show inset selection ring (full-page only). */
+  isLayoutSelected?: boolean
 }
 
 export default function BlockAppearanceWrapper({
@@ -25,17 +27,19 @@ export default function BlockAppearanceWrapper({
   isFullPage = false,
   isRail = false,
   isLayoutEditing = false,
+  isLayoutSelected = false,
 }: BlockAppearanceWrapperProps) {
   const sizing = getEffectiveBlockSizing(block)
 
-  // Full-page: no card chrome in view mode; in layout edit show inset ring for selection affordance.
+  // Full-page: edge-to-edge in view and edit; subtle ring only when selected in layout edit.
   if (isFullPage) {
     return (
       <div
         className={cn(
           "relative h-full w-full min-h-0 flex flex-col",
           isLayoutEditing &&
-            "ring-2 ring-inset ring-accent-link/35 rounded-lg border border-dashed border-accent-link/40",
+            isLayoutSelected &&
+            "ring-2 ring-inset ring-accent-link/35 border border-accent-link/40",
           className
         )}
       >

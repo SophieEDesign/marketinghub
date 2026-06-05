@@ -37,15 +37,22 @@ export function builderBlockFrameClassName({
   | "isKeyboardHighlighted"
   | "isFullPageLayout"
 >): string {
-  if (!isEditing) {
-    return cn("block-container relative", BUILDER_CHROME_FRAME_VIEW)
+  if (!isEditing || isFullPageLayout) {
+    return cn(
+      "block-container relative h-full w-full min-h-0",
+      BUILDER_CHROME_FRAME_VIEW,
+      isEditing &&
+        isFullPageLayout &&
+        isSelected &&
+        "ring-2 ring-inset ring-accent-link/35 border border-accent-link/40",
+      isEditing && isFullPageLayout && isSnapHighlighted && BUILDER_CHROME_FRAME_SNAP,
+      isEditing && isFullPageLayout && isKeyboardHighlighted && BUILDER_CHROME_FRAME_KEYBOARD
+    )
   }
 
   return cn(
     "block-container relative",
     BUILDER_CHROME_FRAME_BASE,
-    isFullPageLayout &&
-      "border-accent-link/50 ring-2 ring-inset ring-accent-link/35 shadow-card",
     isSelected && BUILDER_CHROME_FRAME_SELECTED,
     isSnapHighlighted && BUILDER_CHROME_FRAME_SNAP,
     isKeyboardHighlighted && BUILDER_CHROME_FRAME_KEYBOARD

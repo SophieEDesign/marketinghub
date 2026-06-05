@@ -30,9 +30,11 @@ function matchFieldByAliases(
   tokenMap: Map<string, string[]>,
   aliases: string[]
 ): TableField | null {
-  for (const field of fields) {
-    const tokens = tokenMap.get(field.id) ?? []
-    if (aliases.some((alias) => matchesAlias(tokens, alias))) return field
+  for (const alias of aliases) {
+    for (const field of fields) {
+      const tokens = tokenMap.get(field.id) ?? []
+      if (matchesAlias(tokens, alias)) return field
+    }
   }
   return null
 }

@@ -38,7 +38,11 @@ export interface UseCampaignsOverviewDataResult {
 }
 
 export function useCampaignsOverviewData(config?: BlockConfig): UseCampaignsOverviewDataResult {
-  const forceMock = isMarketingMockEnabled(config, "campaigns_use_mock")
+  const forceMock = isMarketingMockEnabled(
+    config,
+    "campaigns_overview_use_mock",
+    "campaigns_use_mock"
+  )
   const [loading, setLoading] = useState(!forceMock)
   const [hasTable, setHasTable] = useState(false)
   const [fromLiveData, setFromLiveData] = useState(false)

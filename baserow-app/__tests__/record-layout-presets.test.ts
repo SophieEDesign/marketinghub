@@ -48,6 +48,30 @@ describe("record layout resolver", () => {
     expect(labels).toContain("More fields")
   })
 
+  it("maps Resource Hub media fields into asset preview and details (not linked records)", () => {
+    const fields = [
+      field("f1", "name"),
+      field("f2", "hub_category"),
+      field("f3", "document_link"),
+      field("f4", "attachments"),
+      field("f5", "notes"),
+      field("f6", "campaign"),
+    ]
+    const result = resolveRecordLayout(fields, "asset")
+    const preview = result.sections.find((section) => section.id === "asset_preview")
+    const details = result.sections.find((section) => section.id === "asset_details")
+    const linked = result.sections.find((section) => section.id === "linked_records")
+
+    expect(preview?.fields.map((item) => item.name).sort()).toEqual(
+      ["attachments", "document_link"].sort()
+    )
+    expect(details?.fields.map((item) => item.name).sort()).toEqual(
+      ["hub_category", "name", "notes"].sort()
+    )
+    expect(linked?.fields.map((item) => item.name)).toEqual(["campaign"])
+    expect(result.mediaPreviewField?.name).toBe("attachments")
+  })
+
   it("prioritises summary fields in section ordering", () => {
     const fields = [
       field("f1", "status"),

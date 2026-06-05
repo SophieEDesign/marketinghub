@@ -1,11 +1,19 @@
 import { describe, it, expect } from "vitest"
+import { readFileSync } from "fs"
+import { join } from "path"
 import {
   filterMembersWelcomeEvents,
   filterMembersWelcomeResources,
   attendanceDisplayLabel,
   isUpcomingEvent,
+  membersWelcomeCopy,
+  MEMBERS_WELCOME_DEFAULT_COPY,
+  MEMBERS_WELCOME_LEGACY_TITLE,
 } from "@/lib/marketing/members-welcome"
 import type { MarketingEventItem } from "@/lib/marketing/events"
+import { BLOCK_REGISTRY } from "@/lib/interface/registry"
+import { BLOCK_CONFIG_UNION_TYPES, validateBlockConfig } from "@/lib/interface/block-config-types"
+import { assertBlockConfig } from "@/lib/interface/assertBlockConfig"
 
 function sampleEvent(
   partial: Partial<MarketingEventItem> & { id: string; eventName: string }
@@ -81,5 +89,60 @@ describe("members-welcome helpers", () => {
   it("maps attendance labels for members", () => {
     expect(attendanceDisplayLabel("attending")).toBe("Attending")
     expect(attendanceDisplayLabel(null)).toBe("Not responded")
+  })
+})
+
+describe("members_welcome registry and config parity", () => {
+  it("is in BLOCK_REGISTRY and BLOCK_CONFIG_UNION_TYPES", () => {
+    expect(BLOCK_REGISTRY.members_welcome).toBeDefined()
+    expect(BLOCK_CONFIG_UNION_TYPES).toContain("members_welcome")
+  })
+
+  it("default config passes assertBlockConfig and validateBlockConfig", () => {
+    const config = BLOCK_REGISTRY.members_welcome.defaultConfig
+    expect(assertBlockConfig("members_welcome", config).valid).toBe(true)
+    expect(validateBlockConfig("members_welcome", config).valid).toBe(true)
+  })
+
+  it("renders via BlockRenderer switch case", () => {
+    const src = readFileSync(
+      join(process.cwd(), "components/interface/BlockRenderer.tsx"),
+      "utf8"
+    )
+    expect(src).toContain('case "members_welcome"')
+    expect(src).toContain("MembersWelcomeBlock")
+  })
+})
+
+describe("membersWelcomeCopy", () => {
+  it("uses defaults when config is empty", () => {
+    expect(membersWelcomeCopy({})).toEqual({
+      title: MEMBERS_WELCOME_DEFAULT_COPY.title,
+      subtitle: MEMBERS_WELCOME_DEFAULT_COPY.subtitle,
+      body: MEMBERS_WELCOME_DEFAULT_COPY.body,
+      showQuickActions: true,
+    })
+  })
+
+  it("treats legacy provisioning title as default hero copy", () => {
+    expect(membersWelcomeCopy({ title: MEMBERS_WELCOME_LEGACY_TITLE }).title).toBe(
+      MEMBERS_WELCOME_DEFAULT_COPY.title
+    )
+  })
+
+  it("respects custom title, subtitle, body, and quick action toggle", () => {
+    expect(
+      membersWelcomeCopy({
+        title: "Custom heading",
+        subtitle: "Custom subtitle",
+        members_welcome_body: "Custom body",
+        members_welcome_show_quick_actions: false,
+      })
+    ).toEqual({
+      title: "Custom heading",
+      subtitle: "Custom subtitle",
+      body: "Custom body",
+      showQuickActions: false,
+    })
   })
 })

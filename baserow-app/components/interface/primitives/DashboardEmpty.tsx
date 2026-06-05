@@ -1,5 +1,10 @@
 "use client"
 
+/**
+ * Empty states for marketing/dashboard blocks (no primary action).
+ * For empty states with action buttons, use `@/components/empty-states/EmptyState`.
+ */
+
 import { cn } from "@/lib/utils"
 import { TEXT_EMPTY } from "@/lib/interface/typography-tokens"
 

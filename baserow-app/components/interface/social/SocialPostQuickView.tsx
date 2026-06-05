@@ -1,5 +1,7 @@
 "use client"
 
+/** @deprecated Unused runtime path — social posts open in RecordPanel. Retained for reference/tests. */
+
 import { ExternalLink, ImageIcon, X } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"

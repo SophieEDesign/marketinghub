@@ -12,6 +12,7 @@ import {
   type EventRecordContextualPayload,
   type RecordDrawerMode,
 } from "@/lib/records/record-drawer-mode"
+import { inferRecordLayoutTypeFromTableName } from "@/lib/records/infer-record-layout-type"
 import type { TableField } from "@/types/fields"
 
 interface RecordPanelState {
@@ -202,6 +203,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const navigateToLinkedRecord = useCallback((tableId: string, recordId: string, tableName: string | null, interfaceMode?: 'view' | 'edit') => {
+    const layoutType = inferRecordLayoutTypeFromTableName(tableName)
     setState((prev) => ({
       ...prev,
       tableId,
@@ -209,9 +211,9 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
       tableName,
       cascadeContext: undefined, // Clear when navigating; caller can pass again if needed
       interfaceMode: interfaceMode ?? prev.interfaceMode ?? 'view', // Preserve interfaceMode when navigating
-      recordLayoutType: "generic",
-      recordDrawerMode: "edit",
-      eventContextual: null,
+      recordLayoutType: layoutType,
+      recordDrawerMode: defaultRecordDrawerMode(layoutType, "edit"),
+      eventContextual: layoutType === "event" ? prev.eventContextual ?? null : null,
       history: [...prev.history, { tableId, recordId, tableName }],
     }))
   }, [])

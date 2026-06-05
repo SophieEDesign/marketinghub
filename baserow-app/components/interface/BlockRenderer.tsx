@@ -704,7 +704,7 @@ export default function BlockRenderer({
       case "content_theme":
         return (
           <LazyBlockWrapper enabled={deferBlockMount}>
-            <ContentThemeBlock block={safeBlock} isEditing={canEdit} />
+            <ContentThemeBlock block={safeBlock} isEditing={canEdit} interfaceMode={interfaceMode} />
           </LazyBlockWrapper>
         )
 

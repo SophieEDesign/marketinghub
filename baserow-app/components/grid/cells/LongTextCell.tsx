@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import RichTextEditor from '@/components/fields/RichTextEditor'
-import { sanitizeRichText } from "@/lib/sanitize"
+import { plainTextFromHtml } from "@/lib/sanitize"
 import TextCellModal from '@/components/grid/TextCellModal'
 import {
   ContextMenu,
@@ -72,16 +72,8 @@ export default function LongTextCell({
     handleSave()
   }
 
-  // Strip HTML tags for display preview
-  const stripHtml = (html: string | null): string => {
-    if (!html) return ''
-    const tmp = document.createElement('DIV')
-    tmp.innerHTML = html
-    return tmp.textContent || tmp.innerText || ''
-  }
-
   const handleCopy = async () => {
-    const text = stripHtml(value)
+    const text = value ? plainTextFromHtml(value) : ""
     if (text) {
       try {
         await navigator.clipboard.writeText(text)
@@ -141,7 +133,7 @@ export default function LongTextCell({
 
   const displayValue = value || placeholder
   const isPlaceholder = !value
-  const plainText = stripHtml(value)
+  const plainText = value ? plainTextFromHtml(value) : ""
 
   // Controlled wrapping: single line with ellipsis by default, max 2 lines if wrapText enabled
   // CRITICAL: Row height must be fixed - cells must not resize rows
@@ -166,15 +158,16 @@ export default function LongTextCell({
             title={plainText || undefined}
             tabIndex={editable ? 0 : -1}
           >
-            {value && value.trim() && value !== '<p></p>' ? (
-              <div 
-                className={`rich-text-view text-sm max-w-none text-gray-900 ${wrapText ? 'line-clamp-2' : 'line-clamp-1'} overflow-hidden flex-1`}
-                style={{ 
+            {plainText ? (
+              <span
+                className={`text-sm text-gray-900 ${wrapText ? 'line-clamp-2' : 'line-clamp-1'} overflow-hidden flex-1`}
+                style={{
                   lineHeight: '1.25',
                   maxHeight: wrapText ? contentMaxHeight : 'none',
                 }}
-                dangerouslySetInnerHTML={{ __html: sanitizeRichText(value) }}
-              />
+              >
+                {plainText}
+              </span>
             ) : (
               <span className={`text-gray-400 italic truncate w-full`}>
                 {isPlaceholder ? placeholder : ''}

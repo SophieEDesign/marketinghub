@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/select"
 import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/LookupFieldPicker"
 import RichTextEditor from "@/components/fields/RichTextEditor"
-import { sanitizeRichText } from "@/lib/sanitize"
+import { plainTextFromHtml } from "@/lib/sanitize"
 import AttachmentPreview, { type Attachment } from "@/components/attachments/AttachmentPreview"
 import RecordModal from "@/components/calendar/RecordModal"
 
@@ -809,14 +809,14 @@ export default function FieldEditor({
             </label>
           )}
           <div className={`px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-600 min-h-[60px] ${inputClassName}`}>
-            {value ? (
-              <div 
-                className="rich-text-view text-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: sanitizeRichText(value) }}
-              />
-            ) : (
-              <span className="italic">—</span>
-            )}
+            {(() => {
+              const displayText = value ? plainTextFromHtml(String(value)) : ""
+              return displayText ? (
+                <p className="text-sm whitespace-pre-wrap break-words">{displayText}</p>
+              ) : (
+                <span className="italic">—</span>
+              )
+            })()}
           </div>
         </div>
       )

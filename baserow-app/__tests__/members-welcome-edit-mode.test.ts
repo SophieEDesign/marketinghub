@@ -14,6 +14,25 @@ describe("Members Welcome workspace shell", () => {
   })
 })
 
+describe("MembersWelcomeBlock settings-driven copy", () => {
+  it("reads hero copy from config via membersWelcomeCopy", () => {
+    expect(src).toContain("membersWelcomeCopy(config)")
+    expect(src).toContain("{copy.title}")
+    expect(src).toContain("{copy.subtitle}")
+    expect(src).toContain("{copy.body}")
+  })
+
+  it("settings panel exposes heading and data source fields", () => {
+    const settings = readFileSync(
+      join(process.cwd(), "components/interface/settings/MembersWelcomeDataSettings.tsx"),
+      "utf8"
+    )
+    expect(settings).toContain("members_welcome_title")
+    expect(settings).toContain("members_welcome_events_table_id")
+    expect(settings).toContain("members_welcome_resources_table_id")
+  })
+})
+
 describe("MembersWelcomeBlock edit mode", () => {
   it("does not navigate via quick action links when isEditing", () => {
     expect(src).toContain("if (!action.href || isEditing)")
@@ -26,5 +45,9 @@ describe("MembersWelcomeBlock edit mode", () => {
 
   it("does not open resource URLs when isEditing", () => {
     expect(src).toMatch(/openResource[\s\S]*?if \(isEditing/)
+  })
+
+  it("does not navigate guidance help link when isEditing", () => {
+    expect(src).toContain("links.help && !isEditing")
   })
 })

@@ -69,6 +69,7 @@ export function EventListView({
                 <button
                   type="button"
                   onClick={() => onSelect(item.id)}
+                  aria-label={`Open event: ${item.eventName}`}
                   className={cn(
                     "w-full text-left rounded-lg border px-3 py-2.5 transition-colors",
                     "hover:bg-muted/30",

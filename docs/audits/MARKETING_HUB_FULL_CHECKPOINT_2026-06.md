@@ -2,7 +2,7 @@
 
 **Date:** 4 June 2026  
 **Scope:** Marketing Hub + Interface Builder stabilisation after custom blocks, record drawers, unified edit mode, and June fixes  
-**Method:** Reconcile [FULL_APP_UX_AUDIT_2026-06.md](./FULL_APP_UX_AUDIT_2026-06.md); static code review; provisioning scripts/migrations; Vitest (55 files); local `tsc --noEmit`; bundle analyze (partial)  
+**Method:** Reconcile [FULL_APP_UX_AUDIT_2026-06.md](./FULL_APP_UX_AUDIT_2026-06.md); static code review; provisioning scripts/migrations; Vitest (59 files); local `tsc --noEmit`; bundle analyze (partial)  
 **Baseline audits:** [CUSTOM_BLOCK_MODAL_PANEL_FIELD_AUDIT_2026-06.md](./CUSTOM_BLOCK_MODAL_PANEL_FIELD_AUDIT_2026-06.md), [REGRESSION_RISK_AUDIT_2026-05.md](./REGRESSION_RISK_AUDIT_2026-05.md), [PERFORMANCE_LAZY_BLOCK_AUDIT_2026-06.md](./PERFORMANCE_LAZY_BLOCK_AUDIT_2026-06.md)
 
 **Note:** Stabilisation commits applied during this checkpoint cycle (P1/P2/performance) are reflected below. This document is the authoritative checkpoint; the attached plan file is not edited.
@@ -11,17 +11,17 @@
 
 ## 1. Executive summary
 
-### Overall health: **~82%** — safe to continue feature work
+### Overall health: **~88%** — code complete; staging QA runbook ready
 
 | Pillar | Jun audit (pre-fix) | Checkpoint (now) | Trend |
 |--------|---------------------|------------------|-------|
-| UX / stability | 64% | **84%** | ↑ |
+| UX / stability | 64% | **88%** | ↑ |
 | Layout | 72% | **82%** | ↑ |
-| Performance | 68% | **76%** | ↑ |
-| Accessibility | 52% | **68%** | ↑ |
-| Data / settings wiring | — | **74%** | — |
-| Regression protection | — | **85%** | ↑ |
-| Design consistency | 70% | **72%** | ↑ slight |
+| Performance | 68% | **78%** | ↑ |
+| Accessibility | 52% | **72%** | ↑ |
+| Data / settings wiring | — | **78%** | ↑ |
+| Regression protection | — | **90%** | ↑ |
+| Design consistency | 70% | **74%** | ↑ slight |
 
 ### What is stable
 
@@ -34,14 +34,14 @@
 - P0 fix: Content Timeline edit-mode guards on item click, open record, and add content
 - Accessibility pass: `RecordPanel` focus trap + restore; grid group/row keyboard; `FilterResultsAnnouncer` on marketing filters
 - Performance: `deferBlockMount = !isFullPage`; bundle analyzer reports generated locally
-- Tests: **528/528** Vitest pass (incl. `content-timeline-edit-mode`, `accessibility-marketing-a11y-2026-06`); `tsc --noEmit` clean via local `node_modules/typescript`
+- Backlog close-out: linked-record layout inference; Upcoming Summary + Content Timeline navigation; PERF-001 sidebar prefetch; Resource Hub hides `DetailPanel` when record drawer open; `campaigns_overview_use_mock` contract; orphan drawers marked `@deprecated`; Members Welcome view-all links guarded in edit mode
+- P3 checkpoint: Content Theme record actions; calendar keyboard on FullCalendar + list/timeline; jsx-a11y lint scope; [STAGING_QA_CHECKLIST_2026-06.md](./STAGING_QA_CHECKLIST_2026-06.md)
+- Tests: **563/563** Vitest pass; `tsc --noEmit` clean via local `node_modules/typescript`
 
 ### What is still risky
 
-- **P3:** Linked-record navigation resets to generic drawer layout
-- **P3:** `campaigns_use_mock` vs block-prefixed mock naming contract drift
-- **P3:** Upcoming Summary “View all” handlers are TODO stubs
-- Manual REG-005 / full staging QA not executed in this pass
+- **Manual only:** Execute [STAGING_QA_CHECKLIST_2026-06.md](./STAGING_QA_CHECKLIST_2026-06.md) on preview/staging (REG-005 sign-off)
+- **Optional:** CI bundle budget; empty-state merge; settings token migration; jsx-a11y warning triage
 
 ### Safe to continue feature work?
 
@@ -63,35 +63,31 @@ _No open P0 items at checkpoint close._
 
 | ID | Issue | Status |
 |----|-------|--------|
-| CHK-P1-001 | Gallery Resource Hub: block `DetailPanel` + global `RecordPanel` can coexist on Manage asset | **Mitigated** edit guards; UX still dual-panel feel — document in QA |
-| CHK-P1-002 | `navigateToLinkedRecord` forces `recordLayoutType: "generic"` | **Open** — [`RecordPanelContext.tsx`](../baserow-app/contexts/RecordPanelContext.tsx) |
-| CHK-P1-003 | Blocks API prefetch on nav hover (PERF-001) | **Open** |
-| CHK-P1-004 | Manual REG-005 verification after settings save | **Open** — manual checklist §15 |
+| CHK-P1-001 | Gallery Resource Hub: block `DetailPanel` + global `RecordPanel` on Manage asset | **Fixed** — `DetailPanel` hidden while `isRecordModalOpen` |
+| CHK-P1-002 | `navigateToLinkedRecord` forced generic layout | **Fixed** — [`infer-record-layout-type.ts`](../baserow-app/lib/records/infer-record-layout-type.ts) |
+| CHK-P1-003 | Blocks API prefetch on nav hover (PERF-001) | **Fixed** — [`prefetch-page-blocks.ts`](../baserow-app/lib/pages/prefetch-page-blocks.ts) + `Sidebar` hover |
+| CHK-P1-004 | Manual REG-005 verification after settings save | **Open** — [STAGING_QA_CHECKLIST_2026-06.md](./STAGING_QA_CHECKLIST_2026-06.md) |
 
 ---
 
 ## 4. Medium priority (polish / consistency)
 
-| ID | Issue |
-|----|-------|
-| CHK-P2-001 | `campaigns_use_mock` vs `{block}_use_mock` contract (`campaigns_overview`) |
-| CHK-P2-002 | Upcoming Summary `handleViewAll` / `handleViewAllActivity` TODO — no navigation |
-| CHK-P2-003 | Content Theme TODOs (add theme/idea, record editing, permissions) |
-| CHK-P2-004 | Orphan UI: `SocialPostQuickView`, `ThingsToDoDetailPanel`, `EventDetailDrawer` (unused paths) |
-| CHK-P2-005 | Empty-state primitives fragmented (`EmptyState`, `DashboardEmpty`, inline) |
-| CHK-P2-006 | Settings panels still use some hardcoded `gray-*` / `blue-*` |
+| ID | Issue | Status |
+|----|-------|--------|
+| CHK-P2-001 | `campaigns_use_mock` vs block-prefixed mock contract | **Fixed** — `campaigns_overview_use_mock` + legacy fallback |
+| CHK-P2-002 | Upcoming Summary view-all stubs | **Fixed** — routes to Marketing Hub pages via `useMarketingPageLinks` |
+| CHK-P2-003 | Content Theme record actions | **Fixed** — add/open theme + add content idea via `RecordPanel` |
+| CHK-P2-004 | Orphan drawer UI components | **Mitigated** — `@deprecated`; not imported in runtime paths |
+| CHK-P2-005 | Empty-state primitives fragmented | **Documented** — `DashboardEmpty` vs `EmptyState` guidance in component JSDoc |
+| CHK-P2-006 | Settings panels hardcoded `gray-*` / `blue-*` | **Open** |
 
 ---
 
 ## 5. Low priority / nice-to-have
 
-- jsx-a11y lint in CI
-- Drawer focus-trap audit
-- Per-block loading placeholder heights (reduce lazy-mount shift)
-- Chunk prefetch on sidebar page hover
 - CI bundle size budget from `build:analyze`
-- Content Timeline footer “View full calendar” TODO
-- Members Welcome header `Link` navigation in edit mode (quick actions fixed; “View all events” links may still navigate)
+- Merge `DashboardEmpty` / `EmptyState` into one primitive (optional refactor)
+- Settings panel token migration (`gray-*` → semantic tokens)
 
 ---
 
@@ -118,7 +114,7 @@ Provisioning: [`apply-marketing-hub-workspace.cjs`](../baserow-app/scripts/apply
 | Purpose | Quarterly themes + timeline + tasks — clear |
 | Blocks | `content_theme`, `content_timeline`, `things_to_do` |
 | Filters | Usable when configured; theme block has no record opens |
-| Edit mode | Good except content timeline |
+| Edit mode | Good |
 
 ### Campaigns
 
@@ -196,7 +192,7 @@ Provisioning: [`apply-marketing-hub-workspace.cjs`](../baserow-app/scripts/apply
 | Block | Settings | Runtime | Edit mode | Demo/live | Layout/mobile | A11y | Perf | Status |
 |-------|----------|---------|-----------|-----------|---------------|------|------|--------|
 | `campaigns_overview` | Strong (`table_id`, `view_id`, field_ids, `campaigns_use_mock`) | Wired | OK | OK | Full-page OK | Partial | Dynamic+lazy | **Good** |
-| `content_theme` | `table_id`, `content_theme_use_mock`, max themes | Wired | N/A (no records) | OK | OK | Partial | Dynamic+lazy | **Good** |
+| `content_theme` | `table_id`, `content_theme_use_mock`, max themes | Wired | N/A (records via footer) | OK | OK | Filter `aria-live` | Dynamic+lazy | **Good** |
 | `content_timeline` | field_ids, mock, max items, filters | Wired | OK | OK | Scroll OK | Filter `aria-live` | Dynamic+lazy | **Good** |
 | `things_to_do` | field_ids, mock, filters | Wired | OK | OK | Full-page OK | Row keyboard partial | Dynamic+lazy | **Good** |
 | `event_calendar` | field_ids, `view_id`, mock | Wired | OK | OK | Full-page OK | Partial | Dynamic+lazy | **Good** |
@@ -233,8 +229,7 @@ Provisioning: [`apply-marketing-hub-workspace.cjs`](../baserow-app/scripts/apply
 
 ### Remaining drawer issues
 
-- Linked records → generic layout
-- Orphan components (dead code): `SocialPostQuickView`, `ThingsToDoDetailPanel`, `ThingsToDoRecordSidePanel`, unused `EventDetailDrawer` import risk
+- Orphan components marked deprecated (not in runtime import graph)
 
 ---
 
@@ -274,6 +269,7 @@ Provisioning: [`apply-marketing-hub-workspace.cjs`](../baserow-app/scripts/apply
 | `custom-block-record-drawer-regression.test.ts` | Drawer contract, edit guards incl. content timeline |
 | `content-timeline-edit-mode.test.ts` | Content Timeline edit-mode guards |
 | `accessibility-marketing-a11y-2026-06.test.ts` | Drawer focus, grid keyboard, filter live regions |
+| `marketing-hub-p3-checkpoint-2026-06.test.ts` | Content Theme records, calendar keyboard, jsx-a11y config |
 | `custom-block-record-layout-routing.test.ts` | Layout types, upcoming summary |
 | `custom-block-modal-field-contract.test.ts` | Overlay + field UI |
 | `resource-hub-edit-mode.test.ts` | Resource Hub edit guards |
@@ -298,7 +294,8 @@ Provisioning: [`apply-marketing-hub-workspace.cjs`](../baserow-app/scripts/apply
 
 | Check | Result |
 |-------|--------|
-| `npm test -- --run` | **528 passed**, 57 files (post P0 + a11y) |
+| `npm test -- --run` | **563 passed**, 60 files |
+| `npm run lint` | jsx-a11y enabled (warn) for `components/interface/**` |
 | `node node_modules/typescript/lib/tsc.js --noEmit` | **Pass** |
 | `npm run build:analyze` | Prebuild `tsx` path broken globally; direct `ANALYZE=true next build` produced `.next/analyze/*.html` (see [PERFORMANCE_LAZY_BLOCK_AUDIT_2026-06.md](./PERFORMANCE_LAZY_BLOCK_AUDIT_2026-06.md)) |
 | `npm run build` | Intermittent OneDrive `.next` readlink `EINVAL` on Windows — env |
@@ -315,7 +312,9 @@ See [PERFORMANCE_LAZY_BLOCK_AUDIT_2026-06.md](./PERFORMANCE_LAZY_BLOCK_AUDIT_202
 - Dashboard tiles defer mount; full-page blocks mount immediately
 - KPI block wrapped with lazy deferral
 - Static lightweight blocks (text, filter, field) remain in main bundle by design
-- **Not implemented:** nav-hover chunk prefetch, CI bundle budgets
+- **Not implemented:** CI bundle budgets (runtime prefetch added in Sidebar)
+
+**PERF-001:** Sidebar hover/focus calls `prefetchPageBlocks` to warm `/api/pages/{id}/blocks` before navigation.
 
 **File-level recommendations:**
 
@@ -338,13 +337,13 @@ See [PERFORMANCE_LAZY_BLOCK_AUDIT_2026-06.md](./PERFORMANCE_LAZY_BLOCK_AUDIT_202
 - `ThingsToDoRow` keyboard coverage in stabilisation tests
 - **Record drawer:** `useOverlayPanelA11y` — initial focus, Tab trap, restore focus on close; `role="dialog"` + `aria-modal` on overlay panel
 - **Grid:** `AirtableGridView` group headers as buttons with `aria-expanded`; row-number buttons open records
-- **Marketing filters:** `FilterResultsAnnouncer` (`aria-live="polite"`) on Campaigns, Content Timeline, Things To Do, Resource Hub
+- **Marketing filters:** `FilterResultsAnnouncer` on Campaigns, Content Timeline, Things To Do, Resource Hub, Content Theme
+- **Calendars:** FullCalendar `eventDidMount` keyboard on event/social calendars; list/timeline `aria-label`s
 
 ### Backlog
 
-- Calendar view keyboard parity (beyond grid + Things To Do rows)
-- Badge contrast sampling; jsx-a11y eslint plugin on `components/interface/**`
-- Social/Event calendar filter result announcements (if search added)
+- jsx-a11y warning triage in `components/interface/**` (lint enabled at warn level)
+- Badge contrast sampling
 
 ---
 
@@ -361,22 +360,15 @@ See [PERFORMANCE_LAZY_BLOCK_AUDIT_2026-06.md](./PERFORMANCE_LAZY_BLOCK_AUDIT_202
 
 ## 14. Recommended fix order
 
-### P1 — stabilise UX
+### Manual (staging)
 
-1. Manual REG-005 + sidebar/overlay QA (§15)
-2. Linked-record contextual layout preservation
-3. Document or reduce Resource Hub gallery double-panel on Manage
+1. Complete [STAGING_QA_CHECKLIST_2026-06.md](./STAGING_QA_CHECKLIST_2026-06.md) including REG-005
 
-### P2 — polish
+### Optional polish
 
-4. Align `campaigns_use_mock` naming or document exception
-5. Wire or remove Upcoming Summary “View all”
-6. Remove/archive orphan drawer components
-
-### P3 — future
-
-7. PERF-001 prefetch; CI bundle analyze; Content Theme record editing TODOs
-8. Calendar keyboard parity; jsx-a11y lint in CI
+2. CI bundle budget from `build:analyze`
+3. Consolidate empty-state components; settings token cleanup
+4. Triage jsx-a11y warnings in interface folder
 
 ---
 
@@ -396,10 +388,9 @@ See [PERFORMANCE_LAZY_BLOCK_AUDIT_2026-06.md](./PERFORMANCE_LAZY_BLOCK_AUDIT_202
 
 ## 16. Suggested next prompts
 
-- **P1 UX:** “Linked-record layout preservation + manual REG-005 verification notes”
-- **P2 polish:** “Wire Upcoming Summary view-all or remove controls; align campaigns mock key naming”
-- **Cleanup:** “Archive orphan SocialPostQuickView / ThingsToDoDetailPanel / EventDetailDrawer paths”
-- **QA:** “Run manual checklist §15 on staging and capture results”
+- **QA:** “Run STAGING_QA_CHECKLIST_2026-06 on preview and record results”
+- **CI:** “Add bundle size budget gate from build:analyze output”
+- **Polish:** “Triage jsx-a11y warnings in components/interface”
 
 ---
 
@@ -421,7 +412,12 @@ See [PERFORMANCE_LAZY_BLOCK_AUDIT_2026-06.md](./PERFORMANCE_LAZY_BLOCK_AUDIT_202
 | campaigns_open_record_mode | Dead | **Removed** (P2) |
 | mockAction stubs | Misleading | **Removed** (P2) |
 | Content Timeline edit guard | Gap | **Fixed** |
-| Accessibility pass | Backlog | **Fixed** — drawer focus, grid keyboard, filter live regions |
+| Linked-record layout | Generic only | **Fixed** — table-name inference |
+| Upcoming Summary view-all | TODO stubs | **Fixed** |
+| PERF-001 prefetch | Missing | **Fixed** — sidebar hover |
+| campaigns mock key | Drift | **Fixed** — `campaigns_overview_use_mock` |
+| Resource Hub dual panel | UX gap | **Fixed** — hide DetailPanel when drawer open |
+| Accessibility pass | Backlog | **Fixed** |
 
 ---
 
@@ -434,6 +430,8 @@ See [PERFORMANCE_LAZY_BLOCK_AUDIT_2026-06.md](./PERFORMANCE_LAZY_BLOCK_AUDIT_202
 | Performance | `deferBlockMount`; KPI lazy wrap; `PERFORMANCE_LAZY_BLOCK_AUDIT_2026-06.md`; `DetailPanel` TS fix |
 | P0 close-out | Content Timeline edit guards; `content-timeline-edit-mode.test.ts` |
 | Accessibility | `useOverlayPanelA11y`, `FilterResultsAnnouncer`, grid keyboard; `accessibility-marketing-a11y-2026-06.test.ts` |
+| Backlog close | Linked layout, view-all, prefetch, mock key, Resource Hub UX; `marketing-hub-backlog-close-2026-06.test.ts` |
+| P3 checkpoint | Content Theme records, calendar keyboard, jsx-a11y scope; `STAGING_QA_CHECKLIST_2026-06.md` |
 
 ---
 

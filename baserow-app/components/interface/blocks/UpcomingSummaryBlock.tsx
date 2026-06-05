@@ -53,7 +53,13 @@ import {
 import UpcomingSummarySectionCard from "./upcoming-summary/UpcomingSummarySectionCard"
 import MarketingDemoDataBanner from "@/components/interface/primitives/MarketingDemoDataBanner"
 import { marketingDemoState } from "@/lib/marketing/block-config-resolver"
+import { useRouter } from "next/navigation"
 import { resolveUpcomingSummaryRecordLayoutType } from "@/lib/marketing/upcoming-summary-record-layout"
+import {
+  UPCOMING_SUMMARY_ACTIVITY_PAGE_NAMES,
+  UPCOMING_SUMMARY_SECTION_PAGE_NAMES,
+} from "@/lib/marketing/marketing-page-links"
+import { useMarketingPageLinks } from "@/hooks/useMarketingPageLinks"
 
 interface UpcomingSummaryBlockProps {
   block: PageBlock
@@ -171,7 +177,9 @@ export default function UpcomingSummaryBlock({
   interfaceMode = "view",
 }: UpcomingSummaryBlockProps) {
   const { config } = block
+  const router = useRouter()
   const { openRecordModal } = useRecordModal()
+  const { resolvePath } = useMarketingPageLinks()
   const { loading, error, fromLiveData, hasTable, data: liveData, reload } =
     useUpcomingSummaryData({ config })
 
@@ -282,13 +290,20 @@ export default function UpcomingSummaryBlock({
     [linksEnabled, isEditing, openRecordModal, interfaceMode, reload]
   )
 
-  const handleViewAll = useCallback((_section: UpcomingSummarySectionId) => {
-    // TODO: link to filtered view for section
-  }, [])
+  const handleViewAll = useCallback(
+    (section: UpcomingSummarySectionId) => {
+      if (isEditing || !linksEnabled) return
+      const path = resolvePath(UPCOMING_SUMMARY_SECTION_PAGE_NAMES[section])
+      if (path) router.push(path)
+    },
+    [isEditing, linksEnabled, resolvePath, router]
+  )
 
   const handleViewAllActivity = useCallback(() => {
-    // TODO: navigate to activity view
-  }, [])
+    if (isEditing || !linksEnabled) return
+    const path = resolvePath(UPCOMING_SUMMARY_ACTIVITY_PAGE_NAMES)
+    if (path) router.push(path)
+  }, [isEditing, linksEnabled, resolvePath, router])
 
   const renderDeadline = (item: DeadlineItem) => {
     const ChannelIcon = CHANNEL_ICONS[item.channel ?? "file"] ?? FileText

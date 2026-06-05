@@ -26,7 +26,7 @@ import {
 } from "@/lib/field-colors"
 import { getFieldDisplayName } from "@/lib/fields/display"
 import { getManualChoiceLabels } from "@/lib/fields/select-options"
-import { sanitizeRichText } from "@/lib/sanitize"
+import { plainTextFromHtml } from "@/lib/sanitize"
 import { FIELD_LABEL_CLASS_NO_MARGIN, FIELD_LABEL_GAP_CLASS } from "@/lib/fields/field-label"
 
 interface InlineFieldEditorProps {
@@ -486,6 +486,8 @@ export default function InlineFieldEditor({
       )
     }
 
+    const displayText = value ? plainTextFromHtml(String(value)) : ""
+
     return (
       <div className={longTextContainerClass}>
         {showLabel && (
@@ -500,11 +502,8 @@ export default function InlineFieldEditor({
         )}
         {isReadOnly ? (
           <div className={cn("overflow-visible", readOnlyBoxClassName)}>
-            {value ? (
-              <div 
-                className="rich-text-view text-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: sanitizeRichText(value) }}
-              />
+            {displayText ? (
+              <p className="text-sm whitespace-pre-wrap break-words">{displayText}</p>
             ) : (
               <span className="italic">—</span>
             )}
@@ -512,13 +511,10 @@ export default function InlineFieldEditor({
         ) : (
           <div
             onClick={disableClickToEdit ? undefined : onEditStart}
-            className={cn("overflow-visible min-h-[40px]", displayBoxClassName, !value && "bg-white")}
+            className={cn("overflow-visible min-h-[40px]", displayBoxClassName, !displayText && "bg-white")}
           >
-            {value ? (
-              <div 
-                className="rich-text-view text-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: sanitizeRichText(value) }}
-              />
+            {displayText ? (
+              <p className="text-sm whitespace-pre-wrap break-words">{displayText}</p>
             ) : (
               <span className="text-gray-400 italic">Click to add text...</span>
             )}

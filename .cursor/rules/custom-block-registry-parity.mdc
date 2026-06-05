@@ -1,0 +1,43 @@
+# Custom Block Registry Parity
+
+**CRITICAL:** Any custom block added to `BLOCK_REGISTRY` must be registered in every canonical path. Drift causes blocks to render as hard-coded, unselectable, or missing settings.
+
+## Required registrations (all must include the new block type)
+
+1. `baserow-app/lib/interface/types.ts` — `BlockType` union
+2. `baserow-app/lib/interface/registry.ts` — `BLOCK_REGISTRY` entry with `defaultConfig`
+3. `baserow-app/lib/interface/block-config-types.ts` — typed config + `BlockConfigUnion` + `BLOCK_CONFIG_UNION_TYPES`
+4. `baserow-app/lib/interface/assertBlockConfig.ts` — validation case
+5. `baserow-app/lib/interface/blockPickerModel.ts` — picker category
+6. `baserow-app/components/interface/BlockPickerPanel.tsx` — icon map (if custom icon)
+7. `baserow-app/components/interface/BlockRenderer.tsx` — `case` + lazy import
+8. `baserow-app/components/interface/settings/blockSettingsRegistry.tsx` — data + appearance renderers
+9. `baserow-app/__tests__/interface-invariants.test.ts` — parity passes via `BLOCK_CONFIG_UNION_TYPES` vs registry
+10. `baserow-app/__tests__/edit-mode-block-selection.test.ts` — marketing custom blocks list (when applicable)
+
+## Edit-mode click guards (custom blocks with internal navigation)
+
+Blocks with quick-action cards, links, or record opens **must** guard all interactive handlers in page layout edit mode:
+
+```tsx
+if (isEditing) return
+// or: render <div> instead of <Link> when isEditing
+```
+
+Apply to: quick actions, view-all links, guidance CTAs, event/resource card buttons, record drawer opens.
+
+## Tests to add/update per new block
+
+- Registry/config union parity (`members_welcome` pattern in `members-welcome.test.ts`)
+- `assertBlockConfig` accepts default config
+- BlockRenderer `case` present
+- Edit-mode: no navigation/drawer opens when `isEditing`
+- View mode: actions still work
+
+## Verification
+
+```bash
+npm test -- --run interface-invariants
+npm test -- --run edit-mode
+npm test -- --run members
+```

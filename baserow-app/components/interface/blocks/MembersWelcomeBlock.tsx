@@ -21,6 +21,7 @@ import { useRecordModal } from "@/contexts/RecordModalContext"
 import {
   filterMembersWelcomeEvents,
   filterMembersWelcomeResources,
+  membersWelcomeCopy,
   membersWelcomeLimits,
   pagePath,
   attendanceDisplayLabel,
@@ -94,6 +95,7 @@ export default function MembersWelcomeBlock({
   const { openRecordModal } = useRecordModal()
   const { links, loading: linksLoading } = useMembersWelcomePageLinks(config)
   const limits = membersWelcomeLimits(config)
+  const copy = membersWelcomeCopy(config)
 
   const eventConfig = useMemo(
     () => ({
@@ -238,15 +240,10 @@ export default function MembersWelcomeBlock({
         <div className="flex flex-col gap-6 p-6 md:flex-row md:items-center md:p-8">
           <div className="min-w-0 flex-1">
             <h1 className="text-2xl font-bold tracking-tight text-[#111827] md:text-3xl">
-              Welcome to the Peters &amp; May Marketing Hub
+              {copy.title}
             </h1>
-            <p className="mt-2 text-sm text-[#374151] md:text-base">
-              Access shared events, useful resources and collaboration tools in one place.
-            </p>
-            <p className="mt-3 text-sm text-[#6B7280]">
-              Use this space to view upcoming events, manage your attendance, access approved
-              documents and stay aligned with relevant activity.
-            </p>
+            <p className="mt-2 text-sm text-[#374151] md:text-base">{copy.subtitle}</p>
+            <p className="mt-3 text-sm text-[#6B7280]">{copy.body}</p>
           </div>
           <div
             className="hidden shrink-0 md:flex h-28 w-40 items-center justify-center rounded-xl border border-[#E6E6EF]/80 bg-white/70 text-[#6D4AFF]"
@@ -258,23 +255,25 @@ export default function MembersWelcomeBlock({
       </section>
 
       {/* Quick actions */}
-      <section>
-        <h2 className="text-lg font-semibold text-[#111827]">Quick actions</h2>
-        <p className="mt-1 text-sm text-[#6B7280]">
-          Open the areas you can use most often.
-        </p>
-        {linksLoading ? (
-          <div className="mt-4 flex justify-center py-8">
-            <LoadingSpinner size="sm" text="Loading links…" />
-          </div>
-        ) : (
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {quickActions.map((action) => (
-              <QuickActionCard key={action.id} action={action} isEditing={isEditing} />
-            ))}
-          </div>
-        )}
-      </section>
+      {copy.showQuickActions ? (
+        <section>
+          <h2 className="text-lg font-semibold text-[#111827]">Quick actions</h2>
+          <p className="mt-1 text-sm text-[#6B7280]">
+            Open the areas you can use most often.
+          </p>
+          {linksLoading ? (
+            <div className="mt-4 flex justify-center py-8">
+              <LoadingSpinner size="sm" text="Loading links…" />
+            </div>
+          ) : (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {quickActions.map((action) => (
+                <QuickActionCard key={action.id} action={action} isEditing={isEditing} />
+              ))}
+            </div>
+          )}
+        </section>
+      ) : null}
 
       {/* Snapshots */}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -285,7 +284,7 @@ export default function MembersWelcomeBlock({
               <h2 className="text-base font-semibold text-[#111827]">Upcoming Events</h2>
               <p className="text-xs text-[#6B7280]">Your next {limits.maxEvents} visible events</p>
             </div>
-            {links.events ? (
+            {links.events && !isEditing ? (
               <Link
                 href={pagePath(links.events)!}
                 className="shrink-0 text-xs font-semibold text-[#6D4AFF] hover:underline"
@@ -366,7 +365,7 @@ export default function MembersWelcomeBlock({
               <h2 className="text-base font-semibold text-[#111827]">Featured Resources</h2>
               <p className="text-xs text-[#6B7280]">Approved files and guidance for members</p>
             </div>
-            {links.resources ? (
+            {links.resources && !isEditing ? (
               <Link
                 href={pagePath(links.resources)!}
                 className="shrink-0 text-xs font-semibold text-[#6D4AFF] hover:underline"
@@ -451,13 +450,17 @@ export default function MembersWelcomeBlock({
               </p>
             </div>
           </div>
-          {links.help ? (
+          {links.help && !isEditing ? (
             <Link
               href={pagePath(links.help)!}
               className="inline-flex shrink-0 items-center justify-center rounded-lg bg-[#6D4AFF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#5a3de6]"
             >
               Contact the team
             </Link>
+          ) : links.help && isEditing ? (
+            <span className="inline-flex shrink-0 items-center justify-center rounded-lg bg-[#6D4AFF]/70 px-4 py-2 text-sm font-semibold text-white">
+              Contact the team
+            </span>
           ) : null}
         </div>
       </section>

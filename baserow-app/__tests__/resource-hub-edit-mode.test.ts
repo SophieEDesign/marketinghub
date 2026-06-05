@@ -28,4 +28,9 @@ describe("InternalResourceHubBlock edit mode", () => {
     expect(src).toContain("openRecordModal({")
     expect(src).toContain('recordLayoutType: "asset"')
   })
+
+  it("opens Manage asset in edit mode for admin field editing", () => {
+    expect(src).toContain('initialDrawerMode: "edit"')
+    expect(src).toContain('effectiveRole === "admin"')
+  })
 })

@@ -18,6 +18,7 @@ import type { TableField } from "@/types/fields"
 import { renderPills } from "@/lib/ui/pills"
 import { formatDateUK } from "@/lib/utils"
 import { formatDateByField, formatNumericValue } from "@/lib/fields/format"
+import { plainTextFromHtml } from "@/lib/sanitize"
 import type { GroupRule } from "@/lib/grouping/types"
 import { buildGroupTree, flattenGroupTree } from "@/lib/grouping/groupTree"
 import { getFieldDisplayName } from "@/lib/fields/display"
@@ -379,7 +380,7 @@ export default function RecordContextBlock({
 
   const formatCellValue = (v: unknown): string => {
     if (v == null) return ""
-    if (typeof v === "string") return v.trim()
+    if (typeof v === "string") return plainTextFromHtml(v)
     if (typeof v === "number" || typeof v === "boolean") return String(v)
     if (Array.isArray(v)) return v.map(formatCellValue).filter(Boolean).join(", ")
     if (typeof v === "object" && v !== null && "value" in (v as object)) return formatCellValue((v as { value: unknown }).value)
@@ -425,8 +426,10 @@ export default function RecordContextBlock({
       case "percent":
       case "currency":
         return formatNumericValue(Number(value), field)
+      case "long_text":
+        return plainTextFromHtml(String(value)) || "—"
       default:
-        return String(value)
+        return typeof value === "string" ? plainTextFromHtml(value) : String(value)
     }
   }
 

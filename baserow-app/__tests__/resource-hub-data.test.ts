@@ -142,4 +142,82 @@ describe("buildResourceHubItems", () => {
     expect(items[0].url).toBe("https://cdn.example.com/assets/hero.jpg")
     expect(items[0].fileType).toBe("JPG")
   })
+
+  it("classifies uploaded PDF attachments as PDF, not external links", () => {
+    const items = buildResourceHubItems(
+      [
+        {
+          id: "6",
+          name: "Brand guidelines PDF",
+          hub_category: "Documents",
+          document_link: null,
+          attachments: [
+            {
+              url: "https://project.supabase.co/storage/v1/object/public/attachments/media/1/attachments/file.pdf",
+              name: "brand-guidelines.pdf",
+              type: "application/pdf",
+            },
+          ],
+        },
+      ],
+      FIELDS,
+      "media-table"
+    )
+
+    expect(items).toHaveLength(1)
+    expect(items[0].fileType).toBe("PDF")
+    expect(items[0].url).toContain("file.pdf")
+  })
+
+  it("treats storage uploads without extensions as documents, not external links", () => {
+    const items = buildResourceHubItems(
+      [
+        {
+          id: "7",
+          name: "Uploaded asset",
+          hub_category: "Documents",
+          document_link: null,
+          attachments: [
+            {
+              url: "https://project.supabase.co/storage/v1/object/public/attachments/media/1/attachments/abc-uuid",
+              name: "briefing-pack.docx",
+              type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            },
+          ],
+        },
+      ],
+      FIELDS,
+      "media-table"
+    )
+
+    expect(items).toHaveLength(1)
+    expect(items[0].fileType).toBe("DOCX")
+  })
+
+  it("prefers attachment over reference link for preview and file type", () => {
+    const items = buildResourceHubItems(
+      [
+        {
+          id: "8",
+          name: "Guideline pack",
+          hub_category: "Documents",
+          document_link: "https://example.com/resource-center",
+          attachments: [
+            {
+              url: "https://project.supabase.co/storage/v1/object/public/attachments/media/1/attachments/guide.pdf",
+              name: "guide.pdf",
+              type: "application/pdf",
+            },
+          ],
+        },
+      ],
+      FIELDS,
+      "media-table"
+    )
+
+    expect(items).toHaveLength(1)
+    expect(items[0].fileType).toBe("PDF")
+    expect(items[0].url).toContain("guide.pdf")
+    expect(items[0].referenceUrl).toBe("https://example.com/resource-center")
+  })
 })

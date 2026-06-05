@@ -1,5 +1,7 @@
 "use client"
 
+/** @deprecated Unused runtime path — tasks open in RecordPanel. Retained for reference/tests. */
+
 import type { ReactNode } from "react"
 import {
   Copy,

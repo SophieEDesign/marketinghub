@@ -10,6 +10,11 @@ export type SelectedContext =
   | { type: "field"; fieldId: string; tableId?: string; blockId?: string }
   | null
 
+/** Page / block / list settings — do not auto-switch to record detail settings while active. */
+export function isPageLevelSettingsContext(ctx: SelectedContext): boolean {
+  return ctx?.type === "page" || ctx?.type === "block" || ctx?.type === "recordList"
+}
+
 interface SelectionContextType {
   selectedContext: SelectedContext
   setSelectedContext: (ctx: SelectedContext) => void

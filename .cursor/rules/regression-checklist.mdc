@@ -18,6 +18,7 @@ Before merging changes under the globs above:
 
 ## Quick rules
 
+- **BLOCK-REGISTRY:** New custom blocks must satisfy `.cursor/rules/custom-block-registry-parity.mdc` (registry, config union, BlockRenderer, settings, edit-mode guards, tests)
 - **REG-001:** Bulk action bar only when 2+ checkbox-selected rows in core data (`BULK_ACTION_MIN_SELECTED_COUNT`)
 - **REG-003:** Do not call bulk `handleRowSelect` from row background click — checkbox column only
 - **REG-004:** Content overlays use `md:left-sidebar` on desktop so sidebar stays clickable

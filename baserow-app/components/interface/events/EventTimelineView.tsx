@@ -153,6 +153,7 @@ export function EventTimelineView({
               <button
                 type="button"
                 onClick={() => onSelect(item.id)}
+                aria-label={`Open event: ${item.eventName}`}
                 className={cn(
                   "min-w-0 text-left text-xs font-medium text-foreground truncate hover:text-accent-link",
                   selectedId === item.id && "text-accent-link"
@@ -180,6 +181,7 @@ export function EventTimelineView({
                 type="button"
                 title={`${item.eventName}\n${item.dateRangeLabel}`}
                 onClick={() => onSelect(item.id)}
+                aria-label={`Open event: ${item.eventName}`}
                 className={cn(
                   "absolute top-1/2 z-[2] flex h-7 -translate-y-1/2 items-center overflow-hidden rounded-md border px-2 text-left text-[10px] font-medium shadow-sm transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-link",
                   selectedId === item.id && "ring-2 ring-accent-link ring-offset-1"

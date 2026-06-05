@@ -82,7 +82,7 @@ export default function InternalResourceHubBlock({
     return undefined
   })()
   const showDetailPanel = config.resource_hub_show_detail_panel !== false
-  const { openRecordModal } = useRecordModal()
+  const { openRecordModal, isRecordModalOpen } = useRecordModal()
   const { role: clientRole } = useUserRole()
   const effectiveRole = useEffectiveUserRole(clientRole)
   const { loading, error, fromLiveData, hasTable, tableIds, resources: liveResources, reload } =
@@ -173,11 +173,14 @@ export default function InternalResourceHubBlock({
         supabaseTableName: tableIds.mediaSupabaseTable,
         interfaceMode,
         recordLayoutType: "asset",
+        initialDrawerMode: "edit",
         onRecordUpdated: () => reload(),
       })
     },
     [isEditing, tableIds, openRecordModal, interfaceMode, reload]
   )
+
+  const showSideDetailPanel = showDetailPanel && !isRecordModalOpen
 
   const canCreateResource =
     effectiveRole === "admin" &&
@@ -354,7 +357,7 @@ export default function InternalResourceHubBlock({
           )}
         </main>
 
-        {showDetailPanel ? (
+        {showSideDetailPanel ? (
           <DetailPanel
             resource={showPreview ? selected : null}
             variants={showPreview ? variants : []}

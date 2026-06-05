@@ -43,25 +43,44 @@ describe("canvas edit chrome — full-page blocks", () => {
     expect(isCanvasFullPageMode("block-a", [{ id: "block-a" }])).toBe(true)
   })
 
-  it("applies full-page layout ring classes in edit mode", () => {
-    const cls = builderBlockFrameClassName({
+  it("keeps full-page layout chromeless in edit mode until selected", () => {
+    const unselected = builderBlockFrameClassName({
       isEditing: true,
       isSelected: false,
       isFullPageLayout: true,
     })
-    expect(cls).toContain("ring-inset")
-    expect(cls).toContain("ring-accent-link")
+    expect(unselected).toContain("bg-transparent")
+    expect(unselected).not.toContain("border-dashed")
+    expect(unselected).not.toContain("shadow-card")
+
+    const selected = builderBlockFrameClassName({
+      isEditing: true,
+      isSelected: true,
+      isFullPageLayout: true,
+    })
+    expect(selected).toContain("ring-inset")
+    expect(selected).toContain("ring-accent-link")
   })
 })
 
 describe("BlockAppearanceWrapper — full-page edit outline", () => {
-  it("renders layout-edit ring when isFullPage and isLayoutEditing", () => {
+  it("shows layout-edit ring only when full-page block is selected", () => {
     const src = readFileSync(
       join(process.cwd(), "components/interface/BlockAppearanceWrapper.tsx"),
       "utf8"
     )
-    expect(src).toContain("isLayoutEditing")
-    expect(src).toMatch(/isFullPage[\s\S]*isLayoutEditing[\s\S]*ring-inset/)
+    expect(src).toContain("isLayoutSelected")
+    expect(src).toMatch(/isLayoutEditing[\s\S]*isLayoutSelected[\s\S]*ring-inset/)
+  })
+})
+
+describe("InterfacePageClient — viewport-filling layouts in edit mode", () => {
+  it("does not add grid edit padding when main scroll is suppressed", () => {
+    const src = readFileSync(
+      join(process.cwd(), "components/interface/InterfacePageClient.tsx"),
+      "utf8"
+    )
+    expect(src).toMatch(/isEditMode && !suppressMainScroll \? "pb-48"/)
   })
 })
 

@@ -2734,7 +2734,7 @@ export default function Canvas({
                           )}
                         </div>
                       )}
-                      <BlockAppearanceWrapper block={fullPageBlock} isFullPage isRail isLayoutEditing={isEditing} className={isEditing ? "pointer-events-auto" : ""}>
+                      <BlockAppearanceWrapper block={fullPageBlock} isFullPage isRail isLayoutEditing={isEditing} isLayoutSelected={selectedBlockId === fullPageBlock.id} className={isEditing ? "pointer-events-auto" : ""}>
                         <div className={`h-full w-full overflow-hidden ${isEditing && fullPageBlock.type === "record_context" ? "pt-10" : ""}`}>
                           <BlockRenderer
                             block={fullPageBlock}
@@ -2792,7 +2792,7 @@ export default function Canvas({
                     </div>
                   </div>
                 ) : (
-                  <BlockAppearanceWrapper block={fullPageBlock} isFullPage isLayoutEditing={isEditing} className={isEditing ? "pointer-events-auto" : ""}>
+                  <BlockAppearanceWrapper block={fullPageBlock} isFullPage isLayoutEditing={isEditing} isLayoutSelected={selectedBlockId === fullPageBlock.id} className={isEditing ? "pointer-events-auto" : ""}>
                     <div className="h-full w-full overflow-hidden">
                       <BlockRenderer
                         block={fullPageBlock}

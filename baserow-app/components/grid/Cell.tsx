@@ -9,6 +9,7 @@ import {
   normalizeHexColor,
 } from "@/lib/field-colors"
 import type { FieldType, FieldOptions } from "@/types/fields"
+import { plainTextFromHtml } from "@/lib/sanitize"
 
 interface CellProps {
   value: any
@@ -349,6 +350,8 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
     } else if (fieldType === "percent" && typeof value === "number") {
       const precision = fieldOptions?.precision ?? 2
       displayValue = `${(value * 100).toFixed(precision)}%`
+    } else if (fieldType === "long_text") {
+      displayValue = plainTextFromHtml(String(value))
     } else {
       displayValue = String(value)
     }

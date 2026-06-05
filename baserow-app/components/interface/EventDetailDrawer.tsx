@@ -1,5 +1,7 @@
 "use client"
 
+/** @deprecated Unused runtime path — events open in RecordPanel. Retained for reference/tests. */
+
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import {

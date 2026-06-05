@@ -5,6 +5,7 @@
 
 import type { TableField } from '@/types/fields'
 import { isLinkedField } from '@/types/fields'
+import { plainTextFromHtml } from '@/lib/sanitize'
 import { resolveLinkedFieldDisplay } from './linkedFields'
 
 /**
@@ -106,6 +107,10 @@ export function formatCellValue(value: any, field?: TableField): string {
   // Handle objects (e.g., JSON fields)
   if (typeof value === 'object') {
     return JSON.stringify(value)
+  }
+
+  if (field?.type === 'long_text' && typeof value === 'string') {
+    return plainTextFromHtml(value)
   }
 
   // Convert to string

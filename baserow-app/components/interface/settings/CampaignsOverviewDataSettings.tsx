@@ -71,7 +71,8 @@ export default function CampaignsOverviewDataSettings({
         views={views}
         onUpdate={onUpdate}
         onTableChange={onTableChange}
-        mockConfigKey="campaigns_use_mock"
+        mockConfigKey="campaigns_overview_use_mock"
+        legacyMockKey="campaigns_use_mock"
         showView
         tableLabel="Campaigns table"
       />

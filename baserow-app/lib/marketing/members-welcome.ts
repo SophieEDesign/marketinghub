@@ -6,6 +6,37 @@ import type { MockResource } from "@/components/interface/blocks/internal-resour
 
 export const MEMBERS_WELCOME_PAGE_NAME = "Members Welcome"
 
+/** Legacy provisioning title — treated as unset so hero copy defaults apply. */
+export const MEMBERS_WELCOME_LEGACY_TITLE = "Members Welcome"
+
+export const MEMBERS_WELCOME_DEFAULT_COPY = {
+  title: "Welcome to the Peters & May Marketing Hub",
+  subtitle:
+    "Access shared events, useful resources and collaboration tools in one place.",
+  body:
+    "Use this space to view upcoming events, manage your attendance, access approved documents and stay aligned with relevant activity.",
+} as const
+
+export function membersWelcomeCopy(config?: BlockConfig): {
+  title: string
+  subtitle: string
+  body: string
+  showQuickActions: boolean
+} {
+  const rawTitle = config?.title?.trim()
+  const title =
+    !rawTitle || rawTitle === MEMBERS_WELCOME_LEGACY_TITLE
+      ? MEMBERS_WELCOME_DEFAULT_COPY.title
+      : rawTitle
+  return {
+    title,
+    subtitle: config?.subtitle?.trim() || MEMBERS_WELCOME_DEFAULT_COPY.subtitle,
+    body:
+      config?.members_welcome_body?.trim() || MEMBERS_WELCOME_DEFAULT_COPY.body,
+    showQuickActions: config?.members_welcome_show_quick_actions !== false,
+  }
+}
+
 export const MEMBERS_WELCOME_PAGE_LINK_NAMES = {
   events: ["Event Calendar", "Events Calendar"],
   resources: ["Resource Hub", "Internal Staff Hub"],

@@ -185,7 +185,7 @@ export default function CanvasFullPageBlock({
 
       <div
         className={cn(
-          "block-content relative z-0 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg",
+          "block-content relative z-0 flex min-h-0 flex-1 flex-col overflow-hidden",
           block.config?.locked && "pointer-events-none opacity-75"
         )}
         data-block-id={block.id}
@@ -201,6 +201,7 @@ export default function CanvasFullPageBlock({
                 isFullPage
                 isRail
                 isLayoutEditing={isEditing}
+                isLayoutSelected={isBlockSelected}
                 className={isEditing ? "pointer-events-auto" : ""}
               >
                 <div className="h-full min-h-0 w-full overflow-hidden">{blockRenderer}</div>
@@ -235,6 +236,7 @@ export default function CanvasFullPageBlock({
             block={block}
             isFullPage
             isLayoutEditing={isEditing}
+            isLayoutSelected={isBlockSelected}
             className={cn("flex min-h-0 flex-1 flex-col", isEditing ? "pointer-events-auto" : "")}
           >
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{blockRenderer}</div>

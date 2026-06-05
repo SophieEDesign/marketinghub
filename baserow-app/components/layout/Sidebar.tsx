@@ -3,6 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { pageIdFromHref, prefetchPageBlocks } from "@/lib/pages/prefetch-page-blocks"
 import {
   ChevronLeft,
   ChevronRight,
@@ -96,8 +97,15 @@ export default function Sidebar({
     )
 
     if (href) {
+      const pageId = pageIdFromHref(href)
       return (
-        <Link href={href} prefetch={false} className="block">
+        <Link
+          href={href}
+          prefetch={false}
+          className="block"
+          onMouseEnter={() => prefetchPageBlocks(pageId)}
+          onFocus={() => prefetchPageBlocks(pageId)}
+        >
           {content}
         </Link>
       )

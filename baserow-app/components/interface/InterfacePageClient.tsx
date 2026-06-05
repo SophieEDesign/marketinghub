@@ -16,7 +16,7 @@ import { getRequiredAnchorType } from "@/lib/interface/page-types"
 import { useEditMode } from "@/contexts/EditModeContext"
 import { useUIMode } from "@/contexts/UIModeContext"
 import { useMainScroll } from "@/contexts/MainScrollContext"
-import { useSelectionContext } from "@/contexts/SelectionContext"
+import { useSelectionContext, isPageLevelSettingsContext } from "@/contexts/SelectionContext"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { VIEWS_ENABLED } from "@/lib/featureFlags"
 import { toPostgrestColumn } from "@/lib/supabase/postgrest"
@@ -106,19 +106,21 @@ function InterfacePageContent({
 
   if (useRecordReviewLayout && hasPage) {
     return (
-      <RecordReviewPage
-        page={page as any}
-        initialBlocks={memoizedBlocks}
-        isViewer={isViewer}
-        hideHeader={true}
-        pageTableId={pageTableId}
-        onLayoutSave={onRecordViewLayoutSave}
-        onPageConfigSave={onRecordViewPageConfigSave}
-      />
+      <div className="flex flex-1 min-h-0 h-full w-full">
+        <RecordReviewPage
+          page={page as any}
+          initialBlocks={memoizedBlocks}
+          isViewer={isViewer}
+          hideHeader={true}
+          pageTableId={pageTableId}
+          onLayoutSave={onRecordViewLayoutSave}
+          onPageConfigSave={onRecordViewPageConfigSave}
+        />
+      </div>
     )
   }
   return (
-    <div className={`min-h-0 min-w-0 w-full max-w-full flex flex-col ${BLOCK_EMBED_CLASSNAME}`}>
+    <div className={`flex flex-1 min-h-0 min-w-0 w-full max-w-full flex-col ${BLOCK_EMBED_CLASSNAME}`}>
       <InterfaceBuilder
         page={(interfaceBuilderPage ?? fallbackPage) as any}
         initialBlocks={memoizedBlocks}
@@ -273,6 +275,7 @@ function InterfacePageClientInternal({
     if (!recordPanelState.isOpen || !recordPanelState.recordId || !recordPanelState.tableId || !recordPanelState.onLayoutSave) return
     const isViewingRecordOrField = selectedContext?.type === "record" || selectedContext?.type === "field"
     if (isViewingRecordOrField) return
+    if (isPageLevelSettingsContext(selectedContext)) return
     setSelectedContext({ type: "record", recordId: recordPanelState.recordId, tableId: recordPanelState.tableId })
   }, [isEditing, recordPanelState.isOpen, recordPanelState.recordId, recordPanelState.tableId, recordPanelState.onLayoutSave, selectedContext?.type, setSelectedContext])
 
@@ -1572,7 +1575,7 @@ function InterfacePageClientInternal({
         <CanvasContainer
           scrollOwner={suppressMainScroll ? "parent" : "self"}
           fullBleed
-          className={`relative ${suppressMainScroll ? "flex-1 min-h-0" : "min-h-full"} ${isEditMode ? "pb-48" : ""}`}
+          className={`relative ${suppressMainScroll ? "flex-1 min-h-0 h-full" : "min-h-full"} ${isEditMode && !suppressMainScroll ? "pb-48" : ""}`}
         >
           <InterfacePageContent
             useRecordReviewLayout={useRecordReviewLayout}

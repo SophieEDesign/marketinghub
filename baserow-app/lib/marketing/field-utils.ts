@@ -2,6 +2,7 @@
  * Shared field-resolution helpers for marketing dashboards.
  */
 
+import { plainTextFromHtml } from "@/lib/sanitize"
 import type { FieldOptions } from "@/types/fields"
 
 type FieldWithOptions = { name: string; type?: string; options?: FieldOptions }
@@ -20,7 +21,10 @@ export function pickFieldName(
 
 export function formatDisplayValue(value: unknown): string | null {
   if (value == null || value === "") return null
-  if (typeof value === "string") return value.trim() || null
+  if (typeof value === "string") {
+    const text = plainTextFromHtml(value)
+    return text || null
+  }
   if (typeof value === "number" || typeof value === "boolean") return String(value)
   if (Array.isArray(value)) {
     const parts = value.map((v) => formatDisplayValue(v)).filter(Boolean) as string[]

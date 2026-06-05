@@ -12,11 +12,19 @@ import {
   resolveThemeFields,
 } from "@/lib/marketing/content-theme-data"
 import {
+  findContentTable,
   findQuarterlyThemesTable,
   type MarketingTableRow,
 } from "@/lib/marketing/marketing-tables"
 import type { ContentThemeItem } from "@/lib/interface/content-theme-mock-data"
 import type { BlockConfig } from "@/lib/interface/types"
+
+export interface ContentThemeTableIds {
+  themesTableId: string
+  themesSupabaseTable: string
+  contentTableId: string | null
+  contentSupabaseTable: string | null
+}
 
 export interface UseContentThemeDataResult {
   loading: boolean
@@ -24,6 +32,7 @@ export interface UseContentThemeDataResult {
   fromLiveData: boolean
   hasTable: boolean
   themes: ContentThemeItem[]
+  tableIds: ContentThemeTableIds | null
   reload: () => void
 }
 
@@ -38,6 +47,7 @@ export function useContentThemeData(options?: {
   const [fromLiveData, setFromLiveData] = useState(false)
   const [hasTable, setHasTable] = useState(false)
   const [themes, setThemes] = useState<ContentThemeItem[]>([])
+  const [tableIds, setTableIds] = useState<ContentThemeTableIds | null>(null)
   const [reloadToken, setReloadToken] = useState(0)
 
   const reload = useCallback(() => setReloadToken((n) => n + 1), [])
@@ -48,6 +58,7 @@ export function useContentThemeData(options?: {
       setFromLiveData(false)
       setHasTable(false)
       setThemes([])
+      setTableIds(null)
       return
     }
 
@@ -79,6 +90,14 @@ export function useContentThemeData(options?: {
         }
 
         setHasTable(true)
+
+        const contentTable = findContentTable(registry)
+        setTableIds({
+          themesTableId: themesTable.id,
+          themesSupabaseTable: themesTable.supabase_table,
+          contentTableId: contentTable?.id ?? null,
+          contentSupabaseTable: contentTable?.supabase_table ?? null,
+        })
 
         const { data: fieldRows, error: fieldsErr } = await supabase
           .from("table_fields")
@@ -119,6 +138,7 @@ export function useContentThemeData(options?: {
           setError(e instanceof Error ? e.message : "Failed to load themes")
           setThemes([])
           setFromLiveData(false)
+          setTableIds(null)
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -131,5 +151,5 @@ export function useContentThemeData(options?: {
     }
   }, [reloadToken, config, forceMock])
 
-  return { loading, error, fromLiveData, hasTable, themes, reload }
+  return { loading, error, fromLiveData, hasTable, themes, tableIds, reload }
 }

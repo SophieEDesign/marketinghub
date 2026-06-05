@@ -7,9 +7,11 @@ import interactionPlugin from "@fullcalendar/interaction"
 import type {
   EventClickArg,
   EventContentArg,
+  EventDidMountArg,
   EventDropArg,
   EventInput,
 } from "@fullcalendar/core"
+import { mountCalendarEventKeyboard } from "@/lib/a11y/calendar-event-keyboard"
 import { SocialCalendarEventCard } from "@/components/interface/social/SocialCalendarEventCard"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { SocialCalendarEvent } from "@/lib/marketing/social-media-calendar"
@@ -170,6 +172,16 @@ export default function SocialMediaCalendarView({
     [showPlatformIcons, showApprovalStatus]
   )
 
+  const handleEventDidMount = useCallback(
+    (arg: EventDidMountArg) => {
+      if (!onEventClick || !arg.event.id) return
+      mountCalendarEventKeyboard(arg.el, arg.event.title || "Social post", () =>
+        onEventClick(String(arg.event.id))
+      )
+    },
+    [onEventClick]
+  )
+
   const headerToolbar = useMemo(
     () => ({
       left: "prev,next today",
@@ -211,6 +223,7 @@ export default function SocialMediaCalendarView({
           eventClick={handleEventClick}
           dateClick={canDayClick ? handleDateClick : undefined}
           eventContent={eventContent}
+          eventDidMount={handleEventDidMount}
           editable={canDrag}
           eventDrop={canDrag ? handleEventDrop : undefined}
           eventDurationEditable={false}

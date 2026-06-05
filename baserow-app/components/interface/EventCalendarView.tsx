@@ -5,7 +5,8 @@ import FullCalendar from "@fullcalendar/react"
 import dayGridPlugin from "@fullcalendar/daygrid"
 import timeGridPlugin from "@fullcalendar/timegrid"
 import interactionPlugin from "@fullcalendar/interaction"
-import type { EventClickArg, EventContentArg, EventInput } from "@fullcalendar/core"
+import type { EventClickArg, EventContentArg, EventDidMountArg, EventInput } from "@fullcalendar/core"
+import { mountCalendarEventKeyboard } from "@/lib/a11y/calendar-event-keyboard"
 import { EventListView } from "@/components/interface/events/EventListView"
 import { EventTimelineView } from "@/components/interface/events/EventTimelineView"
 import { EventCalendarEventCard } from "@/components/interface/EventCalendarEventCard"
@@ -91,6 +92,16 @@ export default function EventCalendarView({
     []
   )
 
+  const handleEventDidMount = useCallback(
+    (arg: EventDidMountArg) => {
+      if (!onEventClick || !arg.event.id) return
+      mountCalendarEventKeyboard(arg.el, arg.event.title || "Event", () =>
+        onEventClick(String(arg.event.id))
+      )
+    },
+    [onEventClick]
+  )
+
   if (viewMode === "list") {
     return (
       <div className={cn("overflow-hidden flex-1 rounded-xl border border-border/40 bg-card", panelMinH, className)}>
@@ -142,6 +153,7 @@ export default function EventCalendarView({
           aspectRatio={viewMode === "week" ? 1.1 : 1.35}
           eventClick={handleEventClick}
           eventContent={eventContent}
+          eventDidMount={handleEventDidMount}
           eventDisplay="block"
           displayEventEnd={false}
           dayMaxEvents={viewMode === "month" ? 2 : 8}

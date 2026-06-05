@@ -58,7 +58,7 @@ export function sanitizeHtmlBlock(html: string): string {
   return DOMPurify.sanitize(html, HTML_BLOCK_CONFIG) as string
 }
 
-/** Strip tags for previews and summaries (asset descriptions, etc.). */
+/** Strip HTML for forward-facing views; rich text editors keep source HTML in storage. */
 export function plainTextFromHtml(html: string): string {
   if (typeof html !== "string" || !html.trim()) return ""
   if (!html.includes("<")) return html.trim()

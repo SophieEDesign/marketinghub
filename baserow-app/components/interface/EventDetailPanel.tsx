@@ -25,7 +25,7 @@ import {
   googleCalendarAddUrl,
   outlookCalendarAddUrl,
 } from "@/lib/marketing/event-calendar-ics"
-import { sanitizeRichText } from "@/lib/sanitize"
+import { plainTextFromHtml } from "@/lib/sanitize"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 
@@ -174,12 +174,11 @@ export function EventDetailContent({
         ) : null}
       </div>
 
-      {event.description ? (
+      {event.description && plainTextFromHtml(event.description) ? (
         <div className="px-4 py-2 text-sm text-muted-foreground leading-relaxed shrink-0">
-          <div
-            className="rich-text-view max-w-none line-clamp-4"
-            dangerouslySetInnerHTML={{ __html: sanitizeRichText(event.description) }}
-          />
+          <p className="line-clamp-4 whitespace-pre-wrap break-words">
+            {plainTextFromHtml(event.description)}
+          </p>
         </div>
       ) : null}
 
@@ -364,8 +363,8 @@ export function EventDetailContent({
             value="notes"
             className={cn("mt-3", fitContent ? "" : "flex-1 overflow-y-auto")}
           >
-            <p className="text-xs text-muted-foreground whitespace-pre-wrap">
-              {event.notes || "No internal notes."}
+            <p className="text-xs text-muted-foreground whitespace-pre-wrap break-words">
+              {event.notes ? plainTextFromHtml(event.notes) : "No internal notes."}
             </p>
           </TabsContent>
         ) : null}

@@ -7,6 +7,7 @@ import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
 import { resolveChoiceColor, normalizeHexColor, getTextColorForBackground, SEMANTIC_COLORS } from '@/lib/field-colors'
 import { formatDateUK } from "@/lib/utils"
+import { plainTextFromHtml } from "@/lib/sanitize"
 import type { TableField } from "@/types/fields"
 import { renderPill, renderPills } from "@/lib/ui/pills"
 import { sortLabelsByManualOrder } from "@/lib/fields/select-options"
@@ -693,6 +694,8 @@ function ListViewInner({
           return `${value.length} file${value.length !== 1 ? 's' : ''}`
         }
         return '—'
+      case 'long_text':
+        return plainTextFromHtml(String(value)) || '—'
       default:
         return String(value)
     }
