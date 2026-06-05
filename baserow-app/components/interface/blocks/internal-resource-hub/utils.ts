@@ -1,5 +1,39 @@
-import type { CategoryFilter, MockResource } from "./types"
+import type {
+  CategoryFilter,
+  MockResource,
+  ResourceAttachmentVariant,
+} from "./types"
 import { HUB_CATEGORY_OPTIONS } from "./types"
+
+export const ATTACHMENT_VARIANT_SEP = "::att::"
+
+export function attachmentVariantKey(recordId: string, index: number): string {
+  return `${recordId}${ATTACHMENT_VARIANT_SEP}${index}`
+}
+
+export function parseAttachmentVariantKey(
+  id: string
+): { recordId: string; index: number } | null {
+  const sepIndex = id.indexOf(ATTACHMENT_VARIANT_SEP)
+  if (sepIndex === -1) return null
+  const recordId = id.slice(0, sepIndex)
+  const index = Number.parseInt(id.slice(sepIndex + ATTACHMENT_VARIANT_SEP.length), 10)
+  if (!recordId || Number.isNaN(index)) return null
+  return { recordId, index }
+}
+
+export function variantResourceFromAttachment(
+  base: MockResource,
+  attachment: ResourceAttachmentVariant
+): MockResource {
+  return {
+    ...base,
+    id: attachment.key,
+    url: attachment.url,
+    thumbnailUrl: attachment.thumbnailUrl ?? attachment.url,
+    fileType: attachment.fileType,
+  }
+}
 
 export function countByCategory(
   resources: MockResource[]
@@ -50,18 +84,38 @@ export function getRecent(resources: MockResource[], limit = 3): MockResource[] 
     .slice(0, limit)
 }
 
+/** Related files for thumbnail strip: explicit variant group or multiple attachments on one record. */
 export function getVariants(
   resources: MockResource[],
   resource: MockResource
 ): MockResource[] {
   if (resource.variantGroup) {
-    return resources.filter(
-      (r) => r.variantGroup === resource.variantGroup
+    const group = resources.filter((r) => r.variantGroup === resource.variantGroup)
+    if (group.length > 1) return group
+  }
+  if (resource.attachmentVariants && resource.attachmentVariants.length > 1) {
+    return resource.attachmentVariants.map((attachment) =>
+      variantResourceFromAttachment(resource, attachment)
     )
   }
-  return resources
-    .filter((r) => r.id !== resource.id && r.category === resource.category)
-    .slice(0, 4)
+  return []
+}
+
+export function resolveDisplayResource(
+  resources: MockResource[],
+  selected: MockResource | null,
+  selectedId: string | null,
+  attachmentIndex: number
+): MockResource | null {
+  if (!selected) return null
+  const variants = getVariants(resources, selected)
+  if (variants.length <= 1) return selected
+
+  if (selected.variantGroup && selectedId) {
+    return variants.find((v) => v.id === selectedId) ?? selected
+  }
+
+  return variants[attachmentIndex] ?? variants[0] ?? selected
 }
 
 export function parseDefaultCategory(value: string | undefined): CategoryFilter {

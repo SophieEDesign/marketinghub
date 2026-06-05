@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import FieldEditor from "@/components/fields/FieldEditor"
+import InlineFieldEditor from "@/components/records/InlineFieldEditor"
 import RecordFields from "@/components/records/RecordFields"
 import RecordActivity from "@/components/records/RecordActivity"
 import RecordComments from "@/components/records/RecordComments"
@@ -40,13 +41,6 @@ import {
   type RecordDrawerMode,
 } from "@/lib/records/record-drawer-mode"
 import EventRecordContextualView from "@/components/records/EventRecordContextualView"
-
-function isUuidLike(value: unknown): value is string {
-  return (
-    typeof value === "string" &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
-  )
-}
 
 function extractUrlLike(value: unknown): string | null {
   if (typeof value === "string") {
@@ -147,7 +141,13 @@ export default function RecordEditor({
 }: RecordEditorProps) {
   const { selectedContext, setSelectedContext } = useSelectionContext()
   const { toast } = useToast()
-  const { setFieldLayout: setLiveFieldLayout, setRecordDrawerMode } = useRecordPanel()
+  const {
+    setFieldLayout: setLiveFieldLayout,
+    setRecordDrawerMode,
+    navigateToLinkedRecord,
+    openRecordByTableId,
+    state: recordPanelState,
+  } = useRecordPanel()
 
   const core = useRecordEditorCore({
     tableId,
@@ -314,8 +314,6 @@ export default function RecordEditor({
       : null
 
   const [localFieldLayout, setLocalFieldLayout] = useState<FieldLayoutItem[]>([])
-  const [assetUserNamesById, setAssetUserNamesById] = useState<Record<string, string>>({})
-  const [assetTableNamesById, setAssetTableNamesById] = useState<Record<string, string>>({})
   const resolvedLayoutSignatureRef = useRef<string>("")
   useEffect(() => {
     const visKey = visibilityContext === "canvas" ? "visible_in_canvas" : "visible_in_modal"
@@ -490,54 +488,45 @@ export default function RecordEditor({
     )
   }, [useCustomLayout, customLayoutCollapseInitSig, showTaskActivityTab, customLayoutSectionIdsSig])
 
-  useEffect(() => {
-    if (!useCustomLayout || recordLayoutType !== "asset" || !formData) return
-    const userIds = new Set<string>()
-    const usageTableIds = new Set<string>()
-    for (const section of customLayout.sections) {
-      for (const field of section.fields) {
-        const fieldName = field.name.toLowerCase()
-        const rawValue = formData[field.name]
-        if ((fieldName.includes("updated_by") || fieldName.includes("uploaded_by")) && isUuidLike(rawValue)) {
-          userIds.add(rawValue)
+  const handleLinkedRecordClick = useCallback(
+    async (linkedTableId: string, linkedRecordId: string) => {
+      try {
+        if (linkedTableId === tableId && linkedRecordId === recordId) return
+        const supabase = createClient()
+        const { data: linkedTable } = await supabase
+          .from("tables")
+          .select("name, supabase_table")
+          .eq("id", linkedTableId)
+          .single()
+        const panelInterfaceMode = recordPanelState.interfaceMode ?? interfaceMode ?? "view"
+        if (linkedTable) {
+          navigateToLinkedRecord(
+            linkedTableId,
+            linkedRecordId,
+            linkedTable.supabase_table,
+            panelInterfaceMode
+          )
+        } else {
+          await openRecordByTableId(linkedTableId, linkedRecordId, panelInterfaceMode)
         }
-        if (fieldName.includes("usage") && typeof rawValue === "string") {
-          const match = rawValue.match(/^table:([0-9a-f-]{36})$/i)
-          if (match?.[1]) usageTableIds.add(match[1])
-        }
+      } catch (e: any) {
+        toast({
+          title: "Failed to open linked record",
+          description: e?.message || "Please try again",
+          variant: "destructive",
+        })
       }
-    }
-    if (userIds.size === 0 && usageTableIds.size === 0) return
-    let cancelled = false
-    const run = async () => {
-      const supabase = createClient()
-      if (userIds.size > 0) {
-        const { data } = await supabase.from("users").select("id, email").in("id", [...userIds])
-        if (!cancelled && data) {
-          const mapped: Record<string, string> = {}
-          data.forEach((u: any) => {
-            const email = typeof u?.email === "string" ? u.email : ""
-            mapped[String(u.id)] = email.includes("@") ? `${email.split("@")[0]}.` : "Unknown user"
-          })
-          setAssetUserNamesById((prev) => ({ ...prev, ...mapped }))
-        }
-      }
-      if (usageTableIds.size > 0) {
-        const { data } = await supabase.from("tables").select("id, name").in("id", [...usageTableIds])
-        if (!cancelled && data) {
-          const mapped: Record<string, string> = {}
-          data.forEach((t: any) => {
-            if (typeof t?.id === "string" && typeof t?.name === "string") mapped[t.id] = t.name
-          })
-          setAssetTableNamesById((prev) => ({ ...prev, ...mapped }))
-        }
-      }
-    }
-    void run()
-    return () => {
-      cancelled = true
-    }
-  }, [useCustomLayout, recordLayoutType, formData, customLayoutSectionIdsSig, customLayoutCollapseInitSig])
+    },
+    [
+      tableId,
+      recordId,
+      recordPanelState.interfaceMode,
+      interfaceMode,
+      navigateToLinkedRecord,
+      openRecordByTableId,
+      toast,
+    ]
+  )
 
   const handleCustomDiscard = useCallback(() => {
     discardChanges()
@@ -722,34 +711,29 @@ export default function RecordEditor({
         if (!section) return null
         return (
           <div className="px-1 py-2 space-y-3">
-            {section.fields.map((field) => (
-              (() => {
-                const fieldName = field.name.toLowerCase()
-                let displayValue = formData[field.name]
-                if ((fieldName.includes("updated_by") || fieldName.includes("uploaded_by")) && isUuidLike(displayValue)) {
-                  displayValue = assetUserNamesById[displayValue] ?? displayValue
-                }
-                if (fieldName.includes("usage") && typeof displayValue === "string") {
-                  const match = displayValue.match(/^table:([0-9a-f-]{36})$/i)
-                  if (match?.[1]) {
-                    displayValue = assetTableNamesById[match[1]] ? `Table: ${assetTableNamesById[match[1]]}` : "Table link"
-                  }
-                }
-                return (
-              <FieldEditor
-                key={field.id}
-                field={field}
-                value={displayValue}
-                onChange={(v) => handleFieldChange(field.name, v)}
-                onBlur={(v) => handleFieldBlur(field.name, v)}
-                required={field.required || false}
-                recordId={recordId || undefined}
-                tableName={effectiveTableName || undefined}
-                isReadOnly={customLayoutReadOnly || !isFieldEditable(field.name)}
-              />
-                )
-              })()
-            ))}
+            {section.fields.map((field) => {
+              const fieldReadOnly = customLayoutReadOnly || !isFieldEditable(field.name)
+              return (
+                <InlineFieldEditor
+                  key={field.id}
+                  field={field}
+                  value={formData[field.name]}
+                  onChange={(v) => handleFieldChange(field.name, v)}
+                  onBlur={(v) => handleFieldBlur(field.name, v)}
+                  isEditing={!fieldReadOnly}
+                  onEditStart={() => {}}
+                  onEditEnd={() => {}}
+                  onLinkedRecordClick={handleLinkedRecordClick}
+                  onAddLinkedRecord={() => {}}
+                  isReadOnly={fieldReadOnly}
+                  tableId={tableId}
+                  recordId={recordId || undefined}
+                  tableName={effectiveTableName || undefined}
+                  displayMode="list"
+                  onFieldOptionsUpdate={refreshFields}
+                />
+              )
+            })}
           </div>
         )
       }

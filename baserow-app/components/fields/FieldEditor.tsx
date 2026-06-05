@@ -7,23 +7,11 @@ import { formatDateByField, formatNumericValue } from "@/lib/fields/format"
 import type { TableField } from "@/types/fields"
 import { getFieldDisplayName } from "@/lib/fields/display"
 import { FIELD_LABEL_CLASS_NO_MARGIN } from "@/lib/fields/field-label"
-import {
-  resolveChoiceColor,
-  getTextColorForBackground,
-  normalizeHexColor,
-} from "@/lib/field-colors"
 import { getManualChoiceLabels, sortLabelsByManualOrder } from "@/lib/fields/select-options"
 import { useToast } from "@/components/ui/use-toast"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import InlineSelectDropdown from "@/components/fields/InlineSelectDropdown"
 import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/LookupFieldPicker"
+import { isUserField, getUserDisplayName, isUserId } from "@/lib/users/userDisplay"
 import RichTextEditor from "@/components/fields/RichTextEditor"
 import { plainTextFromHtml } from "@/lib/sanitize"
 import AttachmentPreview, { type Attachment } from "@/components/attachments/AttachmentPreview"
@@ -333,6 +321,8 @@ export default function FieldEditor({
 }: FieldEditorProps) {
   const { toast } = useToast()
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(null)
+  const [userDisplayName, setUserDisplayName] = useState<string | null>(null)
+  const isUserFieldType = isUserField(field.name)
   const [createRecordModalOpen, setCreateRecordModalOpen] = useState(false)
   const [createRecordTableId, setCreateRecordTableId] = useState<string | null>(null)
   const [createRecordTableFields, setCreateRecordTableFields] = useState<TableField[]>([])
@@ -343,6 +333,14 @@ export default function FieldEditor({
       inputRef.current.focus()
     }
   }, [autoFocus])
+
+  useEffect(() => {
+    if (isUserFieldType && value && typeof value === "string") {
+      getUserDisplayName(value).then(setUserDisplayName).catch(() => setUserDisplayName(null))
+    } else {
+      setUserDisplayName(null)
+    }
+  }, [isUserFieldType, value])
 
   const isVirtual = field.type === "formula" || field.type === "lookup"
   // Use prop override first, then check field-level read-only, then virtual
@@ -550,158 +548,50 @@ export default function FieldEditor({
     )
   }
 
-  // Select fields
+  // Select fields — shared InlineSelectDropdown (same as RecordFields / InlineFieldEditor)
   if (field.type === "single_select" || field.type === "multi_select") {
-    // Capture the narrowed type so TS keeps it inside closures.
     const selectFieldType: "single_select" | "multi_select" = field.type
-
-    const choices = getManualChoiceLabels(selectFieldType, field.options)
+    const fromSelectOptions = getManualChoiceLabels(selectFieldType, field.options)
+    const choices =
+      fromSelectOptions.length > 0 ? fromSelectOptions : field.options?.choices || []
     const isMulti = selectFieldType === "multi_select"
-    const selectedValuesRaw = isMulti
-      ? (Array.isArray(value) ? value : value ? [value] : [])
-      : value
-        ? [value]
-        : []
-    // IMPORTANT: pills must always follow manual order (sort_index),
-    // and must never be affected by any per-picker alphabetise UI.
-    const selectedValues = sortLabelsByManualOrder(selectedValuesRaw, selectFieldType, field.options)
-    const useSemanticColors = selectFieldType === "single_select"
-    const getChoiceColor = (choice: string): string =>
-      resolveChoiceColor(choice, selectFieldType, field.options, useSemanticColors)
 
-    if (isReadOnly) {
-      return (
-        <div className="space-y-2.5">
-          {showLabel && (
-            <label className={`${labelClassName} flex items-center gap-2`}>
-              {getFieldDisplayName(field)}
-              {required && <span className="text-red-500">*</span>}
-              {isVirtual && (
-                <span title="Formula or lookup field">
-                  <Calculator className="h-3 w-3 text-gray-400" />
-                </span>
-              )}
-            </label>
-          )}
-          <div className={`px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm min-h-[40px] flex items-center flex-wrap gap-1.5 ${inputClassName}`}>
-            {selectedValues.length > 0 ? (
-              selectedValues.map((val: string) => {
-                const hexColor = getChoiceColor(val)
-                const textColorClass = getTextColorForBackground(hexColor)
-                const bgColor = normalizeHexColor(hexColor)
-                return (
-                  <span
-                    key={val}
-                    className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap shadow-sm ${textColorClass}`}
-                    style={{ backgroundColor: bgColor }}
-                  >
-                    {val}
-                  </span>
-                )
-              })
-            ) : (
-              <span className="text-gray-400 italic">—</span>
-            )}
-          </div>
-        </div>
-      )
-    }
-
-    const renderChoicePill = (choice: string) => {
-      const hexColor = getChoiceColor(choice)
-      const textColorClass = getTextColorForBackground(hexColor)
-      const bgColor = normalizeHexColor(hexColor)
-      return (
-        <span
-          className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium whitespace-nowrap ${textColorClass}`}
-          style={{ backgroundColor: bgColor }}
-        >
-          {choice}
-        </span>
-      )
-    }
-
-    // Editable select - dropdowns (single + multi)
     return (
       <div className="space-y-2.5">
         {showLabel && (
           <label className={`${labelClassName} flex items-center gap-2`}>
             {getFieldDisplayName(field)}
             {required && <span className="text-red-500">*</span>}
+            {isVirtual && (
+              <span title="Formula or lookup field">
+                <Calculator className="h-3 w-3 text-gray-400" />
+              </span>
+            )}
           </label>
         )}
-        {choices.length === 0 ? (
-          <div className="text-sm text-gray-500 italic px-2 py-1">No options configured</div>
-        ) : isMulti ? (
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                className={`w-full min-h-[40px] px-3.5 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 flex flex-wrap items-center gap-1.5 text-left ${inputClassName}`}
-              >
-                {selectedValues.length > 0 ? (
-                  selectedValues.map((v) => <span key={v}>{renderChoicePill(v)}</span>)
-                ) : (
-                  <span className="text-gray-400 italic">Select…</span>
-                )}
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="w-[var(--radix-popper-anchor-width)] p-2">
-              <div className="max-h-64 overflow-auto space-y-1">
-                {choices.map((choice) => {
-                  const isSelected = selectedValuesRaw.includes(choice)
-                  return (
-                    <button
-                      key={choice}
-                      type="button"
-                      onClick={() => {
-                        const toggled = isSelected
-                          ? selectedValuesRaw.filter((v) => v !== choice)
-                          : [...selectedValuesRaw, choice]
-                        onChange(sortLabelsByManualOrder(toggled, selectFieldType, field.options))
-                      }}
-                      className="w-full flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-gray-50 text-left"
-                    >
-                      <Checkbox checked={isSelected} onCheckedChange={() => {}} />
-                      {renderChoicePill(choice)}
-                    </button>
+        <InlineSelectDropdown
+          value={isMulti ? (Array.isArray(value) ? value : value ? [value] : []) : value}
+          choices={choices}
+          choiceColors={field.options?.choiceColors}
+          fieldOptions={field.options}
+          fieldType={selectFieldType}
+          fieldId={field.id}
+          tableId={field.table_id}
+          editable={!isReadOnly}
+          canEditOptions={!isReadOnly}
+          onValueChange={async (newValue) => {
+            onChange(
+              isMulti
+                ? sortLabelsByManualOrder(
+                    Array.isArray(newValue) ? newValue : newValue ? [newValue] : [],
+                    selectFieldType,
+                    field.options
                   )
-                })}
-              </div>
-
-              <div className="pt-2 mt-2 border-t flex items-center justify-between">
-                <span className="text-xs text-gray-500">
-                  {selectedValues.length} selected
-                </span>
-                <button
-                  type="button"
-                  onClick={() => onChange([])}
-                  className="text-xs text-gray-600 hover:text-gray-900 hover:underline"
-                  disabled={selectedValuesRaw.length === 0}
-                >
-                  Clear
-                </button>
-              </div>
-            </PopoverContent>
-          </Popover>
-        ) : (
-          <Select
-            value={typeof value === "string" ? value : Array.isArray(value) ? value[0] : undefined}
-            onValueChange={(v) => onChange(v === "__CLEAR__" ? null : v)}
-          >
-            <SelectTrigger className={inputClassName}>
-              <SelectValue placeholder="Select…" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__CLEAR__">Clear</SelectItem>
-              {choices.map((choice) => (
-                <SelectItem key={choice} value={choice}>
-                  {choice}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+                : newValue
+            )
+          }}
+          placeholder="Select…"
+        />
       </div>
     )
   }
@@ -866,7 +756,9 @@ export default function FieldEditor({
           </label>
         )}
         <div className={`px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-600 italic ${inputClassName}`}>
-          {(field.type === "number" || field.type === "percent" || field.type === "currency")
+          {isUserFieldType
+            ? userDisplayName || (isUserId(value) ? "Unknown user" : "—")
+            : (field.type === "number" || field.type === "percent" || field.type === "currency")
             ? formatNumericValue(typeof value === "number" ? value : parseFloat(String(value)), field, "—")
             : value !== null && value !== undefined
               ? String(value)

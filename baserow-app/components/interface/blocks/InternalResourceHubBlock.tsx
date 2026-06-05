@@ -34,7 +34,9 @@ import {
   filterResources,
   getRecent,
   getVariants,
+  parseAttachmentVariantKey,
   parseDefaultCategory,
+  resolveDisplayResource,
 } from "./internal-resource-hub/utils"
 import type { CategoryFilter } from "./internal-resource-hub/types"
 import MarketingDemoDataBanner from "@/components/interface/primitives/MarketingDemoDataBanner"
@@ -93,6 +95,7 @@ export default function InternalResourceHubBlock({
   )
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedAttachmentIndex, setSelectedAttachmentIndex] = useState(0)
   const [favourites, setFavourites] = useState<Set<string>>(() => new Set())
 
   const demoState = marketingDemoState({ forceMock, fromLiveData, hasTable, error })

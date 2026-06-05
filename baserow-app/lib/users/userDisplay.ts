@@ -34,10 +34,22 @@ export function isUserId(value: any): boolean {
 /**
  * Checks if a field name is a user-related system field
  */
+/** Detect user-reference columns by metadata name (not display labels). */
 export function isUserField(fieldName: string | null | undefined): boolean {
   if (!fieldName) return false
+  // Physical column names only — ignore spaced display labels like "Updated By".
+  if (/\s/.test(fieldName)) return false
   const lower = fieldName.toLowerCase()
-  return lower === "created_by" || lower === "updated_by" || lower === "user_id" || lower === "owner_id"
+  if (
+    lower === "created_by" ||
+    lower === "updated_by" ||
+    lower === "user_id" ||
+    lower === "owner_id"
+  ) {
+    return true
+  }
+  if (lower.endsWith("_by")) return true
+  return /(^|_)(assignee|uploaded_by|owned_by|owner)(_|$)/.test(lower)
 }
 
 /**

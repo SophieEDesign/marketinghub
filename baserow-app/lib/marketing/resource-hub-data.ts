@@ -12,9 +12,11 @@ import {
   categoryLabel,
   HUB_CATEGORY_OPTIONS,
   type MockResource,
+  type ResourceAttachmentVariant,
   type ResourceCategory,
   type ResourceFileType,
 } from "@/components/interface/blocks/internal-resource-hub/types"
+import { attachmentVariantKey } from "@/components/interface/blocks/internal-resource-hub/utils"
 
 export interface MediaFieldMap {
   name: string
@@ -22,6 +24,7 @@ export interface MediaFieldMap {
   hubCategory: string | null
   status: string | null
   documentLink: string | null
+  editLink: string | null
   attachments: string | null
   assignee: string | null
   updatedAt: string | null
@@ -112,7 +115,8 @@ export function resolveMediaFields(
     notes: pick([/^notes$/i, /description/i], null),
     hubCategory: pick([/^hub_category$/i, /resource.?hub.?category/i], "hub_category"),
     status: pick([/^status$/i], null),
-    documentLink: pick([/document_link/i, /file_url/i, /link/i, /url/i], "document_link"),
+    documentLink: pick([/document_link/i, /file_url/i, /^link$/i, /^url$/i], "document_link"),
+    editLink: pick([/edit[_\s-]?link/i], "edit_link"),
     attachments: pick([/^attachments?$/i, /^images?$/i, /media/i, /attachment/i], "attachments"),
     assignee: pick([/assignee/i, /owned_by/i, /owner/i, /uploaded_by/i], null),
     updatedAt: pick([/^updated_at$/i], "updated_at"),
@@ -305,10 +309,21 @@ export function buildResourceHubItems(
     const thumbnailUrl = primaryAttachmentUrl ?? undefined
     const url = primaryAttachmentUrl || linkUrl || null
     const referenceUrl = primaryAttachmentUrl && linkUrl ? linkUrl : undefined
+    const editLinkRaw = fields.editLink ? formatDisplayValue(row[fields.editLink]) : null
+    const editLink =
+      editLinkRaw && /^https?:\/\//i.test(editLinkRaw.trim()) ? editLinkRaw.trim() : undefined
     const fileType = resolveResourceFileType(
       url,
       primaryAttachmentUrl ? primaryAttachment : null
     )
+    const recordId = String(row.id)
+    const attachmentVariants: ResourceAttachmentVariant[] = parsedAttachments.map((att, index) => ({
+      key: attachmentVariantKey(recordId, index),
+      url: att.url,
+      name: att.name,
+      fileType: resolveResourceFileType(att.url, att),
+      thumbnailUrl: att.url,
+    }))
     const hubCategoryRaw = fields.hubCategory
       ? formatDisplayValue(row[fields.hubCategory])
       : null
@@ -326,13 +341,15 @@ export function buildResourceHubItems(
       : legacyStatus?.trim() || undefined
 
     items.push({
-      id: String(row.id),
+      id: recordId,
       title,
       category,
       fileType,
       url: url ?? undefined,
       referenceUrl,
+      editLink,
       thumbnailUrl,
+      attachmentVariants: attachmentVariants.length > 1 ? attachmentVariants : undefined,
       description: fields.notes ? formatDisplayValue(row[fields.notes]) ?? undefined : undefined,
       updatedAt,
       owner: fields.assignee ? formatDisplayValue(row[fields.assignee]) ?? undefined : undefined,

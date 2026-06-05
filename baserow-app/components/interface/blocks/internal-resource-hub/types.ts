@@ -32,6 +32,14 @@ export type ResourceFileType =
   | "ZIP"
   | "LINK"
 
+export interface ResourceAttachmentVariant {
+  key: string
+  url: string
+  name?: string
+  fileType: ResourceFileType
+  thumbnailUrl?: string
+}
+
 export interface MockResource {
   id: string
   title: string
@@ -39,6 +47,7 @@ export interface MockResource {
   fileType: ResourceFileType
   url?: string
   referenceUrl?: string
+  editLink?: string
   thumbnailUrl?: string
   description?: string
   fileSize?: string
@@ -50,6 +59,8 @@ export interface MockResource {
   isInternalOnly?: boolean
   isFeatured?: boolean
   variantGroup?: string
+  /** Multiple files on the same record — drives the in-hub attachment thumbnail strip. */
+  attachmentVariants?: ResourceAttachmentVariant[]
   owner?: string
 }
 
