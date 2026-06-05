@@ -7,7 +7,7 @@ import interactionPlugin from "@fullcalendar/interaction"
 import type {
   EventClickArg,
   EventContentArg,
-  EventDidMountArg,
+  EventMountArg,
   EventDropArg,
   EventInput,
 } from "@fullcalendar/core"
@@ -173,7 +173,7 @@ export default function SocialMediaCalendarView({
   )
 
   const handleEventDidMount = useCallback(
-    (arg: EventDidMountArg) => {
+    (arg: EventMountArg) => {
       if (!onEventClick || !arg.event.id) return
       mountCalendarEventKeyboard(arg.el, arg.event.title || "Social post", () =>
         onEventClick(String(arg.event.id))

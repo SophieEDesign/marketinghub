@@ -5,7 +5,7 @@ import FullCalendar from "@fullcalendar/react"
 import dayGridPlugin from "@fullcalendar/daygrid"
 import timeGridPlugin from "@fullcalendar/timegrid"
 import interactionPlugin from "@fullcalendar/interaction"
-import type { EventClickArg, EventContentArg, EventDidMountArg, EventInput } from "@fullcalendar/core"
+import type { EventClickArg, EventContentArg, EventMountArg, EventInput } from "@fullcalendar/core"
 import { mountCalendarEventKeyboard } from "@/lib/a11y/calendar-event-keyboard"
 import { EventListView } from "@/components/interface/events/EventListView"
 import { EventTimelineView } from "@/components/interface/events/EventTimelineView"
@@ -93,7 +93,7 @@ export default function EventCalendarView({
   )
 
   const handleEventDidMount = useCallback(
-    (arg: EventDidMountArg) => {
+    (arg: EventMountArg) => {
       if (!onEventClick || !arg.event.id) return
       mountCalendarEventKeyboard(arg.el, arg.event.title || "Event", () =>
         onEventClick(String(arg.event.id))
