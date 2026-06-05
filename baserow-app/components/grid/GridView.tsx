@@ -31,6 +31,7 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 import { SkeletonLoader } from "@/components/ui/SkeletonLoader"
 import EmptyTableState from "@/components/empty-states/EmptyTableState"
 import { computeFormulaFields } from "@/lib/formulas/computeFormulaFields"
+import { SELECT_CHOICE_MIGRATED_EVENT } from "@/lib/fields/select-choice-migration"
 import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
 import {
   applySoftDeleteFilter,
@@ -2161,6 +2162,22 @@ function GridViewInner({
   // Keep ref updated so openRecordInEditMode effect can call loadRows without it in deps (prevents React #185)
   loadRowsRef.current = loadRows
 
+  const handleFieldOptionsUpdate = useCallback(() => {
+    onTableFieldsRefresh?.()
+    void loadRowsRef.current()
+  }, [onTableFieldsRefresh])
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ tableId?: string }>).detail
+      if (!detail?.tableId || detail.tableId !== tableId) return
+      onTableFieldsRefresh?.()
+      void loadRowsRef.current()
+    }
+    window.addEventListener(SELECT_CHOICE_MIGRATED_EVENT, handler)
+    return () => window.removeEventListener(SELECT_CHOICE_MIGRATED_EVENT, handler)
+  }, [tableId, onTableFieldsRefresh])
+
   // Track if component is mounted to prevent state updates after unmount
   const isMountedRef = useRef(true)
   useEffect(() => {
@@ -3746,7 +3763,7 @@ function GridViewInner({
                                           await handleCellSave(rowId, field.field_name, value)
                                         }
                                       }}
-                                      onFieldOptionsUpdate={onTableFieldsRefresh}
+                                      onFieldOptionsUpdate={handleFieldOptionsUpdate}
                                     />
                                   ) : (
                                     <Cell
@@ -3965,7 +3982,7 @@ function GridViewInner({
                                         await handleCellSave(rowId, field.field_name, value)
                                       }
                                     }}
-                                    onFieldOptionsUpdate={onTableFieldsRefresh}
+                                    onFieldOptionsUpdate={handleFieldOptionsUpdate}
                                   />
                                 ) : (
                                   <Cell

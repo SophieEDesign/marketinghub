@@ -32,6 +32,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { TableField } from '@/types/fields'
 import { asArray } from '@/lib/utils/asArray'
 import { useDataView } from '@/lib/dataView/useDataView'
+import { SELECT_CHOICE_MIGRATED_EVENT } from '@/lib/fields/select-choice-migration'
 import type { Selection } from '@/lib/dataView/types'
 import { useIsMobile, useIsTablet } from '@/hooks/useResponsive'
 import { cn } from '@/lib/utils'
@@ -341,6 +342,24 @@ export default function AirtableGridView({
     sorts: sortsForData,
     onError: (err, message) => handleError(err, "Grid Error", message),
   })
+
+  const resolvedTableId = tableIdState || tableId || null
+
+  const handleFieldOptionsUpdate = useCallback(() => {
+    onTableFieldsRefresh?.()
+    void refresh()
+  }, [onTableFieldsRefresh, refresh])
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ tableId?: string }>).detail
+      if (!detail?.tableId || !resolvedTableId || detail.tableId !== resolvedTableId) return
+      onTableFieldsRefresh?.()
+      void refresh()
+    }
+    window.addEventListener(SELECT_CHOICE_MIGRATED_EVENT, handler)
+    return () => window.removeEventListener(SELECT_CHOICE_MIGRATED_EVENT, handler)
+  }, [resolvedTableId, onTableFieldsRefresh, refresh])
 
   // CRITICAL: Normalize all inputs at grid entry point
   // Never trust upstream to pass correct types - always normalize
@@ -2141,7 +2160,7 @@ export default function AirtableGridView({
                               wrapText={wrapText}
                               rowHeight={effectiveRowHeight}
                               onSave={(value) => handleCellSave(row.id, field.name, value)}
-                              onFieldOptionsUpdate={onTableFieldsRefresh}
+                              onFieldOptionsUpdate={handleFieldOptionsUpdate}
                               isCellSelected={isCellSelected}
                               onDelete={() => {
                                 setRowToDelete(row.id)

@@ -1,17 +1,20 @@
 "use client"
 
+import { useState } from "react"
 import { ChevronRight, Image as ImageIcon } from "lucide-react"
-import Image from "next/image"
 import AccentCard from "@/components/interface/primitives/AccentCard"
 import type { TableField } from "@/types/fields"
 import { formatDateUK } from "@/lib/utils"
 import { renderPills } from "@/lib/ui/pills"
 import { cn } from "@/lib/utils"
 import { TEXT_CARD_TITLE } from "@/lib/interface/typography-tokens"
+import { plainTextFromHtml } from "@/lib/sanitize"
+import { isPreviewableImageUrl, resolveImageUrlFromFieldValue } from "@/lib/dataView/resolveImageUrl"
 import type { ReactNode } from "react"
 
 type ImageDisplayMode = "show_if_available" | "placeholder" | "hide_when_empty"
 type TextBehaviour = "wrap" | "truncate_1" | "truncate_2" | "truncate_3"
+type CardLayout = "compact" | "gallery"
 
 interface RecordCardProps {
   recordId: string
@@ -21,6 +24,8 @@ interface RecordCardProps {
   secondaryFieldNames?: string[]
   imageFieldName?: string | null
   imageDisplayMode?: ImageDisplayMode
+  fitImageSize?: boolean
+  layout?: CardLayout
   showFieldLabels?: boolean
   showEmptyFields?: boolean
   textBehaviour?: TextBehaviour
@@ -65,8 +70,51 @@ function formatValue(field: TableField, value: any): ReactNode {
     const count = Array.isArray(value) ? value.length : 0
     return `${count} file${count === 1 ? "" : "s"}`
   }
+  if (field.type === "long_text") {
+    const text = plainTextFromHtml(String(value))
+    return text || "—"
+  }
 
-  return String(value)
+  return typeof value === "string" ? plainTextFromHtml(value) || "—" : String(value)
+}
+
+function CardCoverImage({
+  imageUrl,
+  fitImageSize,
+  large,
+}: {
+  imageUrl: string | null
+  fitImageSize: boolean
+  large?: boolean
+}) {
+  const [failed, setFailed] = useState(false)
+  const showImage = imageUrl && isPreviewableImageUrl(imageUrl) && !failed
+
+  return (
+    <div
+      className={cn(
+        "overflow-hidden bg-muted/40 border-border/40",
+        large ? "aspect-[4/3] w-full border-b" : "mb-2 h-10 w-10 rounded-inner border"
+      )}
+    >
+      {showImage ? (
+        <img
+          src={imageUrl}
+          alt=""
+          loading="lazy"
+          className={cn(
+            "h-full w-full",
+            fitImageSize ? "object-contain" : "object-cover"
+          )}
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <span className="flex h-full w-full items-center justify-center">
+          <ImageIcon className={cn("text-muted-foreground", large ? "h-8 w-8" : "h-4 w-4")} />
+        </span>
+      )}
+    </div>
+  )
 }
 
 export default function RecordCard({
@@ -77,6 +125,8 @@ export default function RecordCard({
   secondaryFieldNames = [],
   imageFieldName = null,
   imageDisplayMode = "show_if_available",
+  fitImageSize = false,
+  layout = "compact",
   showFieldLabels = false,
   showEmptyFields = false,
   textBehaviour = "wrap",
@@ -85,26 +135,57 @@ export default function RecordCard({
   borderColor = null,
   onOpen,
 }: RecordCardProps) {
+  const isGalleryLayout = layout === "gallery"
   const primaryField = fields.find((f) => f.name === primaryFieldName || f.id === primaryFieldName) ?? null
   const primaryValue = primaryField ? rowData[primaryField.name] : (rowData[primaryFieldName || ""] ?? rowData.name ?? "Untitled")
   const secondaryFields = secondaryFieldNames
     .map((name) => fields.find((f) => f.name === name || f.id === name))
     .filter(Boolean) as TableField[]
 
-  const imageValue = imageFieldName ? rowData[imageFieldName] : null
-  const imageUrl =
-    Array.isArray(imageValue) && imageValue[0] && typeof imageValue[0] === "object"
-      ? (imageValue[0] as any).url
-      : Array.isArray(imageValue) && typeof imageValue[0] === "string"
-        ? imageValue[0]
-        : typeof imageValue === "string"
-          ? imageValue
-          : null
+  const imageUrl = imageFieldName ? resolveImageUrlFromFieldValue(rowData[imageFieldName]) : null
 
   const showImageArea =
     imageDisplayMode === "placeholder" ||
     (imageDisplayMode === "show_if_available" && !!imageUrl) ||
     (imageDisplayMode === "hide_when_empty" && !!imageUrl)
+
+  const titleBlock = (
+    <p className={cn(TEXT_CARD_TITLE, textClampClass(textBehaviour), textBehaviour === "wrap" && "line-clamp-2")}>
+      {isEmptyValue(primaryValue) ? "Untitled" : String(primaryValue)}
+    </p>
+  )
+
+  const fieldsBlock = (
+    <div className="mt-1.5 space-y-1">
+      {secondaryFields.map((field) => {
+        const value = rowData[field.name]
+        if (!showEmptyFields && isEmptyValue(value)) return null
+        return (
+          <div key={field.id || field.name} className="min-w-0 text-xs text-muted-foreground">
+            {showFieldLabels && <span className="mr-1 text-muted-foreground/80">{field.name}:</span>}
+            <span className={cn("min-w-0", textBehaviour === "wrap" ? "whitespace-normal break-words" : textClampClass(textBehaviour))}>
+              {formatValue(field, value)}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+
+  const openButton = (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation()
+        onOpen(recordId)
+      }}
+      className="h-7 w-7 shrink-0 rounded-inner text-muted-foreground hover:bg-muted/60 hover:text-foreground ring-accent-focus"
+      aria-label="Open record"
+      title="Open record"
+    >
+      <ChevronRight className="h-4 w-4" />
+    </button>
+  )
 
   return (
     <AccentCard
@@ -113,66 +194,36 @@ export default function RecordCard({
       accentPosition={borderColor ? "left" : "none"}
       selected={selected}
       interactive
-      className="w-full max-w-none"
+      className={cn("w-full max-w-none", isGalleryLayout && "flex flex-col overflow-hidden p-0")}
       style={{
-        minHeight: 120,
+        minHeight: isGalleryLayout ? undefined : 120,
         height: fixedHeightPx && fixedHeightPx > 0 ? fixedHeightPx : undefined,
       }}
       onDoubleClick={() => onOpen(recordId)}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          {showImageArea && (
-            <div className="mb-2 h-10 w-10 overflow-hidden rounded-inner border border-border/40 bg-muted/40">
-              {imageUrl ? (
-                <Image
-                  src={imageUrl}
-                  alt=""
-                  width={40}
-                  height={40}
-                  unoptimized
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <span className="flex h-full w-full items-center justify-center">
-                  <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                </span>
-              )}
-            </div>
+      {isGalleryLayout ? (
+        <>
+          {(imageDisplayMode !== "hide_when_empty" || !!imageUrl) && (
+            <CardCoverImage imageUrl={imageUrl} fitImageSize={fitImageSize} large />
           )}
-
-          <p className={cn(TEXT_CARD_TITLE, textClampClass(textBehaviour), textBehaviour === "wrap" && "line-clamp-2")}>
-            {isEmptyValue(primaryValue) ? "Untitled" : String(primaryValue)}
-          </p>
-
-          <div className="mt-1.5 space-y-1">
-            {secondaryFields.map((field) => {
-              const value = rowData[field.name]
-              if (!showEmptyFields && isEmptyValue(value)) return null
-              return (
-                <div key={field.id || field.name} className="min-w-0 text-xs text-muted-foreground">
-                  {showFieldLabels && <span className="mr-1 text-muted-foreground/80">{field.name}:</span>}
-                  <span className={cn("min-w-0", textBehaviour === "wrap" ? "whitespace-normal break-words" : textClampClass(textBehaviour))}>
-                    {formatValue(field, value)}
-                  </span>
-                </div>
-              )
-            })}
+          <div className="flex items-start justify-between gap-3 p-3">
+            <div className="min-w-0 flex-1">
+              {titleBlock}
+              {fieldsBlock}
+            </div>
+            {openButton}
           </div>
+        </>
+      ) : (
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            {showImageArea && <CardCoverImage imageUrl={imageUrl} fitImageSize={fitImageSize} />}
+            {titleBlock}
+            {fieldsBlock}
+          </div>
+          {openButton}
         </div>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation()
-            onOpen(recordId)
-          }}
-          className="h-7 w-7 shrink-0 rounded-inner text-muted-foreground hover:bg-muted/60 hover:text-foreground ring-accent-focus"
-          aria-label="Open record"
-          title="Open record"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </button>
-      </div>
+      )}
     </AccentCard>
   )
 }

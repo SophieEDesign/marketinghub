@@ -153,6 +153,16 @@ export function applyAlphabetiseMode(labels: string[], mode: SelectAlphabetiseMo
  * Prefers raw selectOptions/select_options so real UUIDs from the DB are preserved.
  * Use this for kanban column headers and anywhere we need to show a label from a stored id/value.
  */
+export function resolveStoredChoiceLabel(
+  stored: string,
+  fieldType: 'single_select' | 'multi_select',
+  fieldOptions?: FieldOptions | null
+): string {
+  const trimmed = String(stored ?? '').trim()
+  if (!trimmed) return trimmed
+  return getOptionValueToLabelMap(fieldType, fieldOptions).get(trimmed) ?? trimmed
+}
+
 export function getOptionValueToLabelMap(
   fieldType: 'single_select' | 'multi_select',
   fieldOptions?: FieldOptions | null

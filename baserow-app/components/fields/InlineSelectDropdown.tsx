@@ -11,7 +11,12 @@ import {
 } from '@/lib/field-colors'
 import type { FieldOptions, SelectOption } from '@/types/fields'
 import { ChoicePill } from '@/components/fields/ChoicePill'
-import { getManualChoiceLabels, normalizeSelectOptionsForUi } from '@/lib/fields/select-options'
+import {
+  getManualChoiceLabels,
+  normalizeSelectOptionsForUi,
+  resolveStoredChoiceLabel,
+} from '@/lib/fields/select-options'
+import { dispatchSelectChoiceMigrated } from '@/lib/fields/select-choice-migration'
 
 interface InlineSelectDropdownProps {
   value: string | string[] | null
@@ -103,6 +108,12 @@ export default function InlineSelectDropdown({
     }
   }, [choiceColors, fieldOptions, optimisticFieldOptions])
 
+  const displaySelectedValues = useMemo(
+    (): string[] =>
+      selectedValues.map((stored) => resolveStoredChoiceLabel(stored, fieldType, mergedOptions)),
+    [selectedValues, fieldType, mergedOptions]
+  )
+
   const effectiveChoices = useMemo(() => {
     const fromOptions = getManualChoiceLabels(fieldType, mergedOptions)
     if (fromOptions.length > 0) return fromOptions
@@ -125,6 +136,19 @@ export default function InlineSelectDropdown({
 
   const applyOptimisticFieldOptions = (next: FieldOptions) => {
     setOptimisticFieldOptions(next)
+  }
+
+  const notifyAfterChoiceMigration = async (response: Response) => {
+    let recordsUpdated = 0
+    try {
+      const payload = await response.json()
+      recordsUpdated =
+        typeof payload?.recordsUpdated === 'number' ? payload.recordsUpdated : 0
+    } catch {
+      // Ignore parse errors; field options still updated.
+    }
+    onFieldOptionsUpdate?.()
+    dispatchSelectChoiceMigrated(tableId, recordsUpdated)
   }
 
   const findSelectOptionForChoice = (
@@ -260,7 +284,7 @@ export default function InlineSelectDropdown({
       }
 
       setSearchTerm('')
-      onFieldOptionsUpdate?.()
+      await notifyAfterChoiceMigration(response)
     } catch (error: any) {
       console.error('Error creating option:', error)
       alert(error.message || 'Failed to create option')
@@ -325,7 +349,7 @@ export default function InlineSelectDropdown({
 
       setEditingChoice(null)
       setNewChoiceName('')
-      onFieldOptionsUpdate?.()
+      await notifyAfterChoiceMigration(response)
     } catch (error: any) {
       console.error('Error renaming option:', error)
       alert(error.message || 'Failed to rename option')
@@ -374,7 +398,7 @@ export default function InlineSelectDropdown({
 
       applyOptimisticFieldOptions(nextOptions)
       setEditingColor(null)
-      onFieldOptionsUpdate?.()
+      await notifyAfterChoiceMigration(response)
     } catch (error: any) {
       console.error('Error updating color:', error)
       alert(error.message || 'Failed to update color')
@@ -432,7 +456,7 @@ export default function InlineSelectDropdown({
         await onValueChange(null)
       }
 
-      onFieldOptionsUpdate?.()
+      await notifyAfterChoiceMigration(response)
     } catch (error: any) {
       console.error('Error deleting option:', error)
       alert(error.message || 'Failed to delete option')
@@ -445,10 +469,16 @@ export default function InlineSelectDropdown({
     // Read-only display
     return (
       <div className="flex flex-wrap gap-1.5">
-        {selectedValues.length > 0 ? (
-          selectedValues.map((val: string) => {
+        {displaySelectedValues.length > 0 ? (
+          displaySelectedValues.map((val: string, index: number) => {
             return (
-              <ChoicePill key={val} label={val} fieldType={fieldType} fieldOptions={mergedOptions} truncate={pillTruncate} />
+              <ChoicePill
+                key={`${selectedValues[index] ?? val}-${index}`}
+                label={val}
+                fieldType={fieldType}
+                fieldOptions={mergedOptions}
+                truncate={pillTruncate}
+              />
             )
           })
         ) : (
@@ -484,9 +514,15 @@ export default function InlineSelectDropdown({
           onClick={handleTriggerClick}
         >
           <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 text-left">
-            {selectedValues.length > 0 ? (
-              selectedValues.map((val: string) => (
-                <ChoicePill key={val} label={val} fieldType={fieldType} fieldOptions={mergedOptions} truncate={pillTruncate} />
+            {displaySelectedValues.length > 0 ? (
+              displaySelectedValues.map((val: string, index: number) => (
+                <ChoicePill
+                  key={`${selectedValues[index] ?? val}-${index}`}
+                  label={val}
+                  fieldType={fieldType}
+                  fieldOptions={mergedOptions}
+                  truncate={pillTruncate}
+                />
               ))
             ) : (
               <span className="text-muted-foreground italic">{placeholder}</span>

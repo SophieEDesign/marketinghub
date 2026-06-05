@@ -61,6 +61,8 @@ interface GalleryViewProps {
   recordLimit?: number
   displayMode?: "fit" | "fixed"
   overflowBehaviour?: "view_all" | "scroll" | "paginate"
+  /** Full-page mode: scroll inside the view when content overflows. */
+  forceInternalScroll?: boolean
 }
 
 export default function GalleryView({
@@ -90,6 +92,7 @@ export default function GalleryView({
   recordLimit = 12,
   displayMode = "fit",
   overflowBehaviour = "view_all",
+  forceInternalScroll = false,
 }: GalleryViewProps) {
   const { openRecord } = useRecordPanel()
   const [rows, setRows] = useState<TableRow[]>([])
@@ -578,6 +581,8 @@ export default function GalleryView({
             secondaryFieldNames={secondary}
             imageFieldName={imageField || null}
             imageDisplayMode={cardImageDisplay}
+            fitImageSize={fitImageSize}
+            layout="gallery"
             showFieldLabels={cardShowLabels}
             showEmptyFields={cardShowEmptyFields}
             textBehaviour={cardTextBehaviour}
@@ -605,6 +610,7 @@ export default function GalleryView({
       cardHeightMode,
       cardFixedHeightPx,
       imageField,
+      fitImageSize,
     ]
   )
 
@@ -651,7 +657,8 @@ export default function GalleryView({
     )
   }
 
-  const allowInternalScroll = overflowBehaviour === "scroll"
+  const allowInternalScroll =
+    forceInternalScroll || (displayMode === "fixed" && overflowBehaviour === "scroll")
 
   const renderGroupedSection = (group: GroupedNode<GalleryGroupItem>, level = 0): JSX.Element => {
     const isCollapsed = collapsedGroups.has(group.pathKey)
@@ -772,7 +779,7 @@ export default function GalleryView({
               {children.map((child) => renderGroupedSection(child, level + 1))}
             </div>
           ) : hasCards ? (
-            <div className="w-full min-w-0 grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
+            <div className="w-full min-w-0 grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
               {items.map((item) => renderCard(item.__row, `${group.pathKey}:${item.__rowId}`))}
             </div>
           ) : null
@@ -796,7 +803,7 @@ export default function GalleryView({
           {groupedRows.map((group) => renderGroupedSection(group))}
         </div>
       ) : (
-        <div className="w-full min-w-0 p-6 grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
+        <div className="w-full min-w-0 p-6 grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
           {visibleRows.map((row) => renderCard(row, String(row.id)))}
         </div>
       )}

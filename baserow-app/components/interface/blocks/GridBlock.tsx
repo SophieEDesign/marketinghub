@@ -41,6 +41,7 @@ import { buildRecordContextFilters } from "@/lib/interface/record-context-filter
 import { cn } from "@/lib/utils"
 import { effectiveAllowInternalScroll, resolveBlockDisplaySettings } from "@/lib/interface/block-display-settings"
 import BlockHeader from "@/components/interface/blocks/shared/BlockHeader"
+import { SELECT_CHOICE_MIGRATED_EVENT } from "@/lib/fields/select-choice-migration"
 
 interface GridBlockProps {
   block: PageBlock
@@ -291,6 +292,16 @@ useEffect(() => {
   }, [viewType])
   // Bump to force views to refetch after record creation.
   const [refreshKey, setRefreshKey] = useState(0)
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ tableId?: string }>).detail
+      if (!detail?.tableId || detail.tableId !== tableId) return
+      setRefreshKey((key) => key + 1)
+    }
+    window.addEventListener(SELECT_CHOICE_MIGRATED_EVENT, handler)
+    return () => window.removeEventListener(SELECT_CHOICE_MIGRATED_EVENT, handler)
+  }, [tableId])
 
   const viewFiltersWithUserOverrides = useMemo(() => {
     return mergeViewDefaultFiltersWithUserQuickFilters(viewDefaultFilters, userQuickFilters)
@@ -1006,6 +1017,7 @@ useEffect(() => {
             recordLimit={displaySettings.recordLimit}
             displayMode={displaySettings.displayMode}
             overflowBehaviour={displaySettings.overflowBehaviour}
+            forceInternalScroll={allowInternalScroll}
           />
         )
       }

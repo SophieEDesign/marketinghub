@@ -33,6 +33,7 @@ import { getPrimaryFieldName } from '@/lib/fields/primary'
 import FormulaEditor from '@/components/fields/FormulaEditor'
 import type { SelectOption } from '@/types/fields'
 import { normalizeSelectOptionsForUi } from '@/lib/fields/select-options'
+import { dispatchSelectChoiceMigrated } from '@/lib/fields/select-choice-migration'
 import Link from 'next/link'
 import { ensureSectionExists } from '@/lib/core-data/section-settings'
 import {
@@ -777,10 +778,14 @@ export default function FieldSettingsDrawer({
         }),
       })
 
+      const data = await response.json()
       if (!response.ok) {
-        const data = await response.json()
         alert(data.error || 'Failed to update field')
         return
+      }
+
+      if (typeof data.recordsUpdated === 'number' && data.recordsUpdated > 0) {
+        dispatchSelectChoiceMigrated(tableId, data.recordsUpdated)
       }
 
       onSave()

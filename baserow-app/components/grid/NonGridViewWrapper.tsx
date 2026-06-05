@@ -329,6 +329,7 @@ export default function NonGridViewWrapper({
             imageField={cardImageField || undefined}
             colorField={cardColorField || undefined}
             defaultGroupsCollapsed={false}
+            forceInternalScroll
             blockConfig={{
               gallery_group_by: groupingFieldId || undefined,
               group_by_rules: groupByRules || undefined,

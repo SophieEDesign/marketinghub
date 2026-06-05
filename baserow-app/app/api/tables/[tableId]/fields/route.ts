@@ -17,6 +17,10 @@ import type { TableField, FieldType, FieldOptions } from '@/types/fields'
 import { debugLog } from '@/lib/debug'
 import { addPhysicalTableColumn, dropPhysicalTableColumn } from '@/lib/fields/physicalTableColumns'
 import { notifyPostgrestSchemaReload, runTableSqlAdmin } from '@/lib/fields/runTableSqlAdmin'
+import {
+  detectSelectChoiceChanges,
+  migrateSelectChoiceRecords,
+} from '@/lib/fields/select-choice-migration'
 
 const SYSTEM_FIELD_NAMES = new Set(['created_at', 'created_by', 'updated_at', 'updated_by'])
 function isSystemFieldName(name: string) {
@@ -1024,6 +1028,7 @@ export async function PATCH(
     }
 
     // Handle options update
+    let recordsUpdatedForChoiceChange = 0
     if (options && JSON.stringify(options) !== JSON.stringify(existingField.options)) {
       const optionsValidation = validateFieldOptions(
         (type || existingField.type) as FieldType,
@@ -1068,6 +1073,29 @@ export async function PATCH(
           )
         }
       }
+
+      if (
+        (fieldType === 'single_select' || fieldType === 'multi_select') &&
+        existingField.type !== 'formula' &&
+        existingField.type !== 'lookup'
+      ) {
+        const { renames, deletions } = detectSelectChoiceChanges(
+          fieldType,
+          (existingField.options || {}) as FieldOptions,
+          options as FieldOptions
+        )
+        if (renames.length > 0 || deletions.length > 0) {
+          recordsUpdatedForChoiceChange = await migrateSelectChoiceRecords({
+            supabase,
+            tableName: table.supabase_table,
+            fieldName: existingField.name,
+            fieldType,
+            renames,
+            deletions,
+          })
+        }
+      }
+
       updates.options = options
     }
 
@@ -1146,6 +1174,7 @@ export async function PATCH(
     return NextResponse.json({
       field: updatedField,
       warning: isDestructive ? 'Type change may result in data loss' : undefined,
+      recordsUpdated: recordsUpdatedForChoiceChange > 0 ? recordsUpdatedForChoiceChange : undefined,
     })
   } catch (error: unknown) {
     const errorResponse = createErrorResponse(error, 'Failed to update field', 500)
