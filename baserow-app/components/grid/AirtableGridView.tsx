@@ -174,6 +174,7 @@ export default function AirtableGridView({
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
   const [showDeleteRowConfirm, setShowDeleteRowConfirm] = useState(false)
   const [rowToDelete, setRowToDelete] = useState<string | null>(null)
+  const [pendingBulkDeleteIds, setPendingBulkDeleteIds] = useState<string[]>([])
   const [pendingPasteAction, setPendingPasteAction] = useState<(() => void) | null>(null)
   const [selectedCount, setSelectedCount] = useState(0)
   const { handleError } = useOperationFeedback({
@@ -334,7 +335,7 @@ export default function AirtableGridView({
 
   // Use local sorts so column-header sort triggers refetch; menu sort updates viewSorts -> standardizedSorts -> syncs to sorts
   const sortsForData = useMemo(() => sorts.map(s => ({ field: s.field, direction: s.direction })), [sorts])
-  const { rows: allRows, loading, error, updateCell, refresh, retry, insertRow, duplicateRow, deleteRow, physicalColumns } = useGridData({
+  const { rows: allRows, loading, error, updateCell, refresh, retry, insertRow, duplicateRow, deleteRow, bulkDeleteRows, physicalColumns } = useGridData({
     tableName,
     tableId: tableIdState || tableId,
     fields,
@@ -1063,6 +1064,40 @@ export default function AirtableGridView({
     setSelectedRowIds(new Set())
     setLastSelectedIndex(null)
   }
+
+  const getValidSelectedRecordIds = useCallback(() => {
+    return Array.from(selectedRowIds).filter((id): id is string => {
+      return typeof id === 'string' && id.trim().length > 0 && safeRows.some((row) => row.id === id)
+    })
+  }, [selectedRowIds, safeRows])
+
+  const performBulkDelete = useCallback(async (recordIds: string[]) => {
+    if (!tableName) {
+      throw new Error('Table is not configured for deletion')
+    }
+    if (recordIds.length === 0) {
+      throw new Error('No records selected for deletion')
+    }
+    await bulkDeleteRows(recordIds)
+    handleClearSelection()
+    setPendingBulkDeleteIds([])
+    router.refresh()
+  }, [tableName, bulkDeleteRows, router])
+
+  const requestBulkDeleteConfirm = useCallback(() => {
+    const recordIds = getValidSelectedRecordIds()
+    if (recordIds.length === 0) {
+      handleError(
+        new Error('No records selected for deletion'),
+        'Failed to delete records',
+        'Select one or more records and try again.'
+      )
+      return
+    }
+    setPendingBulkDeleteIds(recordIds)
+    setSelectedCount(recordIds.length)
+    setShowBulkDeleteConfirm(true)
+  }, [getValidSelectedRecordIds, handleError])
 
   // Build render items (groups + rows or just rows) + optional "click to add" row (spreadsheet-style)
   const renderItems = useMemo(() => {
@@ -2261,9 +2296,10 @@ export default function AirtableGridView({
           router.refresh()
         }}
         onBulkDelete={async () => {
-          setSelectedCount(selectedRowIds.size)
-          setShowBulkDeleteConfirm(true)
+          requestBulkDeleteConfirm()
         }}
+        onBulkDeleteRecords={performBulkDelete}
+        getSelectedRecordIds={getValidSelectedRecordIds}
       />
 
       {/* Field Builder Modal for Insert Left/Right */}
@@ -2327,24 +2363,8 @@ export default function AirtableGridView({
         open={showBulkDeleteConfirm}
         onOpenChange={setShowBulkDeleteConfirm}
         onConfirm={async () => {
-          const recordIds = Array.from(selectedRowIds)
           try {
-            const response = await fetch('/api/records/bulk-delete', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                table: tableName,
-                recordIds,
-              }),
-            })
-            
-            if (!response.ok) {
-              const data = await response.json()
-              throw new Error(data.error || 'Failed to delete records')
-            }
-            
-            handleClearSelection()
-            router.refresh()
+            await performBulkDelete(pendingBulkDeleteIds)
           } catch (error: any) {
             handleError(error, "Failed to delete records", error.message || "An error occurred while deleting records")
           }

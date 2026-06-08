@@ -47,6 +47,7 @@ export interface UseGridDataReturn {
   insertRow: (data: Record<string, any>) => Promise<GridRow | null>
   duplicateRow: (rowId: string) => Promise<GridRow | null>
   deleteRow: (rowId: string) => Promise<void>
+  bulkDeleteRows: (rowIds: string[]) => Promise<void>
   /** Physical columns that exist in the database (null if not yet loaded) */
   physicalColumns: Set<string> | null
 }
@@ -971,6 +972,52 @@ export function useGridData({
     [tableName, onError, toast]
   )
 
+  const bulkDeleteRows = useCallback(
+    async (rowIds: string[]) => {
+      const ids = rowIds.filter((id) => typeof id === 'string' && id.trim().length > 0)
+      if (ids.length === 0) {
+        throw new Error('No records selected for deletion')
+      }
+
+      try {
+        if (!supportsSoftDelete(physicalColumnsRef.current)) {
+          throw new Error(softDeleteNotSupportedMessage(tableName))
+        }
+
+        const patch = buildSoftDeletePatch()
+        const batchSize = 100
+        for (let i = 0; i < ids.length; i += batchSize) {
+          const batch = ids.slice(i, i + batchSize)
+          const { error: deleteError } = await supabase
+            .from(tableName)
+            .update(patch)
+            .in('id', batch)
+
+          if (deleteError) {
+            throw deleteError
+          }
+        }
+
+        const idSet = new Set(ids)
+        setRows((prevRows) => prevRows.filter((row) => !idSet.has(row.id)))
+      } catch (err: unknown) {
+        console.error('Error bulk deleting rows:', err)
+        const errorMessage = err instanceof Error ? err.message : String(err)
+        if (onError) {
+          onError(err, errorMessage)
+        } else {
+          toast({
+            variant: 'destructive',
+            title: 'Failed to delete records',
+            description: errorMessage,
+          })
+        }
+        throw err
+      }
+    },
+    [tableName, onError, toast]
+  )
+
   const refresh = useCallback(async () => {
     await mutate()
   }, [mutate])
@@ -990,6 +1037,7 @@ export function useGridData({
     insertRow,
     duplicateRow,
     deleteRow,
+    bulkDeleteRows,
     physicalColumns: physicalColumnsRef.current,
   }
 }

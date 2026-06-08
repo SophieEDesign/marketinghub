@@ -17,6 +17,9 @@ interface BulkActionBarProps {
   onClearSelection: () => void
   onBulkUpdate: (updates: Record<string, any>) => Promise<void>
   onBulkDelete?: () => Promise<void>
+  /** Performs bulk delete after BulkEditModal confirmation (not the bar confirm dialog). */
+  onBulkDeleteRecords?: (recordIds: string[]) => Promise<void>
+  getSelectedRecordIds?: () => string[]
 }
 
 export default function BulkActionBar({
@@ -27,6 +30,8 @@ export default function BulkActionBar({
   onClearSelection,
   onBulkUpdate,
   onBulkDelete,
+  onBulkDeleteRecords,
+  getSelectedRecordIds,
 }: BulkActionBarProps) {
   const [bulkEditOpen, setBulkEditOpen] = useState(false)
 
@@ -89,7 +94,17 @@ export default function BulkActionBar({
           tableName={tableName}
           tableFields={tableFields}
           userRole={userRole}
-          onDelete={onBulkDelete}
+          onDelete={
+            onBulkDeleteRecords && getSelectedRecordIds
+              ? async () => {
+                  const recordIds = getSelectedRecordIds()
+                  if (recordIds.length === 0) {
+                    throw new Error('No records selected for deletion')
+                  }
+                  await onBulkDeleteRecords(recordIds)
+                }
+              : onBulkDelete
+          }
           onSave={async (updates) => {
             await onBulkUpdate(updates)
             setBulkEditOpen(false)

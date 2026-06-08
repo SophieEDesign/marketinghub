@@ -1,16 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { isAdmin } from '@/lib/roles'
+import { buildSoftDeletePatch } from '@/lib/supabase/physical-columns'
+
+async function resolveSupabaseTable(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  table?: string,
+  tableId?: string
+): Promise<string | null> {
+  if (tableId) {
+    const { data } = await supabase
+      .from('tables')
+      .select('supabase_table')
+      .eq('id', tableId)
+      .maybeSingle()
+    if (data?.supabase_table) return data.supabase_table
+  }
+
+  if (table) {
+    const { data } = await supabase
+      .from('tables')
+      .select('supabase_table')
+      .eq('supabase_table', table)
+      .maybeSingle()
+    if (data?.supabase_table) return data.supabase_table
+    // Allow direct physical table name when registry row is missing.
+    return table
+  }
+
+  return null
+}
 
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
     const body = await request.json()
-    const { table, recordIds } = body
+    const { table, tableId, recordIds } = body
 
-    if (!table || !recordIds || !Array.isArray(recordIds) || recordIds.length === 0) {
+    const ids = Array.isArray(recordIds)
+      ? recordIds.filter((id: unknown) => typeof id === 'string' && id.trim().length > 0)
+      : []
+
+    if (ids.length === 0) {
       return NextResponse.json(
-        { error: 'table and recordIds array are required' },
+        { error: 'recordIds array with at least one id is required' },
+        { status: 400 }
+      )
+    }
+
+    const supabaseTable = await resolveSupabaseTable(supabase, table, tableId)
+    if (!supabaseTable) {
+      return NextResponse.json(
+        { error: 'table or tableId is required' },
         { status: 400 }
       )
     }
@@ -24,39 +65,31 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get table info
-    const { data: tableInfo } = await supabase
-      .from('tables')
-      .select('supabase_table')
-      .eq('supabase_table', table)
-      .single()
-
-    if (!tableInfo) {
-      return NextResponse.json(
-        { error: 'Table not found' },
-        { status: 404 }
-      )
-    }
-
-    // Delete records in batches
+    const patch = buildSoftDeletePatch()
     const batchSize = 100
-    const batches = []
-    for (let i = 0; i <recordIds.length; i += batchSize) {
-      batches.push(recordIds.slice(i, i + batchSize))
-    }
+    let deleted = 0
 
-    const deletePromises = batches.map((batch) =>
-      supabase
-        .from(table)
-        .update({ deleted_at: new Date().toISOString() })
+    for (let i = 0; i < ids.length; i += batchSize) {
+      const batch = ids.slice(i, i + batchSize)
+      const { error, count } = await supabase
+        .from(supabaseTable)
+        .update(patch, { count: 'exact' })
         .in('id', batch)
-    )
 
-    await Promise.all(deletePromises)
+      if (error) {
+        console.error('Error in bulk delete batch:', error)
+        return NextResponse.json(
+          { error: error.message || 'Failed to delete records' },
+          { status: 500 }
+        )
+      }
+
+      deleted += count ?? batch.length
+    }
 
     return NextResponse.json({
       success: true,
-      deleted: recordIds.length,
+      deleted,
     })
   } catch (error: any) {
     console.error('Error in bulk delete:', error)
@@ -66,4 +99,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-
