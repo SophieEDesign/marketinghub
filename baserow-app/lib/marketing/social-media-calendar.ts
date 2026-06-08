@@ -29,7 +29,8 @@ import {
 } from "@/lib/interface/filters"
 import type { TableField } from "@/types/fields"
 import { normalizeHexColor } from "@/lib/field-colors"
-import type { BlockConfig } from "@/lib/interface/types"
+import type { FilterTree, FilterGroup, FilterCondition } from "@/lib/filters/canonical-model"
+import type { BlockConfig, BlockFilter } from "@/lib/interface/types"
 import { plainTextFromHtml } from "@/lib/sanitize"
 import type { FieldOptions } from "@/types/fields"
 import { format, startOfDay } from "date-fns"
@@ -143,6 +144,111 @@ type FieldRow = { name: string; type?: string; options?: FieldOptions }
 
 const SOCIAL_TYPE_PATTERN =
   /social|linkedin|instagram|facebook|twitter|x\.com|tiktok|youtube|bluesky/i
+
+const SOCIAL_TYPE_FIELD_PATTERN = /content[_\s-]*type|post[_\s-]*type|^type$/i
+
+export function sourceTableLooksSocial(tableName: string | null | undefined): boolean {
+  const name = tableName?.trim().toLowerCase()
+  if (!name) return false
+  return /social/.test(name) && /(post|media)/.test(name)
+}
+
+function shouldStripRedundantSocialTypeFilter(
+  field: string,
+  value: unknown,
+  isSocialTable: boolean,
+  existingFields: Set<string>
+): boolean {
+  const trimmed = field.trim()
+  if (!trimmed || !existingFields.has(trimmed)) return false
+  if (!isSocialTable) return false
+  if (!SOCIAL_TYPE_FIELD_PATTERN.test(trimmed)) return false
+  const valueStr = String(value ?? "")
+    .trim()
+    .toLowerCase()
+  return valueStr.includes("social")
+}
+
+function sanitizeFilterTreeNode(
+  node: FilterCondition | FilterGroup,
+  isSocialTable: boolean,
+  existingFields: Set<string>
+): FilterCondition | FilterGroup | null {
+  if ("field_id" in node && "operator" in node) {
+    if (
+      shouldStripRedundantSocialTypeFilter(
+        node.field_id,
+        node.value,
+        isSocialTable,
+        existingFields
+      )
+    ) {
+      return null
+    }
+    return node
+  }
+
+  const children = node.children
+    .map((child) => sanitizeFilterTreeNode(child, isSocialTable, existingFields))
+    .filter((child): child is FilterCondition | FilterGroup => child != null)
+
+  if (children.length === 0) return null
+  return { ...node, children }
+}
+
+function sanitizeFilterTree(
+  tree: FilterTree,
+  isSocialTable: boolean,
+  existingFields: Set<string>
+): FilterTree {
+  if (!tree) return tree
+  return sanitizeFilterTreeNode(tree as FilterCondition | FilterGroup, isSocialTable, existingFields)
+}
+
+/**
+ * Drop redundant social-type block filters when the source table is already dedicated
+ * social posts (e.g. post_type = Social Post). Those filters often use labels that do not
+ * match stored values and return zero rows. Social-only scoping is handled at runtime.
+ */
+export function sanitizeSocialCalendarQueryConfig(
+  config: BlockConfig | undefined,
+  contentFields: Array<{ name: string }>,
+  tableName: string | null | undefined
+): BlockConfig | undefined {
+  if (!config) return config
+
+  const filters = Array.isArray(config.filters) ? config.filters : []
+  const filterTree = (config as { filter_tree?: FilterTree }).filter_tree
+  if (filters.length === 0 && !filterTree) return config
+
+  const existingFields = new Set(contentFields.map((f) => f.name))
+  const isSocialTable = sourceTableLooksSocial(tableName)
+
+  const cleanedFilters = filters.filter((filter) => {
+    const field = typeof filter?.field === "string" ? filter.field.trim() : ""
+    if (!field || !existingFields.has(field)) return false
+    return !shouldStripRedundantSocialTypeFilter(
+      field,
+      filter?.value,
+      isSocialTable,
+      existingFields
+    )
+  }) as BlockFilter[]
+
+  const cleanedTree = filterTree
+    ? sanitizeFilterTree(filterTree, isSocialTable, existingFields)
+    : undefined
+
+  const filtersChanged = cleanedFilters.length !== filters.length
+  const treeChanged = cleanedTree !== filterTree
+  if (!filtersChanged && !treeChanged) return config
+
+  const next: BlockConfig = { ...config, filters: cleanedFilters }
+  if (filterTree) {
+    ;(next as { filter_tree?: FilterTree }).filter_tree = cleanedTree ?? undefined
+  }
+  return next
+}
 
 const PLATFORM_FROM_CHANNEL: Record<string, SocialPlatform> = {
   instagram: "instagram",

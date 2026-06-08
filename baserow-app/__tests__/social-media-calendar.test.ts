@@ -13,7 +13,9 @@ import {
   normalizeSocialStatus,
   parseContentMediaThumbnail,
   socialCalendarDateFieldValue,
+  sanitizeSocialCalendarQueryConfig,
   socialCalendarSettingsFromConfig,
+  sourceTableLooksSocial,
   type SocialCalendarFieldMap,
   type SocialCalendarItem,
 } from "@/lib/marketing/social-media-calendar"
@@ -172,6 +174,55 @@ describe("parseContentMediaThumbnail", () => {
     ])
     expect(result.thumbnailUrl).toBe("https://example.com/a.jpg")
     expect(result.mediaUrls).toHaveLength(2)
+  })
+})
+
+describe("sanitizeSocialCalendarQueryConfig", () => {
+  it("strips redundant post_type social filters on Social Posts table", () => {
+    const config = sanitizeSocialCalendarQueryConfig(
+      {
+        filters: [{ field: "post_type", operator: "equal", value: "Social Post" }],
+        filter_tree: {
+          operator: "AND",
+          children: [
+            { field_id: "post_type", operator: "equal", value: "Social Post" },
+          ],
+        },
+      },
+      [{ name: "post_type" }, { name: "status" }],
+      "Social Posts"
+    )
+    expect(config?.filters).toEqual([])
+    expect((config as { filter_tree?: unknown })?.filter_tree).toBeUndefined()
+  })
+
+  it("keeps post_type filters on mixed content tables", () => {
+    const config = sanitizeSocialCalendarQueryConfig(
+      {
+        filters: [{ field: "post_type", operator: "equal", value: "Social Post" }],
+      },
+      [{ name: "post_type" }],
+      "Content Planning"
+    )
+    expect(config?.filters).toHaveLength(1)
+  })
+
+  it("keeps non-social filters on Social Posts table", () => {
+    const config = sanitizeSocialCalendarQueryConfig(
+      {
+        filters: [{ field: "status", operator: "equal", value: "draft" }],
+      },
+      [{ name: "status" }],
+      "Social Posts"
+    )
+    expect(config?.filters).toHaveLength(1)
+  })
+})
+
+describe("sourceTableLooksSocial", () => {
+  it("detects dedicated social posts tables", () => {
+    expect(sourceTableLooksSocial("Social Posts")).toBe(true)
+    expect(sourceTableLooksSocial("Content Planning")).toBe(false)
   })
 })
 

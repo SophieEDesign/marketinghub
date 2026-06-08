@@ -33,6 +33,7 @@ import {
   buildSocialCalendarItems,
   buildSocialStatusSummary,
   collectSocialFilterOptions,
+  sourceTableLooksSocial,
   extendSocialCalendarFieldMap,
   filterSocialCalendarItems,
   getCurrentQuarter,
@@ -249,11 +250,10 @@ export function SocialMediaCalendarCore({
     return map
   }, [campaignRows, fields])
 
-  const sourceTableLooksSocial = useMemo(() => {
-    const name = sourceTableName?.trim().toLowerCase()
-    if (!name) return false
-    return /social/.test(name) && /(post|media)/.test(name)
-  }, [sourceTableName])
+  const isSocialPostsTable = useMemo(
+    () => sourceTableLooksSocial(sourceTableName),
+    [sourceTableName]
+  )
 
   const socialMarkerFieldName = useMemo(() => {
     const id = blockConfig?.social_media_calendar_social_marker_field_id?.trim()
@@ -290,7 +290,7 @@ export function SocialMediaCalendarCore({
       const autoScoped = applyContentScope(
         allSocialItems,
         contentScope,
-        !sourceTableLooksSocial && socialFields?.contentType != null
+        !isSocialPostsTable && socialFields?.contentType != null
       )
 
       if (contentScope !== "social_only" || !socialMarkerFieldName || !socialMarkerValue) {
@@ -308,7 +308,7 @@ export function SocialMediaCalendarCore({
       socialFields?.contentType,
       socialMarkerFieldName,
       socialMarkerValue,
-      sourceTableLooksSocial,
+      isSocialPostsTable,
       rowById,
     ]
   )

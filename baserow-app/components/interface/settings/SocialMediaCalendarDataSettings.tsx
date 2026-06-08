@@ -17,6 +17,7 @@ import MarketingFieldMappingSection from "./shared/MarketingFieldMappingSection"
 import MarketingFieldSelect from "./shared/MarketingFieldSelect"
 import BlockFilterEditor from "./BlockFilterEditor"
 import SortSelector from "./shared/SortSelector"
+import { sourceTableLooksSocial } from "@/lib/marketing/social-media-calendar"
 
 export default function SocialMediaCalendarDataSettings({
   config,
@@ -30,6 +31,9 @@ export default function SocialMediaCalendarDataSettings({
     ? fields.filter((f) => f.table_id === config.table_id)
     : fields
   const blockFilters = Array.isArray(config.filters) ? config.filters : []
+  const sourceTableName =
+    tables.find((t) => t.id === config.table_id)?.name ?? null
+  const isSocialPostsTable = sourceTableLooksSocial(sourceTableName)
 
   const setField = (idKey: keyof BlockConfig, nameKey: keyof BlockConfig) =>
     (fieldId: string | undefined, fieldName: string | undefined) => {
@@ -179,6 +183,13 @@ export default function SocialMediaCalendarDataSettings({
             onChange={(filters) => onUpdate({ filters })}
             onConfigUpdate={(updates) => onUpdate(updates)}
           />
+          {isSocialPostsTable ? (
+            <p className="text-[11px] text-muted-foreground leading-snug">
+              Social Posts is already a social-only table. Use Content scope → Social only (or
+              leave it as default) instead of filtering post_type here — type filters with labels
+              like &quot;Social Post&quot; often match no rows.
+            </p>
+          ) : null}
         </div>
       ) : null}
 
