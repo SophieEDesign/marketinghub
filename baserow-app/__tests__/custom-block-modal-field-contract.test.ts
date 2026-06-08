@@ -34,14 +34,30 @@ describe("custom block modal field contract", () => {
     expect(src).not.toContain("<select")
   })
 
-  it("campaign/status/type/priority badges use shared badge styling helper path", () => {
+  it("campaign/status/type/priority badges use shared ChoicePill path", () => {
     const src = readSource("components/interface/blocks/CampaignsOverviewBlock.tsx")
-    expect(src).toContain("function toneForValue")
-    expect(src).toContain("function Badge")
-    expect(src).toContain("toneForValue(value)")
-    expect(src).toContain("<Badge value={item.type} />")
-    expect(src).toContain("<Badge value={item.status} />")
-    expect(src).toContain("<Badge value={item.priority} />")
+    expect(src).toContain('from "@/components/fields/ChoicePill"')
+    expect(src).toContain("<ChoicePill")
+    expect(src).toContain("CampaignValuePill")
+    expect(src).not.toContain("function toneForValue")
+    expect(src).not.toContain("function Badge(")
+  })
+
+  it("UpcomingSummaryBlock and SocialStatusPill use shared ChoicePill for status display", () => {
+    const upcoming = readSource("components/interface/blocks/UpcomingSummaryBlock.tsx")
+    const social = readSource("components/interface/social/SocialStatusPill.tsx")
+    expect(upcoming).toContain('from "@/components/fields/ChoicePill"')
+    expect(upcoming).toContain("<ChoicePill")
+    expect(social).toContain('from "@/components/fields/ChoicePill"')
+    expect(social).toContain("<ChoicePill")
+    expect(social).not.toContain("getMarketingStatusPillClassNames")
+  })
+
+  it("RecordEditor custom layout header uses ChoicePill for status display", () => {
+    const src = readSource("components/records/RecordEditor.tsx")
+    expect(src).toContain('from "@/components/fields/ChoicePill"')
+    expect(src).toContain("fieldOptions={customLayout.statusField?.options}")
+    expect(src).not.toContain('from "@/components/ui/badge"')
   })
 
   it("ThingsToDoRecordSidePanel receives and passes interfaceMode", () => {

@@ -9,7 +9,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { Maximize2, ChevronDown, ChevronRight, ArrowLeft, Save, Trash2, X, Copy, ExternalLink, Link2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { ChoicePill } from "@/components/fields/ChoicePill"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import FieldEditor from "@/components/fields/FieldEditor"
 import InlineFieldEditor from "@/components/records/InlineFieldEditor"
@@ -819,9 +819,13 @@ export default function RecordEditor({
                     {String(titleValue || recordTitle || "Record Details")}
                   </h3>
                   {statusValue != null && statusValue !== "" ? (
-                    <Badge variant="secondary" className="mt-1 max-w-full truncate">
-                      {String(statusValue)}
-                    </Badge>
+                    <ChoicePill
+                      label={String(statusValue)}
+                      fieldType="single_select"
+                      fieldOptions={customLayout.statusField?.options}
+                      truncate
+                      className="mt-1 max-w-full"
+                    />
                   ) : null}
                 </div>
                 <div className="flex items-center gap-1">

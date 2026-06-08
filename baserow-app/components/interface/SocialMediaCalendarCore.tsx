@@ -392,6 +392,14 @@ export function SocialMediaCalendarCore({
       initialDrawerMode: "view" | "edit" = "view"
     ) => {
       if (!tableIds) return
+      if (
+        recordId === null &&
+        recordPanelState.isOpen &&
+        recordPanelState.recordId === null &&
+        recordPanelState.tableId === tableIds.contentTableId
+      ) {
+        return
+      }
       const common = {
         tableId: tableIds.contentTableId,
         supabaseTableName: tableIds.contentSupabaseTable,
@@ -437,6 +445,9 @@ export function SocialMediaCalendarCore({
       openRecordModal,
       interfaceMode,
       isEditing,
+      recordPanelState.isOpen,
+      recordPanelState.recordId,
+      recordPanelState.tableId,
     ]
   )
 

@@ -26,6 +26,7 @@ import {
 import type { PageBlock } from "@/lib/interface/types"
 import type { UpcomingSummarySectionId } from "@/lib/interface/types"
 import { cn } from "@/lib/utils"
+import { ChoicePill } from "@/components/fields/ChoicePill"
 import {
   ALL_UPCOMING_SUMMARY_SECTIONS,
   BLOCKER_REASON_LABELS,
@@ -107,14 +108,12 @@ function formatDateRange(start: string, end?: string): string {
 
 function StatusPill({ label, className }: { label: string; className?: string }) {
   return (
-    <span
-      className={cn(
-        "inline-flex max-w-full shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-medium truncate",
-        className ?? "bg-muted/60 text-foreground/90"
-      )}
-    >
-      {label}
-    </span>
+    <ChoicePill
+      label={label}
+      fieldType="single_select"
+      truncate
+      className={className}
+    />
   )
 }
 

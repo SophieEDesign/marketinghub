@@ -31,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { ChoicePill } from "@/components/fields/ChoicePill"
 import { cn } from "@/lib/utils"
 import {
   marketingBlockRootClass,
@@ -44,36 +45,15 @@ interface CampaignsOverviewBlockProps {
   isFullPage?: boolean
 }
 
-function toneForValue(value?: string): string {
-  const v = (value || "").toLowerCase().trim()
-  if (!v) return "border-border/50 bg-muted/40 text-muted-foreground"
-  if (["active", "live", "in progress", "complete", "completed"].includes(v)) {
-    return "border-emerald-200/70 bg-emerald-50 text-emerald-700"
-  }
-  if (["planning", "planned", "draft", "review"].includes(v)) {
-    return "border-blue-200/70 bg-blue-50 text-blue-700"
-  }
-  if (["urgent", "high", "on hold", "blocked", "risk"].includes(v)) {
-    return "border-amber-200/70 bg-amber-50 text-amber-700"
-  }
-  if (["low", "backlog", "idea"].includes(v)) {
-    return "border-slate-200/70 bg-slate-50 text-slate-600"
-  }
-  return "border-violet-200/70 bg-violet-50 text-violet-700"
-}
-
-function Badge({ value }: { value?: string }) {
+function CampaignValuePill({ value }: { value?: string }) {
   if (!value) return <span className="text-xs text-muted-foreground">-</span>
   return (
-    <span
-      className={cn(
-        "inline-flex max-w-[140px] items-center truncate rounded-full border px-2 py-0.5 text-[11px] font-medium",
-        toneForValue(value)
-      )}
-      title={value}
-    >
-      {value}
-    </span>
+    <ChoicePill
+      label={value}
+      fieldType="single_select"
+      truncate
+      className="max-w-[140px]"
+    />
   )
 }
 
@@ -372,11 +352,11 @@ export default function CampaignsOverviewBlock({
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-2"><Badge value={item.type} /></td>
-                      <td className="px-3 py-2"><Badge value={item.division} /></td>
-                      <td className="px-3 py-2"><Badge value={item.status} /></td>
-                      <td className="px-3 py-2"><Badge value={item.priority} /></td>
-                      <td className="px-3 py-2"><Badge value={item.stage} /></td>
+                      <td className="px-3 py-2"><CampaignValuePill value={item.type} /></td>
+                      <td className="px-3 py-2"><CampaignValuePill value={item.division} /></td>
+                      <td className="px-3 py-2"><CampaignValuePill value={item.status} /></td>
+                      <td className="px-3 py-2"><CampaignValuePill value={item.priority} /></td>
+                      <td className="px-3 py-2"><CampaignValuePill value={item.stage} /></td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">
                         {formatDateRange(item.startDate, item.endDate)}
                       </td>
@@ -423,9 +403,9 @@ export default function CampaignsOverviewBlock({
                     >
                       <p className="text-sm font-semibold">{item.title}</p>
                       <div className="mt-2 flex flex-wrap gap-1.5">
-                        <Badge value={item.status} />
-                        <Badge value={item.stage} />
-                        <Badge value={item.priority} />
+                        <CampaignValuePill value={item.status} />
+                        <CampaignValuePill value={item.stage} />
+                        <CampaignValuePill value={item.priority} />
                       </div>
                       <p className="mt-2 text-xs text-muted-foreground">
                         {view === "calendar" ? "Dates" : view === "timeline" ? "Timeline" : "Period"}:{" "}

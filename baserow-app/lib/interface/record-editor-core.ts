@@ -232,6 +232,10 @@ export function useRecordEditorCore(
   const baselineFormDataRef = useRef<Record<string, any>>({})
   const draftSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const physicalColumnsRef = useRef<Set<string> | null>(null)
+  /** Prevents overlapping save() calls (state `saving` updates async). */
+  const saveInFlightRef = useRef(false)
+  /** After first create insert, block duplicate inserts until parent passes recordId. */
+  const createCommittedIdRef = useRef<string | null>(null)
 
   const getDraftKey = useCallback(() => {
     if (recordId) return `record-draft-${recordId}`
@@ -239,6 +243,15 @@ export function useRecordEditorCore(
   }, [recordId, tableId])
 
   const isCreateMode = recordId == null
+
+  useEffect(() => {
+    if (recordId != null) {
+      createCommittedIdRef.current = recordId
+      return
+    }
+    createCommittedIdRef.current = null
+    saveInFlightRef.current = false
+  }, [recordId, tableId])
 
   useEffect(() => {
     formDataRef.current = formData
@@ -607,6 +620,8 @@ export function useRecordEditorCore(
 
   const save = useCallback(async () => {
     if (!effectiveTableName) return
+    if (saveInFlightRef.current) return
+    if (!recordId && createCommittedIdRef.current) return
     // Optional defence-in-depth: only enforce when cascadeContext was provided; do not change successful paths
     if (cascadeContext != null) {
       if (recordId && !canEditRecords) {
@@ -622,6 +637,7 @@ export function useRecordEditorCore(
         return
       }
     }
+    saveInFlightRef.current = true
     setSaving(true)
     try {
       const supabase = createClient()
@@ -673,6 +689,15 @@ export function useRecordEditorCore(
           .single()
         if (error) throw error
         const createdId = data?.id ?? null
+        if (createdId) {
+          createCommittedIdRef.current = createdId
+        }
+        const newBaseline = data ? { ...data } : { ...payload, id: createdId }
+        baselineFormDataRef.current = newBaseline
+        setBaselineFormData(newBaseline)
+        if (data) {
+          setFormData(data)
+        }
         clearDraft()
         triggerRecordAutomations(tableId, 'row_created', data as Record<string, any>)
         onSave?.(createdId)
@@ -680,6 +705,7 @@ export function useRecordEditorCore(
     } catch (e) {
       if (!isAbortError(e)) throw e
     } finally {
+      saveInFlightRef.current = false
       setSaving(false)
     }
   }, [
@@ -700,8 +726,13 @@ export function useRecordEditorCore(
   const handleFieldBlur = useCallback(
     (fieldName: string, value?: any) => {
       // Create mode: auto-save when user blurs a field and there are changes (so they don't forget to save when clicking out)
-      if (!recordId && canCreateRecords && !saving) {
-        const currentValue = value !== undefined ? value : formDataRef.current[fieldName]
+      if (
+        !recordId &&
+        canCreateRecords &&
+        !saving &&
+        !saveInFlightRef.current &&
+        !createCommittedIdRef.current
+      ) {
         const baseline = baselineFormDataRef.current
         const hasChanges = JSON.stringify(formDataRef.current) !== JSON.stringify(baseline)
         if (hasChanges && effectiveTableName) {
