@@ -20,13 +20,13 @@ const MAX_WIDTH = 1200
 export default function RecordPanel() {
   const {
     state,
-    openRecord,
     closeRecord,
     setWidth,
     togglePin,
     toggleFullscreen,
     goBack,
     setRecordDrawerMode,
+    promoteCreateRecord,
   } = useRecordPanel()
   const { isEdit, state: uiModeState } = useUIMode()
   const { toast } = useToast()
@@ -137,7 +137,7 @@ export default function RecordPanel() {
       {/* Key: remount on record change only; interfaceMode is a prop, not a key */}
       <div
         ref={panelRef}
-        key={`record-panel-${state.recordId ?? "new"}`}
+        key={`record-panel-${state.panelSessionId}`}
         role={overlayA11yActive ? "dialog" : undefined}
         aria-modal={overlayA11yActive ? true : undefined}
         aria-label="Record details"
@@ -278,27 +278,9 @@ export default function RecordPanel() {
             active={active}
             onSave={state.recordId === null ? (createdId) => {
               state.onRecordCreated?.(createdId ?? "")
-              // Switch to edit mode so user can continue editing; subsequent changes auto-save
-              if (createdId && state.tableId && state.tableName) {
-                openRecord(
-                  state.tableId,
-                  createdId,
-                  state.tableName,
-                  state.modalFields,
-                  state.modalLayout,
-                  state.cascadeContext,
-                  "edit",
-                  state.onRecordDeleted,
-                  state.onRecordUpdated,
-                  state.fieldLayout,
-                  state.onLayoutSave,
-                  state.tableFields,
-                  state.recordLayoutType,
-                  {
-                    initialDrawerMode: state.recordDrawerMode,
-                    eventContextual: state.eventContextual ?? null,
-                  }
-                )
+              // Promote in place so the user can keep editing without panel remount / reload flash
+              if (createdId && state.tableId) {
+                promoteCreateRecord(createdId)
               } else {
                 closeRecord()
               }

@@ -29,6 +29,7 @@ import { getPrimaryFieldName } from "@/lib/fields/primary"
 import { sectionAndSortFields } from "@/lib/fields/sectioning"
 import { useSelectionContext } from "@/contexts/SelectionContext"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
+import { useUIMode } from "@/contexts/UIModeContext"
 import { useToast } from "@/components/ui/use-toast"
 import { isAbortError } from "@/lib/api/error-handling"
 import { createClient } from "@/lib/supabase/client"
@@ -140,6 +141,7 @@ export default function RecordEditor({
   onRecordUpdate,
 }: RecordEditorProps) {
   const { selectedContext, setSelectedContext } = useSelectionContext()
+  const { isEdit } = useUIMode()
   const { toast } = useToast()
   const {
     setFieldLayout: setLiveFieldLayout,
@@ -324,7 +326,7 @@ export default function RecordEditor({
   }, [resolvedFieldLayout, visibilityContext])
 
   const isEditingLayout =
-    interfaceMode === "edit" &&
+    isEdit() &&
     canEditLayout &&
     !isViewOnly &&
     Boolean(onLayoutSave) &&

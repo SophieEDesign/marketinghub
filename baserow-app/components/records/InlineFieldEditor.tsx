@@ -26,7 +26,7 @@ import {
 } from "@/lib/field-colors"
 import { getFieldDisplayName } from "@/lib/fields/display"
 import { getManualChoiceLabels } from "@/lib/fields/select-options"
-import { plainTextFromHtml } from "@/lib/sanitize"
+import { plainTextFromHtml, sanitizeRichText } from "@/lib/sanitize"
 import { FIELD_LABEL_CLASS_NO_MARGIN, FIELD_LABEL_GAP_CLASS } from "@/lib/fields/field-label"
 
 interface InlineFieldEditorProps {
@@ -514,7 +514,10 @@ export default function InlineFieldEditor({
             className={cn("overflow-visible min-h-[40px]", displayBoxClassName, !displayText && "bg-white")}
           >
             {displayText ? (
-              <p className="text-sm whitespace-pre-wrap break-words">{displayText}</p>
+              <div
+                className="rich-text-view text-sm max-w-none"
+                dangerouslySetInnerHTML={{ __html: sanitizeRichText(String(value)) }}
+              />
             ) : (
               <span className="text-gray-400 italic">Click to add text...</span>
             )}

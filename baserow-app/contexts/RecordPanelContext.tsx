@@ -46,6 +46,8 @@ interface RecordPanelState {
   initialData?: Record<string, any>
   /** Create mode only: called when record is saved with new id. */
   onRecordCreated?: (createdRecordId: string) => void
+  /** Bumps when a new panel session starts; stable through create → edit promotion. */
+  panelSessionId: number
 }
 
 export interface OpenRecordOptions {
@@ -97,6 +99,8 @@ interface RecordPanelContextType {
   setFieldLayout: (layout: FieldLayoutItem[]) => void
   /** Switch contextual drawer between overview and edit without reopening. */
   setRecordDrawerMode: (mode: RecordDrawerMode) => void
+  /** After create save: assign recordId in place without remounting or reloading. */
+  promoteCreateRecord: (createdRecordId: string) => void
 }
 
 const RecordPanelContext = createContext<RecordPanelContextType | undefined>(undefined)
@@ -119,6 +123,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
     interfaceMode: 'view', // Default to view mode
     recordDrawerMode: "edit",
     eventContextual: null,
+    panelSessionId: 0,
   })
 
   const openRecord = useCallback((
@@ -162,10 +167,16 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
       recordDrawerMode: drawerMode,
       eventContextual:
         layoutType === "event" ? drawerOptions?.eventContextual ?? null : null,
+      initialData: undefined,
+      onRecordCreated: undefined,
       history:
         prev.isOpen && prev.tableId === tableId && prev.recordId === recordId
           ? prev.history
           : [...prev.history, { tableId, recordId, tableName }],
+      panelSessionId:
+        prev.isOpen && prev.tableId === tableId && prev.recordId === recordId
+          ? prev.panelSessionId
+          : prev.panelSessionId + 1,
     }))
     // Per architectural contract: do NOT call setRightPanelData. Inspector reads from selection.
   }, [setSelectedContext])
@@ -250,7 +261,36 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
       ),
       eventContextual: null,
       history: [],
+      panelSessionId: prev.panelSessionId + 1,
     }))
+  }, [setSelectedContext])
+
+  const promoteCreateRecord = useCallback((createdRecordId: string) => {
+    let tableIdForContext: string | null = null
+    setState((prev) => {
+      if (!prev.isOpen || !prev.tableId || prev.recordId != null) return prev
+      tableIdForContext = prev.tableId
+      return {
+        ...prev,
+        recordId: createdRecordId,
+        initialData: undefined,
+        onRecordCreated: undefined,
+        interfaceMode: prev.interfaceMode ?? "edit",
+        history:
+          prev.history.length > 0
+            ? prev.history
+            : [
+                {
+                  tableId: prev.tableId,
+                  recordId: createdRecordId,
+                  tableName: prev.tableName,
+                },
+              ],
+      }
+    })
+    if (tableIdForContext) {
+      setSelectedContext({ type: "record", recordId: createdRecordId, tableId: tableIdForContext })
+    }
   }, [setSelectedContext])
 
   const setRecordDrawerMode = useCallback((mode: RecordDrawerMode) => {
@@ -323,6 +363,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
     setInterfaceMode,
     setFieldLayout,
     setRecordDrawerMode,
+    promoteCreateRecord,
   }), [
     state,
     openRecord,
@@ -337,6 +378,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
     setInterfaceMode,
     setFieldLayout,
     setRecordDrawerMode,
+    promoteCreateRecord,
   ])
 
   return (

@@ -12,7 +12,16 @@ describe("record editor create deduplication", () => {
     expect(src).toContain("createCommittedIdRef")
     expect(src).toContain("saveInFlightRef")
     expect(src).toContain("if (!recordId && createCommittedIdRef.current) return")
-    expect(src).toContain("!createCommittedIdRef.current")
+    expect(src).toContain("freshlyCreatedIdRef")
+  })
+
+  it("promotes create to edit in place without reopening the panel", () => {
+    const panelCtx = readSource("contexts/RecordPanelContext.tsx")
+    const panel = readSource("components/records/RecordPanel.tsx")
+    expect(panelCtx).toContain("promoteCreateRecord")
+    expect(panelCtx).toContain("panelSessionId")
+    expect(panel).toContain("promoteCreateRecord")
+    expect(panel).not.toContain("openRecord(")
   })
 
   it("prevents reopening social calendar create while create drawer is already open", () => {

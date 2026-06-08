@@ -236,6 +236,8 @@ export function useRecordEditorCore(
   const saveInFlightRef = useRef(false)
   /** After first create insert, block duplicate inserts until parent passes recordId. */
   const createCommittedIdRef = useRef<string | null>(null)
+  /** Skip redundant fetch when parent promotes create → edit with insert response already in formData. */
+  const freshlyCreatedIdRef = useRef<string | null>(null)
 
   const getDraftKey = useCallback(() => {
     if (recordId) return `record-draft-${recordId}`
@@ -250,6 +252,7 @@ export function useRecordEditorCore(
       return
     }
     createCommittedIdRef.current = null
+    freshlyCreatedIdRef.current = null
     saveInFlightRef.current = false
   }, [recordId, tableId])
 
@@ -433,11 +436,19 @@ export function useRecordEditorCore(
     if (!active) return
     if (recordId) {
       const tableToUse = supabaseTableNameProp ?? effectiveTableName
-      if (tableToUse) {
-        loadRecord()
-      } else {
+      if (!tableToUse) {
         setLoading(false)
+        return
       }
+      if (
+        freshlyCreatedIdRef.current === recordId &&
+        Object.keys(formDataRef.current).length > 0
+      ) {
+        freshlyCreatedIdRef.current = null
+        setLoading(false)
+        return
+      }
+      loadRecord()
     } else if (initialData) {
       setFormData(initialData)
       const baseline = { ...initialData }
@@ -691,6 +702,7 @@ export function useRecordEditorCore(
         const createdId = data?.id ?? null
         if (createdId) {
           createCommittedIdRef.current = createdId
+          freshlyCreatedIdRef.current = createdId
         }
         const newBaseline = data ? { ...data } : { ...payload, id: createdId }
         baselineFormDataRef.current = newBaseline
@@ -725,22 +737,6 @@ export function useRecordEditorCore(
 
   const handleFieldBlur = useCallback(
     (fieldName: string, value?: any) => {
-      // Create mode: auto-save when user blurs a field and there are changes (so they don't forget to save when clicking out)
-      if (
-        !recordId &&
-        canCreateRecords &&
-        !saving &&
-        !saveInFlightRef.current &&
-        !createCommittedIdRef.current
-      ) {
-        const baseline = baselineFormDataRef.current
-        const hasChanges = JSON.stringify(formDataRef.current) !== JSON.stringify(baseline)
-        if (hasChanges && effectiveTableName) {
-          save()
-          return
-        }
-      }
-
       if (!saveOnFieldChange || !recordId) return
       if (cascadeContext != null && !canEditRecords) return
 
@@ -755,7 +751,7 @@ export function useRecordEditorCore(
       if (currentValue === oldValue) return
       persistFieldChange(fieldName, currentValue, oldValue)
     },
-    [saveOnFieldChange, recordId, cascadeContext, canEditRecords, canCreateRecords, saving, effectiveTableName, save, persistFieldChange]
+    [saveOnFieldChange, recordId, cascadeContext, canEditRecords, persistFieldChange]
   )
 
   const deleteRecord = useCallback(
