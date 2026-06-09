@@ -17,27 +17,18 @@ function field(id: string, name: string): TableField {
   } as TableField
 }
 
-describe("social calendar one-drawer record behaviour", () => {
-  it("opens posts via openRecordModal with social_post layout (not openRecord)", () => {
+describe("social calendar record behaviour", () => {
+  it("opens posts via generic record panel (not social_post contextual layout)", () => {
     const src = read("components/interface/SocialMediaCalendarCore.tsx")
-    expect(src).toContain("openRecordModal")
-    expect(src).not.toMatch(/openRecord\s*\(/)
-    expect(src).toContain('recordLayoutType: "social_post"')
-    expect(src).toContain("initialDrawerMode")
-    expect(src).toContain("openPost(id")
+    expect(src).toContain("openRecord(")
+    expect(src).toContain('recordLayoutType: "generic"')
+    expect(src).not.toContain('recordLayoutType: "social_post"')
+    expect(src).not.toContain("initialDrawerMode")
   })
 
   it("does not open record drawer while page layout edit selects the block", () => {
     const src = read("components/interface/SocialMediaCalendarCore.tsx")
-    expect(src).toContain("if (isEditing) return")
-  })
-
-  it("uses contextual tabs and edit/discard footer in RecordEditor", () => {
-    const src = read("components/records/RecordEditor.tsx")
-    expect(src).toContain("Edit post")
-    expect(src).toContain("Discard changes")
-    expect(src).toContain("setRecordDrawerMode")
-    expect(src).toContain("<Tabs")
+    expect(src).toMatch(/if \(isEditing.*\) return/)
   })
 
   it("keeps RecordPanel overlay clear of sidebar on desktop", () => {
@@ -45,7 +36,7 @@ describe("social calendar one-drawer record behaviour", () => {
     expect(src).toContain("md:left-sidebar")
   })
 
-  it("maps social_post fields into Overview/Caption/More fields tabs", () => {
+  it("maps social_post fields into Overview/Caption/More fields tabs when layout is requested", () => {
     const fields = [
       field("f1", "Content Name"),
       field("f2", "Caption"),

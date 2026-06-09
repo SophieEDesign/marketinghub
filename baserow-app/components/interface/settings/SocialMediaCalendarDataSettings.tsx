@@ -185,9 +185,8 @@ export default function SocialMediaCalendarDataSettings({
           />
           {isSocialPostsTable ? (
             <p className="text-[11px] text-muted-foreground leading-snug">
-              Social Posts is already a social-only table. Use Content scope → Social only (or
-              leave it as default) instead of filtering post_type here — type filters with labels
-              like &quot;Social Post&quot; often match no rows.
+              Social Posts can include editorial and newsletter rows. Use Content scope → Social
+              only, or filter post_type → Social Post, to show social posts only.
             </p>
           ) : null}
         </div>

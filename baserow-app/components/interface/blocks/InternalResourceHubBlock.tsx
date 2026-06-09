@@ -206,6 +206,7 @@ export default function InternalResourceHubBlock({
       recordId: null,
       supabaseTableName: tableIds.mediaSupabaseTable,
       interfaceMode,
+      recordLayoutType: "asset",
       onSave: () => reload(),
       onRecordUpdated: () => reload(),
     })

@@ -227,7 +227,8 @@ describe("App-layer auth alignment routes", () => {
   it("gates sidebar mutation controls behind admin state", () => {
     const sidebarPath = join(process.cwd(), "components", "layout", "AirtableSidebar.tsx")
     const source = readFileSync(sidebarPath, "utf8")
-    expect(source).toContain("{isAdmin && (")
-    expect(source).toContain("editMode={isEditMode && isAdmin}")
+    expect(source).toContain('const showAdminSidebar = isAdmin && !isMemberPreview')
+    expect(source).toContain("const isEditMode = isWorkspaceEditing && showAdminSidebar")
+    expect(source).toContain("editMode={isEditMode}")
   })
 })

@@ -26,6 +26,7 @@ function AttachmentFieldEditor({
   labelClassName,
   required,
   recordId,
+  attachmentStorageId,
   tableName,
 }: {
   field: TableField
@@ -36,6 +37,7 @@ function AttachmentFieldEditor({
   labelClassName: string
   required: boolean
   recordId?: string
+  attachmentStorageId?: string
   tableName?: string
 }) {
   const { toast } = useToast()
@@ -58,7 +60,8 @@ function AttachmentFieldEditor({
     return []
   }, [value])
 
-  const canUpload = !isReadOnly && !!recordId && !!tableName
+  const storageRecordId = recordId || attachmentStorageId
+  const canUpload = !isReadOnly && !!storageRecordId && !!tableName
 
   const generateUUID = (): string => {
     if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -73,13 +76,6 @@ function AttachmentFieldEditor({
 
   const handleFiles = async (files: FileList) => {
     if (!canUpload || uploading) {
-      if (!recordId || !tableName) {
-        toast({
-          variant: "destructive",
-          title: "Upload unavailable",
-          description: "Save the record first, then upload files.",
-        })
-      }
       return
     }
 
@@ -89,7 +85,7 @@ function AttachmentFieldEditor({
     try {
       for (const file of Array.from(files)) {
         const ext = (file?.name || "").split(".").pop() || "bin"
-        const filePath = `attachments/${tableName}/${recordId}/${field.name}/${generateUUID()}.${ext}`
+        const filePath = `attachments/${tableName}/${storageRecordId}/${field.name}/${generateUUID()}.${ext}`
 
         const { error: uploadError } = await supabase.storage
           .from("attachments")
@@ -287,6 +283,8 @@ export interface FieldEditorProps {
   required?: boolean // Show required indicator
   // Optional: enable attachment uploads (used by record modals/drawers)
   recordId?: string
+  /** Draft folder id for attachment uploads before the record row exists */
+  attachmentStorageId?: string
   tableName?: string
 }
 
@@ -317,6 +315,7 @@ export default function FieldEditor({
   autoFocus = false,
   required = false,
   recordId,
+  attachmentStorageId,
   tableName,
 }: FieldEditorProps) {
   const { toast } = useToast()
@@ -461,6 +460,7 @@ export default function FieldEditor({
         labelClassName={labelClassName}
         required={required}
         recordId={recordId}
+        attachmentStorageId={attachmentStorageId}
         tableName={tableName}
       />
     )

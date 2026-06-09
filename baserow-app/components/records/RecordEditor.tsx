@@ -42,6 +42,8 @@ import {
   type RecordDrawerMode,
 } from "@/lib/records/record-drawer-mode"
 import EventRecordContextualView from "@/components/records/EventRecordContextualView"
+import { createDraftRecordStorageId } from "@/lib/records/draft-record-storage-id"
+import { cn } from "@/lib/utils"
 
 function extractUrlLike(value: unknown): string | null {
   if (typeof value === "string") {
@@ -194,6 +196,8 @@ export default function RecordEditor({
   } = core
 
   const canSave = recordId ? canEditRecords : canCreateRecords
+  const draftStorageIdRef = useRef(createDraftRecordStorageId())
+  const attachmentStorageId = recordId ?? draftStorageIdRef.current
   const isCustomMarketingLayout = Boolean(
     recordLayoutType && recordLayoutType !== "generic"
   )
@@ -474,6 +478,12 @@ export default function RecordEditor({
 
   useEffect(() => {
     if (!useCustomLayout) return
+    if (recordLayoutType === "asset") {
+      setActiveCustomTab((prev) =>
+        ["details", "usage", "activity"].includes(prev) ? prev : "details"
+      )
+      return
+    }
     const baseSectionIds = customLayoutSectionIdsSig
       ? customLayoutSectionIdsSig.split(",")
       : []
@@ -488,7 +498,13 @@ export default function RecordEditor({
           ? prev
           : first
     )
-  }, [useCustomLayout, customLayoutCollapseInitSig, showTaskActivityTab, customLayoutSectionIdsSig])
+  }, [
+    useCustomLayout,
+    customLayoutCollapseInitSig,
+    showTaskActivityTab,
+    customLayoutSectionIdsSig,
+    recordLayoutType,
+  ])
 
   const handleLinkedRecordClick = useCallback(
     async (linkedTableId: string, linkedRecordId: string) => {
@@ -622,6 +638,21 @@ export default function RecordEditor({
   }
 
   const renderFieldsContent = () => {
+    // Event calendar passes rich payload from the block; render it without waiting on
+    // a separate single-row fetch (which can fail on soft-delete column races).
+    if (showEventContextualView && eventContextual) {
+      return (
+        <EventRecordContextualView
+          payload={eventContextual}
+          onClose={() => onClose?.()}
+          onEdit={handleCustomEdit}
+          onDelete={recordId && onDeleted ? handleDelete : undefined}
+          canDelete={canDeleteRecords}
+          deleting={deleting}
+        />
+      )
+    }
+
     if (loading) {
       return (
         <div className="flex items-center justify-center py-8">
@@ -641,19 +672,6 @@ export default function RecordEditor({
         <div className="flex items-center justify-center py-8">
           <div className="text-gray-500">Preparing fields…</div>
         </div>
-      )
-    }
-
-    if (showEventContextualView && eventContextual) {
-      return (
-        <EventRecordContextualView
-          payload={eventContextual}
-          onClose={() => onClose?.()}
-          onEdit={handleCustomEdit}
-          onDelete={recordId && onDeleted ? handleDelete : undefined}
-          canDelete={canDeleteRecords}
-          deleting={deleting}
-        />
       )
     }
 
@@ -730,6 +748,7 @@ export default function RecordEditor({
                   isReadOnly={fieldReadOnly}
                   tableId={tableId}
                   recordId={recordId || undefined}
+                  attachmentStorageId={!recordId ? attachmentStorageId : undefined}
                   tableName={effectiveTableName || undefined}
                   displayMode="list"
                   onFieldOptionsUpdate={refreshFields}
@@ -897,7 +916,14 @@ export default function RecordEditor({
                 ))}
               </TabsList>
               {tabsForUi.map((tab) => (
-                <TabsContent key={tab.id} value={tab.id} className="mt-3 focus-visible:outline-none">
+                <TabsContent
+                  key={tab.id}
+                  value={tab.id}
+                  className={cn(
+                    "mt-3 focus-visible:outline-none",
+                    mode === "review" && (recordId || canSave) ? "pb-28" : undefined
+                  )}
+                >
                   {tab.isActivity ? (
                     <div className="space-y-4 px-1 py-2">
                       <div className="rounded-card-lg border border-border/35 bg-card p-3">
@@ -924,6 +950,20 @@ export default function RecordEditor({
               ))}
             </Tabs>
           </div>
+
+          {mode === "review" && !recordId && canSave && !customLayoutReadOnly ? (
+            <div className="sticky bottom-0 z-10 border-t border-border/40 bg-background/95 backdrop-blur px-4 py-3 flex flex-col gap-2 shrink-0">
+              <Button
+                type="button"
+                size="sm"
+                className="w-full"
+                onClick={handleSave}
+                disabled={saving || loading || !canSave}
+              >
+                {saving ? "Saving…" : "Save"}
+              </Button>
+            </div>
+          ) : null}
 
           {mode === "review" && recordId ? (
             <div className="sticky bottom-0 z-10 border-t border-border/40 bg-background/95 backdrop-blur px-4 py-3 flex flex-col gap-2 shrink-0">
@@ -1021,6 +1061,7 @@ export default function RecordEditor({
             fieldGroups={fieldGroups}
             tableId={tableId}
             recordId={recordId || ""}
+            attachmentStorageId={!recordId ? attachmentStorageId : undefined}
             tableName={effectiveTableName || ""}
             isFieldEditable={isFieldEditable}
             fieldLayout={localFieldLayout.length > 0 ? localFieldLayout : resolvedFieldLayout}
@@ -1100,6 +1141,7 @@ export default function RecordEditor({
                       onBlur={(v) => handleFieldBlur(field.name, v)}
                       required={field.required || false}
                       recordId={recordId || undefined}
+                      attachmentStorageId={!recordId ? attachmentStorageId : undefined}
                       tableName={effectiveTableName || undefined}
                       isReadOnly={!effectiveEditable}
                     />
@@ -1122,6 +1164,7 @@ export default function RecordEditor({
               onBlur={(v) => handleFieldBlur(field.name, v)}
               required={field.required || false}
               recordId={recordId || undefined}
+              attachmentStorageId={!recordId ? attachmentStorageId : undefined}
               tableName={effectiveTableName || undefined}
               isReadOnly={!effectiveEditable}
             />

@@ -145,7 +145,9 @@ type FieldRow = { name: string; type?: string; options?: FieldOptions }
 const SOCIAL_TYPE_PATTERN =
   /social|linkedin|instagram|facebook|twitter|x\.com|tiktok|youtube|bluesky/i
 
-const SOCIAL_TYPE_FIELD_PATTERN = /content[_\s-]*type|post[_\s-]*type|^type$/i
+// post_type is intentionally excluded — on Social Posts it is a real subtype filter
+// (e.g. social_post vs editorial), not redundant scope.
+const SOCIAL_TYPE_FIELD_PATTERN = /content[_\s-]*type|^type$/i
 
 export function sourceTableLooksSocial(tableName: string | null | undefined): boolean {
   const name = tableName?.trim().toLowerCase()

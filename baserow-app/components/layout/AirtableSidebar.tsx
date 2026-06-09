@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, type MouseEvent } from "react"
+import { useState, useEffect, useRef, useMemo, type MouseEvent } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -32,7 +32,10 @@ import BaseDropdown from "./BaseDropdown"
 import { cn } from "@/lib/utils"
 import { useIsMobile } from "@/hooks/useResponsive"
 import { useMemberPreview } from "@/contexts/MemberPreviewContext"
-import { withMemberPreviewHref } from "@/lib/navigation/member-preview"
+import {
+  pickMemberPreviewHomePage,
+  withMemberPreviewHref,
+} from "@/lib/navigation/member-preview"
 import type { Table, View } from "@/types/database"
 
 interface InterfacePage {
@@ -51,6 +54,7 @@ interface InterfaceGroup {
   order_index: number
   collapsed: boolean
   workspace_id?: string | null
+  is_admin_only?: boolean
   icon?: string | null
 }
 
@@ -179,18 +183,37 @@ export default function AirtableSidebar({
 
   const { isMemberPreview } = useMemberPreview()
   const isAdmin = userRole === "admin"
+  const showAdminSidebar = isAdmin && !isMemberPreview
 
   const isSettings = pathname.includes("/settings")
   const currentPageIdFromPath = pathname?.match(/\/pages\/([^/?]+)/)?.[1]
   const { isWorkspaceEditing, toggle: toggleWorkspaceEdit } =
     useWorkspaceLayoutEdit(currentPageIdFromPath)
-  const isEditMode = isWorkspaceEditing
+  const isEditMode = isWorkspaceEditing && showAdminSidebar
+
+  const memberPreviewHome = useMemo(
+    () =>
+      isMemberPreview
+        ? pickMemberPreviewHomePage(interfacePages, interfaceGroups)
+        : null,
+    [isMemberPreview, interfacePages, interfaceGroups]
+  )
+
+  const resolvedHomePageId = isMemberPreview
+    ? memberPreviewHome?.id ?? null
+    : defaultPageId
+  const resolvedHomeTitle = isMemberPreview
+    ? memberPreviewHome?.name ?? null
+    : landingPageTitle
+
   const homeHref =
-    typeof defaultPageId === "string" && defaultPageId.length > 0
-      ? withMemberPreviewHref(`/pages/${defaultPageId}`, isMemberPreview)
+    typeof resolvedHomePageId === "string" && resolvedHomePageId.length > 0
+      ? withMemberPreviewHref(`/pages/${resolvedHomePageId}`, isMemberPreview)
       : null
   const isHomeActive =
-    Boolean(homeHref && currentPageIdFromPath && defaultPageId === currentPageIdFromPath)
+    Boolean(
+      homeHref && currentPageIdFromPath && resolvedHomePageId === currentPageIdFromPath
+    )
 
   useEffect(() => {
     if (previousPathnameRef.current === null) {
@@ -256,7 +279,7 @@ export default function AirtableSidebar({
     )
   }
 
-  const showAdministration = isAdmin
+  const showAdministration = showAdminSidebar
 
   return (
     <>
@@ -327,7 +350,7 @@ export default function AirtableSidebar({
             </div>
           </div>
 
-          {isAdmin && (
+          {showAdminSidebar && (
             <div className="flex-shrink-0 px-3 pb-2 flex flex-col gap-1">
               <button
                 type="button"
@@ -372,7 +395,7 @@ export default function AirtableSidebar({
                   }
                 }}
               >
-                {landingPageTitle ?? "Home"}
+                {resolvedHomeTitle ?? "Home"}
               </SidebarNavItem>
             )}
           </div>
@@ -381,7 +404,7 @@ export default function AirtableSidebar({
             <GroupedInterfaces
               interfacePages={interfacePages}
               interfaceGroups={interfaceGroups}
-              editMode={isEditMode && isAdmin}
+              editMode={isEditMode}
               onRefresh={() => {
                 window.dispatchEvent(new CustomEvent("pages-updated"))
                 router.refresh()

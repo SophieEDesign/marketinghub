@@ -50,7 +50,10 @@ import {
 import PageCreationWizard from "@/components/interface/PageCreationWizard"
 import { useToast } from "@/components/ui/use-toast"
 import { useMemberPreview } from "@/contexts/MemberPreviewContext"
-import { withMemberPreviewHref } from "@/lib/navigation/member-preview"
+import {
+  filterInterfacePagesForNav,
+  withMemberPreviewHref,
+} from "@/lib/navigation/member-preview"
 import {
   VIRTUAL_UNGROUPED_GROUP_ID,
   groupsMatchForReorder,
@@ -75,6 +78,7 @@ interface InterfaceGroup {
   collapsed: boolean
   workspace_id?: string | null
   is_system?: boolean
+  is_admin_only?: boolean
   icon?: string | null
 }
 
@@ -227,10 +231,9 @@ export default function GroupedInterfaces({
   // Organize pages by group
   // Pages without group_id go to "Ungrouped" system group
   const pagesForDisplay = useMemo(() => {
-    const base = editMode ? pages : pages.filter((page) => !page.is_hidden)
-    if (!isMemberPreview) return base
-    return base.filter((page) => !page.is_admin_only)
-  }, [editMode, pages, isMemberPreview])
+    if (editMode) return pages
+    return filterInterfacePagesForNav(pages, isMemberPreview, groups)
+  }, [editMode, pages, isMemberPreview, groups])
 
   const pagesByGroup = useMemo(() => {
     const result: Record<string, InterfacePage[]> = {}

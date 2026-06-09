@@ -163,6 +163,51 @@ export function resolveStoredChoiceLabel(
   return getOptionValueToLabelMap(fieldType, fieldOptions).get(trimmed) ?? trimmed
 }
 
+/** Lowercase snake_case slug often used as the stored single_select cell value. */
+export function selectChoiceStoredSlug(label: string): string {
+  return label
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '_')
+    .replace(/[^a-z0-9_]/g, '')
+}
+
+/**
+ * Resolve a UI filter value (label, id, or legacy slug) to all stored DB values
+ * that should match for single_select equality filters.
+ */
+export function resolveSelectFilterStoredValues(
+  filterValue: unknown,
+  fieldType: 'single_select' | 'multi_select',
+  fieldOptions?: FieldOptions | null
+): string[] {
+  if (filterValue == null) return []
+  const raw = String(filterValue).trim()
+  if (!raw) return []
+
+  const candidates = new Set<string>([raw, raw.toLowerCase(), selectChoiceStoredSlug(raw)])
+  const { selectOptions } = normalizeSelectOptionsForUi(fieldType, fieldOptions)
+
+  for (const option of selectOptions) {
+    const label = String(option.label ?? '').trim()
+    const id = String(option.id ?? '').trim()
+    const matches =
+      raw === label ||
+      raw === id ||
+      raw.toLowerCase() === label.toLowerCase() ||
+      selectChoiceStoredSlug(raw) === selectChoiceStoredSlug(label)
+
+    if (!matches) continue
+    if (id) candidates.add(id)
+    if (label) {
+      candidates.add(label)
+      candidates.add(selectChoiceStoredSlug(label))
+    }
+  }
+
+  return [...candidates].filter(Boolean)
+}
+
 export function getOptionValueToLabelMap(
   fieldType: 'single_select' | 'multi_select',
   fieldOptions?: FieldOptions | null

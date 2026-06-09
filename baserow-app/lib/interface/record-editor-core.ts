@@ -312,23 +312,6 @@ export function useRecordEditorCore(
     }
   }, [tableId, supabaseTableNameProp])
 
-  useEffect(() => {
-    const tableToUse = supabaseTableNameProp ?? effectiveTableName
-    if (!tableToUse) {
-      physicalColumnsRef.current = null
-      return
-    }
-    let cancelled = false
-    void (async () => {
-      const supabase = createClient()
-      const cols = await fetchPhysicalColumns(supabase, tableToUse)
-      if (!cancelled) physicalColumnsRef.current = cols
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [supabaseTableNameProp, effectiveTableName])
-
   const loadFields = useCallback(async () => {
     if (tableFieldsProp != null || !tableId) return
     try {
@@ -405,6 +388,30 @@ export function useRecordEditorCore(
       setLoading(false)
     }
   }, [recordId, effectiveTableName, supabaseTableNameProp, getDraftKey])
+
+  useEffect(() => {
+    const tableToUse = supabaseTableNameProp ?? effectiveTableName
+    if (!tableToUse) {
+      physicalColumnsRef.current = null
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const supabase = createClient()
+      const cols = await fetchPhysicalColumns(supabase, tableToUse)
+      if (!cancelled) {
+        physicalColumnsRef.current = cols
+        // First load may have used a soft-delete filter before columns were known;
+        // retry once schema is resolved (avoids false "Record not found" on edit).
+        if (active && recordId) {
+          loadRecord()
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [supabaseTableNameProp, effectiveTableName, active, recordId, loadRecord])
 
   useEffect(() => {
     if (supabaseTableNameProp != null) {
