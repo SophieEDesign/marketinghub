@@ -3,6 +3,7 @@ import {
   isMemberPreviewSearch,
   withMemberPreviewHref,
   filterInterfacePagesForNav,
+  pickMemberPreviewHomePage,
   isPageEditableForUser,
 } from "@/lib/navigation/member-preview"
 
@@ -31,9 +32,21 @@ describe("member preview navigation helpers", () => {
       { id: "1", name: "Home", is_admin_only: false, is_hidden: false },
       { id: "2", name: "Secret", is_admin_only: true, is_hidden: false },
       { id: "3", name: "Hidden", is_admin_only: false, is_hidden: true },
+      { id: "4", name: "Grouped", is_admin_only: false, is_hidden: false, group_id: "g-admin" },
     ]
-    expect(filterInterfacePagesForNav(pages, false).map((p) => p.id)).toEqual(["1", "2"])
-    expect(filterInterfacePagesForNav(pages, true).map((p) => p.id)).toEqual(["1"])
+    const groups = [{ id: "g-admin", is_admin_only: true }]
+    expect(filterInterfacePagesForNav(pages, false).map((p) => p.id)).toEqual(["1", "2", "4"])
+    expect(filterInterfacePagesForNav(pages, true).map((p) => p.id)).toEqual(["1", "4"])
+    expect(filterInterfacePagesForNav(pages, true, groups).map((p) => p.id)).toEqual(["1"])
+  })
+
+  it("pickMemberPreviewHomePage prefers Members Welcome", () => {
+    const pages = [
+      { id: "home", name: "Marketing Home", is_admin_only: true, is_hidden: false },
+      { id: "welcome", name: "Members Welcome", is_admin_only: false, is_hidden: false },
+      { id: "events", name: "Event Calendar", is_admin_only: false, is_hidden: false },
+    ]
+    expect(pickMemberPreviewHomePage(pages)?.id).toBe("welcome")
   })
 
   it("isPageEditableForUser is false for admin in member preview", () => {

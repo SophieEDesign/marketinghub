@@ -40,6 +40,15 @@ describe("Event Calendar one contextual drawer", () => {
     expect(editor).toContain("setRecordDrawerMode")
   })
 
+  it("RecordEditor shows event contextual view before record-not-found gate", () => {
+    const editor = read("components/records/RecordEditor.tsx")
+    const contextualIdx = editor.indexOf("if (showEventContextualView && eventContextual)")
+    const notFoundIdx = editor.indexOf("Record not found")
+    expect(contextualIdx).toBeGreaterThan(-1)
+    expect(notFoundIdx).toBeGreaterThan(-1)
+    expect(contextualIdx).toBeLessThan(notFoundIdx)
+  })
+
   it("RecordPanel overlay uses md:left-sidebar", () => {
     const panel = read("components/records/RecordPanel.tsx")
     expect(panel).toContain("md:left-sidebar")

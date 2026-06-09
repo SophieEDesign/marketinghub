@@ -33,4 +33,8 @@ describe("InternalResourceHubBlock edit mode", () => {
     expect(src).toContain('initialDrawerMode: "edit"')
     expect(src).toContain('effectiveRole === "admin"')
   })
+
+  it("opens create resource with asset layout", () => {
+    expect(src).toMatch(/handleCreateResource[\s\S]*?recordLayoutType:\s*"asset"/)
+  })
 })

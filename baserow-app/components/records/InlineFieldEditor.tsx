@@ -46,6 +46,8 @@ interface InlineFieldEditorProps {
   labelClassName?: string // Optional label classes
   tableId?: string // For attachment uploads
   recordId?: string // For attachment uploads
+  /** Draft folder id for attachment uploads before the record row exists */
+  attachmentStorageId?: string
   tableName?: string // For attachment uploads (supabase table name)
   displayMode?: 'compact' | 'inline' | 'expanded' | 'list' // Linked field layout (default: list — stacked pills in interfaces)
   /** When true, display boxes do not call onEditStart on click; parent handles click for selection (layout mode) */
@@ -70,6 +72,7 @@ export default function InlineFieldEditor({
   labelClassName: propLabelClassName,
   tableId,
   recordId,
+  attachmentStorageId,
   tableName,
   displayMode = 'list',
   disableClickToEdit = false,
@@ -534,7 +537,8 @@ export default function InlineFieldEditor({
   if (field.type === "attachment") {
     const attachments: Attachment[] = Array.isArray(value) ? value : value ? [value] : []
     
-    if (isEditing && !isReadOnly && tableId && recordId && tableName) {
+    const uploadRecordId = recordId || attachmentStorageId
+    if (isEditing && !isReadOnly && tableId && uploadRecordId && tableName) {
       // Show attachment editor with upload capability
       return (
         <AttachmentFieldEditor
@@ -543,7 +547,7 @@ export default function InlineFieldEditor({
           onChange={onChange}
           onEditEnd={onEditEnd}
           tableId={tableId}
-          recordId={recordId}
+          recordId={uploadRecordId}
           tableName={tableName}
         />
       )

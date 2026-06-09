@@ -178,7 +178,7 @@ export function SocialMediaCalendarCore({
 }) {
   const blockConfig = config ?? undefined
   const { openRecordModal } = useRecordModal()
-  const { state: recordPanelState } = useRecordPanel()
+  const { openRecord, state: recordPanelState } = useRecordPanel()
   const {
     loading,
     error,
@@ -290,7 +290,7 @@ export function SocialMediaCalendarCore({
       const autoScoped = applyContentScope(
         allSocialItems,
         contentScope,
-        !isSocialPostsTable && socialFields?.contentType != null
+        socialFields?.contentType != null
       )
 
       if (contentScope !== "social_only" || !socialMarkerFieldName || !socialMarkerValue) {
@@ -386,11 +386,7 @@ export function SocialMediaCalendarCore({
     !!tableIds?.contentTableId
 
   const openPost = useCallback(
-    (
-      recordId: string | null,
-      scheduleDate?: string,
-      initialDrawerMode: "view" | "edit" = "view"
-    ) => {
+    (recordId: string | null, scheduleDate?: string) => {
       if (!tableIds) return
       if (
         recordId === null &&
@@ -400,7 +396,7 @@ export function SocialMediaCalendarCore({
       ) {
         return
       }
-      const common = {
+      openRecordModal({
         tableId: tableIds.contentTableId,
         supabaseTableName: tableIds.contentSupabaseTable,
         onRecordUpdated: reload,
@@ -409,29 +405,20 @@ export function SocialMediaCalendarCore({
         cascadeContext: recordPanelCascade,
         tableFields: contentTableFields,
         interfaceMode,
-        recordLayoutType: "social_post" as const,
-      }
-      if (recordId === null) {
-        openRecordModal({
-          ...common,
-          recordId: null,
-          initialDrawerMode: "edit",
-          initialData: buildSocialCalendarCreateInitialData({
-            config: blockConfig,
-            contentScope,
-            fields,
-            contentFields,
-            tableFields: contentTableFields,
-            scheduleDate,
-          }),
-        })
-      } else {
-        openRecordModal({
-          ...common,
-          recordId,
-          initialDrawerMode,
-        })
-      }
+        recordId,
+        recordLayoutType: "generic",
+        initialData:
+          recordId === null
+            ? buildSocialCalendarCreateInitialData({
+                config: blockConfig,
+                contentScope,
+                fields,
+                contentFields,
+                tableFields: contentTableFields,
+                scheduleDate,
+              })
+            : undefined,
+      })
     },
     [
       tableIds,
@@ -444,7 +431,6 @@ export function SocialMediaCalendarCore({
       contentFields,
       openRecordModal,
       interfaceMode,
-      isEditing,
       recordPanelState.isOpen,
       recordPanelState.recordId,
       recordPanelState.tableId,
@@ -462,10 +448,32 @@ export function SocialMediaCalendarCore({
   const handleSelectPost = useCallback(
     (id: string) => {
       setSelectedId(id)
-      if (isEditing) return
-      openPost(id, undefined, "view")
+      if (isEditing || !tableIds) return
+      openRecord(
+        tableIds.contentTableId,
+        id,
+        tableIds.contentSupabaseTable,
+        undefined,
+        undefined,
+        recordPanelCascade,
+        interfaceMode,
+        reload,
+        reload,
+        undefined,
+        undefined,
+        contentTableFields,
+        "generic"
+      )
     },
-    [isEditing, openPost]
+    [
+      isEditing,
+      tableIds,
+      openRecord,
+      recordPanelCascade,
+      interfaceMode,
+      reload,
+      contentTableFields,
+    ]
   )
 
   useEffect(() => {

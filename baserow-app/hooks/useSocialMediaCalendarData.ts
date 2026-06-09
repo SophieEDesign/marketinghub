@@ -151,9 +151,12 @@ export function useSocialMediaCalendarData(options?: {
           fieldIds
         )
 
+        const contentTableFieldRows = (fieldRows?.filter((f) => f.table_id === content.id) ||
+          []) as TableField[]
+
         const queryConfig = sanitizeSocialCalendarQueryConfig(
           config,
-          contentFieldRows,
+          contentTableFieldRows,
           content.name
         )
 
@@ -166,7 +169,7 @@ export function useSocialMediaCalendarData(options?: {
           applyMarketingBlockDataQuery(
             supabase.from(content.supabase_table).select("*").is("deleted_at", null),
             queryConfig,
-            contentFieldRows
+            contentTableFieldRows
           ),
           supabase
             .from(campaigns.supabase_table)
@@ -186,7 +189,7 @@ export function useSocialMediaCalendarData(options?: {
         setFields(fieldMap)
         setContentFields(contentFieldRows)
         setContentTableFields(
-          (fieldRows?.filter((f) => f.table_id === content.id) || []).map((f) => ({
+          contentTableFieldRows.map((f) => ({
             id: f.id,
             name: f.name,
             type: f.type,

@@ -20,7 +20,6 @@ function field(id: string, name: string): TableField {
 describe("custom block record drawer regression", () => {
   describe("recordLayoutType routing for custom blocks", () => {
     it.each([
-      ["components/interface/SocialMediaCalendarCore.tsx", 'recordLayoutType: "social_post"'],
       ["components/interface/EventCalendarCore.tsx", 'recordLayoutType: "event"'],
       ["components/interface/blocks/ThingsToDoBlock.tsx", 'recordLayoutType: "task"'],
       ["components/interface/blocks/CampaignsOverviewBlock.tsx", 'recordLayoutType: "campaign"'],
@@ -28,6 +27,12 @@ describe("custom block record drawer regression", () => {
     ])("maps %s to expected contextual type", (file, expected) => {
       const src = readSource(file)
       expect(src).toContain(expected)
+    })
+
+    it("keeps Social calendar on generic record panel (standard modal fields)", () => {
+      const src = readSource("components/interface/SocialMediaCalendarCore.tsx")
+      expect(src).toContain('recordLayoutType: "generic"')
+      expect(src).not.toContain('recordLayoutType: "social_post"')
     })
 
     it("keeps resource hub primary click as file URL and manage action as asset drawer", () => {

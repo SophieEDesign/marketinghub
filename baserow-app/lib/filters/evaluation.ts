@@ -11,6 +11,7 @@
 import type { FilterTree, FilterGroup, FilterCondition } from './canonical-model'
 import { normalizeFilterTree } from './canonical-model'
 import type { TableField, LinkedField } from '@/types/fields'
+import { resolveSelectFilterStoredValues } from '@/lib/fields/select-options'
 import { createClient } from '@/lib/supabase/client'
 import { getDisplayFieldNameForLinkedTable, getLinkedTableMetadataCached } from '@/lib/dataView/linkedFields'
 
@@ -303,10 +304,10 @@ function applyCondition(
 ): any {
   const { field_id, operator } = condition
   const value = resolveDateOnlyDynamicValue(condition.value)
-  const fieldName = field_id
   
   // Find field definition for field-aware filtering
   const field = tableFields?.find(f => f.name === field_id || f.id === field_id)
+  const fieldName = field?.name ?? field_id
   const fieldType = field?.type
 
   switch (operator) {
@@ -314,6 +315,16 @@ function applyCondition(
       if (fieldType === 'multi_select') {
         // Multi-select: check if array contains the value
         return query.filter(fieldName, 'cs', `{${String(value)}}`)
+      }
+      if (fieldType === 'single_select') {
+        const candidates = resolveSelectFilterStoredValues(
+          value,
+          'single_select',
+          field?.options
+        )
+        if (candidates.length === 0) return query.eq(fieldName, value)
+        if (candidates.length === 1) return query.eq(fieldName, candidates[0])
+        return query.in(fieldName, candidates)
       }
       if (fieldType === 'checkbox') {
         // Checkbox: convert boolean to string for Supabase

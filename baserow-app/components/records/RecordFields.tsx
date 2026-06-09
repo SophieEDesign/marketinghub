@@ -42,6 +42,8 @@ interface RecordFieldsProps {
   fieldGroups: Record<string, string[]>
   tableId: string
   recordId: string
+  /** Draft folder id for attachment uploads before the record row exists */
+  attachmentStorageId?: string
   isFieldEditable?: (fieldName: string) => boolean // Function to check if a field is editable
   tableName?: string // Supabase table name (optional, will be fetched if not provided)
   showFieldNames?: boolean // Show field titles above inputs (default true)
@@ -85,6 +87,7 @@ export default function RecordFields({
   fieldGroups,
   tableId,
   recordId,
+  attachmentStorageId,
   isFieldEditable = () => true, // Default to all fields editable if not provided
   tableName: propTableName,
   showFieldNames = true,
@@ -804,6 +807,7 @@ export default function RecordFields({
               showLabel={false}
               tableId={tableId}
               recordId={recordId}
+              attachmentStorageId={attachmentStorageId}
               tableName={tableName}
               disableClickToEdit={layoutMode}
               displayMode="list"

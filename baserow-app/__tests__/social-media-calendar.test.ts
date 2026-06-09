@@ -178,7 +178,7 @@ describe("parseContentMediaThumbnail", () => {
 })
 
 describe("sanitizeSocialCalendarQueryConfig", () => {
-  it("strips redundant post_type social filters on Social Posts table", () => {
+  it("keeps post_type filters on Social Posts table", () => {
     const config = sanitizeSocialCalendarQueryConfig(
       {
         filters: [{ field: "post_type", operator: "equal", value: "Social Post" }],
@@ -192,8 +192,19 @@ describe("sanitizeSocialCalendarQueryConfig", () => {
       [{ name: "post_type" }, { name: "status" }],
       "Social Posts"
     )
+    expect(config?.filters).toHaveLength(1)
+    expect((config as { filter_tree?: unknown })?.filter_tree).toBeTruthy()
+  })
+
+  it("strips redundant content_type social filters on Social Posts table", () => {
+    const config = sanitizeSocialCalendarQueryConfig(
+      {
+        filters: [{ field: "content_type", operator: "equal", value: "Social Media" }],
+      },
+      [{ name: "content_type" }],
+      "Social Posts"
+    )
     expect(config?.filters).toEqual([])
-    expect((config as { filter_tree?: unknown })?.filter_tree).toBeUndefined()
   })
 
   it("keeps post_type filters on mixed content tables", () => {
@@ -231,6 +242,15 @@ describe("applyContentScope", () => {
     const items = [
       makeItem({ id: "a", contentType: "Social Media" }),
       makeItem({ id: "b", contentType: "Blog", platforms: [] }),
+    ]
+    const social = applyContentScope(items, "social_only")
+    expect(social.map((i) => i.id)).toEqual(["a"])
+  })
+
+  it("filters editorial out when content type is a stored slug", () => {
+    const items = [
+      makeItem({ id: "a", contentType: "social_post" }),
+      makeItem({ id: "b", contentType: "editorial", platforms: [] }),
     ]
     const social = applyContentScope(items, "social_only")
     expect(social.map((i) => i.id)).toEqual(["a"])

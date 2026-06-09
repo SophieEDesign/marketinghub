@@ -238,7 +238,31 @@ async function getGroupIdByName(name) {
   return data?.[0]?.id || null
 }
 
-async function upsertPage({ name, aliases = [], page_type, group_id, order_index, saved_view_id, config }) {
+const ADMIN_ONLY_PAGE_NAMES = new Set([
+  "Marketing Home",
+  "Dashboard",
+  "Marketing Dashboard",
+  "Theme Workspace",
+  "Campaigns",
+  "Content Planning",
+  "Things To Do",
+])
+
+function pageIsAdminOnly(name) {
+  return ADMIN_ONLY_PAGE_NAMES.has(name)
+}
+
+async function upsertPage({
+  name,
+  aliases = [],
+  page_type,
+  group_id,
+  order_index,
+  saved_view_id,
+  config,
+  is_admin_only,
+}) {
+  const adminOnly = is_admin_only ?? pageIsAdminOnly(name)
   const lookupNames = [name, ...(aliases || [])]
   const { data: existingRows, error: eErr } = await supabase
     .from("interface_pages")
@@ -262,7 +286,7 @@ async function upsertPage({ name, aliases = [], page_type, group_id, order_index
         order_index,
         saved_view_id,
         config,
-        is_admin_only: false,
+        is_admin_only: adminOnly,
         is_hidden: false,
       })
       .eq("id", existing.id)
@@ -286,7 +310,7 @@ async function upsertPage({ name, aliases = [], page_type, group_id, order_index
       dashboard_layout_id: null,
       form_config_id: null,
       record_config_id: null,
-      is_admin_only: false,
+      is_admin_only: adminOnly,
       is_hidden: false,
     })
     .select("id")
@@ -1016,19 +1040,23 @@ async function archiveDeprecatedPages() {
 }
 
 async function applyMarketingNavPriority(pageIds) {
-  const orderedIds = [
-    pageIds.membersWelcome,
-    pageIds.home,
-    pageIds.theme,
-    pageIds.campaigns,
-    pageIds.content,
-    pageIds.thingsToDo,
-    pageIds.resourceHub,
-    pageIds.social,
-    pageIds.eventCalendar,
-  ].filter(Boolean)
-  for (let i = 0; i < orderedIds.length; i += 1) {
-    await supabase.from("interface_pages").update({ order_index: i, is_admin_only: false }).eq("id", orderedIds[i])
+  const ordered = [
+    { id: pageIds.membersWelcome, name: "Members Welcome" },
+    { id: pageIds.home, name: "Marketing Home" },
+    { id: pageIds.theme, name: "Theme Workspace" },
+    { id: pageIds.campaigns, name: "Campaigns" },
+    { id: pageIds.content, name: "Content Planning" },
+    { id: pageIds.thingsToDo, name: "Things To Do" },
+    { id: pageIds.resourceHub, name: "Resource Hub" },
+    { id: pageIds.social, name: "Social Calendar" },
+    { id: pageIds.eventCalendar, name: "Event Calendar" },
+  ].filter((entry) => entry.id)
+  for (let i = 0; i < ordered.length; i += 1) {
+    const { id, name } = ordered[i]
+    await supabase
+      .from("interface_pages")
+      .update({ order_index: i, is_admin_only: pageIsAdminOnly(name) })
+      .eq("id", id)
   }
 }
 
