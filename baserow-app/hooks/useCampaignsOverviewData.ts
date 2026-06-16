@@ -18,6 +18,7 @@ import {
   resolveCampaignOverviewFields,
 } from "@/lib/marketing/campaigns-overview-config"
 import { findCampaignsTable, type MarketingTableRow } from "@/lib/marketing/marketing-tables"
+import { applySoftDeleteFilter, fetchPhysicalColumns } from "@/lib/supabase/physical-columns"
 import {
   CAMPAIGNS_OVERVIEW_MOCK,
   parseProgress,
@@ -108,7 +109,9 @@ export function useCampaignsOverviewData(config?: BlockConfig): UseCampaignsOver
           campaignsOverviewOverridesFromConfig(config)
         )
 
+        const physicalColumns = await fetchPhysicalColumns(supabase, campaignsTable.supabase_table)
         let query = supabase.from(campaignsTable.supabase_table).select("*")
+        query = applySoftDeleteFilter(query, physicalColumns)
         query = applyMarketingBlockDataQuery(query, config, tableFields)
         query = query.limit(campaignsOverviewMaxItems(config))
 

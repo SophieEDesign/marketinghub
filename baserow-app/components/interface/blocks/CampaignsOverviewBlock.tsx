@@ -160,6 +160,64 @@ export default function CampaignsOverviewBlock({
   const updateFilter = (key: keyof CampaignOverviewFilters, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }))
   }
+  const openCampaignRecord = (item: CampaignOverviewItem) => {
+    if (isEditing || clickAction === "none") return
+    if (!item.recordTableId || !item.recordSupabaseTable) return
+    openRecordModal({
+      tableId: item.recordTableId,
+      recordId: item.id,
+      supabaseTableName: item.recordSupabaseTable,
+      interfaceMode,
+      recordLayoutType: "campaign",
+    })
+  }
+  const dateGroupedItems = useMemo(() => {
+    const monthLabel = (date: Date) =>
+      date.toLocaleDateString("en-GB", { month: "long", year: "numeric" })
+    const grouped = new Map<string, CampaignOverviewItem[]>()
+    const noDate: CampaignOverviewItem[] = []
+
+    for (const item of filteredItems) {
+      const rawDate = item.startDate || item.endDate
+      if (!rawDate) {
+        noDate.push(item)
+        continue
+      }
+      const parsed = new Date(rawDate)
+      if (Number.isNaN(parsed.getTime())) {
+        noDate.push(item)
+        continue
+      }
+      const key = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}`
+      if (!grouped.has(key)) grouped.set(key, [])
+      grouped.get(key)!.push(item)
+    }
+
+    const ordered = Array.from(grouped.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, list]) => ({
+        key,
+        label: monthLabel(new Date(`${key}-01`)),
+        items: [...list].sort((a, b) => {
+          const aDate = new Date(a.startDate || a.endDate || "").getTime()
+          const bDate = new Date(b.startDate || b.endDate || "").getTime()
+          return aDate - bDate
+        }),
+      }))
+
+    if (noDate.length > 0) {
+      ordered.push({ key: "no-date", label: "No scheduled date", items: noDate })
+    }
+    return ordered
+  }, [filteredItems])
+
+  const timelineItems = useMemo(() => {
+    return [...filteredItems].sort((a, b) => {
+      const aDate = new Date(a.startDate || a.endDate || "9999-12-31").getTime()
+      const bDate = new Date(b.startDate || b.endDate || "9999-12-31").getTime()
+      return aDate - bDate
+    })
+  }, [filteredItems])
 
   if (loading) {
     return (
@@ -247,9 +305,10 @@ export default function CampaignsOverviewBlock({
         </div>
       ) : null}
 
-      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border/40 p-3">
-        {config?.campaigns_show_filters !== false
-          ? [
+      <div className="flex shrink-0 items-start gap-3 border-b border-border/40 p-3">
+        {config?.campaigns_show_filters !== false ? (
+          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto pb-1">
+            {[
               ["Status", "status", options.status],
               ["Stage", "stage", options.stage],
               ["Type", "campaignType", options.type],
@@ -257,27 +316,29 @@ export default function CampaignsOverviewBlock({
               ["Owner", "owner", options.owner],
               ["Priority", "priority", options.priority],
             ].map(([label, key, list]) => (
-              <Select
-                key={String(key)}
-                value={filters[key as keyof CampaignOverviewFilters]}
-                onValueChange={(value) =>
-                  updateFilter(key as keyof CampaignOverviewFilters, value)
-                }
-              >
-                <SelectTrigger className="h-8 min-w-[120px] rounded-md border border-border/50 bg-background px-2 text-xs">
-                  <SelectValue placeholder={`${label}: All`} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{label}: All</SelectItem>
-                  {(list as string[]).map((v) => (
-                    <SelectItem key={v} value={v}>
-                      {v}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ))
-          : null}
+              <div key={String(key)} className="shrink-0">
+                <Select
+                  value={filters[key as keyof CampaignOverviewFilters]}
+                  onValueChange={(value) =>
+                    updateFilter(key as keyof CampaignOverviewFilters, value)
+                  }
+                >
+                  <SelectTrigger className="h-8 w-[150px] rounded-md border border-border/50 bg-background px-2 text-xs">
+                    <SelectValue placeholder={`${label}: All`} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{label}: All</SelectItem>
+                    {(list as string[]).map((v) => (
+                      <SelectItem key={v} value={v}>
+                        {v}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ))}
+          </div>
+        ) : null}
         <div className="ml-auto flex items-center gap-2">
           {(["list", "kanban", "calendar", "timeline"] as CampaignView[]).map((mode) => (
             <Button
@@ -327,17 +388,7 @@ export default function CampaignsOverviewBlock({
                         "cursor-pointer border-b border-border/20 transition-colors even:bg-muted/[0.06] hover:bg-muted/30",
                         dense ? "h-10" : "h-14"
                       )}
-                      onClick={() => {
-                        if (isEditing || clickAction === "none") return
-                        if (!item.recordTableId || !item.recordSupabaseTable) return
-                        openRecordModal({
-                          tableId: item.recordTableId,
-                          recordId: item.id,
-                          supabaseTableName: item.recordSupabaseTable,
-                          interfaceMode,
-                          recordLayoutType: "campaign",
-                        })
-                      }}
+                      onClick={() => openCampaignRecord(item)}
                     >
                       <td className="px-4 py-2">
                         <div className="flex items-center gap-2">
@@ -375,7 +426,7 @@ export default function CampaignsOverviewBlock({
               </table>
             </div>
           ))
-        ) : (
+        ) : view === "kanban" ? (
           <div className="space-y-4 p-4">
             {groupedItems.map((group) => (
               <div key={group.label}>
@@ -384,22 +435,12 @@ export default function CampaignsOverviewBlock({
                     {group.label} ({group.items.length})
                   </h3>
                 ) : null}
-                <div className={cn("grid gap-3", view === "kanban" ? "md:grid-cols-3" : "md:grid-cols-2")}>
+                <div className="grid gap-3 md:grid-cols-3">
                   {group.items.map((item) => (
                     <div
                       key={item.id}
                       className="cursor-pointer rounded-lg border border-border/40 bg-muted/10 p-3 hover:bg-muted/20"
-                      onClick={() => {
-                        if (isEditing || clickAction === "none") return
-                        if (!item.recordTableId || !item.recordSupabaseTable) return
-                        openRecordModal({
-                          tableId: item.recordTableId,
-                          recordId: item.id,
-                          supabaseTableName: item.recordSupabaseTable,
-                          interfaceMode,
-                          recordLayoutType: "campaign",
-                        })
-                      }}
+                      onClick={() => openCampaignRecord(item)}
                     >
                       <p className="text-sm font-semibold">{item.title}</p>
                       <div className="mt-2 flex flex-wrap gap-1.5">
@@ -421,6 +462,63 @@ export default function CampaignsOverviewBlock({
                 </div>
               </div>
             ))}
+          </div>
+        ) : view === "calendar" ? (
+          <div className="space-y-4 p-4">
+            {dateGroupedItems.map((group) => (
+              <div key={group.key} className="rounded-xl border border-border/40 bg-muted/5">
+                <div className="border-b border-border/30 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {group.label} ({group.items.length})
+                </div>
+                <div className="grid gap-3 p-3 md:grid-cols-2">
+                  {group.items.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="rounded-lg border border-border/40 bg-background p-3 text-left transition-colors hover:bg-muted/20"
+                      onClick={() => openCampaignRecord(item)}
+                    >
+                      <p className="text-sm font-semibold">{item.title}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {formatDateRange(item.startDate, item.endDate)}
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        <CampaignValuePill value={item.status} />
+                        <CampaignValuePill value={item.stage} />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-3 p-4">
+            {timelineItems.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className="w-full rounded-lg border border-border/40 bg-background p-3 text-left transition-colors hover:bg-muted/20"
+                onClick={() => openCampaignRecord(item)}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm font-semibold">{item.title}</p>
+                  <span className="text-xs text-muted-foreground">
+                    {formatDateRange(item.startDate, item.endDate)}
+                  </span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <CampaignValuePill value={item.status} />
+                  <CampaignValuePill value={item.priority} />
+                  <CampaignValuePill value={item.owner} />
+                </div>
+              </button>
+            ))}
+            {timelineItems.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border/50 p-6 text-center text-sm text-muted-foreground">
+                No campaigns match the current filters.
+              </div>
+            ) : null}
           </div>
         )}
       </div>
