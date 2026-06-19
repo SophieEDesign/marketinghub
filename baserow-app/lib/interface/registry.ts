@@ -798,9 +798,9 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
     defaultConfig: {
       title: 'Welcome to the Peters & May Marketing Hub',
       subtitle:
-        'Access shared events, useful resources and collaboration tools in one place.',
+        'Your events, resources and collaboration tools — all in one place.',
       members_welcome_body:
-        'Use this space to view upcoming events, manage your attendance, access approved documents and stay aligned with relevant activity.',
+        'View upcoming activity and update your attendance under Events. Find approved logos, documents and media in the Resource Hub. Got an event to suggest or need a hand? Get in touch with the team.',
       members_welcome_show_quick_actions: true,
       members_welcome_max_events: 5,
       members_welcome_max_resources: 5,

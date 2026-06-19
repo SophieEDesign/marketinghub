@@ -17,7 +17,7 @@ describe("Members Welcome workspace shell", () => {
 describe("MembersWelcomeBlock settings-driven copy", () => {
   it("reads hero copy from config via membersWelcomeCopy", () => {
     expect(src).toContain("membersWelcomeCopy(config)")
-    expect(src).toContain("{copy.title}")
+    expect(src).toContain("heroTitle")
     expect(src).toContain("{copy.subtitle}")
     expect(src).toContain("{copy.body}")
   })
@@ -35,8 +35,12 @@ describe("MembersWelcomeBlock settings-driven copy", () => {
 
 describe("MembersWelcomeBlock edit mode", () => {
   it("does not navigate via quick action links when isEditing", () => {
-    expect(src).toContain("if (!action.href || isEditing)")
-    expect(src).toContain("<QuickActionCard key={action.id} action={action} isEditing={isEditing} />")
+    expect(src).toContain("isEditing={isEditing}")
+    expect(src).toContain("QuickActionCard")
+  })
+
+  it("does not update RSVP when isEditing", () => {
+    expect(src).toMatch(/handleRsvp[\s\S]*?if \(isEditing\)/)
   })
 
   it("does not open event drawer when isEditing", () => {

@@ -5,8 +5,10 @@ import {
   filterMembersWelcomeEvents,
   filterMembersWelcomeResources,
   attendanceDisplayLabel,
-  isUpcomingEvent,
+  countAttendingEvents,
   membersWelcomeCopy,
+  membersWelcomeGreeting,
+  isUpcomingEvent,
   MEMBERS_WELCOME_DEFAULT_COPY,
   MEMBERS_WELCOME_LEGACY_TITLE,
 } from "@/lib/marketing/members-welcome"
@@ -88,7 +90,23 @@ describe("members-welcome helpers", () => {
 
   it("maps attendance labels for members", () => {
     expect(attendanceDisplayLabel("attending")).toBe("Attending")
+    expect(attendanceDisplayLabel("not_attending")).toBe("Can't go")
     expect(attendanceDisplayLabel(null)).toBe("Not responded")
+  })
+
+  it("builds time-of-day greeting", () => {
+    expect(membersWelcomeGreeting("Sarah", new Date("2026-06-19T09:00:00"))).toBe(
+      "Good morning, Sarah"
+    )
+  })
+
+  it("counts attending events", () => {
+    expect(
+      countAttendingEvents([
+        sampleEvent({ id: "1", eventName: "A", currentUserAttendanceStatus: "attending" }),
+        sampleEvent({ id: "2", eventName: "B", currentUserAttendanceStatus: "maybe" }),
+      ])
+    ).toBe(1)
   })
 })
 

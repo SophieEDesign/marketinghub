@@ -54,7 +54,7 @@ export default function ResourceGrid({
   }
 
   return (
-    <div className="space-y-4 p-4 md:p-5">
+    <div className="space-y-6 p-4 md:p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium text-[#1f2a44]">
           {resources.length} resource{resources.length === 1 ? "" : "s"}
@@ -92,12 +92,14 @@ export default function ResourceGrid({
       </div>
 
       {showFeatured && featured.length > 0 ? (
-        <section aria-label="Pinned essentials">
-          <div className="mb-3 flex items-center gap-2">
+        <section aria-label="Pinned essentials" className="space-y-4">
+          <div className="flex items-center gap-2">
             <List className="h-4 w-4 text-[#c4a574]" />
-            <h3 className="text-sm font-semibold text-[#1f2a44]">Pinned essentials</h3>
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-[#1f2a44]">
+              Pinned essentials
+            </h3>
           </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {featured.map((r) => (
               <ResourceCard
                 key={`featured-${r.id}`}
@@ -111,7 +113,16 @@ export default function ResourceGrid({
         </section>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
+      {showFeatured && featured.length > 0 ? (
+        <div className="flex items-center gap-2 pt-1">
+          <Grid3X3 className="h-4 w-4 text-[#9aa1ab]" />
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-[#1f2a44]">
+            All resources
+          </h3>
+        </div>
+      ) : null}
+
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-2">
         {resources.map((r) => (
           <ResourceCard
             key={r.id}
