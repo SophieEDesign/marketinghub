@@ -13,6 +13,7 @@ import {
   Star,
   Tag,
   User,
+  X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -42,6 +43,7 @@ interface DetailPanelProps {
   onCopyLink: () => void
   onEditDetails?: () => void
   onSelectVariant?: (id: string) => void
+  onClose?: () => void
   className?: string
 }
 
@@ -130,9 +132,19 @@ export default function DetailPanel({
   onCopyLink,
   onEditDetails,
   onSelectVariant,
+  onClose,
   className,
 }: DetailPanelProps) {
   const [activeTab, setActiveTab] = useState("details")
+
+  useEffect(() => {
+    if (!resource || !onClose) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose()
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [resource, onClose])
 
   const displayVariants = useMemo(() => {
     if (!resource) return []
@@ -170,16 +182,7 @@ export default function DetailPanel({
     resource?.usage?.match(/^table:[0-9a-f-]{36}$/i) ? "Linked in Marketing Hub" : resource?.usage
 
   if (!resource) {
-    return (
-      <aside
-        className={cn(
-          "flex w-full shrink-0 flex-col items-center justify-center border-t border-border/60 bg-muted/5 p-6 text-center md:w-[320px] md:border-l md:border-t-0",
-          className
-        )}
-      >
-        <p className="text-sm text-muted-foreground">Select a resource to view details</p>
-      </aside>
-    )
+    return null
   }
 
   const hubLabel = categoryLabel(resource.category)
@@ -188,11 +191,12 @@ export default function DetailPanel({
   return (
     <aside
       className={cn(
-        "flex w-full shrink-0 flex-col border-t border-border/60 bg-background md:w-[320px] md:border-l md:border-t-0",
+        "flex w-full max-w-[392px] shrink-0 flex-col border-[#e4e7ec] bg-white shadow-[-12px_0_40px_rgba(15,28,43,0.22)]",
         className
       )}
     >
-      <div className="shrink-0 border-b border-border/60 px-4 py-3">
+      <div className="h-[3px] shrink-0 bg-gradient-to-r from-[#c4a574] to-[#b08d52]" />
+      <div className="shrink-0 border-b border-[#eef1f4] px-4 py-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <h3 className="text-base font-semibold leading-snug text-[#1f2a44] break-words">
@@ -227,6 +231,18 @@ export default function DetailPanel({
                 )}
               />
             </Button>
+            {onClose ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={onClose}
+                aria-label="Close detail panel"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            ) : null}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button type="button" variant="ghost" size="icon" className="h-8 w-8">

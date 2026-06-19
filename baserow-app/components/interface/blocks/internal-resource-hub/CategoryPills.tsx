@@ -25,7 +25,7 @@ export default function CategoryPills({
   return (
     <div
       className={cn(
-        "flex gap-2 overflow-x-auto border-b border-[#e4e7ec] bg-white px-3 py-2 md:hidden",
+        "flex gap-2 overflow-x-auto border-b border-[#e4e7ec] bg-white px-4 py-3 md:px-8",
         className
       )}
     >

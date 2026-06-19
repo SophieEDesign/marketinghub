@@ -50,7 +50,7 @@ import {
 import type { MockResource } from "@/components/interface/blocks/internal-resource-hub/types"
 import DashboardEmpty from "@/components/interface/primitives/DashboardEmpty"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/components/ui/use-toast"
 import { cn } from "@/lib/utils"
 
 interface MembersWelcomeBlockProps {

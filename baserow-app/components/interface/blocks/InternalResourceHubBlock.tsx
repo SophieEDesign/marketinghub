@@ -19,10 +19,8 @@ import { FilterResultsAnnouncer } from "@/components/a11y/FilterResultsAnnouncer
 import DashboardEmpty from "@/components/interface/primitives/DashboardEmpty"
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 import HubHeader from "./internal-resource-hub/HubHeader"
-import CategorySidebar from "./internal-resource-hub/CategorySidebar"
 import CategoryPills from "./internal-resource-hub/CategoryPills"
 import ResourceGrid from "./internal-resource-hub/ResourceGrid"
-import AssetPreviewView from "./internal-resource-hub/AssetPreviewView"
 import DetailPanel from "./internal-resource-hub/DetailPanel"
 import {
   MARKETING_HOME_MOCK_RESOURCES,
@@ -33,12 +31,9 @@ import {
   countByCategory,
   filterResources,
   getFeatured,
-  getRecent,
   getVariants,
   hasActiveFilters,
-  parseAttachmentVariantKey,
   parseDefaultCategory,
-  resolveDisplayResource,
   sortResources,
   type ResourceSortMode,
 } from "./internal-resource-hub/utils"
@@ -74,9 +69,6 @@ export default function InternalResourceHubBlock({
     "Access official logos, brand assets, images and documents for internal use."
   const showSearch = config.resource_hub_show_search !== false
   const showFilters = config.resource_hub_show_filters !== false
-  const showRecent = config.resource_hub_show_recent !== false
-  const showUploadArea =
-    config.resource_hub_show_upload !== false && isEditing
   const layoutMode = config.resource_hub_layout_mode || "gallery"
   const isListLayout = layoutMode === "list"
   const forceMock = isMarketingMockEnabled(
@@ -101,7 +93,6 @@ export default function InternalResourceHubBlock({
   )
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [selectedAttachmentIndex, setSelectedAttachmentIndex] = useState(0)
   const [favourites, setFavourites] = useState<Set<string>>(() => new Set())
   const [sortMode, setSortMode] = useState<ResourceSortMode>("recent")
 
@@ -160,7 +151,6 @@ export default function InternalResourceHubBlock({
     return filtered.filter((r) => !featuredIds.has(r.id))
   }, [filtered, featured, showFeaturedRow])
   const filtersActive = hasActiveFilters(category, searchQuery)
-  const recent = useMemo(() => getRecent(resources), [resources])
   const selected = useMemo(
     () => resources.find((r) => r.id === selectedId) ?? null,
     [resources, selectedId]
@@ -169,8 +159,6 @@ export default function InternalResourceHubBlock({
     () => (selected ? getVariants(resources, selected) : []),
     [resources, selected]
   )
-
-  const showPreview = selectedId !== null && selected !== null
 
   const handleSelect = useCallback(
     (id: string) => {
@@ -203,10 +191,6 @@ export default function InternalResourceHubBlock({
     setSearchQuery("")
   }, [])
 
-  const noticeText =
-    config.resource_hub_internal_notice ||
-    "For internal use only. Please follow brand guidelines in all communications."
-
   const heroImageUrl =
     typeof config.resource_hub_hero_url === "string" && config.resource_hub_hero_url.trim()
       ? config.resource_hub_hero_url.trim()
@@ -237,7 +221,7 @@ export default function InternalResourceHubBlock({
     [isEditing, tableIds, openRecordModal, interfaceMode, reload]
   )
 
-  const showSideDetailPanel = showDetailPanel && !isRecordModalOpen
+  const showSideDetailPanel = showDetailPanel && !isRecordModalOpen && selected !== null
 
   const canCreateResource =
     effectiveRole === "admin" &&
@@ -372,66 +356,45 @@ export default function InternalResourceHubBlock({
         />
       ) : null}
 
-      <div
+      <main
         className={cn(
-          "flex min-h-0 flex-1 flex-col md:flex-row md:min-h-0",
-          isFullPage && "h-full"
+          "min-h-0 flex-1 bg-[#eceef1]",
+          marketingBlockScrollPanelClass(isFullPage) || "overflow-y-auto"
         )}
       >
-        {showFilters ? (
-          <CategorySidebar
-            className={cn("hidden md:flex", isFullPage && "h-full min-h-0")}
-            category={category}
-            counts={counts}
-            recent={recent}
-            noticeText={noticeText}
-            showRecent={showRecent}
-            onCategoryChange={setCategory}
-            onSelectResource={handleSelect}
+        <ResourceGrid
+          resources={gridResources}
+          featured={featured}
+          favourites={favourites}
+          category={category}
+          totalCount={filteredBase.length}
+          sortMode={sortMode}
+          onSortModeChange={setSortMode}
+          showFeatured={showFeaturedRow}
+          onSelect={handleSelect}
+          onToggleFavourite={toggleFavouriteById}
+          onClearFilters={clearFilters}
+          hasActiveFilters={filtersActive}
+        />
+      </main>
+
+      {showSideDetailPanel && selected ? (
+        <>
+          <button
+            type="button"
+            className="fixed inset-0 z-40 bg-[#0f1c2b]/40 md:left-64"
+            onClick={handleBack}
+            aria-label="Close resource details"
           />
-        ) : null}
-
-        <main
-          className={cn(
-            "min-h-0 flex-1 bg-[#eceef1]",
-            marketingBlockScrollPanelClass(isFullPage) || "overflow-y-auto"
-          )}
-        >
-          {showPreview && selected ? (
-            <AssetPreviewView
-              resource={selected}
-              variants={variants}
-              selectedId={selectedId!}
-              showUpload={showUploadArea}
-              isEditing={isEditing}
-              onBack={handleBack}
-              onSelectVariant={handleSelect}
-            />
-          ) : (
-            <ResourceGrid
-              resources={gridResources}
-              featured={featured}
-              favourites={favourites}
-              sortMode={sortMode}
-              onSortModeChange={setSortMode}
-              showFeatured={showFeaturedRow}
-              onSelect={handleSelect}
-              onToggleFavourite={toggleFavouriteById}
-              onClearFilters={clearFilters}
-              hasActiveFilters={filtersActive}
-            />
-          )}
-        </main>
-
-        {showSideDetailPanel ? (
           <DetailPanel
-            resource={showPreview ? selected : null}
-            variants={showPreview ? variants : []}
+            resource={selected}
+            variants={variants}
             selectedId={selectedId}
             isFavourite={selectedId ? favourites.has(selectedId) : false}
             isEditing={isEditing}
             onToggleFavourite={toggleFavourite}
             onSelectVariant={handleSelect}
+            onClose={handleBack}
             onDownload={() => {
               if (isEditing) return
               if (selected?.url) window.open(selected.url, "_blank", "noopener,noreferrer")
@@ -454,13 +417,10 @@ export default function InternalResourceHubBlock({
                 ? () => handleEditResourceDetails(selectedId)
                 : undefined
             }
-            className={cn(
-              showPreview ? undefined : "hidden md:flex",
-              isFullPage && "md:h-full md:min-h-0 md:overflow-y-auto"
-            )}
+            className="fixed right-0 top-0 bottom-0 z-50 h-full max-h-screen w-full max-w-[392px] overflow-hidden"
           />
-        ) : null}
-      </div>
+        </>
+      ) : null}
     </div>
   )
 }
