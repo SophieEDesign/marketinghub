@@ -25,9 +25,14 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
-import type { EventCalendarViewMode } from "@/lib/marketing/events"
+import {
+  accentBackground,
+  eventTypeAccentColor,
+  type EventCalendarViewMode,
+} from "@/lib/marketing/events"
 
-const FILTER_CONTROL = "h-8 text-xs border-border/40 bg-background"
+const FILTER_CONTROL =
+  "h-[34px] text-xs border-[#d4d7dc] bg-white text-[#1f2a44] rounded-lg shadow-none"
 
 const VIEW_OPTIONS: {
   value: EventCalendarViewMode
@@ -154,84 +159,41 @@ export default function EventCalendarToolbar({
   const filtersVisible = showFilters && (showFiltersRow || filtersExpanded)
 
   return (
-    <div className="flex flex-col gap-3 shrink-0">
+    <div className="flex flex-col gap-2.5 shrink-0 rounded-[13px] border border-[#e4e7ec] bg-white px-3 py-2.5">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         {title ? (
-          <h2 className="text-lg font-semibold text-foreground tracking-tight shrink-0">{title}</h2>
+          <h2 className="text-lg font-semibold text-[#1f2a44] tracking-tight shrink-0 lg:hidden">
+            {title}
+          </h2>
         ) : null}
 
-        <div className="flex flex-wrap items-center gap-2 lg:flex-1 lg:justify-center min-w-0">
-          <div
-            className="inline-flex rounded-lg border border-border/50 bg-muted/30 p-0.5 shrink-0"
-            role="tablist"
-            aria-label="Calendar view"
-          >
-            {VIEW_OPTIONS.map((opt) => {
-              const Icon = opt.icon
-              const active = viewMode === opt.value
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => onViewModeChange(opt.value)}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
-                    active
-                      ? "bg-accent-link/12 text-accent-link shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  {opt.label}
-                </button>
-              )
-            })}
-          </div>
-          {filtersVisible ? (
-            <div className="flex flex-row flex-wrap items-center gap-2 min-w-0">
-              <FilterSelect
-                label="Event type"
-                options={eventTypes}
-                value={filterEventType}
-                onChange={onFilterEventType}
-                placeholder="All event types"
-              />
-              <FilterSelect
-                label="Location"
-                options={locations}
-                value={filterLocation}
-                onChange={onFilterLocation}
-                placeholder="All locations"
-              />
-              <FilterSelect
-                label="Status"
-                options={statuses}
-                value={filterStatus}
-                onChange={onFilterStatus}
-                placeholder="All statuses"
-              />
-              {filtersExpanded && owners.length > 0 ? (
-                <FilterSelect
-                  label="Owner"
-                  options={owners}
-                  value={filterOwner}
-                  onChange={onFilterOwner}
-                  placeholder="All owners"
-                />
-              ) : null}
-              {hasActiveFilters && onClearFilters ? (
-                <button
-                  type="button"
-                  onClick={onClearFilters}
-                  className="text-xs font-medium text-accent-link hover:underline shrink-0"
-                >
-                  Clear
-                </button>
-              ) : null}
-            </div>
-          ) : null}
+        <div
+          className="inline-flex gap-0.5 rounded-[9px] bg-[#f1f3f6] p-0.5 shrink-0"
+          role="tablist"
+          aria-label="Calendar view"
+        >
+          {VIEW_OPTIONS.map((opt) => {
+            const Icon = opt.icon
+            const active = viewMode === opt.value
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => onViewModeChange(opt.value)}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-[7px] px-3 py-2 text-[12.5px] font-semibold transition-[background,color,box-shadow]",
+                  active
+                    ? "bg-white text-[#005b8f] shadow-[0_1px_3px_rgba(31,42,68,0.08)]"
+                    : "text-[#9aa1ab] hover:text-[#1f2a44]"
+                )}
+              >
+                <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                {opt.label}
+              </button>
+            )
+          })}
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5 shrink-0 lg:justify-end">
@@ -239,7 +201,7 @@ export default function EventCalendarToolbar({
             type="button"
             variant="outline"
             size="sm"
-            className="h-8 text-xs font-medium"
+            className={cn(FILTER_CONTROL, "px-3 font-semibold hover:bg-[#fafbfc]")}
             onClick={onToday}
           >
             Today
@@ -248,21 +210,11 @@ export default function EventCalendarToolbar({
             type="button"
             variant="outline"
             size="icon"
-            className="h-8 w-8"
+            className={cn(FILTER_CONTROL, "w-[34px] px-0")}
             onClick={onPrev}
             aria-label="Previous period"
           >
             <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="h-8 w-8"
-            onClick={onNext}
-            aria-label="Next period"
-          >
-            <ChevronRight className="h-4 w-4" />
           </Button>
           <Select
             value={monthValue}
@@ -275,7 +227,13 @@ export default function EventCalendarToolbar({
               }
             }}
           >
-            <SelectTrigger className={cn(FILTER_CONTROL, "w-[148px] font-semibold")} aria-label="Month">
+            <SelectTrigger
+              className={cn(
+                FILTER_CONTROL,
+                "min-w-[150px] border-transparent bg-transparent font-semibold text-sm text-[#1f2a44] shadow-none hover:bg-transparent focus:ring-0"
+              )}
+              aria-label="Month"
+            >
               <SelectValue>{format(cursorDate, "MMMM yyyy")}</SelectValue>
             </SelectTrigger>
             <SelectContent className="max-h-64">
@@ -286,12 +244,22 @@ export default function EventCalendarToolbar({
               ))}
             </SelectContent>
           </Select>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className={cn(FILTER_CONTROL, "w-[34px] px-0")}
+            onClick={onNext}
+            aria-label="Next period"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
           {showFilters ? (
             <Button
               type="button"
               variant={filtersExpanded ? "secondary" : "outline"}
               size="sm"
-              className="h-8 gap-1.5 text-xs font-medium ml-0.5"
+              className={cn(FILTER_CONTROL, "gap-1.5 font-semibold ml-0.5")}
               onClick={() => setFiltersExpanded((v) => !v)}
               aria-expanded={filtersExpanded}
             >
@@ -302,6 +270,93 @@ export default function EventCalendarToolbar({
         </div>
       </div>
 
+      {showFilters && showFiltersRow && eventTypes.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-1.5 border-t border-[#f3f5f8] pt-2.5">
+          <button
+            type="button"
+            onClick={() => onFilterEventType("all")}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11.5px] font-semibold transition-colors",
+              filterEventType === "all"
+                ? "border-[#cfe2ee] bg-[#e8f1f7] text-[#005b8f]"
+                : "border-[#e4e7ec] bg-white text-[#6b7280] hover:border-[#d4d7dc]"
+            )}
+          >
+            All types
+          </button>
+          {eventTypes.map((type) => {
+            const color = eventTypeAccentColor(type)
+            const tint = accentBackground(color)
+            const active = filterEventType === type
+            return (
+              <button
+                key={type}
+                type="button"
+                onClick={() => onFilterEventType(active ? "all" : type)}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11.5px] font-semibold transition-colors",
+                  active
+                    ? "shadow-sm"
+                    : "border-[#e4e7ec] bg-white text-[#6b7280] hover:border-[#d4d7dc]"
+                )}
+                style={
+                  active
+                    ? {
+                        backgroundColor: tint,
+                        borderColor: `${color}44`,
+                        color,
+                      }
+                    : undefined
+                }
+              >
+                <span
+                  className="h-[7px] w-[7px] shrink-0 rounded-full"
+                  style={{ backgroundColor: color }}
+                  aria-hidden
+                />
+                {type}
+              </button>
+            )
+          })}
+        </div>
+      ) : null}
+
+      {filtersVisible && (locations.length > 0 || statuses.length > 0 || filtersExpanded) ? (
+        <div className="flex flex-row flex-wrap items-center gap-2 border-t border-[#f3f5f8] pt-2.5">
+          <FilterSelect
+            label="Location"
+            options={locations}
+            value={filterLocation}
+            onChange={onFilterLocation}
+            placeholder="All locations"
+          />
+          <FilterSelect
+            label="Status"
+            options={statuses}
+            value={filterStatus}
+            onChange={onFilterStatus}
+            placeholder="All statuses"
+          />
+          {filtersExpanded && owners.length > 0 ? (
+            <FilterSelect
+              label="Owner"
+              options={owners}
+              value={filterOwner}
+              onChange={onFilterOwner}
+              placeholder="All owners"
+            />
+          ) : null}
+          {hasActiveFilters && onClearFilters ? (
+            <button
+              type="button"
+              onClick={onClearFilters}
+              className="text-xs font-semibold text-[#005b8f] hover:underline shrink-0"
+            >
+              Clear
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   )
 }

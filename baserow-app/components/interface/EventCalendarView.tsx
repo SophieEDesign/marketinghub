@@ -104,7 +104,7 @@ export default function EventCalendarView({
 
   if (viewMode === "list") {
     return (
-      <div className={cn("overflow-hidden flex-1 rounded-xl border border-border/40 bg-card", panelMinH, className)}>
+      <div className={cn("overflow-hidden flex-1 rounded-2xl border border-[#e4e7ec] bg-white", panelMinH, className)}>
         <EventListView
           items={items}
           selectedId={selectedId}
@@ -135,7 +135,7 @@ export default function EventCalendarView({
   return (
     <div
       className={cn(
-        "flex-1 rounded-xl border border-border/40 bg-card shadow-sm w-full min-h-0 overflow-x-hidden overflow-y-auto",
+        "flex-1 rounded-2xl border border-[#e4e7ec] bg-white shadow-[0_1px_2px_rgba(31,42,68,0.04)] w-full min-h-0 overflow-x-hidden overflow-y-auto",
         panelMinH,
         isEditing && "pointer-events-none opacity-90",
         className

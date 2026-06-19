@@ -930,11 +930,12 @@
   padding: 0.18rem 0.22rem;
 }
 
-/* Event Calendar — marketing month grid (white cards, purple today) */
+/* Event Calendar — Harbour × Marque month/week grid */
 .calendar-embed--events .fc {
-  --fc-border-color: hsl(var(--border) / 0.35);
+  --fc-border-color: #f3f5f8;
   --fc-page-bg-color: transparent;
-  --fc-today-bg-color: hsl(var(--accent-link) / 0.06);
+  --fc-today-bg-color: transparent;
+  --fc-neutral-bg-color: #fafbfc;
 }
 
 /*
@@ -960,54 +961,66 @@
 }
 
 .calendar-embed--events .fc .fc-scrollgrid {
-  border: 1px solid hsl(var(--border) / 0.35);
-  border-radius: 0.625rem;
+  border: 1px solid #e4e7ec;
+  border-radius: 1rem;
+}
+
+.calendar-embed--events .fc .fc-scrollgrid-section > * {
+  border-color: #f3f5f8;
 }
 
 .calendar-embed--events .fc .fc-col-header-cell {
-  background: transparent;
-  border-color: hsl(var(--border) / 0.35);
+  background: #fff;
+  border-color: #eef1f4;
 }
 
 .calendar-embed--events .fc .fc-col-header-cell-cushion {
-  padding: 0.5rem 0.25rem;
-  font-size: 0.65rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  padding: 0.65rem 0.4rem;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9aa1ab;
 }
 
 .calendar-embed--events .fc .fc-daygrid-day-top {
   display: flex;
   flex-direction: row;
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .calendar-embed--events .fc .fc-daygrid-day-number {
-  font-size: 0.75rem;
+  font-size: 12px;
   font-weight: 500;
-  color: hsl(var(--foreground));
-  padding: 0.25rem 0.35rem;
+  color: #1f2a44;
+  padding: 0.2rem 0.35rem;
+}
+
+.calendar-embed--events .fc .fc-day-other {
+  background: #fafbfc;
 }
 
 .calendar-embed--events .fc .fc-day-other .fc-daygrid-day-number {
-  color: hsl(var(--muted-foreground) / 0.45);
+  color: #c7ccd4;
+  font-weight: 500;
 }
 
 .calendar-embed--events .fc .fc-day-sunday .fc-daygrid-day-number {
-  color: #ef4444;
+  color: #1f2a44;
 }
 
 .calendar-embed--events .fc .fc-day-today .fc-daygrid-day-number {
-  background-color: hsl(var(--accent-link));
-  color: white;
+  background-color: #005b8f;
+  color: #fff;
   border-radius: 9999px;
-  width: 1.625rem;
-  height: 1.625rem;
+  min-width: 1.45rem;
+  height: 1.45rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin: 0.15rem 0.2rem;
+  margin: 0.1rem 0.15rem;
   font-weight: 600;
+  font-size: 12px;
 }
 
 .calendar-embed--events .fc-event {
@@ -1018,7 +1031,7 @@
 
 .calendar-embed--events .fc-daygrid-event {
   margin-top: 3px;
-  border-radius: 0.5rem;
+  border-radius: 6px;
   cursor: pointer;
 }
 
@@ -1045,7 +1058,7 @@
 }
 
 .calendar-embed--events .fc .fc-daygrid-more-link {
-  color: hsl(var(--accent-link));
+  color: #9aa1ab;
   font-size: 0.6875rem;
   font-weight: 600;
   padding: 0.125rem 0.25rem;
@@ -1053,15 +1066,17 @@
 }
 
 .calendar-embed--events .fc .fc-daygrid-more-link:hover {
+  color: #6b7280;
   text-decoration: underline;
 }
 
 .calendar-embed--events .fc-timegrid-event {
-  border-radius: 0.5rem;
-  border-left-width: 4px !important;
-  background: hsl(var(--card)) !important;
-  border-color: hsl(var(--border) / 0.5) !important;
+  border-radius: 6px;
+  border-left-width: 3px !important;
+  background: #fff !important;
+  border-color: #edf0f4 !important;
   cursor: pointer;
+  box-shadow: 0 1px 2px rgba(31, 42, 68, 0.04);
 }
 
 /* Social media calendar block */

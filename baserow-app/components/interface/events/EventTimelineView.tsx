@@ -1,39 +1,20 @@
 "use client"
 
-import { useLayoutEffect, useMemo, useRef } from "react"
+import { useMemo } from "react"
 import { format } from "date-fns"
 import DashboardEmpty from "@/components/interface/primitives/DashboardEmpty"
-import {
-  buildEventTimelineRange,
-  getEventTimelineMonthScrollPct,
-  getEventTimelineTodayPct,
-  positionEventOnTimeline,
-  type MarketingEventItem,
-} from "@/lib/marketing/events"
+import type { MarketingEventItem } from "@/lib/marketing/events"
 import { cn } from "@/lib/utils"
 
-const LABEL_COL_WIDTH = 200
-const ROW_HEIGHT = 44
-const MIN_TRACK_WIDTH = 720
-
-function scrollTimelineToMonth(
-  container: HTMLElement,
-  pct: number,
-  labelWidth = LABEL_COL_WIDTH
-) {
-  const maxScroll = container.scrollWidth - container.clientWidth
-  if (maxScroll <= 0) return
-  const trackWidth = Math.max(container.scrollWidth - labelWidth, 1)
-  const monthLeft = labelWidth + (pct / 100) * trackWidth
-  const offset = Math.min(container.clientWidth * 0.2, 120)
-  container.scrollLeft = Math.max(0, Math.min(monthLeft - offset, maxScroll))
+function monthKey(d: Date): string {
+  return format(d, "yyyy-MM")
 }
 
 export function EventTimelineView({
   items,
   selectedId,
   onSelect,
-  rangeStart,
+  rangeStart: _rangeStart,
   fillContainer = false,
 }: {
   items: MarketingEventItem[]
@@ -44,35 +25,23 @@ export function EventTimelineView({
 }) {
   const withDates = useMemo(() => items.filter((i) => i.startDate), [items])
 
-  const timeline = useMemo(
-    () => buildEventTimelineRange(withDates, rangeStart),
-    [withDates, rangeStart]
-  )
-
-  const todayPct = useMemo(() => getEventTimelineTodayPct(timeline), [timeline])
-
-  const scrollRef = useRef<HTMLDivElement>(null)
-
-  useLayoutEffect(() => {
-    const el = scrollRef.current
-    if (!el) return
-    const pct = getEventTimelineMonthScrollPct(timeline, rangeStart)
-    if (pct == null) return
-    const run = () => scrollTimelineToMonth(el, pct)
-    run()
-    requestAnimationFrame(run)
-  }, [timeline, rangeStart])
-
-  const rows = useMemo(() => {
-    return withDates
-      .map((item) => ({
-        item,
-        position: positionEventOnTimeline(item, timeline),
-      }))
-      .filter((r): r is { item: MarketingEventItem; position: NonNullable<typeof r.position> } =>
-        Boolean(r.position)
-      )
-  }, [withDates, timeline])
+  const groups = useMemo(() => {
+    const sorted = [...withDates].sort(
+      (a, b) => (a.startDate?.getTime() ?? 0) - (b.startDate?.getTime() ?? 0)
+    )
+    const map = new Map<string, { label: string; items: MarketingEventItem[] }>()
+    for (const item of sorted) {
+      const d = item.startDate!
+      const key = monthKey(d)
+      const existing = map.get(key)
+      if (existing) {
+        existing.items.push(item)
+      } else {
+        map.set(key, { label: format(d, "MMMM yyyy"), items: [item] })
+      }
+    }
+    return Array.from(map.values())
+  }, [withDates])
 
   if (withDates.length === 0) {
     return (
@@ -85,128 +54,54 @@ export function EventTimelineView({
     )
   }
 
-  if (rows.length === 0) {
-    return (
-      <DashboardEmpty
-        title="No events in this period"
-        description="Try adjusting filters or navigating to months that include your events."
-        variant="compact"
-        className="py-12"
-      />
-    )
-  }
-
   return (
     <div
-      ref={scrollRef}
       className={cn(
-        "overflow-auto",
+        "overflow-y-auto rounded-2xl border border-[#e4e7ec] bg-white px-5 py-4 md:px-6",
         fillContainer ? "min-h-0 h-full flex-1" : "min-h-[min(68vh,520px)]"
       )}
     >
-      <div
-        className="relative"
-        style={{ minWidth: `min(100%, ${LABEL_COL_WIDTH + MIN_TRACK_WIDTH}px)` }}
-      >
-        {/* Month header */}
-        <div className="sticky top-0 z-20 flex border-b border-border/50 bg-background/95 backdrop-blur-sm">
-          <div
-            className="sticky left-0 z-30 shrink-0 border-r border-border/40 bg-background/95 px-3 py-2"
-            style={{ width: LABEL_COL_WIDTH }}
-          >
-            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              Event
-            </span>
-          </div>
-          <div className="relative flex flex-1">
-            {timeline.months.map((m) => (
-              <div
-                key={m.toISOString()}
-                className="flex-1 min-w-[52px] border-r border-border/30 px-1 py-2 text-center"
-              >
-                <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  {format(m, "MMM yyyy")}
-                </div>
-              </div>
-            ))}
-            {todayPct != null ? (
-              <div
-                className="pointer-events-none absolute top-0 bottom-0 z-10 border-l-2 border-dashed border-accent-link/70"
-                style={{ left: `${todayPct}%` }}
-                aria-hidden
-              />
-            ) : null}
-          </div>
-        </div>
-
-        {/* Event rows */}
-        {rows.map(({ item, position }) => (
-          <div
-            key={item.id}
-            className="flex border-b border-border/30 hover:bg-muted/10"
-            style={{ minHeight: ROW_HEIGHT }}
-          >
-            <div
-              className="sticky left-0 z-10 flex shrink-0 items-center border-r border-border/40 bg-background/95 px-3"
-              style={{ width: LABEL_COL_WIDTH }}
-            >
-              <button
-                type="button"
-                onClick={() => onSelect(item.id)}
-                aria-label={`Open event: ${item.eventName}`}
-                className={cn(
-                  "min-w-0 text-left text-xs font-medium text-foreground truncate hover:text-accent-link",
-                  selectedId === item.id && "text-accent-link"
-                )}
-              >
-                {item.eventName}
-              </button>
-            </div>
-            <div className="relative flex flex-1" style={{ minHeight: ROW_HEIGHT }}>
-              {timeline.months.map((m) => (
-                <div
-                  key={m.toISOString()}
-                  className="flex-1 min-w-[52px] border-r border-border/15"
-                  aria-hidden
-                />
+      {groups.map((group) => (
+        <section key={group.label} className="pt-4 first:pt-1">
+          <h3 className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-[#005b8f]">
+            {group.label}
+          </h3>
+          <div className="ml-1 border-l-2 border-[#e4e7ec] py-2 pl-5">
+            <ul className="flex flex-col gap-3.5">
+              {group.items.map((item) => (
+                <li key={item.id} className="relative">
+                  <span
+                    className="absolute -left-[27px] top-1 h-[13px] w-[13px] rounded-full border-[3px] bg-white"
+                    style={{ borderColor: item.accentColor }}
+                    aria-hidden
+                  />
+                  <button
+                    type="button"
+                    onClick={() => onSelect(item.id)}
+                    aria-label={`Open event: ${item.eventName}`}
+                    className={cn(
+                      "flex w-full items-center gap-3 text-left transition-opacity hover:opacity-90",
+                      selectedId === item.id && "opacity-100"
+                    )}
+                  >
+                    <span className="w-[70px] shrink-0 text-xs font-bold text-[#1f2a44]">
+                      {item.startDate ? format(item.startDate, "d MMM") : "—"}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold text-[#1f2a44]">
+                        {item.eventName}
+                      </span>
+                      <span className="mt-1 block text-[11.5px] font-medium text-[#9aa1ab]">
+                        {[item.eventType, item.locationLabel].filter(Boolean).join(" · ")}
+                      </span>
+                    </span>
+                  </button>
+                </li>
               ))}
-              {todayPct != null ? (
-                <div
-                  className="pointer-events-none absolute top-0 bottom-0 z-[1] border-l-2 border-dashed border-accent-link/50"
-                  style={{ left: `${todayPct}%` }}
-                  aria-hidden
-                />
-              ) : null}
-              <button
-                type="button"
-                title={`${item.eventName}\n${item.dateRangeLabel}`}
-                onClick={() => onSelect(item.id)}
-                aria-label={`Open event: ${item.eventName}`}
-                className={cn(
-                  "absolute top-1/2 z-[2] flex h-7 -translate-y-1/2 items-center overflow-hidden rounded-md border px-2 text-left text-[10px] font-medium shadow-sm transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-link",
-                  selectedId === item.id && "ring-2 ring-accent-link ring-offset-1"
-                )}
-                style={{
-                  left: `${position.leftPct}%`,
-                  width: `${position.widthPct}%`,
-                  minWidth: position.isSingleDay ? 56 : 72,
-                  maxWidth: position.isSingleDay ? 120 : undefined,
-                  backgroundColor: item.backgroundColor,
-                  borderColor: item.accentColor,
-                  color: item.accentColor,
-                }}
-              >
-                <span
-                  className="absolute inset-y-0 left-0 w-1 rounded-l-md"
-                  style={{ backgroundColor: item.accentColor }}
-                  aria-hidden
-                />
-                <span className="relative truncate pl-1.5">{item.dateRangeLabel}</span>
-              </button>
-            </div>
+            </ul>
           </div>
-        ))}
-      </div>
+        </section>
+      ))}
     </div>
   )
 }

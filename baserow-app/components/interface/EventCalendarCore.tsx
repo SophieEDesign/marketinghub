@@ -602,9 +602,9 @@ export function EventCalendarCore({
       ) : null}
 
       {!showEmpty && settings.showLegend ? (
-        <div className="flex flex-wrap items-center gap-3 text-[10px] text-muted-foreground pt-1 shrink-0">
+        <div className="flex flex-wrap items-center gap-4 pt-1 shrink-0">
           {EVENT_TYPE_LEGEND.map(({ label, color }) => (
-            <span key={label} className="inline-flex items-center gap-1">
+            <span key={label} className="inline-flex items-center gap-1.5 text-[11.5px] font-medium text-[#6b7280]">
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} aria-hidden />
               {label}
             </span>
