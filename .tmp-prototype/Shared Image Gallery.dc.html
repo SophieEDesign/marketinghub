@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{font-family:'Inter',ui-sans-serif,system-ui,sans-serif;background:#eceef1;color:#1f2a44;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  button{font-family:inherit}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:#cdd2da;border-radius:8px;border:2px solid transparent;background-clip:content-box}
+  @keyframes fadein{from{opacity:0}to{opacity:1}}
+  @keyframes pop{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}
+</style>
+</helmet>
+
+<div style="min-height:100vh;background:#eceef1;padding:30px 28px 64px;">
+  <div style="max-width:1240px;margin:0 auto;">
+
+    <!-- BLOCK CARD -->
+    <div style="background:#fff;border:1px solid #e4e7ec;border-radius:18px;box-shadow:0 1px 3px rgba(31,42,68,.05),0 14px 40px rgba(31,42,68,.05);overflow:hidden;">
+
+      <!-- header -->
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:22px 24px;border-bottom:1px solid #eef1f4;">
+        <div style="display:flex;align-items:flex-start;gap:14px;min-width:0;">
+          <sc-if value="{{ inFolder }}">
+            <button onClick="{{ onBack }}" aria-label="Back" style="height:38px;width:38px;border-radius:10px;border:1px solid #d4d7dc;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">{{ icBack }}</button>
+          </sc-if>
+          <div style="min-width:0;">
+            <div style="display:flex;align-items:center;gap:9px;">
+              <h2 style="margin:0;font:600 18px/1.2 Inter;color:#1f2a44;letter-spacing:-.01em;">{{ headerTitle }}</h2>
+              <span style="display:inline-flex;align-items:center;gap:6px;background:#f7f1e6;border:1px solid #ecdfc8;border-radius:100px;padding:4px 10px;font:600 10.5px/1 Inter;color:#b08d52;">{{ icDrive }}Google Drive</span>
+            </div>
+            <p style="margin:6px 0 0;font:400 13.5px/1.4 Inter;color:#9aa1ab;">{{ headerSubtitle }}</p>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:9px;flex-shrink:0;">
+          <div style="display:flex;align-items:center;gap:8px;background:#f5f7fa;border:1px solid #e2e6ea;border-radius:9px;padding:0 12px;height:38px;width:210px;">
+            <span style="display:flex;">{{ icSearch }}</span>
+            <input value="{{ query }}" onInput="{{ onSearch }}" placeholder="{{ searchPlaceholder }}" style="flex:1;background:transparent;border:none;outline:none;font:400 13px/1 Inter;color:#1f2a44;height:100%;"/>
+          </div>
+          <a href="https://drive.google.com" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:7px;text-decoration:none;background:#fff;border:1px solid #d4d7dc;border-radius:9px;height:38px;padding:0 13px;font:600 12.5px/1 Inter;color:#1f2a44;">{{ icExternal }}Open in Drive</a>
+        </div>
+      </div>
+
+      <!-- ===== FOLDER GRID ===== -->
+      <sc-if value="{{ isFolderView }}">
+        <div style="padding:22px 24px;">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:18px;">
+            <sc-for list="{{ folders }}" as="f" hint-placeholder-count="8">
+              <div onClick="{{ f.onOpen }}" style="cursor:pointer;border-radius:15px;overflow:hidden;border:1px solid #e4e7ec;background:#fff;transition:box-shadow .2s,transform .2s,border-color .2s;box-shadow:0 1px 2px rgba(31,42,68,.04);" style-hover="box-shadow:0 16px 34px rgba(31,42,68,.16);transform:translateY(-3px);border-color:#d7dce3;">
+                <div style="position:relative;aspect-ratio:4/3;overflow:hidden;background:{{ f.fallbackBg }};">
+                  <sc-if value="{{ f.hasPhoto }}" hint-placeholder-val="{{ false }}">
+                    {{ f.coverImg }}
+                    <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(15,28,43,0) 38%,rgba(15,28,43,.78) 100%);"></div>
+                  </sc-if>
+                  <sc-if value="{{ f.iconOnly }}" hint-placeholder-val="{{ true }}">
+                    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">{{ f.bigIconEl }}</div>
+                    <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(15,28,43,0) 45%,rgba(15,28,43,.55) 100%);"></div>
+                  </sc-if>
+                  <span style="position:absolute;left:11px;top:11px;display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.92);backdrop-filter:blur(4px);border-radius:7px;padding:5px 8px;font:700 10px/1 Inter;color:#1f2a44;">{{ f.smIconEl }}{{ f.count }}</span>
+                  <div style="position:absolute;left:13px;right:13px;bottom:12px;">
+                    <div style="font:600 15px/1.2 Inter;color:#fff;letter-spacing:-.01em;">{{ f.name }}</div>
+                    <div style="font:500 11px/1 Inter;color:rgba(255,255,255,.78);margin-top:4px;">{{ f.sub }}</div>
+                  </div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ===== IMAGE GRID (inside a folder) ===== -->
+      <sc-if value="{{ isImageView }}">
+        <div style="padding:22px 24px;">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px;">
+            <sc-for list="{{ images }}" as="im" hint-placeholder-count="0">
+              <div onClick="{{ im.onOpen }}" style="position:relative;aspect-ratio:1/1;border-radius:13px;overflow:hidden;cursor:pointer;border:1px solid #e4e7ec;background:#eef1f4;" style-hover="box-shadow:0 12px 26px rgba(31,42,68,.16);">
+                {{ im.imgEl }}
+                <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(15,28,43,0) 55%,rgba(15,28,43,.6) 100%);opacity:0;transition:opacity .2s;" style-hover="opacity:1;"></div>
+                <span style="position:absolute;left:10px;right:10px;bottom:9px;font:600 11px/1.3 Inter;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ im.name }}</span>
+                <span style="position:absolute;right:9px;top:9px;background:{{ im.badgeBg }};color:{{ im.badgeFg }};font:800 8.5px/1 Inter;letter-spacing:.04em;padding:4px 6px;border-radius:5px;">{{ im.type }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- footer fallback -->
+      <div style="padding:14px 24px;border-top:1px solid #eef1f4;background:#fafbfc;">
+        <span style="font:400 12.5px/1.4 Inter;color:#9aa1ab;">Prefer the source? <a href="https://drive.google.com" target="_blank" rel="noopener" style="color:#005b8f;font-weight:600;text-decoration:none;">Open the Google Drive gallery →</a></span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== LIGHTBOX ===== -->
+  <sc-if value="{{ hasLightbox }}">
+    <div onClick="{{ onCloseLightbox }}" style="position:fixed;inset:0;background:rgba(9,17,27,.82);z-index:60;display:flex;align-items:center;justify-content:center;padding:40px;animation:fadein .18s ease;">
+      <div style="position:relative;max-width:940px;width:100%;animation:pop .22s cubic-bezier(.22,.61,.36,1);">
+        {{ lightbox.imgEl }}
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:16px;">
+          <div>
+            <div style="font:600 16px/1.3 Inter;color:#fff;">{{ lightbox.name }}</div>
+            <div style="font:400 12.5px/1 Inter;color:rgba(255,255,255,.6);margin-top:5px;">{{ lightbox.meta }}</div>
+          </div>
+          <div style="display:flex;gap:9px;flex-shrink:0;">
+            <button style="display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.24);color:#fff;border-radius:10px;height:42px;padding:0 16px;font:600 12.5px/1 Inter;cursor:pointer;">{{ icDownloadW }}Download</button>
+            <button onClick="{{ onCloseLightbox }}" aria-label="Close" style="height:42px;width:42px;border-radius:10px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.24);cursor:pointer;display:flex;align-items:center;justify-content:center;">{{ icXW }}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { folder: null, query: '', lightbox: null };
+
+  ICONS() {
+    return {
+      search: [['circle', { cx: 11, cy: 11, r: 8 }], ['path', { d: 'm21 21-4.3-4.3' }]],
+      external: [['path', { d: 'M15 3h6v6' }], ['path', { d: 'M10 14 21 3' }], ['path', { d: 'M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6' }]],
+      back: [['path', { d: 'm15 18-6-6 6-6' }]],
+      image: [['rect', { width: 18, height: 18, x: 3, y: 3, rx: 2, ry: 2 }], ['circle', { cx: 9, cy: 9, r: 2 }], ['path', { d: 'm21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21' }]],
+      drive: [['path', { d: 'm12.87 2.5 8.13 14.08-3.26 5.42H6.26L3 16.58 11.13 2.5z' }]],
+      x: [['path', { d: 'M18 6 6 18' }], ['path', { d: 'm6 6 12 12' }]],
+      download: [['path', { d: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' }], ['polyline', { points: '7 10 12 15 17 10' }], ['line', { x1: 12, x2: 12, y1: 15, y2: 3 }]],
+      ship: [['path', { d: 'M2 21c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1 .6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1' }], ['path', { d: 'M19.38 20A11.6 11.6 0 0 0 21 14l-9-4-9 4c0 2.9.94 5.34 2.81 7.76' }], ['path', { d: 'M19 13V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v6' }], ['path', { d: 'M12 10v4' }], ['path', { d: 'M12 2v3' }]],
+      anchor: [['circle', { cx: 12, cy: 5, r: 3 }], ['line', { x1: 12, x2: 12, y1: 22, y2: 8 }], ['path', { d: 'M5 12H2a10 10 0 0 0 20 0h-3' }]],
+      truck: [['path', { d: 'M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2' }], ['path', { d: 'M15 18H9' }], ['path', { d: 'M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14' }], ['circle', { cx: 7, cy: 18, r: 2 }], ['circle', { cx: 17, cy: 18, r: 2 }]],
+      container: [['path', { d: 'M22 7.7c0-.6-.4-1.2-.8-1.5l-6.3-3.9a1.72 1.72 0 0 0-1.7 0l-10.3 6c-.5.2-.9.8-.9 1.4v6.6c0 .5.4 1.1.8 1.4l6.3 3.9a1.72 1.72 0 0 0 1.7 0l10.3-6c.5-.3.9-.9.9-1.4Z' }], ['path', { d: 'M10 21.9V14L2.1 9.1' }], ['path', { d: 'm10 14 11.9-6.9' }]],
+      sailboat: [['path', { d: 'M22 18H2a4 4 0 0 0 4 4h12a4 4 0 0 0 4-4Z' }], ['path', { d: 'M21 14 10 2 3 14h18Z' }], ['path', { d: 'M10 2v16' }]],
+      grid: [['rect', { width: 7, height: 7, x: 3, y: 3, rx: 1 }], ['rect', { width: 7, height: 7, x: 14, y: 3, rx: 1 }], ['rect', { width: 7, height: 7, x: 14, y: 14, rx: 1 }], ['rect', { width: 7, height: 7, x: 3, y: 14, rx: 1 }]],
+    };
+  }
+  ic(name, o) {
+    o = o || {};
+    const defs = this.ICONS()[name] || this.ICONS().image;
+    const ch = defs.map((c, i) => React.createElement(c[0], Object.assign({ key: i }, c[1])));
+    return React.createElement('svg', { width: o.size || 18, height: o.size || 18, viewBox: '0 0 24 24', fill: 'none', stroke: o.color || 'currentColor', strokeWidth: o.sw || 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', style: { display: 'block', flexShrink: 0 } }, ch);
+  }
+
+  FOLDERS() {
+    return [
+      { id: 'superyacht', name: 'Superyacht', icon: 'sailboat', count: 42, cover: 'assets/hero-yacht-aerial.jpg', pos: 'center 40%' },
+      { id: 'catamaran', name: 'Catamaran', icon: 'sailboat', count: 18, cover: 'assets/hero-dubai.jpg', pos: 'center 50%' },
+      { id: 'racing', name: 'Racing', icon: 'sailboat', count: 27, cover: 'assets/vessel-ctv.jpeg', pos: 'center 45%' },
+      { id: 'commercial', name: 'Commercial', icon: 'ship', count: 31, cover: 'assets/vessel-cargo.jpg', pos: 'center 50%' },
+      { id: 'liner', name: 'Liner', icon: 'ship', count: 12, cover: 'assets/hero-dubai.jpg', pos: 'center 62%' },
+      { id: 'forwarding', name: 'Forwarding', icon: 'truck', count: 9, cover: null },
+      { id: 'flat-rail', name: 'Flat Rail', icon: 'container', count: 6, cover: null },
+      { id: 'other', name: 'Other', icon: 'anchor', count: 14, cover: null },
+    ];
+  }
+
+  renderVals() {
+    const st = this.state;
+    const q = st.query.trim().toLowerCase();
+    const open = (id) => this.setState({ folder: id, query: '' });
+
+    // FOLDER VIEW
+    let folders = this.FOLDERS();
+    if (!st.folder && q) folders = folders.filter((f) => f.name.toLowerCase().includes(q));
+    const folderCards = folders.map((f) => ({
+      name: f.name,
+      count: f.count,
+      sub: f.count + ' images',
+      hasPhoto: !!f.cover,
+      iconOnly: !f.cover,
+      cover: f.cover,
+      pos: f.pos || 'center',
+      coverImg: f.cover ? React.createElement('img', { src: f.cover, style: { position: 'absolute', inset: 0, height: '100%', width: '100%', objectFit: 'cover', objectPosition: f.pos || 'center', transition: 'transform .4s' } }) : null,
+      fallbackBg: f.cover ? '#1b2c40' : 'linear-gradient(135deg,#1f2a44,#0f1c2b)',
+      bigIconEl: this.ic(f.icon, { size: 52, color: 'rgba(196,165,116,.55)', sw: 1.4 }),
+      smIconEl: this.ic('image', { size: 12, color: '#5c6168' }),
+      onOpen: () => open(f.id),
+    }));
+
+    // IMAGE VIEW
+    const cur = this.FOLDERS().find((f) => f.id === st.folder);
+    let images = [];
+    if (cur) {
+      const pool = [
+        { src: 'assets/hero-yacht-aerial.jpg', pos: 'center 40%' },
+        { src: 'assets/hero-dubai.jpg', pos: 'center 50%' },
+        { src: 'assets/vessel-cargo.jpg', pos: 'center 50%' },
+        { src: 'assets/vessel-ctv.jpeg', pos: 'center 45%' },
+        { src: 'assets/hero-dubai.jpg', pos: 'center 30%' },
+        { src: 'assets/hero-yacht-aerial.jpg', pos: 'center 60%' },
+        { src: 'assets/vessel-cargo.jpg', pos: 'left center' },
+        { src: 'assets/vessel-ctv.jpeg', pos: 'right center' },
+        { src: 'assets/hero-yacht-aerial.jpg', pos: 'center 25%' },
+      ];
+      const n = Math.min(9, cur.count);
+      images = [];
+      for (let i = 0; i < n; i++) {
+        const p = pool[i % pool.length];
+        const type = i % 5 === 0 ? 'PNG' : 'JPG';
+        images.push({
+          src: p.src, pos: p.pos,
+          imgEl: React.createElement('img', { src: p.src, style: { position: 'absolute', inset: 0, height: '100%', width: '100%', objectFit: 'cover', objectPosition: p.pos } }),
+          name: cur.name + ' ' + String(i + 1).padStart(2, '0'),
+          type,
+          badgeBg: type === 'PNG' ? '#e7f3ee' : '#e3f0fa',
+          badgeFg: type === 'PNG' ? '#1b7a52' : '#0a6bb0',
+          onOpen: () => this.setState({ lightbox: { src: p.src, imgEl: React.createElement('img', { src: p.src, style: { width: '100%', maxHeight: '74vh', objectFit: 'contain', borderRadius: '12px', boxShadow: '0 30px 80px rgba(0,0,0,.5)' } }), name: cur.name + ' ' + String(i + 1).padStart(2, '0'), meta: cur.name + ' · JPG · 3840×2160 · Google Drive' } }),
+        });
+      }
+      if (q) images = images.filter((im) => im.name.toLowerCase().includes(q));
+    }
+
+    return {
+      inFolder: !!st.folder,
+      isFolderView: !st.folder,
+      isImageView: !!st.folder,
+      headerTitle: cur ? cur.name : 'Shared Image Gallery',
+      headerSubtitle: cur ? cur.count + ' images in this collection' : 'Approved marine photography by vessel type and sector.',
+      searchPlaceholder: cur ? 'Search ' + cur.name + '…' : 'Search collections…',
+      query: st.query,
+      onSearch: (e) => this.setState({ query: e.target.value }),
+      onBack: () => this.setState({ folder: null, query: '' }),
+      folders: folderCards,
+      images,
+      hasLightbox: !!st.lightbox,
+      lightbox: st.lightbox || {},
+      onCloseLightbox: () => this.setState({ lightbox: null }),
+      icSearch: this.ic('search', { size: 15, color: '#9aa1ab' }),
+      icExternal: this.ic('external', { size: 15, color: '#1f2a44' }),
+      icBack: this.ic('back', { size: 18, color: '#5c6168' }),
+      icDrive: this.ic('drive', { size: 12, color: '#b08d52' }),
+      icXW: this.ic('x', { size: 18, color: '#fff' }),
+      icDownloadW: this.ic('download', { size: 15, color: '#fff' }),
+    };
+  }
+}
+</script>
+</body>
+</html>

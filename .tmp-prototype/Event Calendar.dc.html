@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{font-family:'Inter',ui-sans-serif,system-ui,sans-serif;background:#eceef1;color:#1f2a44;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  button,input{font-family:inherit}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:#cdd2da;border-radius:8px;border:2px solid transparent;background-clip:content-box}
+  @keyframes slidein{from{transform:translateX(26px);opacity:0}to{transform:translateX(0);opacity:1}}
+  @keyframes fadein{from{opacity:0}to{opacity:1}}
+</style>
+</helmet>
+
+<div style="min-height:100vh;background:#eceef1;display:flex;flex-direction:column;">
+
+  <!-- TOP APP BAR -->
+  <div style="display:flex;align-items:center;gap:14px;height:58px;padding:0 24px;background:#fff;border-bottom:1px solid #e4e7ec;position:sticky;top:0;z-index:30;">
+    <img src="assets/logo-dark.svg" alt="Peters &amp; May" style="height:22px;"/>
+    <div style="height:20px;width:1px;background:#e4e7ec;"></div>
+    <div style="display:flex;align-items:center;gap:7px;font:500 13px/1 Inter;color:#9aa1ab;">Marketing Hub <span style="display:flex;">{{ icChevron }}</span> <span style="color:#1f2a44;font-weight:600;">Event Calendar</span></div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:16px;">
+      <span style="display:flex;cursor:pointer;">{{ icBell }}</span>
+      <div style="height:30px;width:30px;border-radius:50%;background:#005b8f;color:#fff;font:600 12px/30px Inter;text-align:center;">SE</div>
+    </div>
+  </div>
+
+  <div style="flex:1;max-width:1300px;width:100%;margin:0 auto;padding:24px 28px 56px;display:flex;flex-direction:column;gap:18px;">
+
+    <!-- HEADER -->
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap;">
+      <div>
+        <h1 style="margin:0 0 6px;font:300 30px/1.1 Inter;letter-spacing:-.02em;color:#1f2a44;">Event <span style="font-weight:600;">calendar</span></h1>
+        <p style="margin:0;font:400 14px/1.4 Inter;color:#6b7280;max-width:520px;">Boat shows, racing, conferences and hospitality across the Peters &amp; May calendar.</p>
+      </div>
+      <div style="display:flex;align-items:center;gap:9px;">
+        <div style="display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #d4d7dc;border-radius:9px;padding:0 12px;height:38px;width:210px;">
+          <span style="display:flex;">{{ icSearch }}</span>
+          <input value="{{ query }}" onInput="{{ onSearch }}" placeholder="Search events…" style="flex:1;background:transparent;border:none;outline:none;font:400 13px/1 Inter;color:#1f2a44;height:100%;"/>
+        </div>
+        <button style="display:flex;align-items:center;gap:7px;background:#fff;color:#1f2a44;border:1px solid #d4d7dc;border-radius:9px;height:38px;padding:0 13px;font:600 12.5px/1 Inter;cursor:pointer;">{{ icCalSm }}Export</button>
+        <button style="display:flex;align-items:center;gap:7px;background:#005b8f;color:#fff;border:none;border-radius:9px;height:38px;padding:0 15px;font:600 12.5px/1 Inter;cursor:pointer;" style-hover="background:#004f7d;">{{ icPlus }}Add event</button>
+      </div>
+    </div>
+
+    <!-- TOOLBAR -->
+    <div style="display:flex;flex-direction:column;gap:11px;background:#fff;border:1px solid #e4e7ec;border-radius:13px;padding:11px 13px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
+        <!-- view modes -->
+        <div style="display:flex;gap:3px;background:#f1f3f6;border-radius:9px;padding:3px;">
+          <sc-for list="{{ viewModes }}" as="v" hint-placeholder-count="4">
+            <button onClick="{{ v.onClick }}" style="display:flex;align-items:center;gap:6px;border:none;cursor:pointer;border-radius:7px;padding:8px 13px;font:600 12.5px/1 Inter;background:{{ v.bg }};color:{{ v.fg }};box-shadow:{{ v.shadow }};">{{ v.iconEl }}{{ v.label }}</button>
+          </sc-for>
+        </div>
+
+        <!-- nav -->
+        <div style="display:flex;align-items:center;gap:6px;">
+          <button onClick="{{ onToday }}" style="background:#fff;border:1px solid #d4d7dc;border-radius:8px;height:34px;padding:0 13px;font:600 12.5px/1 Inter;color:#1f2a44;cursor:pointer;">Today</button>
+          <button onClick="{{ onPrev }}" aria-label="Previous" style="background:#fff;border:1px solid #d4d7dc;border-radius:8px;height:34px;width:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;">{{ icChevL }}</button>
+          <div style="min-width:150px;text-align:center;font:600 14px/1 Inter;color:#1f2a44;">{{ periodLabel }}</div>
+          <button onClick="{{ onNext }}" aria-label="Next" style="background:#fff;border:1px solid #d4d7dc;border-radius:8px;height:34px;width:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;">{{ icChevR }}</button>
+        </div>
+      </div>
+
+      <!-- type filters -->
+      <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;border-top:1px solid #f3f5f8;padding-top:11px;">
+        <sc-for list="{{ typeFilters }}" as="t" hint-placeholder-count="5">
+          <button onClick="{{ t.onClick }}" style="display:flex;align-items:center;gap:6px;border:1px solid {{ t.border }};background:{{ t.bg }};border-radius:100px;padding:6px 12px;font:600 11.5px/1 Inter;color:{{ t.fg }};cursor:pointer;">
+            <span style="height:7px;width:7px;border-radius:50%;background:{{ t.dot }};display:block;"></span>{{ t.label }}
+          </button>
+        </sc-for>
+      </div>
+    </div>
+
+    <!-- ===== MONTH VIEW ===== -->
+    <sc-if value="{{ isMonth }}">
+      <div style="background:#fff;border:1px solid #e4e7ec;border-radius:16px;overflow:hidden;">
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid #eef1f4;">
+          <sc-for list="{{ weekdayNames }}" as="wd" hint-placeholder-count="7">
+            <div style="padding:11px 10px;font:700 10px/1 Inter;letter-spacing:.08em;text-transform:uppercase;color:#9aa1ab;text-align:left;">{{ wd }}</div>
+          </sc-for>
+        </div>
+        <div>
+          <sc-for list="{{ weeks }}" as="wk" hint-placeholder-count="6">
+            <div style="position:relative;border-bottom:1px solid #f3f5f8;">
+              <div style="display:grid;grid-template-columns:repeat(7,1fr);">
+                <sc-for list="{{ wk.days }}" as="d" hint-placeholder-count="7">
+                  <div style="min-height:132px;border-right:1px solid #f3f5f8;padding:7px;background:{{ d.cellBg }};">
+                    <div style="display:flex;align-items:center;justify-content:flex-start;">
+                      <span style="display:flex;align-items:center;justify-content:center;height:23px;min-width:23px;padding:0 6px;border-radius:100px;font:{{ d.numWeight }} 12px/1 Inter;color:{{ d.numColor }};background:{{ d.numBg }};">{{ d.label }}</span>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+              {{ wk.barsEl }}
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ===== WEEK VIEW ===== -->
+    <sc-if value="{{ isWeek }}">
+      <div style="background:#fff;border:1px solid #e4e7ec;border-radius:16px;overflow:hidden;display:grid;grid-template-columns:repeat(7,1fr);">
+        <sc-for list="{{ weekColumns }}" as="col" hint-placeholder-count="7">
+          <div style="border-right:1px solid #f3f5f8;min-height:360px;">
+            <div style="padding:11px 10px;border-bottom:1px solid #eef1f4;background:{{ col.headBg }};">
+              <div style="font:700 10px/1 Inter;letter-spacing:.06em;text-transform:uppercase;color:#9aa1ab;">{{ col.dow }}</div>
+              <div style="font:{{ col.numWeight }} 18px/1 Inter;color:{{ col.numColor }};margin-top:5px;">{{ col.day }}</div>
+            </div>
+            <div style="padding:8px;display:flex;flex-direction:column;gap:7px;">
+              <sc-for list="{{ col.events }}" as="e" hint-placeholder-count="0">
+                <div onClick="{{ e.onClick }}" style="background:#fff;border:1px solid #eef1f4;border-left:3px solid {{ e.color }};border-radius:9px;padding:8px 9px;cursor:pointer;box-shadow:0 1px 2px rgba(31,42,68,.04);transition:box-shadow .18s,transform .18s;" style-hover="box-shadow:0 8px 18px rgba(31,42,68,.13);transform:translateY(-2px);">
+                  <div style="font:600 11px/1.3 Inter;color:#1f2a44;">{{ e.name }}</div>
+                  <div style="display:flex;align-items:center;gap:4px;margin-top:5px;">{{ e.pinEl }}<span style="font:500 9.5px/1 Inter;color:#9aa1ab;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ e.location }}</span></div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:7px;">
+                    <span style="display:inline-flex;align-items:center;gap:5px;font:600 9px/1 Inter;color:{{ e.color }};"><span style="height:6px;width:6px;border-radius:50%;background:{{ e.color }};display:block;"></span>{{ e.type }}</span>
+                    <sc-if value="{{ e.attending }}">{{ e.attEl }}</sc-if>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <!-- ===== LIST VIEW ===== -->
+    <sc-if value="{{ isList }}">
+      <div style="display:flex;flex-direction:column;gap:24px;">
+        <sc-for list="{{ listGroups }}" as="g" hint-placeholder-count="2">
+          <div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:13px;">
+              <span style="font:700 11px/1 Inter;letter-spacing:.1em;text-transform:uppercase;color:#9aa1ab;">{{ g.label }}</span>
+              <span style="height:1px;flex:1;background:#e4e7ec;"></span>
+              <span style="font:600 11px/1 Inter;color:#c0c5cd;">{{ g.count }}</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;">
+              <sc-for list="{{ g.events }}" as="e" hint-placeholder-count="3">
+                <div onClick="{{ e.onClick }}" style="position:relative;display:flex;gap:14px;background:#fff;border:1px solid #e4e7ec;border-radius:15px;padding:15px 16px 15px 17px;cursor:pointer;overflow:hidden;transition:box-shadow .2s,transform .2s,border-color .2s;box-shadow:0 1px 2px rgba(31,42,68,.04);" style-hover="box-shadow:0 14px 30px rgba(31,42,68,.13);transform:translateY(-3px);border-color:#d7dce3;">
+                  <span style="position:absolute;left:0;top:0;bottom:0;width:4px;background:{{ e.color }};"></span>
+                  <!-- date block -->
+                  <div style="flex-shrink:0;width:54px;text-align:center;border-radius:12px;overflow:hidden;border:1px solid #eef1f4;align-self:flex-start;">
+                    <div style="background:{{ e.color }};color:#fff;font:700 9.5px/1 Inter;letter-spacing:.08em;padding:5px 0;">{{ e.mon }}</div>
+                    <div style="font:700 20px/1 Inter;color:#1f2a44;padding:7px 0 8px;background:#fff;">{{ e.day }}</div>
+                  </div>
+                  <!-- body -->
+                  <div style="min-width:0;flex:1;display:flex;flex-direction:column;">
+                    <div style="display:flex;align-items:flex-start;gap:8px;justify-content:space-between;">
+                      <div style="font:600 14.5px/1.3 Inter;color:#1f2a44;letter-spacing:-.01em;">{{ e.name }}</div>
+                      <span style="display:inline-flex;align-items:center;gap:5px;border:1px solid {{ e.typeBorder }};background:{{ e.bg }};border-radius:100px;padding:4px 9px;font:600 10px/1 Inter;color:{{ e.color }};flex-shrink:0;white-space:nowrap;"><span style="height:6px;width:6px;border-radius:50%;background:{{ e.color }};display:block;"></span>{{ e.type }}</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;margin-top:7px;flex-wrap:wrap;">
+                      <span style="display:inline-flex;align-items:center;gap:5px;font:500 11.5px/1 Inter;color:#9aa1ab;">{{ e.pinEl }}{{ e.location }}</span>
+                      <span style="height:3px;width:3px;border-radius:50%;background:#cdd2da;display:block;"></span>
+                      <span style="display:inline-flex;align-items:center;gap:5px;font:500 11.5px/1 Inter;color:#9aa1ab;">{{ e.calEl }}{{ e.dateRange }}</span>
+                    </div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:13px;">
+                      <!-- avatar stack -->
+                      <div style="display:flex;align-items:center;gap:8px;">
+                        <div style="display:flex;">
+                          <sc-for list="{{ e.avatars }}" as="av" hint-placeholder-count="3">
+                            <div style="height:24px;width:24px;border-radius:50%;background:{{ av.bg }};color:{{ av.fg }};font:700 9px/24px Inter;text-align:center;border:2px solid #fff;margin-left:{{ av.ml }};">{{ av.initials }}</div>
+                          </sc-for>
+                        </div>
+                        <span style="font:500 11px/1 Inter;color:#9aa1ab;">{{ e.attendeeText }}</span>
+                      </div>
+                      <span style="display:inline-flex;align-items:center;gap:5px;border:1px solid {{ e.attBorder }};background:{{ e.attBg }};border-radius:100px;padding:5px 10px;font:600 11px/1 Inter;color:{{ e.attFg }};flex-shrink:0;">{{ e.attIconEl }}{{ e.attLabel }}</span>
+                    </div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <!-- ===== TIMELINE VIEW ===== -->
+    <sc-if value="{{ isTimeline }}">
+      <div style="background:#fff;border:1px solid #e4e7ec;border-radius:16px;padding:8px 22px 22px;">
+        <sc-for list="{{ timelineGroups }}" as="g" hint-placeholder-count="2">
+          <div style="padding-top:18px;">
+            <div style="font:700 11px/1 Inter;letter-spacing:.1em;text-transform:uppercase;color:#005b8f;margin-bottom:6px;">{{ g.label }}</div>
+            <div style="border-left:2px solid #e4e7ec;padding-left:20px;display:flex;flex-direction:column;gap:14px;margin-left:4px;padding-top:8px;padding-bottom:4px;">
+              <sc-for list="{{ g.events }}" as="e" hint-placeholder-count="3">
+                <div onClick="{{ e.onClick }}" style="position:relative;cursor:pointer;">
+                  <span style="position:absolute;left:-27px;top:3px;height:13px;width:13px;border-radius:50%;background:#fff;border:3px solid {{ e.color }};"></span>
+                  <div style="display:flex;align-items:center;gap:12px;">
+                    <div style="font:700 12px/1 Inter;color:#1f2a44;width:70px;flex-shrink:0;">{{ e.shortDate }}</div>
+                    <div style="flex:1;min-width:0;">
+                      <div style="font:600 14px/1.25 Inter;color:#1f2a44;">{{ e.name }}</div>
+                      <div style="font:500 11.5px/1 Inter;color:#9aa1ab;margin-top:4px;">{{ e.type }} · {{ e.location }}</div>
+                    </div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <!-- ===== METRIC STRIP ===== -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;">
+      <sc-for list="{{ metrics }}" as="m" hint-placeholder-count="4">
+        <div style="background:#fff;border:1px solid #e4e7ec;border-radius:14px;padding:15px 17px;display:flex;align-items:center;gap:13px;">
+          <div style="height:42px;width:42px;border-radius:11px;background:{{ m.tint }};display:flex;align-items:center;justify-content:center;flex-shrink:0;">{{ m.iconEl }}</div>
+          <div>
+            <div style="font:700 22px/1 Inter;color:#1f2a44;">{{ m.value }}</div>
+            <div style="font:500 11.5px/1 Inter;color:#9aa1ab;margin-top:5px;">{{ m.label }}</div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+
+    <!-- LEGEND -->
+    <div style="display:flex;flex-wrap:wrap;gap:16px;padding-top:2px;">
+      <sc-for list="{{ legend }}" as="l" hint-placeholder-count="6">
+        <span style="display:inline-flex;align-items:center;gap:7px;font:500 11.5px/1 Inter;color:#6b7280;"><span style="height:9px;width:9px;border-radius:50%;background:{{ l.color }};display:block;"></span>{{ l.label }}</span>
+      </sc-for>
+    </div>
+
+  </div>
+
+  <!-- ===== DETAIL SLIDE-OVER ===== -->
+  <sc-if value="{{ hasSelection }}">
+    <div onClick="{{ onClose }}" style="position:fixed;inset:0;background:rgba(15,28,43,.42);z-index:40;animation:fadein .18s ease;"></div>
+    <aside style="position:fixed;top:0;right:0;bottom:0;width:392px;max-width:92vw;background:#fff;z-index:50;display:flex;flex-direction:column;box-shadow:-12px 0 40px rgba(15,28,43,.22);animation:slidein .22s cubic-bezier(.22,.61,.36,1);">
+      <div style="height:4px;background:{{ sel.color }};"></div>
+      <div style="padding:20px 20px 16px;border-bottom:1px solid #eef1f4;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
+          <span style="display:inline-flex;align-items:center;gap:6px;border:1px solid {{ sel.typeBorder }};background:{{ sel.bg }};border-radius:100px;padding:5px 11px;font:600 11px/1 Inter;color:{{ sel.color }};"><span style="height:7px;width:7px;border-radius:50%;background:{{ sel.color }};display:block;"></span>{{ sel.type }}</span>
+          <button onClick="{{ onClose }}" aria-label="Close" style="height:32px;width:32px;border-radius:8px;border:none;background:#f1f5f9;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">{{ icX }}</button>
+        </div>
+        <h3 style="margin:14px 0 0;font:600 20px/1.25 Inter;color:#1f2a44;">{{ sel.name }}</h3>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:18px 20px;">
+        <div style="display:flex;flex-direction:column;gap:13px;margin-bottom:20px;">
+          <div style="display:flex;align-items:center;gap:11px;">{{ icCalRow }}<span style="font:500 13.5px/1.4 Inter;color:#2c2f36;">{{ sel.dateRangeFull }}</span></div>
+          <div style="display:flex;align-items:center;gap:11px;">{{ icPinRow }}<span style="font:500 13.5px/1.4 Inter;color:#2c2f36;">{{ sel.locationFull }}</span></div>
+          <div style="display:flex;align-items:center;gap:11px;">{{ icUsersRow }}<span style="font:500 13.5px/1.4 Inter;color:#2c2f36;">{{ sel.attendeeText }}</span></div>
+        </div>
+
+        <sc-if value="{{ sel.hasDesc }}">
+          <div style="font:700 10px/1 Inter;letter-spacing:.1em;text-transform:uppercase;color:#9aa1ab;margin-bottom:9px;">About</div>
+          <p style="margin:0 0 20px;font:400 13.5px/1.6 Inter;color:#5c6168;">{{ sel.desc }}</p>
+        </sc-if>
+
+        <div style="font:700 10px/1 Inter;letter-spacing:.1em;text-transform:uppercase;color:#9aa1ab;margin-bottom:10px;">Your attendance</div>
+        <div style="display:flex;gap:7px;">
+          <sc-for list="{{ sel.rsvp }}" as="r" hint-placeholder-count="3">
+            <button onClick="{{ r.onClick }}" style="flex:1;border:1px solid {{ r.border }};background:{{ r.bg }};color:{{ r.fg }};border-radius:10px;padding:11px 4px;font:600 12px/1 Inter;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;">{{ r.iconEl }}{{ r.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+      <div style="border-top:1px solid #eef1f4;padding:14px 20px;display:flex;gap:9px;">
+        <button onClick="{{ sel.onWebsite }}" style="flex:1;display:flex;align-items:center;justify-content:center;gap:7px;background:#005b8f;color:#fff;border:none;border-radius:10px;height:44px;font:600 13px/1 Inter;cursor:pointer;">{{ icGlobe }}Event website</button>
+        <button onClick="{{ sel.onExport }}" style="display:flex;align-items:center;justify-content:center;gap:7px;background:#fff;color:#1f2a44;border:1px solid #d4d7dc;border-radius:10px;height:44px;padding:0 16px;font:600 13px/1 Inter;cursor:pointer;">{{ icDownload }}.ics</button>
+      </div>
+    </aside>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { view: 'month', y: 2026, m: 8, query: '', typeFilter: 'all', selectedId: null, rsvp: {} };
+
+  ICONS() {
+    return {
+      bell: [['path', { d: 'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9' }], ['path', { d: 'M10.3 21a1.94 1.94 0 0 0 3.4 0' }]],
+      chevronRight: [['path', { d: 'm9 18 6-6-6-6' }]],
+      chevronLeft: [['path', { d: 'm15 18-6-6 6-6' }]],
+      search: [['circle', { cx: 11, cy: 11, r: 8 }], ['path', { d: 'm21 21-4.3-4.3' }]],
+      plus: [['path', { d: 'M5 12h14' }], ['path', { d: 'M12 5v14' }]],
+      calendar: [['rect', { width: 18, height: 18, x: 3, y: 4, rx: 2 }], ['path', { d: 'M3 10h18' }], ['path', { d: 'M8 2v4' }], ['path', { d: 'M16 2v4' }]],
+      calDays: [['rect', { width: 18, height: 18, x: 3, y: 4, rx: 2 }], ['path', { d: 'M3 10h18' }], ['path', { d: 'M8 2v4' }], ['path', { d: 'M16 2v4' }], ['path', { d: 'M8 14h.01' }], ['path', { d: 'M12 14h.01' }], ['path', { d: 'M16 14h.01' }]],
+      layoutList: [['rect', { width: 7, height: 7, x: 3, y: 3, rx: 1 }], ['rect', { width: 7, height: 7, x: 3, y: 14, rx: 1 }], ['path', { d: 'M14 4h7' }], ['path', { d: 'M14 9h7' }], ['path', { d: 'M14 15h7' }], ['path', { d: 'M14 20h7' }]],
+      sliders: [['line', { x1: 21, x2: 14, y1: 4, y2: 4 }], ['line', { x1: 10, x2: 3, y1: 4, y2: 4 }], ['line', { x1: 21, x2: 12, y1: 12, y2: 12 }], ['line', { x1: 8, x2: 3, y1: 12, y2: 12 }], ['line', { x1: 21, x2: 16, y1: 20, y2: 20 }], ['line', { x1: 12, x2: 3, y1: 20, y2: 20 }], ['line', { x1: 14, x2: 14, y1: 2, y2: 6 }], ['line', { x1: 8, x2: 8, y1: 10, y2: 14 }], ['line', { x1: 16, x2: 16, y1: 18, y2: 22 }]],
+      mapPin: [['path', { d: 'M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z' }], ['circle', { cx: 12, cy: 10, r: 3 }]],
+      users: [['path', { d: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2' }], ['circle', { cx: 9, cy: 7, r: 4 }], ['path', { d: 'M22 21v-2a4 4 0 0 0-3-3.87' }], ['path', { d: 'M16 3.13a4 4 0 0 1 0 7.75' }]],
+      globe: [['circle', { cx: 12, cy: 12, r: 10 }], ['path', { d: 'M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20' }], ['path', { d: 'M2 12h20' }]],
+      download: [['path', { d: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' }], ['polyline', { points: '7 10 12 15 17 10' }], ['line', { x1: 12, x2: 12, y1: 15, y2: 3 }]],
+      x: [['path', { d: 'M18 6 6 18' }], ['path', { d: 'm6 6 12 12' }]],
+      check: [['path', { d: 'M20 6 9 17l-5-5' }]],
+      helpC: [['circle', { cx: 12, cy: 12, r: 10 }], ['path', { d: 'M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3' }], ['path', { d: 'M12 17h.01' }]],
+      flag: [['path', { d: 'M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z' }], ['line', { x1: 4, x2: 4, y1: 22, y2: 15 }]],
+      clock: [['circle', { cx: 12, cy: 12, r: 10 }], ['polyline', { points: '12 6 12 12 16 14' }]],
+      userCheck: [['path', { d: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2' }], ['circle', { cx: 9, cy: 7, r: 4 }], ['path', { d: 'm16 11 2 2 4-4' }]],
+      globe2: [['circle', { cx: 12, cy: 12, r: 10 }], ['path', { d: 'M2 12h20' }], ['path', { d: 'M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20' }]],
+    };
+  }
+  ic(name, o) {
+    o = o || {};
+    const defs = this.ICONS()[name] || this.ICONS().calendar;
+    const ch = defs.map((c, i) => React.createElement(c[0], Object.assign({ key: i }, c[1])));
+    return React.createElement('svg', { width: o.size || 18, height: o.size || 18, viewBox: '0 0 24 24', fill: 'none', stroke: o.color || 'currentColor', strokeWidth: o.sw || 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', style: { display: 'block', flexShrink: 0 } }, ch);
+  }
+
+  TYPES() {
+    return {
+      'Boat Show': { color: '#005b8f', bg: '#e8f1f7', border: '#cfe2ee' },
+      'Conference': { color: '#007dc5', bg: '#e3f0fa', border: '#c5e0f3' },
+      'Exhibition': { color: '#1b7a52', bg: '#e7f3ee', border: '#c8e6d8' },
+      'Racing / Sport': { color: '#5b6fa8', bg: '#eaedf5', border: '#d3daeb' },
+      'Hospitality': { color: '#b08d52', bg: '#f7f1e6', border: '#ecdfc8' },
+      'Sponsorship': { color: '#c0292f', bg: '#fbe9ea', border: '#f3ccce' },
+      'Internal': { color: '#64748b', bg: '#eef1f5', border: '#dde3ea' },
+    };
+  }
+  tm(type) { return this.TYPES()[type] || this.TYPES()['Internal']; }
+
+  EVENTS() {
+    // m is 0-indexed month
+    return [
+      { id: 'e1', name: 'Sponsorship deadline — 2027', type: 'Sponsorship', s: [2026, 8, 1], e: [2026, 8, 1], city: 'Remote', country: '', attendees: 2, attending: 'attending', website: true, desc: 'Final date to confirm 2027 event sponsorship commitments with partners.' },
+      { id: 'e2', name: 'Autumn Press Day', type: 'Conference', s: [2026, 8, 4], e: [2026, 8, 4], city: 'London', country: 'UK', attendees: 8, attending: 'not_responded', website: true, desc: 'Media briefing introducing the autumn superyacht transport campaign to trade press.' },
+      { id: 'e3', name: 'Cannes Yachting Festival', type: 'Boat Show', s: [2026, 8, 9], e: [2026, 8, 14], city: 'Cannes', country: 'France', attendees: 6, attending: 'attending', website: true, desc: 'Europe\u2019s leading on-water boat show. Peters & May stand, hospitality and superyacht logistics consultations.' },
+      { id: 'e4', name: 'Partner Hospitality Dinner', type: 'Hospitality', s: [2026, 8, 11], e: [2026, 8, 11], city: 'Cannes', country: 'France', attendees: 24, attending: 'maybe', website: false, desc: 'Invitation-only dinner for key partners and clients during the Cannes festival.' },
+      { id: 'e5', name: 'Southampton Intl Boat Show', type: 'Boat Show', s: [2026, 8, 19], e: [2026, 8, 28], city: 'Southampton', country: 'UK', attendees: 5, attending: 'not_responded', website: true, desc: 'The UK\u2019s biggest festival of boating. Stand presence and customer meetings throughout.' },
+      { id: 'e6', name: '2027 Rallies Briefing', type: 'Internal', s: [2026, 8, 16], e: [2026, 8, 16], city: 'Southampton', country: 'UK', attendees: 14, attending: 'attending', website: false, desc: 'Internal planning session for the 2027 owner rallies programme.' },
+      { id: 'e7', name: 'Monaco Yacht Show', type: 'Boat Show', s: [2026, 8, 24], e: [2026, 8, 27], city: 'Monaco', country: 'Monaco', attendees: 7, attending: 'attending', website: true, desc: 'The premier superyacht show. Premium hospitality and superyacht transport consultations at Port Hercule.' },
+      { id: 'e8', name: 'SailGP Andalusia', type: 'Racing / Sport', s: [2026, 9, 11], e: [2026, 9, 12], city: 'C\u00e1diz', country: 'Spain', attendees: 4, attending: 'not_responded', website: true, desc: 'Peters & May Racing presence at SailGP Andalusia \u2014 media and partner activations.' },
+      { id: 'e9', name: 'Fort Lauderdale Boat Show', type: 'Boat Show', s: [2026, 9, 28], e: [2026, 10, 1], city: 'Fort Lauderdale', country: 'USA', attendees: 5, attending: 'not_responded', website: true, desc: 'The largest in-water boat show in the world. North America logistics team presence.' },
+      { id: 'e10', name: 'METSTRADE Show', type: 'Exhibition', s: [2026, 10, 18], e: [2026, 10, 20], city: 'Amsterdam', country: 'Netherlands', attendees: 6, attending: 'maybe', website: true, desc: 'The world\u2019s largest trade exhibition for marine equipment, materials and systems.' },
+    ];
+  }
+
+  MONTHS() { return ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']; }
+  MON3() { return ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']; }
+  dn(y, m, d) { return y * 10000 + (m + 1) * 100 + d; }
+
+  attMeta(status) {
+    const M = {
+      attending: { label: 'Attending', bg: '#e7f3ee', border: '#bfe3cf', fg: '#1b7a52', icon: 'check' },
+      maybe: { label: 'Maybe', bg: '#e3f0fa', border: '#bcdcf2', fg: '#0a6bb0', icon: 'helpC' },
+      not_attending: { label: "Can't go", bg: '#f3f4f6', border: '#e2e5ea', fg: '#6b7280', icon: 'x' },
+      not_responded: { label: 'Respond', bg: '#fff', border: '#e4e7ec', fg: '#9aa1ab', icon: 'clock' },
+    };
+    return M[status] || M.not_responded;
+  }
+
+  effectiveAttending(ev) { return this.state.rsvp[ev.id] || ev.attending || 'not_responded'; }
+
+  filteredEvents() {
+    const q = this.state.query.trim().toLowerCase();
+    const tf = this.state.typeFilter;
+    return this.EVENTS().filter((ev) => {
+      if (tf !== 'all' && ev.type !== tf) return false;
+      if (q) {
+        const hay = (ev.name + ' ' + ev.type + ' ' + ev.city + ' ' + ev.country).toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }
+
+  fmtRange(ev) {
+    const mon = this.MON3();
+    const [sy, sm, sd] = ev.s, [ey, em, ed] = ev.e;
+    if (sy === ey && sm === em && sd === ed) return mon[sm] + ' ' + sd + ', ' + sy;
+    if (sm === em) return mon[sm] + ' ' + sd + '\u2013' + ed + ', ' + sy;
+    return mon[sm] + ' ' + sd + ' \u2013 ' + mon[em] + ' ' + ed + ', ' + ey;
+  }
+
+  renderVals() {
+    const st = this.state;
+    const months = this.MONTHS(), mon3 = this.MON3();
+    const events = this.filteredEvents();
+    const setView = (v) => this.setState({ view: v });
+    const select = (id) => this.setState({ selectedId: id });
+
+    // view modes
+    const vmDefs = [
+      { id: 'month', label: 'Month', icon: 'calDays' },
+      { id: 'week', label: 'Week', icon: 'calendar' },
+      { id: 'list', label: 'List', icon: 'layoutList' },
+      { id: 'timeline', label: 'Timeline', icon: 'sliders' },
+    ];
+    const viewModes = vmDefs.map((v) => {
+      const active = st.view === v.id;
+      return { label: v.label, onClick: () => setView(v.id), bg: active ? '#fff' : 'transparent', fg: active ? '#005b8f' : '#6b7280', shadow: active ? '0 1px 2px rgba(31,42,68,.12)' : 'none', iconEl: this.ic(v.icon, { size: 14, color: active ? '#005b8f' : '#9aa1ab' }) };
+    });
+
+    // type filters
+    const tfDefs = ['all', 'Boat Show', 'Racing / Sport', 'Conference', 'Hospitality', 'Sponsorship', 'Exhibition', 'Internal'];
+    const typeFilters = tfDefs.map((t) => {
+      const active = st.typeFilter === t;
+      const meta = t === 'all' ? { color: '#1f2a44', bg: '#eef1f5', border: '#dde3ea' } : this.tm(t);
+      return {
+        label: t === 'all' ? 'All' : t,
+        onClick: () => this.setState({ typeFilter: active ? 'all' : t }),
+        dot: t === 'all' ? '#9aa1ab' : meta.color,
+        bg: active ? meta.bg : '#fff',
+        border: active ? meta.border : '#e4e7ec',
+        fg: active ? meta.color : '#6b7280',
+      };
+    });
+
+    // period label
+    let periodLabel = months[st.m] + ' ' + st.y;
+
+    // ---- MONTH GRID ----
+    const weekdayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const first = new Date(st.y, st.m, 1);
+    const startWd = (first.getDay() + 6) % 7;
+    const todayDn = this.dn(2026, 5, 19);
+    const MAXLANES = 4;
+    const weeks = [];
+    for (let w = 0; w < 6; w++) {
+      const days = [];
+      const cellNums = [];
+      for (let i = 0; i < 7; i++) {
+        const idx = w * 7 + i;
+        const cellDate = new Date(st.y, st.m, 1 - startWd + idx);
+        const cy = cellDate.getFullYear(), cm = cellDate.getMonth(), cd = cellDate.getDate();
+        const cellNum = this.dn(cy, cm, cd);
+        cellNums.push(cellNum);
+        const inMonth = cm === st.m;
+        const isToday = cellNum === todayDn;
+        days.push({
+          label: cd,
+          numColor: isToday ? '#fff' : (inMonth ? '#1f2a44' : '#c7ccd4'),
+          numBg: isToday ? '#005b8f' : 'transparent',
+          numWeight: isToday ? 700 : (inMonth ? 600 : 400),
+          cellBg: inMonth ? '#fff' : '#fafbfc',
+        });
+      }
+
+      // build spanning segments for events that intersect this week
+      const wkStart = cellNums[0], wkEnd = cellNums[6];
+      const segs = [];
+      events.forEach((ev) => {
+        const sNum = this.dn(...ev.s), eNum = this.dn(...ev.e);
+        if (eNum < wkStart || sNum > wkEnd) return;
+        let startCol = null, endCol = null;
+        for (let i = 0; i < 7; i++) {
+          if (cellNums[i] >= sNum && startCol === null) startCol = i;
+          if (cellNums[i] <= eNum) endCol = i;
+        }
+        if (startCol === null || endCol === null) return;
+        segs.push({ ev, startCol, endCol, sNum, len: endCol - startCol + 1 });
+      });
+      // sort: earliest start, then longest span first (so long bars take low lanes)
+      segs.sort((a, b) => a.startCol - b.startCol || b.len - a.len || a.sNum - b.sNum);
+      // lane assignment (interval scheduling by columns)
+      const lanes = [];
+      segs.forEach((seg) => {
+        let lane = 0;
+        while (true) {
+          const occupied = lanes[lane] || [];
+          const clash = occupied.some((o) => !(seg.endCol < o.startCol || seg.startCol > o.endCol));
+          if (!clash) { (lanes[lane] = occupied).push(seg); seg.lane = lane; break; }
+          lane++;
+        }
+      });
+
+      // overflow per cell beyond MAXLANES
+      const overflow = [0, 0, 0, 0, 0, 0, 0];
+      const bars = [];
+      segs.forEach((seg) => {
+        if (seg.lane >= MAXLANES) {
+          for (let c = seg.startCol; c <= seg.endCol; c++) overflow[c]++;
+          return;
+        }
+        const meta = this.tm(seg.ev.type);
+        const attending = this.effectiveAttending(seg.ev) === 'attending';
+        const isStart = this.dn(...seg.ev.s) >= wkStart; // true start falls in this week
+        const children = [
+          React.createElement('span', { key: 't', style: { font: '600 10.5px/1 Inter', color: '#2c3340', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 } }, seg.ev.name),
+        ];
+        if (attending) children.push(this.ic('check', { size: 11, color: '#1b7a52', sw: 2.4 }));
+        bars.push(React.createElement('div', {
+          key: seg.ev.id,
+          onClick: (e) => { e.stopPropagation(); select(seg.ev.id); },
+          style: {
+            gridColumn: (seg.startCol + 1) + ' / span ' + seg.len,
+            gridRow: String(seg.lane + 1),
+            display: 'flex', alignItems: 'center', gap: '6px',
+            background: '#fff', border: '1px solid #edf0f4',
+            borderLeft: isStart ? ('3px solid ' + meta.color) : ('3px solid ' + meta.color),
+            borderTopLeftRadius: isStart ? '6px' : '2px', borderBottomLeftRadius: isStart ? '6px' : '2px',
+            borderTopRightRadius: '6px', borderBottomRightRadius: '6px',
+            padding: '0 8px', height: '23px', cursor: 'pointer',
+            boxShadow: '0 1px 1px rgba(31,42,68,.04)', overflow: 'hidden', minWidth: 0,
+          },
+        }, children));
+      });
+      // overflow markers (one per cell that needs it)
+      overflow.forEach((n, c) => {
+        if (n > 0) bars.push(React.createElement('div', {
+          key: 'of' + c,
+          style: { gridColumn: (c + 1) + ' / span 1', gridRow: String(MAXLANES + 1), font: '600 10px/23px Inter', color: '#9aa1ab', paddingLeft: '4px' },
+        }, '+' + n + ' more'));
+      });
+
+      const barsEl = React.createElement('div', {
+        style: { position: 'absolute', top: '34px', left: 0, right: 0, padding: '0 6px', display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gridAutoRows: '23px', columnGap: '4px', rowGap: '4px' },
+      }, bars);
+
+      weeks.push({ days, barsEl });
+    }
+
+    // ---- WEEK COLUMNS ----
+    const weekColumns = [];
+    {
+      // week containing cursor: anchor to st.y/st.m + (for week nav we shift m as proxy); use first week of month if month view default. We'll show the week of the 1st by cursor.
+      const anchor = new Date(st.y, st.m, st._weekDay || 1);
+      const aWd = (anchor.getDay() + 6) % 7;
+      const monday = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() - aWd);
+      const dows = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+      for (let i = 0; i < 7; i++) {
+        const dt = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i);
+        const num = this.dn(dt.getFullYear(), dt.getMonth(), dt.getDate());
+        const isToday = num === todayDn;
+        const evs = events.filter((ev) => this.dn(...ev.s) <= num && num <= this.dn(...ev.e)).map((ev) => {
+          const meta = this.tm(ev.type);
+          const attending = this.effectiveAttending(ev) === 'attending';
+          return { name: ev.name, type: ev.type, color: meta.color, bg: meta.bg, textColor: meta.color, location: (ev.city || 'TBC') + (ev.country ? ', ' + ev.country : ''), pinEl: this.ic('mapPin', { size: 11, color: '#9aa1ab' }), attending, attEl: this.ic('check', { size: 12, color: '#1b7a52', sw: 2.4 }), onClick: () => select(ev.id) };
+        });
+        weekColumns.push({ dow: dows[i], day: dt.getDate(), headBg: isToday ? '#e8f1f7' : '#fff', numColor: isToday ? '#005b8f' : '#1f2a44', numWeight: isToday ? 700 : 600, events: evs });
+      }
+    }
+
+    // ---- LIST GROUPS (by month) ----
+    const AVPAL = [
+      ['#e8f1f7', '#005b8f'], ['#e7f3ee', '#1b7a52'], ['#f7f1e6', '#b08d52'],
+      ['#e3f0fa', '#0a6bb0'], ['#eaedf5', '#5b6fa8'], ['#fbe9ea', '#c0292f'],
+    ];
+    const AVNAMES = ['SE', 'JM', 'AR', 'TK', 'LP', 'DC', 'MN', 'RB'];
+    const sorted = [...events].sort((a, b) => this.dn(...a.s) - this.dn(...b.s));
+    const groupsMap = {};
+    sorted.forEach((ev) => {
+      const key = ev.s[0] * 100 + ev.s[1];
+      if (!groupsMap[key]) groupsMap[key] = { label: months[ev.s[1]] + ' ' + ev.s[0], key, events: [] };
+      const meta = this.tm(ev.type);
+      const att = this.attMeta(this.effectiveAttending(ev));
+      const shown = Math.min(3, ev.attendees);
+      const avatars = [];
+      for (let i = 0; i < shown; i++) {
+        const pal = AVPAL[(ev.id.charCodeAt(1) + i) % AVPAL.length];
+        avatars.push({ initials: AVNAMES[(ev.id.charCodeAt(1) + i * 3) % AVNAMES.length], bg: pal[0], fg: pal[1], ml: i === 0 ? '0' : '-8px' });
+      }
+      const extra = ev.attendees - shown;
+      groupsMap[key].events.push({
+        name: ev.name, mon: mon3[ev.s[1]], day: ev.s[2], color: meta.color, bg: meta.bg, typeBorder: meta.border, type: ev.type,
+        location: (ev.city || '') + (ev.country ? ', ' + ev.country : ''), dateRange: this.fmtRange(ev),
+        pinEl: this.ic('mapPin', { size: 13, color: '#9aa1ab' }),
+        calEl: this.ic('calendar', { size: 12, color: '#9aa1ab' }),
+        avatars, attendeeText: extra > 0 ? '+' + extra + ' attending' : ev.attendees + ' attending',
+        attLabel: att.label, attBg: att.bg, attBorder: att.border, attFg: att.fg, attIconEl: this.ic(att.icon, { size: 12, color: att.fg }),
+        onClick: () => select(ev.id),
+      });
+    });
+    const listGroups = Object.values(groupsMap).sort((a, b) => a.key - b.key).map((g) => ({ ...g, count: g.events.length + (g.events.length === 1 ? ' event' : ' events') }));
+
+    // ---- TIMELINE (reuse sorted, group by month) ----
+    const tlMap = {};
+    sorted.forEach((ev) => {
+      const key = ev.s[0] * 100 + ev.s[1];
+      if (!tlMap[key]) tlMap[key] = { label: months[ev.s[1]] + ' ' + ev.s[0], key, events: [] };
+      const meta = this.tm(ev.type);
+      tlMap[key].events.push({ name: ev.name, type: ev.type, color: meta.color, location: (ev.city || '') + (ev.country ? ', ' + ev.country : ''), shortDate: mon3[ev.s[1]] + ' ' + ev.s[2], onClick: () => select(ev.id) });
+    });
+    const timelineGroups = Object.values(tlMap).sort((a, b) => a.key - b.key);
+
+    // ---- METRICS ----
+    const allEv = this.EVENTS();
+    const upcoming = allEv.filter((ev) => this.dn(...ev.e) >= todayDn).length;
+    const teamAttending = allEv.filter((ev) => this.effectiveAttending(ev) === 'attending').length;
+    const countries = new Set(allEv.map((ev) => ev.country).filter(Boolean)).size;
+    const thisMonth = allEv.filter((ev) => ev.s[0] === st.y && ev.s[1] === st.m).length;
+    const metrics = [
+      { value: upcoming, label: 'Upcoming events', tint: '#e8f1f7', iconEl: this.ic('calDays', { size: 20, color: '#005b8f' }) },
+      { value: teamAttending, label: "You're attending", tint: '#e7f3ee', iconEl: this.ic('userCheck', { size: 20, color: '#1b7a52' }) },
+      { value: countries, label: 'Countries', tint: '#f7f1e6', iconEl: this.ic('globe2', { size: 20, color: '#b08d52' }) },
+      { value: thisMonth, label: 'This month', tint: '#e3f0fa', iconEl: this.ic('flag', { size: 20, color: '#007dc5' }) },
+    ];
+
+    // legend
+    const legend = Object.keys(this.TYPES()).map((k) => ({ label: k, color: this.TYPES()[k].color }));
+
+    // navigation
+    const onPrev = () => this.setState((s) => { if (s.view === 'week') { const a = new Date(s.y, s.m, (s._weekDay || 1) - 7); return { y: a.getFullYear(), m: a.getMonth(), _weekDay: a.getDate() }; } let m = s.m - 1, y = s.y; if (m < 0) { m = 11; y--; } return { m, y }; });
+    const onNext = () => this.setState((s) => { if (s.view === 'week') { const a = new Date(s.y, s.m, (s._weekDay || 1) + 7); return { y: a.getFullYear(), m: a.getMonth(), _weekDay: a.getDate() }; } let m = s.m + 1, y = s.y; if (m > 11) { m = 0; y++; } return { m, y }; });
+    const onToday = () => this.setState({ y: 2026, m: 5, _weekDay: 19 });
+
+    // selection
+    const selRaw = st.selectedId ? this.EVENTS().find((e) => e.id === st.selectedId) : null;
+    let sel = null;
+    if (selRaw) {
+      const meta = this.tm(selRaw.type);
+      const cur = this.effectiveAttending(selRaw);
+      const opts = [
+        { key: 'attending', label: 'Going', icon: 'check' },
+        { key: 'maybe', label: 'Maybe', icon: 'helpC' },
+        { key: 'not_attending', label: "Can't go", icon: 'x' },
+      ];
+      sel = {
+        name: selRaw.name, type: selRaw.type, color: meta.color, bg: meta.bg, typeBorder: meta.border,
+        dateRangeFull: this.fmtRange(selRaw),
+        locationFull: (selRaw.city || 'TBC') + (selRaw.country ? ', ' + selRaw.country : ''),
+        attendeeText: selRaw.attendees + ' from the team attending',
+        hasDesc: !!selRaw.desc, desc: selRaw.desc,
+        rsvp: opts.map((o) => {
+          const active = cur === o.key;
+          const ac = o.key === 'attending' ? '#1b7a52' : o.key === 'maybe' ? '#0a6bb0' : '#6b7280';
+          return {
+            label: o.label,
+            onClick: () => this.setState((s) => ({ rsvp: { ...s.rsvp, [selRaw.id]: active ? 'not_responded' : o.key } })),
+            bg: active ? (o.key === 'attending' ? '#e7f3ee' : o.key === 'maybe' ? '#e3f0fa' : '#f3f4f6') : '#fff',
+            border: active ? (o.key === 'attending' ? '#bfe3cf' : o.key === 'maybe' ? '#bcdcf2' : '#e2e5ea') : '#e4e7ec',
+            fg: active ? ac : '#6b7280',
+            iconEl: this.ic(o.icon, { size: 17, color: active ? ac : '#9aa1ab' }),
+          };
+        }),
+        onWebsite: () => {},
+        onExport: () => {},
+      };
+    }
+
+    return {
+      query: st.query,
+      onSearch: (e) => this.setState({ query: e.target.value }),
+      viewModes, typeFilters, periodLabel, weekdayNames, weeks, weekColumns, listGroups, timelineGroups, metrics, legend,
+      isMonth: st.view === 'month', isWeek: st.view === 'week', isList: st.view === 'list', isTimeline: st.view === 'timeline',
+      onPrev, onNext, onToday,
+      hasSelection: !!sel, sel, onClose: () => this.setState({ selectedId: null }),
+      icChevron: this.ic('chevronRight', { size: 14, color: '#9aa1ab' }),
+      icBell: this.ic('bell', { size: 18, color: '#5c6168' }),
+      icSearch: this.ic('search', { size: 15, color: '#9aa1ab' }),
+      icCalSm: this.ic('calendar', { size: 15, color: '#5c6168' }),
+      icPlus: this.ic('plus', { size: 15, color: '#fff' }),
+      icChevL: this.ic('chevronLeft', { size: 17, color: '#5c6168' }),
+      icChevR: this.ic('chevronRight', { size: 17, color: '#5c6168' }),
+      icX: this.ic('x', { size: 17, color: '#5c6168' }),
+      icCalRow: this.ic('calendar', { size: 17, color: '#9aa1ab' }),
+      icPinRow: this.ic('mapPin', { size: 17, color: '#9aa1ab' }),
+      icUsersRow: this.ic('users', { size: 17, color: '#9aa1ab' }),
+      icGlobe: this.ic('globe', { size: 16, color: '#fff' }),
+      icDownload: this.ic('download', { size: 16, color: '#1f2a44' }),
+    };
+  }
+}
+</script>
+</body>
+</html>

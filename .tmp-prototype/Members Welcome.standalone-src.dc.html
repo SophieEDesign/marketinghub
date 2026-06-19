@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="ext-resource-dependency" content="assets/hero-dubai.jpg" data-resource-id="heroDubai" />
+<meta name="ext-resource-dependency" content="assets/logo-dark.svg" data-resource-id="logoDark" />
+<script src="./support.js"></script>
+</head>
+<body>
+<template id="__bundler_thumbnail" data-bg-color="#0f1c2b">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <rect width="1200" height="800" fill="#0f1c2b"/>
+    <rect x="360" y="250" width="480" height="170" rx="24" fill="#c4a574"/>
+    <path d="M600 300 L660 360 L600 420 L540 360 Z" fill="#0f1c2b"/>
+    <rect x="470" y="470" width="260" height="20" rx="10" fill="#2e445e"/>
+    <rect x="510" y="510" width="180" height="14" rx="7" fill="#21344a"/>
+  </svg>
+</template>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{font-family:'Inter',ui-sans-serif,system-ui,sans-serif;background:#eceef1;color:#1f2a44;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  button{font-family:inherit}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:#cdd2da;border-radius:8px;border:2px solid transparent;background-clip:content-box}
+</style>
+</helmet>
+
+<div style="min-height:100vh;background:#eceef1;display:flex;flex-direction:column;">
+
+  <!-- TOP APP BAR -->
+  <div style="display:flex;align-items:center;gap:14px;height:58px;padding:0 24px;background:#fff;border-bottom:1px solid #e4e7ec;position:sticky;top:0;z-index:30;">
+    <img src="assets/logo-dark.svg" alt="Peters &amp; May" style="height:22px;"/>
+    <div style="height:20px;width:1px;background:#e4e7ec;"></div>
+    <div style="display:flex;align-items:center;gap:7px;font:500 13px/1 Inter;color:#9aa1ab;">Marketing Hub <span style="display:flex;">{{ icChevron }}</span> <span style="color:#1f2a44;font-weight:600;">Members Welcome</span></div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:16px;">
+      <span style="display:flex;cursor:pointer;">{{ icBell }}</span>
+      <div style="height:30px;width:30px;border-radius:50%;background:#005b8f;color:#fff;font:600 12px/30px Inter;text-align:center;">SE</div>
+    </div>
+  </div>
+
+  <div style="flex:1;max-width:1140px;width:100%;margin:0 auto;padding:26px 28px 64px;display:flex;flex-direction:column;gap:26px;">
+
+    <!-- HERO -->
+    <section style="position:relative;border-radius:20px;overflow:hidden;min-height:248px;display:flex;align-items:flex-end;">
+      <img src="assets/hero-yacht-aerial.jpg" style="position:absolute;inset:0;height:100%;width:100%;object-fit:cover;object-position:center 40%;"/>
+      <div style="position:absolute;inset:0;background:linear-gradient(108deg,rgba(15,28,43,.9) 0%,rgba(15,28,43,.6) 48%,rgba(15,28,43,.25) 100%);"></div>
+      <div style="position:relative;padding:30px 32px;width:100%;">
+        <div style="font:700 11px/1 Inter;letter-spacing:.16em;text-transform:uppercase;color:#d9c49a;margin-bottom:13px;">{{ greeting }}</div>
+        <h1 style="margin:0 0 9px;font:300 30px/1.12 Inter;letter-spacing:-.02em;color:#fff;max-width:560px;">Welcome to the Peters &amp; May <span style="font-weight:600;">Marketing Hub</span></h1>
+        <p style="margin:0 0 18px;font:400 14.5px/1.5 Inter;color:#d3dbe6;max-width:500px;">Your events, resources and collaboration tools — all in one place.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.24);backdrop-filter:blur(8px);border-radius:100px;padding:8px 14px;">
+            <span style="display:flex;">{{ icCalWhite }}</span><span style="font:600 12.5px/1 Inter;color:#fff;">{{ eventCount }} upcoming events</span>
+          </div>
+          <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.24);backdrop-filter:blur(8px);border-radius:100px;padding:8px 14px;">
+            <span style="display:flex;">{{ icCheckWhite }}</span><span style="font:600 12.5px/1 Inter;color:#fff;">{{ attendingCount }} you're attending</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- QUICK ACTIONS -->
+    <section>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px;">
+        <h2 style="margin:0;font:600 17px/1.2 Inter;color:#1f2a44;letter-spacing:-.01em;">Quick actions</h2>
+        <span style="font:400 13px/1 Inter;color:#9aa1ab;">Open the areas you use most</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;">
+        <sc-for list="{{ quickActions }}" as="q" hint-placeholder-count="6">
+          <div onClick="{{ q.onClick }}" style="position:relative;display:flex;flex-direction:column;background:#fff;border:1px solid #e4e7ec;border-radius:16px;padding:18px;cursor:pointer;transition:box-shadow .2s,transform .2s,border-color .2s;box-shadow:0 1px 3px rgba(31,42,68,.05);" style-hover="box-shadow:0 12px 28px rgba(31,42,68,.12);transform:translateY(-2px);border-color:#cfd5dd;">
+            <div style="display:flex;height:42px;width:42px;align-items:center;justify-content:center;border-radius:11px;background:{{ q.iconBg }};margin-bottom:14px;">{{ q.iconEl }}</div>
+            <h3 style="margin:0 0 6px;font:600 15px/1.25 Inter;color:#1f2a44;">{{ q.title }}</h3>
+            <p style="margin:0 0 16px;font:400 13px/1.5 Inter;color:#6b7280;flex:1;">{{ q.desc }}</p>
+            <span style="display:inline-flex;align-items:center;gap:6px;font:600 12.5px/1 Inter;color:{{ q.linkColor }};">{{ q.actionLabel }} {{ q.arrowEl }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <!-- SNAPSHOTS -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+
+      <!-- EVENTS -->
+      <section style="display:flex;flex-direction:column;background:#fff;border:1px solid #e4e7ec;border-radius:18px;overflow:hidden;">
+        <header style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:17px 18px;border-bottom:1px solid #eef1f4;">
+          <div>
+            <h2 style="margin:0;font:600 15px/1.2 Inter;color:#1f2a44;">Upcoming events</h2>
+            <p style="margin:4px 0 0;font:400 12px/1 Inter;color:#9aa1ab;">Your next {{ eventCount }} visible events</p>
+          </div>
+          <span style="font:600 12px/1 Inter;color:#005b8f;cursor:pointer;flex-shrink:0;">View all</span>
+        </header>
+        <div style="padding:12px;display:flex;flex-direction:column;gap:10px;">
+          <sc-for list="{{ events }}" as="e" hint-placeholder-count="4">
+            <div style="border:1px solid #eef1f4;border-radius:13px;padding:13px;background:#fafbfc;">
+              <div style="display:flex;gap:12px;align-items:flex-start;">
+                <div style="flex-shrink:0;width:46px;text-align:center;border-radius:9px;overflow:hidden;border:1px solid #e4e7ec;background:#fff;">
+                  <div style="background:{{ e.accent }};color:#fff;font:700 9px/1 Inter;letter-spacing:.06em;padding:4px 0;">{{ e.mon }}</div>
+                  <div style="font:700 17px/1 Inter;color:#1f2a44;padding:5px 0 6px;">{{ e.day }}</div>
+                </div>
+                <div style="min-width:0;flex:1;">
+                  <div style="font:600 13.5px/1.3 Inter;color:#1f2a44;">{{ e.name }}</div>
+                  <div style="font:400 12px/1.3 Inter;color:#9aa1ab;margin-top:3px;">{{ e.meta }}</div>
+                  <div style="display:inline-flex;align-items:center;gap:5px;margin-top:8px;border:1px solid {{ e.badgeBorder }};background:{{ e.badgeBg }};border-radius:100px;padding:4px 9px;font:600 10px/1 Inter;color:{{ e.badgeFg }};">{{ e.badgeDot }}{{ e.badgeLabel }}</div>
+                </div>
+              </div>
+              <div style="display:flex;gap:6px;margin-top:11px;">
+                <sc-for list="{{ e.rsvp }}" as="r" hint-placeholder-count="3">
+                  <button onClick="{{ r.onClick }}" style="flex:1;border:1px solid {{ r.border }};background:{{ r.bg }};color:{{ r.fg }};border-radius:8px;padding:7px 4px;font:600 11.5px/1 Inter;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;">{{ r.iconEl }}{{ r.label }}</button>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+
+      <!-- RESOURCES -->
+      <section style="display:flex;flex-direction:column;background:#fff;border:1px solid #e4e7ec;border-radius:18px;overflow:hidden;">
+        <header style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:17px 18px;border-bottom:1px solid #eef1f4;">
+          <div>
+            <h2 style="margin:0;font:600 15px/1.2 Inter;color:#1f2a44;">Featured resources</h2>
+            <p style="margin:4px 0 0;font:400 12px/1 Inter;color:#9aa1ab;">Approved files &amp; guidance</p>
+          </div>
+          <span style="font:600 12px/1 Inter;color:#005b8f;cursor:pointer;flex-shrink:0;">View all</span>
+        </header>
+        <div style="flex:1;">
+          <sc-for list="{{ resources }}" as="r" hint-placeholder-count="5">
+            <div onClick="{{ r.onOpen }}" style="display:flex;align-items:center;gap:13px;padding:13px 18px;border-bottom:1px solid #f3f5f8;cursor:pointer;" style-hover="background:#f7f9fb;">
+              <div style="height:44px;width:44px;border-radius:10px;flex-shrink:0;overflow:hidden;background:{{ r.tileBg }};display:flex;align-items:center;justify-content:center;">
+                <sc-if value="{{ r.isPhoto }}" hint-placeholder-val="{{ true }}"><img src="{{ r.img }}" style="height:100%;width:100%;object-fit:cover;"/></sc-if>
+                <sc-if value="{{ r.isBrand }}"><img src="{{ r.logo }}" style="max-width:64%;max-height:22px;object-fit:contain;"/></sc-if>
+                <sc-if value="{{ r.isFile }}">{{ r.fileIconEl }}</sc-if>
+              </div>
+              <div style="min-width:0;flex:1;">
+                <div style="font:600 13.5px/1.25 Inter;color:#1f2a44;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ r.title }}</div>
+                <div style="display:flex;align-items:center;gap:7px;margin-top:4px;">
+                  <span style="font:400 11.5px/1 Inter;color:#9aa1ab;">{{ r.cat }} · {{ r.updated }}</span>
+                  <span style="display:inline-flex;align-items:center;gap:4px;font:600 10px/1 Inter;color:#b08d52;">{{ r.srcIconEl }}{{ r.source }}</span>
+                </div>
+              </div>
+              <span style="background:{{ r.badgeBg }};color:{{ r.badgeFg }};font:800 9px/1 Inter;letter-spacing:.04em;padding:5px 7px;border-radius:6px;flex-shrink:0;">{{ r.type }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+    </div>
+
+    <!-- GUIDANCE -->
+    <section style="border-radius:18px;border:1px solid #ece3cf;background:linear-gradient(120deg,#f7f4ec,#fbf9f3);padding:22px 24px;">
+      <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;">
+        <div style="display:flex;height:46px;width:46px;align-items:center;justify-content:center;border-radius:12px;background:#f0e7d3;flex-shrink:0;">{{ icMegaphone }}</div>
+        <div style="flex:1;min-width:240px;">
+          <h2 style="margin:0 0 5px;font:600 16px/1.2 Inter;color:#1f2a44;">How to use this space</h2>
+          <p style="margin:0;font:400 13px/1.55 Inter;color:#7d6a45;max-width:640px;">View upcoming activity and update your attendance under Events. Find approved logos, documents and media in the Resource Hub. Got an event to suggest or need a hand? Get in touch with the team.</p>
+        </div>
+        <button style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(95deg,#c4a574,#b08d52);color:#fff;border:none;border-radius:10px;padding:12px 20px;font:600 13px/1 Inter;cursor:pointer;flex-shrink:0;box-shadow:0 6px 16px rgba(176,141,82,.3);">{{ icMail }}Contact the team</button>
+      </div>
+    </section>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { rsvp: { e1: 'attending', e2: 'not_responded', e3: 'maybe', e4: 'not_responded' } };
+
+  ICONS() {
+    return {
+      bell: [['path', { d: 'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9' }], ['path', { d: 'M10.3 21a1.94 1.94 0 0 0 3.4 0' }]],
+      chevronRight: [['path', { d: 'm9 18 6-6-6-6' }]],
+      arrowRight: [['path', { d: 'M5 12h14' }], ['path', { d: 'm12 5 7 7-7 7' }]],
+      calendar: [['rect', { width: 18, height: 18, x: 3, y: 4, rx: 2 }], ['path', { d: 'M3 10h18' }], ['path', { d: 'M8 2v4' }], ['path', { d: 'M16 2v4' }]],
+      userCheck: [['path', { d: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2' }], ['circle', { cx: 9, cy: 7, r: 4 }], ['path', { d: 'm16 11 2 2 4-4' }]],
+      folderOpen: [['path', { d: 'm6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H18a2 2 0 0 1 2 2v2' }]],
+      plusCircle: [['circle', { cx: 12, cy: 12, r: 10 }], ['path', { d: 'M8 12h8' }], ['path', { d: 'M12 8v8' }]],
+      users: [['path', { d: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2' }], ['circle', { cx: 9, cy: 7, r: 4 }], ['path', { d: 'M22 21v-2a4 4 0 0 0-3-3.87' }], ['path', { d: 'M16 3.13a4 4 0 0 1 0 7.75' }]],
+      help: [['circle', { cx: 12, cy: 12, r: 10 }], ['path', { d: 'M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3' }], ['path', { d: 'M12 17h.01' }]],
+      megaphone: [['path', { d: 'm3 11 18-5v12L3 14v-3z' }], ['path', { d: 'M11.6 16.8a3 3 0 1 1-5.8-1.6' }]],
+      mail: [['rect', { width: 20, height: 16, x: 2, y: 4, rx: 2 }], ['path', { d: 'm22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7' }]],
+      check: [['path', { d: 'M20 6 9 17l-5-5' }]],
+      x: [['path', { d: 'M18 6 6 18' }], ['path', { d: 'm6 6 12 12' }]],
+      helpCircle: [['circle', { cx: 12, cy: 12, r: 10 }], ['path', { d: 'M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3' }], ['path', { d: 'M12 17h.01' }]],
+      fileText: [['path', { d: 'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z' }], ['path', { d: 'M14 2v4a2 2 0 0 0 2 2h4' }], ['path', { d: 'M16 13H8' }], ['path', { d: 'M16 17H8' }]],
+      presentation: [['path', { d: 'M2 3h20' }], ['path', { d: 'M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3' }], ['path', { d: 'm7 21 5-5 5 5' }]],
+      hardDrive: [['line', { x1: 22, x2: 2, y1: 12, y2: 12 }], ['path', { d: 'M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z' }], ['line', { x1: 6, x2: 6.01, y1: 16, y2: 16 }], ['line', { x1: 10, x2: 10.01, y1: 16, y2: 16 }]],
+      helpC: [['circle', { cx: 12, cy: 12, r: 10 }]],
+    };
+  }
+
+  ic(name, o) {
+    o = o || {};
+    const defs = this.ICONS()[name] || this.ICONS().helpC;
+    const children = defs.map((c, i) => React.createElement(c[0], Object.assign({ key: i }, c[1])));
+    return React.createElement('svg', {
+      width: o.size || 18, height: o.size || 18, viewBox: '0 0 24 24',
+      fill: o.fill || 'none', stroke: o.color || 'currentColor',
+      strokeWidth: o.sw || 1.85, strokeLinecap: 'round', strokeLinejoin: 'round',
+      style: { display: 'block', flexShrink: 0 },
+    }, children);
+  }
+
+  renderVals() {
+    const st = this.state;
+
+    // greeting by time of day
+    const h = new Date().getHours();
+    const part = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+    const greeting = part + ', Sarah';
+
+    // quick actions
+    const qaDefs = [
+      { id: 'events', title: 'View events', desc: 'See upcoming boat shows, industry events and member activities.', actionLabel: 'Open event calendar', icon: 'calendar', tint: '#e3f0fa', color: '#0a6bb0' },
+      { id: 'attendance', title: 'My attendance', desc: 'Check which events you are attending and update your response.', actionLabel: 'View my events', icon: 'userCheck', tint: '#e7f3ee', color: '#1b7a52' },
+      { id: 'resources', title: 'Resource hub', desc: 'Access approved logos, presentations, documents and shared media.', actionLabel: 'Open resources', icon: 'folderOpen', tint: '#f0e7d3', color: '#b08d52' },
+      { id: 'submit', title: 'Submit an event', desc: 'Suggest an event for review by the Peters & May team.', actionLabel: 'Submit event', icon: 'plusCircle', tint: '#e8f1f7', color: '#005b8f' },
+      { id: 'contacts', title: 'Useful contacts', desc: 'Find relevant Peters & May contacts for events and collaboration.', actionLabel: 'View contacts', icon: 'users', tint: '#eef1f6', color: '#3d4d63' },
+      { id: 'help', title: 'Help & guidance', desc: 'Learn how to use the hub or contact the team for support.', actionLabel: 'Get help', icon: 'helpCircle', tint: '#fde8e8', color: '#c0292f' },
+    ];
+    const quickActions = qaDefs.map((q) => ({
+      ...q,
+      iconBg: q.tint,
+      iconEl: this.ic(q.icon, { size: 21, color: q.color }),
+      linkColor: '#005b8f',
+      arrowEl: this.ic('arrowRight', { size: 15, color: '#005b8f' }),
+      onClick: () => {},
+    }));
+
+    // RSVP states
+    const RSVP = {
+      attending: { label: 'Attending', bg: '#e7f3ee', border: '#bfe3cf', fg: '#1b7a52', dot: '#1b7a52' },
+      maybe: { label: 'Maybe', bg: '#e3f0fa', border: '#bcdcf2', fg: '#0a6bb0', dot: '#0a6bb0' },
+      not_attending: { label: "Can't go", bg: '#f3f4f6', border: '#e2e5ea', fg: '#6b7280', dot: '#9aa1ab' },
+      not_responded: { label: 'Not responded', bg: '#f3f4f6', border: '#e2e5ea', fg: '#6b7280', dot: '#c7ccd4' },
+    };
+    const dot = (color) => React.createElement('span', { style: { height: '6px', width: '6px', borderRadius: '50%', background: color, display: 'block' } });
+    const setRsvp = (eid, val) => this.setState((s) => ({ rsvp: { ...s.rsvp, [eid]: val } }));
+
+    const evDefs = [
+      { id: 'e1', name: 'Cannes Yachting Festival', mon: 'SEP', day: '09', accent: '#005b8f', meta: 'Sep 9–14 · Cannes, France', type: 'Boat Show' },
+      { id: 'e2', name: 'Monaco Yacht Show', mon: 'SEP', day: '24', accent: '#c4a574', meta: 'Sep 24–27 · Port Hercule, Monaco', type: 'Boat Show' },
+      { id: 'e3', name: 'Southampton Intl Boat Show', mon: 'SEP', day: '19', accent: '#0a6bb0', meta: 'Sep 19–28 · Southampton, UK', type: 'Boat Show' },
+      { id: 'e4', name: 'METSTRADE Show', mon: 'NOV', day: '18', accent: '#c0292f', meta: 'Nov 18–20 · Amsterdam, NL', type: 'Trade' },
+    ];
+    const events = evDefs.map((e) => {
+      const status = st.rsvp[e.id] || 'not_responded';
+      const b = RSVP[status];
+      const opts = [
+        { key: 'attending', label: 'Going', icon: 'check' },
+        { key: 'maybe', label: 'Maybe', icon: 'helpC' },
+        { key: 'not_attending', label: "Can't", icon: 'x' },
+      ];
+      return {
+        ...e,
+        badgeLabel: b.label, badgeBg: b.bg, badgeBorder: b.border, badgeFg: b.fg,
+        badgeDot: dot(b.dot),
+        rsvp: opts.map((o) => {
+          const active = status === o.key;
+          const activeColor = o.key === 'attending' ? '#1b7a52' : o.key === 'maybe' ? '#0a6bb0' : '#6b7280';
+          return {
+            label: o.label,
+            onClick: () => setRsvp(e.id, active ? 'not_responded' : o.key),
+            bg: active ? (o.key === 'attending' ? '#e7f3ee' : o.key === 'maybe' ? '#e3f0fa' : '#f3f4f6') : '#fff',
+            border: active ? (o.key === 'attending' ? '#bfe3cf' : o.key === 'maybe' ? '#bcdcf2' : '#e2e5ea') : '#e4e7ec',
+            fg: active ? activeColor : '#6b7280',
+            iconEl: this.ic(o.icon, { size: 13, color: active ? activeColor : '#9aa1ab' }),
+          };
+        }),
+      };
+    });
+    const attendingCount = Object.values(st.rsvp).filter((v) => v === 'attending').length;
+
+    // resources
+    const BADGE = { PNG: ['#e7f3ee', '#1b7a52'], JPG: ['#e3f0fa', '#0a6bb0'], PDF: ['#fde8e8', '#c0292f'], PPTX: ['#fbeede', '#b5651d'], DOCX: ['#eef1f6', '#3d4d63'] };
+    const FILEICON = { PDF: 'fileText', PPTX: 'presentation', DOCX: 'fileText' };
+    const resDefs = [
+      { title: 'Brand Guidelines 2026', cat: 'Brand Guidelines', type: 'PDF', kind: 'file', source: 'Drive', updated: '5d ago' },
+      { title: 'Superyacht Transport — Hero', cat: 'Images', type: 'JPG', kind: 'photo', img: (window.__resources && window.__resources.heroDubai) || 'assets/hero-dubai.jpg', source: 'Drive', updated: '1w ago' },
+      { title: 'Primary Logo Pack', cat: 'Logos', type: 'PNG', kind: 'brand', logo: (window.__resources && window.__resources.logoDark) || 'assets/logo-dark.svg', source: 'Drive', updated: '2d ago' },
+      { title: 'LinkedIn Post Template', cat: 'Templates', type: 'PPTX', kind: 'file', source: 'Drive', updated: '4d ago' },
+      { title: 'Q2 Campaign Brief', cat: 'Documents', type: 'DOCX', kind: 'file', source: 'SharePoint', updated: '6d ago' },
+    ];
+    const resources = resDefs.map((r) => {
+      const [bb, bf] = BADGE[r.type] || ['#eef1f6', '#3d4d63'];
+      return {
+        ...r,
+        isPhoto: r.kind === 'photo', isBrand: r.kind === 'brand', isFile: r.kind === 'file',
+        badgeBg: bb, badgeFg: bf,
+        tileBg: r.kind === 'brand' ? '#fff' : (r.kind === 'file' ? bb : '#eef1f4'),
+        fileIconEl: this.ic(FILEICON[r.type] || 'fileText', { size: 20, color: bf }),
+        srcIconEl: this.ic('hardDrive', { size: 11, color: '#b08d52' }),
+        onOpen: () => {},
+      };
+    });
+
+    return {
+      greeting,
+      eventCount: evDefs.length,
+      attendingCount,
+      quickActions, events, resources,
+      icChevron: this.ic('chevronRight', { size: 14, color: '#9aa1ab' }),
+      icBell: this.ic('bell', { size: 18, color: '#5c6168' }),
+      icCalWhite: this.ic('calendar', { size: 15, color: '#fff' }),
+      icCheckWhite: this.ic('userCheck', { size: 15, color: '#fff' }),
+      icMegaphone: this.ic('megaphone', { size: 22, color: '#b08d52' }),
+      icMail: this.ic('mail', { size: 16, color: '#fff' }),
+    };
+  }
+}
+</script>
+</body>
+</html>

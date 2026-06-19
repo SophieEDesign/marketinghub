@@ -52,30 +52,30 @@ export type EventTypeLabel = (typeof EVENT_TYPES)[number] | string
 export type EventStatusLabel = (typeof EVENT_STATUSES)[number] | string
 
 const EVENT_TYPE_COLORS: Record<string, string> = {
-  "boat show": "#3B82F6",
-  exhibition: "#10B981",
-  conference: "#3B82F6",
-  "racing / sport": "#8B5CF6",
-  racing: "#8B5CF6",
-  sport: "#8B5CF6",
-  "experience / events": "#8B5CF6",
-  experience: "#8B5CF6",
-  hospitality: "#F97316",
-  sponsorship: "#EC4899",
-  internal: "#64748B",
-  international: "#14B8A6",
-  other: "#EC4899",
+  "boat show": "#005b8f",
+  exhibition: "#1b7a52",
+  conference: "#007dc5",
+  "racing / sport": "#5b6fa8",
+  racing: "#5b6fa8",
+  sport: "#5b6fa8",
+  "experience / events": "#5b6fa8",
+  experience: "#5b6fa8",
+  hospitality: "#b08d52",
+  sponsorship: "#c0292f",
+  internal: "#64748b",
+  international: "#007dc5",
+  other: "#64748b",
 }
 
-/** Legend entries for event type colours (design-token friendly hex). */
+/** Legend entries for event type colours (Harbour × Marque palette). */
 export const EVENT_TYPE_LEGEND: { label: string; color: string }[] = [
-  { label: "Racing / Sport", color: "#8B5CF6" },
-  { label: "Exhibition", color: "#10B981" },
-  { label: "Conference", color: "#3B82F6" },
-  { label: "Hospitality", color: "#F97316" },
-  { label: "Sponsorship", color: "#EC4899" },
-  { label: "Internal", color: "#64748B" },
-  { label: "Other", color: "#EC4899" },
+  { label: "Boat Show", color: "#005b8f" },
+  { label: "Conference", color: "#007dc5" },
+  { label: "Exhibition", color: "#1b7a52" },
+  { label: "Racing / Sport", color: "#5b6fa8" },
+  { label: "Hospitality", color: "#b08d52" },
+  { label: "Sponsorship", color: "#c0292f" },
+  { label: "Internal", color: "#64748b" },
 ]
 
 export type EventAttendanceStatus = "attending" | "maybe" | "not_attending" | "interested"
@@ -1020,6 +1020,7 @@ export function buildEventCalendarEvents(items: MarketingEventItem[]): EventCale
           attendeeLabels: item.attendeeLabels,
           attendeeCount: item.attendeeCount,
           accentColor: item.accentColor,
+          currentUserAttending: item.currentUserAttending,
         },
       }
       if (end) fc.end = end
