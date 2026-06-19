@@ -449,8 +449,7 @@ export default function CampaignsOverviewBlock({
                         <CampaignValuePill value={item.priority} />
                       </div>
                       <p className="mt-2 text-xs text-muted-foreground">
-                        {view === "calendar" ? "Dates" : view === "timeline" ? "Timeline" : "Period"}:{" "}
-                        {formatDateRange(item.startDate, item.endDate)}
+                        Period: {formatDateRange(item.startDate, item.endDate)}
                       </p>
                       {config?.campaigns_show_progress !== false ? (
                         <div className="mt-2">
