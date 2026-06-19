@@ -36,9 +36,15 @@ export function variantResourceFromAttachment(
 }
 
 export function countByCategory(
-  resources: MockResource[]
+  resources: MockResource[],
+  favouriteIds?: Set<string>
 ): Record<CategoryFilter, number> {
-  const counts: Record<string, number> = { all: resources.length }
+  const counts: Record<string, number> = {
+    all: resources.length,
+    favourites: favouriteIds
+      ? resources.filter((r) => favouriteIds.has(r.id)).length
+      : 0,
+  }
   for (const r of resources) {
     counts[r.category] = (counts[r.category] ?? 0) + 1
   }
@@ -51,23 +57,60 @@ export function countByCategory(
 export function filterResources(
   resources: MockResource[],
   category: CategoryFilter,
-  searchQuery: string
+  searchQuery: string,
+  favouriteIds?: Set<string>
 ): MockResource[] {
   const q = searchQuery.trim().toLowerCase()
   return resources.filter((r) => {
-    if (category !== "all" && r.category !== category) return false
+    if (category === "favourites") {
+      if (!favouriteIds?.has(r.id)) return false
+    } else if (category !== "all" && r.category !== category) {
+      return false
+    }
     if (!q) return true
     const haystack = [
       r.title,
       r.category,
       r.fileType,
       r.description ?? "",
+      r.source ?? "",
       ...(r.tags ?? []),
     ]
       .join(" ")
       .toLowerCase()
     return haystack.includes(q)
   })
+}
+
+export type ResourceSortMode = "recent" | "az"
+
+export function sortResources(
+  resources: MockResource[],
+  mode: ResourceSortMode
+): MockResource[] {
+  const copy = [...resources]
+  if (mode === "az") {
+    return copy.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" }))
+  }
+  return copy.sort((a, b) => {
+    const aKey = a.updatedAt ?? a.addedAt ?? ""
+    const bKey = b.updatedAt ?? b.addedAt ?? ""
+    return bKey.localeCompare(aKey)
+  })
+}
+
+export function getFeatured(resources: MockResource[], limit = 4): MockResource[] {
+  const featured = resources.filter((r) => r.isFeatured)
+  if (featured.length >= limit) return featured.slice(0, limit)
+  const rest = resources.filter((r) => !r.isFeatured)
+  return [...featured, ...rest].slice(0, limit)
+}
+
+export function hasActiveFilters(
+  category: CategoryFilter,
+  searchQuery: string
+): boolean {
+  return category !== "all" || searchQuery.trim().length > 0
 }
 
 export function getRecent(resources: MockResource[], limit = 3): MockResource[] {
@@ -121,6 +164,7 @@ export function resolveDisplayResource(
 export function parseDefaultCategory(value: string | undefined): CategoryFilter {
   const valid: CategoryFilter[] = [
     "all",
+    "favourites",
     "logos",
     "brand-guidelines",
     "images",

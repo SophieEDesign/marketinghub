@@ -1,17 +1,17 @@
 "use client"
 
 import {
+  Archive,
   File,
   FileText,
   Image as ImageIcon,
   Link as LinkIcon,
   Presentation,
   Video,
-  Archive,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { MockResource } from "./types"
-import { isImageType } from "./utils"
+import type { MockResource, ResourceFileType } from "./types"
+import { getFileTypeBadgeClasses } from "./types"
 
 interface PreviewByTypeProps {
   resource: MockResource
@@ -19,15 +19,80 @@ interface PreviewByTypeProps {
   large?: boolean
 }
 
-function LogoPlaceholder({ large }: { large?: boolean }) {
+function fileTypeIcon(fileType: ResourceFileType, large?: boolean) {
+  const size = large ? "h-10 w-10" : "h-7 w-7"
+  switch (fileType) {
+    case "PDF":
+    case "DOCX":
+      return <FileText className={size} />
+    case "PPTX":
+      return <Presentation className={size} />
+    case "MP4":
+      return <Video className={size} />
+    case "ZIP":
+      return <Archive className={size} />
+    case "LINK":
+      return <LinkIcon className={size} />
+    case "PNG":
+    case "JPG":
+    case "SVG":
+      return <ImageIcon className={size} />
+    default:
+      return <File className={size} />
+  }
+}
+
+function DocumentTile({
+  resource,
+  className,
+  large,
+}: {
+  resource: MockResource
+  className?: string
+  large?: boolean
+}) {
+  const badge = getFileTypeBadgeClasses(resource.fileType)
+  const headerTone =
+    resource.fileType === "PDF"
+      ? "bg-[#c0292f]"
+      : resource.fileType === "PPTX"
+        ? "bg-[#b5651d]"
+        : resource.fileType === "MP4"
+          ? "bg-indigo-600"
+          : resource.fileType === "DOCX"
+            ? "bg-[#3d4d63]"
+            : resource.fileType === "PNG" || resource.fileType === "SVG" || resource.fileType === "XLSX"
+              ? "bg-[#1b7a52]"
+              : resource.fileType === "JPG"
+                ? "bg-[#0a6bb0]"
+                : "bg-[#005b8f]"
+
   return (
     <div
       className={cn(
-        "flex items-center justify-center font-bold tracking-tight text-[#1e3a5f]",
-        large ? "text-5xl md:text-6xl" : "text-2xl"
+        "flex h-full w-full flex-col overflow-hidden rounded-[10px] border border-[#e2e6ea] bg-white shadow-sm",
+        className
       )}
     >
-      {"P&M"}
+      <div className={cn("flex items-center justify-center px-3 py-2 text-white", headerTone)}>
+        <span className="text-[10px] font-bold uppercase tracking-wide">{resource.fileType}</span>
+      </div>
+      <div
+        className={cn(
+          "flex flex-1 flex-col items-center justify-center gap-2 px-3 text-[#1f2a44]",
+          large ? "py-8" : "py-4"
+        )}
+      >
+        <span className={cn("rounded-lg p-2", badge)}>{fileTypeIcon(resource.fileType, large)}</span>
+        <p
+          className={cn(
+            "line-clamp-2 text-center font-medium leading-snug text-[#1f2a44]",
+            large ? "text-sm" : "text-xs"
+          )}
+        >
+          {resource.title}
+        </p>
+      </div>
     </div>
   )
 }
@@ -37,153 +102,17 @@ export default function PreviewByType({
   className,
   large = false,
 }: PreviewByTypeProps) {
-  const { fileType, title, thumbnailUrl, url } = resource
-  const isLogo = resource.category === "logos" || title.toLowerCase().includes("logo")
-  const provider =
-    typeof url === "string" && url.length > 0
-      ? (() => {
-          try {
-            return new URL(url).hostname.replace(/^www\./, "")
-          } catch {
-            return "external link"
-          }
-        })()
-      : null
+  const { title, thumbnailUrl } = resource
 
-  if (thumbnailUrl && isImageType(fileType)) {
+  if (thumbnailUrl) {
     return (
       <img
         src={thumbnailUrl}
         alt={title}
-        className={cn("max-h-full max-w-full object-contain", className)}
+        className={cn("h-full w-full object-cover", className)}
       />
     )
   }
 
-  if (isImageType(fileType) || isLogo) {
-    if (isLogo) {
-      return (
-        <div
-          className={cn(
-            "flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-50 to-white",
-            className
-          )}
-        >
-          <LogoPlaceholder large={large} />
-        </div>
-      )
-    }
-    return (
-      <div
-        className={cn(
-          "flex h-full w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-blue-50/80 via-slate-50 to-white text-muted-foreground",
-          className
-        )}
-      >
-        <ImageIcon className={cn(large ? "h-16 w-16" : "h-10 w-10", "opacity-40")} />
-        {!large && <span className="text-xs font-medium">{fileType}</span>}
-      </div>
-    )
-  }
-
-  if (fileType === "PDF") {
-    return (
-      <div
-        className={cn(
-          "flex h-full w-full flex-col items-center justify-center gap-3 bg-gradient-to-br from-rose-50/60 to-white p-6",
-          className
-        )}
-      >
-        <div className="rounded-2xl border border-rose-100 bg-white p-6 shadow-sm">
-          <FileText className={cn(large ? "h-20 w-20" : "h-12 w-12", "text-rose-500")} />
-        </div>
-        <span className="text-sm font-medium text-rose-700/80">PDF Document</span>
-      </div>
-    )
-  }
-
-  if (fileType === "PPTX") {
-    return (
-      <div
-        className={cn(
-          "flex h-full w-full flex-col items-center justify-center gap-3 bg-gradient-to-br from-orange-50/60 to-white",
-          className
-        )}
-      >
-        <Presentation className={cn(large ? "h-20 w-20" : "h-12 w-12", "text-orange-500")} />
-        <span className="text-sm font-medium text-orange-700/80">Presentation</span>
-      </div>
-    )
-  }
-
-  if (fileType === "MP4") {
-    return (
-      <div
-        className={cn(
-          "relative flex h-full w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-violet-100/50 to-slate-900/5",
-          className
-        )}
-      >
-        <Video className={cn(large ? "h-20 w-20" : "h-12 w-12", "text-violet-600")} />
-        <span className="text-sm text-violet-700/80">Video preview</span>
-      </div>
-    )
-  }
-
-  if (fileType === "DOCX") {
-    return (
-      <div
-        className={cn(
-          "flex h-full w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-slate-50 to-white",
-          className
-        )}
-      >
-        <FileText className={cn(large ? "h-16 w-16" : "h-10 w-10", "text-slate-500")} />
-        <span className="text-sm text-muted-foreground">Document</span>
-      </div>
-    )
-  }
-
-  if (fileType === "ZIP") {
-    return (
-      <div
-        className={cn(
-          "flex h-full w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-amber-50/60 to-white",
-          className
-        )}
-      >
-        <Archive className={cn(large ? "h-16 w-16" : "h-10 w-10", "text-amber-600")} />
-        <span className="text-sm text-amber-800/70">Archive</span>
-      </div>
-    )
-  }
-
-  if (fileType === "LINK") {
-    return (
-      <div
-        className={cn(
-          "flex h-full w-full flex-col items-center justify-center gap-3 bg-gradient-to-br from-sky-50/70 to-white p-4 text-center",
-          className
-        )}
-      >
-        <LinkIcon className={cn(large ? "h-16 w-16" : "h-10 w-10", "text-sky-600")} />
-        <span className="text-sm font-medium text-sky-800/90">External Resource</span>
-        {!large && provider && (
-          <span className="max-w-[90%] truncate text-xs text-sky-700/70">{provider}</span>
-        )}
-      </div>
-    )
-  }
-
-  return (
-    <div
-      className={cn(
-        "flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground",
-        className
-      )}
-    >
-      <File className={cn(large ? "h-16 w-16" : "h-10 w-10")} />
-      <span className="text-sm">{fileType}</span>
-    </div>
-  )
+  return <DocumentTile resource={resource} className={className} large={large} />
 }

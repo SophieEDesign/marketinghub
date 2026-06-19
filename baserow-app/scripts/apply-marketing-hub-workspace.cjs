@@ -786,11 +786,13 @@ function buildResourceHubBlocks() {
       h: 8,
       config: {
         title: "Internal Resource Hub",
-        resource_hub_subtitle: "Logos, documents, templates and internal assets.",
-        resource_hub_layout_mode: "list",
+        resource_hub_subtitle:
+          "Approved logos, guidelines, photography and templates — on brand, every time.",
+        resource_hub_layout_mode: "gallery",
         resource_hub_use_dashboard_mock: false,
         resource_hub_show_search: true,
         resource_hub_show_recent: true,
+        resource_hub_show_filters: true,
         resource_hub_show_upload: true,
       },
     }),

@@ -18,7 +18,9 @@ export type ResourceCategory =
   | "videos"
   | "presentations"
 
-export type CategoryFilter = ResourceCategory | "all"
+export type CategoryFilter = ResourceCategory | "all" | "favourites"
+
+export type ResourceSource = "Google Drive" | "SharePoint"
 
 export type ResourceFileType =
   | "PNG"
@@ -62,6 +64,8 @@ export interface MockResource {
   /** Multiple files on the same record — drives the in-hub attachment thumbnail strip. */
   attachmentVariants?: ResourceAttachmentVariant[]
   owner?: string
+  /** Derived from document_link host (Google Drive, SharePoint, etc.) */
+  source?: ResourceSource | string
 }
 
 export interface HubCategoryOption {
@@ -97,7 +101,7 @@ export function getFileTypeBadgeClasses(fileType: ResourceFileType): string {
     case "PPTX":
       return "bg-orange-100 text-orange-700"
     case "MP4":
-      return "bg-violet-100 text-violet-700"
+      return "bg-indigo-100 text-indigo-700"
     case "ZIP":
       return "bg-amber-100 text-amber-700"
     case "LINK":

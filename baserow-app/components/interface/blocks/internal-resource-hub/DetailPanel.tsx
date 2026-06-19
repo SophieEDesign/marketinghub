@@ -195,15 +195,15 @@ export default function DetailPanel({
       <div className="shrink-0 border-b border-border/60 px-4 py-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <h3 className="text-base font-semibold leading-snug text-[#1e3a5f] break-words">
+            <h3 className="text-base font-semibold leading-snug text-[#1f2a44] break-words">
               {resource.title}
             </h3>
-            <p className="mt-0.5 text-xs text-muted-foreground">{hubLabel}</p>
+            <p className="mt-0.5 text-xs text-[#9aa1ab]">{hubLabel}</p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               <HeaderBadge className={getFileTypeBadgeClasses(resource.fileType)}>
                 {resource.fileType}
               </HeaderBadge>
-              <HeaderBadge className="bg-violet-100 text-violet-800">{hubLabel}</HeaderBadge>
+              <HeaderBadge className="bg-[#005b8f]/10 text-[#005b8f]">{hubLabel}</HeaderBadge>
               {resource.updatedAt ? (
                 <HeaderBadge className="bg-muted text-muted-foreground">
                   Updated {resource.updatedAt}
@@ -261,19 +261,19 @@ export default function DetailPanel({
           <TabsList className="h-9 w-full justify-start gap-0 rounded-none border-0 bg-transparent p-0">
             <TabsTrigger
               value="details"
-              className="rounded-none border-b-2 border-transparent px-3 py-2 text-xs data-[state=active]:border-violet-600 data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+              className="rounded-none border-b-2 border-transparent px-3 py-2 text-xs data-[state=active]:border-[#005b8f] data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
             >
               Details
             </TabsTrigger>
             <TabsTrigger
               value="versions"
-              className="rounded-none border-b-2 border-transparent px-3 py-2 text-xs data-[state=active]:border-violet-600 data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+              className="rounded-none border-b-2 border-transparent px-3 py-2 text-xs data-[state=active]:border-[#005b8f] data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
             >
               Versions
             </TabsTrigger>
             <TabsTrigger
               value="activity"
-              className="rounded-none border-b-2 border-transparent px-3 py-2 text-xs data-[state=active]:border-violet-600 data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+              className="rounded-none border-b-2 border-transparent px-3 py-2 text-xs data-[state=active]:border-[#005b8f] data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
             >
               Activity
             </TabsTrigger>
@@ -311,7 +311,7 @@ export default function DetailPanel({
                       onClick={() => onSelectVariant(v.id)}
                       className={cn(
                         "relative h-12 w-12 shrink-0 overflow-hidden rounded-lg border-2 transition-colors",
-                        selected ? "border-violet-500" : "border-border/60 hover:border-violet-300"
+                        selected ? "border-[#005b8f]" : "border-[#e4e7ec] hover:border-[#005b8f]/40"
                       )}
                     >
                       <PreviewByType resource={v} className="h-full w-full" />
@@ -350,8 +350,8 @@ export default function DetailPanel({
                             className={cn(
                               "rounded-full px-2 py-0.5 text-[10px] font-semibold",
                               i === 0
-                                ? "bg-violet-100 text-violet-800"
-                                : "bg-teal-100 text-teal-800"
+                                ? "bg-[#005b8f]/10 text-[#005b8f]"
+                                : "bg-[#eceef1] text-[#1f2a44]/80"
                             )}
                           >
                             {t}
@@ -411,7 +411,7 @@ export default function DetailPanel({
                 Open{" "}
                 <button
                   type="button"
-                  className="font-medium text-violet-700 hover:underline"
+                  className="font-medium text-[#005b8f] hover:underline"
                   onClick={onEditDetails}
                 >
                   Manage asset
@@ -448,7 +448,7 @@ export default function DetailPanel({
                 Comments and detailed history are available in{" "}
                 <button
                   type="button"
-                  className="font-medium text-violet-700 hover:underline"
+                  className="font-medium text-[#005b8f] hover:underline"
                   onClick={onEditDetails}
                 >
                   Manage asset
@@ -460,23 +460,42 @@ export default function DetailPanel({
         </div>
       </Tabs>
 
-      <div className="shrink-0 space-y-2 border-t border-border/60 p-4">
-        <Button type="button" className="w-full gap-2 bg-violet-600 hover:bg-violet-700" onClick={onDownload}>
-          <Download className="h-4 w-4" />
-          {resource.fileType === "LINK" ? "Open link" : "Download"}
+      <div className="shrink-0 space-y-2 border-t border-[#e4e7ec] p-4">
+        <Button
+          type="button"
+          className="min-h-11 w-full gap-2 bg-[#c4a574] text-[#1f2a44] hover:bg-[#b08d52]"
+          onClick={onViewFull}
+        >
+          <ExternalLink className="h-4 w-4" />
+          {resource.source ? `Open in ${resource.source}` : resource.fileType === "LINK" ? "Open link" : "Open file"}
         </Button>
         <div className="flex flex-col gap-2 sm:grid sm:grid-cols-2">
-          <Button type="button" variant="outline" className="gap-2 border-border/60" onClick={onViewFull}>
-            <ExternalLink className="h-4 w-4 shrink-0" />
-            View full size
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-11 gap-2 border-[#e4e7ec]"
+            onClick={onDownload}
+          >
+            <Download className="h-4 w-4 shrink-0" />
+            Download
           </Button>
-          <Button type="button" variant="outline" className="gap-2 border-border/60" onClick={onCopyLink}>
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-11 gap-2 border-[#e4e7ec]"
+            onClick={onCopyLink}
+          >
             <Link className="h-4 w-4 shrink-0" />
             Copy link
           </Button>
         </div>
         {onEditDetails ? (
-          <Button type="button" variant="outline" className="w-full border-violet-200 text-violet-800" onClick={onEditDetails}>
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-11 w-full border-[#005b8f]/20 text-[#005b8f]"
+            onClick={onEditDetails}
+          >
             Manage asset
           </Button>
         ) : null}

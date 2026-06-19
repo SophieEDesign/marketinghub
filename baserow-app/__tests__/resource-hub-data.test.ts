@@ -1,8 +1,11 @@
 import { describe, it, expect } from "vitest"
 import {
   buildResourceHubItems,
+  extractGoogleDriveFileId,
   parseHubCategory,
   resolveResourceCategory,
+  resolveResourceSource,
+  resolveResourceThumbnailUrl,
 } from "@/lib/marketing/resource-hub-data"
 import type { MediaFieldMap } from "@/lib/marketing/resource-hub-data"
 
@@ -219,5 +222,50 @@ describe("buildResourceHubItems", () => {
     expect(items[0].fileType).toBe("PDF")
     expect(items[0].url).toContain("guide.pdf")
     expect(items[0].referenceUrl).toBe("https://example.com/resource-center")
+  })
+
+  it("derives Google Drive thumbnail and source from document_link", () => {
+    const fileId = "1-pHl-DXNlOPC4LuWneYmHB-fzHscofyS"
+    const items = buildResourceHubItems(
+      [
+        {
+          id: "drive-1",
+          name: "Brand guidelines",
+          hub_category: "Brand Guidelines",
+          document_link: `https://drive.google.com/file/d/${fileId}/view`,
+        },
+      ],
+      FIELDS,
+      "media-table"
+    )
+
+    expect(items).toHaveLength(1)
+    expect(items[0].source).toBe("Google Drive")
+    expect(items[0].thumbnailUrl).toBe(
+      `https://drive.google.com/thumbnail?id=${fileId}&sz=w600`
+    )
+  })
+})
+
+describe("resource link helpers", () => {
+  it("extracts Google Drive file id from /d/ URLs", () => {
+    expect(
+      extractGoogleDriveFileId("https://drive.google.com/file/d/abc123XYZ/view?usp=sharing")
+    ).toBe("abc123XYZ")
+  })
+
+  it("resolves resource source from host", () => {
+    expect(resolveResourceSource("https://drive.google.com/file/d/x/view")).toBe("Google Drive")
+    expect(resolveResourceSource("https://contoso.sharepoint.com/sites/marketing")).toBe(
+      "SharePoint"
+    )
+  })
+
+  it("prefers Drive thumbnail when no attachment image exists", () => {
+    const thumb = resolveResourceThumbnailUrl(
+      "https://drive.google.com/open?id=file123",
+      null
+    )
+    expect(thumb).toBe("https://drive.google.com/thumbnail?id=file123&sz=w600")
   })
 })

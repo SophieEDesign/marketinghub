@@ -4,7 +4,7 @@
  * Internal Resource Hub — visual media library block for internal staff.
  */
 
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import type { PageBlock } from "@/lib/interface/types"
 import { useResourceHubData } from "@/hooks/useResourceHubData"
 import { useRecordModal } from "@/contexts/RecordModalContext"
@@ -32,11 +32,15 @@ import ResourceList, { ResourceListHeader } from "./internal-resource-hub/Resour
 import {
   countByCategory,
   filterResources,
+  getFeatured,
   getRecent,
   getVariants,
+  hasActiveFilters,
   parseAttachmentVariantKey,
   parseDefaultCategory,
   resolveDisplayResource,
+  sortResources,
+  type ResourceSortMode,
 } from "./internal-resource-hub/utils"
 import type { CategoryFilter } from "./internal-resource-hub/types"
 import MarketingDemoDataBanner from "@/components/interface/primitives/MarketingDemoDataBanner"
@@ -45,6 +49,8 @@ import {
   marketingBlockScrollPanelClass,
 } from "@/lib/interface/marketing-block-layout"
 import { cn } from "@/lib/utils"
+
+const FAVOURITES_STORAGE_KEY = "resource-hub-favourites"
 
 interface InternalResourceHubBlockProps {
   block: PageBlock
@@ -97,6 +103,28 @@ export default function InternalResourceHubBlock({
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedAttachmentIndex, setSelectedAttachmentIndex] = useState(0)
   const [favourites, setFavourites] = useState<Set<string>>(() => new Set())
+  const [sortMode, setSortMode] = useState<ResourceSortMode>("recent")
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(FAVOURITES_STORAGE_KEY)
+      if (!raw) return
+      const ids = JSON.parse(raw) as unknown
+      if (Array.isArray(ids)) {
+        setFavourites(new Set(ids.filter((id): id is string => typeof id === "string")))
+      }
+    } catch {
+      // Ignore corrupt local storage
+    }
+  }, [])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(FAVOURITES_STORAGE_KEY, JSON.stringify([...favourites]))
+    } catch {
+      // Ignore quota / privacy mode
+    }
+  }, [favourites])
 
   const demoState = marketingDemoState({ forceMock, fromLiveData, hasTable, error })
   const mockPool = config.resource_hub_use_dashboard_mock
@@ -115,11 +143,23 @@ export default function InternalResourceHubBlock({
       ? demoState.bannerMessage
       : MARKETING_DEMO_BANNER_DEFAULT
     : ""
-  const counts = useMemo(() => countByCategory(resources), [resources])
-  const filtered = useMemo(
-    () => filterResources(resources, category, searchQuery),
-    [resources, category, searchQuery]
+  const counts = useMemo(() => countByCategory(resources, favourites), [resources, favourites])
+  const filteredBase = useMemo(
+    () => filterResources(resources, category, searchQuery, favourites),
+    [resources, category, searchQuery, favourites]
   )
+  const filtered = useMemo(
+    () => sortResources(filteredBase, sortMode),
+    [filteredBase, sortMode]
+  )
+  const featured = useMemo(() => getFeatured(resources), [resources])
+  const showFeaturedRow = category === "all" && !searchQuery.trim()
+  const gridResources = useMemo(() => {
+    if (!showFeaturedRow) return filtered
+    const featuredIds = new Set(featured.map((f) => f.id))
+    return filtered.filter((r) => !featuredIds.has(r.id))
+  }, [filtered, featured, showFeaturedRow])
+  const filtersActive = hasActiveFilters(category, searchQuery)
   const recent = useMemo(() => getRecent(resources), [resources])
   const selected = useMemo(
     () => resources.find((r) => r.id === selectedId) ?? null,
@@ -144,19 +184,33 @@ export default function InternalResourceHubBlock({
     setSelectedId(null)
   }, [])
 
-  const toggleFavourite = useCallback(() => {
-    if (!selectedId) return
+  const toggleFavouriteById = useCallback((id: string) => {
     setFavourites((prev) => {
       const next = new Set(prev)
-      if (next.has(selectedId)) next.delete(selectedId)
-      else next.add(selectedId)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
       return next
     })
-  }, [selectedId])
+  }, [])
+
+  const toggleFavourite = useCallback(() => {
+    if (!selectedId) return
+    toggleFavouriteById(selectedId)
+  }, [selectedId, toggleFavouriteById])
+
+  const clearFilters = useCallback(() => {
+    setCategory("all")
+    setSearchQuery("")
+  }, [])
 
   const noticeText =
     config.resource_hub_internal_notice ||
     "For internal use only. Please follow brand guidelines in all communications."
+
+  const heroImageUrl =
+    typeof config.resource_hub_hero_url === "string" && config.resource_hub_hero_url.trim()
+      ? config.resource_hub_hero_url.trim()
+      : undefined
 
   const openResourceUrl = useCallback(
     (id: string) => {
@@ -290,7 +344,7 @@ export default function InternalResourceHubBlock({
       data-block-selectable
       className={marketingBlockRootClass(
         isFullPage,
-        "rounded-card-lg border border-border/60 bg-background shadow-card"
+        "rounded-card-lg border border-[#e4e7ec] bg-[#eceef1] shadow-card"
       )}
     >
       {isDemoData ? (
@@ -306,6 +360,7 @@ export default function InternalResourceHubBlock({
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onCreate={canCreateResource ? handleCreateResource : undefined}
+        heroImageUrl={heroImageUrl}
       />
 
       {showFilters ? (
@@ -338,7 +393,7 @@ export default function InternalResourceHubBlock({
 
         <main
           className={cn(
-            "min-h-0 flex-1 bg-muted/5",
+            "min-h-0 flex-1 bg-[#eceef1]",
             marketingBlockScrollPanelClass(isFullPage) || "overflow-y-auto"
           )}
         >
@@ -354,9 +409,16 @@ export default function InternalResourceHubBlock({
             />
           ) : (
             <ResourceGrid
-              resources={filtered}
+              resources={gridResources}
+              featured={featured}
               favourites={favourites}
+              sortMode={sortMode}
+              onSortModeChange={setSortMode}
+              showFeatured={showFeaturedRow}
               onSelect={handleSelect}
+              onToggleFavourite={toggleFavouriteById}
+              onClearFilters={clearFilters}
+              hasActiveFilters={filtersActive}
             />
           )}
         </main>

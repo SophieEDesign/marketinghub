@@ -260,6 +260,65 @@ function parseAttachmentItem(item: unknown): ParsedAttachment | null {
   }
 }
 
+/** Extract Google Drive / Docs file id from common share URL shapes. */
+export function extractGoogleDriveFileId(url: string): string | null {
+  try {
+    const parsed = new URL(url.trim())
+    const host = parsed.hostname.toLowerCase()
+    if (!host.includes("google.com")) return null
+    const pathMatch = parsed.pathname.match(/\/d\/([a-zA-Z0-9_-]+)/)
+    if (pathMatch?.[1]) return pathMatch[1]
+    const idParam = parsed.searchParams.get("id")
+    if (idParam) return idParam
+    return null
+  } catch {
+    return null
+  }
+}
+
+export function buildGoogleDriveThumbnailUrl(fileId: string): string {
+  return `https://drive.google.com/thumbnail?id=${fileId}&sz=w600`
+}
+
+/** Parse link host → human-readable storage source label. */
+export function resolveResourceSource(url: string | null | undefined): string | undefined {
+  if (!url?.trim()) return undefined
+  try {
+    const host = new URL(url.trim()).hostname.toLowerCase()
+    if (host.includes("drive.google.com") || host.includes("docs.google.com")) {
+      return "Google Drive"
+    }
+    if (host.includes("sharepoint.com") || host.includes("onedrive")) {
+      return "SharePoint"
+    }
+    return undefined
+  } catch {
+    return undefined
+  }
+}
+
+function isDirectImageUrl(url: string): boolean {
+  return /\.(png|jpe?g|svg|webp|gif)(\?|$)/i.test(url.split("?")[0] ?? "")
+}
+
+/** Prefer attachment image, then Drive thumbnail from document_link, then attachment URL. */
+export function resolveResourceThumbnailUrl(
+  linkUrl: string | null,
+  primaryAttachmentUrl: string | null
+): string | undefined {
+  if (primaryAttachmentUrl && isDirectImageUrl(primaryAttachmentUrl)) {
+    return primaryAttachmentUrl
+  }
+
+  for (const candidate of [linkUrl, primaryAttachmentUrl]) {
+    if (!candidate) continue
+    const fileId = extractGoogleDriveFileId(candidate)
+    if (fileId) return buildGoogleDriveThumbnailUrl(fileId)
+  }
+
+  return primaryAttachmentUrl ?? undefined
+}
+
 export function parseAttachments(input: unknown): ParsedAttachment[] {
   if (input == null || input === "") return []
 
@@ -306,7 +365,8 @@ export function buildResourceHubItems(
       : []
     const primaryAttachment = parsedAttachments[0] ?? null
     const primaryAttachmentUrl = primaryAttachment?.url ?? null
-    const thumbnailUrl = primaryAttachmentUrl ?? undefined
+    const thumbnailUrl = resolveResourceThumbnailUrl(linkUrl, primaryAttachmentUrl)
+    const source = resolveResourceSource(linkUrl ?? primaryAttachmentUrl)
     const url = primaryAttachmentUrl || linkUrl || null
     const referenceUrl = primaryAttachmentUrl && linkUrl ? linkUrl : undefined
     const editLinkRaw = fields.editLink ? formatDisplayValue(row[fields.editLink]) : null
@@ -322,7 +382,8 @@ export function buildResourceHubItems(
       url: att.url,
       name: att.name,
       fileType: resolveResourceFileType(att.url, att),
-      thumbnailUrl: att.url,
+      thumbnailUrl:
+        resolveResourceThumbnailUrl(linkUrl, att.url) ?? att.url,
     }))
     const hubCategoryRaw = fields.hubCategory
       ? formatDisplayValue(row[fields.hubCategory])
@@ -349,6 +410,7 @@ export function buildResourceHubItems(
       referenceUrl,
       editLink,
       thumbnailUrl,
+      source,
       attachmentVariants: attachmentVariants.length > 1 ? attachmentVariants : undefined,
       description: fields.notes ? formatDisplayValue(row[fields.notes]) ?? undefined : undefined,
       updatedAt,

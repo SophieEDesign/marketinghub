@@ -32,7 +32,7 @@ describe("P2 Resource Hub stub removal", () => {
   it("omits header filter button when category filters are in-panel", () => {
     expect(src).not.toContain("onFilterClick=")
     const header = readSource("components/interface/blocks/internal-resource-hub/HubHeader.tsx")
-    expect(header).toContain("onFilterClick ?")
+    expect(header).not.toContain("onFilterClick")
   })
 
   it("omits list layout View all stub", () => {
