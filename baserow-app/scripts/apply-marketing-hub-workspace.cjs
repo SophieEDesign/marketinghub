@@ -802,7 +802,7 @@ function buildResourceHubBlocks() {
       x: 0,
       y: 10,
       w: 8,
-      h: 6,
+      h: 14,
       config: {
         title: "Shared Image Gallery",
         subtitle: "Inline view of the shared Google Drive gallery for generic resource images.",
@@ -815,7 +815,7 @@ function buildResourceHubBlocks() {
       x: 8,
       y: 10,
       w: 4,
-      h: 6,
+      h: 12,
       config: {
         title: "Resource Actions",
         things_to_do_subtitle: "Assets or content items needing attention.",

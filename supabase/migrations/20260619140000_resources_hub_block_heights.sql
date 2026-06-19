@@ -1,4 +1,4 @@
--- Replace Resource Hub iframe HTML gallery with native Google Drive gallery block.
+-- Resource Hub bottom row blocks were too short (h=6) and clipped gallery + actions content.
 
 DO $$
 DECLARE

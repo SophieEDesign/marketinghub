@@ -183,9 +183,9 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
     label: 'Google Drive Gallery',
     icon: 'HardDrive',
     defaultWidth: 8,
-    defaultHeight: 8,
+    defaultHeight: 14,
     minWidth: 4,
-    minHeight: 4,
+    minHeight: 8,
     defaultConfig: {
       title: 'Shared Image Gallery',
       subtitle: 'Approved marine photography by vessel type and sector.',

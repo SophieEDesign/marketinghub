@@ -26,12 +26,13 @@ export default function DriveGalleryBlock({ block, isEditing = false }: DriveGal
   }
 
   return (
-    <GalleryDriveView
-      rootFolderId={rootFolderId}
-      title={config?.title}
-      subtitle={config?.subtitle}
-      isEditing={isEditing}
-      className="h-full"
-    />
+    <div className="h-full min-h-0 overflow-y-auto">
+      <GalleryDriveView
+        rootFolderId={rootFolderId}
+        title={config?.title}
+        subtitle={config?.subtitle}
+        isEditing={isEditing}
+      />
+    </div>
   )
 }
