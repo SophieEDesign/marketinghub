@@ -10,6 +10,7 @@ export type BlockType =
   | 'kpi_summary'
   | 'text'
   | 'html'
+  | 'drive_gallery'
   | 'image'
   | 'gallery'
   | 'divider'
@@ -174,6 +175,8 @@ export interface BlockConfig {
   markdown?: boolean
   // HTML block (custom bits)
   html?: string
+  /** Google Drive root folder id for drive_gallery blocks. */
+  drive_folder_id?: string
   // KPI comparison
   comparison?: {
     date_field: string

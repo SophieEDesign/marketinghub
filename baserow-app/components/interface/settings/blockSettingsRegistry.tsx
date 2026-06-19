@@ -14,6 +14,7 @@ import ActionDataSettings from "./ActionDataSettings"
 import ActionAppearanceSettings from "./ActionAppearanceSettings"
 import LinkPreviewDataSettings from "./LinkPreviewDataSettings"
 import HtmlDataSettings from "./HtmlDataSettings"
+import DriveGalleryDataSettings from "./DriveGalleryDataSettings"
 import LinkPreviewAppearanceSettings from "./LinkPreviewAppearanceSettings"
 import GridDataSettings from "./GridDataSettings"
 import GridAppearanceSettings from "./GridAppearanceSettings"
@@ -87,6 +88,7 @@ const DATA_SETTINGS_RENDERERS: Partial<Record<BlockType, DataRenderer>> = {
   action: (ctx) => <ActionDataSettings {...ctx} />,
   link_preview: (ctx) => <LinkPreviewDataSettings {...ctx} />,
   html: (ctx) => <HtmlDataSettings {...ctx} />,
+  drive_gallery: (ctx) => <DriveGalleryDataSettings {...ctx} />,
   grid: (ctx) => <GridDataSettings {...ctx} />,
   form: (ctx) => <FormDataSettings {...ctx} />,
   record: (ctx) => <RecordDataSettings {...ctx} />,
@@ -193,6 +195,16 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
     </>
   ),
   html: (ctx) => (
+    <>
+      <CommonAppearanceSettings
+        config={ctx.config}
+        onUpdate={ctx.onUpdateAppearance}
+        blockType={ctx.blockType}
+        fields={ctx.fields}
+      />
+    </>
+  ),
+  drive_gallery: (ctx) => (
     <>
       <CommonAppearanceSettings
         config={ctx.config}

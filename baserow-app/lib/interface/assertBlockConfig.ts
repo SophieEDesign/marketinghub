@@ -225,6 +225,7 @@ export function assertBlockConfig(
     case 'social_media_calendar':
     case 'campaigns_overview':
     case 'members_welcome':
+    case 'drive_gallery':
       // These blocks don't require config
       return { valid: true }
 

@@ -38,6 +38,10 @@ const BlockLoadingPlaceholder = () => (
   </div>
 )
 
+const DriveGalleryBlock = dynamic(() => import("./blocks/DriveGalleryBlock"), {
+  ssr: false,
+  loading: () => <BlockLoadingPlaceholder />,
+})
 const FormBlock = dynamic(() => import("./blocks/FormBlock"), {
   ssr: false,
   loading: () => <BlockLoadingPlaceholder />,
@@ -501,6 +505,13 @@ export default function BlockRenderer({
 
       case "html":
         return <HtmlBlock block={safeBlock} isEditing={canEdit} onUpdate={onUpdate ? (u) => handleUpdate(u) : undefined} />
+
+      case "drive_gallery":
+        return (
+          <LazyBlockWrapper enabled={deferBlockMount}>
+            <DriveGalleryBlock block={safeBlock} isEditing={canEdit} />
+          </LazyBlockWrapper>
+        )
 
       case "image":
         return (

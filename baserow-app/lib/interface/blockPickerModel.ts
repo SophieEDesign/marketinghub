@@ -39,6 +39,7 @@ const BLOCK_TYPE_CATEGORY: Record<BlockType, BlockCategoryId> = {
   number: "record",
   text: "content",
   html: "content",
+  drive_gallery: "content",
   image: "content",
   gallery: "content",
   link_preview: "content",

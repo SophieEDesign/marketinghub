@@ -100,6 +100,7 @@ describe("apply-marketing-hub-workspace.cjs", () => {
   it("Resource Hub blocks", () => {
     const types = blockTypesInBuilder("buildResourceHubBlocks")
     expect(types).toContain("internal_resource_hub")
+    expect(types).toContain("drive_gallery")
     expect(types).toContain("things_to_do")
   })
 
@@ -133,6 +134,7 @@ describe("Marketing Hub block registry", () => {
     "things_to_do",
     "campaigns_overview",
     "members_welcome",
+    "drive_gallery",
     "html",
   ]
 

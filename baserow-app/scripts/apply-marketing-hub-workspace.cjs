@@ -797,9 +797,22 @@ function buildResourceHubBlocks() {
       },
     }),
     makeBlock({
+      provisioningKey: "resources_gallery_embed",
+      type: "drive_gallery",
+      x: 0,
+      y: 10,
+      w: 8,
+      h: 6,
+      config: {
+        title: "Shared Image Gallery",
+        subtitle: "Inline view of the shared Google Drive gallery for generic resource images.",
+        drive_folder_id: "1-pHl-DXNlOPC4LuWneYmHB-fzHscofyS",
+      },
+    }),
+    makeBlock({
       provisioningKey: "resources_actions",
       type: "things_to_do",
-      x: 0,
+      x: 8,
       y: 10,
       w: 4,
       h: 6,

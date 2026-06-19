@@ -29,6 +29,7 @@ import {
   CheckSquare,
   Share2,
   Home,
+  HardDrive,
 } from "lucide-react"
 import { BLOCK_REGISTRY } from "@/lib/interface/registry"
 import type { BlockType } from "@/lib/interface/types"
@@ -49,6 +50,7 @@ export const blockPickerIconMap: Record<BlockType, React.ElementType> = {
   kpi_summary: LayoutGrid,
   text: Type,
   html: Code,
+  drive_gallery: HardDrive,
   image: Image,
   gallery: Images,
   divider: Minus,

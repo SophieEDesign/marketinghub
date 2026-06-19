@@ -58,6 +58,10 @@ export interface HtmlBlockConfig extends BaseBlockConfig {
   html?: string
 }
 
+export interface DriveGalleryBlockConfig extends BaseBlockConfig {
+  drive_folder_id?: string
+}
+
 // Image Block Config
 export interface ImageBlockConfig extends BaseBlockConfig {
   image_url: string // Required (but can be empty for upload prompt)
@@ -184,6 +188,7 @@ export type BlockConfigUnion =
   | (KPIBlockConfig & { _type: 'kpi' })
   | (TextBlockConfig & { _type: 'text' })
   | (HtmlBlockConfig & { _type: 'html' })
+  | (DriveGalleryBlockConfig & { _type: 'drive_gallery' })
   | (ImageBlockConfig & { _type: 'image' })
   | (GalleryBlockConfig & { _type: 'gallery' })
   | (CalendarBlockConfig & { _type: 'calendar' })
@@ -215,7 +220,7 @@ export type BlockConfigUnion =
 
 /** Block types that have typed config in BlockConfigUnion (for drift detection). */
 export const BLOCK_CONFIG_UNION_TYPES = [
-  'grid', 'form', 'record', 'chart', 'kpi', 'text', 'html', 'image', 'gallery',
+  'grid', 'form', 'record', 'chart', 'kpi', 'text', 'html', 'drive_gallery', 'image', 'gallery',
   'calendar', 'kanban', 'timeline', 'list', 'multi_calendar', 'multi_timeline', 'number',
   'divider', 'button', 'action', 'link_preview', 'horizontal_grouped', 'field',
   'content_theme', 'content_timeline', 'internal_resource_hub', 'kpi_summary',
@@ -466,6 +471,7 @@ export function validateBlockConfig(
     case 'social_media_calendar':
     case 'campaigns_overview':
     case 'members_welcome':
+    case 'drive_gallery':
       // Marketing calendar blocks: optional table_id; no required fields
       break
 
