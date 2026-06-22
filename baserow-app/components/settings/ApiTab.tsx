@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Copy, Check, FileText } from 'lucide-react'
+import SettingsPlanableSyncTab from '@/components/settings/PlanableSyncTab'
 
 export default function SettingsApiTab() {
   const [copiedField, setCopiedField] = useState<string | null>(null)
@@ -28,6 +29,7 @@ export default function SettingsApiTab() {
   }
 
   return (
+    <div className="space-y-6">
     <Card>
       <CardHeader>
         <CardTitle>API Keys</CardTitle>
@@ -109,5 +111,7 @@ export default function SettingsApiTab() {
         </div>
       </CardContent>
     </Card>
+    <SettingsPlanableSyncTab />
+    </div>
   )
 }

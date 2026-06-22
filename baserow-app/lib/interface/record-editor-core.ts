@@ -39,6 +39,7 @@ import {
   softDeleteNotSupportedMessage,
   supportsSoftDelete,
 } from '@/lib/supabase/physical-columns'
+import { withPlanableHubSyncPatch } from '@/lib/marketing/planable-sync'
 
 function normalizeCampaignStatusForConstraint(
   tableName: string | null | undefined,
@@ -527,9 +528,15 @@ export function useRecordEditorCore(
 
       const normalizedValue = normalizeUpdateValue(fieldName, value)
       const supabase = createClient()
+      const hasSyncSourceColumn = physicalColumnsRef.current.has('sync_source')
 
-      const doUpdate = async (val: any) =>
-        supabase.from(tableToUse).update({ [fieldName]: val }).eq('id', recordId).select().single()
+      const doUpdate = async (val: any) => {
+        const patch = withPlanableHubSyncPatch(
+          { [fieldName]: val },
+          { fieldName, hasSyncSourceColumn }
+        )
+        return supabase.from(tableToUse).update(patch).eq('id', recordId).select().single()
+      }
 
       let finalSavedValue: any = normalizeCampaignStatusForConstraint(
         tableToUse,
@@ -670,6 +677,9 @@ export function useRecordEditorCore(
           f.name,
           payload[f.name]
         )
+      }
+      if (physicalColumnsRef.current.has('sync_source')) {
+        payload.sync_source = 'hub'
       }
       if (recordId) {
         const baseline = baselineFormDataRef.current

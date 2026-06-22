@@ -27,6 +27,10 @@ import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { useSocialMediaCalendarData } from "@/hooks/useSocialMediaCalendarData"
 import { formatDisplayValue } from "@/lib/marketing/field-utils"
 import {
+  PLANABLE_SYNC_FIELDS,
+  PLANABLE_SYNC_SOURCE,
+} from "@/lib/marketing/planable-sync"
+import {
   applyContentScope,
   buildSocialCalendarCreateInitialData,
   buildSocialCalendarEvents,
@@ -496,7 +500,10 @@ export function SocialMediaCalendarCore({
         return false
       }
       const dateField = socialFields.contentDate
-      const updates = { [dateField]: socialCalendarDateFieldValue(newDate) }
+      const updates: Record<string, unknown> = {
+        [dateField]: socialCalendarDateFieldValue(newDate),
+        [PLANABLE_SYNC_FIELDS.syncSource]: PLANABLE_SYNC_SOURCE.hub,
+      }
       try {
         const supabase = createClient()
         const { error } = await supabase
