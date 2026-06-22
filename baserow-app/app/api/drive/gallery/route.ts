@@ -7,6 +7,7 @@
 
 import { NextResponse } from "next/server"
 import { getDriveClient, upsizeThumb, fileExtension } from "@/lib/drive/client"
+import { resolveDriveFolderUrl } from "@/lib/drive/urls"
 import type {
   DriveGalleryFolder,
   DriveGalleryImage,
@@ -17,6 +18,21 @@ export const revalidate = 300
 export const dynamic = "force-dynamic"
 
 const FOLDER_MIME = "application/vnd.google-apps.folder"
+
+async function getFolderMeta(driveId: string) {
+  const drive = getDriveClient()
+  const meta = await drive.files.get({
+    fileId: driveId,
+    fields: "id,name,webViewLink",
+    supportsAllDrives: true,
+  })
+  const id = meta.data.id as string
+  return {
+    id,
+    name: meta.data.name ?? "Gallery",
+    webViewLink: resolveDriveFolderUrl(id, meta.data.webViewLink ?? null),
+  }
+}
 
 async function listSubfolders(driveId: string) {
   const drive = getDriveClient()
@@ -85,6 +101,7 @@ export async function GET(request: Request) {
     const subfolders = await listSubfolders(folderId)
 
     if (subfolders.length > 0) {
+      const folder = await getFolderMeta(folderId)
       const folders: DriveGalleryFolder[] = await Promise.all(
         subfolders.map(async (sf) => {
           const imgs = await listImages(sf.id as string)
@@ -98,26 +115,17 @@ export async function GET(request: Request) {
           }
         })
       )
-      const body: DriveGalleryResponse = { kind: "folders", folders }
+      const body: DriveGalleryResponse = { kind: "folders", folder, folders }
       return NextResponse.json(body, {
         headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" },
       })
     }
 
-    const drive = getDriveClient()
-    const meta = await drive.files.get({
-      fileId: folderId,
-      fields: "id,name,webViewLink",
-      supportsAllDrives: true,
-    })
+    const folder = await getFolderMeta(folderId)
     const images = (await listImages(folderId)).map(toImage)
     const body: DriveGalleryResponse = {
       kind: "images",
-      folder: {
-        id: meta.data.id as string,
-        name: meta.data.name ?? "Gallery",
-        webViewLink: meta.data.webViewLink ?? null,
-      },
+      folder,
       images,
     }
     return NextResponse.json(body, {

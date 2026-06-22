@@ -29,6 +29,7 @@ export function variantResourceFromAttachment(
   return {
     ...base,
     id: attachment.key,
+    title: attachment.name?.trim() || base.title,
     url: attachment.url,
     thumbnailUrl: attachment.thumbnailUrl ?? attachment.url,
     fileType: attachment.fileType,

@@ -29,6 +29,7 @@ export type DriveGalleryImage = {
 /** Folder listing response (root of subfolders). */
 export type DriveFoldersResponse = {
   kind: "folders"
+  folder: { id: string; name: string; webViewLink: string | null }
   folders: DriveGalleryFolder[]
 }
 

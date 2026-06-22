@@ -14,7 +14,7 @@ describe("InternalResourceHubBlock edit mode", () => {
 
   it("does not open file URL when isEditing", () => {
     expect(src).toMatch(/openResourceUrl[\s\S]*?if \(isEditing\) return/)
-    expect(src).toContain("window.open(r.url")
+    expect(src).toContain("window.open(url")
   })
 
   it("does not open Manage asset drawer when isEditing", () => {

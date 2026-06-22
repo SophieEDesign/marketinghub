@@ -19,6 +19,7 @@ import {
 } from "lucide-react"
 import { useDriveGallery } from "./useDriveGallery"
 import type { DriveGalleryImage } from "@/lib/drive/types"
+import { driveFolderUrl, resolveDriveFolderUrl } from "@/lib/drive/urls"
 import { cn } from "@/lib/utils"
 
 type Props = {
@@ -63,21 +64,31 @@ export default function GalleryDriveView({
 
   const inFolder = folderId !== null
   const q = query.trim().toLowerCase()
+  const activeFolderId = folderId ?? rootFolderId
 
   const header = useMemo(() => {
     if (state.status === "ready" && state.data.kind === "images") {
       return {
         title: state.data.folder.name,
         subtitle: `${state.data.images.length} images in this collection`,
-        webViewLink: state.data.folder.webViewLink,
+        driveUrl: resolveDriveFolderUrl(state.data.folder.id, state.data.folder.webViewLink),
+      }
+    }
+    if (state.status === "ready" && state.data.kind === "folders") {
+      return {
+        title: state.data.folder.name || title || "Shared Image Gallery",
+        subtitle:
+          subtitle ??
+          `${state.data.folders.length} collections in this gallery`,
+        driveUrl: resolveDriveFolderUrl(state.data.folder.id, state.data.folder.webViewLink),
       }
     }
     return {
       title: title ?? "Shared Image Gallery",
       subtitle: subtitle ?? "Approved marine photography by vessel type and sector.",
-      webViewLink: null as string | null,
+      driveUrl: driveFolderUrl(activeFolderId),
     }
-  }, [state, title, subtitle])
+  }, [state, title, subtitle, activeFolderId])
 
   const openFolder = (id: string) => {
     if (isEditing) return
@@ -131,7 +142,7 @@ export default function GalleryDriveView({
           </div>
           {!isEditing && (
             <a
-              href={header.webViewLink ?? "https://drive.google.com"}
+              href={header.driveUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="flex h-[38px] items-center gap-1.5 rounded-[9px] border border-[#d4d7dc] bg-white px-3.5 text-[12.5px] font-semibold text-[#1f2a44] hover:bg-[#f7f9fb]"
@@ -149,7 +160,7 @@ export default function GalleryDriveView({
           <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-[#d4d7dc] py-14 text-center">
             <p className="text-sm font-semibold text-[#1f2a44]">Couldn’t load the gallery</p>
             <p className="max-w-sm text-[13px] text-[#9aa1ab]">{state.message}</p>
-            <a href="https://drive.google.com" target="_blank" rel="noopener noreferrer" className="text-[13px] font-semibold text-[#005b8f] hover:underline">
+            <a href={driveFolderUrl(rootFolderId)} target="_blank" rel="noopener noreferrer" className="text-[13px] font-semibold text-[#005b8f] hover:underline">
               Open the Google Drive gallery →
             </a>
           </div>
@@ -223,7 +234,7 @@ export default function GalleryDriveView({
       <div className="border-t border-[#eef1f4] bg-[#fafbfc] px-6 py-3.5">
         <span className="text-[12.5px] text-[#9aa1ab]">
           Prefer the source?{" "}
-          <a href={header.webViewLink ?? "https://drive.google.com"} target="_blank" rel="noopener noreferrer" className="font-semibold text-[#005b8f] hover:underline">
+          <a href={header.driveUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-[#005b8f] hover:underline">
             Open the Google Drive gallery →
           </a>
         </span>

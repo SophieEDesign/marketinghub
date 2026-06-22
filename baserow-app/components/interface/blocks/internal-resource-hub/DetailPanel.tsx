@@ -30,9 +30,12 @@ import {
   getFileTypeBadgeClasses,
   type MockResource,
 } from "./types"
+import { ATTACHMENT_VARIANT_SEP } from "./utils"
 
 interface DetailPanelProps {
   resource: MockResource | null
+  /** Asset record title (when resource is an attachment variant). */
+  recordTitle?: string
   variants?: MockResource[]
   selectedId?: string | null
   isFavourite: boolean
@@ -122,6 +125,7 @@ function buildActivityEntries(resource: MockResource): { title: string; meta: st
 
 export default function DetailPanel({
   resource,
+  recordTitle,
   variants = [],
   selectedId,
   isFavourite,
@@ -153,6 +157,16 @@ export default function DetailPanel({
 
   const versionRows = useMemo(() => {
     if (!resource) return []
+    const isAttachmentSet = displayVariants.some((v) => v.id.includes(ATTACHMENT_VARIANT_SEP))
+    if (isAttachmentSet) {
+      return displayVariants.map((v, index) => ({
+        id: v.id,
+        label: v.title || `File ${index + 1}`,
+        date: v.updatedAt ?? v.addedAt ?? "",
+        isCurrent: v.id === (selectedId ?? resource.id),
+        url: v.url,
+      }))
+    }
     const ordered = [
       resource,
       ...displayVariants.filter((v) => v.id !== resource.id),
@@ -167,7 +181,7 @@ export default function DetailPanel({
       isCurrent: index === 0,
       url: v.url,
     }))
-  }, [resource, displayVariants])
+  }, [resource, displayVariants, selectedId])
 
   useEffect(() => {
     setActiveTab("details")
@@ -187,6 +201,9 @@ export default function DetailPanel({
 
   const hubLabel = categoryLabel(resource.category)
   const updatedLine = [resource.updatedAt, resource.owner].filter(Boolean).join(" · ")
+  const headingTitle = recordTitle ?? resource.title
+  const activeFileName =
+    recordTitle && resource.title !== recordTitle ? resource.title : undefined
 
   return (
     <aside
@@ -200,8 +217,13 @@ export default function DetailPanel({
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <h3 className="text-base font-semibold leading-snug text-[#1f2a44] break-words">
-              {resource.title}
+              {headingTitle}
             </h3>
+            {activeFileName ? (
+              <p className="mt-0.5 text-xs text-[#6b7280] truncate" title={activeFileName}>
+                {activeFileName}
+              </p>
+            ) : null}
             <p className="mt-0.5 text-xs text-[#9aa1ab]">{hubLabel}</p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               <HeaderBadge className={getFileTypeBadgeClasses(resource.fileType)}>
@@ -317,23 +339,31 @@ export default function DetailPanel({
             </div>
 
             {displayVariants.length > 1 && onSelectVariant ? (
-              <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-                {displayVariants.slice(0, 4).map((v) => {
-                  const selected = v.id === (selectedId ?? resource.id)
-                  return (
-                    <button
-                      key={v.id}
-                      type="button"
-                      onClick={() => onSelectVariant(v.id)}
-                      className={cn(
-                        "relative h-12 w-12 shrink-0 overflow-hidden rounded-lg border-2 transition-colors",
-                        selected ? "border-[#005b8f]" : "border-[#e4e7ec] hover:border-[#005b8f]/40"
-                      )}
-                    >
-                      <PreviewByType resource={v} className="h-full w-full" />
-                    </button>
-                  )
-                })}
+              <div className="space-y-1.5">
+                <SectionHeading>
+                  {displayVariants.some((v) => v.id.includes(ATTACHMENT_VARIANT_SEP))
+                    ? "Files in this asset"
+                    : "Related files"}
+                </SectionHeading>
+                <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+                  {displayVariants.map((v) => {
+                    const selected = v.id === (selectedId ?? resource.id)
+                    return (
+                      <button
+                        key={v.id}
+                        type="button"
+                        title={v.title}
+                        onClick={() => onSelectVariant(v.id)}
+                        className={cn(
+                          "relative h-12 w-12 shrink-0 overflow-hidden rounded-lg border-2 transition-colors",
+                          selected ? "border-[#005b8f]" : "border-[#e4e7ec] hover:border-[#005b8f]/40"
+                        )}
+                      >
+                        <PreviewByType resource={v} className="h-full w-full" />
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
             ) : null}
 
@@ -389,7 +419,11 @@ export default function DetailPanel({
           </TabsContent>
 
           <TabsContent value="versions" className="mt-0 px-4 py-4 focus-visible:outline-none">
-            <SectionHeading>Versions</SectionHeading>
+            <SectionHeading>
+              {versionRows.some((row) => row.id.includes(ATTACHMENT_VARIANT_SEP))
+                ? "Files"
+                : "Versions"}
+            </SectionHeading>
             <ul className="mt-2 divide-y divide-border/60 rounded-xl border border-border/60 bg-muted/10">
               {versionRows.map((row) => (
                 <li key={row.id} className="flex items-center gap-2 px-3 py-2.5 text-sm">
@@ -401,7 +435,9 @@ export default function DetailPanel({
                     aria-hidden
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-foreground/90">{row.label}</p>
+                    <p className="font-medium text-foreground/90 truncate" title={row.label}>
+                      {row.label}
+                    </p>
                     {row.date ? (
                       <p className="text-xs text-muted-foreground">{row.date}</p>
                     ) : null}
@@ -415,7 +451,7 @@ export default function DetailPanel({
                     onClick={() => {
                       if (row.url) window.open(row.url, "_blank", "noopener,noreferrer")
                     }}
-                    aria-label={`Download ${row.label}`}
+                    aria-label={`Open ${row.label}`}
                   >
                     <Download className="h-4 w-4" />
                   </Button>

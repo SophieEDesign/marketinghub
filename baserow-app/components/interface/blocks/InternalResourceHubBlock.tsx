@@ -33,7 +33,9 @@ import {
   getFeatured,
   getVariants,
   hasActiveFilters,
+  parseAttachmentVariantKey,
   parseDefaultCategory,
+  resolveDisplayResource,
   sortResources,
   type ResourceSortMode,
 } from "./internal-resource-hub/utils"
@@ -151,13 +153,29 @@ export default function InternalResourceHubBlock({
     return filtered.filter((r) => !featuredIds.has(r.id))
   }, [filtered, featured, showFeaturedRow])
   const filtersActive = hasActiveFilters(category, searchQuery)
-  const selected = useMemo(
-    () => resources.find((r) => r.id === selectedId) ?? null,
-    [resources, selectedId]
+  const selectedRecordId = useMemo(() => {
+    if (!selectedId) return null
+    return parseAttachmentVariantKey(selectedId)?.recordId ?? selectedId
+  }, [selectedId])
+
+  const selectedRecord = useMemo(
+    () => resources.find((r) => r.id === selectedRecordId) ?? null,
+    [resources, selectedRecordId]
   )
+
+  const attachmentIndex = useMemo(() => {
+    if (!selectedId) return 0
+    return parseAttachmentVariantKey(selectedId)?.index ?? 0
+  }, [selectedId])
+
+  const displayResource = useMemo(
+    () => resolveDisplayResource(resources, selectedRecord, selectedId, attachmentIndex),
+    [resources, selectedRecord, selectedId, attachmentIndex]
+  )
+
   const variants = useMemo(
-    () => (selected ? getVariants(resources, selected) : []),
-    [resources, selected]
+    () => (selectedRecord ? getVariants(resources, selectedRecord) : []),
+    [resources, selectedRecord]
   )
 
   const handleSelect = useCallback(
@@ -182,9 +200,9 @@ export default function InternalResourceHubBlock({
   }, [])
 
   const toggleFavourite = useCallback(() => {
-    if (!selectedId) return
-    toggleFavouriteById(selectedId)
-  }, [selectedId, toggleFavouriteById])
+    if (!selectedRecordId) return
+    toggleFavouriteById(selectedRecordId)
+  }, [selectedRecordId, toggleFavouriteById])
 
   const clearFilters = useCallback(() => {
     setCategory("all")
@@ -199,8 +217,12 @@ export default function InternalResourceHubBlock({
   const openResourceUrl = useCallback(
     (id: string) => {
       if (isEditing) return
-      const r = resources.find((x) => x.id === id)
-      if (r?.url) window.open(r.url, "_blank", "noopener,noreferrer")
+      const recordId = parseAttachmentVariantKey(id)?.recordId ?? id
+      const record = resources.find((x) => x.id === recordId)
+      if (!record) return
+      const index = parseAttachmentVariantKey(id)?.index ?? 0
+      const url = resolveDisplayResource(resources, record, id, index)?.url
+      if (url) window.open(url, "_blank", "noopener,noreferrer")
     },
     [resources, isEditing]
   )
@@ -221,7 +243,7 @@ export default function InternalResourceHubBlock({
     [isEditing, tableIds, openRecordModal, interfaceMode, reload]
   )
 
-  const showSideDetailPanel = showDetailPanel && !isRecordModalOpen && selected !== null
+  const showSideDetailPanel = showDetailPanel && !isRecordModalOpen && selectedRecord !== null
 
   const canCreateResource =
     effectiveRole === "admin" &&
@@ -235,7 +257,7 @@ export default function InternalResourceHubBlock({
     demoState.useLiveData &&
     !forceMock &&
     !!tableIds?.mediaTableId &&
-    !!selectedId
+    !!selectedRecordId
 
   const handleCreateResource = useCallback(() => {
     if (!canCreateResource || !tableIds) return
@@ -378,7 +400,7 @@ export default function InternalResourceHubBlock({
         />
       </main>
 
-      {showSideDetailPanel && selected ? (
+      {showSideDetailPanel && selectedRecord && displayResource ? (
         <>
           <button
             type="button"
@@ -387,24 +409,25 @@ export default function InternalResourceHubBlock({
             aria-label="Close resource details"
           />
           <DetailPanel
-            resource={selected}
+            resource={displayResource}
+            recordTitle={selectedRecord.title}
             variants={variants}
             selectedId={selectedId}
-            isFavourite={selectedId ? favourites.has(selectedId) : false}
+            isFavourite={selectedRecordId ? favourites.has(selectedRecordId) : false}
             isEditing={isEditing}
             onToggleFavourite={toggleFavourite}
             onSelectVariant={handleSelect}
             onClose={handleBack}
             onDownload={() => {
               if (isEditing) return
-              if (selected?.url) window.open(selected.url, "_blank", "noopener,noreferrer")
+              if (displayResource.url) window.open(displayResource.url, "_blank", "noopener,noreferrer")
             }}
             onViewFull={() => {
               if (isEditing) return
-              openResourceUrl(selectedId!)
+              openResourceUrl(selectedId ?? selectedRecordId!)
             }}
             onCopyLink={async () => {
-              const url = selected?.url
+              const url = displayResource.url
               if (!url) return
               try {
                 await navigator.clipboard.writeText(url)
@@ -413,8 +436,8 @@ export default function InternalResourceHubBlock({
               }
             }}
             onEditDetails={
-              canManageSelectedResource && selectedId
-                ? () => handleEditResourceDetails(selectedId)
+              canManageSelectedResource && selectedRecordId
+                ? () => handleEditResourceDetails(selectedRecordId)
                 : undefined
             }
             className="fixed right-0 top-0 bottom-0 z-50 h-full max-h-screen w-full max-w-[392px] overflow-hidden"
