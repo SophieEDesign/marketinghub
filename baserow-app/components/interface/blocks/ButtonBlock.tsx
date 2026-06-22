@@ -1,23 +1,60 @@
 "use client"
 
 import { useState } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { useRouter } from "next/navigation"
 import type { PageBlock } from "@/lib/interface/types"
-import { Zap } from "lucide-react"
+import { ExternalLink, Zap } from "lucide-react"
 
 interface ButtonBlockProps {
   block: PageBlock
   isEditing?: boolean
 }
 
+function resolveButtonActionType(
+  config: PageBlock["config"]
+): "automation" | "link" | undefined {
+  if (config?.button_action_type === "automation" || config?.button_action_type === "link") {
+    return config.button_action_type
+  }
+  if (config?.button_automation_id) return "automation"
+  if (config?.button_url?.trim()) return "link"
+  return undefined
+}
+
+function openButtonLink(url: string, router: ReturnType<typeof useRouter>) {
+  const trimmed = url.trim()
+  if (!trimmed) return
+
+  if (trimmed.startsWith("/") || trimmed.startsWith("?")) {
+    router.push(trimmed)
+    return
+  }
+
+  const href = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
+  window.open(href, "_blank", "noopener,noreferrer")
+}
+
 export default function ButtonBlock({ block, isEditing = false }: ButtonBlockProps) {
+  const router = useRouter()
   const { config } = block
   const label = config?.button_label || "Button"
+  const actionType = resolveButtonActionType(config)
   const automationId = config?.button_automation_id
+  const linkUrl = config?.button_url?.trim()
+  const isAutomation = actionType === "automation" && !!automationId
+  const isLink = actionType === "link" && !!linkUrl
+  const isConfigured = isAutomation || isLink
   const [loading, setLoading] = useState(false)
 
   async function handleClick() {
-    if (!automationId || isEditing) return
+    if (isEditing || !isConfigured) return
+
+    if (isLink && linkUrl) {
+      openButtonLink(linkUrl, router)
+      return
+    }
+
+    if (!isAutomation || !automationId) return
 
     setLoading(true)
     try {
@@ -40,18 +77,28 @@ export default function ButtonBlock({ block, isEditing = false }: ButtonBlockPro
     }
   }
 
+  const appearance = config?.appearance || {}
+  const buttonStyle: React.CSSProperties = {
+    backgroundColor: appearance.button_background || "#2563eb",
+    color: appearance.button_text_color || "#ffffff",
+  }
+
   return (
-    <div className="h-full flex items-center justify-center p-4">
+    <div className="h-full flex flex-col items-center justify-center p-4">
       <button
         onClick={handleClick}
-        disabled={!automationId || isEditing || loading}
-        className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+        disabled={!isConfigured || isEditing || loading}
+        style={buttonStyle}
+        className="px-6 py-3 rounded-md hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-opacity"
       >
-        {automationId && <Zap className="h-4 w-4" />}
+        {isAutomation && <Zap className="h-4 w-4" />}
+        {isLink && <ExternalLink className="h-4 w-4" />}
         {loading ? "Running..." : label}
       </button>
-      {isEditing && !automationId && (
-        <p className="text-xs text-gray-400 mt-2">Select an automation in settings</p>
+      {isEditing && !isConfigured && (
+        <p className="text-xs text-gray-400 mt-2 text-center">
+          Select an automation or add a link in settings
+        </p>
       )}
     </div>
   )

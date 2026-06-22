@@ -112,7 +112,8 @@ export type DividerBlockConfig = BaseBlockConfig
 // Button Block Config
 export interface ButtonBlockConfig extends BaseBlockConfig {
   button_label: string // Required
-  // Note: button_automation_id is already in BlockConfig
+  button_action_type?: 'automation' | 'link'
+  // Note: button_automation_id and button_url are already in BlockConfig
 }
 
 // Action Block Config

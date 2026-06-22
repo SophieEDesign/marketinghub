@@ -141,7 +141,9 @@ export interface BlockConfig {
   image_url?: string
   image_alt?: string
   button_label?: string
+  button_action_type?: 'automation' | 'link'
   button_automation_id?: string
+  button_url?: string
   visibility_rules?: VisibilityRule[]
   // Table snapshot
   row_limit?: number
