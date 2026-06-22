@@ -7,6 +7,7 @@
 
 import { NextResponse } from "next/server"
 import { getDriveClient, upsizeThumb, fileExtension } from "@/lib/drive/client"
+import { formatDriveApiError } from "@/lib/drive/auth"
 import { resolveDriveFolderUrl } from "@/lib/drive/urls"
 import type {
   DriveGalleryFolder,
@@ -16,6 +17,7 @@ import type {
 
 export const revalidate = 300
 export const dynamic = "force-dynamic"
+export const runtime = "nodejs"
 
 const FOLDER_MIME = "application/vnd.google-apps.folder"
 
@@ -132,7 +134,11 @@ export async function GET(request: Request) {
       headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" },
     })
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Failed to load gallery"
-    return NextResponse.json({ error: message }, { status: 500 })
+    const message = formatDriveApiError(e)
+    const status =
+      e && typeof e === "object" && "response" in e
+        ? ((e as { response?: { status?: number } }).response?.status ?? 500)
+        : 500
+    return NextResponse.json({ error: message }, { status: status >= 400 && status < 600 ? status : 500 })
   }
 }

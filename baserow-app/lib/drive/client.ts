@@ -1,31 +1,26 @@
 // Server-only Google Drive client (service-account auth). Never import from a client component.
 
 import { google, type drive_v3 } from "googleapis"
+import { readServiceAccountCredentials } from "@/lib/drive/auth"
 
 let cached: drive_v3.Drive | null = null
 
 /**
  * Returns a memoised, read-only Drive client authed with the service account.
- * Requires env: GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY.
+ * Requires env: GOOGLE_SERVICE_ACCOUNT_EMAIL + GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
+ * or GOOGLE_SERVICE_ACCOUNT_JSON.
  */
 export function getDriveClient(): drive_v3.Drive {
   if (cached) return cached
 
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL
-  const rawKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
-
-  if (!email || !rawKey) {
-    throw new Error(
-      "Drive gallery not configured: set GOOGLE_SERVICE_ACCOUNT_EMAIL and GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY."
-    )
+  const creds = readServiceAccountCredentials()
+  if ("error" in creds) {
+    throw new Error(creds.error)
   }
 
-  // Env stores newlines as the literal characters \n — convert back to real newlines.
-  const privateKey = rawKey.replace(/\\n/g, "\n")
-
   const auth = new google.auth.JWT({
-    email,
-    key: privateKey,
+    email: creds.email,
+    key: creds.privateKey,
     scopes: ["https://www.googleapis.com/auth/drive.readonly"],
   })
 
