@@ -72,36 +72,21 @@ export default function BlockFilterEditor({
     // Normalize the tree
     const normalized = normalizeFilterTree(newTree)
 
-    // If onConfigUpdate is provided, store filter_tree in config (preferred method)
-    if (onConfigUpdate) {
-      const flatForLegacy = normalized ? flattenFilterTree(normalized) : []
-      onConfigUpdate({
-        filter_tree: normalized,
-        // Keep legacy filters for backward compatibility (AND-only semantics)
-        // NOTE: OR is not representable in the legacy flat list, so consumers must prefer filter_tree
-        filters: flatForLegacy.map(c => ({
-          field: c.field_id,
-          operator: c.operator as any,
-          value: c.value,
-        })),
-      })
-    }
-
-    // Always update flat filters for backward compatibility
-    if (!normalized) {
-      onChange([])
-      return
-    }
-
-    // Flatten tree to get all conditions
-    const conditions = flattenFilterTree(normalized)
-    
-    // Convert to BlockFilter[]
-    const blockFilters: BlockFilter[] = conditions.map(c => ({
+    const flatForLegacy = normalized ? flattenFilterTree(normalized) : []
+    const blockFilters: BlockFilter[] = flatForLegacy.map((c) => ({
       field: c.field_id,
-      operator: c.operator as BlockFilter['operator'], // May need to filter valid operators
+      operator: c.operator as BlockFilter["operator"],
       value: c.value,
     }))
+
+    // Single config update — avoid batched setState dropping filter_tree
+    if (onConfigUpdate) {
+      onConfigUpdate({
+        filter_tree: normalized ?? undefined,
+        filters: blockFilters,
+      })
+      return
+    }
 
     onChange(blockFilters)
   }

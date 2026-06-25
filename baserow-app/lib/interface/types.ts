@@ -634,6 +634,8 @@ export interface BlockConfig {
   social_media_calendar_social_marker_field_id?: string
   social_media_calendar_social_marker_field?: string
   social_media_calendar_social_marker_value?: string
+  /** When content scope is Social only on Social Posts — e.g. "Social Post". */
+  social_media_calendar_scope_post_type?: string
   social_media_calendar_content_type_default?: string
   social_media_calendar_owner_field_id?: string
   social_media_calendar_owner_field?: string

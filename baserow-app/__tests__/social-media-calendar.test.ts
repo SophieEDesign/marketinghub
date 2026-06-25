@@ -14,6 +14,10 @@ import {
   parseContentMediaThumbnail,
   socialCalendarDateFieldValue,
   sanitizeSocialCalendarQueryConfig,
+  prepareSocialCalendarQueryConfig,
+  applySocialCalendarScope,
+  upsertSocialCalendarScopePostType,
+  rowMatchesScopePostType,
   socialCalendarSettingsFromConfig,
   sourceTableLooksSocial,
   type SocialCalendarFieldMap,
@@ -174,6 +178,138 @@ describe("parseContentMediaThumbnail", () => {
     ])
     expect(result.thumbnailUrl).toBe("https://example.com/a.jpg")
     expect(result.mediaUrls).toHaveLength(2)
+  })
+})
+
+describe("prepareSocialCalendarQueryConfig", () => {
+  it("strips post_type scope from query so toolbar can toggle all content", () => {
+    const config = prepareSocialCalendarQueryConfig(
+      {
+        social_media_calendar_content_scope: "social_only",
+        social_media_calendar_scope_post_type: "Social Post",
+        social_media_calendar_type_field: "post_type",
+        filters: [{ field: "post_type", operator: "equal", value: "Social Post" }],
+        filter_tree: {
+          operator: "AND",
+          children: [{ field_id: "post_type", operator: "equal", value: "Social Post" }],
+        },
+      },
+      [{ name: "post_type" }, { name: "status" }],
+      "Social Posts"
+    )
+    expect(config?.filters).toEqual([])
+    expect((config as { filter_tree?: unknown })?.filter_tree).toBeUndefined()
+  })
+
+  it("keeps non-type block filters on query", () => {
+    const config = prepareSocialCalendarQueryConfig(
+      {
+        social_media_calendar_scope_post_type: "Social Post",
+        social_media_calendar_type_field: "post_type",
+        filters: [
+          { field: "post_type", operator: "equal", value: "Social Post" },
+          { field: "status", operator: "equal", value: "draft" },
+        ],
+      },
+      [{ name: "post_type" }, { name: "status" }],
+      "Social Posts"
+    )
+    expect(config?.filters).toEqual([{ field: "status", operator: "equal", value: "draft" }])
+  })
+})
+
+describe("applySocialCalendarScope", () => {
+  it("filters social posts table rows by post_type when social only", () => {
+    const items = [
+      makeItem({ id: "a", contentType: "Social Post" }),
+      makeItem({ id: "b", contentType: "Editorial", platforms: [] }),
+    ]
+    const rows = [
+      { id: "a", post_type: "social_post" },
+      { id: "b", post_type: "editorial" },
+    ]
+    const scoped = applySocialCalendarScope({
+      items,
+      contentScope: "social_only",
+      config: {
+        social_media_calendar_type_field: "post_type",
+        social_media_calendar_scope_post_type: "Social Post",
+      },
+      contentFields: [{ name: "post_type" }],
+      contentTableFields: [
+        {
+          name: "post_type",
+          type: "single_select",
+          options: {
+            selectOptions: [
+              { id: "social_post", label: "Social Post" },
+              { id: "editorial", label: "Editorial" },
+            ],
+          },
+        },
+      ],
+      contentRows: rows,
+      sourceTableName: "Social Posts",
+    })
+    expect(scoped.map((i) => i.id)).toEqual(["a"])
+  })
+
+  it("shows all rows when content scope is all_content", () => {
+    const items = [
+      makeItem({ id: "a", contentType: "Social Post" }),
+      makeItem({ id: "b", contentType: "Editorial", platforms: [] }),
+    ]
+    const scoped = applySocialCalendarScope({
+      items,
+      contentScope: "all_content",
+      config: {
+        social_media_calendar_scope_post_type: "Social Post",
+        social_media_calendar_type_field: "post_type",
+      },
+      contentFields: [{ name: "post_type" }],
+      contentTableFields: [{ name: "post_type" }],
+      contentRows: [
+        { id: "a", post_type: "social_post" },
+        { id: "b", post_type: "editorial" },
+      ],
+      sourceTableName: "Social Posts",
+    })
+    expect(scoped).toHaveLength(2)
+  })
+})
+
+describe("upsertSocialCalendarScopePostType", () => {
+  it("writes scope value and syncs block filters", () => {
+    const patch = upsertSocialCalendarScopePostType(
+      { social_media_calendar_type_field: "post_type" },
+      [{ name: "post_type" }],
+      "Social Post"
+    )
+    expect(patch.social_media_calendar_scope_post_type).toBe("Social Post")
+    expect(patch.filters).toEqual([
+      { field: "post_type", operator: "equal", value: "Social Post" },
+    ])
+    expect(patch.filter_tree).toBeTruthy()
+  })
+})
+
+describe("rowMatchesScopePostType", () => {
+  it("matches stored slug to display label", () => {
+    const field = {
+      name: "post_type",
+      type: "single_select",
+      options: {
+        selectOptions: [{ id: "social_post", label: "Social Post" }],
+      },
+    }
+    expect(
+      rowMatchesScopePostType(
+        { post_type: "social_post" },
+        "post_type",
+        "Social Post",
+        field
+      )
+    ).toBe(true)
   })
 })
 

@@ -1,4 +1,6 @@
 import { applyFiltersToQuery } from "@/lib/interface/filters"
+import { isEmptyFilterTree, normalizeFilterTree } from "@/lib/filters/canonical-model"
+import type { FilterTree } from "@/lib/filters/canonical-model"
 import type { BlockConfig } from "@/lib/interface/types"
 
 type OrderableQuery = {
@@ -14,9 +16,11 @@ export function applyMarketingBlockDataQuery<T extends OrderableQuery>(
   fallbackSortField = "created_at"
 ): T {
   const safeConfig = config || {}
-  const filterTree = (safeConfig as { filter_tree?: unknown }).filter_tree
+  const filterTree = (safeConfig as { filter_tree?: FilterTree }).filter_tree
+  const normalizedTree = normalizeFilterTree(filterTree ?? null)
   const flatFilters = Array.isArray(safeConfig.filters) ? safeConfig.filters : []
-  const activeFilters = filterTree ?? flatFilters
+  const activeFilters =
+    normalizedTree && !isEmptyFilterTree(normalizedTree) ? normalizedTree : flatFilters
 
   let nextQuery = applyFiltersToQuery(query, activeFilters as any, tableFields as any) as T
 

@@ -17,7 +17,13 @@ import MarketingFieldMappingSection from "./shared/MarketingFieldMappingSection"
 import MarketingFieldSelect from "./shared/MarketingFieldSelect"
 import BlockFilterEditor from "./BlockFilterEditor"
 import SortSelector from "./shared/SortSelector"
-import { sourceTableLooksSocial } from "@/lib/marketing/social-media-calendar"
+import {
+  choiceLabelsFromField,
+  resolveSocialCalendarScopePostType,
+  resolveSocialCalendarTypeFieldName,
+  sourceTableLooksSocial,
+  upsertSocialCalendarScopePostType,
+} from "@/lib/marketing/social-media-calendar"
 
 export default function SocialMediaCalendarDataSettings({
   config,
@@ -34,6 +40,14 @@ export default function SocialMediaCalendarDataSettings({
   const sourceTableName =
     tables.find((t) => t.id === config.table_id)?.name ?? null
   const isSocialPostsTable = sourceTableLooksSocial(sourceTableName)
+  const typeFieldName = resolveSocialCalendarTypeFieldName(config, tableFields)
+  const typeFieldMeta = typeFieldName
+    ? tableFields.find((f) => f.name === typeFieldName)
+    : undefined
+  const postTypeOptions = choiceLabelsFromField(typeFieldMeta)
+  const scopePostType =
+    resolveSocialCalendarScopePostType(config, tableFields, sourceTableName) || ""
+  const contentScope = config.social_media_calendar_content_scope || "social_only"
 
   const setField = (idKey: keyof BlockConfig, nameKey: keyof BlockConfig) =>
     (fieldId: string | undefined, fieldName: string | undefined) => {
@@ -185,8 +199,7 @@ export default function SocialMediaCalendarDataSettings({
           />
           {isSocialPostsTable ? (
             <p className="text-[11px] text-muted-foreground leading-snug">
-              Social Posts can include editorial and newsletter rows. Use Content scope → Social
-              only, or filter post_type → Social Post, to show social posts only.
+              Additional filters only — post type is configured under Content scope above.
             </p>
           ) : null}
         </div>
@@ -255,13 +268,25 @@ export default function SocialMediaCalendarDataSettings({
       <div className="space-y-2">
         <Label>Content scope</Label>
         <Select
-          value={config.social_media_calendar_content_scope || "social_only"}
-          onValueChange={(v) =>
+          value={contentScope}
+          onValueChange={(v) => {
+            const scope = v as BlockConfig["social_media_calendar_content_scope"]
+            if (scope === "all_content") {
+              onUpdate({
+                social_media_calendar_content_scope: scope,
+                ...upsertSocialCalendarScopePostType(config, tableFields, undefined),
+              })
+              return
+            }
+            const scopeValue =
+              config.social_media_calendar_scope_post_type?.trim() ||
+              scopePostType ||
+              undefined
             onUpdate({
-              social_media_calendar_content_scope:
-                v as BlockConfig["social_media_calendar_content_scope"],
+              social_media_calendar_content_scope: scope,
+              ...upsertSocialCalendarScopePostType(config, tableFields, scopeValue),
             })
-          }
+          }}
         >
           <SelectTrigger>
             <SelectValue />
@@ -272,6 +297,40 @@ export default function SocialMediaCalendarDataSettings({
           </SelectContent>
         </Select>
       </div>
+
+      {isSocialPostsTable && contentScope === "social_only" && typeFieldName ? (
+        <div className="space-y-2">
+          <Label>Post type (social only)</Label>
+          <Select
+            value={scopePostType || undefined}
+            onValueChange={(v) =>
+              onUpdate(upsertSocialCalendarScopePostType(config, tableFields, v))
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select post type" />
+            </SelectTrigger>
+            <SelectContent>
+              {(postTypeOptions.length > 0
+                ? postTypeOptions
+                : ["Social Post", "Editorial", "Newsletter"]
+              ).map((option) => (
+                <SelectItem key={option} value={option}>
+                  {option}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-[11px] text-muted-foreground leading-snug">
+            Limits the calendar to this {typeFieldName} value. Use the toolbar &quot;All
+            content&quot; toggle to preview other types without changing this setting.
+          </p>
+        </div>
+      ) : isSocialPostsTable && contentScope === "social_only" ? (
+        <p className="text-[11px] text-muted-foreground leading-snug">
+          Map the Content type field above (e.g. post_type) to enable post-type filtering.
+        </p>
+      ) : null}
 
       {config.table_id ? (
         <div className="space-y-3 rounded-md border border-border/40 p-3">

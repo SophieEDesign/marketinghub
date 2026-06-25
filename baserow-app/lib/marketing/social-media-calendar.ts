@@ -30,7 +30,13 @@ import {
 import type { TableField } from "@/types/fields"
 import { normalizeHexColor } from "@/lib/field-colors"
 import type { FilterTree, FilterGroup, FilterCondition } from "@/lib/filters/canonical-model"
+import {
+  conditionsToFilterTree,
+  flattenFilterTree,
+  normalizeFilterTree,
+} from "@/lib/filters/canonical-model"
 import type { BlockConfig, BlockFilter } from "@/lib/interface/types"
+import { resolveSelectFilterStoredValues } from "@/lib/fields/select-options"
 import { plainTextFromHtml } from "@/lib/sanitize"
 import type { FieldOptions } from "@/types/fields"
 import { format, startOfDay } from "date-fns"
@@ -208,9 +214,9 @@ function sanitizeFilterTree(
 }
 
 /**
- * Drop redundant social-type block filters when the source table is already dedicated
- * social posts (e.g. post_type = Social Post). Those filters often use labels that do not
- * match stored values and return zero rows. Social-only scoping is handled at runtime.
+ * Drop redundant content_type filters on dedicated Social Posts tables.
+ * post_type scope is applied client-side (see applySocialCalendarScope) so the
+ * toolbar "All content" toggle can still load every row.
  */
 export function sanitizeSocialCalendarQueryConfig(
   config: BlockConfig | undefined,
@@ -250,6 +256,214 @@ export function sanitizeSocialCalendarQueryConfig(
     ;(next as { filter_tree?: FilterTree }).filter_tree = cleanedTree ?? undefined
   }
   return next
+}
+
+/** Default post_type label when Social only scope is active on Social Posts. */
+export const DEFAULT_SOCIAL_POST_TYPE_SCOPE = "Social Post"
+
+type FieldNameRow = { name: string; id?: string; type?: string; options?: FieldOptions }
+
+export function resolveSocialCalendarTypeFieldName(
+  config: BlockConfig | undefined | null,
+  fields: FieldNameRow[]
+): string | null {
+  const id = config?.social_media_calendar_type_field_id?.trim()
+  if (id) {
+    const byId = fields.find((f) => f.id === id)
+    if (byId?.name) return byId.name
+  }
+  const byName = config?.social_media_calendar_type_field?.trim()
+  if (byName) return byName
+  return pickFieldName(fields, [/post_type/i, /content_type/i, /^type$/i], null)
+}
+
+export function resolveSocialCalendarScopePostType(
+  config: BlockConfig | undefined | null,
+  fields: FieldNameRow[],
+  tableName: string | null | undefined
+): string | null {
+  if (config?.social_media_calendar_content_scope === "all_content") return null
+
+  const configured = config?.social_media_calendar_scope_post_type?.trim()
+  if (configured) return configured
+
+  const typeField = resolveSocialCalendarTypeFieldName(config, fields)
+  if (typeField) {
+    const flat = Array.isArray(config?.filters) ? config.filters : []
+    for (const f of flat) {
+      if (f.field === typeField && f.operator === "equal") {
+        const v = filterValueAsString(f.value)
+        if (v) return v
+      }
+    }
+    const tree = (config as { filter_tree?: FilterTree })?.filter_tree
+    const normalized = normalizeFilterTree(tree ?? null)
+    if (normalized) {
+      for (const c of flattenFilterTree(normalized)) {
+        if (c.field_id === typeField && c.operator === "equal") {
+          const v = filterValueAsString(c.value)
+          if (v) return v
+        }
+      }
+    }
+  }
+
+  if (sourceTableLooksSocial(tableName)) {
+    return DEFAULT_SOCIAL_POST_TYPE_SCOPE
+  }
+  return null
+}
+
+export function rowMatchesScopePostType(
+  row: Record<string, unknown>,
+  typeFieldName: string,
+  scopeValue: string,
+  fieldMeta?: FieldNameRow
+): boolean {
+  const raw = row[typeFieldName]
+  if (raw == null) return false
+
+  const display = formatDisplayValue(raw)
+  if (display.toLowerCase() === scopeValue.toLowerCase()) return true
+
+  const storedCandidates = resolveSelectFilterStoredValues(
+    scopeValue,
+    "single_select",
+    fieldMeta?.options
+  )
+  const rawStr = typeof raw === "string" ? raw.trim() : display.trim()
+  if (!rawStr) return false
+
+  return storedCandidates.some(
+    (c) => c === rawStr || c.toLowerCase() === rawStr.toLowerCase()
+  )
+}
+
+function stripTypeFieldScopeFilters(
+  config: BlockConfig,
+  typeFieldName: string | null
+): BlockConfig {
+  if (!typeFieldName) return config
+
+  const filters = (Array.isArray(config.filters) ? config.filters : []).filter(
+    (f) => f.field !== typeFieldName
+  )
+  const filterTree = (config as { filter_tree?: FilterTree }).filter_tree
+  let nextTree: FilterTree | undefined = filterTree
+
+  if (filterTree) {
+    const normalized = normalizeFilterTree(filterTree)
+    if (normalized) {
+      const remaining = flattenFilterTree(normalized).filter(
+        (c) => c.field_id !== typeFieldName
+      )
+      nextTree =
+        remaining.length > 0 ? conditionsToFilterTree(remaining, normalized.operator) : undefined
+    }
+  }
+
+  const next: BlockConfig = { ...config, filters }
+  ;(next as { filter_tree?: FilterTree }).filter_tree = nextTree
+  return next
+}
+
+/** Query config for live fetch — strips post_type scope (applied client-side for toolbar toggle). */
+export function prepareSocialCalendarQueryConfig(
+  config: BlockConfig | undefined,
+  contentFields: FieldNameRow[],
+  tableName: string | null | undefined
+): BlockConfig | undefined {
+  const sanitized = sanitizeSocialCalendarQueryConfig(config, contentFields, tableName) ?? config
+  if (!sanitized) return config
+
+  const typeField = resolveSocialCalendarTypeFieldName(sanitized, contentFields)
+  const scopeValue = resolveSocialCalendarScopePostType(sanitized, contentFields, tableName)
+  if (!typeField || !scopeValue) return sanitized
+
+  return stripTypeFieldScopeFilters(sanitized, typeField)
+}
+
+export function upsertSocialCalendarScopePostType(
+  config: BlockConfig,
+  fields: FieldNameRow[],
+  scopePostType: string | undefined
+): Partial<BlockConfig> {
+  const typeField = resolveSocialCalendarTypeFieldName(config, fields)
+  const withoutScope = typeField ? stripTypeFieldScopeFilters(config, typeField) : config
+  const trimmed = scopePostType?.trim()
+
+  if (!trimmed || !typeField) {
+    return {
+      social_media_calendar_scope_post_type: trimmed || undefined,
+      filters: withoutScope.filters,
+      filter_tree: (withoutScope as { filter_tree?: FilterTree }).filter_tree,
+    }
+  }
+
+  const scopeFilter: BlockFilter = {
+    field: typeField,
+    operator: "equal",
+    value: trimmed,
+  }
+  const otherFilters = (withoutScope.filters || []).filter((f) => f.field !== typeField)
+  const filters = [...otherFilters, scopeFilter]
+  const filter_tree = conditionsToFilterTree(
+    filters.map((f) => ({
+      field_id: f.field,
+      operator: f.operator as FilterCondition["operator"],
+      value: f.value,
+    })),
+    "AND"
+  )
+
+  return {
+    social_media_calendar_scope_post_type: trimmed,
+    filters,
+    filter_tree,
+  }
+}
+
+export function applySocialCalendarScope(params: {
+  items: SocialCalendarItem[]
+  contentScope: ContentScopeMode
+  config?: BlockConfig | null
+  contentFields: FieldNameRow[]
+  contentTableFields: FieldNameRow[]
+  contentRows: Record<string, unknown>[]
+  sourceTableName: string | null | undefined
+  contentTypeFieldExists?: boolean
+}): SocialCalendarItem[] {
+  const {
+    items,
+    contentScope,
+    config,
+    contentFields,
+    contentTableFields,
+    contentRows,
+    sourceTableName,
+    contentTypeFieldExists = true,
+  } = params
+
+  if (contentScope === "all_content") return items
+
+  const typeFieldName = resolveSocialCalendarTypeFieldName(config, contentTableFields)
+  const scopeValue = resolveSocialCalendarScopePostType(
+    config,
+    contentTableFields.length > 0 ? contentTableFields : contentFields,
+    sourceTableName
+  )
+
+  if (sourceTableLooksSocial(sourceTableName) && typeFieldName && scopeValue) {
+    const fieldMeta = contentTableFields.find((f) => f.name === typeFieldName)
+    const rowById = new Map(contentRows.map((row) => [String(row.id), row]))
+    return items.filter((item) => {
+      const row = rowById.get(item.id)
+      if (!row) return false
+      return rowMatchesScopePostType(row, typeFieldName, scopeValue, fieldMeta)
+    })
+  }
+
+  return applyContentScope(items, contentScope, contentTypeFieldExists)
 }
 
 const PLATFORM_FROM_CHANNEL: Record<string, SocialPlatform> = {
@@ -498,6 +712,7 @@ export const DEFAULT_SOCIAL_MEDIA_CALENDAR_BLOCK_CONFIG: BlockConfig = {
     "Visual planning for social posts — platforms, media, and approval status at a glance.",
   social_media_calendar_default_view: "month",
   social_media_calendar_content_scope: "social_only",
+  social_media_calendar_scope_post_type: DEFAULT_SOCIAL_POST_TYPE_SCOPE,
   social_media_calendar_content_type_default: DEFAULT_SOCIAL_CONTENT_TYPE_LABEL,
   social_media_calendar_mode: "full",
   social_media_calendar_show_status_bar: true,

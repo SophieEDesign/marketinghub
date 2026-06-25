@@ -17,7 +17,7 @@ import {
 } from "@/lib/marketing/block-config-resolver"
 import { applyMarketingBlockDataQuery } from "@/lib/marketing/block-data-query"
 import { findCampaignsTable, findContentTable, findQuarterlyThemesTable } from "@/lib/marketing/marketing-tables"
-import { sanitizeSocialCalendarQueryConfig } from "@/lib/marketing/social-media-calendar"
+import { prepareSocialCalendarQueryConfig } from "@/lib/marketing/social-media-calendar"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { FieldOptions, TableField } from "@/types/fields"
 
@@ -154,7 +154,7 @@ export function useSocialMediaCalendarData(options?: {
         const contentTableFieldRows = (fieldRows?.filter((f) => f.table_id === content.id) ||
           []) as TableField[]
 
-        const queryConfig = sanitizeSocialCalendarQueryConfig(
+        const queryConfig = prepareSocialCalendarQueryConfig(
           config,
           contentTableFieldRows,
           content.name

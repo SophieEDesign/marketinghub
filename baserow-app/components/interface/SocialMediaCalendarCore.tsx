@@ -31,7 +31,7 @@ import {
   PLANABLE_SYNC_SOURCE,
 } from "@/lib/marketing/planable-sync"
 import {
-  applyContentScope,
+  applySocialCalendarScope,
   buildSocialCalendarCreateInitialData,
   buildSocialCalendarEvents,
   buildSocialCalendarItems,
@@ -291,17 +291,22 @@ export function SocialMediaCalendarCore({
 
   const scopedItems = useMemo(
     () => {
-      const autoScoped = applyContentScope(
-        allSocialItems,
+      const scopeFiltered = applySocialCalendarScope({
+        items: allSocialItems,
         contentScope,
-        socialFields?.contentType != null
-      )
+        config: blockConfig,
+        contentFields,
+        contentTableFields,
+        contentRows,
+        sourceTableName,
+        contentTypeFieldExists: socialFields?.contentType != null,
+      })
 
       if (contentScope !== "social_only" || !socialMarkerFieldName || !socialMarkerValue) {
-        return autoScoped
+        return scopeFiltered
       }
 
-      return allSocialItems.filter((item) => {
+      return scopeFiltered.filter((item) => {
         const row = rowById.get(item.id)
         return valueMatchesSocialMarker(row?.[socialMarkerFieldName], socialMarkerValue)
       })
@@ -309,10 +314,14 @@ export function SocialMediaCalendarCore({
     [
       allSocialItems,
       contentScope,
+      blockConfig,
+      contentFields,
+      contentTableFields,
+      contentRows,
+      sourceTableName,
       socialFields?.contentType,
       socialMarkerFieldName,
       socialMarkerValue,
-      isSocialPostsTable,
       rowById,
     ]
   )
