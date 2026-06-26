@@ -17,8 +17,8 @@ import MarketingFieldMappingSection from "./shared/MarketingFieldMappingSection"
 import MarketingFieldSelect from "./shared/MarketingFieldSelect"
 import BlockFilterEditor from "./BlockFilterEditor"
 import SortSelector from "./shared/SortSelector"
+import { choiceLabelsFromField } from "@/lib/marketing/field-utils"
 import {
-  choiceLabelsFromField,
   resolveSocialCalendarScopePostType,
   resolveSocialCalendarTypeFieldName,
   sourceTableLooksSocial,

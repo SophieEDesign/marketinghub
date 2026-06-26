@@ -324,6 +324,7 @@ export function rowMatchesScopePostType(
   if (raw == null) return false
 
   const display = formatDisplayValue(raw)
+  if (!display) return false
   if (display.toLowerCase() === scopeValue.toLowerCase()) return true
 
   const storedCandidates = resolveSelectFilterStoredValues(

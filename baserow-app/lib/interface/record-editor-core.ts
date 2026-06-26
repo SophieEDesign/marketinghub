@@ -528,7 +528,7 @@ export function useRecordEditorCore(
 
       const normalizedValue = normalizeUpdateValue(fieldName, value)
       const supabase = createClient()
-      const hasSyncSourceColumn = physicalColumnsRef.current.has('sync_source')
+      const hasSyncSourceColumn = physicalColumnsRef.current?.has('sync_source') ?? false
 
       const doUpdate = async (val: any) => {
         const patch = withPlanableHubSyncPatch(
@@ -678,7 +678,7 @@ export function useRecordEditorCore(
           payload[f.name]
         )
       }
-      if (physicalColumnsRef.current.has('sync_source')) {
+      if (physicalColumnsRef.current?.has('sync_source')) {
         payload.sync_source = 'hub'
       }
       if (recordId) {
