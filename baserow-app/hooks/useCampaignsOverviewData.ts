@@ -18,6 +18,7 @@ import {
   resolveCampaignOverviewFields,
 } from "@/lib/marketing/campaigns-overview-config"
 import { findCampaignsTable, type MarketingTableRow } from "@/lib/marketing/marketing-tables"
+import { useTablesRegistry } from "@/hooks/useTablesRegistry"
 import { applySoftDeleteFilter, fetchPhysicalColumns } from "@/lib/supabase/physical-columns"
 import {
   CAMPAIGNS_OVERVIEW_MOCK,
@@ -44,6 +45,11 @@ export function useCampaignsOverviewData(config?: BlockConfig): UseCampaignsOver
     "campaigns_overview_use_mock",
     "campaigns_use_mock"
   )
+  const {
+    tables: registryTables,
+    loading: registryLoading,
+    error: registryError,
+  } = useTablesRegistry()
   const [loading, setLoading] = useState(!forceMock)
   const [hasTable, setHasTable] = useState(false)
   const [fromLiveData, setFromLiveData] = useState(false)
@@ -63,6 +69,13 @@ export function useCampaignsOverviewData(config?: BlockConfig): UseCampaignsOver
       return
     }
 
+    if (registryLoading) return
+    if (registryError) {
+      setLoading(false)
+      setError(registryError)
+      return
+    }
+
     let cancelled = false
 
     async function load() {
@@ -70,16 +83,8 @@ export function useCampaignsOverviewData(config?: BlockConfig): UseCampaignsOver
       setError(null)
       try {
         const supabase = createClient()
-        const { data: tables, error: tablesErr } = await supabase
-          .from("tables")
-          .select("id, name, supabase_table")
-
-        if (tablesErr || !tables?.length) {
-          throw new Error(tablesErr?.message || "Could not load tables")
-        }
-
         const campaignsTable = resolveMarketingTable(
-          tables as MarketingTableRow[],
+          registryTables,
           config?.table_id,
           findCampaignsTable
         )
@@ -193,7 +198,7 @@ export function useCampaignsOverviewData(config?: BlockConfig): UseCampaignsOver
     return () => {
       cancelled = true
     }
-  }, [config, forceMock, reloadToken])
+  }, [config, forceMock, reloadToken, registryTables, registryLoading, registryError])
 
   const demoState = marketingDemoState({
     forceMock,

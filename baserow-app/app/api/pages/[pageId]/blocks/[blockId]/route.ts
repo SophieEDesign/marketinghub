@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { requireAdmin } from '@/lib/api/authz'
 import { deleteBlock } from '@/lib/pages/saveBlocks'
 
 /**
@@ -10,13 +10,8 @@ export async function DELETE(
   { params }: { params: Promise<{ pageId: string; blockId: string }> }
 ) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { admin, response } = await requireAdmin()
+    if (!admin) return response
 
     const { blockId } = await params
     await deleteBlock(blockId)

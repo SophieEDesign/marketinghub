@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { requireAdmin } from "@/lib/api/authz"
 import { executeAutomation } from "@/lib/automations/engine"
 import type { Automation } from "@/types/database"
 
@@ -11,6 +12,9 @@ export async function POST(
   { params }: { params: { automationId: string } }
 ) {
   try {
+    const { admin, response } = await requireAdmin()
+    if (!admin) return response
+
     const supabase = await createClient()
 
     // Load automation

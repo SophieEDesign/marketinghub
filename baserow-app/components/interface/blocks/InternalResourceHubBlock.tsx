@@ -404,7 +404,7 @@ export default function InternalResourceHubBlock({
         <>
           <button
             type="button"
-            className="fixed inset-0 z-40 bg-[#0f1c2b]/40 md:left-64"
+            className="fixed inset-0 z-40 bg-[#0f1c2b]/40 md:left-sidebar"
             onClick={handleBack}
             aria-label="Close resource details"
           />

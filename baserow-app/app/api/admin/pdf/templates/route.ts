@@ -1,26 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { requireAdmin } from '@/lib/api/authz'
 
 /**
  * GET /api/admin/pdf/templates - Get all PDF templates
  */
 export async function GET(request: NextRequest) {
   try {
+    const { admin, response } = await requireAdmin()
+    if (!admin) return response
+
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    // Check authentication
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    // Check if user has admin role (you may need to adjust this based on your auth system)
-    // For now, we'll allow any authenticated user
-    
-    // Query PDF templates table
     const { data, error } = await supabase
       .from('pdf_templates')
       .select('*')
@@ -54,10 +44,12 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const { admin, response } = await requireAdmin()
+    if (!admin) return response
+
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    // Check authentication
     if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized' },

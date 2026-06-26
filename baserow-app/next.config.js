@@ -34,7 +34,18 @@ const nextConfig = {
     ];
   },
   images: {
-    domains: [],
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "*.supabase.co",
+        pathname: "/storage/v1/object/public/**",
+      },
+      {
+        protocol: "https",
+        hostname: "*.supabase.in",
+        pathname: "/storage/v1/object/public/**",
+      },
+    ],
   },
   experimental: {
     optimizePackageImports: [

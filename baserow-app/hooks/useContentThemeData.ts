@@ -18,6 +18,7 @@ import {
 } from "@/lib/marketing/marketing-tables"
 import type { ContentThemeItem } from "@/lib/interface/content-theme-mock-data"
 import type { BlockConfig } from "@/lib/interface/types"
+import { useTablesRegistry } from "@/hooks/useTablesRegistry"
 
 export interface ContentThemeTableIds {
   themesTableId: string
@@ -41,6 +42,11 @@ export function useContentThemeData(options?: {
 }): UseContentThemeDataResult {
   const config = options?.config
   const forceMock = isMarketingMockEnabled(config, "content_theme_use_mock")
+  const {
+    tables: registryTables,
+    loading: registryLoading,
+    error: registryError,
+  } = useTablesRegistry()
 
   const [loading, setLoading] = useState(!forceMock)
   const [error, setError] = useState<string | null>(null)
@@ -62,6 +68,13 @@ export function useContentThemeData(options?: {
       return
     }
 
+    if (registryLoading) return
+    if (registryError) {
+      setLoading(false)
+      setError(registryError)
+      return
+    }
+
     let cancelled = false
 
     async function load() {
@@ -69,15 +82,7 @@ export function useContentThemeData(options?: {
       setError(null)
       try {
         const supabase = createClient()
-        const { data: tables, error: tablesErr } = await supabase
-          .from("tables")
-          .select("id, name, supabase_table")
-
-        if (tablesErr || !tables?.length) {
-          throw new Error(tablesErr?.message || "Could not load tables")
-        }
-
-        const registry = tables as MarketingTableRow[]
+        const registry = registryTables
         const themesTable = resolveMarketingTable(
           registry,
           config?.table_id,
@@ -149,7 +154,7 @@ export function useContentThemeData(options?: {
     return () => {
       cancelled = true
     }
-  }, [reloadToken, config, forceMock])
+  }, [reloadToken, config, forceMock, registryTables, registryLoading, registryError])
 
   return { loading, error, fromLiveData, hasTable, themes, tableIds, reload }
 }

@@ -562,7 +562,7 @@ async function executeCallWebhook(
 
 async function executeRunScript(
   action: ActionConfig,
-  context: AutomationContext
+  _context: AutomationContext
 ): Promise<ActionResult> {
   if (!action.script) {
     return {
@@ -571,33 +571,12 @@ async function executeRunScript(
     }
   }
 
-  // Sandboxed script execution - very limited
-  // Only allow safe operations
-  try {
-    // Replace variables first
-    const script = replaceVariablesInObject(action.script, context)
-    
-    // Very basic sandbox - only allow simple calculations
-    // In production, use a proper sandbox like vm2 or isolated execution
-    const result = eval(`
-      (function() {
-        const context = ${JSON.stringify(context.trigger_data || {})};
-        ${script}
-      })()
-    `)
-
-    return {
-      success: true,
-      data: { result },
-    }
-  } catch (error: any) {
-    const friendlyError = getUserFriendlyError(error, {
-      actionType: 'run_script'
-    })
-    return {
-      success: false,
-      error: friendlyError.message,
-    }
+  // Disabled: eval()-based execution is a remote code execution risk.
+  // Re-enable only behind a proper isolated sandbox (e.g. dedicated worker).
+  return {
+    success: false,
+    error:
+      'run_script is disabled for security. Use supported automation actions (update_record, send_email, call_webhook, etc.) instead.',
   }
 }
 

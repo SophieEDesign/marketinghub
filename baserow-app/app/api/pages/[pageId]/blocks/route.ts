@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { requireAdmin } from '@/lib/api/authz'
 import { saveBlockLayout, createBlock, deleteBlock } from '@/lib/pages/saveBlocks'
 import { normalizeBlockConfig } from '@/lib/interface/block-validator'
 import { validateBlockConfig } from '@/lib/interface/block-config-types'
@@ -223,6 +224,9 @@ export async function PATCH(
   { params }: { params: Promise<{ pageId: string }> }
 ) {
   try {
+    const { admin, response } = await requireAdmin()
+    if (!admin) return response
+
     const { pageId } = await params
     const body = await request.json()
     const { layout, blockUpdates } = body
@@ -431,6 +435,9 @@ export async function POST(
   { params }: { params: Promise<{ pageId: string }> }
 ) {
   try {
+    const { admin, response } = await requireAdmin()
+    if (!admin) return response
+
     const { pageId } = await params
     const body = await request.json()
     const { type, x, y, w, h, config } = body

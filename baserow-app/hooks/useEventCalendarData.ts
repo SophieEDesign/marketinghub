@@ -28,6 +28,7 @@ import { findContentTable, findQuarterlyThemesTable } from "@/lib/marketing/mark
 import { formatDisplayValue } from "@/lib/marketing/field-utils"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { FieldOptions } from "@/types/fields"
+import { useTablesRegistry } from "@/hooks/useTablesRegistry"
 
 type FieldRow = { name: string; type?: string; options?: FieldOptions }
 
@@ -61,6 +62,11 @@ export function useEventCalendarData(options?: {
 }): UseEventCalendarDataResult {
   const config = options?.config
   const forceMock = isMarketingMockEnabled(config, "event_calendar_use_mock")
+  const {
+    tables: registryTables,
+    loading: registryLoading,
+    error: registryError,
+  } = useTablesRegistry()
   const [loading, setLoading] = useState(!forceMock)
   const [error, setError] = useState<string | null>(null)
   const [fromLiveData, setFromLiveData] = useState(false)
@@ -165,6 +171,13 @@ export function useEventCalendarData(options?: {
       return
     }
 
+    if (registryLoading) return
+    if (registryError) {
+      setLoading(false)
+      setError(registryError)
+      return
+    }
+
     let cancelled = false
 
     async function load() {
@@ -178,17 +191,9 @@ export function useEventCalendarData(options?: {
         const userId = user?.id ?? null
         if (!cancelled) setCurrentUserId(userId)
 
-        const { data: tables, error: tablesErr } = await supabase
-          .from("tables")
-          .select("id, name, supabase_table")
-
-        if (tablesErr || !tables?.length) {
-          throw new Error(tablesErr?.message || "Could not load tables")
-        }
-
-        const registry = tables as import("@/lib/marketing/marketing-tables").MarketingTableRow[]
+        const registry = registryTables
         const contentTable = resolveMarketingTable(registry, config?.table_id, findContentTable)
-        const locationsTable = tables.find((t) => /location/i.test(t.name))
+        const locationsTable = registry.find((t) => /location/i.test(t.name))
         const themesTable = findQuarterlyThemesTable(registry)
 
         if (!contentTable?.supabase_table) {
@@ -321,7 +326,7 @@ export function useEventCalendarData(options?: {
     return () => {
       cancelled = true
     }
-  }, [reloadToken, config, forceMock])
+  }, [reloadToken, config, forceMock, registryTables, registryLoading, registryError])
 
   const filterOptions = useMemo(() => collectEventFilterOptions(allItems), [allItems])
 

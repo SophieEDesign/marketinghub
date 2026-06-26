@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAdmin } from '@/lib/api/authz'
 import { restoreVersion } from '@/lib/versioning/versioning'
 
 /**
@@ -6,6 +7,9 @@ import { restoreVersion } from '@/lib/versioning/versioning'
  */
 export async function POST(request: NextRequest) {
   try {
+    const { admin, response } = await requireAdmin()
+    if (!admin) return response
+
     const body = await request.json()
     const { entity_type, entity_id, version_number } = body
 

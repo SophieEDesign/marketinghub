@@ -56,12 +56,12 @@ export async function sendMentionNotification(
     })
 
     if (error) {
-      console.error("[sendMentionNotification] Resend error:", JSON.stringify(error), "toEmail:", toEmail)
+      console.error("[sendMentionNotification] Resend error:", JSON.stringify(error))
       return { success: false, error: error.message }
     }
 
     if (data?.id) {
-      console.log("[sendMentionNotification] Email sent, id:", data.id, "to:", toEmail)
+      console.log("[sendMentionNotification] Email sent, id:", data.id)
     }
     return { success: true }
   } catch (err: unknown) {

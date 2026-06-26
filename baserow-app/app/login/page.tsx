@@ -276,6 +276,15 @@ function LoginForm() {
               Request access
             </Link>
           </p>
+          <p className="mt-3 text-center text-xs text-muted-foreground">
+            <Link href="/privacy" className="hover:underline">
+              Privacy policy
+            </Link>
+            {" · "}
+            <Link href="/cookies" className="hover:underline">
+              Cookies
+            </Link>
+          </p>
         </div>
       </LoginLayout>
     </div>

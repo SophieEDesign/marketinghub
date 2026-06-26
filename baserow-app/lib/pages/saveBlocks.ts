@@ -24,8 +24,8 @@ export async function saveBlockLayout(
   pageId: string,
   layout: LayoutItem[]
 ): Promise<void> {
-  // Use admin client to bypass RLS - layout save is already protected by API/auth.
-  // RLS policies can block updates even when user has page access (e.g. policy mismatch).
+  // Use admin client to bypass RLS. Callers MUST enforce requireAdmin() before invoking
+  // (see PATCH/POST /api/pages/[pageId]/blocks and DELETE .../blocks/[blockId]).
   const supabase = createAdminClient()
 
   // Schema probe: verify page_id column exists (migration may not have run on this project)

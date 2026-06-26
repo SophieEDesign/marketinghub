@@ -28,6 +28,7 @@ import { formatDisplayValue } from "@/lib/marketing/field-utils"
 import { buildThemeMaps } from "@/lib/marketing/content-planning"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { FieldOptions } from "@/types/fields"
+import { useTablesRegistry } from "@/hooks/useTablesRegistry"
 
 type FieldRow = { id?: string; name: string; type?: string; options?: FieldOptions }
 
@@ -62,6 +63,11 @@ export function useContentTimelineData(options?: {
   const config = options?.config
   const excludeEventTypes = options?.excludeEventTypes !== false
   const forceMock = isMarketingMockEnabled(config, "content_timeline_use_mock")
+  const {
+    tables: registryTables,
+    loading: registryLoading,
+    error: registryError,
+  } = useTablesRegistry()
 
   const [loading, setLoading] = useState(!forceMock)
   const [error, setError] = useState<string | null>(null)
@@ -84,6 +90,14 @@ export function useContentTimelineData(options?: {
       return
     }
 
+    if (registryLoading) return
+
+    if (registryError) {
+      setLoading(false)
+      setError(registryError)
+      return
+    }
+
     let cancelled = false
 
     async function load() {
@@ -91,15 +105,7 @@ export function useContentTimelineData(options?: {
       setError(null)
       try {
         const supabase = createClient()
-        const { data: tables, error: tablesErr } = await supabase
-          .from("tables")
-          .select("id, name, supabase_table")
-
-        if (tablesErr || !tables?.length) {
-          throw new Error(tablesErr?.message || "Could not load tables")
-        }
-
-        const registry = tables as MarketingTableRow[]
+        const registry = registryTables
         const sourceTables = resolveContentTimelineSourceTables(registry, {
           tableId: config?.table_id,
           includeSocialPosts: config?.content_timeline_include_social_posts !== false,
@@ -262,7 +268,7 @@ export function useContentTimelineData(options?: {
     return () => {
       cancelled = true
     }
-  }, [reloadToken, excludeEventTypes, config, forceMock])
+  }, [reloadToken, excludeEventTypes, config, forceMock, registryTables, registryLoading, registryError])
 
   return { loading, error, fromLiveData, hasTable, tableIds, items, reload }
 }

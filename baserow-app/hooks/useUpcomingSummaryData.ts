@@ -24,6 +24,7 @@ import {
 import type { ContentPlanningTableIds } from "@/lib/marketing/content-planning"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { FieldOptions } from "@/types/fields"
+import { useTablesRegistry } from "@/hooks/useTablesRegistry"
 
 type FieldRow = { name: string; type?: string; options?: FieldOptions }
 
@@ -59,6 +60,11 @@ export function useUpcomingSummaryData(options?: {
 }): UseUpcomingSummaryDataResult {
   const config = options?.config
   const forceMock = isMarketingMockEnabled(config, "upcoming_summary_use_mock")
+  const {
+    tables: registryTables,
+    loading: registryLoading,
+    error: registryError,
+  } = useTablesRegistry()
   const [loading, setLoading] = useState(!forceMock)
   const [hasTable, setHasTable] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -78,6 +84,13 @@ export function useUpcomingSummaryData(options?: {
       return
     }
 
+    if (registryLoading) return
+    if (registryError) {
+      setLoading(false)
+      setError(registryError)
+      return
+    }
+
     let cancelled = false
 
     async function load() {
@@ -85,15 +98,7 @@ export function useUpcomingSummaryData(options?: {
       setError(null)
       try {
         const supabase = createClient()
-        const { data: tables, error: tablesErr } = await supabase
-          .from("tables")
-          .select("id, name, supabase_table")
-
-        if (tablesErr || !tables?.length) {
-          throw new Error(tablesErr?.message || "Could not load tables")
-        }
-
-        const registry = tables as MarketingTableRow[]
+        const registry = registryTables
         const content = resolveMarketingTable(
           registry,
           config?.upcoming_summary_content_table_id || config?.table_id,
@@ -213,7 +218,7 @@ export function useUpcomingSummaryData(options?: {
     return () => {
       cancelled = true
     }
-  }, [reloadToken, config, forceMock])
+  }, [reloadToken, config, forceMock, registryTables, registryLoading, registryError])
 
   return { loading, error, fromLiveData, hasTable, tableIds, data, reload }
 }

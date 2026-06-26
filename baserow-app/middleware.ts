@@ -32,6 +32,8 @@ function isPublicRoute(pathname: string): boolean {
     '/',                    // Root - redirects to login if not authenticated
     '/login',               // Login page
     '/signup',              // Request access (no self-service Supabase signup)
+    '/privacy',             // Privacy policy
+    '/cookies',             // Cookie notice
     '/auth',                // All auth routes (callback, setup-password, etc.)
     '/public',              // Public routes
   ];
@@ -80,6 +82,11 @@ function isPublicApiRoute(pathname: string, method: string): boolean {
 
   // External automation webhooks (Zapier, etc.) — no session; secured by unguessable webhook_id in URL + rate limits in route
   if (pathname.startsWith('/api/hooks/')) {
+    return true;
+  }
+
+  // Data retention job — auth via CRON_SECRET bearer or admin session in handler
+  if (pathname === '/api/admin/data-retention' && method === 'POST') {
     return true;
   }
 
@@ -207,14 +214,14 @@ export async function middleware(req: NextRequest) {
     }
   );
 
-  // Check for active session
+  // Validate session with Supabase Auth server (prefer getUser over getSession)
   const {
-    data: { session },
+    data: { user },
     error,
-  } = await supabase.auth.getSession();
+  } = await supabase.auth.getUser();
 
-  // If there's an error or no session, redirect to login
-  if (error || !session) {
+  // If there's an error or no user, redirect to login
+  if (error || !user) {
     const redirectUrl = req.nextUrl.clone();
     redirectUrl.pathname = '/login';
     

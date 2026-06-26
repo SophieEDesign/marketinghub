@@ -25,7 +25,12 @@
   },
   "overrides": [
     {
-      "files": ["components/interface/**/*.{tsx,jsx}"],
+      "files": [
+        "components/interface/**/*.{tsx,jsx}",
+        "components/grid/**/*.{tsx,jsx}",
+        "components/records/**/*.{tsx,jsx}",
+        "components/layout/**/*.{tsx,jsx}"
+      ],
       "extends": ["plugin:jsx-a11y/recommended"],
       "rules": {
         "jsx-a11y/click-events-have-key-events": "warn",

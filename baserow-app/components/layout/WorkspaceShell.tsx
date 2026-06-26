@@ -203,6 +203,12 @@ function ShellContent({
 
   return (
     <div className="flex flex-col h-screen min-h-[100dvh] bg-canvas overflow-hidden">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:left-4 focus:top-4 focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:shadow focus:ring-2 focus:ring-ring"
+      >
+        Skip to main content
+      </a>
       {!hideTopbar && <OnboardingTour />}
       {/* Edit mode banner - full app width at top, above sidebar and content */}
       <MemberPreviewBanner />
@@ -243,7 +249,7 @@ function ShellContent({
             )}
             <div className="flex flex-1 min-h-0 min-w-0 w-full">
               {/* InterfaceContainer: min-h-0 allows height to flow to main > CalendarView */}
-              <div className="flex flex-1 basis-0 flex-col min-h-0 min-w-0 overflow-hidden">
+              <div id="main-content" className="flex flex-1 basis-0 flex-col min-h-0 min-w-0 overflow-hidden">
                 {!hideTopbar && (
                   <Topbar
                     title={title}

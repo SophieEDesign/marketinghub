@@ -40,7 +40,7 @@ export default function CategoryPills({
             className={cn(
               "shrink-0 rounded-full px-3 py-2 text-xs font-medium transition-colors min-h-11",
               active
-                ? "bg-[#005b8f] text-white"
+                ? "bg-hub-primary text-white"
                 : "border border-[#e4e7ec] bg-white text-[#1f2a44]/85"
             )}
           >

@@ -17,6 +17,7 @@ const DEFAULT_PRIMARY = "#1e3a5f"
 function SignupForm() {
   const [email, setEmail] = useState("")
   const [name, setName] = useState("")
+  const [privacyConsent, setPrivacyConsent] = useState(false)
   const [loading, setLoading] = useState(false)
   const [checkingAuth, setCheckingAuth] = useState(true)
   const [submitted, setSubmitted] = useState(false)
@@ -81,6 +82,12 @@ function SignupForm() {
     const emailValidation = validateEmail(email)
     if (!emailValidation.valid) {
       setEmailError(emailValidation.error || "Invalid email")
+      setLoading(false)
+      return
+    }
+
+    if (!privacyConsent) {
+      setError("Please confirm you have read the privacy policy before submitting.")
       setLoading(false)
       return
     }
@@ -213,9 +220,27 @@ function SignupForm() {
                   </div>
                 )}
 
+                <label className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={privacyConsent}
+                    onChange={(e) => setPrivacyConsent(e.target.checked)}
+                    className="mt-1 h-4 w-4 rounded border-border"
+                    required
+                  />
+                  <span>
+                    I agree that my details will be processed to review this access request, as
+                    described in the{" "}
+                    <Link href="/privacy" className="underline hover:text-foreground" target="_blank">
+                      privacy policy
+                    </Link>
+                    .
+                  </span>
+                </label>
+
                 <Button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || !privacyConsent}
                   className="w-full text-white hover:opacity-90"
                   style={buttonStyle}
                 >

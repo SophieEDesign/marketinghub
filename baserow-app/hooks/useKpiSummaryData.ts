@@ -22,6 +22,7 @@ import {
 } from "@/lib/marketing/kpi-summary"
 import type { MarketingTableRow } from "@/lib/marketing/marketing-tables"
 import type { BlockConfig } from "@/lib/interface/types"
+import { useTablesRegistry } from "@/hooks/useTablesRegistry"
 
 /** Backfill data-source fields for cards saved before live KPI wiring. */
 export function enrichKpiSummaryCards(cards: KpiSummaryCardConfig[]): KpiSummaryCardConfig[] {
@@ -92,6 +93,11 @@ export function useKpiSummaryData(options?: {
 }): UseKpiSummaryDataResult {
   const config = options?.config
   const forceMock = isMarketingMockEnabled(config, "kpi_summary_use_mock")
+  const {
+    tables: registryTables,
+    loading: registryLoading,
+    error: registryError,
+  } = useTablesRegistry()
   const sourceCards = enrichKpiSummaryCards(
     (config?.kpi_summary_cards?.length
       ? config.kpi_summary_cards
@@ -118,6 +124,13 @@ export function useKpiSummaryData(options?: {
       return
     }
 
+    if (registryLoading) return
+    if (registryError) {
+      setLoading(false)
+      setError(registryError)
+      return
+    }
+
     let cancelled = false
 
     async function load() {
@@ -125,15 +138,7 @@ export function useKpiSummaryData(options?: {
       setError(null)
       try {
         const supabase = createClient()
-        const { data: tables, error: tablesErr } = await supabase
-          .from("tables")
-          .select("id, name, supabase_table")
-
-        if (tablesErr || !tables?.length) {
-          throw new Error(tablesErr?.message || "Could not load tables")
-        }
-
-        const registry = tables as MarketingTableRow[]
+        const registry = registryTables
         const resolved = resolveKpiSummaryCards(registry, sourceCards, {})
         const tableIds = [
           ...new Set(resolved.map((r) => r.tableId).filter(Boolean)),
@@ -247,7 +252,7 @@ export function useKpiSummaryData(options?: {
     return () => {
       cancelled = true
     }
-  }, [forceMock, cardsKey])
+  }, [forceMock, cardsKey, registryTables, registryLoading, registryError])
 
   const demo = marketingDemoState({
     forceMock,

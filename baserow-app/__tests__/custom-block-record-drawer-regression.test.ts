@@ -37,7 +37,7 @@ describe("custom block record drawer regression", () => {
 
     it("keeps resource hub primary click as file URL and manage action as asset drawer", () => {
       const src = readSource("components/interface/blocks/InternalResourceHubBlock.tsx")
-      expect(src).toContain("window.open(r.url")
+      expect(src).toMatch(/window\.open\((url|displayResource\.url)/)
       expect(src).toContain('recordLayoutType: "asset"')
       expect(src).toContain("canManageSelectedResource")
     })

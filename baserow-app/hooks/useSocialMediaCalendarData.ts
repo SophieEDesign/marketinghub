@@ -20,6 +20,7 @@ import { findCampaignsTable, findContentTable, findQuarterlyThemesTable } from "
 import { prepareSocialCalendarQueryConfig } from "@/lib/marketing/social-media-calendar"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { FieldOptions, TableField } from "@/types/fields"
+import { useTablesRegistry } from "@/hooks/useTablesRegistry"
 
 type PlanningFieldRow = { name: string; type?: string; options?: FieldOptions }
 
@@ -56,6 +57,11 @@ export function useSocialMediaCalendarData(options?: {
 }): UseSocialMediaCalendarDataResult {
   const config = options?.config
   const forceMock = isMarketingMockEnabled(config, "social_media_calendar_use_mock")
+  const {
+    tables: registryTables,
+    loading: registryLoading,
+    error: registryError,
+  } = useTablesRegistry()
 
   const [loading, setLoading] = useState(!forceMock)
   const [fromLiveData, setFromLiveData] = useState(false)
@@ -83,6 +89,13 @@ export function useSocialMediaCalendarData(options?: {
       return
     }
 
+    if (registryLoading) return
+    if (registryError) {
+      setLoading(false)
+      setError(registryError)
+      return
+    }
+
     let cancelled = false
 
     async function load() {
@@ -90,15 +103,7 @@ export function useSocialMediaCalendarData(options?: {
       setError(null)
       try {
         const supabase = createClient()
-        const { data: tables, error: tablesErr } = await supabase
-          .from("tables")
-          .select("id, name, supabase_table")
-
-        if (tablesErr || !tables?.length) {
-          throw new Error(tablesErr?.message || "Could not load tables")
-        }
-
-        const registry = tables as import("@/lib/marketing/marketing-tables").MarketingTableRow[]
+        const registry = registryTables
         const quarterlyThemes = findQuarterlyThemesTable(registry)
         const campaigns = findCampaignsTable(registry)
         const content = resolveMarketingTable(registry, config?.table_id, findContentTable)
@@ -222,7 +227,7 @@ export function useSocialMediaCalendarData(options?: {
     return () => {
       cancelled = true
     }
-  }, [reloadToken, config, forceMock])
+  }, [reloadToken, config, forceMock, registryTables, registryLoading, registryError])
 
   const { labelById, colorById } = useMemo(() => {
     if (!fields) return { labelById: new Map<string, string>(), colorById: new Map<string, string>() }

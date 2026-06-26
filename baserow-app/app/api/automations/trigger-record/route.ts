@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { requireAdmin } from '@/lib/api/authz'
 import {
   runRecordAutomations,
   getTableIdFromSupabaseTable,
@@ -22,6 +22,9 @@ import {
  */
 export async function POST(request: NextRequest) {
   try {
+    const { admin, response } = await requireAdmin()
+    if (!admin) return response
+
     const body = await request.json().catch(() => ({}))
     const {
       tableId,

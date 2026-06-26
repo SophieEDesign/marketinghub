@@ -32,7 +32,7 @@ describe("custom block record layout routing", () => {
   it("keeps Resource Hub primary URL open and adds secondary manage action", () => {
     const src = read("components/interface/blocks/InternalResourceHubBlock.tsx")
     const detail = read("components/interface/blocks/internal-resource-hub/DetailPanel.tsx")
-    expect(src).toContain("window.open(r.url")
+    expect(src).toMatch(/window\.open\((url|displayResource\.url)/)
     expect(src).toContain('recordLayoutType: "asset"')
     expect(detail).toContain("Manage asset")
   })
