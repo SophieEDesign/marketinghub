@@ -152,6 +152,7 @@ export function SocialMediaCalendarFromConfig({
   /** When true, preview panel stays inline (dashboard block). When false, full-page may use a drawer on small screens. */
   embeddedInBlock?: boolean
   className?: string
+  pageId?: string | null
 }) {
   const settings = socialCalendarSettingsFromConfig(config)
   return (
@@ -163,6 +164,7 @@ export function SocialMediaCalendarFromConfig({
       interfaceMode={interfaceMode}
       embeddedInBlock={embeddedInBlock}
       className={className}
+      pageId={pageId}
     />
   )
 }
@@ -175,10 +177,12 @@ export function SocialMediaCalendarCore({
   interfaceMode = "view",
   embeddedInBlock = true,
   className,
+  pageId = null,
 }: SocialMediaCalendarCoreProps & {
   isEditing?: boolean
   interfaceMode?: "view" | "edit"
   embeddedInBlock?: boolean
+  pageId?: string | null
 }) {
   const blockConfig = config ?? undefined
   const { openRecordModal } = useRecordModal()
@@ -794,6 +798,7 @@ export function SocialMediaCalendarCore({
                 showPlatformIcons={settings.showPlatformIcons}
                 showApprovalStatus={settings.showApprovalStatus}
                 fillContainer={!embeddedInBlock}
+                pageId={pageId}
               />
             </div>
           ) : viewMode === "list" ? (

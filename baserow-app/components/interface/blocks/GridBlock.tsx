@@ -847,6 +847,7 @@ useEffect(() => {
             canEditLayout={canEditLayout}
             interfaceMode={interfaceMode}
             blockId={block.id}
+            pageId={pageId}
           />
           </ErrorBoundary>
         )

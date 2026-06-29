@@ -75,6 +75,8 @@ interface CalendarViewProps {
   interfaceMode?: 'view' | 'edit'
   /** Optional block id for record modal remount key. */
   blockId?: string | null
+  /** When this changes (page navigation), calendar recenters on today / default preset. */
+  pageId?: string | null
 }
 
 export interface CalendarViewScrollHandle {
@@ -155,6 +157,7 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
   canEditLayout = false,
   interfaceMode = 'view',
   blockId = null,
+  pageId = null,
 }, ref) {
   // -------------------------------------------------------------------------
   // HOOKS: All useState, useMemo, useEffect, useRef, useCallback (and useRouter)
@@ -197,8 +200,13 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
   // CRITICAL: Use useState to prevent hydration mismatch - localStorage access must happen after mount
   const [calendarDebugEnabled, setCalendarDebugEnabled] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const fullCalendarRef = useRef<{ getApi?: () => { updateSize: () => void } } | null>(null)
-  const hasScrolledToInitialRef = useRef(false)
+  const fullCalendarRef = useRef<{
+    getApi?: () => {
+      updateSize: () => void
+      today?: () => void
+      gotoDate?: (date: Date) => void
+    }
+  } | null>(null)
   const [containerWidth, setContainerWidth] = useState(0)
   
   // Lifecycle logging
@@ -1949,33 +1957,44 @@ const CalendarViewInner = forwardRef<CalendarViewScrollHandle, CalendarViewProps
     handleDateClickRef.current(info)
   }, [])
 
-  // Anchor-based scroll: scroll to date without filtering or remounting
-  const handleScrollToDate = useCallback((date: Date) => {
-    scrollToDateUtil(date, scrollContainerRef.current, {
+  const navigateCalendarToDate = useCallback((date: Date, behavior: ScrollBehavior = "smooth") => {
+    const target = startOfDay(date)
+    const api = fullCalendarRef.current?.getApi?.()
+    const today = startOfDay(new Date())
+    if (target.getTime() === today.getTime() && typeof api?.today === "function") {
+      api.today()
+    } else if (typeof api?.gotoDate === "function") {
+      api.gotoDate(target)
+    }
+    scrollToDateUtil(target, scrollContainerRef.current, {
       block: "start",
-      behavior: "smooth",
+      behavior,
     })
   }, [])
 
+  const handleScrollToDate = useCallback(
+    (date: Date) => {
+      navigateCalendarToDate(date, "smooth")
+    },
+    [navigateCalendarToDate]
+  )
+
   useImperativeHandle(ref, () => ({ scrollToDate: handleScrollToDate }), [handleScrollToDate])
 
-  // Initial scroll to default date after calendar renders (once)
+  // Recenter on today (or configured preset) when the calendar opens or the page is revisited.
   useEffect(() => {
-    if (!mounted || hasScrolledToInitialRef.current) return
+    if (!mounted) return
     const preset = (blockConfig as any)?.default_date_range_preset as string | undefined
     const validPresets = ["today", "thisWeek", "thisMonth", "nextWeek", "nextMonth"]
-    const targetPreset = preset && validPresets.includes(preset) ? preset : "thisWeek"
-    const targetDate = getTargetDateForPreset(targetPreset as "today" | "thisWeek" | "nextWeek" | "thisMonth" | "nextMonth")
-    // Defer scroll until FullCalendar has rendered
-    const t = setTimeout(() => {
-      hasScrolledToInitialRef.current = true
-      scrollToDateUtil(targetDate, scrollContainerRef.current, {
-        block: "start",
-        behavior: "smooth",
-      })
+    const targetPreset = preset && validPresets.includes(preset) ? preset : "today"
+    const targetDate = getTargetDateForPreset(
+      targetPreset as "today" | "thisWeek" | "nextWeek" | "thisMonth" | "nextMonth"
+    )
+    const t = window.setTimeout(() => {
+      navigateCalendarToDate(targetDate, "auto")
     }, 100)
-    return () => clearTimeout(t)
-  }, [mounted, blockConfig])
+    return () => window.clearTimeout(t)
+  }, [mounted, pageId, blockConfig?.default_date_range_preset, navigateCalendarToDate])
 
   // ---------- END OF HOOKS: No hook may be declared below this line ----------
   // From here on only conditional returns and the main render.

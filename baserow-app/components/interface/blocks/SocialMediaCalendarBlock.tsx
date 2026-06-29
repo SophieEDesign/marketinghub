@@ -10,6 +10,7 @@ interface SocialMediaCalendarBlockProps {
   interfaceMode?: "view" | "edit"
   pageEditable?: boolean
   isFullPage?: boolean
+  pageId?: string | null
 }
 
 /**
@@ -22,6 +23,7 @@ export default function SocialMediaCalendarBlock({
   interfaceMode = "view",
   pageEditable,
   isFullPage = false,
+  pageId = null,
 }: SocialMediaCalendarBlockProps) {
   const canEdit = pageEditable !== false
   const embeddedInBlock = !isFullPage
@@ -44,6 +46,7 @@ export default function SocialMediaCalendarBlock({
         interfaceMode={interfaceMode}
         embeddedInBlock={embeddedInBlock}
         className="flex-1 min-h-0 p-3 md:p-4"
+        pageId={pageId}
       />
     </div>
   )

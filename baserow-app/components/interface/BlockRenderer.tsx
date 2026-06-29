@@ -776,6 +776,7 @@ export default function BlockRenderer({
               interfaceMode={interfaceMode}
               pageEditable={pageEditable}
               isFullPage={isFullPage}
+              pageId={pageId}
             />
           </LazyBlockWrapper>
         )

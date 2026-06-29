@@ -34,6 +34,8 @@ interface SocialMediaCalendarViewProps {
   className?: string
   /** Full-page: fill parent height (viewport) instead of content-sized auto height. */
   fillContainer?: boolean
+  /** When this changes (page navigation), calendar recenters on today. */
+  pageId?: string | null
 }
 
 export default function SocialMediaCalendarView({
@@ -48,6 +50,7 @@ export default function SocialMediaCalendarView({
   showApprovalStatus = true,
   className,
   fillContainer = false,
+  pageId = null,
 }: SocialMediaCalendarViewProps) {
   const { state: recordPanelState } = useRecordPanel()
   const [mounted, setMounted] = useState(false)
@@ -84,6 +87,12 @@ export default function SocialMediaCalendarView({
     if (!mounted) return
     requestCalendarResize()
   }, [mounted, fillContainer, viewMode, requestCalendarResize])
+
+  useEffect(() => {
+    if (!mounted) return
+    const api = fullCalendarRef.current?.getApi?.() as { today?: () => void } | undefined
+    api?.today?.()
+  }, [mounted, pageId])
 
   useEffect(() => {
     const onLayoutResize = () => requestCalendarResize()
@@ -212,6 +221,7 @@ export default function SocialMediaCalendarView({
           key={viewMode}
           plugins={CALENDAR_PLUGINS}
           initialView={viewMode === "week" ? "dayGridWeek" : "dayGridMonth"}
+          initialDate={new Date()}
           views={calendarViews}
           headerToolbar={headerToolbar}
           events={fcEvents}
