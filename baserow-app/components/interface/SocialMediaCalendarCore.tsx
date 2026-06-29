@@ -752,17 +752,29 @@ export function SocialMediaCalendarCore({
         onValueChange={(v) => setViewMode(v as SocialCalendarViewMode)}
         className="shrink-0"
       >
-        <TabsList className="h-8">
-          <TabsTrigger value="month" className="text-xs px-3">
+        <TabsList className="h-8 rounded-lg border-0 bg-[#f1f3f6] p-0.5">
+          <TabsTrigger
+            value="month"
+            className="rounded-md px-3 text-xs text-[#6b7280] data-[state=active]:bg-white data-[state=active]:text-[#005b8f] data-[state=active]:shadow-sm"
+          >
             Month
           </TabsTrigger>
-          <TabsTrigger value="week" className="text-xs px-3">
+          <TabsTrigger
+            value="week"
+            className="rounded-md px-3 text-xs text-[#6b7280] data-[state=active]:bg-white data-[state=active]:text-[#005b8f] data-[state=active]:shadow-sm"
+          >
             Week
           </TabsTrigger>
-          <TabsTrigger value="list" className="text-xs px-3">
+          <TabsTrigger
+            value="list"
+            className="rounded-md px-3 text-xs text-[#6b7280] data-[state=active]:bg-white data-[state=active]:text-[#005b8f] data-[state=active]:shadow-sm"
+          >
             List
           </TabsTrigger>
-          <TabsTrigger value="feed" className="text-xs px-3">
+          <TabsTrigger
+            value="feed"
+            className="rounded-md px-3 text-xs text-[#6b7280] data-[state=active]:bg-white data-[state=active]:text-[#005b8f] data-[state=active]:shadow-sm"
+          >
             Feed
           </TabsTrigger>
         </TabsList>

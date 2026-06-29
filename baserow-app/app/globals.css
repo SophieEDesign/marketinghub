@@ -1081,12 +1081,54 @@
 
 /* Social media calendar block */
 .social-calendar-embed .fc {
-  --fc-border-color: hsl(var(--border) / 0.35);
+  --fc-border-color: #f3f5f8;
   --fc-page-bg-color: transparent;
+  --fc-today-bg-color: transparent;
 }
 
 .social-calendar-embed--hero .fc .fc-daygrid-day-frame {
   min-height: 6rem;
+}
+
+.social-calendar-embed--hero .fc .fc-col-header-cell-cushion {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9aa1ab;
+}
+
+.social-calendar-embed--hero .fc .fc-daygrid-day-number {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  margin: 0.25rem;
+}
+
+.social-calendar-embed--hero .fc .fc-day-today .fc-daygrid-day-number {
+  background: #005b8f;
+  color: #fff;
+  border-radius: 9999px;
+  min-width: 1.5rem;
+  text-align: center;
+}
+
+.social-calendar-embed--hero .fc .fc-day-other .fc-daygrid-day-frame {
+  background: #fafbfc;
+}
+
+.social-calendar-embed--hero .fc .fc-day-other .fc-daygrid-day-number {
+  color: #c7ccd4;
+}
+
+.social-calendar-embed--hero .fc .fc-daygrid-more-link {
+  color: #9aa1ab;
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.social-calendar-embed--hero .fc .fc-daygrid-more-link:hover {
+  color: #6b7280;
 }
 
 /* Show every post in the cell — no “+N more” popover */
@@ -1131,21 +1173,9 @@
 }
 
 .social-calendar-embed--hero .fc-social-event {
-  box-shadow: 0 4px 12px hsl(var(--foreground) / 0.08);
+  box-shadow: none;
 }
 
 .social-calendar-embed--hero .fc-daygrid-event .fc-event-main {
   padding: 0;
-}
-
-.social-calendar-embed--hero .fc .fc-daygrid-day-number {
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.social-calendar-embed--hero .fc .fc-col-header-cell-cushion {
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }

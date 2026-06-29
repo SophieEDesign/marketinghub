@@ -43,14 +43,15 @@ describe("custom block modal field contract", () => {
     expect(src).not.toContain("function Badge(")
   })
 
-  it("UpcomingSummaryBlock and SocialStatusPill use shared ChoicePill for status display", () => {
+  it("UpcomingSummaryBlock uses ChoicePill; SocialStatusPill uses on-brand status colours", () => {
     const upcoming = readSource("components/interface/blocks/UpcomingSummaryBlock.tsx")
     const social = readSource("components/interface/social/SocialStatusPill.tsx")
+    const lib = readSource("lib/marketing/social-media-calendar.ts")
     expect(upcoming).toContain('from "@/components/fields/ChoicePill"')
     expect(upcoming).toContain("<ChoicePill")
-    expect(social).toContain('from "@/components/fields/ChoicePill"')
-    expect(social).toContain("<ChoicePill")
-    expect(social).not.toContain("getMarketingStatusPillClassNames")
+    expect(social).toContain("socialStatusColors")
+    expect(lib).toContain("export function socialStatusColors")
+    expect(social).not.toContain('from "@/components/fields/ChoicePill"')
   })
 
   it("RecordEditor custom layout header uses ChoicePill for status display", () => {

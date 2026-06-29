@@ -28,9 +28,10 @@ export function SocialPostCard({
       onClick={onClick}
       disabled={!onClick}
       className={cn(
-        "w-full min-w-0 text-left rounded-xl transition-shadow",
-        onClick && "cursor-pointer hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        selected && "ring-2 ring-primary/40 shadow-md",
+        "w-full min-w-0 rounded-xl text-left transition-shadow",
+        onClick &&
+          "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#005b8f]/40",
+        selected && "rounded-xl ring-2 ring-[#005b8f]/35",
         !onClick && "cursor-default"
       )}
     >

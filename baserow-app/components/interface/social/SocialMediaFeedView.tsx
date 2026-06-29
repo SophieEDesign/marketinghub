@@ -43,7 +43,7 @@ export function SocialMediaFeedView({
   return (
     <div
       className={cn(
-        "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 min-h-0 overflow-y-auto pr-1",
+        "grid min-h-0 gap-4 overflow-y-auto pr-1 [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]",
         fillContainer ? "flex-1" : compact ? "max-h-[420px]" : "max-h-[min(68vh,580px)]"
       )}
     >

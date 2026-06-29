@@ -61,9 +61,12 @@ export function SocialMediaListView({
     >
       {groups.map((group) => (
         <section key={group.day.toISOString()}>
-          <h3 className="text-xs font-semibold text-muted-foreground mb-2 sticky top-0 bg-background/90 py-1 backdrop-blur-sm z-[1]">
-            {format(group.day, "EEEE, d MMMM yyyy")}
-          </h3>
+          <div className="sticky top-0 z-[1] mb-2 flex items-center gap-3 bg-background/90 py-1 backdrop-blur-sm">
+            <h3 className="text-[10px] font-bold uppercase tracking-wider text-[#9aa1ab]">
+              {format(group.day, "EEEE, d MMMM yyyy")}
+            </h3>
+            <div className="h-px flex-1 bg-[#e4e7ec]" aria-hidden />
+          </div>
           <ul className="flex flex-col gap-2">
             {group.items.map((item) => (
               <li key={item.id}>

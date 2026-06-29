@@ -750,6 +750,26 @@ export function socialStatusDisplayLabel(status: SocialWorkflowStatus): string {
   return labels[status]
 }
 
+export interface SocialStatusColorTokens {
+  dot: string
+  bg: string
+  fg: string
+}
+
+/** On-brand status colours for pills, dots, and summary chips. */
+export function socialStatusColors(status: SocialWorkflowStatus): SocialStatusColorTokens {
+  const map: Record<SocialWorkflowStatus, SocialStatusColorTokens> = {
+    idea: { dot: "#64748b", bg: "#eef1f5", fg: "#64748b" },
+    draft: { dot: "#007dc5", bg: "#e3f0fa", fg: "#007dc5" },
+    needs_review: { dot: "#b5651d", bg: "#fbeede", fg: "#b5651d" },
+    approved: { dot: "#1b7a52", bg: "#e7f3ee", fg: "#1b7a52" },
+    scheduled: { dot: "#5b6fa8", bg: "#eaedf5", fg: "#5b6fa8" },
+    published: { dot: "#0f766e", bg: "#e0f2f1", fg: "#0f766e" },
+    unknown: { dot: "#9aa1ab", bg: "#f1f3f6", fg: "#9aa1ab" },
+  }
+  return map[status]
+}
+
 function platformFromString(raw: string): SocialPlatform | null {
   const key = raw.trim().toLowerCase().replace(/\s+/g, "")
   if (PLATFORM_FROM_CHANNEL[key]) return PLATFORM_FROM_CHANNEL[key]
