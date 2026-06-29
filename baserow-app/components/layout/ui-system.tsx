@@ -220,23 +220,32 @@ export function AppPageHeader({
   meta,
   actions,
   className,
+  showPageTitle = true,
 }: {
   title: React.ReactNode
   meta?: React.ReactNode
   actions?: React.ReactNode
   className?: string
+  /** When false, only search + account actions show (e.g. marketing pages with their own hero). */
+  showPageTitle?: boolean
 }) {
   return (
-    <div className={cn("flex-shrink-0 flex flex-col", className)}>
+    <div className={cn("sticky top-0 z-30 flex-shrink-0 flex flex-col bg-white/95", className)}>
       <AppHeader
         showSearch
         leftSlot={
-          <div className="flex min-w-0 flex-1 items-center gap-3">
-            <div className="min-w-0 text-base font-semibold tracking-tight text-foreground md:text-lg">
-              {title}
+          showPageTitle ? (
+            <div className="flex min-w-0 max-w-[min(100%,28rem)] shrink items-center gap-3">
+              <div className="min-w-0 truncate text-base font-semibold leading-normal text-foreground md:text-lg">
+                {title}
+              </div>
+              {meta ? (
+                <div className="hidden sm:block shrink-0 text-xs leading-normal text-muted-foreground">
+                  {meta}
+                </div>
+              ) : null}
             </div>
-            {meta ? <div className="hidden sm:block text-xs text-muted-foreground shrink-0">{meta}</div> : null}
-          </div>
+          ) : undefined
         }
       />
       {actions ? (

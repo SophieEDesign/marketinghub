@@ -27,7 +27,7 @@ export default function AppHeader({
   return (
     <header
       className={cn(
-        "flex-shrink-0 flex h-14 items-center gap-3 border-b border-hub-border bg-white/90 backdrop-blur-sm px-4 md:px-6",
+        "flex-shrink-0 flex min-h-14 items-center gap-3 border-b border-hub-border bg-white/90 backdrop-blur-sm px-4 md:px-6 py-2",
         className
       )}
     >

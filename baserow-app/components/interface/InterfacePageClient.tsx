@@ -200,6 +200,9 @@ function InterfacePageClientInternal({
     return isMarketingHubWorkspacePage(page) || marketingHome
   }, [page?.name, marketingHome])
 
+  /** Marketing workspace pages use block heroes; hide redundant page title unless editing layout. */
+  const showHeaderPageTitle = !marketingDashboard || isEditMode
+
   // Track previous pageId to reset blocks when page changes
   // CRITICAL: Use ref to track actual pageId changes, not effect dependencies
   const previousPageIdRef = useRef<string | null>(null)
@@ -1450,7 +1453,7 @@ function InterfacePageClientInternal({
   }
 
   return (
-    <div className="relative flex w-full flex-1 min-h-0 min-w-0 max-w-full flex-col overflow-hidden">
+    <div className="relative flex w-full flex-1 min-h-0 min-w-0 max-w-full flex-col overflow-x-hidden">
       {/* Loading overlay: single scroll surface; do not unmount tree */}
       {loading && !hasPage && blocks.length === 0 && (
         <div
@@ -1494,6 +1497,7 @@ function InterfacePageClientInternal({
       {!isViewer && hasPage && isAdmin && (
         <AppPageHeader
           className={suppressMainScroll ? "py-2" : undefined}
+          showPageTitle={showHeaderPageTitle}
           title={
             isEditingTitle ? (
               <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -1533,6 +1537,7 @@ function InterfacePageClientInternal({
       {isViewer && hasPage && isAdmin && (
         <AppPageHeader
           className={suppressMainScroll ? "py-2" : undefined}
+          showPageTitle={showHeaderPageTitle}
           title={<span className={suppressMainScroll ? "text-base" : "text-lg"}>{page?.name}</span>}
           actions={
             <Button
@@ -1551,6 +1556,7 @@ function InterfacePageClientInternal({
       {!isViewer && hasPage && !isAdmin && (
         <AppPageHeader
           className={suppressMainScroll ? "py-2" : undefined}
+          showPageTitle={showHeaderPageTitle}
           title={<span className={suppressMainScroll ? "text-base" : "text-lg"}>{page?.name}</span>}
           actions={
             <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-md flex-shrink-0" title="Ask an admin to edit this page">
