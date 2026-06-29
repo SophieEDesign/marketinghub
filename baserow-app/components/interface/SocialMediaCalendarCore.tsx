@@ -144,6 +144,7 @@ export function SocialMediaCalendarFromConfig({
   interfaceMode = "view",
   embeddedInBlock = true,
   className,
+  pageId = null,
 }: {
   config?: import("@/lib/interface/types").BlockConfig | null
   canEdit?: boolean
