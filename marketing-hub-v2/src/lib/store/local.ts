@@ -30,6 +30,11 @@ function migrateContent(items: ContentItem[] | undefined): ContentItem[] | undef
       content_type:
         item.content_type?.trim() ||
         normalizeContentType(channel[0] || "Social"),
+      deadline_date: item.deadline_date ?? null,
+      category: item.category ?? "",
+      priority: item.priority ?? "",
+      website: item.website ?? "",
+      caption: item.caption ?? "",
     };
   });
 }

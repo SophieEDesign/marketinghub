@@ -62,6 +62,16 @@ function formatSignIn(value: string | null | undefined) {
   }
 }
 
+/** Invite not yet accepted (Supabase Auth fields present). */
+function isInvitePending(u: HubUser) {
+  if (u.email_confirmed_at === undefined && u.invited_at === undefined) {
+    return false;
+  }
+  if (u.last_sign_in_at) return false;
+  if (u.email_confirmed_at) return false;
+  return true;
+}
+
 export function UsersAdminClient({
   initial,
   initialSource = "local",
@@ -77,8 +87,10 @@ export function UsersAdminClient({
   const [roleFilter, setRoleFilter] = useState("all");
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [actingRequestId, setActingRequestId] = useState<string | null>(null);
+  const [actingUserKey, setActingUserKey] = useState<string | null>(null);
   const [form, setForm] = useState({
     full_name: "",
     email: "",
@@ -227,6 +239,7 @@ export function UsersAdminClient({
       return;
     }
     setError(null);
+    setNotice(null);
     const res = await fetch("/api/admin/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -238,6 +251,57 @@ export function UsersAdminClient({
       return;
     }
     await refresh();
+  }
+
+  async function reinvite(id: string, email: string) {
+    if (
+      !window.confirm(
+        `Resend the invite email to ${email || "this user"}?`
+      )
+    ) {
+      return;
+    }
+    setActingUserKey(`${id}:reinvite`);
+    setError(null);
+    setNotice(null);
+    const res = await fetch("/api/admin/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "reinvite", id }),
+    });
+    const data = await res.json();
+    setActingUserKey(null);
+    if (!res.ok) {
+      setError(data.error ?? "Could not resend invite");
+      return;
+    }
+    setNotice(data.message ?? `Invite resent to ${email}`);
+    await refresh();
+  }
+
+  async function sendPasswordReset(id: string, email: string) {
+    if (
+      !window.confirm(
+        `Send a password reset email to ${email || "this user"}?`
+      )
+    ) {
+      return;
+    }
+    setActingUserKey(`${id}:reset`);
+    setError(null);
+    setNotice(null);
+    const res = await fetch("/api/admin/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "send_password_reset", id }),
+    });
+    const data = await res.json();
+    setActingUserKey(null);
+    if (!res.ok) {
+      setError(data.error ?? "Could not send password reset");
+      return;
+    }
+    setNotice(data.message ?? `Password reset sent to ${email}`);
   }
 
   async function decideAccessRequest(
@@ -297,6 +361,12 @@ export function UsersAdminClient({
       {error ? (
         <p className="mb-4 rounded-xl border border-[var(--danger)]/30 bg-[var(--danger)]/5 px-4 py-3 text-sm text-[var(--danger)]">
           {error}
+        </p>
+      ) : null}
+
+      {notice ? (
+        <p className="mb-4 rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-sm text-brand">
+          {notice}
         </p>
       ) : null}
 
@@ -570,19 +640,52 @@ export function UsersAdminClient({
                   </select>
                 </td>
                 <td className="hidden px-4 py-3 text-muted md:table-cell">
-                  {formatSignIn(u.last_sign_in_at)}
+                  <span className="block">{formatSignIn(u.last_sign_in_at)}</span>
+                  {source === "supabase" && isInvitePending(u) ? (
+                    <span className="mt-0.5 inline-block rounded-full bg-sand px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">
+                      Invite pending
+                    </span>
+                  ) : null}
                 </td>
                 <td className="hidden px-4 py-3 text-muted xl:table-cell">
                   {u.notes || "—"}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <button
-                    type="button"
-                    className="text-xs text-[var(--danger)]"
-                    onClick={() => void remove(u.id)}
-                  >
-                    Remove
-                  </button>
+                  <div className="flex flex-col items-end gap-1.5 sm:flex-row sm:flex-wrap sm:justify-end">
+                    {source === "supabase" ? (
+                      <>
+                        {isInvitePending(u) ? (
+                          <button
+                            type="button"
+                            className="text-xs text-brand hover:underline disabled:opacity-50"
+                            disabled={actingUserKey === `${u.id}:reinvite`}
+                            onClick={() => void reinvite(u.id, u.email)}
+                          >
+                            {actingUserKey === `${u.id}:reinvite`
+                              ? "Sending…"
+                              : "Resend invite"}
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          className="text-xs text-brand hover:underline disabled:opacity-50"
+                          disabled={actingUserKey === `${u.id}:reset`}
+                          onClick={() => void sendPasswordReset(u.id, u.email)}
+                        >
+                          {actingUserKey === `${u.id}:reset`
+                            ? "Sending…"
+                            : "Send password reset"}
+                        </button>
+                      </>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="text-xs text-[var(--danger)]"
+                      onClick={() => void remove(u.id)}
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

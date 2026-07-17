@@ -290,15 +290,30 @@ export async function importFromCoreData(): Promise<ImportResult> {
               /^publish/i,
             ])
           )?.slice(0, 10) ?? null;
+        const deadline =
+          asIsoDate(pickField(r, [/^date_?due$/i, /^deadline$/i]))?.slice(
+            0,
+            10
+          ) ?? null;
+        const publishDate =
+          asIsoDate(
+            pickField(r, [
+              /^publish_?date$/i,
+              /^date$/i,
+              /^scheduled/i,
+              /^publish/i,
+            ])
+          )?.slice(0, 10) ?? null;
 
         const rawNotes = asString(
+          pickField(r, [/^notes_?detail$/i, /^notes$/i, /^body$/i])
+        );
+        const rawCaption = asString(
           pickField(r, [
             /^content_?post_?text$/i,
-            /^notes_?detail$/i,
             /^caption$/i,
-            /^notes$/i,
+            /^post_?text$/i,
             /^text$/i,
-            /^body$/i,
           ])
         );
         const rawPostType =
@@ -325,8 +340,20 @@ export async function importFromCoreData(): Promise<ImportResult> {
             pickField(r, [/^owner$/i, /^assignee$/i, /^author$/i])
           ),
           notes: rawNotes,
+          caption: rawCaption,
+          category,
+          priority: asString(pickField(r, [/^priority$/i])),
+          website: asString(
+            pickField(r, [/^website$/i, /^publication_?url$/i])
+          ),
           asset_url: asString(
-            pickField(r, [/^canva_?url$/i, /^asset/i, /^image/i, /^media/i])
+            pickField(r, [
+              /^canva_?url$/i,
+              /^content_?folder_?canva$/i,
+              /^asset/i,
+              /^image/i,
+              /^media/i,
+            ])
           ),
           planable_url: asString(
             pickField(r, [/^planable_?url$/i, /^planable/i])
@@ -340,8 +367,14 @@ export async function importFromCoreData(): Promise<ImportResult> {
             channel: cleaned.channel,
             content_type: cleaned.content_type,
             owner: cleaned.owner,
-            due_date: due,
+            due_date: publishDate || due,
+            deadline_date:
+              deadline && deadline !== (publishDate || due) ? deadline : null,
             status: mapStatus(statusRaw),
+            category: cleaned.category,
+            priority: cleaned.priority,
+            website: cleaned.website,
+            caption: cleaned.caption,
             planable_url: cleaned.planable_url,
             asset_url: cleaned.asset_url,
             notes: cleaned.notes,

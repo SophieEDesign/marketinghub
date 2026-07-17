@@ -13,6 +13,8 @@ import {
   hasServiceRoleKey,
   inviteSupabaseHubUser,
   listSupabaseHubUsers,
+  reinviteSupabaseHubUser,
+  sendPasswordResetForHubUser,
   updateSupabaseHubUser,
 } from "@/lib/supabase/hub-users";
 
@@ -95,6 +97,43 @@ export async function POST(request: NextRequest) {
         await deleteHubUser(body.id);
       }
       return jsonOk({ ok: true });
+    }
+
+    if (action === "reinvite") {
+      if (!useSupabase) {
+        return jsonError(
+          "Resend invite requires SUPABASE_SERVICE_ROLE_KEY",
+          400
+        );
+      }
+      if (!body.id) return jsonError("User id is required");
+      const result = await reinviteSupabaseHubUser(String(body.id));
+      const message =
+        result.delivery === "invite"
+          ? "Invite resent"
+          : "Invite could not be resent; sent a password setup email instead";
+      return jsonOk({
+        item: result.user,
+        source: "supabase",
+        delivery: result.delivery,
+        message,
+      });
+    }
+
+    if (action === "send_password_reset") {
+      if (!useSupabase) {
+        return jsonError(
+          "Password reset requires SUPABASE_SERVICE_ROLE_KEY",
+          400
+        );
+      }
+      if (!body.id) return jsonError("User id is required");
+      await sendPasswordResetForHubUser(String(body.id));
+      return jsonOk({
+        ok: true,
+        source: "supabase",
+        message: "Password reset email sent",
+      });
     }
 
     const role = (body.role as HubAccessRole) ?? "member";

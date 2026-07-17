@@ -64,10 +64,26 @@ Admins **Accept** / **Deny** pending External requests on **Admin → Users**. A
 ### Invite user (admin)
 
 1. **Admin → Users → Invite user** — name, email, role (Admin / Member / External).
-2. They accept the Supabase invite email and set a password.
+2. They accept the Supabase invite email and set a password on `/set-password`.
 3. Sign in at `/login` → land per role table above.
 4. Optional for Members: link a **Contact** for **My details** (`/app/me`).
 5. For Externals: mark relevant Media folders **Public**.
+
+### Resend invite / password reset (admin)
+
+On each user row (when Supabase is connected):
+
+| Action | When | What it does |
+|--------|------|----------------|
+| **Resend invite** | Invite still pending (never confirmed / signed in) | Re-sends the Invite user email |
+| **Send password reset** | Any user with an email | Sends the Reset Password email |
+
+Self-serve: **Forgot password?** on `/login` → `/forgot-password`.
+
+Invite and recovery links go through `/auth/callback` then `/set-password`. Add these under Authentication → URL Configuration → Redirect URLs:
+
+- `{NEXT_PUBLIC_APP_URL}/auth/callback`
+- `{NEXT_PUBLIC_APP_URL}/set-password`
 
 ### Change role later
 
@@ -78,5 +94,8 @@ Admins **Accept** / **Deny** pending External requests on **Admin → Users**. A
 ### Prerequisites
 
 - `SUPABASE_SERVICE_ROLE_KEY` set for live invites.
+- `NEXT_PUBLIC_APP_URL` set to the public site origin (used for invite / reset redirects).
 - Supabase Auth email (invite) configured in the project.
 - Optional: `HUB_MEMBER_EMAIL_DOMAINS` (comma-separated; default `petersandmay.com`).
+- Custom SMTP (e.g. Resend) for From: Peters & May — see Authentication → SMTP.
+- Branded Auth emails (same header on all): [`docs/email-templates/`](docs/email-templates/README.md). Paste each HTML file into Authentication → Email Templates (Invite, Confirm signup, Magic Link, Reset Password, Change Email, Reauthentication).

@@ -17,6 +17,20 @@ export function normalizeHubAccessRole(value: unknown): HubAccessRole {
     : "member";
 }
 
+/** Public app origin for Auth email redirectTo (must be allow-listed in Supabase). */
+export function getAppUrl() {
+  const explicit = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
+  if (explicit) return explicit;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return "http://localhost:3001";
+}
+
+/** Invite / recovery emails land here, then the user sets a password. */
+export function passwordSetupRedirectUrl() {
+  const next = encodeURIComponent("/set-password");
+  return `${getAppUrl()}/auth/callback?next=${next}`;
+}
+
 function displayName(user: User): string {
   const meta = user.user_metadata ?? {};
   return (
@@ -41,9 +55,22 @@ function toHubUser(
     role: normalizeHubAccessRole(profileRole ?? appRole),
     notes: String(meta.notes ?? ""),
     last_sign_in_at: user.last_sign_in_at ?? null,
+    email_confirmed_at: user.email_confirmed_at ?? null,
+    invited_at: user.invited_at ?? null,
     created_at: user.created_at,
     updated_at: user.updated_at ?? user.created_at,
   };
+}
+
+/** True when the user was invited but has not confirmed / signed in yet. */
+export function isHubUserInvitePending(user: HubUser) {
+  // Local demo users omit these fields — do not treat them as pending invites.
+  if (user.email_confirmed_at === undefined && user.invited_at === undefined) {
+    return false;
+  }
+  if (user.last_sign_in_at) return false;
+  if (user.email_confirmed_at) return false;
+  return true;
 }
 
 async function listAllAuthUsers() {
@@ -189,6 +216,7 @@ export async function inviteSupabaseHubUser(input: {
       notes,
       role,
     },
+    redirectTo: passwordSetupRedirectUrl(),
   });
   if (error) throw new Error(error.message);
   const user = data.user;
@@ -288,6 +316,103 @@ export async function deleteSupabaseHubUser(id: string): Promise<void> {
   const supabase = createAdminClient();
   const { error } = await supabase.auth.admin.deleteUser(id);
   if (error) throw new Error(error.message);
+}
+
+/**
+ * Resend the invite email for an existing Auth user (e.g. expired / lost invite).
+ * Tries inviteUserByEmail again (supported for pending invites on current GoTrue).
+ * Falls back to a recovery email if re-invite is rejected.
+ */
+export async function reinviteSupabaseHubUser(id: string): Promise<{
+  user: HubUser;
+  delivery: "invite" | "recovery";
+}> {
+  const supabase = createAdminClient();
+  const { data: existing, error: getError } =
+    await supabase.auth.admin.getUserById(id);
+  if (getError) throw new Error(getError.message);
+  const user = existing.user;
+  if (!user?.email) throw new Error("User not found or has no email");
+
+  if (user.last_sign_in_at || user.email_confirmed_at) {
+    throw new Error(
+      "This user already activated their account. Use Send password reset instead."
+    );
+  }
+
+  const email = user.email.trim().toLowerCase();
+  const fullName = displayName(user);
+  const notes = String(user.user_metadata?.notes ?? "");
+  const role = normalizeHubAccessRole(
+    (
+      await supabase
+        .from("profiles")
+        .select("role")
+        .eq("user_id", id)
+        .maybeSingle()
+    ).data?.role ?? (user.app_metadata as { role?: string } | undefined)?.role
+  );
+
+  const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, {
+    data: {
+      full_name: fullName,
+      notes,
+      role,
+    },
+    redirectTo: passwordSetupRedirectUrl(),
+  });
+
+  if (!error && data.user) {
+    await upsertProfile(data.user.id, email, role);
+    await syncAuthMetadata(data.user.id, role, fullName, notes, data.user);
+    return {
+      user: toHubUser(data.user, role, email),
+      delivery: "invite",
+    };
+  }
+
+  const alreadyExists = /already (been )?registered|already exists|duplicate/i.test(
+    error?.message ?? ""
+  );
+  if (error && !alreadyExists) {
+    throw new Error(error.message);
+  }
+
+  // Fallback when GoTrue rejects a second invite for an existing pending user.
+  await sendRecoveryEmail(email);
+  return {
+    user: toHubUser(user, role, email),
+    delivery: "recovery",
+  };
+}
+
+async function sendRecoveryEmail(email: string) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anon) throw new Error("Supabase is not configured");
+
+  const { createClient } = await import("@supabase/supabase-js");
+  const client = createClient(url, anon, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { error } = await client.auth.resetPasswordForEmail(email, {
+    redirectTo: passwordSetupRedirectUrl(),
+  });
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Send a password-recovery email (Reset Password template) for an existing user.
+ */
+export async function sendPasswordResetForHubUser(id: string): Promise<void> {
+  const supabase = createAdminClient();
+  const { data: existing, error: getError } =
+    await supabase.auth.admin.getUserById(id);
+  if (getError) throw new Error(getError.message);
+  const email = existing.user?.email?.trim().toLowerCase();
+  if (!email) throw new Error("User not found or has no email");
+
+  await sendRecoveryEmail(email);
 }
 
 /** Resolve hub role from profiles (preferred) or app_metadata. */

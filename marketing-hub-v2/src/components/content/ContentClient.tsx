@@ -31,8 +31,11 @@ import {
 import { AssetUploadField } from "@/components/content/AssetUploadField";
 import { ChannelMultiSelect } from "@/components/ui/ChannelMultiSelect";
 import {
-  CHANNELS,
+  CONTENT_CATEGORIES,
+  CONTENT_OUTLETS,
+  CONTENT_PRIORITIES,
   CONTENT_TYPES,
+  SOCIAL_CHANNELS,
   selectOptionsWithCurrent,
 } from "@/lib/data/collections";
 
@@ -61,21 +64,34 @@ const STATUS_COLOR: Record<ContentStatus, string> = {
   published: "#3d8b5c",
 };
 
-const emptyForm = {
-  title: "",
-  channel: ["LinkedIn"] as string[],
-  content_type: "Social",
-  due_date: "",
-  notes: "",
-  planable_url: "",
-  asset_url: "",
-};
+function emptyFormForScope(scope: "all" | "content" | "social") {
+  const social = scope !== "content";
+  return {
+    title: "",
+    channel: social ? (["LinkedIn"] as string[]) : (["Editorial"] as string[]),
+    content_type: social ? "Social" : "Editorial",
+    due_date: "",
+    deadline_date: "",
+    category: "",
+    priority: "",
+    website: "",
+    caption: "",
+    notes: "",
+    planable_url: "",
+    asset_url: "",
+  };
+}
 
 type EditForm = {
   title: string;
   channel: string[];
   content_type: string;
   due_date: string;
+  deadline_date: string;
+  category: string;
+  priority: string;
+  website: string;
+  caption: string;
   notes: string;
   planable_url: string;
   asset_url: string;
@@ -88,11 +104,29 @@ function toEditForm(item: ContentItem): EditForm {
     channel: parseChannels(item.channel),
     content_type: item.content_type || "Social",
     due_date: item.due_date ?? "",
+    deadline_date: item.deadline_date ?? "",
+    category: item.category ?? "",
+    priority: item.priority ?? "",
+    website: item.website ?? "",
+    caption: item.caption ?? "",
     notes: item.notes,
     planable_url: item.planable_url,
     asset_url: item.asset_url,
     status: item.status,
   };
+}
+
+function channelOptionsForType(contentType: string, current: string[] = []) {
+  const base = isSocialContentItem({ content_type: contentType, channel: [] })
+    ? SOCIAL_CHANNELS
+    : CONTENT_OUTLETS;
+  const extras = current.filter(
+    (c) => c && !base.some((o) => o.value === c)
+  );
+  return [
+    ...extras.map((c) => ({ value: c, label: `${c} (custom)` })),
+    ...base,
+  ];
 }
 
 function statusLabel(status: ContentStatus) {
@@ -137,7 +171,7 @@ export function ContentClient({
   const [items, setItems] = useState(initial);
   const [view, setView] = useState<ContentView>("calendar");
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(() => emptyFormForScope(scope));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [edit, setEdit] = useState<EditForm | null>(null);
   const [saving, setSaving] = useState(false);
@@ -148,6 +182,17 @@ export function ContentClient({
   const [datedOnly, setDatedOnly] = useState<"upcoming" | "past" | "all" | "undated">(
     "upcoming"
   );
+
+  const formIsSocial = isSocialContentItem({
+    content_type: form.content_type,
+    channel: form.channel,
+  });
+  const editIsSocial = edit
+    ? isSocialContentItem({
+        content_type: edit.content_type,
+        channel: edit.channel,
+      })
+    : false;
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/content");
@@ -315,11 +360,12 @@ export function ContentClient({
       body: JSON.stringify({
         ...form,
         due_date: form.due_date || null,
+        deadline_date: form.deadline_date || null,
         status: "idea",
       }),
     });
     setShowForm(false);
-    setForm(emptyForm);
+    setForm(emptyFormForScope(scope));
     await refresh();
   }
 
@@ -348,6 +394,11 @@ export function ContentClient({
             channel: edit.channel.length ? edit.channel : ["Social"],
             content_type: edit.content_type.trim() || "Social",
             due_date: edit.due_date || null,
+            deadline_date: edit.deadline_date || null,
+            category: edit.category,
+            priority: edit.priority,
+            website: edit.website,
+            caption: edit.caption,
             notes: edit.notes,
             planable_url: edit.planable_url,
             asset_url: edit.asset_url,
@@ -458,7 +509,10 @@ export function ContentClient({
           <button
             type="button"
             className="btn-primary"
-            onClick={() => setShowForm(true)}
+            onClick={() => {
+              setForm(emptyFormForScope(scope));
+              setShowForm(true);
+            }}
           >
             Add piece
           </button>
@@ -471,7 +525,10 @@ export function ContentClient({
             <button
               type="button"
               className="btn-primary"
-              onClick={() => setShowForm(true)}
+              onClick={() => {
+                setForm(emptyFormForScope(scope));
+                setShowForm(true);
+              }}
             >
               Add piece
             </button>
@@ -571,9 +628,18 @@ export function ContentClient({
             <select
               className="field"
               value={form.content_type}
-              onChange={(e) =>
-                setForm({ ...form, content_type: e.target.value })
-              }
+              onChange={(e) => {
+                const content_type = e.target.value;
+                const social = isSocialContentItem({
+                  content_type,
+                  channel: [],
+                });
+                setForm({
+                  ...form,
+                  content_type,
+                  channel: social ? ["LinkedIn"] : ["Editorial"],
+                });
+              }}
             >
               {CONTENT_TYPES.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -582,23 +648,94 @@ export function ContentClient({
               ))}
             </select>
           </div>
-          <div className="md:col-span-2">
-            <label className="label">Channels</label>
-            <ChannelMultiSelect
-              value={form.channel}
-              options={CHANNELS}
-              onChange={(channel) => setForm({ ...form, channel })}
-            />
-          </div>
           <div>
-            <label className="label">Due date</label>
+            <label className="label">Date</label>
             <input
               className="field"
               type="date"
               value={form.due_date}
               onChange={(e) => setForm({ ...form, due_date: e.target.value })}
             />
+            <p className="mt-1 text-xs text-muted">
+              Publish or go-live date — used on calendar, timeline, and Gantt.
+            </p>
           </div>
+          <div>
+            <label className="label">Category</label>
+            <select
+              className="field"
+              value={form.category}
+              onChange={(e) => setForm({ ...form, category: e.target.value })}
+            >
+              <option value="">Select…</option>
+              {CONTENT_CATEGORIES.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Priority</label>
+            <select
+              className="field"
+              value={form.priority}
+              onChange={(e) => setForm({ ...form, priority: e.target.value })}
+            >
+              <option value="">None</option>
+              {CONTENT_PRIORITIES.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="md:col-span-2">
+            <label className="label">
+              {formIsSocial ? "Platforms" : "Channels / outlets"}
+            </label>
+            <ChannelMultiSelect
+              value={form.channel}
+              options={channelOptionsForType(form.content_type, form.channel)}
+              onChange={(channel) => setForm({ ...form, channel })}
+            />
+          </div>
+          {formIsSocial ? (
+            <div className="md:col-span-2">
+              <label className="label">Caption / post text</label>
+              <textarea
+                className="field min-h-[70px]"
+                value={form.caption}
+                onChange={(e) => setForm({ ...form, caption: e.target.value })}
+              />
+            </div>
+          ) : (
+            <>
+              <div>
+                <label className="label">Deadline</label>
+                <input
+                  className="field"
+                  type="date"
+                  value={form.deadline_date}
+                  onChange={(e) =>
+                    setForm({ ...form, deadline_date: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <label className="label">Website / publication URL</label>
+                <input
+                  className="field"
+                  type="url"
+                  placeholder="https://"
+                  value={form.website}
+                  onChange={(e) =>
+                    setForm({ ...form, website: e.target.value })
+                  }
+                />
+              </div>
+            </>
+          )}
           <div className="md:col-span-2">
             <label className="label">Notes</label>
             <textarea
@@ -617,7 +754,14 @@ export function ContentClient({
             <button type="button" className="btn-primary" onClick={() => void create()}>
               Save
             </button>
-            <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => {
+                setShowForm(false);
+                setForm(emptyFormForScope(scope));
+              }}
+            >
               Cancel
             </button>
           </div>
@@ -953,9 +1097,28 @@ export function ContentClient({
                   <select
                     className="field"
                     value={edit.content_type}
-                    onChange={(e) =>
-                      setEdit({ ...edit, content_type: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const content_type = e.target.value;
+                      const social = isSocialContentItem({
+                        content_type,
+                        channel: [],
+                      });
+                      setEdit({
+                        ...edit,
+                        content_type,
+                        channel: social
+                          ? edit.channel.filter((c) =>
+                              SOCIAL_CHANNELS.some((o) => o.value === c)
+                            ).length
+                            ? edit.channel
+                            : ["LinkedIn"]
+                          : edit.channel.filter((c) =>
+                              CONTENT_OUTLETS.some((o) => o.value === c)
+                            ).length
+                            ? edit.channel
+                            : ["Editorial"],
+                      });
+                    }}
                   >
                     {selectOptionsWithCurrent(
                       CONTENT_TYPES,
@@ -967,16 +1130,8 @@ export function ContentClient({
                     ))}
                   </select>
                 </div>
-                <div className="md:col-span-2">
-                  <label className="label">Channels</label>
-                  <ChannelMultiSelect
-                    value={edit.channel}
-                    options={CHANNELS}
-                    onChange={(channel) => setEdit({ ...edit, channel })}
-                  />
-                </div>
                 <div>
-                  <label className="label">Due date</label>
+                  <label className="label">Date</label>
                   <input
                     className="field"
                     type="date"
@@ -984,6 +1139,63 @@ export function ContentClient({
                     onChange={(e) =>
                       setEdit({ ...edit, due_date: e.target.value })
                     }
+                  />
+                  <p className="mt-1 text-xs text-muted">
+                    Publish or go-live date — used on calendar, timeline, and
+                    Gantt.
+                  </p>
+                </div>
+                <div>
+                  <label className="label">Category</label>
+                  <select
+                    className="field"
+                    value={edit.category}
+                    onChange={(e) =>
+                      setEdit({ ...edit, category: e.target.value })
+                    }
+                  >
+                    <option value="">Select…</option>
+                    {selectOptionsWithCurrent(
+                      CONTENT_CATEGORIES,
+                      edit.category
+                    ).map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Priority</label>
+                  <select
+                    className="field"
+                    value={edit.priority}
+                    onChange={(e) =>
+                      setEdit({ ...edit, priority: e.target.value })
+                    }
+                  >
+                    <option value="">None</option>
+                    {selectOptionsWithCurrent(
+                      CONTENT_PRIORITIES,
+                      edit.priority
+                    ).map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">
+                    {editIsSocial ? "Platforms" : "Channels / outlets"}
+                  </label>
+                  <ChannelMultiSelect
+                    value={edit.channel}
+                    options={channelOptionsForType(
+                      edit.content_type,
+                      edit.channel
+                    )}
+                    onChange={(channel) => setEdit({ ...edit, channel })}
                   />
                 </div>
                 <div>
@@ -1005,6 +1217,56 @@ export function ContentClient({
                     ))}
                   </select>
                 </div>
+                {editIsSocial ? (
+                  <>
+                    <div>
+                      <label className="label">Caption / post text</label>
+                      <textarea
+                        className="field min-h-[70px]"
+                        value={edit.caption}
+                        onChange={(e) =>
+                          setEdit({ ...edit, caption: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Planable URL</label>
+                      <input
+                        className="field"
+                        value={edit.planable_url}
+                        onChange={(e) =>
+                          setEdit({ ...edit, planable_url: e.target.value })
+                        }
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <label className="label">Deadline</label>
+                      <input
+                        className="field"
+                        type="date"
+                        value={edit.deadline_date}
+                        onChange={(e) =>
+                          setEdit({ ...edit, deadline_date: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Website / publication URL</label>
+                      <input
+                        className="field"
+                        type="url"
+                        placeholder="https://"
+                        value={edit.website}
+                        onChange={(e) =>
+                          setEdit({ ...edit, website: e.target.value })
+                        }
+                      />
+                    </div>
+                  </>
+                )}
                 <div>
                   <label className="label">Notes</label>
                   <textarea
@@ -1012,16 +1274,6 @@ export function ContentClient({
                     value={edit.notes}
                     onChange={(e) =>
                       setEdit({ ...edit, notes: e.target.value })
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="label">Planable URL</label>
-                  <input
-                    className="field"
-                    value={edit.planable_url}
-                    onChange={(e) =>
-                      setEdit({ ...edit, planable_url: e.target.value })
                     }
                   />
                 </div>

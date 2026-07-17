@@ -97,19 +97,29 @@ export const EVENT_TYPES: FieldOption[] = [
   { value: "Event", label: "Event" },
 ];
 
-export const CHANNELS: FieldOption[] = [
+export const SOCIAL_CHANNELS: FieldOption[] = [
   { value: "LinkedIn", label: "LinkedIn" },
   { value: "Instagram", label: "Instagram" },
   { value: "Facebook", label: "Facebook" },
   { value: "X", label: "X" },
   { value: "TikTok", label: "TikTok" },
   { value: "YouTube", label: "YouTube" },
+];
+
+export const CONTENT_OUTLETS: FieldOption[] = [
   { value: "Newsletter", label: "Newsletter" },
   { value: "Editorial", label: "Editorial" },
   { value: "PR", label: "PR" },
   { value: "Article", label: "Article" },
+  { value: "Website", label: "Website" },
   { value: "Sponsorship", label: "Sponsorship" },
   { value: "Case study", label: "Case study" },
+];
+
+/** All channel / outlet options (admin + filters). */
+export const CHANNELS: FieldOption[] = [
+  ...SOCIAL_CHANNELS,
+  ...CONTENT_OUTLETS,
 ];
 
 export const CONTENT_TYPES: FieldOption[] = [
@@ -118,6 +128,30 @@ export const CONTENT_TYPES: FieldOption[] = [
   { value: "Newsletter", label: "Newsletter" },
   { value: "Sponsorship", label: "Sponsorship" },
   { value: "PR", label: "PR" },
+  { value: "Press", label: "Press" },
+  { value: "Thought Leadership", label: "Thought Leadership" },
+];
+
+export const CONTENT_CATEGORIES: FieldOption[] = [
+  { value: "General", label: "General" },
+  { value: "Social Media", label: "Social Media" },
+  { value: "Insight", label: "Insight" },
+  { value: "Newsletter", label: "Newsletter" },
+  { value: "Sponsorship", label: "Sponsorship" },
+  { value: "Seasonal", label: "Seasonal" },
+  { value: "Commercial", label: "Commercial" },
+  { value: "Freight Forwarding", label: "Freight Forwarding" },
+  { value: "Press release", label: "Press release" },
+  { value: "Marketing", label: "Marketing" },
+  { value: "Leisure", label: "Leisure" },
+  { value: "Shipping Update", label: "Shipping Update" },
+  { value: "Case study", label: "Case study" },
+];
+
+export const CONTENT_PRIORITIES: FieldOption[] = [
+  { value: "High", label: "High" },
+  { value: "Medium", label: "Medium" },
+  { value: "Low", label: "Low" },
 ];
 
 export const TASK_CATEGORIES: FieldOption[] = [
@@ -298,10 +332,23 @@ export const DATA_COLLECTIONS: CollectionDef[] = [
         options: CONTENT_TYPES,
       }),
       f("channel", { type: "tags", label: "Channels", options: CHANNELS }),
-      f("due_date", { type: "date", label: "Due date" }),
+      f("due_date", { type: "date", label: "Date" }),
+      f("deadline_date", { type: "date", label: "Deadline" }),
+      f("category", {
+        type: "select",
+        label: "Category",
+        options: CONTENT_CATEGORIES,
+      }),
+      f("priority", {
+        type: "select",
+        label: "Priority",
+        options: CONTENT_PRIORITIES,
+      }),
       f("status", { type: "select", options: CONTENT_STATUS }),
+      f("caption", { type: "longtext", label: "Caption / post text" }),
+      f("website", { type: "url", label: "Website / publication URL" }),
       f("planable_url", { type: "url", label: "Planable URL" }),
-      f("asset_url", { type: "url", label: "Asset URL" }),
+      f("asset_url", { type: "url", label: "Asset / Canva URL" }),
       f("notes", { type: "longtext" }),
       f("created_at", { type: "readonly", locked: true }),
       f("updated_at", { type: "readonly", locked: true }),

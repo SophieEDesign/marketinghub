@@ -15,3 +15,29 @@ major_version = 17
 
 [studio]
 enabled = true
+
+# Branded Auth emails (local Inbucket / CLI). Production: paste HTML from
+# docs/email-templates/ into Dashboard → Authentication → Email Templates.
+[auth.email.template.invite]
+subject = "You're invited to Peters & May Marketing Hub"
+content_path = "../docs/email-templates/invite-user.html"
+
+[auth.email.template.confirmation]
+subject = "Confirm your Marketing Hub email"
+content_path = "../docs/email-templates/confirm-signup.html"
+
+[auth.email.template.magic_link]
+subject = "Your Marketing Hub sign-in link"
+content_path = "../docs/email-templates/magic-link.html"
+
+[auth.email.template.recovery]
+subject = "Reset your Marketing Hub password"
+content_path = "../docs/email-templates/reset-password.html"
+
+[auth.email.template.email_change]
+subject = "Confirm your new Marketing Hub email"
+content_path = "../docs/email-templates/change-email.html"
+
+[auth.email.template.reauthentication]
+subject = "Confirm it’s you — Marketing Hub"
+content_path = "../docs/email-templates/reauthentication.html"

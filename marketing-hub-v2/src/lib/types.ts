@@ -18,6 +18,10 @@ export type HubUser = {
   notes: string;
   /** Present when loaded from Supabase Auth. */
   last_sign_in_at?: string | null;
+  /** Null until the user accepts invite / confirms email (Supabase). */
+  email_confirmed_at?: string | null;
+  /** Set when an invite was sent (Supabase). */
+  invited_at?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -72,8 +76,16 @@ export type ContentItem = {
   /** Kind of piece from source post_type (Social, Editorial, Newsletter, …) */
   content_type: string;
   owner: string;
+  /** Publish / go-live date (calendar) */
   due_date: string | null;
+  /** Optional internal deadline (Content table date_due) */
+  deadline_date: string | null;
   status: ContentStatus;
+  category: string;
+  priority: string;
+  website: string;
+  /** Social caption / post copy (Content table content_post_text) */
+  caption: string;
   planable_url: string;
   asset_url: string;
   notes: string;

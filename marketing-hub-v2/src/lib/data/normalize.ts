@@ -70,8 +70,13 @@ export function normalizeContentType(raw: string): string {
     return "Editorial";
   }
   if (lower === "newsletter") return "Newsletter";
-  if (lower === "sponsorship") return "Sponsorship";
+  if (lower === "sponsorship" || lower === "sponsorship content") {
+    return "Sponsorship";
+  }
   if (lower === "pr" || lower === "press") return "PR";
+  if (lower === "thought leadership" || lower === "thought_leadership") {
+    return "Thought Leadership";
+  }
   if (s.includes("_")) {
     return s
       .split("_")
@@ -99,6 +104,8 @@ const NON_SOCIAL_TYPES = new Set([
   "pr",
   "press",
   "article",
+  "thought leadership",
+  "content",
 ]);
 
 const NON_SOCIAL_CHANNELS = new Set([
@@ -246,10 +253,15 @@ export function cleanContentFields(item: {
   notes: string;
   asset_url: string;
   planable_url: string;
+  category?: string;
+  priority?: string;
+  website?: string;
+  caption?: string;
 }) {
   const notes = stripHtml(item.notes);
+  const caption = stripHtml(item.caption ?? "");
   const title = stripHtml(item.title) || "Untitled post";
-  const channel = normalizeChannels(item.channel, title, notes);
+  const channel = normalizeChannels(item.channel, title, notes || caption);
   const content_type = normalizeContentType(
     item.content_type || channel[0] || "Social"
   );
@@ -259,9 +271,23 @@ export function cleanContentFields(item: {
     content_type,
     owner: (item.owner ?? "").trim(),
     notes,
+    caption,
+    category: (item.category ?? "").trim(),
+    priority: normalizeContentPriority(item.priority ?? ""),
+    website: (item.website ?? "").trim(),
     asset_url: extractAssetUrl(item.asset_url),
     planable_url: (item.planable_url ?? "").trim(),
   };
+}
+
+export function normalizeContentPriority(raw: string): string {
+  const s = (raw ?? "").trim();
+  if (!s) return "";
+  const lower = s.toLowerCase();
+  if (lower.includes("high") || lower.includes("important")) return "High";
+  if (lower.includes("medium")) return "Medium";
+  if (lower.includes("low")) return "Low";
+  return s;
 }
 
 /** Social Posts rows that are really calendar events (belong in Events, not content). */

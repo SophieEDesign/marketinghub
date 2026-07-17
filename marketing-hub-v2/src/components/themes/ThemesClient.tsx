@@ -18,9 +18,12 @@ import { AssetUploadField } from "@/components/content/AssetUploadField";
 import { cn } from "@/lib/utils";
 import {
   CHANNELS,
+  CONTENT_CATEGORIES,
+  CONTENT_PRIORITIES,
   CONTENT_TYPES,
   selectOptionsWithCurrent,
 } from "@/lib/data/collections";
+import { isSocialContentItem } from "@/lib/data/normalize";
 
 const STATUS_LABEL: Record<ThemeStatus, string> = {
   previous: "Previous",
@@ -49,6 +52,11 @@ type ContentEditForm = {
   channel: string[];
   content_type: string;
   due_date: string;
+  deadline_date: string;
+  category: string;
+  priority: string;
+  website: string;
+  caption: string;
   notes: string;
   planable_url: string;
   asset_url: string;
@@ -76,6 +84,11 @@ function contentToForm(item: ContentItem): ContentEditForm {
         : [],
     content_type: item.content_type || "Editorial",
     due_date: item.due_date ?? "",
+    deadline_date: item.deadline_date ?? "",
+    category: item.category ?? "",
+    priority: item.priority ?? "",
+    website: item.website ?? "",
+    caption: item.caption ?? "",
     notes: item.notes,
     planable_url: item.planable_url,
     asset_url: item.asset_url,
@@ -410,6 +423,11 @@ export function ThemesClient({
               : ["Editorial"],
             content_type: contentEdit.content_type.trim() || "Editorial",
             due_date: contentEdit.due_date || null,
+            deadline_date: contentEdit.deadline_date || null,
+            category: contentEdit.category,
+            priority: contentEdit.priority,
+            website: contentEdit.website,
+            caption: contentEdit.caption,
             notes: contentEdit.notes,
             planable_url: contentEdit.planable_url,
             asset_url: contentEdit.asset_url,
@@ -981,7 +999,7 @@ export function ThemesClient({
                   />
                 </div>
                 <div>
-                  <label className="label">Due date</label>
+                  <label className="label">Date</label>
                   <input
                     className="field"
                     type="date"
@@ -993,6 +1011,66 @@ export function ThemesClient({
                       })
                     }
                   />
+                </div>
+                <div>
+                  <label className="label">Deadline</label>
+                  <input
+                    className="field"
+                    type="date"
+                    value={contentEdit.deadline_date}
+                    onChange={(e) =>
+                      setContentEdit({
+                        ...contentEdit,
+                        deadline_date: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="label">Category</label>
+                  <select
+                    className="field"
+                    value={contentEdit.category}
+                    onChange={(e) =>
+                      setContentEdit({
+                        ...contentEdit,
+                        category: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="">Select…</option>
+                    {selectOptionsWithCurrent(
+                      CONTENT_CATEGORIES,
+                      contentEdit.category
+                    ).map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Priority</label>
+                  <select
+                    className="field"
+                    value={contentEdit.priority}
+                    onChange={(e) =>
+                      setContentEdit({
+                        ...contentEdit,
+                        priority: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="">None</option>
+                    {selectOptionsWithCurrent(
+                      CONTENT_PRIORITIES,
+                      contentEdit.priority
+                    ).map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="label">Status</label>
@@ -1014,25 +1092,60 @@ export function ThemesClient({
                   </select>
                 </div>
                 <div>
+                  <label className="label">Website / publication URL</label>
+                  <input
+                    className="field"
+                    type="url"
+                    placeholder="https://"
+                    value={contentEdit.website}
+                    onChange={(e) =>
+                      setContentEdit({
+                        ...contentEdit,
+                        website: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                {isSocialContentItem({
+                  content_type: contentEdit.content_type,
+                  channel: contentEdit.channel,
+                }) ? (
+                  <>
+                    <div className="sm:col-span-2">
+                      <label className="label">Caption / post text</label>
+                      <textarea
+                        className="field min-h-[70px]"
+                        value={contentEdit.caption}
+                        onChange={(e) =>
+                          setContentEdit({
+                            ...contentEdit,
+                            caption: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Planable URL</label>
+                      <input
+                        className="field"
+                        value={contentEdit.planable_url}
+                        onChange={(e) =>
+                          setContentEdit({
+                            ...contentEdit,
+                            planable_url: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                  </>
+                ) : null}
+                <div className="sm:col-span-2">
                   <label className="label">Notes</label>
                   <textarea
                     className="field min-h-[70px]"
                     value={contentEdit.notes}
                     onChange={(e) =>
                       setContentEdit({ ...contentEdit, notes: e.target.value })
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="label">Planable URL</label>
-                  <input
-                    className="field"
-                    value={contentEdit.planable_url}
-                    onChange={(e) =>
-                      setContentEdit({
-                        ...contentEdit,
-                        planable_url: e.target.value,
-                      })
                     }
                   />
                 </div>
