@@ -173,6 +173,7 @@ counts.theme_main_content = await upsert(
   (store.theme_mains || []).map((m) => ({
     id: m.id,
     theme_id: m.theme_id,
+    content_id: m.content_id ?? null,
     title: m.title,
     channel: m.channel ?? "",
     owner: m.owner ?? "",
@@ -279,5 +280,20 @@ counts.report_links = await upsert(
     updated_at: r.updated_at,
   }))
 );
+
+// Also upsert the durable JSON store the app actually reads at runtime.
+{
+  const { error } = await client.from("hub_store").upsert(
+    {
+      id: "default",
+      payload: store,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "id" }
+  );
+  if (error) throw new Error(`hub_store: ${error.message}`);
+  counts.hub_store_contacts = (store.contacts || []).length;
+  console.log(`  hub_store: contacts=${counts.hub_store_contacts}`);
+}
 
 console.log("\nDone:", counts);

@@ -14,7 +14,7 @@ export default async function PublicMediaPage() {
     <div className="mx-auto max-w-6xl px-4 py-10 md:px-8">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <Link href="/" className="hover:opacity-90">
-          <BrandLockup size={32} titleClassName="text-base" />
+          <BrandLockup size={36} />
         </Link>
         <div className="flex flex-wrap gap-2">
           {!canDownload ? (

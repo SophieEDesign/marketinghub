@@ -145,6 +145,8 @@ export type QuarterlyTheme = {
 export type ThemeMainContent = {
   id: string;
   theme_id: string;
+  /** Linked row in the Content table (attachments, due date, Planable, etc.) */
+  content_id: string | null;
   title: string;
   channel: string;
   owner: string;

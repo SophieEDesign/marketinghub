@@ -153,6 +153,7 @@ export async function exportStoreToSupabase(
     data.theme_mains.map((m) => ({
       id: m.id,
       theme_id: m.theme_id,
+      content_id: m.content_id ?? null,
       title: m.title,
       channel: m.channel ?? "",
       owner: m.owner ?? "",

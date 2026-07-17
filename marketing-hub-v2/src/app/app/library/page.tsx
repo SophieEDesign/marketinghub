@@ -5,8 +5,7 @@ import { hasSupabaseConfig } from "@/lib/auth/config";
 
 export const dynamic = "force-dynamic";
 
-const FALLBACK_LOGO =
-  "https://hwtycgvclhckglmuwnmw.supabase.co/storage/v1/object/public/attachments/attachments/table_media_1768074185692/a16be738-bf61-4474-8c99-70b415150fdb/media/c4e67edf-bf44-4f3a-9c35-9ea1701ba393.png";
+const FALLBACK_LOGO = "/pm-group-logo.png";
 
 const FALLBACK_GUIDE =
   "https://hwtycgvclhckglmuwnmw.supabase.co/storage/v1/object/public/attachments/attachments/table_media_1768074185692/19e724de-39c2-4ee5-b545-dae584996d8c/media/4363f3e1-1bb0-49f4-ad10-7f6d92ea52e0.pdf";

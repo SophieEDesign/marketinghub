@@ -92,13 +92,22 @@ export async function createContent(
   return item;
 }
 
-export async function updateContent(id: string, patch: Partial<ContentItem>) {
+export async function updateContent(
+  id: string,
+  patch: Partial<ContentItem>
+): Promise<ContentItem | null> {
   let updated: ContentItem | null = null;
   await updateStore((s) => {
     const idx = s.content.findIndex((c) => c.id === id);
     if (idx === -1) return;
-    s.content[idx] = { ...s.content[idx], ...patch, id, updated_at: nowIso() };
-    updated = s.content[idx];
+    const next: ContentItem = {
+      ...s.content[idx],
+      ...patch,
+      id,
+      updated_at: nowIso(),
+    };
+    s.content[idx] = next;
+    updated = next;
   });
   return updated;
 }
@@ -447,6 +456,7 @@ export async function createThemeMain(
 ) {
   const item: ThemeMainContent = {
     ...input,
+    content_id: input.content_id ?? null,
     id: uid("tmc"),
     created_at: nowIso(),
     updated_at: nowIso(),
@@ -457,21 +467,48 @@ export async function createThemeMain(
   return item;
 }
 
+/** Create a Content table row for a theme main if missing, and return both. */
+export async function ensureThemeMainContentLink(mainId: string) {
+  const store = await readStore();
+  const main = store.theme_mains.find((m) => m.id === mainId);
+  if (!main) return null;
+
+  if (main.content_id) {
+    const existing = store.content.find((c) => c.id === main.content_id);
+    if (existing) return { main, content: existing };
+  }
+
+  const content = await createContent({
+    title: main.title,
+    channel: main.channel || "Editorial",
+    content_type: "Editorial",
+    owner: main.owner ?? "",
+    due_date: null,
+    status: main.status,
+    planable_url: "",
+    asset_url: "",
+    notes: main.notes ?? "",
+  });
+  const updated = await updateThemeMain(mainId, { content_id: content.id });
+  return { main: updated ?? { ...main, content_id: content.id }, content };
+}
+
 export async function updateThemeMain(
   id: string,
   patch: Partial<ThemeMainContent>
-) {
+): Promise<ThemeMainContent | null> {
   let updated: ThemeMainContent | null = null;
   await updateStore((s) => {
     const idx = s.theme_mains.findIndex((m) => m.id === id);
     if (idx === -1) return;
-    s.theme_mains[idx] = {
+    const next: ThemeMainContent = {
       ...s.theme_mains[idx],
       ...patch,
       id,
       updated_at: nowIso(),
     };
-    updated = s.theme_mains[idx];
+    s.theme_mains[idx] = next;
+    updated = next;
   });
   return updated;
 }

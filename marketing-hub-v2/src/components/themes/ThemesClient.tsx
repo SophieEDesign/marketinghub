@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CornerDownRight, Plus } from "lucide-react";
+import Link from "next/link";
+import { CornerDownRight, ExternalLink, Paperclip, Plus } from "lucide-react";
 import type {
+  ContentItem,
   ContentStatus,
   QuarterlyTheme,
   ThemeMainContent,
@@ -11,14 +13,27 @@ import type {
 } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ContactOwnerSelect } from "@/components/ui/ContactOwnerSelect";
+import { AssetUploadField } from "@/components/content/AssetUploadField";
 import { cn } from "@/lib/utils";
-import { CHANNELS, selectOptionsWithCurrent } from "@/lib/data/collections";
+import {
+  CHANNELS,
+  CONTENT_TYPES,
+  selectOptionsWithCurrent,
+} from "@/lib/data/collections";
 
 const STATUS_LABEL: Record<ThemeStatus, string> = {
   previous: "Previous",
   active: "Active",
   upcoming: "Upcoming",
 };
+
+const CONTENT_STATUS_OPTIONS: { id: ContentStatus; label: string }[] = [
+  { id: "idea", label: "Idea" },
+  { id: "draft", label: "Draft" },
+  { id: "review", label: "Review" },
+  { id: "scheduled", label: "Scheduled" },
+  { id: "published", label: "Published" },
+];
 
 type ThemeEditForm = {
   title: string;
@@ -28,6 +43,18 @@ type ThemeEditForm = {
   status: ThemeStatus;
 };
 
+type ContentEditForm = {
+  title: string;
+  channel: string;
+  content_type: string;
+  due_date: string;
+  notes: string;
+  planable_url: string;
+  asset_url: string;
+  owner: string;
+  status: ContentStatus;
+};
+
 function themeToForm(theme: QuarterlyTheme): ThemeEditForm {
   return {
     title: theme.title,
@@ -35,6 +62,20 @@ function themeToForm(theme: QuarterlyTheme): ThemeEditForm {
     quarter: theme.quarter,
     year: String(theme.year),
     status: theme.status,
+  };
+}
+
+function contentToForm(item: ContentItem): ContentEditForm {
+  return {
+    title: item.title,
+    channel: item.channel,
+    content_type: item.content_type || "Editorial",
+    due_date: item.due_date ?? "",
+    notes: item.notes,
+    planable_url: item.planable_url,
+    asset_url: item.asset_url,
+    owner: item.owner,
+    status: item.status,
   };
 }
 
@@ -50,14 +91,17 @@ export function ThemesClient({
   initialThemes,
   initialMains,
   initialOffshoots,
+  initialContent,
 }: {
   initialThemes: QuarterlyTheme[];
   initialMains: ThemeMainContent[];
   initialOffshoots: ThemeOffshoot[];
+  initialContent: ContentItem[];
 }) {
   const [themes, setThemes] = useState(initialThemes);
   const [mains, setMains] = useState(initialMains);
   const [offshoots, setOffshoots] = useState(initialOffshoots);
+  const [content, setContent] = useState(initialContent);
   const initialSelected = pickDefaultTheme(initialThemes);
   const [selectedId, setSelectedId] = useState<string | null>(
     () => initialSelected?.id ?? null
@@ -78,6 +122,11 @@ export function ThemesClient({
     channel: "",
     owner: "",
   });
+  const [editingMainId, setEditingMainId] = useState<string | null>(null);
+  const [editingContentId, setEditingContentId] = useState<string | null>(null);
+  const [contentEdit, setContentEdit] = useState<ContentEditForm | null>(null);
+  const [savingContent, setSavingContent] = useState(false);
+  const [openingContent, setOpeningContent] = useState(false);
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/themes");
@@ -85,6 +134,7 @@ export function ThemesClient({
     setThemes(data.themes ?? []);
     setMains(data.mains ?? []);
     setOffshoots(data.offshoots ?? []);
+    setContent(data.content ?? []);
   }, []);
 
   useEffect(() => {
@@ -130,6 +180,12 @@ export function ThemesClient({
     () => mains.filter((m) => m.theme_id === selectedId),
     [mains, selectedId]
   );
+
+  const contentById = useMemo(() => {
+    const map = new Map<string, ContentItem>();
+    for (const item of content) map.set(item.id, item);
+    return map;
+  }, [content]);
 
   function selectYear(year: number) {
     setYearTab(year);
@@ -229,6 +285,7 @@ export function ThemesClient({
     setThemes(nextThemes);
     setMains(data.mains ?? []);
     setOffshoots(data.offshoots ?? []);
+    setContent(data.content ?? []);
     const remainingInYear = nextThemes.filter((t) => t.year === yearTab);
     if (remainingInYear.length > 0) {
       setSelectedId((current) => {
@@ -241,7 +298,70 @@ export function ThemesClient({
         ? yearTab
         : nextYears[0] ?? yearTab;
       setYearTab(nextYear);
-      setSelectedId(pickDefaultTheme(nextThemes.filter((t) => t.year === nextYear))?.id ?? null);
+      setSelectedId(
+        pickDefaultTheme(nextThemes.filter((t) => t.year === nextYear))?.id ??
+          null
+      );
+    }
+  }
+
+  async function openMainContent(main: ThemeMainContent) {
+    setOpeningContent(true);
+    try {
+      let item =
+        (main.content_id && contentById.get(main.content_id)) || null;
+      if (!item) {
+        const res = await fetch("/api/themes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "ensureContent", id: main.id }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.content) return;
+        item = data.content as ContentItem;
+        await refresh();
+      }
+      setEditingMainId(main.id);
+      setEditingContentId(item.id);
+      setContentEdit(contentToForm(item));
+    } finally {
+      setOpeningContent(false);
+    }
+  }
+
+  function closeContentEdit() {
+    setEditingMainId(null);
+    setEditingContentId(null);
+    setContentEdit(null);
+  }
+
+  async function saveContentEdit() {
+    if (!editingContentId || !contentEdit) return;
+    setSavingContent(true);
+    try {
+      await fetch("/api/themes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "updateContent",
+          id: editingContentId,
+          patch: {
+            title: contentEdit.title.trim() || "Untitled",
+            channel: contentEdit.channel.trim() || "Editorial",
+            content_type: contentEdit.content_type.trim() || "Editorial",
+            due_date: contentEdit.due_date || null,
+            notes: contentEdit.notes,
+            planable_url: contentEdit.planable_url,
+            asset_url: contentEdit.asset_url,
+            owner: contentEdit.owner,
+            status: contentEdit.status,
+          },
+        }),
+      });
+      await refresh();
+      closeContentEdit();
+    } finally {
+      setSavingContent(false);
     }
   }
 
@@ -269,6 +389,7 @@ export function ThemesClient({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "delete", entity, id }),
     });
+    if (entity === "main" && editingMainId === id) closeContentEdit();
     await refresh();
   }
 
@@ -277,6 +398,12 @@ export function ThemesClient({
       <PageHeader
         title="Quarterly themes"
         description="Theme → main content → offshoot pieces. Plan the quarter’s spine, then branch social and supporting assets."
+        actions={
+          <Link href="/app/content" className="btn-secondary">
+            <ExternalLink className="h-4 w-4" />
+            Content table
+          </Link>
+        }
       />
 
       {years.length > 0 ? (
@@ -451,6 +578,10 @@ export function ThemesClient({
                   Main content
                 </p>
                 <h3 className="font-display text-xl text-brand">Core pieces</h3>
+                <p className="mt-1 text-xs text-muted">
+                  Each piece links to the Content table — open it to add due dates,
+                  Planable links, and attachments.
+                </p>
               </div>
             </div>
 
@@ -489,18 +620,34 @@ export function ThemesClient({
             <div className="space-y-4">
               {selectedMains.map((main) => {
                 const kids = offshoots.filter((o) => o.main_content_id === main.id);
+                const linked =
+                  (main.content_id && contentById.get(main.content_id)) || null;
                 return (
                   <article
                     key={main.id}
                     className="rounded-2xl border border-border bg-sand/40 p-4"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="font-medium">{main.title}</p>
+                      <div className="min-w-0">
+                        <button
+                          type="button"
+                          className="text-left font-medium text-brand hover:underline"
+                          disabled={openingContent}
+                          onClick={() => void openMainContent(main)}
+                        >
+                          {main.title}
+                        </button>
                         <p className="text-xs text-muted">
                           {main.channel || "No channel"}
                           {main.owner ? ` · ${main.owner}` : ""}
+                          {linked?.due_date ? ` · due ${linked.due_date}` : ""}
                         </p>
+                        {linked?.asset_url ? (
+                          <p className="mt-1 inline-flex items-center gap-1 text-xs text-muted">
+                            <Paperclip className="h-3 w-3" />
+                            Attachment
+                          </p>
+                        ) : null}
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         <select
@@ -514,20 +661,20 @@ export function ThemesClient({
                             )
                           }
                         >
-                          {(
-                            [
-                              "idea",
-                              "draft",
-                              "review",
-                              "scheduled",
-                              "published",
-                            ] as ContentStatus[]
-                          ).map((s) => (
-                            <option key={s} value={s}>
-                              {s}
+                          {CONTENT_STATUS_OPTIONS.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.label}
                             </option>
                           ))}
                         </select>
+                        <button
+                          type="button"
+                          className="btn-secondary py-1.5 text-xs"
+                          disabled={openingContent}
+                          onClick={() => void openMainContent(main)}
+                        >
+                          Edit content
+                        </button>
                         <button
                           type="button"
                           className="btn-secondary py-1.5 text-xs"
@@ -577,17 +724,9 @@ export function ThemesClient({
                                   )
                                 }
                               >
-                                {(
-                                  [
-                                    "idea",
-                                    "draft",
-                                    "review",
-                                    "scheduled",
-                                    "published",
-                                  ] as ContentStatus[]
-                                ).map((s) => (
-                                  <option key={s} value={s}>
-                                    {s}
+                                {CONTENT_STATUS_OPTIONS.map((s) => (
+                                  <option key={s.id} value={s.id}>
+                                    {s.label}
                                   </option>
                                 ))}
                               </select>
@@ -675,6 +814,187 @@ export function ThemesClient({
       ) : (
         <p className="text-sm text-muted">Select a quarter theme to plan content.</p>
       )}
+
+      {contentEdit && editingMainId ? (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/25 md:left-sidebar"
+            onClick={closeContentEdit}
+            aria-hidden
+          />
+          <aside
+            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border bg-white shadow-soft"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Edit content piece"
+          >
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <div>
+                <h2 className="text-sm font-semibold text-brand">Edit content</h2>
+                <p className="text-xs text-muted">Synced with the Content table</p>
+              </div>
+              <button
+                type="button"
+                className="btn-ghost px-2.5 py-1.5 text-xs"
+                onClick={closeContentEdit}
+              >
+                Close
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="grid gap-2">
+                <div>
+                  <label className="label">Title</label>
+                  <input
+                    className="field"
+                    value={contentEdit.title}
+                    onChange={(e) =>
+                      setContentEdit({ ...contentEdit, title: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="label">Content type</label>
+                  <select
+                    className="field"
+                    value={contentEdit.content_type}
+                    onChange={(e) =>
+                      setContentEdit({
+                        ...contentEdit,
+                        content_type: e.target.value,
+                      })
+                    }
+                  >
+                    {selectOptionsWithCurrent(
+                      CONTENT_TYPES,
+                      contentEdit.content_type
+                    ).map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Channel</label>
+                  <select
+                    className="field"
+                    value={contentEdit.channel}
+                    onChange={(e) =>
+                      setContentEdit({ ...contentEdit, channel: e.target.value })
+                    }
+                  >
+                    {selectOptionsWithCurrent(CHANNELS, contentEdit.channel).map(
+                      (o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      )
+                    )}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Owner</label>
+                  <ContactOwnerSelect
+                    className="field"
+                    value={contentEdit.owner}
+                    onChange={(owner) =>
+                      setContentEdit({ ...contentEdit, owner })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="label">Due date</label>
+                  <input
+                    className="field"
+                    type="date"
+                    value={contentEdit.due_date}
+                    onChange={(e) =>
+                      setContentEdit({
+                        ...contentEdit,
+                        due_date: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="label">Status</label>
+                  <select
+                    className="field"
+                    value={contentEdit.status}
+                    onChange={(e) =>
+                      setContentEdit({
+                        ...contentEdit,
+                        status: e.target.value as ContentStatus,
+                      })
+                    }
+                  >
+                    {CONTENT_STATUS_OPTIONS.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Notes</label>
+                  <textarea
+                    className="field min-h-[70px]"
+                    value={contentEdit.notes}
+                    onChange={(e) =>
+                      setContentEdit({ ...contentEdit, notes: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="label">Planable URL</label>
+                  <input
+                    className="field"
+                    value={contentEdit.planable_url}
+                    onChange={(e) =>
+                      setContentEdit({
+                        ...contentEdit,
+                        planable_url: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <AssetUploadField
+                  value={contentEdit.asset_url}
+                  onChange={(asset_url) =>
+                    setContentEdit({ ...contentEdit, asset_url })
+                  }
+                />
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={savingContent}
+                onClick={() => void saveContentEdit()}
+              >
+                {savingContent ? "Saving…" : "Save"}
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={savingContent}
+                onClick={closeContentEdit}
+              >
+                Cancel
+              </button>
+              <Link
+                href="/app/content"
+                className="btn-ghost text-xs"
+                onClick={closeContentEdit}
+              >
+                Open Content table
+              </Link>
+            </div>
+          </aside>
+        </>
+      ) : null}
     </div>
   );
 }

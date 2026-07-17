@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const UPLOAD_ROOT = path.join(getDataDir(), "uploads", "content");
-const MAX_BYTES = 12 * 1024 * 1024; // 12MB
+const MAX_BYTES = 25 * 1024 * 1024; // 25MB per file
 const ALLOWED = new Set([
   "image/jpeg",
   "image/png",
@@ -70,7 +70,10 @@ export async function POST(request: NextRequest) {
   const blob = file as File;
   if (blob.size <= 0) return jsonError("Empty file", 400);
   if (blob.size > MAX_BYTES) {
-    return jsonError("File too large (max 12MB)", 400);
+    return jsonError(
+      `File too large (max ${Math.round(MAX_BYTES / (1024 * 1024))}MB): ${blob.name || "file"}`,
+      413
+    );
   }
 
   const type = blob.type || "application/octet-stream";

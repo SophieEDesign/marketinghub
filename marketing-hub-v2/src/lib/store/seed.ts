@@ -82,6 +82,35 @@ export function createSeedStore(): HubStore {
         created_at: now,
         updated_at: now,
       },
+      {
+        id: "cnt_seed_theme_1",
+        title:
+          "Global forwarding is becoming more complex — customers expect it simpler",
+        channel: "Article",
+        content_type: "Editorial",
+        owner: "Sophie",
+        due_date: null,
+        status: "draft",
+        planable_url: "",
+        asset_url: "",
+        notes: "Core thought-leadership piece for the quarter.",
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        id: "cnt_seed_theme_2",
+        title: "The Middle East is still moving — the route looks different",
+        channel: "Case study",
+        content_type: "Editorial",
+        owner: "Marketing",
+        due_date: null,
+        status: "idea",
+        planable_url: "",
+        asset_url: "",
+        notes: "",
+        created_at: now,
+        updated_at: now,
+      },
     ],
     sponsorships: [
       {
@@ -302,6 +331,7 @@ export function createSeedStore(): HubStore {
       {
         id: "tmc_seed_1",
         theme_id: "thm_seed_q2",
+        content_id: "cnt_seed_theme_1",
         title:
           "Global forwarding is becoming more complex — customers expect it simpler",
         channel: "Article",
@@ -314,6 +344,7 @@ export function createSeedStore(): HubStore {
       {
         id: "tmc_seed_2",
         theme_id: "thm_seed_q2",
+        content_id: "cnt_seed_theme_2",
         title: "The Middle East is still moving — the route looks different",
         channel: "Case study",
         owner: "Marketing",

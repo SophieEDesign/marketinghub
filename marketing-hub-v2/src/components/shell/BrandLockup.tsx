@@ -1,5 +1,7 @@
 import { cn } from "@/lib/utils";
 
+export const BRAND_LOGO_SRC = "/pm-group-logo.png";
+
 export function BrandMark({
   className,
   size = 36,
@@ -8,35 +10,21 @@ export function BrandMark({
   size?: number;
 }) {
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 40 40"
-      width={size}
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={BRAND_LOGO_SRC}
+      alt="Peters & May"
+      width={Math.round(size * 2.6)}
       height={size}
-      className={cn("shrink-0", className)}
-      role="img"
-      aria-label="Peters & May Marketing Hub"
-    >
-      <rect width="40" height="40" rx="8" fill="#0b3a4a" />
-      <text
-        x="20"
-        y="26"
-        textAnchor="middle"
-        fontFamily="system-ui, -apple-system, Segoe UI, sans-serif"
-        fontSize="15"
-        fontWeight="700"
-        fill="#ffffff"
-        letterSpacing="-0.6"
-      >
-        MH
-      </text>
-    </svg>
+      className={cn("h-auto w-auto shrink-0 object-contain", className)}
+      style={{ height: size, width: "auto" }}
+    />
   );
 }
 
 export function BrandLockup({
   className,
-  size = 36,
+  size = 40,
   titleClassName,
   subtitleClassName,
 }: {
@@ -46,21 +34,17 @@ export function BrandLockup({
   subtitleClassName?: string;
 }) {
   return (
-    <div className={cn("flex items-center gap-3", className)}>
-      <BrandMark size={size} />
-      <div className="min-w-0">
-        <p
-          className={cn(
-            "font-display text-lg tracking-tight text-brand",
-            titleClassName
-          )}
-        >
-          Peters &amp; May
-        </p>
-        <p className={cn("text-xs text-muted", subtitleClassName)}>
-          Marketing Hub
-        </p>
-      </div>
+    <div className={cn("flex min-w-0 flex-col gap-1.5", className)}>
+      <BrandMark size={size} className="max-w-full" />
+      <p
+        className={cn(
+          "text-xs font-medium text-muted",
+          titleClassName,
+          subtitleClassName
+        )}
+      >
+        Marketing Hub
+      </p>
     </div>
   );
 }

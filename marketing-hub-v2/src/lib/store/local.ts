@@ -53,6 +53,16 @@ function migrateContacts(
   }));
 }
 
+function migrateThemeMains(
+  items: HubStore["theme_mains"] | undefined
+): HubStore["theme_mains"] | undefined {
+  if (!items) return items;
+  return items.map((item) => ({
+    ...item,
+    content_id: item.content_id ?? null,
+  }));
+}
+
 function withDefaults(store: Partial<HubStore>): HubStore {
   const seed = createSeedStore();
   return {
@@ -63,7 +73,7 @@ function withDefaults(store: Partial<HubStore>): HubStore {
     resources: store.resources ?? seed.resources,
     reports: store.reports ?? seed.reports,
     themes: store.themes ?? seed.themes,
-    theme_mains: store.theme_mains ?? seed.theme_mains,
+    theme_mains: migrateThemeMains(store.theme_mains) ?? seed.theme_mains,
     theme_offshoots: store.theme_offshoots ?? seed.theme_offshoots,
     merch_orders: migrateMerch(store.merch_orders) ?? seed.merch_orders,
     merch_inventory: store.merch_inventory ?? seed.merch_inventory,
@@ -72,6 +82,56 @@ function withDefaults(store: Partial<HubStore>): HubStore {
     tasks: store.tasks ?? seed.tasks,
     hub_users: store.hub_users ?? seed.hub_users,
   };
+}
+
+/** Demo seed rows use ids like `ctc_seed_1` / `evt_seed_2`. Real Core imports use `sb_*`. */
+function looksLikeSeedStore(store: Partial<HubStore> | null): boolean {
+  if (!store) return false;
+  const sample =
+    store.contacts?.[0]?.id ??
+    store.events?.[0]?.id ??
+    store.content?.[0]?.id ??
+    store.tasks?.[0]?.id;
+  return typeof sample === "string" && sample.includes("_seed_");
+}
+
+function contactCount(store: Partial<HubStore> | null): number {
+  return store?.contacts?.length ?? 0;
+}
+
+/**
+ * Prefer real Core Data snapshots over demo seed.
+ * When both look real, prefer the larger contacts list.
+ */
+function pickPreferredStore(
+  remote: Partial<HubStore> | null,
+  local: Partial<HubStore> | null
+): Partial<HubStore> | null {
+  if (!remote && !local) return null;
+  if (!remote) return local;
+  if (!local) return remote;
+
+  const remoteSeed = looksLikeSeedStore(remote);
+  const localSeed = looksLikeSeedStore(local);
+  if (remoteSeed && !localSeed) return local;
+  if (localSeed && !remoteSeed) return remote;
+
+  return contactCount(local) > contactCount(remote) ? local : remote;
+}
+
+function needsKeyMigration(store: Partial<HubStore>): boolean {
+  return (
+    !store.themes ||
+    !store.theme_mains ||
+    !store.theme_offshoots ||
+    !store.reports ||
+    !store.merch_orders ||
+    !store.merch_inventory ||
+    !store.staff_requests ||
+    !store.awards ||
+    !store.tasks ||
+    !store.hub_users
+  );
 }
 
 async function readLocalFile(): Promise<Partial<HubStore> | null> {
@@ -138,20 +198,28 @@ async function writeRemoteStore(store: HubStore): Promise<boolean> {
 
 async function ensureStore(): Promise<HubStore> {
   if (shouldUseDurableSupabaseStore()) {
-    let parsed = await readRemoteStore();
-    if (!parsed) {
-      // Bootstrap from local file if present (e.g. after import on one instance).
-      parsed = await readLocalFile();
-    }
-    if (!parsed) {
+    const remote = await readRemoteStore();
+    const local = await readLocalFile();
+    const preferred = pickPreferredStore(remote, local);
+
+    if (!preferred) {
+      // First-run only: never seed-overwrite an existing remote row.
       const seed = createSeedStore();
       await writeRemoteStore(seed);
       await writeLocalFile(seed);
       return seed;
     }
-    const merged = withDefaults(parsed);
-    // Persist migrations / first remote write
-    await writeRemoteStore(merged);
+
+    const merged = withDefaults(preferred);
+    const upgradingFromSeed =
+      looksLikeSeedStore(remote) && !looksLikeSeedStore(preferred);
+    const remoteMissing = !remote;
+
+    // Do NOT write remote on every read — that races with restores and can
+    // push stale /tmp seed back over a good hub_store snapshot.
+    if (remoteMissing || upgradingFromSeed || needsKeyMigration(preferred)) {
+      await writeRemoteStore(merged);
+    }
     await writeLocalFile(merged);
     return merged;
   }
@@ -163,18 +231,7 @@ async function ensureStore(): Promise<HubStore> {
     return seed;
   }
   const merged = withDefaults(parsed);
-  if (
-    !parsed.themes ||
-    !parsed.theme_mains ||
-    !parsed.theme_offshoots ||
-    !parsed.reports ||
-    !parsed.merch_orders ||
-    !parsed.merch_inventory ||
-    !parsed.staff_requests ||
-    !parsed.awards ||
-    !parsed.tasks ||
-    !parsed.hub_users
-  ) {
+  if (needsKeyMigration(parsed)) {
     await writeLocalFile(merged);
   }
   return merged;

@@ -80,7 +80,7 @@ function LoginForm() {
       <Link href={isMediaIntent ? "/media" : "/"} className="mb-8 text-sm text-muted hover:text-foreground">
         ← Back
       </Link>
-      <BrandLockup className="mb-8" size={40} titleClassName="text-xl" />
+      <BrandLockup className="mb-8" size={56} />
       <h1 className="font-display text-3xl text-brand">
         {isMediaIntent ? "Sign in to download" : "Staff login"}
       </h1>

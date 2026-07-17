@@ -406,6 +406,7 @@ export const DATA_COLLECTIONS: CollectionDef[] = [
     fields: [
       f("id", { type: "readonly", locked: true }),
       f("theme_id", { label: "Theme id" }),
+      f("content_id", { label: "Content id" }),
       f("title"),
       f("channel", { type: "select", options: CHANNELS }),
       ownerField(),

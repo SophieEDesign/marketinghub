@@ -1,5 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Allow larger media uploads (per-file) through App Router route handlers.
+  experimental: {
+    middlewareClientMaxBodySize: "30mb",
+    proxyClientMaxBodySize: "30mb",
+    serverActions: {
+      bodySizeLimit: "30mb",
+    },
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "drive.google.com" },

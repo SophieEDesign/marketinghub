@@ -28,6 +28,10 @@ export const metadata: Metadata = {
   },
   description,
   applicationName: title,
+  icons: {
+    icon: "/pm-group-logo.png",
+    apple: "/pm-group-logo.png",
+  },
   openGraph: {
     type: "website",
     siteName: title,

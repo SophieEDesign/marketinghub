@@ -45,6 +45,8 @@ const NEW_FOLDER_VALUE = "__new_folder__";
 const NEW_SUBFOLDER_VALUE = "__new_subfolder__";
 const MEDIA_ACCEPT =
   "image/jpeg,image/png,image/webp,image/gif,application/pdf,video/mp4,video/quicktime,.jpg,.jpeg,.png,.webp,.gif,.pdf,.mp4,.mov";
+/** Keep in sync with /api/content/upload MAX_BYTES */
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 
 function isAcceptedMediaFile(file: File) {
   if (
@@ -65,6 +67,24 @@ function filesFromList(list: FileList | File[] | null | undefined): File[] {
 
 function nameFromFile(file: File) {
   return file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim();
+}
+
+function formatMb(bytes: number) {
+  return `${Math.round(bytes / (1024 * 1024))}MB`;
+}
+
+async function readErrorMessage(res: Response, fallback: string) {
+  const text = await res.text();
+  try {
+    const json = JSON.parse(text) as { error?: string };
+    if (json.error) return json.error;
+  } catch {
+    // Non-JSON (e.g. proxy "Request Entity Too Large")
+  }
+  if (/request entity too large/i.test(text) || res.status === 413) {
+    return `File too large for the server (max about ${formatMb(MAX_UPLOAD_BYTES)} each). Try fewer or smaller images.`;
+  }
+  return text.trim().slice(0, 180) || fallback;
 }
 
 function itemDisplayName(item: MediaListItem) {
@@ -420,6 +440,16 @@ export function MediaGallery({
     setSaving(true);
     setFormError(null);
     try {
+      const oversized = files.filter((f) => f.size > MAX_UPLOAD_BYTES);
+      if (oversized.length > 0) {
+        throw new Error(
+          `These files are over ${formatMb(MAX_UPLOAD_BYTES)}: ${oversized
+            .map((f) => f.name)
+            .slice(0, 3)
+            .join(", ")}${oversized.length > 3 ? ` +${oversized.length - 3} more` : ""}. Remove them or compress, then save again.`
+        );
+      }
+
       const uploaded: {
         url: string;
         name: string;
@@ -427,21 +457,30 @@ export function MediaGallery({
         size?: number | null;
       }[] = [];
 
-      for (const file of files) {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
         const body = new FormData();
         body.append("file", file);
         const uploadRes = await fetch("/api/content/upload", {
           method: "POST",
           body,
         });
+        if (!uploadRes.ok) {
+          throw new Error(
+            await readErrorMessage(
+              uploadRes,
+              `Upload failed for ${file.name} (${i + 1}/${files.length})`
+            )
+          );
+        }
         const uploadJson = (await uploadRes.json()) as {
           url?: string;
           name?: string;
           error?: string;
         };
-        if (!uploadRes.ok || !uploadJson.url) {
+        if (!uploadJson.url) {
           throw new Error(
-            uploadJson.error || `File upload failed for ${file.name}`
+            uploadJson.error || `Upload failed for ${file.name}`
           );
         }
         uploaded.push({
@@ -468,8 +507,11 @@ export function MediaGallery({
           files: uploaded.length > 0 ? uploaded : undefined,
         }),
       });
-      const json = (await res.json()) as { error?: string };
-      if (!res.ok) throw new Error(json.error || "Could not save media");
+      if (!res.ok) {
+        throw new Error(
+          await readErrorMessage(res, "Could not save media")
+        );
+      }
 
       if (gallerySelected) {
         await fetch("/api/media", {
@@ -830,7 +872,8 @@ export function MediaGallery({
                 Drag &amp; drop files here
               </p>
               <p className="mt-1 text-xs text-muted">
-                or click to browse · multiple images OK · PDF / short video too
+                Drop a folder of images or pick multiple files · max{" "}
+                {formatMb(MAX_UPLOAD_BYTES)} each
               </p>
               <input
                 ref={fileInputRef}

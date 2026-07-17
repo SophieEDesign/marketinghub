@@ -6,10 +6,7 @@ export default function LandingPage() {
   return (
     <div className="relative overflow-hidden">
       <div className="mx-auto flex min-h-screen max-w-5xl flex-col justify-center px-6 py-16">
-        <BrandMark size={48} className="mb-6" />
-        <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-accent">
-          Peters &amp; May
-        </p>
+        <BrandMark size={64} className="mb-8" />
         <h1 className="font-display text-5xl leading-tight text-brand md:text-6xl">
           Marketing Hub
         </h1>
