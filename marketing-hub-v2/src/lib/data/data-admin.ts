@@ -30,6 +30,12 @@ export type StoredFieldDef = {
   custom?: boolean;
 };
 
+function isManageableType(
+  type: FieldType
+): type is Exclude<FieldType, "readonly"> {
+  return (MANAGEABLE_FIELD_TYPES as readonly FieldType[]).includes(type);
+}
+
 type FieldExtras = Partial<Record<CollectionKey, StoredFieldDef[]>>;
 
 function isFieldType(value: unknown): value is FieldType {
@@ -439,7 +445,7 @@ export async function addField(
   }
 
   const type =
-    opts.type && MANAGEABLE_FIELD_TYPES.includes(opts.type)
+    opts.type && isManageableType(opts.type)
       ? opts.type
       : inferFieldType(key);
   if (type === "readonly") throw new Error("Cannot create readonly fields");
@@ -519,7 +525,7 @@ export async function updateField(
   const nextType =
     nextTypeRaw === "readonly"
       ? "readonly"
-      : MANAGEABLE_FIELD_TYPES.includes(nextTypeRaw)
+      : isManageableType(nextTypeRaw)
         ? nextTypeRaw
         : "text";
   if (nextType === "readonly" && isCustom) {
