@@ -1,14 +1,17 @@
-/** Division colours for Events calendar / list (brand-adjacent, distinct). */
-export const DIVISION_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  All: { bg: "#0b3a4a", border: "#0b3a4a", text: "#ffffff" },
-  Racing: { bg: "#2a8f9e", border: "#1f7380", text: "#ffffff" },
-  Commercial: { bg: "#c47a2c", border: "#a36320", text: "#ffffff" },
-  Leisure: { bg: "#3d8b5c", border: "#2f6e49", text: "#ffffff" },
-  Forwarding: { bg: "#4a6fa5", border: "#3a5984", text: "#ffffff" },
-  CMT: { bg: "#8b5a6b", border: "#6e4654", text: "#ffffff" },
+/** Division colours — kept distinct from event-type colours in event-type-colors.ts. */
+export const DIVISION_COLORS: Record<
+  string,
+  { bg: string; border: string; text: string }
+> = {
+  All: { bg: "#1e293b", border: "#0f172a", text: "#ffffff" },
+  Racing: { bg: "#0369a1", border: "#075985", text: "#ffffff" },
+  Commercial: { bg: "#b45309", border: "#92400e", text: "#ffffff" },
+  Leisure: { bg: "#15803d", border: "#166534", text: "#ffffff" },
+  Forwarding: { bg: "#6d28d9", border: "#5b21b6", text: "#ffffff" },
+  CMT: { bg: "#be185d", border: "#9d174d", text: "#ffffff" },
 };
 
-const FALLBACK = { bg: "#5b6b76", border: "#4a5761", text: "#ffffff" };
+const FALLBACK = { bg: "#64748b", border: "#475569", text: "#ffffff" };
 
 export function normalizeDivision(raw: string | null | undefined): string {
   const s = (raw ?? "").trim();

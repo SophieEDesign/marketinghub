@@ -163,6 +163,15 @@ function LoginForm() {
           </>
         )}
       </p>
+      <p className="mt-3 text-center text-sm text-muted">
+        Need an account?{" "}
+        <Link
+          href="/request-access"
+          className="text-brand underline-offset-2 hover:underline"
+        >
+          Request access
+        </Link>
+      </p>
     </div>
   );
 }

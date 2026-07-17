@@ -1,10 +1,13 @@
 import { uid } from "@/lib/utils";
 import { readStore, updateStore } from "@/lib/store/local";
 import type {
+  AccessRequest,
   AwardEntry,
   Contact,
   ContentItem,
   ContentStatus,
+  EventAttendance,
+  EventAttendanceStatus,
   EventItem,
   HubAccessRole,
   HubTask,
@@ -69,7 +72,66 @@ export async function updateEvent(id: string, patch: Partial<EventItem>) {
 export async function deleteEvent(id: string) {
   await updateStore((s) => {
     s.events = s.events.filter((e) => e.id !== id);
+    s.event_attendance = s.event_attendance.filter((a) => a.event_id !== id);
   });
+}
+
+const ATTENDANCE_STATUSES: EventAttendanceStatus[] = [
+  "attending",
+  "maybe",
+  "not_attending",
+  "interested",
+];
+
+export function isEventAttendanceStatus(
+  value: unknown
+): value is EventAttendanceStatus {
+  return (
+    typeof value === "string" &&
+    ATTENDANCE_STATUSES.includes(value as EventAttendanceStatus)
+  );
+}
+
+export async function listAttendanceForEvent(eventId: string) {
+  const store = await readStore();
+  return store.event_attendance
+    .filter((a) => a.event_id === eventId)
+    .sort((a, b) => a.user_name.localeCompare(b.user_name));
+}
+
+export async function upsertEventAttendance(input: {
+  event_id: string;
+  user_id: string;
+  user_name: string;
+  attendance_status: EventAttendanceStatus;
+}) {
+  let row: EventAttendance | null = null;
+  await updateStore((s) => {
+    const idx = s.event_attendance.findIndex(
+      (a) => a.event_id === input.event_id && a.user_id === input.user_id
+    );
+    if (idx === -1) {
+      row = {
+        id: uid("att"),
+        event_id: input.event_id,
+        user_id: input.user_id,
+        user_name: input.user_name,
+        attendance_status: input.attendance_status,
+        created_at: nowIso(),
+        updated_at: nowIso(),
+      };
+      s.event_attendance.push(row);
+      return;
+    }
+    s.event_attendance[idx] = {
+      ...s.event_attendance[idx],
+      user_name: input.user_name || s.event_attendance[idx].user_name,
+      attendance_status: input.attendance_status,
+      updated_at: nowIso(),
+    };
+    row = s.event_attendance[idx];
+  });
+  return row;
 }
 
 export async function listContent() {
@@ -924,4 +986,59 @@ export async function deleteHubUser(id: string) {
   await updateStore((s) => {
     s.hub_users = (s.hub_users ?? []).filter((u) => u.id !== id);
   });
+}
+
+export async function listAccessRequests() {
+  const store = await readStore();
+  return [...(store.access_requests ?? [])].sort((a, b) =>
+    b.created_at.localeCompare(a.created_at)
+  );
+}
+
+export async function createAccessRequest(
+  input: Omit<AccessRequest, "id" | "created_at" | "updated_at">
+) {
+  const item: AccessRequest = {
+    ...input,
+    email: input.email.trim().toLowerCase(),
+    full_name: input.full_name.trim() || input.email.trim(),
+    organisation: input.organisation ?? "",
+    reason: input.reason ?? "",
+    id: uid("ar"),
+    created_at: nowIso(),
+    updated_at: nowIso(),
+  };
+  await updateStore((s) => {
+    if (!s.access_requests) s.access_requests = [];
+    s.access_requests.push(item);
+  });
+  return item;
+}
+
+export async function updateAccessRequest(
+  id: string,
+  patch: Partial<AccessRequest>
+) {
+  let updated: AccessRequest | null = null;
+  await updateStore((s) => {
+    if (!s.access_requests) s.access_requests = [];
+    const idx = s.access_requests.findIndex((r) => r.id === id);
+    if (idx === -1) return;
+    s.access_requests[idx] = {
+      ...s.access_requests[idx],
+      ...patch,
+      id,
+      updated_at: nowIso(),
+    };
+    updated = s.access_requests[idx];
+  });
+  return updated;
+}
+
+export async function findPendingAccessRequestByEmail(email: string) {
+  const normalized = email.trim().toLowerCase();
+  const all = await listAccessRequests();
+  return (
+    all.find((r) => r.email === normalized && r.status === "pending") ?? null
+  );
 }

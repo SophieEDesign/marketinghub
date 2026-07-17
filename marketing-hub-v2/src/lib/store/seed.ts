@@ -35,6 +35,7 @@ export function createSeedStore(): HubStore {
         updated_at: now,
       },
     ],
+    event_attendance: [],
     content: [
       {
         id: "cnt_seed_1",
@@ -577,5 +578,6 @@ export function createSeedStore(): HubStore {
         updated_at: now,
       },
     ],
+    access_requests: [],
   };
 }

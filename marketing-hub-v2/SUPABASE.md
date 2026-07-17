@@ -48,22 +48,26 @@ Manage users at **Admin → Users**. With `SUPABASE_SERVICE_ROLE_KEY` set, invit
 | `member` | `staff` | `/app` — day-to-day staff modules |
 | `external` | `media_guest` | `/media` only (redirected out of `/app`) |
 
-### Add a Member (staff)
+### Request access (public)
 
-1. Confirm they need day-to-day hub access (not media-only).
-2. **Admin → Users → Invite user** — name, work email, role **Member**.
-3. They accept the Supabase invite email and set a password.
-4. They sign in at `/login` → land in `/app` as staff.
-5. Optional: link them to a **Contact** so they can use **My details** (`/app/me`).
+Linked from **login** → [`/request-access`](../src/app/request-access/page.tsx).
 
-### Add an External (media / outside)
+| Email | Outcome |
+|-------|---------|
+| `@petersandmay.com` (or domains in `HUB_MEMBER_EMAIL_DOMAINS`) | Auto-accepted as **Member** + invite email |
+| Any other domain | Pending **External** request for admin review |
 
-1. Confirm they only need the **public media gallery**, not the staff hub.
-2. **Admin → Users → Invite user** — name, email, role **External**.
-3. They accept the invite and sign in.
-4. They are sent to `/media` (cannot use `/app`).
-5. Ensure media folders they should see are marked **Public** in Media (Internal folders stay staff-only).
-6. The Admin “External” view toggle is preview-only for admins — live External users never use `/app`.
+Non–P&M people cannot request Member via the form. Admins invite them as Member manually when needed.
+
+Admins **Accept** / **Deny** pending External requests on **Admin → Users**. Accept sends an External invite.
+
+### Invite user (admin)
+
+1. **Admin → Users → Invite user** — name, email, role (Admin / Member / External).
+2. They accept the Supabase invite email and set a password.
+3. Sign in at `/login` → land per role table above.
+4. Optional for Members: link a **Contact** for **My details** (`/app/me`).
+5. For Externals: mark relevant Media folders **Public**.
 
 ### Change role later
 
@@ -75,3 +79,4 @@ Manage users at **Admin → Users**. With `SUPABASE_SERVICE_ROLE_KEY` set, invit
 
 - `SUPABASE_SERVICE_ROLE_KEY` set for live invites.
 - Supabase Auth email (invite) configured in the project.
+- Optional: `HUB_MEMBER_EMAIL_DOMAINS` (comma-separated; default `petersandmay.com`).

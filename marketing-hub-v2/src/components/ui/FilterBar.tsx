@@ -9,6 +9,8 @@ export type FilterSelect = {
   value: string;
   options: { value: string; label: string }[];
   onChange: (value: string) => void;
+  /** Value treated as inactive / used by Clear. Defaults to "all". */
+  clearValue?: string;
 };
 
 export function FilterBar({
@@ -29,11 +31,12 @@ export function FilterBar({
   className?: string;
 }) {
   const hasActive =
-    search.trim().length > 0 || selects.some((s) => s.value !== "all");
+    search.trim().length > 0 ||
+    selects.some((s) => s.value !== (s.clearValue ?? "all"));
 
   function clearAll() {
     onSearchChange("");
-    selects.forEach((s) => s.onChange("all"));
+    selects.forEach((s) => s.onChange(s.clearValue ?? "all"));
   }
 
   return (

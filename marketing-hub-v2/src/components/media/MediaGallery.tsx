@@ -22,6 +22,7 @@ import {
   type MediaFile,
   type MediaListItem,
 } from "@/lib/supabase/media-list";
+import { uploadAssetDirect } from "@/lib/upload/client-upload";
 import { cn } from "@/lib/utils";
 
 type ListResponse = {
@@ -459,36 +460,21 @@ export function MediaGallery({
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const body = new FormData();
-        body.append("file", file);
-        const uploadRes = await fetch("/api/content/upload", {
-          method: "POST",
-          body,
-        });
-        if (!uploadRes.ok) {
+        try {
+          const uploadedFile = await uploadAssetDirect(file);
+          uploaded.push({
+            url: uploadedFile.url,
+            name: uploadedFile.name || file.name,
+            type: file.type,
+            size: file.size,
+          });
+        } catch (e) {
           throw new Error(
-            await readErrorMessage(
-              uploadRes,
-              `Upload failed for ${file.name} (${i + 1}/${files.length})`
-            )
+            e instanceof Error
+              ? `${e.message} (${i + 1}/${files.length})`
+              : `Upload failed for ${file.name} (${i + 1}/${files.length})`
           );
         }
-        const uploadJson = (await uploadRes.json()) as {
-          url?: string;
-          name?: string;
-          error?: string;
-        };
-        if (!uploadJson.url) {
-          throw new Error(
-            uploadJson.error || `Upload failed for ${file.name}`
-          );
-        }
-        uploaded.push({
-          url: uploadJson.url,
-          name: uploadJson.name || file.name,
-          type: file.type,
-          size: file.size,
-        });
       }
 
       const res = await fetch("/api/media", {
@@ -872,8 +858,8 @@ export function MediaGallery({
                 Drag &amp; drop files here
               </p>
               <p className="mt-1 text-xs text-muted">
-                Drop a folder of images or pick multiple files · max{" "}
-                {formatMb(MAX_UPLOAD_BYTES)} each
+                Drop a folder of images or pick multiple files · uploads go
+                straight to storage (max {formatMb(MAX_UPLOAD_BYTES)} each)
               </p>
               <input
                 ref={fileInputRef}

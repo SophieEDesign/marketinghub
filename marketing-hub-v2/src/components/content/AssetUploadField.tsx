@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { ImagePlus, Loader2, Trash2 } from "lucide-react";
 import { isImageUrl } from "@/lib/social/platforms";
+import { uploadAssetDirect } from "@/lib/upload/client-upload";
 import { cn } from "@/lib/utils";
 
 export function AssetUploadField({
@@ -21,17 +22,8 @@ export function AssetUploadField({
     setUploading(true);
     setError(null);
     try {
-      const body = new FormData();
-      body.append("file", file);
-      const res = await fetch("/api/content/upload", {
-        method: "POST",
-        body,
-      });
-      const data = await res.json();
-      if (!res.ok || !data.url) {
-        throw new Error(data.error || "Upload failed");
-      }
-      onChange(String(data.url));
+      const data = await uploadAssetDirect(file);
+      onChange(data.url);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
     } finally {
@@ -101,7 +93,7 @@ export function AssetUploadField({
       />
       {error ? <p className="text-xs text-[var(--danger)]">{error}</p> : null}
       <p className="text-[11px] text-muted">
-        Images, PDF or short video · max 12MB. Shows on the calendar card.
+        Images, PDF or short video · max 25MB. Shows on the calendar card.
       </p>
     </div>
   );

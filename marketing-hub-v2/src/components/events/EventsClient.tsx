@@ -6,7 +6,7 @@ import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import listPlugin from "@fullcalendar/list";
-import type { EventItem } from "@/lib/types";
+import type { EventAttendance, EventAttendanceStatus, EventItem } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { FullCalendarStyles } from "@/components/ui/FullCalendarStyles";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
@@ -22,6 +22,13 @@ import {
   normalizeEventTypeLabel,
 } from "@/lib/events/event-type-colors";
 import { EVENT_TYPES, selectOptionsWithCurrent } from "@/lib/data/collections";
+
+const ATTENDANCE_OPTIONS: { value: EventAttendanceStatus; label: string }[] = [
+  { value: "attending", label: "Attending" },
+  { value: "maybe", label: "Maybe" },
+  { value: "not_attending", label: "Not attending" },
+  { value: "interested", label: "Interested" },
+];
 
 const emptyForm = {
   title: "",
@@ -63,6 +70,31 @@ function hasValidStart(event: EventItem): boolean {
   return !Number.isNaN(t);
 }
 
+/** yyyy-MM-dd for date comparisons (local calendar day). */
+function todayDateKey(): string {
+  return format(new Date(), "yyyy-MM-dd");
+}
+
+/** Last day the event is still on (end date, or start if no end). */
+function eventLastDateKey(event: EventItem): string | null {
+  if (!hasValidStart(event)) return null;
+  const iso = event.ends_at || event.starts_at!;
+  return iso.slice(0, 10);
+}
+
+function matchesDateFilter(
+  event: EventItem,
+  dateFilter: "upcoming" | "past" | "all"
+): boolean {
+  if (dateFilter === "all") return true;
+  const last = eventLastDateKey(event);
+  // Undated events stay visible — they live in "Needs a date".
+  if (!last) return true;
+  const today = todayDateKey();
+  if (dateFilter === "upcoming") return last >= today;
+  return last < today;
+}
+
 /** Midnight / date-only ISO — avoid showing as "1a" in BST. */
 function isDateOnlyIso(iso: string): boolean {
   if (!iso.includes("T")) return true;
@@ -98,8 +130,8 @@ function DivisionSwatch({
   if (compact) {
     return (
       <span
-        className="inline-flex max-w-full truncate rounded px-1 py-px text-[9px] font-semibold leading-tight text-white/95"
-        style={{ backgroundColor: "rgba(0,0,0,0.28)" }}
+        className="inline-flex max-w-full truncate rounded px-1 py-px text-[9px] font-semibold leading-tight"
+        style={{ backgroundColor: color.bg, color: color.text }}
         title={label}
       >
         {label}
@@ -108,8 +140,8 @@ function DivisionSwatch({
   }
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium text-white"
-      style={{ backgroundColor: color.bg }}
+      className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium"
+      style={{ backgroundColor: color.bg, color: color.text }}
     >
       {label}
     </span>
@@ -224,8 +256,12 @@ function EventFields({
 
 export function EventsClient({
   initialEvents,
+  currentUserId,
+  currentUserName,
 }: {
   initialEvents: EventItem[];
+  currentUserId: string | null;
+  currentUserName: string | null;
 }) {
   const { view } = useHubView();
   const canDelete = view === "admin";
@@ -237,10 +273,16 @@ export function EventsClient({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [edit, setEdit] = useState<EventForm | null>(null);
   const [saving, setSaving] = useState(false);
-  const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
+  const [viewMode, setViewMode] = useState<"calendar" | "list">("list");
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [divisionFilter, setDivisionFilter] = useState("all");
+  const [dateFilter, setDateFilter] = useState<"upcoming" | "past" | "all">(
+    "upcoming"
+  );
+  const [attendance, setAttendance] = useState<EventAttendance[]>([]);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [attendanceSaving, setAttendanceSaving] = useState(false);
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/events");
@@ -260,6 +302,91 @@ export function EventsClient({
     // Only re-sync when the list or selected id changes, not on every selected object update.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- selected intentionally omitted
   }, [events, selected?.id]);
+
+  useEffect(() => {
+    if (!selected?.id) {
+      setAttendance([]);
+      return;
+    }
+    let cancelled = false;
+    setAttendanceLoading(true);
+    void fetch(`/api/events/attendance?eventId=${encodeURIComponent(selected.id)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled) setAttendance(data.attendance ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setAttendance([]);
+      })
+      .finally(() => {
+        if (!cancelled) setAttendanceLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selected?.id]);
+
+  const myAttendanceStatus = useMemo(() => {
+    if (!currentUserId) return null;
+    return (
+      attendance.find((a) => a.user_id === currentUserId)?.attendance_status ??
+      null
+    );
+  }, [attendance, currentUserId]);
+
+  const attendingPeople = useMemo(
+    () => attendance.filter((a) => a.attendance_status === "attending"),
+    [attendance]
+  );
+
+  const setMyAttendance = useCallback(
+    async (status: EventAttendanceStatus) => {
+      if (!selected?.id || !currentUserId || attendanceSaving) return;
+      setAttendanceSaving(true);
+      // Optimistic update
+      setAttendance((prev) => {
+        const existing = prev.find((a) => a.user_id === currentUserId);
+        if (existing) {
+          return prev.map((a) =>
+            a.user_id === currentUserId
+              ? {
+                  ...a,
+                  attendance_status: status,
+                  user_name: currentUserName || a.user_name,
+                  updated_at: new Date().toISOString(),
+                }
+              : a
+          );
+        }
+        return [
+          ...prev,
+          {
+            id: `att_temp_${currentUserId}`,
+            event_id: selected.id,
+            user_id: currentUserId,
+            user_name: currentUserName || "You",
+            attendance_status: status,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ];
+      });
+      try {
+        const res = await fetch("/api/events/attendance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ eventId: selected.id, status }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          setAttendance(data.attendance ?? []);
+        }
+      } finally {
+        setAttendanceSaving(false);
+      }
+    },
+    [selected?.id, currentUserId, currentUserName, attendanceSaving]
+  );
 
   const eventTypes = useMemo(() => {
     const set = new Set(
@@ -295,9 +422,10 @@ export function EventsClient({
       ) {
         return false;
       }
+      if (!matchesDateFilter(e, dateFilter)) return false;
       return true;
     });
-  }, [events, search, typeFilter, divisionFilter]);
+  }, [events, search, typeFilter, divisionFilter, dateFilter]);
 
   const dated = useMemo(
     () => filtered.filter((e) => hasValidStart(e)),
@@ -469,9 +597,32 @@ export function EventsClient({
   return (
     <div>
       <FullCalendarStyles />
+      <style>{`
+        .hub-events-fc .fc-list-event td {
+          border-color: transparent !important;
+          background: transparent !important;
+          vertical-align: middle;
+        }
+        .hub-events-fc .fc-list-event:hover td {
+          background: transparent !important;
+        }
+        .hub-events-fc .fc-list-event-title {
+          padding-top: 4px !important;
+          padding-bottom: 4px !important;
+        }
+        .hub-events-fc .fc-list-event-title a {
+          color: inherit !important;
+        }
+        .hub-events-fc .fc-daygrid-event {
+          border: none !important;
+        }
+        .hub-events-fc .fc-event-main {
+          padding: 0 !important;
+        }
+      `}</style>
       <PageHeader
         title="Events"
-        description="Add and edit shows and meetings. Attendance lives in the event spreadsheet. Only admins can delete events."
+        description="Add and edit shows and meetings. Mark whether you're attending when you select an event. Only admins can delete events."
         actions={
           <>
             <button
@@ -502,6 +653,19 @@ export function EventsClient({
         totalCount={events.length}
         selects={[
           {
+            id: "date",
+            label: "Date",
+            value: dateFilter,
+            onChange: (value) =>
+              setDateFilter(value as "upcoming" | "past" | "all"),
+            clearValue: "upcoming",
+            options: [
+              { value: "upcoming", label: "Today onwards" },
+              { value: "past", label: "Past" },
+              { value: "all", label: "All dates" },
+            ],
+          },
+          {
             id: "type",
             label: "Type",
             value: typeFilter,
@@ -525,7 +689,7 @@ export function EventsClient({
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-3 text-xs text-muted">
-        <span className="font-medium text-foreground">Type</span>
+        <span className="font-medium text-foreground">Type (calendar colour)</span>
         {typeLegend.map((name) => {
           const color = eventTypeColor(name);
           return (
@@ -564,7 +728,7 @@ export function EventsClient({
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-        <div className="surface-card p-4">
+        <div className="hub-events-fc surface-card p-4">
           {viewMode === "calendar" ? (
             <FullCalendar
               plugins={[dayGridPlugin, interactionPlugin, listPlugin]}
@@ -623,12 +787,34 @@ export function EventsClient({
               }}
               eventClassNames="!border-0 cursor-grab active:cursor-grabbing"
               eventContent={(arg) => {
+                const eventType = String(
+                  arg.event.extendedProps.eventType ?? ""
+                );
                 const division = String(
                   arg.event.extendedProps.division ?? ""
                 ).trim();
+                const color = eventTypeColor(eventType);
+                const isList = arg.view.type.startsWith("list");
                 return (
-                  <div className="flex w-full min-w-0 flex-col gap-0.5 px-1 py-0.5">
-                    <span className="truncate text-[11px] font-semibold leading-tight text-white">
+                  <div
+                    className={
+                      isList
+                        ? "flex w-full min-w-0 flex-col gap-0.5 rounded px-2 py-1.5"
+                        : "flex w-full min-w-0 flex-col gap-0.5 px-1 py-0.5"
+                    }
+                    style={
+                      isList
+                        ? {
+                            backgroundColor: color.bg,
+                            color: color.text,
+                          }
+                        : undefined
+                    }
+                  >
+                    <span
+                      className="truncate text-[11px] font-semibold leading-tight"
+                      style={{ color: color.text }}
+                    >
                       {arg.event.title}
                     </span>
                     {division ? (
@@ -746,6 +932,54 @@ export function EventsClient({
                     </dd>
                   </div>
                 </dl>
+
+                {currentUserId ? (
+                  <div className="border-t border-border pt-3">
+                    <p className="label !mb-2">Your attendance</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {ATTENDANCE_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          disabled={attendanceSaving}
+                          className={
+                            myAttendanceStatus === opt.value
+                              ? "btn-primary !px-2.5 !py-1.5 text-xs"
+                              : "btn-secondary !px-2.5 !py-1.5 text-xs"
+                          }
+                          onClick={() => void setMyAttendance(opt.value)}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="border-t border-border pt-3">
+                  <p className="label !mb-2">
+                    Attending ({attendingPeople.length})
+                  </p>
+                  {attendanceLoading ? (
+                    <p className="text-xs text-muted">Loading…</p>
+                  ) : attendingPeople.length > 0 ? (
+                    <ul className="space-y-1">
+                      {attendingPeople.map((person) => (
+                        <li
+                          key={person.id}
+                          className="text-sm text-foreground"
+                        >
+                          {person.user_name}
+                          {person.user_id === currentUserId ? (
+                            <span className="ml-1 text-xs text-muted">(you)</span>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-muted">No one marked attending yet.</p>
+                  )}
+                </div>
 
                 <div className="flex flex-wrap gap-2 border-t border-border pt-3">
                   <button

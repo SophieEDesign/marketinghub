@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { Contact, HubAccessRole, HubUser } from "@/lib/types";
+import type { AccessRequest, Contact, HubAccessRole, HubUser } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { cn } from "@/lib/utils";
@@ -71,12 +71,14 @@ export function UsersAdminClient({
 }) {
   const [items, setItems] = useState(initial);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [accessRequests, setAccessRequests] = useState<AccessRequest[]>([]);
   const [source, setSource] = useState<"supabase" | "local">(initialSource);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [actingRequestId, setActingRequestId] = useState<string | null>(null);
   const [form, setForm] = useState({
     full_name: "",
     email: "",
@@ -107,10 +109,22 @@ export function UsersAdminClient({
     }
   }, []);
 
+  const refreshAccessRequests = useCallback(async () => {
+    try {
+      const res = await fetch("/api/access-requests");
+      if (!res.ok) return;
+      const data = await res.json();
+      setAccessRequests(data.requests ?? []);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   useEffect(() => {
     void refresh();
     void refreshContacts();
-  }, [refresh, refreshContacts]);
+    void refreshAccessRequests();
+  }, [refresh, refreshContacts, refreshAccessRequests]);
 
   const contactByUserId = useMemo(() => {
     const map = new Map<string, Contact>();
@@ -119,6 +133,14 @@ export function UsersAdminClient({
     }
     return map;
   }, [contacts]);
+
+  const actionableRequests = useMemo(
+    () =>
+      accessRequests.filter(
+        (r) => r.status === "pending" || r.status === "failed"
+      ),
+    [accessRequests]
+  );
 
   const counts = useMemo(() => {
     return {
@@ -218,6 +240,28 @@ export function UsersAdminClient({
     await refresh();
   }
 
+  async function decideAccessRequest(
+    id: string,
+    action: "approve" | "deny"
+  ) {
+    setActingRequestId(id);
+    setError(null);
+    const res = await fetch("/api/access-requests", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, id }),
+    });
+    const data = await res.json();
+    setActingRequestId(null);
+    if (!res.ok) {
+      setError(data.error ?? `Could not ${action} request`);
+      await refreshAccessRequests();
+      return;
+    }
+    await refreshAccessRequests();
+    if (action === "approve") await refresh();
+  }
+
   return (
     <div>
       <PageHeader
@@ -243,12 +287,76 @@ export function UsersAdminClient({
         <span className="font-medium text-foreground">
           {source === "supabase" ? "Supabase Auth + profiles" : "Local store"}
         </span>
+        {" · "}
+        Public form:{" "}
+        <a href="/request-access" className="text-brand underline-offset-2 hover:underline">
+          /request-access
+        </a>
       </p>
 
       {error ? (
         <p className="mb-4 rounded-xl border border-[var(--danger)]/30 bg-[var(--danger)]/5 px-4 py-3 text-sm text-[var(--danger)]">
           {error}
         </p>
+      ) : null}
+
+      {actionableRequests.length > 0 ? (
+        <div className="surface-card mb-6 overflow-hidden">
+          <div className="border-b border-border bg-sand/50 px-4 py-3">
+            <p className="text-sm font-medium text-foreground">
+              Access requests{" "}
+              <span className="rounded-full bg-brand/10 px-2 py-0.5 text-xs text-brand">
+                {actionableRequests.length}
+              </span>
+            </p>
+            <p className="mt-0.5 text-xs text-muted">
+              External requests from the public form. Accept sends an External
+              invite; use Invite user for Member access (non–P&amp;M).
+            </p>
+          </div>
+          <ul className="divide-y divide-border">
+            {actionableRequests.map((req) => (
+              <li
+                key={req.id}
+                className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground">{req.full_name}</p>
+                  <p className="truncate text-sm text-muted">{req.email}</p>
+                  {req.organisation ? (
+                    <p className="text-xs text-muted">{req.organisation}</p>
+                  ) : null}
+                  {req.reason ? (
+                    <p className="mt-1 text-xs text-muted">{req.reason}</p>
+                  ) : null}
+                  {req.status === "failed" && req.error_message ? (
+                    <p className="mt-1 text-xs text-[var(--danger)]">
+                      {req.error_message}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={actingRequestId === req.id}
+                    onClick={() => void decideAccessRequest(req.id, "approve")}
+                  >
+                    {actingRequestId === req.id ? "…" : "Accept"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    disabled={actingRequestId === req.id}
+                    onClick={() => void decideAccessRequest(req.id, "deny")}
+                  >
+                    Deny
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
       ) : null}
 
       <div className="mb-6 grid gap-3 sm:grid-cols-3">

@@ -67,6 +67,7 @@ function withDefaults(store: Partial<HubStore>): HubStore {
   const seed = createSeedStore();
   return {
     events: migrateEvents(store.events) ?? seed.events,
+    event_attendance: store.event_attendance ?? seed.event_attendance,
     content: migrateContent(store.content) ?? seed.content,
     sponsorships: store.sponsorships ?? seed.sponsorships,
     contacts: migrateContacts(store.contacts) ?? seed.contacts,
@@ -81,6 +82,7 @@ function withDefaults(store: Partial<HubStore>): HubStore {
     awards: store.awards ?? seed.awards,
     tasks: store.tasks ?? seed.tasks,
     hub_users: store.hub_users ?? seed.hub_users,
+    access_requests: store.access_requests ?? seed.access_requests,
   };
 }
 
@@ -130,7 +132,8 @@ function needsKeyMigration(store: Partial<HubStore>): boolean {
     !store.staff_requests ||
     !store.awards ||
     !store.tasks ||
-    !store.hub_users
+    !store.hub_users ||
+    !store.access_requests
   );
 }
 

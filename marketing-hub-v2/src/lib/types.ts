@@ -39,6 +39,24 @@ export type EventItem = {
   updated_at: string;
 };
 
+/** Per-user RSVP for an event (logged-in staff). */
+export type EventAttendanceStatus =
+  | "attending"
+  | "maybe"
+  | "not_attending"
+  | "interested";
+
+export type EventAttendance = {
+  id: string;
+  event_id: string;
+  user_id: string;
+  /** Display name captured at RSVP time. */
+  user_name: string;
+  attendance_status: EventAttendanceStatus;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ContentStatus =
   | "idea"
   | "draft"
@@ -266,8 +284,30 @@ export type HubTask = {
   updated_at: string;
 };
 
+/** Public access requests (login → Request access). Managed under Admin → Users. */
+export type AccessRequestStatus = "pending" | "approved" | "denied" | "failed";
+
+export type AccessRequest = {
+  id: string;
+  full_name: string;
+  email: string;
+  /** member only on auto P&M path; public form otherwise always external */
+  requested_role: "member" | "external";
+  organisation: string;
+  reason: string;
+  status: AccessRequestStatus;
+  decided_role?: "member" | "external" | null;
+  decided_at?: string | null;
+  decided_by?: string | null;
+  error_message?: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type HubStore = {
   events: EventItem[];
+  /** Per-user RSVP rows for Events. */
+  event_attendance: EventAttendance[];
   content: ContentItem[];
   sponsorships: Sponsorship[];
   contacts: Contact[];
@@ -283,4 +323,6 @@ export type HubStore = {
   tasks: HubTask[];
   /** Access directory — managed under Admin → Users, not data tables. */
   hub_users: HubUser[];
+  /** Login access requests — managed under Admin → Users. */
+  access_requests: AccessRequest[];
 };
