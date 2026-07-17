@@ -2,9 +2,10 @@ import { promises as fs } from "fs";
 import path from "path";
 import type { ContentItem, EventItem, HubStore, MerchOrder } from "@/lib/types";
 import { createSeedStore } from "@/lib/store/seed";
+import { getDataDir } from "@/lib/store/paths";
 import { normalizeContentType } from "@/lib/data/normalize";
 
-const DATA_DIR = path.join(process.cwd(), ".data");
+const DATA_DIR = getDataDir();
 const STORE_PATH = path.join(DATA_DIR, "store.json");
 
 function migrateContent(items: ContentItem[] | undefined): ContentItem[] | undefined {
@@ -73,8 +74,7 @@ async function ensureStore(): Promise<HubStore> {
     return merged;
   } catch {
     const seed = createSeedStore();
-    await fs.mkdir(DATA_DIR, { recursive: true });
-    await fs.writeFile(STORE_PATH, JSON.stringify(seed, null, 2), "utf8");
+    await writeStore(seed);
     return seed;
   }
 }
@@ -84,8 +84,13 @@ export async function readStore(): Promise<HubStore> {
 }
 
 export async function writeStore(store: HubStore): Promise<void> {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(STORE_PATH, JSON.stringify(store, null, 2), "utf8");
+  try {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+    await fs.writeFile(STORE_PATH, JSON.stringify(store, null, 2), "utf8");
+  } catch (err) {
+    // Never crash Server Components if the FS is unavailable
+    console.error("[store] write failed", err);
+  }
 }
 
 export async function updateStore(

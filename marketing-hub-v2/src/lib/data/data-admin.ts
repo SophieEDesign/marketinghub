@@ -2,6 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { uid } from "@/lib/utils";
 import { readStore, updateStore } from "@/lib/store/local";
+import { getDataDir } from "@/lib/store/paths";
 import type { HubStore } from "@/lib/types";
 import {
   DATA_COLLECTIONS,
@@ -13,7 +14,7 @@ import {
   type FieldDef,
 } from "@/lib/data/collections";
 
-const DATA_DIR = path.join(process.cwd(), ".data");
+const DATA_DIR = getDataDir();
 const EXTRAS_PATH = path.join(DATA_DIR, "field-extras.json");
 
 type FieldExtras = Partial<Record<CollectionKey, string[]>>;
@@ -28,8 +29,12 @@ async function readExtras(): Promise<FieldExtras> {
 }
 
 async function writeExtras(extras: FieldExtras) {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(EXTRAS_PATH, JSON.stringify(extras, null, 2), "utf8");
+  try {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+    await fs.writeFile(EXTRAS_PATH, JSON.stringify(extras, null, 2), "utf8");
+  } catch (err) {
+    console.error("[field-extras] write failed", err);
+  }
 }
 
 function asRows(store: HubStore, key: CollectionKey): Record<string, unknown>[] {

@@ -3,11 +3,12 @@ import path from "path";
 import { NextRequest } from "next/server";
 import { jsonError, jsonOk, requireStaff } from "@/lib/api";
 import { hasSupabaseConfig } from "@/lib/auth/config";
+import { getDataDir } from "@/lib/store/paths";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const UPLOAD_ROOT = path.join(process.cwd(), ".data", "uploads", "content");
+const UPLOAD_ROOT = path.join(getDataDir(), "uploads", "content");
 const MAX_BYTES = 12 * 1024 * 1024; // 12MB
 const ALLOWED = new Set([
   "image/jpeg",
