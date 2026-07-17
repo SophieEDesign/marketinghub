@@ -375,6 +375,7 @@ export async function importFromCoreData(): Promise<ImportResult> {
             priority: cleaned.priority,
             website: cleaned.website,
             caption: cleaned.caption,
+            theme_id: null,
             planable_url: cleaned.planable_url,
             asset_url: cleaned.asset_url,
             notes: cleaned.notes,

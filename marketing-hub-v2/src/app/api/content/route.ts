@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
     priority: body.priority ?? "",
     website: body.website ?? "",
     caption: body.caption ?? "",
+    theme_id: body.theme_id || null,
     planable_url: body.planable_url ?? "",
     asset_url: body.asset_url ?? "",
     notes: body.notes ?? "",

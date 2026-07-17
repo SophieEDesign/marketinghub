@@ -83,6 +83,7 @@ export async function exportStoreToSupabase(
       priority: c.priority ?? "",
       website: c.website ?? "",
       caption: c.caption ?? "",
+      theme_id: c.theme_id ?? "",
       planable_url: c.planable_url ?? "",
       asset_url: c.asset_url ?? "",
       notes: c.notes ?? "",

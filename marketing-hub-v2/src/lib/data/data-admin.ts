@@ -10,19 +10,120 @@ import {
   getCollection,
   inferFieldType,
   isCollectionKey,
+  themeLinkOptions,
+  MANAGEABLE_FIELD_TYPES,
   type CollectionKey,
   type FieldDef,
+  type FieldOption,
+  type FieldType,
 } from "@/lib/data/collections";
 
 const DATA_DIR = getDataDir();
 const EXTRAS_PATH = path.join(DATA_DIR, "field-extras.json");
 
-type FieldExtras = Partial<Record<CollectionKey, string[]>>;
+export type StoredFieldDef = {
+  key: string;
+  label: string;
+  type: FieldType;
+  options?: FieldOption[];
+  /** True when this is a custom (non-core) field. */
+  custom?: boolean;
+};
+
+type FieldExtras = Partial<Record<CollectionKey, StoredFieldDef[]>>;
+
+function isFieldType(value: unknown): value is FieldType {
+  return (
+    typeof value === "string" &&
+    [
+      "text",
+      "longtext",
+      "number",
+      "date",
+      "datetime",
+      "url",
+      "email",
+      "select",
+      "tags",
+      "readonly",
+    ].includes(value)
+  );
+}
+
+function normalizeOptions(raw: unknown): FieldOption[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const options = raw
+    .map((item) => {
+      if (typeof item === "string") {
+        const value = item.trim();
+        return value ? { value, label: value } : null;
+      }
+      if (item && typeof item === "object") {
+        const value = String(
+          (item as { value?: unknown }).value ??
+            (item as { label?: unknown }).label ??
+            ""
+        ).trim();
+        if (!value) return null;
+        const label = String(
+          (item as { label?: unknown }).label ?? value
+        ).trim();
+        return { value, label: label || value };
+      }
+      return null;
+    })
+    .filter((o): o is FieldOption => Boolean(o));
+  return options.length ? options : undefined;
+}
+
+function normalizeStoredField(
+  raw: unknown,
+  fallbackKey?: string
+): StoredFieldDef | null {
+  if (typeof raw === "string") {
+    const key = slugField(raw);
+    if (!key) return null;
+    return {
+      key,
+      label: key.replace(/_/g, " "),
+      type: inferFieldType(key),
+      custom: true,
+    };
+  }
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  const key = slugField(String(obj.key ?? fallbackKey ?? ""));
+  if (!key) return null;
+  const type = isFieldType(obj.type) ? obj.type : inferFieldType(key);
+  const label =
+    typeof obj.label === "string" && obj.label.trim()
+      ? obj.label.trim()
+      : key.replace(/_/g, " ");
+  return {
+    key,
+    label,
+    type,
+    options: normalizeOptions(obj.options),
+    custom: obj.custom !== false,
+  };
+}
 
 async function readExtras(): Promise<FieldExtras> {
   try {
     const raw = await fs.readFile(EXTRAS_PATH, "utf8");
-    return JSON.parse(raw) as FieldExtras;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const extras: FieldExtras = {};
+    for (const [collection, value] of Object.entries(parsed)) {
+      if (!isCollectionKey(collection) || !Array.isArray(value)) continue;
+      const fields = value
+        .map((item) => normalizeStoredField(item))
+        .filter((f): f is StoredFieldDef => Boolean(f));
+      // Deduplicate by key (last wins)
+      const byKey = new Map<string, StoredFieldDef>();
+      for (const field of fields) byKey.set(field.key, field);
+      extras[collection] = Array.from(byKey.values());
+    }
+    return extras;
   } catch {
     return {};
   }
@@ -35,6 +136,13 @@ async function writeExtras(extras: FieldExtras) {
   } catch (err) {
     console.error("[field-extras] write failed", err);
   }
+}
+
+function emptyValueForType(type: FieldType): unknown {
+  if (type === "tags") return [];
+  if (type === "number") return null;
+  if (type === "date" || type === "datetime") return null;
+  return "";
 }
 
 function asRows(store: HubStore, key: CollectionKey): Record<string, unknown>[] {
@@ -61,7 +169,7 @@ function slugField(name: string): string {
 }
 
 export function listCollectionSummaries() {
-  return DATA_COLLECTIONS.map((c) => ({
+  return DATA_COLLECTIONS.filter((c) => !c.hiddenFromDataAdmin).map((c) => ({
     key: c.key,
     label: c.label,
     description: c.description,
@@ -76,38 +184,74 @@ export async function getTable(collection: string) {
   const store = await readStore();
   const rows = asRows(store, collection);
   const extras = await readExtras();
-  const extraNames = extras[collection] ?? [];
+  const stored = extras[collection] ?? [];
+  const storedByKey = new Map(stored.map((f) => [f.key, f]));
   const discovered = discoverKeys(rows);
+  const coreKeys = new Set(def.fields.map((f) => f.key));
 
   const fieldMap = new Map<string, FieldDef>();
-  for (const field of def.fields) fieldMap.set(field.key, field);
-  for (const name of [...extraNames, ...discovered]) {
-    if (!fieldMap.has(name)) {
-      const type = inferFieldType(name);
-      fieldMap.set(name, {
-        key: name,
-        label: name.replace(/_/g, " "),
-        type,
-        locked: type === "readonly",
-        optionsSource: name.toLowerCase() === "owner" ? "contacts" : undefined,
+  for (const field of def.fields) {
+    const override = storedByKey.get(field.key);
+    if (override) {
+      fieldMap.set(field.key, {
+        ...field,
+        label: override.label || field.label,
+        type: field.locked ? field.type : override.type || field.type,
+        options:
+          field.optionsSource || field.locked
+            ? field.options
+            : (override.options ?? field.options),
+        custom: false,
       });
+    } else {
+      fieldMap.set(field.key, { ...field, custom: false });
     }
   }
 
+  for (const storedField of stored) {
+    if (coreKeys.has(storedField.key)) continue;
+    fieldMap.set(storedField.key, {
+      key: storedField.key,
+      label: storedField.label,
+      type: storedField.type,
+      options: storedField.options,
+      locked: storedField.type === "readonly",
+      custom: true,
+    });
+  }
+
+  for (const name of discovered) {
+    if (fieldMap.has(name)) continue;
+    const type = inferFieldType(name);
+    fieldMap.set(name, {
+      key: name,
+      label: name.replace(/_/g, " "),
+      type,
+      locked: type === "readonly",
+      optionsSource: name.toLowerCase() === "owner" ? "contacts" : undefined,
+      custom: true,
+    });
+  }
+
   // Keep core fields first, then extras alpha
-  const coreKeys = def.fields.map((f) => f.key);
+  const coreOrder = def.fields.map((f) => f.key);
   const rest = Array.from(fieldMap.keys())
-    .filter((k) => !coreKeys.includes(k))
+    .filter((k) => !coreKeys.has(k))
     .sort((a, b) => a.localeCompare(b));
   const contactOpts = contactOwnerOptions(store.contacts ?? []);
-  const fields = [...coreKeys, ...rest]
+  const themeOpts = themeLinkOptions(store.themes ?? []);
+  const fields = [...coreOrder, ...rest]
     .map((k) => fieldMap.get(k)!)
     .filter(Boolean)
-    .map((field) =>
-      field.optionsSource === "contacts"
-        ? { ...field, type: "select" as const, options: contactOpts }
-        : field
-    );
+    .map((field) => {
+      if (field.optionsSource === "contacts") {
+        return { ...field, type: "select" as const, options: contactOpts };
+      }
+      if (field.optionsSource === "themes") {
+        return { ...field, type: "select" as const, options: themeOpts };
+      }
+      return field;
+    });
 
   return {
     collection,
@@ -134,6 +278,9 @@ export async function updateCell(
     const idx = rows.findIndex((r) => String(r.id) === id);
     if (idx === -1) return;
     const next = { ...rows[idx], [field]: value };
+    if (collection === "content" && field === "theme_id") {
+      next.theme_id = value ? String(value) : null;
+    }
     if ("updated_at" in next) {
       next.updated_at = new Date().toISOString();
     }
@@ -242,6 +389,7 @@ export async function addRow(collection: string, patch: Record<string, unknown> 
         priority: "",
         website: "",
         caption: "",
+        theme_id: String(row.theme_id || "") || null,
         planable_url: "",
         asset_url: "",
         notes,
@@ -271,27 +419,162 @@ export async function deleteRow(collection: string, id: string) {
   });
 }
 
-export async function addField(collection: string, name: string) {
+export async function addField(
+  collection: string,
+  name: string,
+  opts: {
+    label?: string;
+    type?: FieldType;
+    options?: FieldOption[];
+  } = {}
+) {
   if (!isCollectionKey(collection)) throw new Error("Unknown collection");
   const key = slugField(name);
   if (!key) throw new Error("Invalid field name");
   if (key === "id") throw new Error("Reserved field");
 
+  const def = getCollection(collection)!;
+  if (def.fields.some((f) => f.key === key)) {
+    throw new Error("Field already exists on this table");
+  }
+
+  const type =
+    opts.type && MANAGEABLE_FIELD_TYPES.includes(opts.type)
+      ? opts.type
+      : inferFieldType(key);
+  if (type === "readonly") throw new Error("Cannot create readonly fields");
+
+  const label =
+    (opts.label && opts.label.trim()) ||
+    name.trim() ||
+    key.replace(/_/g, " ");
+  const needsOptions = type === "select" || type === "tags";
+  const options = needsOptions ? normalizeOptions(opts.options) : undefined;
+
   const extras = await readExtras();
-  const list = new Set(extras[collection] ?? []);
-  list.add(key);
-  extras[collection] = Array.from(list);
+  const list = extras[collection] ?? [];
+  if (list.some((f) => f.key === key)) {
+    throw new Error("Field already exists");
+  }
+  const stored: StoredFieldDef = {
+    key,
+    label,
+    type,
+    options,
+    custom: true,
+  };
+  extras[collection] = [...list, stored];
   await writeExtras(extras);
 
   // Initialise empty value on existing rows so the column is visible
   await updateStore((store) => {
     const rows = asRows(store, collection).map((r) =>
-      key in r ? r : { ...r, [key]: "" }
+      key in r ? r : { ...r, [key]: emptyValueForType(type) }
     );
     (store as HubStore)[collection] = rows as never;
   });
 
-  return { key };
+  return stored;
+}
+
+export async function updateField(
+  collection: string,
+  key: string,
+  patch: {
+    label?: string;
+    type?: FieldType;
+    options?: FieldOption[];
+    /** Rename key — only allowed for custom fields. */
+    newKey?: string;
+  }
+) {
+  if (!isCollectionKey(collection)) throw new Error("Unknown collection");
+  if (!key) throw new Error("Field required");
+
+  const def = getCollection(collection)!;
+  const core = def.fields.find((f) => f.key === key);
+  if (core?.locked) throw new Error("Cannot edit locked field");
+
+  const extras = await readExtras();
+  const list = extras[collection] ?? [];
+  const existingIdx = list.findIndex((f) => f.key === key);
+  const existing = existingIdx >= 0 ? list[existingIdx] : null;
+  const isCustom = !core;
+
+  let nextKey = key;
+  if (patch.newKey && patch.newKey !== key) {
+    if (!isCustom) throw new Error("Cannot rename core table fields");
+    nextKey = slugField(patch.newKey);
+    if (!nextKey) throw new Error("Invalid field name");
+    if (nextKey === "id") throw new Error("Reserved field");
+    if (def.fields.some((f) => f.key === nextKey)) {
+      throw new Error("A core field already uses that name");
+    }
+    if (list.some((f) => f.key === nextKey && f.key !== key)) {
+      throw new Error("Another field already uses that name");
+    }
+  }
+
+  const nextTypeRaw = patch.type ?? existing?.type ?? core?.type ?? inferFieldType(nextKey);
+  const nextType =
+    nextTypeRaw === "readonly"
+      ? "readonly"
+      : MANAGEABLE_FIELD_TYPES.includes(nextTypeRaw)
+        ? nextTypeRaw
+        : "text";
+  if (nextType === "readonly" && isCustom) {
+    throw new Error("Cannot set custom fields to readonly");
+  }
+
+  const nextLabel =
+    (patch.label && patch.label.trim()) ||
+    existing?.label ||
+    core?.label ||
+    nextKey.replace(/_/g, " ");
+
+  const needsOptions = nextType === "select" || nextType === "tags";
+  let nextOptions: FieldOption[] | undefined;
+  if (core?.optionsSource) {
+    nextOptions = undefined;
+  } else if (needsOptions) {
+    nextOptions =
+      patch.options !== undefined
+        ? normalizeOptions(patch.options)
+        : existing?.options ?? core?.options;
+  } else {
+    nextOptions = undefined;
+  }
+
+  const stored: StoredFieldDef = {
+    key: nextKey,
+    label: nextLabel,
+    type: nextType,
+    options: nextOptions,
+    custom: isCustom,
+  };
+
+  if (existingIdx >= 0) {
+    const nextList = [...list];
+    nextList[existingIdx] = stored;
+    extras[collection] = nextList;
+  } else {
+    extras[collection] = [...list, stored];
+  }
+  await writeExtras(extras);
+
+  if (nextKey !== key) {
+    await updateStore((store) => {
+      const rows = asRows(store, collection).map((r) => {
+        if (!(key in r)) return { ...r, [nextKey]: emptyValueForType(nextType) };
+        const next = { ...r, [nextKey]: r[key] };
+        delete next[key];
+        return next;
+      });
+      (store as HubStore)[collection] = rows as never;
+    });
+  }
+
+  return stored;
 }
 
 export async function removeField(collection: string, name: string) {
@@ -301,9 +584,11 @@ export async function removeField(collection: string, name: string) {
   if (core?.locked) throw new Error("Cannot remove locked field");
 
   const extras = await readExtras();
-  extras[collection] = (extras[collection] ?? []).filter((k) => k !== name);
+  extras[collection] = (extras[collection] ?? []).filter((f) => f.key !== name);
   await writeExtras(extras);
 
+  // Core fields: clear values but keep the column concept via schema;
+  // still strip the key from rows so data is gone. Core schema remains in code.
   await updateStore((store) => {
     const rows = asRows(store, collection).map((r) => {
       if (!(name in r)) return r;

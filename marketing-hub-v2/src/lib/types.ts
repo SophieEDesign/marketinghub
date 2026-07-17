@@ -86,6 +86,8 @@ export type ContentItem = {
   website: string;
   /** Social caption / post copy (Content table content_post_text) */
   caption: string;
+  /** Linked quarterly theme (content lives here; Themes page may still use mains for tree). */
+  theme_id: string | null;
   planable_url: string;
   asset_url: string;
   notes: string;

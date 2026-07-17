@@ -1,14 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, Plus, Trash2 } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Plus,
+  Settings2,
+  Trash2,
+} from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import {
   BulkValueControl,
   FieldControl,
   parseTypedValue,
 } from "@/components/data/FieldControl";
-import type { FieldDef } from "@/lib/data/collections";
+import { FieldManagerPanel } from "@/components/data/FieldManagerPanel";
+import type { FieldDef, FieldOption, FieldType } from "@/lib/data/collections";
 import { cn } from "@/lib/utils";
 
 type CollectionSummary = {
@@ -49,7 +57,6 @@ export function DataAdminClient() {
   const [table, setTable] = useState<TablePayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [newField, setNewField] = useState("");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkField, setBulkField] = useState("");
@@ -57,6 +64,10 @@ export function DataAdminClient() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [fieldManagerOpen, setFieldManagerOpen] = useState(false);
+  const [fieldManagerKey, setFieldManagerKey] = useState<string | null>(null);
+  const [fieldBusy, setFieldBusy] = useState(false);
+  const [fieldError, setFieldError] = useState<string | null>(null);
 
   const loadCollections = useCallback(async () => {
     const res = await fetch("/api/data");
@@ -137,6 +148,18 @@ export function DataAdminClient() {
     }
     setSortKey(null);
     setSortDir("asc");
+  }
+
+  function openFieldManager(key?: string | null) {
+    setFieldError(null);
+    setFieldManagerKey(key ?? null);
+    setFieldManagerOpen(true);
+  }
+
+  function closeFieldManager() {
+    setFieldManagerOpen(false);
+    setFieldManagerKey(null);
+    setFieldError(null);
   }
 
   const editableFields = useMemo(
@@ -300,24 +323,54 @@ export function DataAdminClient() {
     await loadTable(active);
   }
 
-  async function handleAddField() {
-    if (!newField.trim()) return;
-    const res = await fetch("/api/data", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "addField",
-        collection: active,
-        name: newField,
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error || "Could not add field");
-      return;
+  async function handleSaveField(payload: {
+    mode: "create" | "update";
+    key: string;
+    label: string;
+    type: FieldType;
+    options?: FieldOption[];
+    newKey?: string;
+  }) {
+    setFieldBusy(true);
+    setFieldError(null);
+    try {
+      const res = await fetch("/api/data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          payload.mode === "create"
+            ? {
+                action: "addField",
+                collection: active,
+                name: payload.key || payload.label,
+                label: payload.label,
+                type: payload.type,
+                options: payload.options,
+              }
+            : {
+                action: "updateField",
+                collection: active,
+                key: payload.key,
+                label: payload.label,
+                type: payload.type,
+                options: payload.options,
+                newKey: payload.newKey,
+              }
+        ),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not save field");
+      await loadTable(active);
+      const savedKey =
+        (data.field?.key as string | undefined) ||
+        payload.newKey ||
+        payload.key;
+      setFieldManagerKey(savedKey);
+    } catch (e) {
+      setFieldError(e instanceof Error ? e.message : "Could not save field");
+    } finally {
+      setFieldBusy(false);
     }
-    setNewField("");
-    await loadTable(active);
   }
 
   async function handleRemoveField(name: string, locked?: boolean) {
@@ -329,21 +382,33 @@ export function DataAdminClient() {
     ) {
       return;
     }
-    const res = await fetch("/api/data", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "removeField",
-        collection: active,
-        name,
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error || "Could not remove field");
-      return;
+    setFieldBusy(true);
+    setFieldError(null);
+    setError(null);
+    try {
+      const res = await fetch("/api/data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "removeField",
+          collection: active,
+          name,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not remove field");
+      await loadTable(active);
+      if (fieldManagerKey === name) {
+        setFieldManagerKey(null);
+      }
+    } catch (e) {
+      const message =
+        e instanceof Error ? e.message : "Could not remove field";
+      setFieldError(message);
+      setError(message);
+    } finally {
+      setFieldBusy(false);
     }
-    await loadTable(active);
   }
 
   return (
@@ -371,7 +436,10 @@ export function DataAdminClient() {
               <button
                 key={c.key}
                 type="button"
-                onClick={() => setActive(c.key)}
+                onClick={() => {
+                  closeFieldManager();
+                  setActive(c.key);
+                }}
                 className={cn(
                   "rounded-lg px-3 py-2 text-left text-sm transition",
                   active === c.key
@@ -388,113 +456,99 @@ export function DataAdminClient() {
 
         <div className="flex min-h-0 min-w-0 flex-col gap-4">
           <div className="shrink-0 space-y-4">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2 className="font-display text-xl text-brand">
-                {table?.label ?? active}
-              </h2>
-              <p className="text-sm text-muted">
-                {table?.description}
-                {table ? ` · ${table.count} rows` : ""}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <input
-                className="field w-44"
-                placeholder="Search rows…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={() => void handleAddRow()}
-              >
-                <Plus className="h-4 w-4" />
-                Add row
-              </button>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-end gap-2 rounded-2xl border border-border bg-white p-3">
-            <div className="min-w-[180px] flex-1">
-              <label className="label">Add field</label>
-              <input
-                className="field"
-                placeholder="e.g. priority or booth_number"
-                value={newField}
-                onChange={(e) => setNewField(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void handleAddField();
-                }}
-              />
-            </div>
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => void handleAddField()}
-            >
-              Add field
-            </button>
-          </div>
-
-          {selected.size > 0 ? (
-            <div className="flex flex-wrap items-end gap-2 rounded-2xl border border-brand/30 bg-accent-soft/50 p-3">
-              <p className="w-full text-sm font-medium text-brand">
-                Bulk edit · {selected.size} selected
-              </p>
-              <div className="min-w-[140px]">
-                <label className="label">Field</label>
-                <select
-                  className="field"
-                  value={bulkField}
-                  onChange={(e) => {
-                    setBulkField(e.target.value);
-                    setBulkValue("");
-                  }}
-                >
-                  <option value="">Choose field…</option>
-                  {editableFields.map((f) => (
-                    <option key={f.key} value={f.key}>
-                      {f.label}
-                    </option>
-                  ))}
-                </select>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 className="font-display text-xl text-brand">
+                  {table?.label ?? active}
+                </h2>
+                <p className="text-sm text-muted">
+                  {table?.description}
+                  {table ? ` · ${table.count} rows` : ""}
+                </p>
               </div>
-              <div className="min-w-[200px] flex-1">
-                <label className="label">New value</label>
-                <BulkValueControl
-                  field={bulkFieldDef}
-                  value={bulkValue}
-                  onChange={setBulkValue}
+              <div className="flex flex-wrap gap-2">
+                <input
+                  className="field w-44"
+                  placeholder="Search rows…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
                 />
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => openFieldManager(null)}
+                >
+                  <Settings2 className="h-4 w-4" />
+                  Manage fields
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => void handleAddRow()}
+                >
+                  <Plus className="h-4 w-4" />
+                  Add row
+                </button>
               </div>
-              <button
-                type="button"
-                className="btn-primary"
-                disabled={bulkBusy || !bulkField}
-                onClick={() => void handleBulkEdit()}
-              >
-                {bulkBusy ? "Updating…" : "Apply to selected"}
-              </button>
-              <button
-                type="button"
-                className="btn-ghost text-[var(--danger)]"
-                disabled={bulkBusy}
-                onClick={() => void handleBulkDelete()}
-              >
-                Delete selected
-              </button>
-              <button
-                type="button"
-                className="btn-secondary"
-                disabled={bulkBusy}
-                onClick={() => setSelected(new Set())}
-              >
-                Clear selection
-              </button>
             </div>
-          ) : null}
+
+            {selected.size > 0 ? (
+              <div className="flex flex-wrap items-end gap-2 rounded-2xl border border-brand/30 bg-accent-soft/50 p-3">
+                <p className="w-full text-sm font-medium text-brand">
+                  Bulk edit · {selected.size} selected
+                </p>
+                <div className="min-w-[140px]">
+                  <label className="label">Field</label>
+                  <select
+                    className="field"
+                    value={bulkField}
+                    onChange={(e) => {
+                      setBulkField(e.target.value);
+                      setBulkValue("");
+                    }}
+                  >
+                    <option value="">Choose field…</option>
+                    {editableFields.map((f) => (
+                      <option key={f.key} value={f.key}>
+                        {f.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="min-w-[200px] flex-1">
+                  <label className="label">New value</label>
+                  <BulkValueControl
+                    field={bulkFieldDef}
+                    value={bulkValue}
+                    onChange={setBulkValue}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={bulkBusy || !bulkField}
+                  onClick={() => void handleBulkEdit()}
+                >
+                  {bulkBusy ? "Updating…" : "Apply to selected"}
+                </button>
+                <button
+                  type="button"
+                  className="btn-ghost text-[var(--danger)]"
+                  disabled={bulkBusy}
+                  onClick={() => void handleBulkDelete()}
+                >
+                  Delete selected
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={bulkBusy}
+                  onClick={() => setSelected(new Set())}
+                >
+                  Clear selection
+                </button>
+              </div>
+            ) : null}
           </div>
 
           {loading ? (
@@ -542,18 +596,31 @@ export function DataAdminClient() {
                                 <ArrowUpDown className="h-3.5 w-3.5 shrink-0 text-muted/60" />
                               )}
                             </button>
-                            {!field.locked ? (
+                            <div className="flex shrink-0 items-center">
                               <button
                                 type="button"
-                                className="rounded p-1 text-muted hover:bg-white hover:text-red-600"
-                                title={`Remove ${field.key}`}
-                                onClick={() =>
-                                  void handleRemoveField(field.key, field.locked)
-                                }
+                                className="rounded p-1 text-muted hover:bg-white hover:text-brand"
+                                title={`Edit field ${field.label}`}
+                                onClick={() => openFieldManager(field.key)}
                               >
-                                <Trash2 className="h-3.5 w-3.5" />
+                                <Settings2 className="h-3.5 w-3.5" />
                               </button>
-                            ) : null}
+                              {!field.locked ? (
+                                <button
+                                  type="button"
+                                  className="rounded p-1 text-muted hover:bg-white hover:text-red-600"
+                                  title={`Remove ${field.key}`}
+                                  onClick={() =>
+                                    void handleRemoveField(
+                                      field.key,
+                                      field.locked
+                                    )
+                                  }
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              ) : null}
+                            </div>
                           </div>
                         </th>
                       );
@@ -625,6 +692,18 @@ export function DataAdminClient() {
           ) : null}
         </div>
       </div>
+
+      <FieldManagerPanel
+        open={fieldManagerOpen}
+        fields={table?.fields ?? []}
+        collectionLabel={table?.label ?? active}
+        busy={fieldBusy}
+        error={fieldError}
+        initialKey={fieldManagerKey}
+        onClose={closeFieldManager}
+        onSave={handleSaveField}
+        onDelete={(key) => handleRemoveField(key)}
+      />
     </div>
   );
 }

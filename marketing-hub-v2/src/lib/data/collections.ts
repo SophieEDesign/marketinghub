@@ -18,9 +18,22 @@ export type FieldType =
   | "tags"
   | "readonly";
 
+/** Types admins can pick when creating/editing fields in Data. */
+export const MANAGEABLE_FIELD_TYPES: Exclude<FieldType, "readonly">[] = [
+  "text",
+  "longtext",
+  "number",
+  "date",
+  "datetime",
+  "url",
+  "email",
+  "select",
+  "tags",
+];
+
 export type FieldOption = { value: string; label: string };
 
-export type FieldOptionsSource = "contacts";
+export type FieldOptionsSource = "contacts" | "themes";
 
 export type FieldDef = {
   key: string;
@@ -31,6 +44,8 @@ export type FieldDef = {
   optionsSource?: FieldOptionsSource;
   /** Protect from delete / edit */
   locked?: boolean;
+  /** Present when field is custom (not in collection core schema). */
+  custom?: boolean;
 };
 
 export type CollectionDef = {
@@ -38,6 +53,8 @@ export type CollectionDef = {
   label: string;
   description: string;
   fields: FieldDef[];
+  /** Hide from Data Admin nav (kept for Themes hierarchy plumbing). */
+  hiddenFromDataAdmin?: boolean;
 };
 
 const CONTENT_STATUS: FieldOption[] = [
@@ -334,7 +351,7 @@ export const DATA_COLLECTIONS: CollectionDef[] = [
   {
     key: "content",
     label: "Content / Social Posts",
-    description: "Pipeline pieces",
+    description: "Pipeline pieces — link to a theme here when part of quarterly planning",
     fields: [
       f("id", { type: "readonly", locked: true }),
       f("title"),
@@ -357,6 +374,11 @@ export const DATA_COLLECTIONS: CollectionDef[] = [
         options: CONTENT_PRIORITIES,
       }),
       f("status", { type: "select", options: CONTENT_STATUS }),
+      f("theme_id", {
+        type: "select",
+        label: "Theme",
+        optionsSource: "themes",
+      }),
       f("caption", { type: "longtext", label: "Caption / post text" }),
       f("website", { type: "url", label: "Website / publication URL" }),
       f("planable_url", { type: "url", label: "Planable URL" }),
@@ -471,7 +493,8 @@ export const DATA_COLLECTIONS: CollectionDef[] = [
   {
     key: "theme_mains",
     label: "Theme mains",
-    description: "Main content under themes",
+    description: "Internal theme → content links (use Content table + Theme field)",
+    hiddenFromDataAdmin: true,
     fields: [
       f("id", { type: "readonly", locked: true }),
       f("theme_id", { label: "Theme id" }),
@@ -488,7 +511,8 @@ export const DATA_COLLECTIONS: CollectionDef[] = [
   {
     key: "theme_offshoots",
     label: "Theme offshoots",
-    description: "Offshoot content",
+    description: "Internal offshoot rows (managed on Themes page)",
+    hiddenFromDataAdmin: true,
     fields: [
       f("id", { type: "readonly", locked: true }),
       f("main_content_id", { label: "Main id" }),
@@ -633,6 +657,34 @@ export function contactOwnerOptions(
     options.unshift({
       value: current,
       label: `${current} (not in contacts)`,
+    });
+  }
+  return options;
+}
+
+/** Theme link options for content.theme_id in Data Admin. */
+export function themeLinkOptions(
+  themes: { id: string; title: string; quarter?: string; year?: number }[],
+  currentValue?: string | null
+): FieldOption[] {
+  const options: FieldOption[] = [{ value: "", label: "— None —" }];
+  const seen = new Set<string>();
+  for (const t of themes) {
+    const id = (t.id ?? "").trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    const when =
+      t.quarter && t.year ? ` · ${t.quarter} ${t.year}` : t.year ? ` · ${t.year}` : "";
+    options.push({
+      value: id,
+      label: `${(t.title || "Untitled").trim()}${when}`,
+    });
+  }
+  const current = (currentValue ?? "").trim();
+  if (current && !seen.has(current)) {
+    options.splice(1, 0, {
+      value: current,
+      label: `${current} (missing theme)`,
     });
   }
   return options;

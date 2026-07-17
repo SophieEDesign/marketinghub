@@ -10,6 +10,7 @@ import {
   listCollectionSummaries,
   removeField,
   updateCell,
+  updateField,
 } from "@/lib/data/data-admin";
 
 export async function GET(request: NextRequest) {
@@ -37,6 +38,7 @@ export async function POST(request: NextRequest) {
     "bulkDelete",
     "deleteRow",
     "addField",
+    "updateField",
     "removeField",
   ]);
   const gate = adminOnly.has(action) ? await requireAdmin() : await requireStaff();
@@ -77,11 +79,24 @@ export async function POST(request: NextRequest) {
       return jsonOk({ ok: true });
     }
     if (action === "addField") {
-      const field = await addField(body.collection, body.name);
+      const field = await addField(body.collection, body.name, {
+        label: body.label,
+        type: body.type,
+        options: body.options,
+      });
       return jsonOk({ field }, { status: 201 });
     }
+    if (action === "updateField") {
+      const field = await updateField(body.collection, body.key ?? body.name, {
+        label: body.label,
+        type: body.type,
+        options: body.options,
+        newKey: body.newKey,
+      });
+      return jsonOk({ field });
+    }
     if (action === "removeField") {
-      await removeField(body.collection, body.name);
+      await removeField(body.collection, body.name ?? body.key);
       return jsonOk({ ok: true });
     }
     return jsonError("Unknown action");

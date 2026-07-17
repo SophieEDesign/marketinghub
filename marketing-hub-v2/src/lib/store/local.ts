@@ -41,8 +41,27 @@ function migrateContent(items: ContentItem[] | undefined): ContentItem[] | undef
       priority: item.priority ?? "",
       website: item.website ?? "",
       caption: item.caption ?? "",
+      theme_id: item.theme_id ?? null,
     };
   });
+}
+
+/** Copy theme_id from theme_mains links onto content rows. */
+function syncThemeIdsOntoContent(store: HubStore): HubStore {
+  const byContentId = new Map<string, string>();
+  for (const main of store.theme_mains ?? []) {
+    if (main.content_id && main.theme_id) {
+      byContentId.set(main.content_id, main.theme_id);
+    }
+  }
+  if (byContentId.size === 0) return store;
+  return {
+    ...store,
+    content: store.content.map((c) => ({
+      ...c,
+      theme_id: c.theme_id || byContentId.get(c.id) || null,
+    })),
+  };
 }
 
 function migrateEvents(items: EventItem[] | undefined): EventItem[] | undefined {
@@ -99,7 +118,7 @@ function withDefaults(store: Partial<HubStore>): HubStore {
   // Only fill missing collections with demo rows when the snapshot itself is seed.
   // Real Core snapshots must not get mrc_seed_* orders planted on migration.
   const fillMissingFromSeed = looksLikeSeedStore(store);
-  return {
+  const base: HubStore = {
     events: migrateEvents(store.events) ?? seed.events,
     event_attendance: store.event_attendance ?? seed.event_attendance,
     content: migrateContent(store.content) ?? seed.content,
@@ -123,6 +142,7 @@ function withDefaults(store: Partial<HubStore>): HubStore {
     hub_users: store.hub_users ?? seed.hub_users,
     access_requests: store.access_requests ?? seed.access_requests,
   };
+  return syncThemeIdsOntoContent(base);
 }
 
 /** Demo seed rows use ids like `ctc_seed_1` / `evt_seed_2`. Real Core imports use `sb_*`. */
