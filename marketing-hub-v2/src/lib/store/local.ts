@@ -65,6 +65,9 @@ function migrateThemeMains(
 
 function withDefaults(store: Partial<HubStore>): HubStore {
   const seed = createSeedStore();
+  // Only fill missing collections with demo rows when the snapshot itself is seed.
+  // Real Core snapshots must not get mrc_seed_* orders planted on migration.
+  const fillMissingFromSeed = looksLikeSeedStore(store);
   return {
     events: migrateEvents(store.events) ?? seed.events,
     event_attendance: store.event_attendance ?? seed.event_attendance,
@@ -76,8 +79,12 @@ function withDefaults(store: Partial<HubStore>): HubStore {
     themes: store.themes ?? seed.themes,
     theme_mains: migrateThemeMains(store.theme_mains) ?? seed.theme_mains,
     theme_offshoots: store.theme_offshoots ?? seed.theme_offshoots,
-    merch_orders: migrateMerch(store.merch_orders) ?? seed.merch_orders,
-    merch_inventory: store.merch_inventory ?? seed.merch_inventory,
+    merch_orders:
+      migrateMerch(store.merch_orders) ??
+      (fillMissingFromSeed ? seed.merch_orders : []),
+    merch_inventory:
+      store.merch_inventory ??
+      (fillMissingFromSeed ? seed.merch_inventory : []),
     staff_requests: store.staff_requests ?? seed.staff_requests,
     awards: store.awards ?? seed.awards,
     tasks: store.tasks ?? seed.tasks,
@@ -97,13 +104,10 @@ function looksLikeSeedStore(store: Partial<HubStore> | null): boolean {
   return typeof sample === "string" && sample.includes("_seed_");
 }
 
-function contactCount(store: Partial<HubStore> | null): number {
-  return store?.contacts?.length ?? 0;
-}
-
 /**
  * Prefer real Core Data snapshots over demo seed.
- * When both look real, prefer the larger contacts list.
+ * When both look real, remote is the durable source of truth — never prefer a
+ * stale /tmp local copy (that resurrects deleted merch orders, events, etc.).
  */
 function pickPreferredStore(
   remote: Partial<HubStore> | null,
@@ -118,7 +122,7 @@ function pickPreferredStore(
   if (remoteSeed && !localSeed) return local;
   if (localSeed && !remoteSeed) return remote;
 
-  return contactCount(local) > contactCount(remote) ? local : remote;
+  return remote;
 }
 
 function needsKeyMigration(store: Partial<HubStore>): boolean {
@@ -250,6 +254,7 @@ export async function writeStore(store: HubStore): Promise<void> {
     await writeLocalFile(store);
     if (!ok) {
       console.error("[store] durable write failed; local cache updated only");
+      throw new Error("Failed to persist hub store to Supabase");
     }
     return;
   }

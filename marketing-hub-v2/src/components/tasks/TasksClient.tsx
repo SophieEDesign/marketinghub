@@ -18,6 +18,13 @@ const STATUSES: { id: TaskStatus; label: string }[] = [
   { id: "done", label: "Done" },
 ];
 
+const VIEWS = [
+  { id: "list", label: "List" },
+  { id: "kanban", label: "Kanban" },
+] as const;
+
+type ViewId = (typeof VIEWS)[number]["id"];
+
 const emptyForm = {
   title: "",
   details: "",
@@ -65,6 +72,7 @@ export function TasksClient({ initial }: { initial: HubTask[] }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("open");
   const [ownerFilter, setOwnerFilter] = useState("all");
+  const [view, setView] = useState<ViewId>("list");
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/tasks");
@@ -188,6 +196,35 @@ export function TasksClient({ initial }: { initial: HubTask[] }) {
         }
       />
 
+      <div
+        className="mb-5 inline-flex flex-wrap gap-1 rounded-2xl border border-border bg-white p-1"
+        role="tablist"
+        aria-label="Tasks views"
+      >
+        {VIEWS.map((v) => (
+          <button
+            key={v.id}
+            type="button"
+            role="tab"
+            aria-selected={view === v.id}
+            className={cn(
+              "rounded-xl px-3.5 py-2 text-sm font-medium transition",
+              view === v.id
+                ? "bg-brand text-white shadow-sm"
+                : "text-muted hover:bg-sand hover:text-foreground"
+            )}
+            onClick={() => {
+              setView(v.id);
+              if (v.id === "kanban" && statusFilter === "open") {
+                setStatusFilter("all");
+              }
+            }}
+          >
+            {v.label}
+          </button>
+        ))}
+      </div>
+
       <FilterBar
         search={search}
         onSearchChange={setSearch}
@@ -298,82 +335,180 @@ export function TasksClient({ initial }: { initial: HubTask[] }) {
         </div>
       ) : null}
 
-      <ul className="surface-card divide-y divide-border">
-        {filtered.map((item) => (
-          <li key={item.id} className="flex flex-wrap items-start gap-3 p-4">
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="font-medium">{item.title}</p>
-                <span
-                  className={cn(
-                    "rounded-full border px-2 py-0.5 text-[11px] font-medium",
-                    statusTone(item.status)
-                  )}
-                >
-                  {STATUSES.find((s) => s.id === item.status)?.label ?? item.status}
-                </span>
-                {isOverdue(item) ? (
-                  <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-800">
-                    Overdue
+      {view === "list" ? (
+        <ul className="surface-card divide-y divide-border">
+          {filtered.map((item) => (
+            <li key={item.id} className="flex flex-wrap items-start gap-3 p-4">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-medium">{item.title}</p>
+                  <span
+                    className={cn(
+                      "rounded-full border px-2 py-0.5 text-[11px] font-medium",
+                      statusTone(item.status)
+                    )}
+                  >
+                    {STATUSES.find((s) => s.id === item.status)?.label ??
+                      item.status}
                   </span>
+                  {isOverdue(item) ? (
+                    <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-800">
+                      Overdue
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-1 text-xs text-muted">
+                  {[
+                    item.category,
+                    item.owner,
+                    item.due_date
+                      ? `Due ${format(parseISO(item.due_date), "d MMM yyyy")}`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+                {item.details ? (
+                  <p className="mt-2 line-clamp-2 text-sm text-foreground/80">
+                    {item.details}
+                  </p>
                 ) : null}
               </div>
-              <p className="mt-1 text-xs text-muted">
-                {[
-                  item.category,
-                  item.owner,
-                  item.due_date
-                    ? `Due ${format(parseISO(item.due_date), "d MMM yyyy")}`
-                    : null,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </p>
-              {item.details ? (
-                <p className="mt-2 line-clamp-2 text-sm text-foreground/80">
-                  {item.details}
-                </p>
-              ) : null}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <select
-                className="field !w-auto py-1.5 text-xs"
-                value={item.status}
-                onChange={(e) =>
-                  void setStatus(item.id, e.target.value as TaskStatus)
-                }
-                aria-label="Change status"
+              <div className="flex flex-wrap gap-2">
+                <select
+                  className="field !w-auto py-1.5 text-xs"
+                  value={item.status}
+                  onChange={(e) =>
+                    void setStatus(item.id, e.target.value as TaskStatus)
+                  }
+                  aria-label="Change status"
+                >
+                  {STATUSES.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="btn-secondary px-2.5 py-1.5 text-xs"
+                  onClick={() => {
+                    setEditingId(item.id);
+                    setEdit(toEditForm(item));
+                  }}
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  className="btn-ghost px-2.5 py-1.5 text-xs text-[var(--danger)]"
+                  onClick={() => void remove(item.id)}
+                >
+                  Delete
+                </button>
+              </div>
+            </li>
+          ))}
+          {filtered.length === 0 ? (
+            <li className="p-6 text-sm text-muted">
+              No tasks match your filters.
+            </li>
+          ) : null}
+        </ul>
+      ) : null}
+
+      {view === "kanban" ? (
+        <div className="flex gap-4 overflow-x-auto pb-2">
+          {STATUSES.map((col) => {
+            const colItems = filtered.filter((i) => i.status === col.id);
+            return (
+              <div
+                key={col.id}
+                className="surface-card flex w-72 shrink-0 flex-col p-3"
               >
-                {STATUSES.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                className="btn-secondary px-2.5 py-1.5 text-xs"
-                onClick={() => {
-                  setEditingId(item.id);
-                  setEdit(toEditForm(item));
-                }}
-              >
-                Edit
-              </button>
-              <button
-                type="button"
-                className="btn-ghost px-2.5 py-1.5 text-xs text-[var(--danger)]"
-                onClick={() => void remove(item.id)}
-              >
-                Delete
-              </button>
-            </div>
-          </li>
-        ))}
-        {filtered.length === 0 ? (
-          <li className="p-6 text-sm text-muted">No tasks match your filters.</li>
-        ) : null}
-      </ul>
+                <div className="mb-3 flex items-center justify-between px-1">
+                  <h2 className="text-sm font-semibold text-brand">
+                    {col.label}
+                  </h2>
+                  <span className="text-xs text-muted">{colItems.length}</span>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {colItems.map((item) => (
+                    <article
+                      key={item.id}
+                      className="rounded-xl border border-border bg-sand/60 p-3"
+                    >
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <p className="text-sm font-medium">{item.title}</p>
+                        {isOverdue(item) ? (
+                          <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-800">
+                            Overdue
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-1 text-xs text-muted">
+                        {[
+                          item.category,
+                          item.owner,
+                          item.due_date
+                            ? `Due ${format(parseISO(item.due_date), "d MMM yyyy")}`
+                            : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                      {item.details ? (
+                        <p className="mt-2 line-clamp-2 text-xs text-foreground/80">
+                          {item.details}
+                        </p>
+                      ) : null}
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <select
+                          className="field !w-auto py-1.5 text-xs"
+                          value={item.status}
+                          onChange={(e) =>
+                            void setStatus(
+                              item.id,
+                              e.target.value as TaskStatus
+                            )
+                          }
+                          aria-label="Change status"
+                        >
+                          {STATUSES.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.label}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          className="btn-secondary px-2.5 py-1.5 text-xs"
+                          onClick={() => {
+                            setEditingId(item.id);
+                            setEdit(toEditForm(item));
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-ghost px-2.5 py-1.5 text-xs text-[var(--danger)]"
+                          onClick={() => void remove(item.id)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                  {colItems.length === 0 ? (
+                    <p className="px-1 py-2 text-xs text-muted">No tasks</p>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
 
       {edit && editingId ? (
         <>

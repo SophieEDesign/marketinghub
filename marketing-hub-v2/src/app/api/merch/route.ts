@@ -58,7 +58,12 @@ export async function POST(request: NextRequest) {
     if (!admin && !ownsMerchOrder(existing, user)) {
       return jsonError("Forbidden", 403);
     }
-    await deleteMerchOrder(body.id);
+    try {
+      await deleteMerchOrder(body.id);
+    } catch (err) {
+      console.error("[merch] delete failed", err);
+      return jsonError("Could not delete order", 500);
+    }
     return jsonOk({ ok: true });
   }
 

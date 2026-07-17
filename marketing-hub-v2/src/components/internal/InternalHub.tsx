@@ -49,7 +49,7 @@ export function InternalHub({
   return (
     <div>
       <PageHeader
-        title="Internal requests"
+        title="Requests"
         description={
           canManageAll
             ? "North Sails clothing orders and stock, asset asks, and social media form requests for the marketing team."

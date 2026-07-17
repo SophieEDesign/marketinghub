@@ -375,11 +375,19 @@ export function MerchClient({
 
   async function remove(id: string) {
     if (!window.confirm("Delete this merch order?")) return;
-    await fetch("/api/merch", {
+    const res = await fetch("/api/merch", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "delete", id }),
     });
+    if (!res.ok) {
+      const data = (await res.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      window.alert(data?.error || "Could not delete this order.");
+      return;
+    }
+    setOrders((prev) => prev.filter((o) => o.id !== id));
     if (editingId === id) closeEdit();
     await refresh();
   }

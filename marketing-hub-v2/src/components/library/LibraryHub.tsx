@@ -11,7 +11,7 @@ import { useState } from "react";
 
 type Tab = "media" | "brand" | "resources";
 
-const TABS: { id: Tab; label: string }[] = [
+const ALL_TABS: { id: Tab; label: string }[] = [
   { id: "media", label: "Media" },
   { id: "brand", label: "Brand" },
   { id: "resources", label: "Resources" },
@@ -31,6 +31,11 @@ export function LibraryHub({
   const isExternal = view === "external";
   const isMember = view === "member";
   const canManage = view === "admin";
+  // Resources overlaps Media Links for now — admin-only until we merge them.
+  const tabs = canManage
+    ? ALL_TABS
+    : ALL_TABS.filter((t) => t.id !== "resources");
+  const activeTab = tab === "resources" && !canManage ? "media" : tab;
 
   if (isExternal) {
     return (
@@ -58,20 +63,20 @@ export function LibraryHub({
         title="Library"
         description={
           isMember
-            ? "Browse and download brand assets, guidelines, and useful links."
+            ? "Browse and download brand assets and guidelines."
             : "Brand assets, guidelines, and useful links — one place for the team."
         }
       />
 
       <SegmentFilter
         label="Library section"
-        value={tab}
+        value={activeTab}
         onChange={setTab}
-        options={TABS}
+        options={tabs}
         size="lg"
       />
 
-      {tab === "media" ? (
+      {activeTab === "media" ? (
         <MediaGallery
           title="Media"
           description="Logos, presentations, gallery, and other brand assets."
@@ -82,7 +87,7 @@ export function LibraryHub({
         />
       ) : null}
 
-      {tab === "brand" ? (
+      {activeTab === "brand" ? (
         <BrandGuidelinesPanel
           logoUrl={logoUrl}
           guideUrl={guideUrl}
@@ -90,7 +95,7 @@ export function LibraryHub({
         />
       ) : null}
 
-      {tab === "resources" ? (
+      {activeTab === "resources" && canManage ? (
         <ResourcesClient
           initial={resources}
           hideHeader

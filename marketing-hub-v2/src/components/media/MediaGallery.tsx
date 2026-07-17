@@ -8,8 +8,12 @@ import {
   Download,
   ExternalLink,
   FileText,
+  FolderOpen,
   Globe,
+  ImageIcon,
+  Link2,
   Lock,
+  Presentation,
   Upload,
   X,
 } from "lucide-react";
@@ -96,6 +100,312 @@ function isImageFile(file: MediaFile) {
   return (
     file.type.startsWith("image/") ||
     /\.(png|jpe?g|gif|webp|svg)$/i.test(file.name)
+  );
+}
+
+function isDirectImageUrl(url: string) {
+  const path = url.split("?")[0] ?? "";
+  return /\.(png|jpe?g|gif|webp|svg)$/i.test(path);
+}
+
+function extractGoogleDriveFileId(url: string): string | null {
+  try {
+    const parsed = new URL(url.trim());
+    const host = parsed.hostname.toLowerCase();
+    if (!host.includes("google.com")) return null;
+    const pathMatch = parsed.pathname.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (pathMatch?.[1]) return pathMatch[1];
+    const idParam = parsed.searchParams.get("id");
+    if (idParam) return idParam;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function googleDriveThumbnailUrl(fileId: string) {
+  return `https://drive.google.com/thumbnail?id=${fileId}&sz=w800`;
+}
+
+function driveThumbFromUrl(url: string | null | undefined): string | null {
+  if (!url?.trim()) return null;
+  const fileId = extractGoogleDriveFileId(url);
+  return fileId ? googleDriveThumbnailUrl(fileId) : null;
+}
+
+/** Prefer real images, then Drive thumbs from links, then image-like cover URLs. */
+function previewUrlsFromItems(items: MediaListItem[], limit = 4): string[] {
+  const urls: string[] = [];
+  const seen = new Set<string>();
+  const add = (url: string | null | undefined) => {
+    if (!url || seen.has(url) || urls.length >= limit) return;
+    seen.add(url);
+    urls.push(url);
+  };
+
+  for (const item of items) {
+    for (const file of item.files) {
+      if (isImageFile(file)) add(file.url);
+    }
+  }
+
+  for (const item of items) {
+    for (const candidate of [
+      item.document_link,
+      item.document_url,
+      item.cover_url,
+      ...item.files.map((f) => f.url),
+    ]) {
+      add(driveThumbFromUrl(candidate));
+    }
+  }
+
+  for (const item of items) {
+    if (item.cover_url && isDirectImageUrl(item.cover_url)) {
+      add(item.cover_url);
+    }
+  }
+
+  return urls;
+}
+
+type FolderKind = "images" | "documents" | "presentations" | "links" | "mixed" | "empty";
+
+function detectFolderKind(items: MediaListItem[]): FolderKind {
+  if (items.length === 0) return "empty";
+  let images = 0;
+  let docs = 0;
+  let decks = 0;
+  let links = 0;
+  for (const item of items) {
+    const hasImage = item.files.some(isImageFile);
+    const fileNames = [
+      ...item.files.map((f) => f.name),
+      item.document_link,
+      item.document_url,
+      item.name,
+    ]
+      .filter(Boolean)
+      .join(" ");
+    if (hasImage) images += 1;
+    else if (/\.(pptx?|key)$/i.test(fileNames) || /presentation/i.test(item.category))
+      decks += 1;
+    else if (/\.(pdf|docx?|xlsx?)$/i.test(fileNames)) docs += 1;
+    else if (item.document_link || item.document_url) links += 1;
+    else docs += 1;
+  }
+  if (images > 0 && docs + decks + links === 0) return "images";
+  if (decks > 0 && images === 0 && docs === 0) return "presentations";
+  if (links > 0 && images === 0 && docs === 0 && decks === 0) return "links";
+  if (docs > 0 && images === 0 && decks === 0) return "documents";
+  if (images > 0) return "mixed";
+  return "documents";
+}
+
+function folderKindMeta(kind: FolderKind) {
+  switch (kind) {
+    case "images":
+      return {
+        label: "Images",
+        Icon: ImageIcon,
+        tone: "from-[#0b3a4a] to-[#2a8f9e]",
+        chip: "bg-[#2a8f9e]",
+      };
+    case "presentations":
+      return {
+        label: "Deck",
+        Icon: Presentation,
+        tone: "from-[#134e63] to-[#b5651d]",
+        chip: "bg-[#b5651d]",
+      };
+    case "links":
+      return {
+        label: "Links",
+        Icon: Link2,
+        tone: "from-[#0b3a4a] to-[#3d4d63]",
+        chip: "bg-[#3d4d63]",
+      };
+    case "empty":
+      return {
+        label: "Empty",
+        Icon: FolderOpen,
+        tone: "from-[#9aa8b2] to-[#d7dee4]",
+        chip: "bg-[#5b6b76]",
+      };
+    case "mixed":
+      return {
+        label: "Mixed",
+        Icon: FolderOpen,
+        tone: "from-[#0b3a4a] to-[#134e63]",
+        chip: "bg-[#0b3a4a]",
+      };
+    default:
+      return {
+        label: "Docs",
+        Icon: FileText,
+        tone: "from-[#1f2a44] to-[#3d4d63]",
+        chip: "bg-[#c0292f]",
+      };
+  }
+}
+
+function FolderCoverFallback({
+  folderName,
+  kind,
+  sampleTitle,
+}: {
+  folderName: string;
+  kind: FolderKind;
+  sampleTitle?: string;
+}) {
+  const meta = folderKindMeta(kind);
+  const Icon = meta.Icon;
+  const isEmpty = kind === "empty";
+
+  return (
+    <div
+      className={cn(
+        "relative flex h-full w-full items-center justify-center overflow-hidden bg-gradient-to-br",
+        meta.tone
+      )}
+    >
+      {!isEmpty ? (
+        <>
+          <div
+            className="absolute left-[12%] top-[18%] h-[58%] w-[42%] rotate-[-8deg] rounded-xl bg-white/25 shadow-sm"
+            aria-hidden
+          />
+          <div
+            className="absolute right-[10%] top-[14%] flex h-[66%] w-[48%] rotate-[5deg] flex-col overflow-hidden rounded-xl border border-white/30 bg-white/95 shadow-md"
+            aria-hidden
+          >
+            <div
+              className={cn(
+                "flex items-center justify-center px-2 py-1.5 text-[10px] font-bold uppercase tracking-wide text-white",
+                meta.chip
+              )}
+            >
+              {meta.label}
+            </div>
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 px-3 text-[#0f1c24]">
+              <Icon className="h-8 w-8 opacity-70" />
+              <p className="line-clamp-2 text-center text-[11px] font-medium leading-snug">
+                {sampleTitle || folderName}
+              </p>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="flex flex-col items-center gap-2 text-white/80">
+          <FolderOpen className="h-12 w-12 opacity-70" />
+          <p className="text-xs font-medium uppercase tracking-wide opacity-80">
+            No assets yet
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FolderCoverMedia({
+  previews,
+  folderName,
+  kind,
+  sampleTitle,
+}: {
+  previews: string[];
+  folderName: string;
+  kind: FolderKind;
+  sampleTitle?: string;
+}) {
+  const [failed, setFailed] = useState<Set<string>>(() => new Set());
+  const visible = previews.filter((url) => !failed.has(url));
+
+  const onError = (url: string) => {
+    setFailed((prev) => {
+      if (prev.has(url)) return prev;
+      const next = new Set(prev);
+      next.add(url);
+      return next;
+    });
+  };
+
+  if (visible.length === 0) {
+    return (
+      <FolderCoverFallback
+        folderName={folderName}
+        kind={kind}
+        sampleTitle={sampleTitle}
+      />
+    );
+  }
+
+  if (visible.length === 1) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={visible[0]}
+        alt=""
+        className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+        onError={() => onError(visible[0]!)}
+      />
+    );
+  }
+
+  if (visible.length === 2) {
+    return (
+      <div className="grid h-full w-full grid-cols-2 gap-0.5 bg-black/10">
+        {visible.map((url) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={url}
+            src={url}
+            alt=""
+            className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+            onError={() => onError(url)}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (visible.length === 3) {
+    return (
+      <div className="grid h-full w-full grid-cols-2 grid-rows-2 gap-0.5 bg-black/10">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={visible[0]}
+          alt=""
+          className="row-span-2 h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+          onError={() => onError(visible[0]!)}
+        />
+        {visible.slice(1).map((url) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={url}
+            src={url}
+            alt=""
+            className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+            onError={() => onError(url)}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid h-full w-full grid-cols-2 grid-rows-2 gap-0.5 bg-black/10">
+      {visible.slice(0, 4).map((url) => (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={url}
+          src={url}
+          alt=""
+          className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+          onError={() => onError(url)}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -210,7 +520,9 @@ export function MediaGallery({
         name,
         photos,
         docs,
-        cover: photos[0]?.url ?? null,
+        previews: previewUrlsFromItems(inCat),
+        kind: detectFolderKind(inCat),
+        sampleTitle: inCat[0] ? itemDisplayName(inCat[0]) : undefined,
         photoCount: photos.length,
         assetCount: inCat.length,
       };
@@ -241,7 +553,9 @@ export function MediaGallery({
       return {
         name,
         photos,
-        cover: photos[0]?.url ?? null,
+        previews: previewUrlsFromItems(inFolder),
+        kind: detectFolderKind(inFolder),
+        sampleTitle: inFolder[0] ? itemDisplayName(inFolder[0]) : undefined,
         photoCount: photos.length,
         assetCount: inFolder.length,
         visibility,
@@ -962,19 +1276,13 @@ export function MediaGallery({
                 className="group overflow-hidden rounded-2xl border border-border bg-white text-left shadow-soft transition hover:-translate-y-0.5 hover:shadow-md"
               >
                 <div className="relative aspect-[4/3] overflow-hidden bg-[#f0f2f3]">
-                  {col.cover ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={col.cover}
-                      alt=""
-                      className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-muted">
-                      <FileText className="h-10 w-10 opacity-40" />
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+                  <FolderCoverMedia
+                    previews={col.previews}
+                    folderName={col.name}
+                    kind={col.kind}
+                    sampleTitle={col.sampleTitle}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/15 to-transparent" />
                   <div className="absolute inset-x-0 bottom-0 p-4 text-white">
                     <p className="text-lg font-medium tracking-tight">
                       {col.name}
@@ -1040,19 +1348,13 @@ export function MediaGallery({
                   className="block w-full text-left"
                 >
                   <div className="relative aspect-[4/3] overflow-hidden bg-[#f0f2f3]">
-                    {sf.cover ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={sf.cover}
-                        alt=""
-                        className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-muted">
-                        <FileText className="h-10 w-10 opacity-40" />
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+                    <FolderCoverMedia
+                      previews={sf.previews}
+                      folderName={sf.name}
+                      kind={sf.kind}
+                      sampleTitle={sf.sampleTitle}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/15 to-transparent" />
                     <div className="absolute inset-x-0 bottom-0 p-4 text-white">
                       <p className="text-lg font-medium tracking-tight">
                         {sf.name}

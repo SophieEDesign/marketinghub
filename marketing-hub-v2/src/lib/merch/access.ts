@@ -10,12 +10,18 @@ export function ownsMerchOrder(order: MerchOrder, user: SessionUser) {
   if (order.created_by_user_id) {
     return order.created_by_user_id === user.id;
   }
-  // Legacy rows (pre user-id): match creator name/email only.
+  // Legacy rows (pre user-id): match creator name/email.
+  // Seed used short names like "Sophie" while profiles are "Sophie Edgerley".
   const needles = [user.full_name, user.email]
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
   const created = order.created_by.trim().toLowerCase();
-  return needles.some((n) => created === n);
+  if (!created) return false;
+  return needles.some((n) => {
+    if (created === n) return true;
+    const first = n.split(/\s+/)[0];
+    return Boolean(first && created === first);
+  });
 }
 
 export function filterMerchOrdersForUser(
