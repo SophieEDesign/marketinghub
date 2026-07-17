@@ -1,0 +1,368 @@
+/** Shared clean-up for hub store + Supabase import. */
+
+const PLATFORM_HINTS: { re: RegExp; channel: string }[] = [
+  { re: /\blinkedin\b|\bli\b|#linkedin/i, channel: "LinkedIn" },
+  { re: /\binstagram\b|\big\b|#instagram|\breel\b/i, channel: "Instagram" },
+  { re: /\bfacebook\b|\bfb\b|#facebook/i, channel: "Facebook" },
+  { re: /\btiktok\b|#tiktok/i, channel: "TikTok" },
+  { re: /\byoutube\b|\byt\b|#youtube/i, channel: "YouTube" },
+  { re: /\bnewsletter\b/i, channel: "Newsletter" },
+  { re: /\bpress\b|\bpr\b|\brelease\b/i, channel: "PR" },
+  {
+    re: /(?<![a-z])x(?![a-z])|\btwitter\b|\btweet\b|#twitter/i,
+    channel: "X",
+  },
+];
+
+const GENERIC_SOCIAL = /^(social(\s*post|\s*media)?|social_post|post)$/i;
+
+export function stripHtml(input: string): string {
+  if (!input) return "";
+  return input
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+/** Pull a usable URL from JSON attachment blobs or plain strings. */
+export function extractAssetUrl(raw: string): string {
+  const s = (raw ?? "").trim();
+  if (!s) return "";
+  if (s.startsWith("http://") || s.startsWith("https://")) return s;
+  if (s.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(s) as { url?: string };
+      if (parsed?.url && typeof parsed.url === "string") return parsed.url;
+    } catch {
+      // ignore
+    }
+  }
+  return s.length < 500 ? s : "";
+}
+
+function detectPlatform(...parts: string[]): string | null {
+  const hay = parts.filter(Boolean).join(" ");
+  for (const hint of PLATFORM_HINTS) {
+    if (hint.re.test(hay)) return hint.channel;
+  }
+  return null;
+}
+
+/**
+ * Map messy Supabase post_type values into hub channels for Content & Social.
+ */
+export function normalizeContentType(raw: string): string {
+  const s = (raw ?? "").trim();
+  if (!s) return "Social";
+  if (GENERIC_SOCIAL.test(s) || /^social/i.test(s)) return "Social";
+  const lower = s.toLowerCase();
+  if (lower === "editorial" || lower === "content" || lower === "article") {
+    return "Editorial";
+  }
+  if (lower === "newsletter") return "Newsletter";
+  if (lower === "sponsorship") return "Sponsorship";
+  if (lower === "pr" || lower === "press") return "PR";
+  if (s.includes("_")) {
+    return s
+      .split("_")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(" ");
+  }
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+const SOCIAL_CHANNELS = new Set([
+  "linkedin",
+  "instagram",
+  "facebook",
+  "tiktok",
+  "youtube",
+  "x",
+  "twitter",
+  "social",
+]);
+
+const NON_SOCIAL_TYPES = new Set([
+  "editorial",
+  "newsletter",
+  "sponsorship",
+  "pr",
+  "press",
+  "article",
+]);
+
+const NON_SOCIAL_CHANNELS = new Set([
+  "editorial",
+  "newsletter",
+  "sponsorship",
+  "pr",
+  "press",
+  "article",
+]);
+
+/** Social calendar items (LinkedIn / IG / etc.) vs editorial pipeline pieces. */
+export function isSocialContentItem(item: {
+  content_type?: string | null;
+  channel?: string | null;
+}): boolean {
+  const type = (item.content_type || "").trim().toLowerCase();
+  const channel = (item.channel || "").trim().toLowerCase();
+  if (NON_SOCIAL_TYPES.has(type) || NON_SOCIAL_CHANNELS.has(channel)) {
+    return false;
+  }
+  if (type === "social" || type.includes("social")) return true;
+  if (SOCIAL_CHANNELS.has(channel) || channel.includes("social")) return true;
+  // Unknown type on a social platform channel
+  if (!type && SOCIAL_CHANNELS.has(channel)) return true;
+  return false;
+}
+
+export function normalizeChannel(
+  raw: string,
+  title = "",
+  notes = ""
+): string {
+  const s = (raw ?? "").trim();
+  if (!s || GENERIC_SOCIAL.test(s)) {
+    return detectPlatform(title, notes, s) || "LinkedIn";
+  }
+  const lower = s.toLowerCase();
+  if (lower === "editorial") return "Editorial";
+  if (lower === "newsletter") return "Newsletter";
+  if (lower === "sponsorship") return "Sponsorship";
+  if (lower === "content") return "Article";
+  if (lower === "pr" || lower === "press") return "PR";
+
+  const fromRaw = detectPlatform(s);
+  if (fromRaw) return fromRaw;
+
+  // Title-case single tokens; leave multi-word as-is if already readable
+  if (/^[a-z0-9_]+$/i.test(s)) {
+    return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+  }
+  return s;
+}
+
+const EVENT_TYPE_MAP: Record<string, string> = {
+  event: "Trade show",
+  events: "Trade show",
+  commercial_event: "Commercial",
+  commercial: "Commercial",
+  awards: "Awards",
+  award: "Awards",
+  sponsorship_event: "Sponsorship",
+  sponsorship: "Sponsorship",
+  conference: "Conference",
+  meeting: "Meeting",
+  internal: "Internal",
+};
+
+export function normalizeEventType(raw: string): string {
+  const s = (raw ?? "").trim();
+  if (!s) return "Event";
+  const key = s.toLowerCase().replace(/\s+/g, "_");
+  if (EVENT_TYPE_MAP[key]) return EVENT_TYPE_MAP[key];
+  if (EVENT_TYPE_MAP[s.toLowerCase()]) return EVENT_TYPE_MAP[s.toLowerCase()];
+  // humanise snake_case
+  if (s.includes("_")) {
+    return s
+      .split("_")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(" ");
+  }
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+export function cleanContentFields(item: {
+  title: string;
+  channel: string;
+  content_type?: string;
+  owner: string;
+  notes: string;
+  asset_url: string;
+  planable_url: string;
+}) {
+  const notes = stripHtml(item.notes);
+  const title = stripHtml(item.title) || "Untitled post";
+  const content_type = normalizeContentType(
+    item.content_type || item.channel || "Social"
+  );
+  return {
+    title,
+    channel: normalizeChannel(item.channel, title, notes),
+    content_type,
+    owner: (item.owner ?? "").trim(),
+    notes,
+    asset_url: extractAssetUrl(item.asset_url),
+    planable_url: (item.planable_url ?? "").trim(),
+  };
+}
+
+/** Social Posts rows that are really calendar events (belong in Events, not content). */
+export function isEventPlaceholderContent(
+  item: { title: string; channel?: string; category?: string; due_date?: string | null },
+  eventTitles?: Set<string>
+): boolean {
+  const title = (item.title ?? "").trim().toLowerCase();
+  if (!title) return false;
+  if (eventTitles?.has(title)) return true;
+
+  const category = (item.category ?? "").trim().toLowerCase();
+  const undated = !item.due_date;
+  if (
+    undated &&
+    (category === "event" ||
+      category === "boat show" ||
+      category === "event/material")
+  ) {
+    return true;
+  }
+
+  if (
+    undated &&
+    /\b(boat show|yacht show|boatbuilders|marina rendezvous|race week|regatta|trade show|symposium|conference|seawork|boot dusseldorf|ibex|hiswa|grand pavois|charter yacht show)\b/i.test(
+      title
+    )
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+export function cleanEventFields(item: {
+  title: string;
+  event_type: string;
+  notes: string;
+  location: string;
+  link_url: string;
+}) {
+  return {
+    title: stripHtml(item.title) || "Untitled event",
+    event_type: normalizeEventType(item.event_type),
+    notes: stripHtml(item.notes),
+    location: stripHtml(item.location),
+    link_url: (item.link_url ?? "").trim(),
+  };
+}
+
+function normKeyPart(value: string | null | undefined): string {
+  return String(value ?? "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const STATUS_RANK: Record<string, number> = {
+  published: 5,
+  scheduled: 4,
+  review: 3,
+  draft: 2,
+  idea: 1,
+};
+
+function contentScore(item: {
+  status: string;
+  notes: string;
+  asset_url: string;
+  planable_url: string;
+  updated_at: string;
+  owner: string;
+}): number {
+  const status = STATUS_RANK[item.status] ?? 0;
+  const richness =
+    (item.notes ? 2 : 0) +
+    (item.asset_url ? 1 : 0) +
+    (item.planable_url ? 1 : 0) +
+    (item.owner ? 1 : 0);
+  const updated = Date.parse(item.updated_at) || 0;
+  return status * 1_000_000 + richness * 10_000 + updated / 1_000_000;
+}
+
+/**
+ * Drop duplicate social/content rows (same title + due date + channel).
+ * Keeps the richest / furthest-along copy.
+ */
+export function dedupeContentItems<
+  T extends {
+    id: string;
+    title: string;
+    channel: string;
+    due_date: string | null;
+    status: string;
+    notes: string;
+    asset_url: string;
+    planable_url: string;
+    owner: string;
+    updated_at: string;
+  },
+>(items: T[]): { items: T[]; removed: number } {
+  // Pass 1: title + due + channel
+  const byDetail = new Map<string, T>();
+  for (const item of items) {
+    const key = [
+      normKeyPart(item.title),
+      item.due_date ?? "",
+      normKeyPart(item.channel),
+    ].join("|");
+    const prev = byDetail.get(key);
+    if (!prev || contentScore(item) > contentScore(prev)) {
+      byDetail.set(key, item);
+    }
+  }
+  // Pass 2: same title (common Supabase duplicates with drifted dates)
+  const byTitle = new Map<string, T>();
+  for (const item of Array.from(byDetail.values())) {
+    const key = normKeyPart(item.title) || item.id;
+    const prev = byTitle.get(key);
+    if (!prev || contentScore(item) > contentScore(prev)) {
+      byTitle.set(key, item);
+    }
+  }
+  const next = Array.from(byTitle.values());
+  return { items: next, removed: items.length - next.length };
+}
+
+/**
+ * Drop duplicate events (same title + start day).
+ */
+export function dedupeEventItems<
+  T extends {
+    id: string;
+    title: string;
+    starts_at: string | null;
+    notes: string;
+    location: string;
+    updated_at: string;
+  },
+>(items: T[]): { items: T[]; removed: number } {
+  const best = new Map<string, T>();
+  for (const item of items) {
+    const key = [
+      normKeyPart(item.title),
+      String(item.starts_at ?? "").slice(0, 10),
+    ].join("|");
+    const prev = best.get(key);
+    if (!prev) {
+      best.set(key, item);
+      continue;
+    }
+    const score = (x: T) =>
+      (x.notes ? 2 : 0) +
+      (x.location ? 1 : 0) +
+      (Date.parse(x.updated_at) || 0) / 1_000_000;
+    if (score(item) > score(prev)) best.set(key, item);
+  }
+  const next = Array.from(best.values());
+  return { items: next, removed: items.length - next.length };
+}

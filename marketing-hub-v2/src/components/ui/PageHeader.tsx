@@ -1,0 +1,73 @@
+import Link from "next/link";
+import type { LucideIcon } from "lucide-react";
+
+export function PageHeader({
+  title,
+  description,
+  actions,
+}: {
+  title: string;
+  description?: string;
+  actions?: React.ReactNode;
+}) {
+  return (
+    <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <h1 className="font-display text-3xl tracking-tight text-brand md:text-4xl">
+          {title}
+        </h1>
+        {description ? (
+          <p className="mt-1 max-w-2xl text-sm text-muted md:text-base">
+            {description}
+          </p>
+        ) : null}
+      </div>
+      {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
+    </div>
+  );
+}
+
+export function EmptyState({
+  title,
+  description,
+  action,
+}: {
+  title: string;
+  description: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="surface-card flex flex-col items-start gap-3 p-8">
+      <h2 className="font-display text-xl text-brand">{title}</h2>
+      <p className="max-w-lg text-sm text-muted">{description}</p>
+      {action}
+    </div>
+  );
+}
+
+export function ModuleCard({
+  href,
+  title,
+  description,
+  icon: Icon,
+}: {
+  href: string;
+  title: string;
+  description: string;
+  icon: LucideIcon;
+}) {
+  return (
+    <Link
+      href={href}
+      className="surface-card group block p-5 transition hover:-translate-y-0.5 hover:border-accent"
+    >
+      <div className="mb-4 inline-flex rounded-xl bg-accent-soft p-2.5 text-brand">
+        <Icon className="h-5 w-5" />
+      </div>
+      <h2 className="font-display text-xl text-brand group-hover:text-brand-soft">
+        {title}
+      </h2>
+      <p className="mt-1 text-sm text-muted">{description}</p>
+    </Link>
+  );
+}

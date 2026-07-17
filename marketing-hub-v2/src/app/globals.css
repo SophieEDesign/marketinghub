@@ -1,0 +1,133 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #f4f6f8;
+  --foreground: #0f1c24;
+  --surface: #ffffff;
+  --muted: #5b6b76;
+  --border: #d7dee4;
+  --brand: #0b3a4a;
+  --brand-soft: #134e63;
+  --accent: #2a8f9e;
+  --accent-soft: #e6f4f6;
+  --sand: #eef1f0;
+  --danger: #b42318;
+  --success: #0f7a4c;
+  --shadow: 0 10px 30px rgba(15, 28, 36, 0.06);
+}
+
+body {
+  color: var(--foreground);
+  background:
+    radial-gradient(1200px 500px at 10% -10%, rgba(42, 143, 158, 0.12), transparent 55%),
+    radial-gradient(900px 400px at 100% 0%, rgba(11, 58, 74, 0.08), transparent 50%),
+    var(--background);
+  min-height: 100vh;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Match shell sidebar so overlays don't cover nav on md+ */
+  .left-sidebar {
+    left: 0;
+  }
+
+  @media (min-width: 768px) {
+    .md\:left-sidebar {
+      left: 16rem; /* w-64 */
+    }
+  }
+}
+
+@layer components {
+  .surface-card {
+    @apply rounded-2xl border bg-white;
+    border-color: var(--border);
+    box-shadow: var(--shadow);
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition;
+  }
+
+  .btn-primary {
+    @apply btn text-white;
+    background: var(--brand);
+  }
+
+  .btn-primary:hover {
+    background: var(--brand-soft);
+  }
+
+  .btn-secondary {
+    @apply btn border bg-white;
+    border-color: var(--border);
+    color: var(--foreground);
+  }
+
+  .btn-secondary:hover {
+    background: var(--sand);
+  }
+
+  .btn-ghost {
+    @apply btn;
+    color: var(--muted);
+  }
+
+  .btn-ghost:hover {
+    background: var(--sand);
+    color: var(--foreground);
+  }
+
+  .field {
+    @apply w-full rounded-xl border bg-white px-3 py-2.5 text-sm outline-none transition;
+    border-color: var(--border);
+  }
+
+  .field:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(42, 143, 158, 0.15);
+  }
+
+  .label {
+    @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide;
+    color: var(--muted);
+  }
+
+  /* Data admin: keep horizontal scrollbar usable without scrolling to the end */
+  .data-table-scroll {
+    overflow: auto;
+    scrollbar-gutter: stable both-edges;
+    scrollbar-width: auto;
+    scrollbar-color: #94a3b8 transparent;
+  }
+
+  .data-table-scroll::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+
+  .data-table-scroll::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 999px;
+  }
+
+  .data-table-scroll::-webkit-scrollbar-thumb {
+    background: #94a3b8;
+    border-radius: 999px;
+    border: 2px solid #f1f5f9;
+  }
+
+  .data-table-scroll::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+  }
+
+  .data-table-scroll::-webkit-scrollbar-corner {
+    background: #f1f5f9;
+  }
+}

@@ -1,0 +1,41 @@
+"use client";
+
+import { ModuleCard } from "@/components/ui/PageHeader";
+import { ImportFromSupabaseButton } from "@/components/supabase/ImportFromSupabaseButton";
+import { useHubView } from "@/lib/hub-view";
+import { navForView } from "@/lib/nav";
+
+export function HomeModules({ supabaseReady }: { supabaseReady: boolean }) {
+  const { view } = useHubView();
+  const modules = navForView(view).filter((n) => n.href !== "/app");
+
+  return (
+    <>
+      {view === "admin" && supabaseReady ? (
+        <div className="mb-6">
+          <ImportFromSupabaseButton label="Sync from Supabase" />
+        </div>
+      ) : null}
+
+      <p className="mb-6 text-sm text-muted">
+        {view === "member"
+          ? "Member view — events, partners, awards, library, and Internal requests. Switch to Admin for Content & Social, Tasks, Themes, Reporting, and Contacts."
+          : supabaseReady
+            ? "Admin view — sync pulls Core Data tables from Supabase (including Tasks)."
+            : "Admin view — add Supabase keys to .env.local to import live data."}
+      </p>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {modules.map((item) => (
+          <ModuleCard
+            key={item.href}
+            href={item.href}
+            title={item.label}
+            description={item.description}
+            icon={item.icon}
+          />
+        ))}
+      </div>
+    </>
+  );
+}
