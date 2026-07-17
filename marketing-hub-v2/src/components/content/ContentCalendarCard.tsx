@@ -3,7 +3,11 @@
 import { Check, FileText, ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ContentItem, ContentStatus } from "@/lib/types";
-import { isSocialContentItem } from "@/lib/data/normalize";
+import {
+  formatChannels,
+  isSocialContentItem,
+  parseChannels,
+} from "@/lib/data/normalize";
 import {
   PLATFORM_META,
   isImageUrl,
@@ -55,11 +59,14 @@ export function ContentCalendarCard({
   compact?: boolean;
 }) {
   const social = isSocialContentItem(item);
+  const channels = parseChannels(item.channel);
   const hasMedia = isImageUrl(item.asset_url);
   const preview =
     item.title?.trim() ||
     item.notes?.replace(/\s+/g, " ").trim().slice(0, 120) ||
     "Untitled";
+  const shownChannels = channels.slice(0, 2);
+  const extraChannels = channels.length - shownChannels.length;
 
   return (
     <div
@@ -71,14 +78,23 @@ export function ContentCalendarCard({
       <div className="flex items-center justify-between gap-1">
         <div className="flex min-w-0 items-center gap-1">
           {social ? (
-            <PlatformDot channel={item.channel} />
+            <>
+              {shownChannels.map((ch) => (
+                <PlatformDot key={ch} channel={ch} />
+              ))}
+              {extraChannels > 0 ? (
+                <span className="text-[9px] font-medium text-slate-400">
+                  +{extraChannels}
+                </span>
+              ) : null}
+            </>
           ) : (
             <span className="inline-flex h-4 items-center rounded bg-slate-700 px-1 text-[8px] font-bold uppercase tracking-wide text-white">
               {item.content_type?.slice(0, 3) || "Cnt"}
             </span>
           )}
           <span className="truncate text-[9px] font-medium text-slate-500">
-            {item.channel || (social ? "Social" : "Content")}
+            {formatChannels(channels) || (social ? "Social" : "Content")}
           </span>
         </div>
       </div>

@@ -205,15 +205,16 @@ export async function addRow(collection: string, patch: Record<string, unknown> 
   for (const field of def.fields) {
     if (field.key in row) continue;
     if (field.locked) continue;
-    row[field.key] = field.key.includes("at") || field.key.includes("date")
-      ? null
-      : field.key === "tags"
-        ? []
-        : field.key === "quantity" || field.key === "year"
-          ? 0
-          : field.key === "content_id"
-            ? null
-            : "";
+    row[field.key] =
+      field.key.includes("at") || field.key.includes("date")
+        ? null
+        : field.type === "tags" || field.key === "tags"
+          ? []
+          : field.key === "quantity" || field.key === "year"
+            ? 0
+            : field.key === "content_id"
+              ? null
+              : "";
   }
 
   // Theme mains must create a linked Content row in the same write, otherwise
@@ -231,7 +232,7 @@ export async function addRow(collection: string, patch: Record<string, unknown> 
       store.content.push({
         id: contentId,
         title,
-        channel: channel || "Editorial",
+        channel: channel ? [channel] : ["Editorial"],
         content_type: "Editorial",
         owner,
         due_date: null,

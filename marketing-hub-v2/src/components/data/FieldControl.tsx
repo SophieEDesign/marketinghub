@@ -215,6 +215,51 @@ export function FieldControl({
   }
 
   if (field.type === "tags") {
+    if (field.options?.length) {
+      const selected = Array.isArray(value)
+        ? value.map(String)
+        : tagsToString(value)
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
+      const selectedSet = new Set(selected);
+      return (
+        <div
+          className={cn(
+            "flex min-w-[200px] max-w-[320px] flex-wrap gap-1 py-0.5",
+            compact && "max-w-[240px]"
+          )}
+        >
+          {field.options.map((o) => {
+            const checked = selectedSet.has(o.value);
+            return (
+              <label
+                key={o.value}
+                className={cn(
+                  "inline-flex cursor-pointer items-center gap-1 rounded border px-1.5 py-0.5 text-[11px]",
+                  checked
+                    ? "border-brand/40 bg-brand/10"
+                    : "border-border bg-white text-muted"
+                )}
+              >
+                <input
+                  type="checkbox"
+                  className="accent-[var(--brand)]"
+                  checked={checked}
+                  onChange={() => {
+                    const next = checked
+                      ? selected.filter((v) => v !== o.value)
+                      : [...selected, o.value];
+                    onCommit(next);
+                  }}
+                />
+                {o.label}
+              </label>
+            );
+          })}
+        </div>
+      );
+    }
     return (
       <input
         type="text"

@@ -19,12 +19,17 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { FullCalendarStyles } from "@/components/ui/FullCalendarStyles";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { cn } from "@/lib/utils";
-import { isSocialContentItem } from "@/lib/data/normalize";
+import {
+  formatChannels,
+  isSocialContentItem,
+  parseChannels,
+} from "@/lib/data/normalize";
 import {
   ContentCalendarCard,
   HUB_CALENDAR_CSS,
 } from "@/components/content/ContentCalendarCard";
 import { AssetUploadField } from "@/components/content/AssetUploadField";
+import { ChannelMultiSelect } from "@/components/ui/ChannelMultiSelect";
 import {
   CHANNELS,
   CONTENT_TYPES,
@@ -58,7 +63,7 @@ const STATUS_COLOR: Record<ContentStatus, string> = {
 
 const emptyForm = {
   title: "",
-  channel: "LinkedIn",
+  channel: ["LinkedIn"] as string[],
   content_type: "Social",
   due_date: "",
   notes: "",
@@ -68,7 +73,7 @@ const emptyForm = {
 
 type EditForm = {
   title: string;
-  channel: string;
+  channel: string[];
   content_type: string;
   due_date: string;
   notes: string;
@@ -80,7 +85,7 @@ type EditForm = {
 function toEditForm(item: ContentItem): EditForm {
   return {
     title: item.title,
-    channel: item.channel,
+    channel: parseChannels(item.channel),
     content_type: item.content_type || "Social",
     due_date: item.due_date ?? "",
     notes: item.notes,
@@ -162,7 +167,7 @@ export function ContentClient({
 
   const channels = useMemo(() => {
     const set = new Set(
-      scopedItems.map((i) => i.channel.trim()).filter(Boolean)
+      scopedItems.flatMap((i) => parseChannels(i.channel)).filter(Boolean)
     );
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [scopedItems]);
@@ -179,7 +184,7 @@ export function ContentClient({
       if (
         !matchesSearch(search, [
           item.title,
-          item.channel,
+          formatChannels(item.channel),
           item.content_type,
           item.notes,
           item.status,
@@ -188,7 +193,12 @@ export function ContentClient({
         return false;
       }
       if (statusFilter !== "all" && item.status !== statusFilter) return false;
-      if (channelFilter !== "all" && item.channel !== channelFilter) return false;
+      if (
+        channelFilter !== "all" &&
+        !parseChannels(item.channel).includes(channelFilter)
+      ) {
+        return false;
+      }
       if (typeFilter !== "all" && item.content_type !== typeFilter) return false;
       return true;
     });
@@ -335,7 +345,7 @@ export function ContentClient({
           id: editingId,
           patch: {
             title: edit.title.trim() || "Untitled post",
-            channel: edit.channel.trim() || "Social",
+            channel: edit.channel.length ? edit.channel : ["Social"],
             content_type: edit.content_type.trim() || "Social",
             due_date: edit.due_date || null,
             notes: edit.notes,
@@ -399,7 +409,7 @@ export function ContentClient({
         <p className="text-sm font-medium">{item.title}</p>
         <p className="mt-1 text-xs text-muted">
           {item.content_type ? `${item.content_type} · ` : ""}
-          {item.channel}
+          {formatChannels(item.channel)}
           {item.due_date ? ` · due ${item.due_date}` : ""}
         </p>
         {item.notes ? (
@@ -572,19 +582,13 @@ export function ContentClient({
               ))}
             </select>
           </div>
-          <div>
-            <label className="label">Channel</label>
-            <select
-              className="field"
+          <div className="md:col-span-2">
+            <label className="label">Channels</label>
+            <ChannelMultiSelect
               value={form.channel}
-              onChange={(e) => setForm({ ...form, channel: e.target.value })}
-            >
-              {CHANNELS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+              options={CHANNELS}
+              onChange={(channel) => setForm({ ...form, channel })}
+            />
           </div>
           <div>
             <label className="label">Due date</label>
@@ -776,7 +780,7 @@ export function ContentClient({
                                 {statusLabel(item.status)}
                               </span>
                               <span className="text-xs text-muted">
-                                {item.channel}
+                                {formatChannels(item.channel)}
                                 {item.content_type
                                   ? ` · ${item.content_type}`
                                   : ""}
@@ -963,23 +967,13 @@ export function ContentClient({
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="label">Channel</label>
-                  <select
-                    className="field"
+                <div className="md:col-span-2">
+                  <label className="label">Channels</label>
+                  <ChannelMultiSelect
                     value={edit.channel}
-                    onChange={(e) =>
-                      setEdit({ ...edit, channel: e.target.value })
-                    }
-                  >
-                    {selectOptionsWithCurrent(CHANNELS, edit.channel).map(
-                      (o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      )
-                    )}
-                  </select>
+                    options={CHANNELS}
+                    onChange={(channel) => setEdit({ ...edit, channel })}
+                  />
                 </div>
                 <div>
                   <label className="label">Due date</label>

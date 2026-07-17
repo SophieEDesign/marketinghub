@@ -599,7 +599,7 @@ export async function createThemeMainWithContent(input: {
   const content: ContentItem = {
     id: uid("cnt"),
     title,
-    channel: channel || "Editorial",
+    channel: channel ? [channel] : ["Editorial"],
     content_type: input.content_type?.trim() || "Editorial",
     owner,
     due_date: null,
@@ -650,7 +650,7 @@ export async function ensureThemeMainContentLink(mainId: string) {
   const content: ContentItem = {
     id: uid("cnt"),
     title: main.title,
-    channel: main.channel || "Editorial",
+    channel: main.channel ? [main.channel] : ["Editorial"],
     content_type: "Editorial",
     owner: main.owner ?? "",
     due_date: null,
@@ -1096,8 +1096,11 @@ export async function createHubUser(
 }
 
 export async function updateHubUser(id: string, patch: Partial<HubUser>) {
-  let updated: HubUser | null = null;
-  let emailChanged = false;
+  // Object holder so TS tracks mutations from inside the updateStore callback.
+  const result: { updated: HubUser | null; emailChanged: boolean } = {
+    updated: null,
+    emailChanged: false,
+  };
   await updateStore((s) => {
     if (!s.hub_users) s.hub_users = [];
     const idx = s.hub_users.findIndex((u) => u.id === id);
@@ -1111,22 +1114,22 @@ export async function updateHubUser(id: string, patch: Partial<HubUser>) {
     if (patch.role !== undefined) next.role = normalizeHubAccessRole(patch.role);
     if (patch.email !== undefined) {
       next.email = patch.email.trim().toLowerCase();
-      emailChanged = next.email !== s.hub_users[idx].email;
+      result.emailChanged = next.email !== s.hub_users[idx].email;
     }
     if (patch.full_name !== undefined) next.full_name = patch.full_name.trim();
     s.hub_users[idx] = next;
-    updated = s.hub_users[idx];
+    result.updated = s.hub_users[idx];
   });
-  if (updated && emailChanged) {
+  if (result.updated && result.emailChanged) {
     await ensureContactForUser({
-      userId: updated.id,
-      email: updated.email,
-      full_name: updated.full_name,
-      notes: updated.notes,
+      userId: result.updated.id,
+      email: result.updated.email,
+      full_name: result.updated.full_name,
+      notes: result.updated.notes,
       createIfMissing: false,
     });
   }
-  return updated;
+  return result.updated;
 }
 
 export async function deleteHubUser(id: string) {

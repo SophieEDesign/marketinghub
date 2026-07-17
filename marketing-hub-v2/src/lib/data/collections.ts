@@ -297,7 +297,7 @@ export const DATA_COLLECTIONS: CollectionDef[] = [
         label: "Content type",
         options: CONTENT_TYPES,
       }),
-      f("channel", { type: "select", options: CHANNELS }),
+      f("channel", { type: "tags", label: "Channels", options: CHANNELS }),
       f("due_date", { type: "date", label: "Due date" }),
       f("status", { type: "select", options: CONTENT_STATUS }),
       f("planable_url", { type: "url", label: "Planable URL" }),
@@ -580,7 +580,7 @@ export function inferFieldType(key: string): FieldType {
   if (k === "owner") return "select";
   if (k.includes("email")) return "email";
   if (k.includes("url") || k.includes("link")) return "url";
-  if (k === "tags") return "tags";
+  if (k === "tags" || k === "channel" || k === "channels") return "tags";
   if (
     k.includes("notes") ||
     k.includes("details") ||

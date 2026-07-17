@@ -3,7 +3,10 @@ import path from "path";
 import type { ContentItem, EventItem, HubStore, MerchOrder } from "@/lib/types";
 import { createSeedStore } from "@/lib/store/seed";
 import { getDataDir } from "@/lib/store/paths";
-import { normalizeContentType } from "@/lib/data/normalize";
+import {
+  normalizeContentType,
+  normalizeChannels,
+} from "@/lib/data/normalize";
 import { allowDemoAuth } from "@/lib/auth/config";
 import { hasServiceRoleKey } from "@/lib/supabase/admin";
 
@@ -18,12 +21,17 @@ function shouldUseDurableSupabaseStore() {
 
 function migrateContent(items: ContentItem[] | undefined): ContentItem[] | undefined {
   if (!items) return items;
-  return items.map((item) => ({
-    ...item,
-    content_type:
-      item.content_type?.trim() ||
-      normalizeContentType(item.channel || "Social"),
-  }));
+  return items.map((item) => {
+    const legacy = item as ContentItem & { channel?: string | string[] };
+    const channel = normalizeChannels(legacy.channel);
+    return {
+      ...item,
+      channel,
+      content_type:
+        item.content_type?.trim() ||
+        normalizeContentType(channel[0] || "Social"),
+    };
+  });
 }
 
 function migrateEvents(items: EventItem[] | undefined): EventItem[] | undefined {

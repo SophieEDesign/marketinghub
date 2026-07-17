@@ -67,8 +67,8 @@ export type ContentStatus =
 export type ContentItem = {
   id: string;
   title: string;
-  /** Platform / outlet (LinkedIn, Editorial, …) */
-  channel: string;
+  /** Platforms / outlets (LinkedIn, Instagram, …) — one or more */
+  channel: string[];
   /** Kind of piece from source post_type (Social, Editorial, Newsletter, …) */
   content_type: string;
   owner: string;

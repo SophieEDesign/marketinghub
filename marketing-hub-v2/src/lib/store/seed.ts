@@ -40,7 +40,7 @@ export function createSeedStore(): HubStore {
       {
         id: "cnt_seed_1",
         title: "Summer shipping tips reel",
-        channel: "Instagram",
+        channel: ["Instagram"],
         content_type: "Social",
         owner: "Sophie",
         due_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7)
@@ -56,7 +56,7 @@ export function createSeedStore(): HubStore {
       {
         id: "cnt_seed_2",
         title: "LinkedIn case study — yacht move",
-        channel: "LinkedIn",
+        channel: ["LinkedIn"],
         content_type: "Social",
         owner: "Marketing",
         due_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 14)
@@ -72,7 +72,7 @@ export function createSeedStore(): HubStore {
       {
         id: "cnt_seed_3",
         title: "Press release — new route",
-        channel: "PR",
+        channel: ["PR"],
         content_type: "PR",
         owner: "Sophie",
         due_date: null,
@@ -87,7 +87,7 @@ export function createSeedStore(): HubStore {
         id: "cnt_seed_theme_1",
         title:
           "Global forwarding is becoming more complex — customers expect it simpler",
-        channel: "Article",
+        channel: ["Article"],
         content_type: "Editorial",
         owner: "Sophie",
         due_date: null,
@@ -101,7 +101,7 @@ export function createSeedStore(): HubStore {
       {
         id: "cnt_seed_theme_2",
         title: "The Middle East is still moving — the route looks different",
-        channel: "Case study",
+        channel: ["Case study"],
         content_type: "Editorial",
         owner: "Marketing",
         due_date: null,

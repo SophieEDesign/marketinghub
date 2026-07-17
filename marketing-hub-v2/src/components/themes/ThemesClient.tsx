@@ -13,6 +13,7 @@ import type {
 } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ContactOwnerSelect } from "@/components/ui/ContactOwnerSelect";
+import { ChannelMultiSelect } from "@/components/ui/ChannelMultiSelect";
 import { AssetUploadField } from "@/components/content/AssetUploadField";
 import { cn } from "@/lib/utils";
 import {
@@ -45,7 +46,7 @@ type ThemeEditForm = {
 
 type ContentEditForm = {
   title: string;
-  channel: string;
+  channel: string[];
   content_type: string;
   due_date: string;
   notes: string;
@@ -68,7 +69,11 @@ function themeToForm(theme: QuarterlyTheme): ThemeEditForm {
 function contentToForm(item: ContentItem): ContentEditForm {
   return {
     title: item.title,
-    channel: item.channel,
+    channel: Array.isArray(item.channel)
+      ? item.channel
+      : item.channel
+        ? [String(item.channel)]
+        : [],
     content_type: item.content_type || "Editorial",
     due_date: item.due_date ?? "",
     notes: item.notes,
@@ -400,7 +405,9 @@ export function ThemesClient({
           id: editingContentId,
           patch: {
             title: contentEdit.title.trim() || "Untitled",
-            channel: contentEdit.channel.trim() || "Editorial",
+            channel: contentEdit.channel.length
+              ? contentEdit.channel
+              : ["Editorial"],
             content_type: contentEdit.content_type.trim() || "Editorial",
             due_date: contentEdit.due_date || null,
             notes: contentEdit.notes,
@@ -953,23 +960,15 @@ export function ThemesClient({
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="label">Channel</label>
-                  <select
-                    className="field"
+                <div className="sm:col-span-2">
+                  <label className="label">Channels</label>
+                  <ChannelMultiSelect
                     value={contentEdit.channel}
-                    onChange={(e) =>
-                      setContentEdit({ ...contentEdit, channel: e.target.value })
+                    options={CHANNELS}
+                    onChange={(channel) =>
+                      setContentEdit({ ...contentEdit, channel })
                     }
-                  >
-                    {selectOptionsWithCurrent(CHANNELS, contentEdit.channel).map(
-                      (o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      )
-                    )}
-                  </select>
+                  />
                 </div>
                 <div>
                   <label className="label">Owner</label>

@@ -237,7 +237,11 @@ export function SocialClient({ hideHeader = false }: { hideHeader?: boolean }) {
       )
         .filter((c) => isSocialContentItem(c) && !!c.due_date)
         .map((c) => {
-          const platform = normalizePlatform(c.channel);
+          const platforms = (Array.isArray(c.channel) ? c.channel : [c.channel])
+            .filter(Boolean)
+            .map((ch) => normalizePlatform(String(ch)));
+          const unique = Array.from(new Set(platforms));
+          const platform = unique[0] ?? "Social";
           return {
             id: c.id,
             text: stripHtml(c.title || c.notes || "Untitled post"),
@@ -245,7 +249,7 @@ export function SocialClient({ hideHeader = false }: { hideHeader?: boolean }) {
             scheduledAt: c.due_date ? `${c.due_date}T09:00:00.000Z` : null,
             url: c.planable_url || null,
             platform,
-            platforms: [platform],
+            platforms: unique.length ? unique : [platform],
             mediaUrl: c.asset_url || null,
             source: "hub" as const,
           };
@@ -278,7 +282,11 @@ export function SocialClient({ hideHeader = false }: { hideHeader?: boolean }) {
   }, [posts]);
 
   const platforms = useMemo(() => {
-    const set = new Set(posts.map((p) => p.platform).filter(Boolean));
+    const set = new Set(
+      posts.flatMap((p) =>
+        p.platforms.length ? p.platforms : [p.platform]
+      ).filter(Boolean)
+    );
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [posts]);
 
@@ -290,7 +298,12 @@ export function SocialClient({ hideHeader = false }: { hideHeader?: boolean }) {
         return false;
       }
       if (statusFilter !== "all" && p.status !== statusFilter) return false;
-      if (platformFilter !== "all" && p.platform !== platformFilter) {
+      if (
+        platformFilter !== "all" &&
+        !(p.platforms.length ? p.platforms : [p.platform]).includes(
+          platformFilter
+        )
+      ) {
         return false;
       }
       return true;

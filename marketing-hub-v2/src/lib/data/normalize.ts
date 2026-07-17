@@ -110,20 +110,55 @@ const NON_SOCIAL_CHANNELS = new Set([
   "article",
 ]);
 
+/** Split channel values from arrays, comma/semicolon lists, or a single string. */
+export function parseChannels(raw: unknown): string[] {
+  if (raw == null || raw === "") return [];
+  if (Array.isArray(raw)) {
+    return raw
+      .flatMap((v) => parseChannels(v))
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  if (typeof raw === "string") {
+    const s = raw.trim();
+    if (!s) return [];
+    if (/[,;|]/.test(s)) {
+      return s
+        .split(/[,;|]/)
+        .map((part) => part.trim())
+        .filter(Boolean);
+    }
+    return [s];
+  }
+  return [String(raw)].filter(Boolean);
+}
+
+export function formatChannels(channels: string[] | string | null | undefined): string {
+  return parseChannels(channels).join(", ");
+}
+
 /** Social calendar items (LinkedIn / IG / etc.) vs editorial pipeline pieces. */
 export function isSocialContentItem(item: {
   content_type?: string | null;
-  channel?: string | null;
+  channel?: string | string[] | null;
 }): boolean {
   const type = (item.content_type || "").trim().toLowerCase();
-  const channel = (item.channel || "").trim().toLowerCase();
-  if (NON_SOCIAL_TYPES.has(type) || NON_SOCIAL_CHANNELS.has(channel)) {
+  const channels = parseChannels(item.channel).map((c) => c.toLowerCase());
+  if (NON_SOCIAL_TYPES.has(type)) return false;
+  if (
+    channels.length > 0 &&
+    channels.every((c) => NON_SOCIAL_CHANNELS.has(c))
+  ) {
     return false;
   }
   if (type === "social" || type.includes("social")) return true;
-  if (SOCIAL_CHANNELS.has(channel) || channel.includes("social")) return true;
+  if (
+    channels.some((c) => SOCIAL_CHANNELS.has(c) || c.includes("social"))
+  ) {
+    return true;
+  }
   // Unknown type on a social platform channel
-  if (!type && SOCIAL_CHANNELS.has(channel)) return true;
+  if (!type && channels.some((c) => SOCIAL_CHANNELS.has(c))) return true;
   return false;
 }
 
@@ -151,6 +186,26 @@ export function normalizeChannel(
     return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
   }
   return s;
+}
+
+/** Normalize one or more channels; falls back to title/notes detection. */
+export function normalizeChannels(
+  raw: unknown,
+  title = "",
+  notes = ""
+): string[] {
+  const parts = parseChannels(raw);
+  const normalized = parts
+    .map((part) => normalizeChannel(part, title, notes))
+    .filter(Boolean);
+  const unique: string[] = [];
+  for (const ch of normalized) {
+    if (!unique.some((u) => u.toLowerCase() === ch.toLowerCase())) {
+      unique.push(ch);
+    }
+  }
+  if (unique.length) return unique;
+  return [normalizeChannel("", title, notes)];
 }
 
 const EVENT_TYPE_MAP: Record<string, string> = {
@@ -185,7 +240,7 @@ export function normalizeEventType(raw: string): string {
 
 export function cleanContentFields(item: {
   title: string;
-  channel: string;
+  channel: string | string[];
   content_type?: string;
   owner: string;
   notes: string;
@@ -194,12 +249,13 @@ export function cleanContentFields(item: {
 }) {
   const notes = stripHtml(item.notes);
   const title = stripHtml(item.title) || "Untitled post";
+  const channel = normalizeChannels(item.channel, title, notes);
   const content_type = normalizeContentType(
-    item.content_type || item.channel || "Social"
+    item.content_type || channel[0] || "Social"
   );
   return {
     title,
-    channel: normalizeChannel(item.channel, title, notes),
+    channel,
     content_type,
     owner: (item.owner ?? "").trim(),
     notes,
@@ -210,7 +266,12 @@ export function cleanContentFields(item: {
 
 /** Social Posts rows that are really calendar events (belong in Events, not content). */
 export function isEventPlaceholderContent(
-  item: { title: string; channel?: string; category?: string; due_date?: string | null },
+  item: {
+    title: string;
+    channel?: string | string[];
+    category?: string;
+    due_date?: string | null;
+  },
   eventTitles?: Set<string>
 ): boolean {
   const title = (item.title ?? "").trim().toLowerCase();
@@ -297,7 +358,7 @@ export function dedupeContentItems<
   T extends {
     id: string;
     title: string;
-    channel: string;
+    channel: string | string[];
     due_date: string | null;
     status: string;
     notes: string;
@@ -313,7 +374,7 @@ export function dedupeContentItems<
     const key = [
       normKeyPart(item.title),
       item.due_date ?? "",
-      normKeyPart(item.channel),
+      normKeyPart(formatChannels(item.channel)),
     ].join("|");
     const prev = byDetail.get(key);
     if (!prev || contentScore(item) > contentScore(prev)) {

@@ -6,6 +6,7 @@ import {
   listContent,
   updateContent,
 } from "@/lib/data/repos";
+import { normalizeChannels } from "@/lib/data/normalize";
 
 export async function GET() {
   const { error } = await requireStaff();
@@ -20,7 +21,11 @@ export async function POST(request: NextRequest) {
   const action = body.action as string | undefined;
 
   if (action === "update") {
-    const updated = await updateContent(body.id, body.patch ?? {});
+    const patch = { ...(body.patch ?? {}) } as Record<string, unknown>;
+    if (patch.channel !== undefined) {
+      patch.channel = normalizeChannels(patch.channel);
+    }
+    const updated = await updateContent(body.id, patch);
     if (!updated) return jsonError("Not found", 404);
     return jsonOk({ item: updated });
   }
@@ -32,7 +37,7 @@ export async function POST(request: NextRequest) {
 
   const item = await createContent({
     title: body.title ?? "Untitled",
-    channel: body.channel ?? "General",
+    channel: normalizeChannels(body.channel ?? body.channels ?? ["LinkedIn"]),
     content_type: body.content_type ?? "Social",
     owner: body.owner ?? "",
     due_date: body.due_date ?? null,

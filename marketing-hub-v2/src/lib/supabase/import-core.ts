@@ -37,6 +37,7 @@ import {
   dedupeContentItems,
   dedupeEventItems,
   isEventPlaceholderContent,
+  parseChannels,
   stripHtml,
 } from "@/lib/data/normalize";
 
@@ -304,10 +305,15 @@ export async function importFromCoreData(): Promise<ImportResult> {
           asString(
             pickField(r, [/^post_?type$/i, /^content_?type$/i, /^type$/i])
           ) || "Social";
+        const rawChannelField = pickField(r, [
+          /^channels?$/i,
+          /^platform$/i,
+          /^network$/i,
+        ]);
         const rawChannel =
-          asString(
-            pickField(r, [/^channels?$/i, /^platform$/i, /^network$/i])
-          ) || rawPostType;
+          parseChannels(rawChannelField).length > 0
+            ? parseChannels(rawChannelField)
+            : [rawPostType];
         const category = asString(
           pickField(r, [/^category$/i, /^hub_?category$/i])
         );

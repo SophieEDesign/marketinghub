@@ -17,6 +17,11 @@ import {
   updateThemeMain,
   updateThemeOffshoot,
 } from "@/lib/data/repos";
+import {
+  formatChannels,
+  normalizeChannels,
+  parseChannels,
+} from "@/lib/data/normalize";
 
 export async function GET() {
   const { error } = await requireStaff();
@@ -66,7 +71,9 @@ async function handleThemesPost(request: NextRequest) {
       if (item.content_id && body.patch) {
         const sync: Record<string, unknown> = {};
         if (body.patch.title !== undefined) sync.title = body.patch.title;
-        if (body.patch.channel !== undefined) sync.channel = body.patch.channel;
+        if (body.patch.channel !== undefined) {
+          sync.channel = normalizeChannels(body.patch.channel);
+        }
         if (body.patch.owner !== undefined) sync.owner = body.patch.owner;
         if (body.patch.status !== undefined) sync.status = body.patch.status;
         if (body.patch.notes !== undefined) sync.notes = body.patch.notes;
@@ -85,14 +92,18 @@ async function handleThemesPost(request: NextRequest) {
   }
 
   if (action === "updateContent") {
-    const content = await updateContent(body.id, body.patch ?? {});
+    const patch = { ...(body.patch ?? {}) } as Record<string, unknown>;
+    if (patch.channel !== undefined) {
+      patch.channel = normalizeChannels(patch.channel);
+    }
+    const content = await updateContent(body.id, patch);
     if (!content) return jsonError("Not found", 404);
     const mains = await listThemeMains();
     const main = mains.find((m) => m.content_id === content.id);
     if (main) {
       await updateThemeMain(main.id, {
         title: content.title,
-        channel: content.channel,
+        channel: formatChannels(content.channel) || parseChannels(content.channel)[0] || "",
         owner: content.owner,
         status: content.status,
         notes: content.notes,

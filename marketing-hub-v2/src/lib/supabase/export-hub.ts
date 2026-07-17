@@ -1,6 +1,7 @@
 import type { HubStore } from "@/lib/types";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { readStore } from "@/lib/store/local";
+import { formatChannels } from "@/lib/data/normalize";
 
 export type ExportResult = {
   events: number;
@@ -72,7 +73,7 @@ export async function exportStoreToSupabase(
     data.content.map((c) => ({
       id: c.id,
       title: c.title,
-      channel: c.channel ?? "",
+      channel: formatChannels(c.channel),
       content_type: c.content_type ?? "Social",
       owner: c.owner ?? "",
       due_date: dateOnly(c.due_date),

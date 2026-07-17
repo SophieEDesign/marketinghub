@@ -111,12 +111,22 @@ export async function POST(request: NextRequest) {
   const fullName = String(body.full_name ?? "").trim();
   const organisation = String(body.organisation ?? "").trim();
   const reason = String(body.reason ?? "").trim();
+  const requestedRole = String(body.requested_role ?? "")
+    .trim()
+    .toLowerCase();
 
   if (!email || !email.includes("@")) {
     return jsonError("A valid email is required");
   }
   if (!fullName) {
     return jsonError("Full name is required");
+  }
+
+  // Defence in depth: non–P&M cannot request Member via the public form.
+  if (requestedRole === "member" && !isAutoMemberEmail(email)) {
+    return jsonError(
+      "Member access cannot be requested for this email. Ask an admin to invite you, or leave the role blank for External media access."
+    );
   }
 
   const duplicate = await findPendingAccessRequestByEmail(email);

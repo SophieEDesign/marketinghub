@@ -766,7 +766,9 @@ function mapMediaRow(
     pickField(r, [/^subfolder$/i, /^gallery_?folder$/i, /^album$/i])
   );
   const subfolder_visibility = normalizeGalleryVisibility(
-    pickField(r, [/^subfolder_?visibility$/i, /^gallery_?visibility$/i])
+    asString(
+      pickField(r, [/^subfolder_?visibility$/i, /^gallery_?visibility$/i])
+    )
   );
   const rawItemVis = asString(
     pickField(r, [/^visibility$/i, /^item_?visibility$/i])
