@@ -11,7 +11,7 @@ const DATA_DIR = getDataDir();
 const STORE_PATH = path.join(DATA_DIR, "store.json");
 const HUB_STORE_ID = "default";
 
-function useDurableSupabaseStore() {
+function shouldUseDurableSupabaseStore() {
   // Demo/local without service role stays on disk. Production with service role uses DB.
   return hasServiceRoleKey() && !allowDemoAuth();
 }
@@ -137,7 +137,7 @@ async function writeRemoteStore(store: HubStore): Promise<boolean> {
 }
 
 async function ensureStore(): Promise<HubStore> {
-  if (useDurableSupabaseStore()) {
+  if (shouldUseDurableSupabaseStore()) {
     let parsed = await readRemoteStore();
     if (!parsed) {
       // Bootstrap from local file if present (e.g. after import on one instance).
@@ -185,7 +185,7 @@ export async function readStore(): Promise<HubStore> {
 }
 
 export async function writeStore(store: HubStore): Promise<void> {
-  if (useDurableSupabaseStore()) {
+  if (shouldUseDurableSupabaseStore()) {
     const ok = await writeRemoteStore(store);
     await writeLocalFile(store);
     if (!ok) {

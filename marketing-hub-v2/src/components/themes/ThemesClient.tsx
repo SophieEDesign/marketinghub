@@ -38,6 +38,14 @@ function themeToForm(theme: QuarterlyTheme): ThemeEditForm {
   };
 }
 
+function pickDefaultTheme(list: QuarterlyTheme[]) {
+  return list.find((t) => t.status === "active") ?? list[0] ?? null;
+}
+
+function uniqueYears(list: QuarterlyTheme[]) {
+  return [...new Set(list.map((t) => t.year))].sort((a, b) => a - b);
+}
+
 export function ThemesClient({
   initialThemes,
   initialMains,
@@ -50,17 +58,18 @@ export function ThemesClient({
   const [themes, setThemes] = useState(initialThemes);
   const [mains, setMains] = useState(initialMains);
   const [offshoots, setOffshoots] = useState(initialOffshoots);
+  const initialSelected = pickDefaultTheme(initialThemes);
   const [selectedId, setSelectedId] = useState(
-    () =>
-      initialThemes.find((t) => t.status === "active")?.id ??
-      initialThemes[0]?.id ??
-      null
+    () => initialSelected?.id ?? null
   );
-  const [themeEdit, setThemeEdit] = useState<ThemeEditForm | null>(() => {
-    const initial =
-      initialThemes.find((t) => t.status === "active") ?? initialThemes[0] ?? null;
-    return initial ? themeToForm(initial) : null;
+  const [yearTab, setYearTab] = useState<number>(() => {
+    if (initialSelected) return initialSelected.year;
+    const years = uniqueYears(initialThemes);
+    return years[0] ?? new Date().getFullYear();
   });
+  const [themeEdit, setThemeEdit] = useState<ThemeEditForm | null>(() =>
+    initialSelected ? themeToForm(initialSelected) : null
+  );
   const [savingTheme, setSavingTheme] = useState(false);
   const [mainForm, setMainForm] = useState({ title: "", channel: "", owner: "" });
   const [offshootFor, setOffshootFor] = useState<string | null>(null);
@@ -82,10 +91,35 @@ export function ThemesClient({
     void refresh();
   }, [refresh]);
 
+  const years = useMemo(() => uniqueYears(themes), [themes]);
+
+  const yearThemes = useMemo(
+    () => themes.filter((t) => t.year === yearTab),
+    [themes, yearTab]
+  );
+
   const selected = useMemo(
     () => themes.find((t) => t.id === selectedId) ?? null,
     [themes, selectedId]
   );
+
+  useEffect(() => {
+    if (years.length === 0) return;
+    if (!years.includes(yearTab)) {
+      setYearTab(years[0]);
+    }
+  }, [years, yearTab]);
+
+  useEffect(() => {
+    if (yearThemes.length === 0) {
+      setSelectedId(null);
+      return;
+    }
+    const stillVisible = yearThemes.some((t) => t.id === selectedId);
+    if (!stillVisible) {
+      setSelectedId(pickDefaultTheme(yearThemes)?.id ?? null);
+    }
+  }, [yearThemes, selectedId]);
 
   useEffect(() => {
     if (selected) setThemeEdit(themeToForm(selected));
@@ -96,6 +130,12 @@ export function ThemesClient({
     () => mains.filter((m) => m.theme_id === selectedId),
     [mains, selectedId]
   );
+
+  function selectYear(year: number) {
+    setYearTab(year);
+    const inYear = themes.filter((t) => t.year === year);
+    setSelectedId(pickDefaultTheme(inYear)?.id ?? null);
+  }
 
   const themeDirty = useMemo(() => {
     if (!selected || !themeEdit) return false;
@@ -163,6 +203,7 @@ export function ThemesClient({
           },
         }),
       });
+      setYearTab(year);
       await refresh();
     } finally {
       setSavingTheme(false);
@@ -188,14 +229,20 @@ export function ThemesClient({
     setThemes(nextThemes);
     setMains(data.mains ?? []);
     setOffshoots(data.offshoots ?? []);
-    setSelectedId((current) => {
-      if (current !== id) return current;
-      return (
-        nextThemes.find((t) => t.status === "active")?.id ??
-        nextThemes[0]?.id ??
-        null
-      );
-    });
+    const remainingInYear = nextThemes.filter((t) => t.year === yearTab);
+    if (remainingInYear.length > 0) {
+      setSelectedId((current) => {
+        if (current !== id) return current;
+        return pickDefaultTheme(remainingInYear)?.id ?? null;
+      });
+    } else {
+      const nextYears = uniqueYears(nextThemes);
+      const nextYear = nextYears.includes(yearTab)
+        ? yearTab
+        : nextYears[0] ?? yearTab;
+      setYearTab(nextYear);
+      setSelectedId(pickDefaultTheme(nextThemes.filter((t) => t.year === nextYear))?.id ?? null);
+    }
   }
 
   async function setItemStatus(
@@ -232,8 +279,34 @@ export function ThemesClient({
         description="Theme → main content → offshoot pieces. Plan the quarter’s spine, then branch social and supporting assets."
       />
 
+      {years.length > 0 ? (
+        <div
+          className="mb-5 inline-flex flex-wrap gap-1 rounded-2xl border border-border bg-white p-1"
+          role="tablist"
+          aria-label="Theme years"
+        >
+          {years.map((year) => (
+            <button
+              key={year}
+              type="button"
+              role="tab"
+              aria-selected={yearTab === year}
+              className={cn(
+                "rounded-xl px-3.5 py-2 text-sm font-medium transition",
+                yearTab === year
+                  ? "bg-brand text-white shadow-sm"
+                  : "text-muted hover:bg-sand hover:text-foreground"
+              )}
+              onClick={() => selectYear(year)}
+            >
+              {year}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {themes.map((theme) => {
+        {yearThemes.map((theme) => {
           const active = theme.id === selectedId;
           const count = mains.filter((m) => m.theme_id === theme.id).length;
           return (
@@ -267,6 +340,11 @@ export function ThemesClient({
             </button>
           );
         })}
+        {yearThemes.length === 0 ? (
+          <p className="col-span-full text-sm text-muted">
+            No themes for {yearTab} yet.
+          </p>
+        ) : null}
       </div>
 
       {selected && themeEdit ? (

@@ -172,8 +172,8 @@ export function MediaGallery({
     void load();
   }, [load]);
 
-  const items = data?.items ?? [];
-  const categories = data?.categories ?? [];
+  const items = useMemo(() => data?.items ?? [], [data?.items]);
+  const categories = useMemo(() => data?.categories ?? [], [data?.categories]);
 
   const collections = useMemo(() => {
     return categories.map((name) => {

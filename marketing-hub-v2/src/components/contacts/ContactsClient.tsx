@@ -82,6 +82,8 @@ export function ContactsClient({ initial }: { initial: Contact[] }) {
     if (!selected) return;
     const next = items.find((c) => c.id === selected.id) ?? null;
     setSelected(next);
+    // Only re-sync when the list or selected id changes, not on every selected object update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- selected intentionally omitted
   }, [items, selected?.id]);
 
   const userById = useMemo(() => {

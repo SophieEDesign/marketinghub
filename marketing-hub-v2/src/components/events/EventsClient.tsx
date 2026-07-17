@@ -257,6 +257,8 @@ export function EventsClient({
     if (!selected) return;
     const next = events.find((e) => e.id === selected.id) ?? null;
     setSelected(next);
+    // Only re-sync when the list or selected id changes, not on every selected object update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- selected intentionally omitted
   }, [events, selected?.id]);
 
   const eventTypes = useMemo(() => {
