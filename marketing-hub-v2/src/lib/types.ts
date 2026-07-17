@@ -250,10 +250,14 @@ export type StaffRequestStatus = "open" | "in_progress" | "done";
 export type StaffRequest = {
   id: string;
   kind: StaffRequestKind;
+  /** Asset type for kind=asset (Presentation, Brochure, Image, …) */
+  category: string;
   title: string;
   details: string;
   requested_by: string;
   needed_by: string | null;
+  /** Uploaded reference file / draft asset URL */
+  attachment_url: string;
   status: StaffRequestStatus;
   created_at: string;
   updated_at: string;

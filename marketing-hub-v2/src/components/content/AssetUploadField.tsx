@@ -9,9 +9,13 @@ import { cn } from "@/lib/utils";
 export function AssetUploadField({
   value,
   onChange,
+  label = "Asset",
+  hint = "Images, PDF or short video · max 25MB. Shows on the calendar card.",
 }: {
   value: string;
   onChange: (url: string) => void;
+  label?: string;
+  hint?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -34,7 +38,7 @@ export function AssetUploadField({
 
   return (
     <div className="space-y-2">
-      <label className="label">Asset</label>
+      <label className="label">{label}</label>
       {value && isImageUrl(value) ? (
         <div className="overflow-hidden rounded-xl border border-border bg-sand/40">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -92,9 +96,7 @@ export function AssetUploadField({
         placeholder="Or paste an asset URL…"
       />
       {error ? <p className="text-xs text-[var(--danger)]">{error}</p> : null}
-      <p className="text-[11px] text-muted">
-        Images, PDF or short video · max 25MB. Shows on the calendar card.
-      </p>
+      {hint ? <p className="text-[11px] text-muted">{hint}</p> : null}
     </div>
   );
 }

@@ -1,8 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { FieldDef } from "@/lib/data/collections";
 import { statusTone } from "@/lib/data/collections";
 import { cn } from "@/lib/utils";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
+import { plainTextFromHtml } from "@/lib/sanitize";
 
 function toDateInput(value: unknown): string {
   if (value == null || value === "") return "";
@@ -68,6 +71,7 @@ export function parseTypedValue(
 export function displayValue(field: FieldDef, value: unknown): string {
   if (value == null) return "";
   if (field.type === "tags") return tagsToString(value);
+  if (field.type === "longtext") return plainTextFromHtml(String(value));
   if (field.type === "date") return toDateInput(value);
   if (field.type === "datetime") {
     const d = new Date(String(value));
@@ -82,6 +86,38 @@ export function displayValue(field: FieldDef, value: unknown): string {
     }
   }
   return String(value);
+}
+
+function LongTextFieldControl({
+  fieldKey,
+  value,
+  onCommit,
+  compact,
+}: {
+  fieldKey: string;
+  value: unknown;
+  onCommit: (next: unknown) => void;
+  compact?: boolean;
+}) {
+  const remote = value == null ? "" : String(value);
+  const [local, setLocal] = useState(remote);
+
+  useEffect(() => {
+    setLocal(remote);
+  }, [fieldKey, remote]);
+
+  return (
+    <RichTextEditor
+      value={local}
+      onChange={setLocal}
+      onBlur={() => {
+        if (local !== remote) onCommit(local);
+      }}
+      minHeight={compact ? "64px" : "88px"}
+      compact={compact}
+      className="min-w-[220px]"
+    />
+  );
 }
 
 function optionLabel(field: FieldDef, value: string): string {
@@ -277,15 +313,11 @@ export function FieldControl({
 
   if (field.type === "longtext") {
     return (
-      <textarea
-        className={cn(inputClass, "min-h-[52px] min-w-[200px] resize-y")}
-        rows={2}
-        defaultValue={value == null ? "" : String(value)}
-        key={`${field.key}-${String(value).slice(0, 40)}`}
-        onBlur={(e) => {
-          if (e.target.value === (value == null ? "" : String(value))) return;
-          onCommit(e.target.value);
-        }}
+      <LongTextFieldControl
+        fieldKey={field.key}
+        value={value}
+        onCommit={onCommit}
+        compact={compact}
       />
     );
   }
@@ -377,11 +409,11 @@ export function BulkValueControl({
 
   if (field.type === "longtext") {
     return (
-      <textarea
-        className="field min-h-[40px]"
-        rows={1}
+      <RichTextEditor
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={onChange}
+        minHeight="72px"
+        compact
       />
     );
   }

@@ -1,12 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { AssetUploadField } from "@/components/content/AssetUploadField";
+import { ASSET_REQUEST_CATEGORIES } from "@/lib/data/collections";
 import type {
   StaffRequest,
   StaffRequestKind,
   StaffRequestStatus,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
+import { RichTextView } from "@/components/ui/RichTextView";
+import { plainTextFromHtml } from "@/lib/sanitize";
 
 const KINDS: { id: StaffRequestKind; label: string }[] = [
   { id: "asset", label: "Asset request" },
@@ -22,11 +27,21 @@ const STATUSES: { id: StaffRequestStatus; label: string }[] = [
 
 const emptyForm = {
   kind: "asset" as StaffRequestKind,
+  category: "",
   title: "",
   details: "",
   requested_by: "",
   needed_by: "",
+  attachment_url: "",
 };
+
+function isAssetKind(kind: StaffRequestKind) {
+  return kind === "asset";
+}
+
+function allowsUpload(kind: StaffRequestKind) {
+  return kind === "asset" || kind === "social_form";
+}
 
 export function StaffRequestsClient({
   initial,
@@ -67,6 +82,8 @@ export function StaffRequestsClient({
     return items.filter((i) => i.kind === kindFilter);
   }, [items, kindFilter]);
 
+  const activeKind = kind ?? form.kind;
+
   const title =
     kind === "asset"
       ? "Asset requests"
@@ -92,6 +109,8 @@ export function StaffRequestsClient({
       body: JSON.stringify({
         ...form,
         kind: kind ?? form.kind,
+        category: isAssetKind(kind ?? form.kind) ? form.category : "",
+        attachment_url: form.attachment_url || "",
         needed_by: form.needed_by || null,
       }),
     });
@@ -177,6 +196,8 @@ export function StaffRequestsClient({
                   setForm({
                     ...form,
                     kind: e.target.value as StaffRequestKind,
+                    category:
+                      e.target.value === "asset" ? form.category : "",
                   })
                 }
               >
@@ -198,6 +219,25 @@ export function StaffRequestsClient({
               }
             />
           </div>
+          {isAssetKind(activeKind) ? (
+            <div className="md:col-span-2">
+              <label className="label">Asset type</label>
+              <select
+                className="field"
+                value={form.category}
+                onChange={(e) =>
+                  setForm({ ...form, category: e.target.value })
+                }
+              >
+                <option value="">Select type…</option>
+                {ASSET_REQUEST_CATEGORIES.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
           <div className="md:col-span-2">
             <label className="label">Title</label>
             <input
@@ -205,9 +245,9 @@ export function StaffRequestsClient({
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
               placeholder={
-                kind === "social_form"
+                kind === "social_form" || activeKind === "social_form"
                   ? "e.g. Staff wins shout-out form"
-                  : kind === "asset"
+                  : kind === "asset" || activeKind === "asset"
                     ? "e.g. High-res project photos for LinkedIn"
                     : "What do you need?"
               }
@@ -215,12 +255,33 @@ export function StaffRequestsClient({
           </div>
           <div className="md:col-span-2">
             <label className="label">Details</label>
-            <textarea
-              className="field min-h-[88px]"
+            <RichTextEditor
               value={form.details}
-              onChange={(e) => setForm({ ...form, details: e.target.value })}
+              onChange={(details) => setForm({ ...form, details })}
+              placeholder="Details…"
+              minHeight="88px"
             />
           </div>
+          {allowsUpload(activeKind) ? (
+            <div className="md:col-span-2">
+              <AssetUploadField
+                value={form.attachment_url}
+                onChange={(url) =>
+                  setForm({ ...form, attachment_url: url })
+                }
+                label={
+                  activeKind === "social_form"
+                    ? "Reference / draft media"
+                    : "Reference file"
+                }
+                hint={
+                  activeKind === "social_form"
+                    ? "Optional image, PDF or short video for the social request · max 25MB."
+                    : "Optional brief, draft, or example file · images, PDF or short video · max 25MB."
+                }
+              />
+            </div>
+          ) : null}
           <div>
             <label className="label">Needed by</label>
             <input
@@ -253,13 +314,28 @@ export function StaffRequestsClient({
         {filtered.map((item) => (
           <li key={item.id} className="surface-card p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted">
                   {KINDS.find((k) => k.id === item.kind)?.label ?? item.kind}
+                  {item.kind === "asset" && item.category
+                    ? ` · ${item.category}`
+                    : ""}
                 </p>
                 <p className="mt-1 font-medium">{item.title}</p>
-                {item.details ? (
-                  <p className="mt-1 text-sm text-muted">{item.details}</p>
+                {plainTextFromHtml(item.details) ? (
+                  <div className="mt-1 text-sm text-muted">
+                    <RichTextView html={item.details} />
+                  </div>
+                ) : null}
+                {item.attachment_url ? (
+                  <a
+                    href={item.attachment_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-2 inline-block text-sm text-brand underline-offset-2 hover:underline"
+                  >
+                    View attachment
+                  </a>
                 ) : null}
                 <p className="mt-2 text-xs text-muted">
                   {item.requested_by || "Staff"}

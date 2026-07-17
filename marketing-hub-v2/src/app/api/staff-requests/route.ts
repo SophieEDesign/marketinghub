@@ -32,10 +32,12 @@ export async function POST(request: NextRequest) {
 
   const item = await createStaffRequest({
     kind: body.kind ?? "other",
+    category: body.category ?? "",
     title: body.title ?? "Request",
     details: body.details ?? "",
     requested_by: body.requested_by ?? "Staff",
     needed_by: body.needed_by || null,
+    attachment_url: body.attachment_url ?? "",
     status: body.status ?? "open",
   });
   return jsonOk({ item }, { status: 201 });

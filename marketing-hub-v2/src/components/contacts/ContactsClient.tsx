@@ -5,6 +5,9 @@ import type { Contact, HubUser } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { useHubView } from "@/lib/hub-view";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
+import { RichTextView } from "@/components/ui/RichTextView";
+import { plainTextFromHtml } from "@/lib/sanitize";
 
 const emptyForm = {
   name: "",
@@ -105,7 +108,7 @@ export function ContactsClient({ initial }: { initial: Contact[] }) {
           c.role,
           c.email,
           c.tags.join(" "),
-          c.notes,
+          plainTextFromHtml(c.notes),
           c.user_id ? userById.get(c.user_id)?.full_name ?? "" : "",
           c.user_id ? userById.get(c.user_id)?.email ?? "" : "",
         ])
@@ -403,8 +406,8 @@ export function ContactsClient({ initial }: { initial: Contact[] }) {
                 </div>
                 <div>
                   <dt className="label !mb-0.5">Notes</dt>
-                  <dd className="whitespace-pre-wrap text-foreground/90">
-                    {selected.notes || "—"}
+                  <dd>
+                    <RichTextView html={selected.notes} />
                   </dd>
                 </div>
               </dl>
@@ -532,10 +535,11 @@ function ContactFields({
       </div>
       <div className="md:col-span-2">
         <label className="label">Notes</label>
-        <textarea
-          className="field min-h-[70px]"
+        <RichTextEditor
           value={form.notes}
-          onChange={(e) => onChange({ ...form, notes: e.target.value })}
+          onChange={(notes) => onChange({ ...form, notes })}
+          placeholder="Notes…"
+          minHeight="70px"
         />
       </div>
     </div>

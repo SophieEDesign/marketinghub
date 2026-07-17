@@ -13,6 +13,7 @@ import {
   isImageUrl,
   platformKey,
 } from "@/lib/social/platforms";
+import { plainTextFromHtml } from "@/lib/sanitize";
 
 const STATUS_LABEL: Record<ContentStatus, string> = {
   idea: "Idea",
@@ -61,10 +62,9 @@ export function ContentCalendarCard({
   const social = isSocialContentItem(item);
   const channels = parseChannels(item.channel);
   const hasMedia = isImageUrl(item.asset_url);
+  const notesPreview = plainTextFromHtml(item.notes).slice(0, 120);
   const preview =
-    item.title?.trim() ||
-    item.notes?.replace(/\s+/g, " ").trim().slice(0, 120) ||
-    "Untitled";
+    item.title?.trim() || notesPreview || "Untitled";
   const shownChannels = channels.slice(0, 2);
   const extraChannels = channels.length - shownChannels.length;
 

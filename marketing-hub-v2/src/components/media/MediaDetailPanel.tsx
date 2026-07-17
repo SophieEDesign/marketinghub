@@ -9,6 +9,8 @@ import {
   type MediaListItem,
 } from "@/lib/supabase/media-list";
 import { cn } from "@/lib/utils";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
+import { RichTextView } from "@/components/ui/RichTextView";
 
 const NEW_SUBFOLDER_VALUE = "__new_subfolder__";
 
@@ -659,13 +661,16 @@ export function MediaDetailPanel({
             </div>
             <div>
               <label className="label">Notes</label>
-              <textarea
-                className="field min-h-[80px]"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                readOnly={!canEdit}
-                disabled={!canEdit}
-              />
+              {canEdit ? (
+                <RichTextEditor
+                  value={notes}
+                  onChange={setNotes}
+                  placeholder="Notes…"
+                  minHeight="80px"
+                />
+              ) : (
+                <RichTextView html={notes} />
+              )}
             </div>
             {error ? (
               <p className="text-sm text-[var(--danger)]">{error}</p>

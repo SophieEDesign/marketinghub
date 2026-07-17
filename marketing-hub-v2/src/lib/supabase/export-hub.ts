@@ -244,10 +244,12 @@ export async function exportStoreToSupabase(
     data.staff_requests.map((s) => ({
       id: s.id,
       kind: s.kind,
+      category: s.category ?? "",
       title: s.title,
       details: s.details ?? "",
       requested_by: s.requested_by ?? "",
       needed_by: dateOnly(s.needed_by),
+      attachment_url: s.attachment_url ?? "",
       status: s.status,
       created_at: s.created_at,
       updated_at: s.updated_at,

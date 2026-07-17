@@ -8,6 +8,9 @@ import {
   REPORT_CATEGORIES,
   REPORT_TOOLS,
 } from "@/lib/data/collections";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
+import { RichTextView } from "@/components/ui/RichTextView";
+import { plainTextFromHtml } from "@/lib/sanitize";
 
 const CATEGORY_ORDER = REPORT_CATEGORIES.map((c) => c.value);
 
@@ -172,10 +175,11 @@ export function ReportsClient({ initial }: { initial: ReportLink[] }) {
           </div>
           <div className="md:col-span-2">
             <label className="label">Description</label>
-            <textarea
-              className="field min-h-[70px]"
+            <RichTextEditor
               value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              onChange={(description) => setForm({ ...form, description })}
+              placeholder="Description…"
+              minHeight="70px"
             />
           </div>
           <div className="flex gap-2">
@@ -203,7 +207,11 @@ export function ReportsClient({ initial }: { initial: ReportLink[] }) {
                     <div className="min-w-0 flex-1">
                       <h3 className="font-medium">{item.title}</h3>
                       <p className="text-xs text-muted">{item.tool}</p>
-                      <p className="mt-1 text-sm text-muted">{item.description}</p>
+                      {plainTextFromHtml(item.description) ? (
+                        <div className="mt-1 text-sm text-muted">
+                          <RichTextView html={item.description} />
+                        </div>
+                      ) : null}
                     </div>
                   </div>
 

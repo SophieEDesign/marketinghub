@@ -172,6 +172,18 @@ export const RESOURCE_CATEGORIES: FieldOption[] = [
   { value: "General", label: "General" },
 ];
 
+/** What kind of asset is being requested (staff asset requests) */
+export const ASSET_REQUEST_CATEGORIES: FieldOption[] = [
+  { value: "Presentation", label: "Presentation / deck" },
+  { value: "Brochure", label: "Brochure" },
+  { value: "Image", label: "Image / photo" },
+  { value: "Logo", label: "Logo" },
+  { value: "Video", label: "Video" },
+  { value: "Document", label: "Document / PDF" },
+  { value: "Template", label: "Template" },
+  { value: "Other", label: "Other" },
+];
+
 export const REPORT_CATEGORIES: FieldOption[] = [
   { value: "Website", label: "Website" },
   { value: "Ads", label: "Ads" },
@@ -540,10 +552,16 @@ export const DATA_COLLECTIONS: CollectionDef[] = [
     fields: [
       f("id", { type: "readonly", locked: true }),
       f("kind", { type: "select", options: STAFF_KINDS }),
+      f("category", {
+        type: "select",
+        label: "Asset type",
+        options: ASSET_REQUEST_CATEGORIES,
+      }),
       f("title"),
       f("details", { type: "longtext" }),
       f("requested_by", { label: "Requested by" }),
       f("needed_by", { type: "date", label: "Needed by" }),
+      f("attachment_url", { type: "url", label: "Attachment" }),
       f("status", { type: "select", options: STAFF_REQUEST_STATUS }),
       f("created_at", { type: "readonly", locked: true }),
       f("updated_at", { type: "readonly", locked: true }),

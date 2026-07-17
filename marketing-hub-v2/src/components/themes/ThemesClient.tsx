@@ -24,6 +24,9 @@ import {
   selectOptionsWithCurrent,
 } from "@/lib/data/collections";
 import { isSocialContentItem } from "@/lib/data/normalize";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
+import { RichTextView } from "@/components/ui/RichTextView";
+import { plainTextFromHtml } from "@/lib/sanitize";
 
 const STATUS_LABEL: Record<ThemeStatus, string> = {
   previous: "Previous",
@@ -560,7 +563,14 @@ export function ThemesClient({
                 </span>
               </div>
               <h2 className="mt-2 font-display text-lg text-brand">{theme.title}</h2>
-              <p className="mt-1 line-clamp-2 text-xs text-muted">{theme.summary}</p>
+              {plainTextFromHtml(theme.summary) ? (
+                <RichTextView
+                  html={theme.summary}
+                  plain
+                  clampLines={2}
+                  className="mt-1 text-xs text-muted"
+                />
+              ) : null}
               <p className="mt-3 text-xs text-muted">{count} main pieces</p>
             </button>
           );
@@ -658,14 +668,14 @@ export function ThemesClient({
               placeholder="Theme title"
               aria-label="Theme title"
             />
-            <textarea
-              className="field mt-3 min-h-[88px]"
+            <RichTextEditor
+              className="mt-3"
               value={themeEdit.summary}
-              onChange={(e) =>
-                setThemeEdit({ ...themeEdit, summary: e.target.value })
+              onChange={(summary) =>
+                setThemeEdit({ ...themeEdit, summary })
               }
               placeholder="Theme summary"
-              aria-label="Theme summary"
+              minHeight="88px"
             />
           </div>
 
@@ -1113,15 +1123,16 @@ export function ThemesClient({
                   <>
                     <div className="sm:col-span-2">
                       <label className="label">Caption / post text</label>
-                      <textarea
-                        className="field min-h-[70px]"
+                      <RichTextEditor
                         value={contentEdit.caption}
-                        onChange={(e) =>
+                        onChange={(caption) =>
                           setContentEdit({
                             ...contentEdit,
-                            caption: e.target.value,
+                            caption,
                           })
                         }
+                        placeholder="Caption / post text…"
+                        minHeight="70px"
                       />
                     </div>
                     <div>
@@ -1141,12 +1152,13 @@ export function ThemesClient({
                 ) : null}
                 <div className="sm:col-span-2">
                   <label className="label">Notes</label>
-                  <textarea
-                    className="field min-h-[70px]"
+                  <RichTextEditor
                     value={contentEdit.notes}
-                    onChange={(e) =>
-                      setContentEdit({ ...contentEdit, notes: e.target.value })
+                    onChange={(notes) =>
+                      setContentEdit({ ...contentEdit, notes })
                     }
+                    placeholder="Notes…"
+                    minHeight="70px"
                   />
                 </div>
                 <AssetUploadField

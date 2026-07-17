@@ -22,6 +22,16 @@ import {
   normalizeEventTypeLabel,
 } from "@/lib/events/event-type-colors";
 import { EVENT_TYPES, selectOptionsWithCurrent } from "@/lib/data/collections";
+import {
+  downloadCalendarIcs,
+  downloadEventIcs,
+  eventsFeedWebcalUrl,
+  googleCalendarAddUrl,
+  outlookCalendarAddUrl,
+} from "@/lib/events/event-ics";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
+import { RichTextView } from "@/components/ui/RichTextView";
+import { plainTextFromHtml } from "@/lib/sanitize";
 
 const ATTENDANCE_OPTIONS: { value: EventAttendanceStatus; label: string }[] = [
   { value: "attending", label: "Attending" },
@@ -254,10 +264,11 @@ function EventFields({
       </div>
       <div className="md:col-span-2">
         <label className="label">Notes</label>
-        <textarea
-          className="field min-h-[80px]"
+        <RichTextEditor
           value={form.notes}
-          onChange={(e) => onChange({ ...form, notes: e.target.value })}
+          onChange={(notes) => onChange({ ...form, notes })}
+          placeholder="Event notes…"
+          minHeight="88px"
         />
       </div>
     </div>
@@ -275,6 +286,7 @@ export function EventsClient({
 }) {
   const { view } = useHubView();
   const canDelete = view === "admin";
+  const showUndatedQueue = view === "admin";
 
   const [events, setEvents] = useState(initialEvents);
   const [selected, setSelected] = useState<EventItem | null>(null);
@@ -292,6 +304,8 @@ export function EventsClient({
   const [attendance, setAttendance] = useState<EventAttendance[]>([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [attendanceSaving, setAttendanceSaving] = useState(false);
+  const [syncMenuOpen, setSyncMenuOpen] = useState(false);
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/events");
@@ -419,7 +433,7 @@ export function EventsClient({
           e.location,
           e.event_type,
           e.division,
-          e.notes,
+          plainTextFromHtml(e.notes),
         ])
       ) {
         return false;
@@ -496,6 +510,33 @@ export function EventsClient({
     ];
     return ordered.length ? ordered : known;
   }, [events]);
+
+  const flashSyncNotice = useCallback((message: string) => {
+    setSyncNotice(message);
+    window.setTimeout(() => setSyncNotice(null), 3500);
+  }, []);
+
+  const handleDownloadFilteredIcs = useCallback(() => {
+    setSyncMenuOpen(false);
+    const count = downloadCalendarIcs(filtered, "marketing-events.ics");
+    if (count === 0) {
+      flashSyncNotice("No dated events to export for the current filters.");
+      return;
+    }
+    flashSyncNotice(`Downloaded ${count} event${count === 1 ? "" : "s"} (.ics).`);
+  }, [filtered, flashSyncNotice]);
+
+  const handleCopyCalendarFeed = useCallback(() => {
+    setSyncMenuOpen(false);
+    const webcal = eventsFeedWebcalUrl(window.location.origin);
+    void navigator.clipboard?.writeText(webcal).then(
+      () =>
+        flashSyncNotice(
+          "Calendar feed URL copied — paste into Google Calendar, Outlook, or Apple Calendar."
+        ),
+      () => flashSyncNotice(`Feed URL: ${webcal}`)
+    );
+  }, [flashSyncNotice]);
 
   async function createEvent() {
     await fetch("/api/events", {
@@ -603,6 +644,15 @@ export function EventsClient({
     ? events.find((e) => e.id === editingId) ?? null
     : null;
 
+  const selectedGoogleUrl =
+    selected && hasValidStart(selected)
+      ? googleCalendarAddUrl(selected)
+      : null;
+  const selectedOutlookUrl =
+    selected && hasValidStart(selected)
+      ? outlookCalendarAddUrl(selected)
+      : null;
+
   return (
     <div>
       <FullCalendarStyles />
@@ -634,6 +684,56 @@ export function EventsClient({
         description="Add and edit shows and meetings. Mark whether you're attending when you select an event. Only admins can delete events."
         actions={
           <>
+            <div className="relative">
+              <button
+                type="button"
+                className="btn-secondary"
+                aria-expanded={syncMenuOpen}
+                aria-haspopup="menu"
+                onClick={() => setSyncMenuOpen((open) => !open)}
+              >
+                Sync calendar
+              </button>
+              {syncMenuOpen ? (
+                <>
+                  <button
+                    type="button"
+                    className="fixed inset-0 z-40 cursor-default md:left-sidebar"
+                    aria-label="Close sync menu"
+                    onClick={() => setSyncMenuOpen(false)}
+                  />
+                  <div
+                    role="menu"
+                    className="absolute right-0 z-50 mt-1 w-64 rounded-lg border border-border bg-white p-1 shadow-lg"
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-sand"
+                      onClick={handleDownloadFilteredIcs}
+                    >
+                      Download filtered events (.ics)
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-sand"
+                      onClick={handleCopyCalendarFeed}
+                    >
+                      Copy calendar feed URL
+                    </button>
+                    <a
+                      role="menuitem"
+                      href="/api/events/feed"
+                      className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-sand"
+                      onClick={() => setSyncMenuOpen(false)}
+                    >
+                      Open / download full feed
+                    </a>
+                  </div>
+                </>
+              ) : null}
+            </div>
             <button
               type="button"
               className="btn-secondary"
@@ -653,6 +753,15 @@ export function EventsClient({
           </>
         }
       />
+
+      {syncNotice ? (
+        <p
+          className="mb-4 rounded-lg border border-border bg-accent-soft/40 px-3 py-2 text-sm text-foreground"
+          role="status"
+        >
+          {syncNotice}
+        </p>
+      ) : null}
 
       <FilterBar
         search={search}
@@ -707,6 +816,29 @@ export function EventsClient({
             </span>
           );
         })}
+      </div>
+
+      <div className="mb-4 flex flex-col gap-3 rounded-lg border border-border bg-accent-soft/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-foreground">
+          Stay up to date — subscribe to the event calendar feed, or download a
+          filtered .ics file.
+        </p>
+        <div className="flex flex-wrap gap-2 shrink-0">
+          <button
+            type="button"
+            className="btn-secondary !px-2.5 !py-1.5 text-xs"
+            onClick={handleCopyCalendarFeed}
+          >
+            Get calendar feed
+          </button>
+          <button
+            type="button"
+            className="btn-secondary !px-2.5 !py-1.5 text-xs"
+            onClick={handleDownloadFilteredIcs}
+          >
+            Download .ics
+          </button>
+        </div>
       </div>
 
       {showForm ? (
@@ -931,8 +1063,8 @@ export function EventsClient({
                   ) : null}
                   <div>
                     <dt className="label !mb-0.5">Notes</dt>
-                    <dd className="whitespace-pre-wrap text-foreground/90">
-                      {selected.notes || "—"}
+                    <dd>
+                      <RichTextView html={selected.notes} />
                     </dd>
                   </div>
                 </dl>
@@ -993,6 +1125,41 @@ export function EventsClient({
                   >
                     {hasValidStart(selected) ? "Edit event" : "Add date"}
                   </button>
+                  {hasValidStart(selected) ? (
+                    <>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={() => {
+                          if (downloadEventIcs(selected)) {
+                            flashSyncNotice("Event downloaded (.ics).");
+                          }
+                        }}
+                      >
+                        Download .ics
+                      </button>
+                      {selectedGoogleUrl ? (
+                        <a
+                          href={selectedGoogleUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn-secondary"
+                        >
+                          Google Calendar
+                        </a>
+                      ) : null}
+                      {selectedOutlookUrl ? (
+                        <a
+                          href={selectedOutlookUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn-secondary"
+                        >
+                          Outlook
+                        </a>
+                      ) : null}
+                    </>
+                  ) : null}
                   {canDelete ? (
                     <button
                       type="button"
@@ -1012,44 +1179,46 @@ export function EventsClient({
             )}
           </div>
 
-          <div className="surface-card flex max-h-[420px] flex-col overflow-hidden">
-            <div className="border-b border-border px-4 py-3">
-              <h3 className="text-sm font-semibold text-brand">
-                Needs a date
-              </h3>
-              <p className="mt-0.5 text-xs text-muted">
-                {undated.length} event{undated.length === 1 ? "" : "s"} not on
-                the calendar
-              </p>
+          {showUndatedQueue ? (
+            <div className="surface-card flex max-h-[420px] flex-col overflow-hidden">
+              <div className="border-b border-border px-4 py-3">
+                <h3 className="text-sm font-semibold text-brand">
+                  Needs a date
+                </h3>
+                <p className="mt-0.5 text-xs text-muted">
+                  {undated.length} event{undated.length === 1 ? "" : "s"} not on
+                  the calendar
+                </p>
+              </div>
+              <ul className="flex-1 divide-y divide-border overflow-y-auto">
+                {undated.map((e) => (
+                  <li key={e.id}>
+                    <button
+                      type="button"
+                      className={`flex w-full flex-col gap-1 px-4 py-3 text-left hover:bg-sand ${
+                        selected?.id === e.id ? "bg-accent-soft/50" : ""
+                      }`}
+                      onClick={() => setSelected(e)}
+                    >
+                      <span className="text-sm font-medium">{e.title}</span>
+                      <span className="flex flex-wrap items-center gap-2 text-xs text-muted">
+                        <TypeSwatch eventType={e.event_type} />
+                        {e.division ? (
+                          <DivisionSwatch division={e.division} />
+                        ) : null}
+                        {e.location ? <span>{e.location}</span> : null}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+                {undated.length === 0 ? (
+                  <li className="px-4 py-6 text-sm text-muted">
+                    All matching events have dates.
+                  </li>
+                ) : null}
+              </ul>
             </div>
-            <ul className="flex-1 divide-y divide-border overflow-y-auto">
-              {undated.map((e) => (
-                <li key={e.id}>
-                  <button
-                    type="button"
-                    className={`flex w-full flex-col gap-1 px-4 py-3 text-left hover:bg-sand ${
-                      selected?.id === e.id ? "bg-accent-soft/50" : ""
-                    }`}
-                    onClick={() => setSelected(e)}
-                  >
-                    <span className="text-sm font-medium">{e.title}</span>
-                    <span className="flex flex-wrap items-center gap-2 text-xs text-muted">
-                      <TypeSwatch eventType={e.event_type} />
-                      {e.division ? (
-                        <DivisionSwatch division={e.division} />
-                      ) : null}
-                      {e.location ? <span>{e.location}</span> : null}
-                    </span>
-                  </button>
-                </li>
-              ))}
-              {undated.length === 0 ? (
-                <li className="px-4 py-6 text-sm text-muted">
-                  All matching events have dates.
-                </li>
-              ) : null}
-            </ul>
-          </div>
+          ) : null}
         </aside>
       </div>
 

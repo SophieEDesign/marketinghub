@@ -867,11 +867,19 @@ export async function deleteMerchInventoryItem(id: string) {
   });
 }
 
+function normalizeStaffRequest(item: StaffRequest): StaffRequest {
+  return {
+    ...item,
+    category: item.category ?? "",
+    attachment_url: item.attachment_url ?? "",
+  };
+}
+
 export async function listStaffRequests() {
   const store = await readStore();
-  return [...store.staff_requests].sort((a, b) =>
-    b.created_at.localeCompare(a.created_at)
-  );
+  return [...store.staff_requests]
+    .map(normalizeStaffRequest)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
 export async function createStaffRequest(
@@ -879,6 +887,8 @@ export async function createStaffRequest(
 ) {
   const item: StaffRequest = {
     ...input,
+    category: input.category ?? "",
+    attachment_url: input.attachment_url ?? "",
     id: uid("sr"),
     created_at: nowIso(),
     updated_at: nowIso(),

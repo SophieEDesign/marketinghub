@@ -1,6 +1,12 @@
 import { promises as fs } from "fs";
 import path from "path";
-import type { ContentItem, EventItem, HubStore, MerchOrder } from "@/lib/types";
+import type {
+  ContentItem,
+  EventItem,
+  HubStore,
+  MerchOrder,
+  StaffRequest,
+} from "@/lib/types";
 import { createSeedStore } from "@/lib/store/seed";
 import { getDataDir } from "@/lib/store/paths";
 import {
@@ -77,6 +83,17 @@ function migrateThemeMains(
   }));
 }
 
+function migrateStaffRequests(
+  items: StaffRequest[] | undefined
+): StaffRequest[] | undefined {
+  if (!items) return items;
+  return items.map((item) => ({
+    ...item,
+    category: item.category ?? "",
+    attachment_url: item.attachment_url ?? "",
+  }));
+}
+
 function withDefaults(store: Partial<HubStore>): HubStore {
   const seed = createSeedStore();
   // Only fill missing collections with demo rows when the snapshot itself is seed.
@@ -99,7 +116,8 @@ function withDefaults(store: Partial<HubStore>): HubStore {
     merch_inventory:
       store.merch_inventory ??
       (fillMissingFromSeed ? seed.merch_inventory : []),
-    staff_requests: store.staff_requests ?? seed.staff_requests,
+    staff_requests:
+      migrateStaffRequests(store.staff_requests) ?? seed.staff_requests,
     awards: store.awards ?? seed.awards,
     tasks: store.tasks ?? seed.tasks,
     hub_users: store.hub_users ?? seed.hub_users,

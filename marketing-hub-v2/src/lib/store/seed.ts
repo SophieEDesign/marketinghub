@@ -480,12 +480,14 @@ export function createSeedStore(): HubStore {
       {
         id: "sr_seed_1",
         kind: "asset",
+        category: "Image",
         title: "High-res yacht load photos for LinkedIn",
         details: "Need 4–6 images from Rotterdam project for next week’s post.",
         requested_by: "Marketing",
         needed_by: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7)
           .toISOString()
           .slice(0, 10),
+        attachment_url: "",
         status: "open",
         created_at: now,
         updated_at: now,
@@ -493,11 +495,13 @@ export function createSeedStore(): HubStore {
       {
         id: "sr_seed_2",
         kind: "social_form",
+        category: "",
         title: "Internal shout-out form for staff wins",
         details:
           "Simple form so offices can submit colleague wins for social.",
         requested_by: "Sophie",
         needed_by: null,
+        attachment_url: "",
         status: "in_progress",
         created_at: now,
         updated_at: now,

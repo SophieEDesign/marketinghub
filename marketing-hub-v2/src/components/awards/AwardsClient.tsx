@@ -8,6 +8,9 @@ import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { ContactOwnerSelect } from "@/components/ui/ContactOwnerSelect";
 import { useHubView } from "@/lib/hub-view";
 import { cn } from "@/lib/utils";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
+import { RichTextView } from "@/components/ui/RichTextView";
+import { plainTextFromHtml } from "@/lib/sanitize";
 
 const STATUSES: { id: AwardStatus; label: string }[] = [
   { id: "watching", label: "Watching" },
@@ -100,7 +103,7 @@ export function AwardsClient({ initial }: { initial: AwardEntry[] }) {
           item.organisation,
           item.category,
           item.owner,
-          item.notes,
+          plainTextFromHtml(item.notes),
         ])
       ) {
         return false;
@@ -291,10 +294,13 @@ export function AwardsClient({ initial }: { initial: AwardEntry[] }) {
                     : ""}
                   {item.owner ? ` · ${item.owner}` : ""}
                 </p>
-                {item.notes ? (
-                  <p className="mt-2 line-clamp-2 text-sm text-foreground/80">
-                    {item.notes}
-                  </p>
+                {plainTextFromHtml(item.notes) ? (
+                  <RichTextView
+                    html={item.notes}
+                    plain
+                    clampLines={2}
+                    className="mt-2 text-sm text-foreground/80"
+                  />
                 ) : null}
                 {item.event_id ? (
                   <a
@@ -404,8 +410,8 @@ export function AwardsClient({ initial }: { initial: AwardEntry[] }) {
                   </div>
                   <div>
                     <dt className="label !mb-0.5">Notes</dt>
-                    <dd className="whitespace-pre-wrap text-foreground/90">
-                      {selected.notes || "—"}
+                    <dd>
+                      <RichTextView html={selected.notes} />
                     </dd>
                   </div>
                   {selected.event_id ? (
@@ -577,10 +583,11 @@ function AwardFields({
       </div>
       <div className="md:col-span-2">
         <label className="label">Notes</label>
-        <textarea
-          className="field min-h-[80px]"
+        <RichTextEditor
           value={form.notes}
-          onChange={(e) => onChange({ ...form, notes: e.target.value })}
+          onChange={(notes) => onChange({ ...form, notes })}
+          placeholder="Notes…"
+          minHeight="80px"
         />
       </div>
     </div>

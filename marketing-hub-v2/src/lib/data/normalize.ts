@@ -1,5 +1,7 @@
 /** Shared clean-up for hub store + Supabase import. */
 
+import { normalizeRichTextStorage } from "@/lib/sanitize";
+
 const PLATFORM_HINTS: { re: RegExp; channel: string }[] = [
   { re: /\blinkedin\b|\bli\b|#linkedin/i, channel: "LinkedIn" },
   { re: /\binstagram\b|\big\b|#instagram|\breel\b/i, channel: "Instagram" },
@@ -258,10 +260,14 @@ export function cleanContentFields(item: {
   website?: string;
   caption?: string;
 }) {
-  const notes = stripHtml(item.notes);
-  const caption = stripHtml(item.caption ?? "");
+  const notes = normalizeRichTextStorage(item.notes);
+  const caption = normalizeRichTextStorage(item.caption ?? "");
   const title = stripHtml(item.title) || "Untitled post";
-  const channel = normalizeChannels(item.channel, title, notes || caption);
+  const channel = normalizeChannels(
+    item.channel,
+    title,
+    stripHtml(notes) || stripHtml(caption)
+  );
   const content_type = normalizeContentType(
     item.content_type || channel[0] || "Social"
   );
@@ -337,7 +343,7 @@ export function cleanEventFields(item: {
   return {
     title: stripHtml(item.title) || "Untitled event",
     event_type: normalizeEventType(item.event_type),
-    notes: stripHtml(item.notes),
+    notes: normalizeRichTextStorage(item.notes),
     location: stripHtml(item.location),
     link_url: (item.link_url ?? "").trim(),
   };

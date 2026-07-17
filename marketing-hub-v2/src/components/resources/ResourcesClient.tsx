@@ -5,6 +5,9 @@ import { Download, ExternalLink } from "lucide-react";
 import type { ResourceLink } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { RESOURCE_CATEGORIES } from "@/lib/data/collections";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
+import { RichTextView } from "@/components/ui/RichTextView";
+import { plainTextFromHtml } from "@/lib/sanitize";
 
 export function ResourcesClient({
   initial,
@@ -138,10 +141,11 @@ export function ResourcesClient({
           </div>
           <div className="md:col-span-2">
             <label className="label">Description</label>
-            <textarea
-              className="field min-h-[70px]"
+            <RichTextEditor
               value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              onChange={(description) => setForm({ ...form, description })}
+              placeholder="Description…"
+              minHeight="70px"
             />
           </div>
           <div className="flex gap-2">
@@ -165,7 +169,11 @@ export function ResourcesClient({
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <h3 className="font-medium">{item.title}</h3>
-                      <p className="mt-1 text-sm text-muted">{item.description}</p>
+                      {plainTextFromHtml(item.description) ? (
+                        <div className="mt-1 text-sm text-muted">
+                          <RichTextView html={item.description} />
+                        </div>
+                      ) : null}
                     </div>
                     {allowManage ? (
                       <button

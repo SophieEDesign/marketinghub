@@ -8,6 +8,9 @@ import { ContactOwnerSelect } from "@/components/ui/ContactOwnerSelect";
 import { useHubView } from "@/lib/hub-view";
 import { format, parseISO, startOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
+import { RichTextView } from "@/components/ui/RichTextView";
+import { plainTextFromHtml } from "@/lib/sanitize";
 
 const STATUSES: { id: SponsorshipStatus; label: string }[] = [
   { id: "prospect", label: "Prospect" },
@@ -164,8 +167,8 @@ export function SponsorshipsClient({
           item.package_name,
           item.value,
           item.owner,
-          item.deliverables,
-          item.notes,
+          plainTextFromHtml(item.deliverables),
+          plainTextFromHtml(item.notes),
           item.status,
           partnerKind(item),
         ])
@@ -493,18 +496,20 @@ export function SponsorshipsClient({
           </div>
           <div className="md:col-span-2">
             <label className="label">Deliverables</label>
-            <textarea
-              className="field min-h-[70px]"
+            <RichTextEditor
               value={form.deliverables}
-              onChange={(e) => setForm({ ...form, deliverables: e.target.value })}
+              onChange={(deliverables) => setForm({ ...form, deliverables })}
+              placeholder="Deliverables…"
+              minHeight="70px"
             />
           </div>
           <div className="md:col-span-2">
             <label className="label">Notes</label>
-            <textarea
-              className="field min-h-[70px]"
+            <RichTextEditor
               value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              onChange={(notes) => setForm({ ...form, notes })}
+              placeholder="Notes…"
+              minHeight="70px"
             />
           </div>
           <div className="flex gap-2">
@@ -541,15 +546,18 @@ export function SponsorshipsClient({
                       </p>
                     </div>
                   </div>
-                  {item.deliverables ? (
-                    <p className="mt-3 text-sm whitespace-pre-wrap">
-                      {item.deliverables}
-                    </p>
+                  {plainTextFromHtml(item.deliverables) ? (
+                    <div className="mt-3 text-sm">
+                      <RichTextView html={item.deliverables} />
+                    </div>
                   ) : null}
-                  {item.notes ? (
-                    <p className="mt-2 line-clamp-3 text-xs text-muted whitespace-pre-wrap">
-                      {item.notes}
-                    </p>
+                  {plainTextFromHtml(item.notes) ? (
+                    <RichTextView
+                      html={item.notes}
+                      plain
+                      clampLines={3}
+                      className="mt-2 text-xs text-muted"
+                    />
                   ) : null}
                   <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted">
                     {item.starts_at ? <span>From {item.starts_at}</span> : null}
@@ -799,14 +807,14 @@ export function SponsorshipsClient({
                   </div>
                   <div>
                     <dt className="label !mb-0.5">Deliverables</dt>
-                    <dd className="whitespace-pre-wrap text-foreground/90">
-                      {selected.deliverables || "—"}
+                    <dd>
+                      <RichTextView html={selected.deliverables} />
                     </dd>
                   </div>
                   <div>
                     <dt className="label !mb-0.5">Notes</dt>
-                    <dd className="whitespace-pre-wrap text-foreground/90">
-                      {selected.notes || "—"}
+                    <dd>
+                      <RichTextView html={selected.notes} />
                     </dd>
                   </div>
                   {selected.onedrive_url ? (
@@ -958,22 +966,22 @@ export function SponsorshipsClient({
                 </div>
                 <div>
                   <label className="label">Deliverables</label>
-                  <textarea
-                    className="field min-h-[70px]"
+                  <RichTextEditor
                     value={edit.deliverables}
-                    onChange={(e) =>
-                      setEdit({ ...edit, deliverables: e.target.value })
+                    onChange={(deliverables) =>
+                      setEdit({ ...edit, deliverables })
                     }
+                    placeholder="Deliverables…"
+                    minHeight="70px"
                   />
                 </div>
                 <div>
                   <label className="label">Notes</label>
-                  <textarea
-                    className="field min-h-[90px]"
+                  <RichTextEditor
                     value={edit.notes}
-                    onChange={(e) =>
-                      setEdit({ ...edit, notes: e.target.value })
-                    }
+                    onChange={(notes) => setEdit({ ...edit, notes })}
+                    placeholder="Notes…"
+                    minHeight="90px"
                   />
                 </div>
               </div>

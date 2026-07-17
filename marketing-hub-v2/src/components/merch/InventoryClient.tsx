@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MerchInventoryItem } from "@/lib/types";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { cn } from "@/lib/utils";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
+import { plainTextFromHtml } from "@/lib/sanitize";
 import {
   CLOTHING_FITS,
   CLOTHING_PRODUCTS,
@@ -152,10 +154,11 @@ function InventoryFields({
       </div>
       <div className="md:col-span-2">
         <label className="label">Notes</label>
-        <textarea
-          className="field min-h-[70px]"
+        <RichTextEditor
           value={form.notes}
-          onChange={(e) => onChange({ ...form, notes: e.target.value })}
+          onChange={(notes) => onChange({ ...form, notes })}
+          placeholder="Notes…"
+          minHeight="70px"
         />
       </div>
     </>
@@ -204,7 +207,7 @@ export function InventoryClient({
           o.fit,
           o.size,
           o.colour,
-          o.notes,
+          plainTextFromHtml(o.notes),
         ])
       ) {
         return false;
@@ -402,7 +405,9 @@ export function InventoryClient({
                   <div className="font-medium text-foreground">{row.item}</div>
                   <div className="text-xs text-muted">
                     {row.brand || "—"}
-                    {row.notes ? ` · ${row.notes}` : ""}
+                    {plainTextFromHtml(row.notes)
+                      ? ` · ${plainTextFromHtml(row.notes)}`
+                      : ""}
                   </div>
                 </td>
                 <td className="px-4 py-3 text-muted">{fitLabel(row.fit)}</td>

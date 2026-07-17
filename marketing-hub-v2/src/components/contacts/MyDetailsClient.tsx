@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Contact } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
+import { RichTextView } from "@/components/ui/RichTextView";
 
 const emptyForm = {
   name: "",
@@ -147,10 +149,11 @@ export function MyDetailsClient() {
           ))}
           <div className="md:col-span-2">
             <label className="label">Notes</label>
-            <textarea
-              className="field min-h-[70px]"
+            <RichTextEditor
               value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              onChange={(notes) => setForm({ ...form, notes })}
+              placeholder="Notes…"
+              minHeight="70px"
             />
           </div>
           <div className="flex gap-2 md:col-span-2">
@@ -202,7 +205,9 @@ export function MyDetailsClient() {
             </div>
             <div className="sm:col-span-2">
               <dt className="label !mb-0.5">Notes</dt>
-              <dd className="whitespace-pre-wrap">{contact.notes || "—"}</dd>
+              <dd>
+                <RichTextView html={contact.notes} />
+              </dd>
             </div>
           </dl>
         </div>

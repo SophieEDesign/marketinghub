@@ -130,4 +130,65 @@ body {
   .data-table-scroll::-webkit-scrollbar-corner {
     background: #f1f5f9;
   }
+
+  /* Rich text (notes / long text) */
+  .prose-hub p {
+    margin: 0 0 0.5em;
+  }
+  .prose-hub p:last-child {
+    margin-bottom: 0;
+  }
+  .prose-hub h2 {
+    font-size: 1.05rem;
+    font-weight: 650;
+    margin: 0.6em 0 0.35em;
+    color: var(--brand);
+  }
+  .prose-hub h3 {
+    font-size: 0.95rem;
+    font-weight: 650;
+    margin: 0.5em 0 0.3em;
+  }
+  .prose-hub ul {
+    list-style: disc;
+    padding-left: 1.25rem;
+    margin: 0.35em 0;
+  }
+  .prose-hub ol {
+    list-style: decimal;
+    padding-left: 1.25rem;
+    margin: 0.35em 0;
+  }
+  .prose-hub a {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .prose-hub strong {
+    font-weight: 650;
+  }
+  .prose-hub blockquote {
+    border-left: 3px solid var(--border);
+    padding-left: 0.75rem;
+    color: var(--muted);
+    margin: 0.5em 0;
+  }
+  .prose-hub code {
+    font-size: 0.85em;
+    background: var(--sand);
+    padding: 0.1em 0.35em;
+    border-radius: 0.35rem;
+  }
+  .rich-text-editor .ProseMirror {
+    outline: none;
+    min-height: inherit;
+  }
+  .rich-text-editor .ProseMirror p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    float: left;
+    height: 0;
+    color: var(--muted);
+    pointer-events: none;
+    opacity: 0.7;
+  }
 }

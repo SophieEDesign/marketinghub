@@ -30,6 +30,7 @@ import {
 } from "@/lib/supabase/media-list";
 import { uploadAssetDirect } from "@/lib/upload/client-upload";
 import { cn } from "@/lib/utils";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
 
 type ListResponse = {
   configured: boolean;
@@ -1441,10 +1442,11 @@ export function MediaGallery({
           </div>
           <div className="md:col-span-2">
             <label className="label">Notes</label>
-            <textarea
-              className="field min-h-[70px]"
+            <RichTextEditor
               value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              onChange={(notes) => setForm({ ...form, notes })}
+              placeholder="Notes…"
+              minHeight="70px"
             />
           </div>
           {formError ? (

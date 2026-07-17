@@ -5,6 +5,9 @@ import type { MerchOrder, MerchStatus } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { cn } from "@/lib/utils";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
+import { RichTextView } from "@/components/ui/RichTextView";
+import { plainTextFromHtml } from "@/lib/sanitize";
 import {
   CLOTHING_BRAND,
   CLOTHING_FITS,
@@ -251,10 +254,11 @@ function OrderFields({
       </div>
       <div className="md:col-span-2">
         <label className="label">Notes</label>
-        <textarea
-          className="field min-h-[70px]"
+        <RichTextEditor
           value={form.notes}
-          onChange={(e) => onChange({ ...form, notes: e.target.value })}
+          onChange={(notes) => onChange({ ...form, notes })}
+          placeholder="Notes…"
+          minHeight="70px"
         />
       </div>
     </>
@@ -318,7 +322,7 @@ export function MerchClient({
           o.logo,
           o.requested_for,
           o.office,
-          o.notes,
+          plainTextFromHtml(o.notes),
           o.created_by,
           o.status,
         ])
@@ -534,10 +538,10 @@ export function MerchClient({
                 {statusLabel(order.status)}
               </span>
             </div>
-            {order.notes ? (
-              <p className="mt-3 whitespace-pre-wrap text-sm text-muted">
-                {order.notes}
-              </p>
+            {plainTextFromHtml(order.notes) ? (
+              <div className="mt-3 text-sm text-muted">
+                <RichTextView html={order.notes} />
+              </div>
             ) : null}
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <button

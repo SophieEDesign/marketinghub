@@ -1,12 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react";
 import { format, parseISO, isBefore, startOfDay } from "date-fns";
 import type { HubTask, TaskStatus } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { ContactOwnerSelect } from "@/components/ui/ContactOwnerSelect";
 import { cn } from "@/lib/utils";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
+import { RichTextView } from "@/components/ui/RichTextView";
+import { plainTextFromHtml } from "@/lib/sanitize";
 import {
   TASK_CATEGORIES,
   selectOptionsWithCurrent,
@@ -70,9 +73,11 @@ export function TasksClient({ initial }: { initial: HubTask[] }) {
   const [edit, setEdit] = useState<EditForm | null>(null);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("open");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [ownerFilter, setOwnerFilter] = useState("all");
-  const [view, setView] = useState<ViewId>("list");
+  const [view, setView] = useState<ViewId>("kanban");
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<TaskStatus | null>(null);
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/tasks");
@@ -94,7 +99,7 @@ export function TasksClient({ initial }: { initial: HubTask[] }) {
       if (
         !matchesSearch(search, [
           item.title,
-          item.details,
+          plainTextFromHtml(item.details),
           item.category,
           item.owner,
           item.status,
@@ -158,12 +163,67 @@ export function TasksClient({ initial }: { initial: HubTask[] }) {
   }
 
   async function setStatus(id: string, status: TaskStatus) {
-    await fetch("/api/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "update", id, patch: { status } }),
-    });
-    await refresh();
+    const previous = items.find((i) => i.id === id)?.status;
+    if (previous === status) return;
+    setItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, status } : item))
+    );
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update", id, patch: { status } }),
+      });
+      if (!res.ok) throw new Error("Failed to update status");
+      await refresh();
+    } catch {
+      if (previous) {
+        setItems((prev) =>
+          prev.map((item) =>
+            item.id === id ? { ...item, status: previous } : item
+          )
+        );
+      } else {
+        await refresh();
+      }
+    }
+  }
+
+  function onCardDragStart(e: DragEvent, id: string) {
+    const target = e.target as HTMLElement;
+    if (target.closest("button, select, input, a, textarea")) {
+      e.preventDefault();
+      return;
+    }
+    e.dataTransfer.setData("text/plain", id);
+    e.dataTransfer.effectAllowed = "move";
+    setDraggingId(id);
+  }
+
+  function onCardDragEnd() {
+    setDraggingId(null);
+    setDropTarget(null);
+  }
+
+  function onColumnDragOver(e: DragEvent, status: TaskStatus) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dropTarget !== status) setDropTarget(status);
+  }
+
+  function onColumnDragLeave(e: DragEvent, status: TaskStatus) {
+    const related = e.relatedTarget as Node | null;
+    if (related && e.currentTarget.contains(related)) return;
+    if (dropTarget === status) setDropTarget(null);
+  }
+
+  function onColumnDrop(e: DragEvent, status: TaskStatus) {
+    e.preventDefault();
+    const id = e.dataTransfer.getData("text/plain");
+    setDraggingId(null);
+    setDropTarget(null);
+    if (!id) return;
+    void setStatus(id, status);
   }
 
   async function remove(id: string) {
@@ -314,10 +374,11 @@ export function TasksClient({ initial }: { initial: HubTask[] }) {
           </div>
           <div className="md:col-span-2">
             <label className="label">Details</label>
-            <textarea
-              className="field min-h-[70px]"
+            <RichTextEditor
               value={form.details}
-              onChange={(e) => setForm({ ...form, details: e.target.value })}
+              onChange={(details) => setForm({ ...form, details })}
+              placeholder="Details…"
+              minHeight="70px"
             />
           </div>
           <div className="flex gap-2">
@@ -368,10 +429,13 @@ export function TasksClient({ initial }: { initial: HubTask[] }) {
                     .filter(Boolean)
                     .join(" · ")}
                 </p>
-                {item.details ? (
-                  <p className="mt-2 line-clamp-2 text-sm text-foreground/80">
-                    {item.details}
-                  </p>
+                {plainTextFromHtml(item.details) ? (
+                  <RichTextView
+                    html={item.details}
+                    plain
+                    clampLines={2}
+                    className="mt-2 text-sm text-foreground/80"
+                  />
                 ) : null}
               </div>
               <div className="flex flex-wrap gap-2">
@@ -421,10 +485,17 @@ export function TasksClient({ initial }: { initial: HubTask[] }) {
         <div className="flex gap-4 overflow-x-auto pb-2">
           {STATUSES.map((col) => {
             const colItems = filtered.filter((i) => i.status === col.id);
+            const isDropTarget = dropTarget === col.id;
             return (
               <div
                 key={col.id}
-                className="surface-card flex w-72 shrink-0 flex-col p-3"
+                className={cn(
+                  "surface-card flex w-72 shrink-0 flex-col p-3 transition",
+                  isDropTarget && "ring-2 ring-brand/40 bg-brand/5"
+                )}
+                onDragOver={(e) => onColumnDragOver(e, col.id)}
+                onDragLeave={(e) => onColumnDragLeave(e, col.id)}
+                onDrop={(e) => onColumnDrop(e, col.id)}
               >
                 <div className="mb-3 flex items-center justify-between px-1">
                   <h2 className="text-sm font-semibold text-brand">
@@ -432,11 +503,17 @@ export function TasksClient({ initial }: { initial: HubTask[] }) {
                   </h2>
                   <span className="text-xs text-muted">{colItems.length}</span>
                 </div>
-                <div className="flex flex-col gap-2">
+                <div className="flex min-h-[4.5rem] flex-1 flex-col gap-2">
                   {colItems.map((item) => (
                     <article
                       key={item.id}
-                      className="rounded-xl border border-border bg-sand/60 p-3"
+                      draggable
+                      onDragStart={(e) => onCardDragStart(e, item.id)}
+                      onDragEnd={onCardDragEnd}
+                      className={cn(
+                        "cursor-grab rounded-xl border border-border bg-sand/60 p-3 active:cursor-grabbing",
+                        draggingId === item.id && "opacity-50"
+                      )}
                     >
                       <div className="flex flex-wrap items-center gap-1.5">
                         <p className="text-sm font-medium">{item.title}</p>
@@ -457,10 +534,13 @@ export function TasksClient({ initial }: { initial: HubTask[] }) {
                           .filter(Boolean)
                           .join(" · ")}
                       </p>
-                      {item.details ? (
-                        <p className="mt-2 line-clamp-2 text-xs text-foreground/80">
-                          {item.details}
-                        </p>
+                      {plainTextFromHtml(item.details) ? (
+                        <RichTextView
+                          html={item.details}
+                          plain
+                          clampLines={2}
+                          className="mt-2 text-xs text-foreground/80"
+                        />
                       ) : null}
                       <div className="mt-3 flex flex-wrap gap-2">
                         <select
@@ -501,7 +581,9 @@ export function TasksClient({ initial }: { initial: HubTask[] }) {
                     </article>
                   ))}
                   {colItems.length === 0 ? (
-                    <p className="px-1 py-2 text-xs text-muted">No tasks</p>
+                    <p className="px-1 py-2 text-xs text-muted">
+                      {isDropTarget ? "Drop here" : "No tasks"}
+                    </p>
                   ) : null}
                 </div>
               </div>
@@ -602,12 +684,11 @@ export function TasksClient({ initial }: { initial: HubTask[] }) {
               </div>
               <div>
                 <label className="label">Details</label>
-                <textarea
-                  className="field min-h-[100px]"
+                <RichTextEditor
                   value={edit.details}
-                  onChange={(e) =>
-                    setEdit({ ...edit, details: e.target.value })
-                  }
+                  onChange={(details) => setEdit({ ...edit, details })}
+                  placeholder="Details…"
+                  minHeight="100px"
                 />
               </div>
             </div>

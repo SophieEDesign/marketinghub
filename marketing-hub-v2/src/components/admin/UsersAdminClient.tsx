@@ -5,6 +5,9 @@ import type { AccessRequest, Contact, HubAccessRole, HubUser } from "@/lib/types
 import { PageHeader } from "@/components/ui/PageHeader";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { cn } from "@/lib/utils";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
+import { RichTextView } from "@/components/ui/RichTextView";
+import { plainTextFromHtml } from "@/lib/sanitize";
 
 const ROLE_OPTIONS: {
   value: HubAccessRole;
@@ -164,7 +167,14 @@ export function UsersAdminClient({
 
   const filtered = useMemo(() => {
     return items.filter((u) => {
-      if (!matchesSearch(search, [u.full_name, u.email, u.role, u.notes])) {
+      if (
+        !matchesSearch(search, [
+          u.full_name,
+          u.email,
+          u.role,
+          plainTextFromHtml(u.notes),
+        ])
+      ) {
         return false;
       }
       if (roleFilter !== "all" && u.role !== roleFilter) return false;
@@ -513,10 +523,11 @@ export function UsersAdminClient({
           </div>
           <div>
             <label className="label">Notes</label>
-            <input
-              className="field"
+            <RichTextEditor
               value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              onChange={(notes) => setForm({ ...form, notes })}
+              placeholder="Notes…"
+              minHeight="70px"
             />
           </div>
           <div className="rounded-xl border border-border bg-sand/40 px-4 py-3 text-xs text-muted md:col-span-2">
@@ -648,7 +659,7 @@ export function UsersAdminClient({
                   ) : null}
                 </td>
                 <td className="hidden px-4 py-3 text-muted xl:table-cell">
-                  {u.notes || "—"}
+                  <RichTextView html={u.notes} plain clampLines={2} />
                 </td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex flex-col items-end gap-1.5 sm:flex-row sm:flex-wrap sm:justify-end">

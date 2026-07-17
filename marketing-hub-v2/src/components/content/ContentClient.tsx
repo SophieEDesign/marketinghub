@@ -38,6 +38,9 @@ import {
   SOCIAL_CHANNELS,
   selectOptionsWithCurrent,
 } from "@/lib/data/collections";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
+import { RichTextView } from "@/components/ui/RichTextView";
+import { plainTextFromHtml } from "@/lib/sanitize";
 
 const COLUMNS: { id: ContentStatus; label: string }[] = [
   { id: "idea", label: "Idea" },
@@ -231,7 +234,7 @@ export function ContentClient({
           item.title,
           formatChannels(item.channel),
           item.content_type,
-          item.notes,
+          plainTextFromHtml(item.notes),
           item.status,
         ])
       ) {
@@ -463,8 +466,13 @@ export function ContentClient({
           {formatChannels(item.channel)}
           {item.due_date ? ` · due ${item.due_date}` : ""}
         </p>
-        {item.notes ? (
-          <p className="mt-2 line-clamp-2 text-xs text-foreground/70">{item.notes}</p>
+        {plainTextFromHtml(item.notes) ? (
+          <RichTextView
+            html={item.notes}
+            plain
+            clampLines={2}
+            className="mt-2 text-xs text-foreground/70"
+          />
         ) : null}
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button
@@ -703,10 +711,11 @@ export function ContentClient({
           {formIsSocial ? (
             <div className="md:col-span-2">
               <label className="label">Caption / post text</label>
-              <textarea
-                className="field min-h-[70px]"
+              <RichTextEditor
                 value={form.caption}
-                onChange={(e) => setForm({ ...form, caption: e.target.value })}
+                onChange={(caption) => setForm({ ...form, caption })}
+                placeholder="Caption / post text…"
+                minHeight="70px"
               />
             </div>
           ) : (
@@ -738,10 +747,11 @@ export function ContentClient({
           )}
           <div className="md:col-span-2">
             <label className="label">Notes</label>
-            <textarea
-              className="field min-h-[70px]"
+            <RichTextEditor
               value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              onChange={(notes) => setForm({ ...form, notes })}
+              placeholder="Notes…"
+              minHeight="70px"
             />
           </div>
           <div className="md:col-span-2">
@@ -933,10 +943,13 @@ export function ContentClient({
                             <p className="font-medium text-foreground">
                               {item.title}
                             </p>
-                            {item.notes ? (
-                              <p className="mt-1 line-clamp-2 text-xs text-muted">
-                                {item.notes}
-                              </p>
+                            {plainTextFromHtml(item.notes) ? (
+                              <RichTextView
+                                html={item.notes}
+                                plain
+                                clampLines={2}
+                                className="mt-1 text-xs text-muted"
+                              />
                             ) : null}
                           </button>
                         </div>
@@ -1221,12 +1234,11 @@ export function ContentClient({
                   <>
                     <div>
                       <label className="label">Caption / post text</label>
-                      <textarea
-                        className="field min-h-[70px]"
+                      <RichTextEditor
                         value={edit.caption}
-                        onChange={(e) =>
-                          setEdit({ ...edit, caption: e.target.value })
-                        }
+                        onChange={(caption) => setEdit({ ...edit, caption })}
+                        placeholder="Caption / post text…"
+                        minHeight="70px"
                       />
                     </div>
                     <div>
@@ -1269,12 +1281,11 @@ export function ContentClient({
                 )}
                 <div>
                   <label className="label">Notes</label>
-                  <textarea
-                    className="field min-h-[70px]"
+                  <RichTextEditor
                     value={edit.notes}
-                    onChange={(e) =>
-                      setEdit({ ...edit, notes: e.target.value })
-                    }
+                    onChange={(notes) => setEdit({ ...edit, notes })}
+                    placeholder="Notes…"
+                    minHeight="70px"
                   />
                 </div>
                 <div>
