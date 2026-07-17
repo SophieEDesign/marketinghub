@@ -1,8 +1,9 @@
 import { NextRequest } from "next/server";
-import { jsonError, jsonOk, requireStaff } from "@/lib/api";
+import { jsonError, jsonOk, requireAdmin } from "@/lib/api";
 import {
   createHubUser,
   deleteHubUser,
+  linkUserToContact,
   listHubUsers,
   updateHubUser,
 } from "@/lib/data/repos";
@@ -18,7 +19,7 @@ import {
 const ROLES: HubAccessRole[] = ["admin", "member", "external"];
 
 export async function GET() {
-  const { error } = await requireStaff();
+  const { error } = await requireAdmin();
   if (error) return error;
 
   try {
@@ -38,7 +39,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const { error } = await requireStaff();
+  const { error } = await requireAdmin();
   if (error) return error;
   const body = await request.json();
   const action = body.action as string | undefined;
@@ -46,15 +47,45 @@ export async function POST(request: NextRequest) {
 
   try {
     if (action === "update") {
-      const patch = body.patch ?? {};
-      if (patch.role !== undefined && !ROLES.includes(patch.role)) {
+      const patch = { ...(body.patch ?? {}) } as Record<string, unknown>;
+      if (patch.role !== undefined && !ROLES.includes(patch.role as HubAccessRole)) {
         return jsonError("Role must be admin, member, or external");
       }
-      const updated = useSupabase
-        ? await updateSupabaseHubUser(body.id, patch)
-        : await updateHubUser(body.id, patch);
-      if (!updated) return jsonError("Not found", 404);
-      return jsonOk({ item: updated, source: useSupabase ? "supabase" : "local" });
+
+      if ("contact_id" in patch) {
+        const contactId =
+          patch.contact_id === null || patch.contact_id === ""
+            ? null
+            : String(patch.contact_id);
+        await linkUserToContact(body.id, contactId);
+        delete patch.contact_id;
+      }
+
+      const hasUserFields =
+        patch.role !== undefined ||
+        patch.full_name !== undefined ||
+        patch.notes !== undefined ||
+        patch.email !== undefined;
+
+      let updated = null;
+      if (hasUserFields) {
+        updated = useSupabase
+          ? await updateSupabaseHubUser(body.id, patch)
+          : await updateHubUser(body.id, patch);
+        if (!updated) return jsonError("Not found", 404);
+      } else {
+        // Contact link-only update — still return the user record.
+        const users = useSupabase
+          ? await listSupabaseHubUsers()
+          : await listHubUsers();
+        updated = users.find((u) => u.id === body.id) ?? null;
+        if (!updated) return jsonError("Not found", 404);
+      }
+
+      return jsonOk({
+        item: updated,
+        source: useSupabase ? "supabase" : "local",
+      });
     }
 
     if (action === "delete") {

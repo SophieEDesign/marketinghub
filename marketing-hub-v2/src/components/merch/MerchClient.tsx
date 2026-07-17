@@ -24,23 +24,30 @@ const STATUSES: { id: MerchStatus; label: string }[] = [
   { id: "cancelled", label: "Cancelled" },
 ];
 
+const MEMBER_STATUSES: { id: MerchStatus; label: string }[] = [
+  { id: "requested", label: "Requested" },
+  { id: "cancelled", label: "Cancelled" },
+];
+
 const DEFAULT_ITEM = CLOTHING_PRODUCTS[0]!.label;
 
-const emptyForm = {
-  item: DEFAULT_ITEM,
-  fit: "male" as ClothingFit | "",
-  size: "M",
-  quantity: "1",
-  colour: defaultColourForItem(DEFAULT_ITEM),
-  requested_for: "",
-  office: "Southampton",
-  needed_by: "",
-  status: "requested" as MerchStatus,
-  notes: "",
-  created_by: "",
-};
+function buildEmptyForm(viewerName = "") {
+  return {
+    item: DEFAULT_ITEM,
+    fit: "male" as ClothingFit | "",
+    size: "M",
+    quantity: "1",
+    colour: defaultColourForItem(DEFAULT_ITEM),
+    requested_for: viewerName,
+    office: "Southampton",
+    needed_by: "",
+    status: "requested" as MerchStatus,
+    notes: "",
+    created_by: viewerName,
+  };
+}
 
-type EditForm = typeof emptyForm;
+type EditForm = ReturnType<typeof buildEmptyForm>;
 
 function toEditForm(order: MerchOrder): EditForm {
   return {
@@ -235,10 +242,17 @@ function OrderFields({
 export function MerchClient({
   initial,
   hideHeader = false,
+  canManageAll = false,
+  viewerName = "",
 }: {
   initial: MerchOrder[];
   hideHeader?: boolean;
+  /** Admins see every order; members only receive their own from the API. */
+  canManageAll?: boolean;
+  viewerName?: string;
 }) {
+  const emptyForm = buildEmptyForm(viewerName);
+  const statusOptions = canManageAll ? STATUSES : MEMBER_STATUSES;
   const [orders, setOrders] = useState(initial);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -258,6 +272,10 @@ export function MerchClient({
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    setForm(buildEmptyForm(viewerName));
+  }, [viewerName]);
 
   const itemTypes = useMemo(() => {
     const set = new Set([
@@ -306,7 +324,7 @@ export function MerchClient({
       }),
     });
     setShowForm(false);
-    setForm(emptyForm);
+    setForm(buildEmptyForm(viewerName));
     await refresh();
   }
 
@@ -372,10 +390,12 @@ export function MerchClient({
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="font-display text-xl text-brand">
-              Corporate clothing
+              {canManageAll ? "Corporate clothing" : "My clothing orders"}
             </h2>
             <p className="mt-0.5 text-xs text-muted">
-              {CLOTHING_BRAND} · polo, gilet, sailor jacket &amp; white shirt
+              {canManageAll
+                ? `${CLOTHING_BRAND} · all staff orders`
+                : `${CLOTHING_BRAND} · only your requests are shown`}
             </p>
           </div>
           <button
@@ -416,7 +436,7 @@ export function MerchClient({
             onChange: setStatusFilter,
             options: [
               { value: "all", label: "All statuses" },
-              ...STATUSES.map((s) => ({ value: s.id, label: s.label })),
+              ...statusOptions.map((s) => ({ value: s.id, label: s.label })),
             ],
           },
           {
@@ -495,26 +515,37 @@ export function MerchClient({
               >
                 Edit
               </button>
-              <select
-                className="field !w-auto py-1.5 text-xs"
-                value={order.status}
-                onChange={(e) =>
-                  void setStatus(order.id, e.target.value as MerchStatus)
-                }
-                aria-label="Change status"
-              >
-                {STATUSES.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
+              {canManageAll ||
+              order.status === "requested" ||
+              order.status === "cancelled" ? (
+                <select
+                  className="field !w-auto py-1.5 text-xs"
+                  value={order.status}
+                  onChange={(e) =>
+                    void setStatus(order.id, e.target.value as MerchStatus)
+                  }
+                  aria-label="Change status"
+                >
+                  {!statusOptions.some((s) => s.id === order.status) ? (
+                    <option value={order.status}>
+                      {statusLabel(order.status)}
+                    </option>
+                  ) : null}
+                  {statusOptions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
             </div>
           </article>
         ))}
         {filtered.length === 0 ? (
           <p className="text-sm text-muted">
-            No clothing orders match your filters.
+            {canManageAll
+              ? "No clothing orders match your filters."
+              : "You have no clothing orders yet. Submit a request to get started."}
           </p>
         ) : null}
       </div>
@@ -557,7 +588,12 @@ export function MerchClient({
                       })
                     }
                   >
-                    {STATUSES.map((s) => (
+                    {!statusOptions.some((s) => s.id === edit.status) ? (
+                      <option value={edit.status}>
+                        {statusLabel(edit.status)}
+                      </option>
+                    ) : null}
+                    {statusOptions.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.label}
                       </option>

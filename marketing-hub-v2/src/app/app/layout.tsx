@@ -1,6 +1,6 @@
 import { AppShell } from "@/components/shell/AppShell";
 import { getSessionUser } from "@/lib/auth/session";
-import { DEMO_STAFF, isAuthBypass } from "@/lib/auth/config";
+import { allowDemoAuth, DEMO_STAFF } from "@/lib/auth/config";
 import { redirect } from "next/navigation";
 
 export default async function StaffAppLayout({
@@ -8,10 +8,21 @@ export default async function StaffAppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = (await getSessionUser()) ?? (isAuthBypass() ? DEMO_STAFF : null);
+  const user = (await getSessionUser()) ?? (allowDemoAuth() ? DEMO_STAFF : null);
   if (!user) {
     redirect("/login?next=/app");
   }
+  if (user.role === "media_guest") {
+    redirect("/media");
+  }
 
-  return <AppShell userName={user.full_name}>{children}</AppShell>;
+  return (
+    <AppShell
+      userName={user.full_name}
+      userEmail={user.email}
+      accessRole={user.role}
+    >
+      {children}
+    </AppShell>
+  );
 }

@@ -173,19 +173,39 @@ const MERCH_SIZES: FieldOption[] = [
 const MERCH_ITEMS: FieldOption[] = [
   { value: "Polo — Regatta (polyester)", label: "Polo — Regatta (polyester)" },
   { value: "Polo — Pique (cotton)", label: "Polo — Pique (cotton)" },
+  { value: "Polo — Tactel", label: "Polo — Tactel" },
   { value: "Gilet — Marstrand (navy)", label: "Gilet — Marstrand (navy)" },
   { value: "Sailor jacket (navy)", label: "Sailor jacket (navy)" },
   { value: "Collared shirt (white)", label: "Collared shirt (white)" },
+  { value: "Premier white shirt", label: "Premier white shirt" },
+  { value: "Backpack", label: "Backpack" },
+  { value: "High Vis", label: "High Vis" },
 ];
 
 const MERCH_FITS: FieldOption[] = [
   { value: "male", label: "Male" },
   { value: "female", label: "Female" },
+  { value: "", label: "—" },
 ];
 
 const MERCH_COLOURS: FieldOption[] = [
   { value: "Navy", label: "Navy" },
   { value: "White", label: "White" },
+  { value: "Yellow", label: "Yellow" },
+];
+
+const MERCH_BRANDS: FieldOption[] = [
+  { value: "North Sails", label: "North Sails" },
+  { value: "Henbury", label: "Henbury" },
+  { value: "Premier", label: "Premier" },
+  { value: "BagBase", label: "BagBase" },
+  { value: "Other", label: "Other" },
+];
+
+const INVENTORY_SIZES: FieldOption[] = [
+  ...MERCH_SIZES,
+  { value: "S-M", label: "S-M" },
+  { value: "N/A", label: "N/A" },
 ];
 
 const STAFF_KINDS: FieldOption[] = [
@@ -330,6 +350,7 @@ export const DATA_COLLECTIONS: CollectionDef[] = [
       f("phone"),
       f("tags", { type: "tags" }),
       f("notes", { type: "longtext" }),
+      f("user_id", { label: "Linked user ID", type: "readonly" }),
       f("created_at", { type: "readonly", locked: true }),
       f("updated_at", { type: "readonly", locked: true }),
     ],
@@ -427,6 +448,28 @@ export const DATA_COLLECTIONS: CollectionDef[] = [
       f("status", { type: "select", options: MERCH_STATUS }),
       f("notes", { type: "longtext" }),
       f("created_by", { label: "Created by" }),
+      f("created_by_user_id", {
+        label: "Created by user ID",
+        type: "readonly",
+        locked: true,
+      }),
+      f("created_at", { type: "readonly", locked: true }),
+      f("updated_at", { type: "readonly", locked: true }),
+    ],
+  },
+  {
+    key: "merch_inventory",
+    label: "Merch inventory",
+    description: "On-hand corporate clothing stock",
+    fields: [
+      f("id", { type: "readonly", locked: true }),
+      f("item", { type: "select", options: MERCH_ITEMS }),
+      f("brand", { type: "select", options: MERCH_BRANDS }),
+      f("fit", { type: "select", options: MERCH_FITS, label: "Fit" }),
+      f("size", { type: "select", options: INVENTORY_SIZES }),
+      f("colour", { type: "select", options: MERCH_COLOURS }),
+      f("quantity", { type: "number" }),
+      f("notes", { type: "longtext" }),
       f("created_at", { type: "readonly", locked: true }),
       f("updated_at", { type: "readonly", locked: true }),
     ],

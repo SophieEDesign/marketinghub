@@ -21,7 +21,7 @@ export function PartnersHub({ initial }: { initial: Sponsorship[] }) {
     <div>
       <PageHeader
         title="Partners"
-        description="Sponsorships and industry memberships in one place — packages, renewals, and deliverables."
+        description="Sponsorships and industry memberships in one place — packages, renewals, and deliverables. Members can add and update memberships."
       />
 
       <SegmentFilter

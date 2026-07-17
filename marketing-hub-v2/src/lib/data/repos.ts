@@ -9,6 +9,7 @@ import type {
   HubAccessRole,
   HubTask,
   HubUser,
+  MerchInventoryItem,
   MerchOrder,
   QuarterlyTheme,
   ReportLink,
@@ -144,6 +145,15 @@ export async function createSponsorship(
   return item;
 }
 
+export async function getSponsorship(id: string) {
+  const store = await readStore();
+  const item = store.sponsorships.find((c) => c.id === id);
+  if (!item) return null;
+  return item.kind === "membership" || item.kind === "sponsorship"
+    ? item
+    : { ...item, kind: "sponsorship" as const };
+}
+
 export async function updateSponsorship(
   id: string,
   patch: Partial<Sponsorship>
@@ -178,7 +188,55 @@ export async function setSponsorshipStatus(
 
 export async function listContacts() {
   const store = await readStore();
-  return store.contacts;
+  return store.contacts.map(normalizeContact);
+}
+
+function normalizeContact(c: Contact): Contact {
+  return { ...c, user_id: c.user_id ?? null };
+}
+
+export async function getContactByUserId(userId: string) {
+  const contacts = await listContacts();
+  return contacts.find((c) => c.user_id === userId) ?? null;
+}
+
+export async function getContactByEmail(email: string) {
+  const needle = email.trim().toLowerCase();
+  if (!needle) return null;
+  const contacts = await listContacts();
+  return (
+    contacts.find((c) => c.email.trim().toLowerCase() === needle) ?? null
+  );
+}
+
+/**
+ * Link a hub user to at most one contact. Pass null to unlink.
+ * Clears the link from any other contact that had this user.
+ */
+export async function linkUserToContact(
+  userId: string,
+  contactId: string | null
+) {
+  let linked: Contact | null = null;
+  await updateStore((s) => {
+    for (let i = 0; i < s.contacts.length; i++) {
+      const c = normalizeContact(s.contacts[i]);
+      if (c.user_id === userId) {
+        s.contacts[i] = { ...c, user_id: null, updated_at: nowIso() };
+      }
+    }
+    if (!contactId) return;
+    const idx = s.contacts.findIndex((c) => c.id === contactId);
+    if (idx === -1) return;
+    const next = {
+      ...normalizeContact(s.contacts[idx]),
+      user_id: userId,
+      updated_at: nowIso(),
+    };
+    s.contacts[idx] = next;
+    linked = next;
+  });
+  return linked;
 }
 
 export async function createContact(
@@ -186,11 +244,20 @@ export async function createContact(
 ) {
   const item: Contact = {
     ...input,
+    user_id: input.user_id ?? null,
     id: uid("ctc"),
     created_at: nowIso(),
     updated_at: nowIso(),
   };
   await updateStore((s) => {
+    if (item.user_id) {
+      for (let i = 0; i < s.contacts.length; i++) {
+        const c = normalizeContact(s.contacts[i]);
+        if (c.user_id === item.user_id) {
+          s.contacts[i] = { ...c, user_id: null, updated_at: nowIso() };
+        }
+      }
+    }
     s.contacts.push(item);
   });
   return item;
@@ -201,7 +268,25 @@ export async function updateContact(id: string, patch: Partial<Contact>) {
   await updateStore((s) => {
     const idx = s.contacts.findIndex((c) => c.id === id);
     if (idx === -1) return;
-    s.contacts[idx] = { ...s.contacts[idx], ...patch, id, updated_at: nowIso() };
+    const nextUserId =
+      patch.user_id !== undefined
+        ? patch.user_id
+        : normalizeContact(s.contacts[idx]).user_id;
+    if (nextUserId) {
+      for (let i = 0; i < s.contacts.length; i++) {
+        if (i === idx) continue;
+        const c = normalizeContact(s.contacts[i]);
+        if (c.user_id === nextUserId) {
+          s.contacts[i] = { ...c, user_id: null, updated_at: nowIso() };
+        }
+      }
+    }
+    s.contacts[idx] = {
+      ...normalizeContact(s.contacts[idx]),
+      ...patch,
+      id,
+      updated_at: nowIso(),
+    };
     updated = s.contacts[idx];
   });
   return updated;
@@ -297,7 +382,11 @@ export async function deleteReport(id: string) {
 
 export async function listThemes() {
   const store = await readStore();
-  return [...store.themes].sort((a, b) => a.quarter.localeCompare(b.quarter));
+  const quarterOrder = { Q1: 1, Q2: 2, Q3: 3, Q4: 4 } as const;
+  return [...store.themes].sort((a, b) => {
+    if (a.year !== b.year) return a.year - b.year;
+    return quarterOrder[a.quarter] - quarterOrder[b.quarter];
+  });
 }
 
 export async function listThemeMains(themeId?: string) {
@@ -443,11 +532,17 @@ export async function listMerchOrders() {
   );
 }
 
+export async function getMerchOrder(id: string) {
+  const store = await readStore();
+  return store.merch_orders.find((o) => o.id === id) ?? null;
+}
+
 export async function createMerchOrder(
   input: Omit<MerchOrder, "id" | "created_at" | "updated_at">
 ) {
   const item: MerchOrder = {
     ...input,
+    created_by_user_id: input.created_by_user_id ?? null,
     id: uid("mrc"),
     created_at: nowIso(),
     updated_at: nowIso(),
@@ -466,10 +561,14 @@ export async function updateMerchOrder(
   await updateStore((s) => {
     const idx = s.merch_orders.findIndex((c) => c.id === id);
     if (idx === -1) return;
+    const nextPatch = { ...patch };
+    delete nextPatch.id;
+    delete nextPatch.created_by_user_id;
     s.merch_orders[idx] = {
       ...s.merch_orders[idx],
-      ...patch,
+      ...nextPatch,
       id,
+      created_by_user_id: s.merch_orders[idx].created_by_user_id ?? null,
       updated_at: nowIso(),
     };
     updated = s.merch_orders[idx];
@@ -480,6 +579,57 @@ export async function updateMerchOrder(
 export async function deleteMerchOrder(id: string) {
   await updateStore((s) => {
     s.merch_orders = s.merch_orders.filter((c) => c.id !== id);
+  });
+}
+
+export async function listMerchInventory() {
+  const store = await readStore();
+  return [...store.merch_inventory].sort((a, b) => {
+    const itemCmp = a.item.localeCompare(b.item);
+    if (itemCmp !== 0) return itemCmp;
+    const fitCmp = (a.fit || "").localeCompare(b.fit || "");
+    if (fitCmp !== 0) return fitCmp;
+    return a.size.localeCompare(b.size);
+  });
+}
+
+export async function createMerchInventoryItem(
+  input: Omit<MerchInventoryItem, "id" | "created_at" | "updated_at">
+) {
+  const item: MerchInventoryItem = {
+    ...input,
+    id: uid("inv"),
+    created_at: nowIso(),
+    updated_at: nowIso(),
+  };
+  await updateStore((s) => {
+    s.merch_inventory.push(item);
+  });
+  return item;
+}
+
+export async function updateMerchInventoryItem(
+  id: string,
+  patch: Partial<MerchInventoryItem>
+) {
+  let updated: MerchInventoryItem | null = null;
+  await updateStore((s) => {
+    const idx = s.merch_inventory.findIndex((c) => c.id === id);
+    if (idx === -1) return;
+    s.merch_inventory[idx] = {
+      ...s.merch_inventory[idx],
+      ...patch,
+      id,
+      updated_at: nowIso(),
+    };
+    updated = s.merch_inventory[idx];
+  });
+  return updated;
+}
+
+export async function deleteMerchInventoryItem(id: string) {
+  await updateStore((s) => {
+    s.merch_inventory = s.merch_inventory.filter((c) => c.id !== id);
   });
 }
 

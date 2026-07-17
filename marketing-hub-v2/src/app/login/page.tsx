@@ -3,32 +3,46 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useState } from "react";
-import { hasSupabaseConfig, isAuthBypass } from "@/lib/auth/config-client";
+import {
+  allowDemoAuthClient,
+  hasSupabaseConfig,
+} from "@/lib/auth/config-client";
+import { safeNextPath } from "@/lib/auth/safe-next";
+import { BrandLockup } from "@/components/shell/BrandLockup";
 
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const intent = params.get("intent"); // "media" = download access only
   const isMediaIntent = intent === "media";
-  const next = params.get("next") || (isMediaIntent ? "/media" : "/app");
+  const next = safeNextPath(
+    params.get("next"),
+    isMediaIntent ? "/media" : "/app"
+  );
   const errorParam = params.get("error");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(
     errorParam === "supabase_not_configured"
       ? "Supabase is not configured. Use demo mode or set env vars."
-      : null
+      : errorParam === "auth_misconfigured"
+        ? "Production auth is misconfigured. Turn off AUTH_BYPASS and set Supabase env vars."
+        : null
   );
   const [loading, setLoading] = useState(false);
-  const bypass = isAuthBypass();
   const supabaseReady = hasSupabaseConfig();
+  const demo = allowDemoAuthClient();
 
   async function grantDemoAccess(kind: "media" | "staff") {
-    await fetch("/api/auth/media-guest", {
+    const res = await fetch("/api/auth/media-guest", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ kind, next }),
     });
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(data.error || "Could not grant access");
+    }
   }
 
   async function onSubmit(e: FormEvent) {
@@ -36,7 +50,7 @@ function LoginForm() {
     setLoading(true);
     setError(null);
     try {
-      if (bypass || !supabaseReady) {
+      if (demo) {
         await grantDemoAccess(isMediaIntent ? "media" : "staff");
         router.push(next);
         return;
@@ -52,8 +66,8 @@ function LoginForm() {
         setLoading(false);
         return;
       }
-      // Also stamp media cookie so downloads work alongside Supabase session
-      await grantDemoAccess(isMediaIntent ? "media" : "staff");
+      // Stamp media cookie after real sign-in (requires session — endpoint checks auth)
+      await grantDemoAccess("media");
       router.push(next);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
@@ -66,6 +80,7 @@ function LoginForm() {
       <Link href={isMediaIntent ? "/media" : "/"} className="mb-8 text-sm text-muted hover:text-foreground">
         ← Back
       </Link>
+      <BrandLockup className="mb-8" size={40} titleClassName="text-xl" />
       <h1 className="font-display text-3xl text-brand">
         {isMediaIntent ? "Sign in to download" : "Staff login"}
       </h1>
@@ -76,14 +91,14 @@ function LoginForm() {
       </p>
 
       <form onSubmit={onSubmit} className="surface-card mt-8 space-y-4 p-6">
-        {bypass ? (
+        {demo ? (
           <p className="rounded-xl bg-accent-soft px-3 py-2 text-sm text-brand">
             Demo mode is on. Continue without a password
             {isMediaIntent ? " to unlock downloads." : " to enter the hub."}
           </p>
         ) : null}
 
-        {!bypass && supabaseReady ? (
+        {!demo && supabaseReady ? (
           <>
             <div>
               <label className="label" htmlFor="email">
@@ -121,7 +136,7 @@ function LoginForm() {
         <button type="submit" className="btn-primary w-full" disabled={loading}>
           {loading
             ? "Signing in…"
-            : bypass || !supabaseReady
+            : demo
               ? isMediaIntent
                 ? "Unlock downloads (demo)"
                 : "Enter hub (demo)"

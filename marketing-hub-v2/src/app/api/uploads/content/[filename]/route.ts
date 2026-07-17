@@ -15,7 +15,6 @@ const MIME: Record<string, string> = {
   ".jpeg": "image/jpeg",
   ".gif": "image/gif",
   ".webp": "image/webp",
-  ".svg": "image/svg+xml",
   ".pdf": "application/pdf",
   ".mp4": "video/mp4",
   ".mov": "video/quicktime",
@@ -38,10 +37,20 @@ export async function GET(
   try {
     const data = await fs.readFile(filePath);
     const ext = path.extname(filename).toLowerCase();
+    if (ext === ".svg") {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    const isDownload =
+      ext === ".pdf" || ext === ".mp4" || ext === ".mov";
     return new NextResponse(data, {
       headers: {
         "Content-Type": MIME[ext] || "application/octet-stream",
         "Cache-Control": "private, max-age=3600",
+        ...(isDownload
+          ? {
+              "Content-Disposition": `attachment; filename="${filename.replace(/"/g, "")}"`,
+            }
+          : {}),
       },
     });
   } catch {

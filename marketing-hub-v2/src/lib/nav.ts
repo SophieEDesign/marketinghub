@@ -11,10 +11,11 @@ import {
   Library,
   Settings,
   Sparkles,
+  UserCircle,
   Users,
 } from "lucide-react";
 
-export type HubViewMode = "admin" | "member";
+export type HubViewMode = "admin" | "member" | "external";
 
 export type NavItem = {
   href: string;
@@ -23,6 +24,8 @@ export type NavItem = {
   icon: LucideIcon;
   /** Shown in member (daily) view when true; admin always sees all. */
   member?: boolean;
+  /** Shown in external (media guest) preview when true. */
+  external?: boolean;
 };
 
 export const STAFF_NAV: NavItem[] = [
@@ -72,6 +75,7 @@ export const STAFF_NAV: NavItem[] = [
     description: "Media, brand guidelines, and resource links",
     icon: Library,
     member: true,
+    external: true,
   },
   {
     href: "/app/themes",
@@ -84,6 +88,13 @@ export const STAFF_NAV: NavItem[] = [
     label: "Internal",
     description: "Clothes, merch, asset asks, and staff social forms",
     icon: Users,
+    member: true,
+  },
+  {
+    href: "/app/me",
+    label: "My details",
+    description: "Your linked contact profile",
+    icon: UserCircle,
     member: true,
   },
   {
@@ -108,5 +119,6 @@ export const STAFF_NAV: NavItem[] = [
 
 export function navForView(view: HubViewMode): NavItem[] {
   if (view === "admin") return STAFF_NAV;
+  if (view === "external") return STAFF_NAV.filter((item) => item.external);
   return STAFF_NAV.filter((item) => item.member);
 }

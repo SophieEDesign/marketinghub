@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { DM_Sans, Fraunces } from "next/font/google";
 import "./globals.css";
 
@@ -12,9 +12,38 @@ const fraunces = Fraunces({
   variable: "--font-display",
 });
 
+const siteUrl =
+  process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
+  "http://localhost:3001";
+
+const title = "Peters & May Marketing Hub";
+const description =
+  "Internal marketing hub for events, content, media, and partnerships.";
+
 export const metadata: Metadata = {
-  title: "Peters & May Marketing Hub",
-  description: "Internal marketing hub for events, content, media, and partnerships.",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: title,
+    template: `%s | ${title}`,
+  },
+  description,
+  applicationName: title,
+  openGraph: {
+    type: "website",
+    siteName: title,
+    title,
+    description,
+    url: siteUrl,
+  },
+  twitter: {
+    card: "summary",
+    title,
+    description,
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0b3a4a",
 };
 
 export default function RootLayout({

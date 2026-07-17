@@ -1,6 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
-import { hasSupabaseConfig, isAuthBypass } from "@/lib/auth/config";
+import {
+  allowDemoAuth,
+  hasSupabaseConfig,
+  productionAuthMisconfigured,
+} from "@/lib/auth/config";
+import { hubCookieOptions } from "@/lib/auth/cookies";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -10,23 +15,27 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Demo mode when AUTH_BYPASS=true or Supabase is not configured yet.
-  if (isAuthBypass() || !hasSupabaseConfig()) {
+  if (productionAuthMisconfigured()) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("error", "auth_misconfigured");
+    return NextResponse.redirect(url);
+  }
+
+  // Demo mode only outside production.
+  if (allowDemoAuth()) {
     const response = NextResponse.next();
-    // Staff hub access implies download rights for media
-    response.cookies.set("mh_staff_demo", "1", {
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 30,
-    });
-    response.cookies.set("mh_media_access", "1", {
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 30,
-    });
+    const opts = hubCookieOptions();
+    response.cookies.set("mh_staff_demo", "1", opts);
+    response.cookies.set("mh_media_access", "1", opts);
     return response;
+  }
+
+  if (!hasSupabaseConfig()) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("error", "supabase_not_configured");
+    return NextResponse.redirect(url);
   }
 
   let response = NextResponse.next({ request });

@@ -30,3 +30,10 @@ Do not delete `legacy/`. See [`marketing-hub-v2/README.md`](marketing-hub-v2/REA
 - `app/`, `public/`, `types/`, `supabase/` — old root scraps
 - `docs/`, `.tmp-prototype/`, `_design-handoff/`
 - Admin / RLS `*.sql` scripts and revert notes
+
+## Freeze policy (do not expand)
+
+- **Do not** add new features or migrations under `legacy/` or root `supabase/migrations/`.
+- New Supabase migrations for the live hub belong in [`marketing-hub-v2/supabase/migrations/`](marketing-hub-v2/supabase/migrations/).
+- Root / `legacy/supabase` trees are **historical** (Baserow builder schema). Keep for rollback only.
+- When rollback is formally retired, archive `legacy/docs`, `_design-handoff`, and `.tmp-prototype` in a separate PR — do not delete without a tagged freeze.

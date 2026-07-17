@@ -100,6 +100,8 @@ export type Contact = {
   phone: string;
   tags: string[];
   notes: string;
+  /** Hub user (auth) linked to this contact — members edit only their linked record. */
+  user_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -186,6 +188,23 @@ export type MerchOrder = {
   status: MerchStatus;
   notes: string;
   created_by: string;
+  /** Auth user id of the requester — members only see their own. */
+  created_by_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** On-hand corporate clothing / kit stock */
+export type MerchInventoryItem = {
+  id: string;
+  item: string;
+  brand: string;
+  /** Male or female cut; empty for unisex / accessories */
+  fit: "male" | "female" | "";
+  size: string;
+  colour: string;
+  quantity: number;
+  notes: string;
   created_at: string;
   updated_at: string;
 };
@@ -256,6 +275,7 @@ export type HubStore = {
   theme_mains: ThemeMainContent[];
   theme_offshoots: ThemeOffshoot[];
   merch_orders: MerchOrder[];
+  merch_inventory: MerchInventoryItem[];
   staff_requests: StaffRequest[];
   awards: AwardEntry[];
   tasks: HubTask[];

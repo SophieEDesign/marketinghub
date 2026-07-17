@@ -28,7 +28,29 @@ export function LibraryHub({
 }) {
   const [tab, setTab] = useState<Tab>("media");
   const { view } = useHubView();
+  const isExternal = view === "external";
   const isMember = view === "member";
+  const canManage = view === "admin";
+
+  if (isExternal) {
+    return (
+      <div>
+        <PageHeader
+          title="Library"
+          description="External view — logos, presentations, and gallery, matching the public media gallery."
+        />
+        <MediaGallery
+          title="Media gallery"
+          description="Browse logos, presentations, and gallery — view freely, sign in to download."
+          showStaffChrome={false}
+          initialCanDownload
+          hideHeader
+          scope="public"
+          allowManage={false}
+        />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -52,11 +74,11 @@ export function LibraryHub({
       {tab === "media" ? (
         <MediaGallery
           title="Media"
-          description="Logos, presentations, and brand assets — public gallery shows Logos & Presentations only for now."
+          description="Logos, presentations, gallery, and other brand assets."
           initialCanDownload
           hideHeader
           scope="all"
-          allowManage={!isMember}
+          allowManage={canManage}
         />
       ) : null}
 
@@ -72,7 +94,7 @@ export function LibraryHub({
         <ResourcesClient
           initial={resources}
           hideHeader
-          allowManage={!isMember}
+          allowManage={canManage}
         />
       ) : null}
     </div>

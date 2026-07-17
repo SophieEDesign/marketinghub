@@ -7,12 +7,23 @@ import { Menu, X } from "lucide-react";
 import { navForView } from "@/lib/nav";
 import { HubViewProvider, useHubView } from "@/lib/hub-view";
 import { MemberRouteGuard } from "@/components/shell/MemberRouteGuard";
+import { AccountMenu, SignOutLink } from "@/components/shell/AccountMenu";
+import { BrandLockup } from "@/components/shell/BrandLockup";
 import { cn } from "@/lib/utils";
+import type { HubViewMode } from "@/lib/nav";
 
-function ViewToggle() {
+function ViewToggle({ canToggle }: { canToggle: boolean }) {
   const { view, setView, ready } = useHubView();
   if (!ready) {
     return <div className="h-9 rounded-xl bg-sand/80" aria-hidden />;
+  }
+
+  if (!canToggle) {
+    return (
+      <p className="rounded-xl border border-border bg-sand/60 px-3 py-2 text-xs font-medium capitalize text-brand">
+        {view} view
+      </p>
+    );
   }
 
   return (
@@ -21,30 +32,27 @@ function ViewToggle() {
       role="group"
       aria-label="Hub view"
     >
-      <button
-        type="button"
-        className={cn(
-          "flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition",
-          view === "member"
-            ? "bg-white text-brand shadow-sm"
-            : "text-muted hover:text-foreground"
-        )}
-        onClick={() => setView("member")}
-      >
-        Member
-      </button>
-      <button
-        type="button"
-        className={cn(
-          "flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition",
-          view === "admin"
-            ? "bg-white text-brand shadow-sm"
-            : "text-muted hover:text-foreground"
-        )}
-        onClick={() => setView("admin")}
-      >
-        Admin
-      </button>
+      {(
+        [
+          { id: "member", label: "Member" },
+          { id: "admin", label: "Admin" },
+          { id: "external", label: "External" },
+        ] as const
+      ).map((option) => (
+        <button
+          key={option.id}
+          type="button"
+          className={cn(
+            "flex-1 rounded-lg px-1.5 py-1.5 text-[11px] font-medium transition sm:px-2 sm:text-xs",
+            view === option.id
+              ? "bg-white text-brand shadow-sm"
+              : "text-muted hover:text-foreground"
+          )}
+          onClick={() => setView(option.id)}
+        >
+          {option.label}
+        </button>
+      ))}
     </div>
   );
 }
@@ -52,9 +60,15 @@ function ViewToggle() {
 function ShellInner({
   children,
   userName,
+  userEmail,
+  accessRole,
+  canToggleAdminView,
 }: {
   children: React.ReactNode;
   userName: string;
+  userEmail?: string;
+  accessRole?: "admin" | "staff" | "media_guest";
+  canToggleAdminView: boolean;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -93,34 +107,40 @@ function ShellInner({
     <div className="min-h-screen md:flex">
       <aside className="hidden w-64 shrink-0 border-r border-border bg-white/80 backdrop-blur md:flex md:flex-col">
         <div className="border-b border-border px-5 py-5">
-          <p className="font-display text-lg tracking-tight text-brand">
-            Peters &amp; May
-          </p>
-          <p className="text-xs text-muted">Marketing Hub</p>
+          <BrandLockup />
           <div className="mt-4 space-y-1.5">
             <p className="text-[10px] font-medium uppercase tracking-wide text-muted">
               View
             </p>
-            <ViewToggle />
+            <ViewToggle canToggle={canToggleAdminView} />
           </div>
         </div>
         <div className="flex-1 overflow-y-auto">{Nav}</div>
-        <div className="border-t border-border px-5 py-4 text-xs text-muted">
-          <p>Signed in as {userName}</p>
-          <p className="mt-1 capitalize text-[11px]">{view} view</p>
+        <div className="border-t border-border px-3 py-3">
+          <AccountMenu
+            userName={userName}
+            userEmail={userEmail}
+            accessRole={accessRole}
+          />
+          <p className="mt-2 px-1 capitalize text-[11px] text-muted">
+            {view} view
+          </p>
         </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-border bg-white/90 px-4 py-3 backdrop-blur md:hidden">
-          <div className="min-w-0">
-            <p className="font-display text-base text-brand">Peters &amp; May</p>
-            <p className="text-xs text-muted">Marketing Hub</p>
-          </div>
+          <BrandLockup size={32} titleClassName="text-base" />
           <div className="flex items-center gap-2">
-            <div className="w-36">
-              <ViewToggle />
+            <div className="w-48">
+              <ViewToggle canToggle={canToggleAdminView} />
             </div>
+            <AccountMenu
+              userName={userName}
+              userEmail={userEmail}
+              accessRole={accessRole}
+              compact
+            />
             <button
               type="button"
               className="btn-secondary px-3 py-2"
@@ -133,7 +153,13 @@ function ShellInner({
         </header>
 
         {open && (
-          <div className="border-b border-border bg-white md:hidden">{Nav}</div>
+          <div className="border-b border-border bg-white md:hidden">
+            {Nav}
+            <div className="border-t border-border px-5 py-3">
+              <p className="text-xs text-muted">Signed in as {userName}</p>
+              <SignOutLink />
+            </div>
+          </div>
         )}
 
         <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
@@ -147,13 +173,32 @@ function ShellInner({
 export function AppShell({
   children,
   userName,
+  userEmail,
+  accessRole = "admin",
 }: {
   children: React.ReactNode;
   userName: string;
+  userEmail?: string;
+  /** Session role from profiles — admins may toggle Admin/Member/External UI. */
+  accessRole?: "admin" | "staff" | "media_guest";
 }) {
+  const canToggleAdminView = accessRole === "admin";
+  const initialView: HubViewMode =
+    accessRole === "admin" ? "admin" : "member";
+
   return (
-    <HubViewProvider>
-      <ShellInner userName={userName}>{children}</ShellInner>
+    <HubViewProvider
+      initialView={initialView}
+      canToggleAdminView={canToggleAdminView}
+    >
+      <ShellInner
+        userName={userName}
+        userEmail={userEmail}
+        accessRole={accessRole}
+        canToggleAdminView={canToggleAdminView}
+      >
+        {children}
+      </ShellInner>
     </HubViewProvider>
   );
 }

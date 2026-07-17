@@ -18,38 +18,59 @@ type HubViewContextValue = {
   view: HubViewMode;
   setView: (view: HubViewMode) => void;
   ready: boolean;
+  canToggleAdminView: boolean;
 };
 
 const HubViewContext = createContext<HubViewContextValue | null>(null);
 
-export function HubViewProvider({ children }: { children: React.ReactNode }) {
-  const [view, setViewState] = useState<HubViewMode>("admin");
+export function HubViewProvider({
+  children,
+  initialView = "member",
+  canToggleAdminView = false,
+}: {
+  children: React.ReactNode;
+  initialView?: HubViewMode;
+  canToggleAdminView?: boolean;
+}) {
+  const [view, setViewState] = useState<HubViewMode>(initialView);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    if (!canToggleAdminView) {
+      setViewState("member");
+      setReady(true);
+      return;
+    }
     try {
       const saved = window.localStorage.getItem(STORAGE_KEY);
-      if (saved === "admin" || saved === "member") {
+      if (saved === "admin" || saved === "member" || saved === "external") {
         setViewState(saved);
+      } else {
+        setViewState(initialView);
       }
     } catch {
-      // ignore
+      setViewState(initialView);
     }
     setReady(true);
-  }, []);
+  }, [canToggleAdminView, initialView]);
 
-  const setView = useCallback((next: HubViewMode) => {
-    setViewState(next);
-    try {
-      window.localStorage.setItem(STORAGE_KEY, next);
-    } catch {
-      // ignore
-    }
-  }, []);
+  const setView = useCallback(
+    (next: HubViewMode) => {
+      if (!canToggleAdminView && next !== "member") return;
+      setViewState(next);
+      if (!canToggleAdminView) return;
+      try {
+        window.localStorage.setItem(STORAGE_KEY, next);
+      } catch {
+        // ignore
+      }
+    },
+    [canToggleAdminView]
+  );
 
   const value = useMemo(
-    () => ({ view, setView, ready }),
-    [view, setView, ready]
+    () => ({ view, setView, ready, canToggleAdminView }),
+    [view, setView, ready, canToggleAdminView]
   );
 
   return (

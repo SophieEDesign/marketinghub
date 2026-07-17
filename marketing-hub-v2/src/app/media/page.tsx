@@ -1,15 +1,20 @@
 import Link from "next/link";
 import { MediaGallery } from "@/components/media/MediaGallery";
+import { MediaSignOutButton } from "@/components/media/MediaSignOutButton";
+import { BrandLockup } from "@/components/shell/BrandLockup";
 import { hasMediaDownloadAccess } from "@/lib/auth/media-access";
+import { getSessionUser } from "@/lib/auth/session";
 
 export default async function PublicMediaPage() {
   const canDownload = await hasMediaDownloadAccess();
+  const sessionUser = await getSessionUser().catch(() => null);
+  const signedIn = Boolean(sessionUser);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 md:px-8">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <Link href="/" className="text-sm text-muted hover:text-foreground">
-          ← Marketing Hub
+        <Link href="/" className="hover:opacity-90">
+          <BrandLockup size={32} titleClassName="text-base" />
         </Link>
         <div className="flex flex-wrap gap-2">
           {!canDownload ? (
@@ -20,6 +25,7 @@ export default async function PublicMediaPage() {
               Sign in to download
             </Link>
           ) : null}
+          {signedIn ? <MediaSignOutButton /> : null}
           <Link href="/login" className="btn-secondary">
             Staff login
           </Link>
@@ -27,7 +33,7 @@ export default async function PublicMediaPage() {
       </div>
       <MediaGallery
         title="Media gallery"
-        description="Browse logos and presentations — view freely, sign in to download."
+        description="Browse logos, presentations, and gallery — view freely, sign in to download."
         showStaffChrome={false}
         initialCanDownload={canDownload}
         scope="public"

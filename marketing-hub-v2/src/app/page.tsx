@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { BrandMark } from "@/components/shell/BrandLockup";
 
 export default function LandingPage() {
   return (
     <div className="relative overflow-hidden">
       <div className="mx-auto flex min-h-screen max-w-5xl flex-col justify-center px-6 py-16">
+        <BrandMark size={48} className="mb-6" />
         <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-accent">
           Peters &amp; May
         </p>
@@ -26,8 +28,10 @@ export default function LandingPage() {
           </Link>
         </div>
         <p className="mt-10 text-xs text-muted">
-          Legacy Airtable-style hub remains available in{" "}
-          <code className="rounded bg-white px-1.5 py-0.5">baserow-app</code>{" "}
+          Legacy Airtable-style hub remains available under{" "}
+          <code className="rounded bg-white px-1.5 py-0.5">
+            legacy/baserow-app
+          </code>{" "}
           and is not removed.
         </p>
       </div>

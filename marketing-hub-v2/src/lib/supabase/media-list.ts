@@ -22,6 +22,13 @@ export type MediaListItem = {
   /** Title to show in the current context (public vs staff). */
   display_name: string;
   category: string;
+  /** Optional folder under Gallery (and similar) for sorting images. */
+  subfolder: string;
+  /**
+   * Gallery subfolder visibility: public (external) or internal (staff).
+   * Non-gallery categories ignore this; missing values treat as public.
+   */
+  subfolder_visibility: GalleryFolderVisibility;
   status: string;
   owned_by: string;
   notes: string;
@@ -32,10 +39,26 @@ export type MediaListItem = {
   updated_at: string | null;
 };
 
-/** Categories visible on the public /media gallery. Gallery/Images to follow later. */
-export const PUBLIC_MEDIA_CATEGORIES = ["Logos", "Presentations"] as const;
+export type GalleryFolderVisibility = "public" | "internal";
+
+export const GALLERY_CATEGORY = "Gallery";
+
+/** Categories visible on the public /media gallery and external library view. */
+export const PUBLIC_MEDIA_CATEGORIES = [
+  "Logos",
+  "Presentations",
+  "Gallery",
+] as const;
 
 export type MediaListScope = "public" | "all";
+
+export function normalizeGalleryVisibility(
+  raw: string | null | undefined
+): GalleryFolderVisibility {
+  return (raw ?? "").trim().toLowerCase() === "internal"
+    ? "internal"
+    : "public";
+}
 
 function parseFiles(raw: unknown): MediaFile[] {
   if (!raw) return [];
@@ -84,6 +107,22 @@ function normalizeLink(raw: string): string {
 function isPublicCategory(category: string): boolean {
   const normalized = category.trim().toLowerCase();
   return PUBLIC_MEDIA_CATEGORIES.some((c) => c.toLowerCase() === normalized);
+}
+
+function isGalleryCategoryName(category: string): boolean {
+  return category.trim().toLowerCase() === GALLERY_CATEGORY.toLowerCase();
+}
+
+/** Public scope: public categories; Gallery subfolders must be public. */
+function isVisibleInPublicScope(item: {
+  category: string;
+  subfolder_visibility: GalleryFolderVisibility;
+}): boolean {
+  if (!isPublicCategory(item.category)) return false;
+  if (isGalleryCategoryName(item.category)) {
+    return item.subfolder_visibility === "public";
+  }
+  return true;
 }
 
 export async function listMediaFromSupabase(options?: {
@@ -150,6 +189,18 @@ export async function listMediaFromSupabase(options?: {
             /^type$/i,
           ])
         ) || "General";
+      const subfolder = asString(
+        pickField(r, [/^subfolder$/i, /^gallery_?folder$/i, /^album$/i])
+      );
+      const subfolder_visibility = normalizeGalleryVisibility(
+        asString(
+          pickField(r, [
+            /^subfolder_?visibility$/i,
+            /^gallery_?visibility$/i,
+            /^folder_?visibility$/i,
+          ])
+        )
+      );
 
       const internalName = name.trim();
       const publicName = publicTitle.trim();
@@ -164,6 +215,8 @@ export async function listMediaFromSupabase(options?: {
         public_title: publicName,
         display_name,
         category,
+        subfolder: subfolder.trim(),
+        subfolder_visibility,
         status: asString(pickField(r, [/^status$/i])) || "",
         owned_by: asString(
           pickField(r, [/^owned_?by$/i, /^owner$/i, /^assignee$/i])
@@ -176,13 +229,16 @@ export async function listMediaFromSupabase(options?: {
         updated_at: asString(r.updated_at) || null,
       } satisfies MediaListItem;
     })
-    .filter((item) => (scope === "public" ? isPublicCategory(item.category) : true))
+    .filter((item) =>
+      scope === "public" ? isVisibleInPublicScope(item) : true
+    )
     .sort((a, b) => a.display_name.localeCompare(b.display_name));
 
   return { items, tableName: mediaTable.name, scope };
 }
 
 export const MEDIA_HUB_CATEGORIES = [
+  "Gallery",
   "Logos",
   "Presentations",
   "Images",
@@ -194,15 +250,28 @@ export const MEDIA_HUB_CATEGORIES = [
   "Advertorial",
 ] as const;
 
+export type MediaUploadFile = {
+  url: string;
+  name: string;
+  type?: string;
+  size?: number | null;
+};
+
 export type CreateMediaInput = {
   name: string;
   public_title?: string;
   category?: string;
+  /** Folder under Gallery for sorting images. */
+  subfolder?: string;
+  /** public = external gallery; internal = staff only. Gallery only. */
+  subfolder_visibility?: GalleryFolderVisibility;
   document_link?: string;
   notes?: string;
   status?: string;
   /** Optional uploaded / linked file for the media jsonb column. */
-  file?: { url: string; name: string; type?: string; size?: number | null };
+  file?: MediaUploadFile;
+  /** Multiple uploaded files (preferred when adding several images at once). */
+  files?: MediaUploadFile[];
   /** auth.users id — required for created_by / updated_by FKs. */
   actorId: string;
 };
@@ -256,22 +325,38 @@ export async function createMediaInSupabase(
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
   const category = (input.category?.trim() || "Documents").trim();
+  const isGallery =
+    category.toLowerCase() === GALLERY_CATEGORY.toLowerCase();
+  const subfolder = isGallery ? (input.subfolder?.trim() || "") : "";
+  const subfolder_visibility: GalleryFolderVisibility = isGallery
+    ? normalizeGalleryVisibility(input.subfolder_visibility ?? "internal")
+    : "public";
   const publicTitle = input.public_title?.trim() || "";
   const documentLink = normalizeLink(input.document_link ?? "");
   const notes = input.notes?.trim() || "";
   const status = input.status?.trim() || "Internal Resource";
 
+  const uploadedFiles: MediaUploadFile[] = [
+    ...(input.files ?? []),
+    ...(input.file?.url ? [input.file] : []),
+  ].filter((f) => !!f?.url);
+
+  // Deduplicate by URL while preserving order.
+  const seenUrls = new Set<string>();
   const media =
-    input.file?.url
-      ? [
-          {
-            url: input.file.url,
-            name: input.file.name || "File",
-            type: input.file.type || "",
-            size:
-              typeof input.file.size === "number" ? input.file.size : null,
-          },
-        ]
+    uploadedFiles.length > 0
+      ? uploadedFiles
+          .filter((f) => {
+            if (seenUrls.has(f.url)) return false;
+            seenUrls.add(f.url);
+            return true;
+          })
+          .map((f) => ({
+            url: f.url,
+            name: f.name || "File",
+            type: f.type || "",
+            size: typeof f.size === "number" ? f.size : null,
+          }))
       : null;
 
   const row = {
@@ -279,6 +364,8 @@ export async function createMediaInSupabase(
     name,
     public_title: publicTitle || null,
     hub_category: category,
+    subfolder: subfolder || null,
+    subfolder_visibility: isGallery ? subfolder_visibility : null,
     document_link: documentLink || null,
     notes: notes || null,
     status,
@@ -307,6 +394,8 @@ export async function createMediaInSupabase(
     public_title: publicTitle,
     display_name: name,
     category,
+    subfolder,
+    subfolder_visibility,
     status,
     owned_by: asString(r.owned_by),
     notes,
@@ -319,6 +408,47 @@ export async function createMediaInSupabase(
       null,
     updated_at: asString(r.updated_at) || now,
   };
+}
+
+/** Set public/internal for every item in a Gallery subfolder (empty = Unsorted). */
+export async function setGallerySubfolderVisibility(input: {
+  subfolder: string;
+  visibility: GalleryFolderVisibility;
+  actorId: string;
+}): Promise<{ updated: number }> {
+  const visibility = normalizeGalleryVisibility(input.visibility);
+  const subfolderKey = input.subfolder.trim();
+
+  const tables = await listCoreTables();
+  const mediaTable = findMediaTable(tables);
+  if (!mediaTable) {
+    throw new Error("Media Links Resources table not found");
+  }
+
+  const actorId = await resolveMediaActorId(input.actorId);
+  const now = new Date().toISOString();
+  const supabase = createServiceClient();
+
+  // Match Unsorted (blank subfolder) or exact name.
+  let query = supabase
+    .from(mediaTable.supabase_table)
+    .update({
+      subfolder_visibility: visibility,
+      updated_at: now,
+      updated_by: actorId,
+    })
+    .is("deleted_at", null)
+    .ilike("hub_category", GALLERY_CATEGORY);
+
+  if (subfolderKey) {
+    query = query.eq("subfolder", subfolderKey);
+  } else {
+    query = query.or("subfolder.is.null,subfolder.eq.");
+  }
+
+  const { data, error } = await query.select("id");
+  if (error) throw new Error(error.message);
+  return { updated: data?.length ?? 0 };
 }
 
 export async function softDeleteMediaInSupabase(

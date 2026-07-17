@@ -1,0 +1,17 @@
+# Marketing Hub v2 — Supabase CLI config (optional local tooling)
+# Project ref: hwtycgvclhckglmuwnmw (Marketing Hub)
+#
+# Legacy Baserow migrations live under legacy/supabase and root supabase/ —
+# treat those as historical only. New migrations belong here.
+
+[project]
+id = "hwtycgvclhckglmuwnmw"
+
+[api]
+enabled = true
+
+[db]
+major_version = 17
+
+[studio]
+enabled = true

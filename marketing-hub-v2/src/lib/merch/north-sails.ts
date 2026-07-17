@@ -2,10 +2,17 @@
 
 export type ClothingFit = "male" | "female";
 
+export type ClothingBrand =
+  | "North Sails"
+  | "Henbury"
+  | "Premier"
+  | "BagBase"
+  | "Other";
+
 export type ClothingProduct = {
   id: string;
   label: string;
-  brand: "North Sails" | "Henbury";
+  brand: ClothingBrand;
   material?: string;
   colours: string[];
   defaultColour: string;
@@ -28,6 +35,13 @@ export const CLOTHING_SIZES = [
   "XL",
   "XXL",
   "3XL",
+] as const;
+
+/** Extra size labels used in stock (accessories / high-vis). */
+export const INVENTORY_SIZES = [
+  ...CLOTHING_SIZES,
+  "S-M",
+  "N/A",
 ] as const;
 
 export const CLOTHING_PRODUCTS: ClothingProduct[] = [
@@ -55,6 +69,14 @@ export const CLOTHING_PRODUCTS: ClothingProduct[] = [
       male: "https://www.northsails.com/en-uk/products/pique-polo-27m105",
       female: "https://www.northsails.com/en-uk/products/pique-polo-fw-27w105",
     },
+  },
+  {
+    id: "polo_tactel",
+    label: "Polo — Tactel",
+    brand: "North Sails",
+    material: "Tactel",
+    colours: ["Navy", "White"],
+    defaultColour: "White",
   },
   {
     id: "gilet",
@@ -92,6 +114,27 @@ export const CLOTHING_PRODUCTS: ClothingProduct[] = [
         "https://www.promotional-store.com/en-GB/henbury/womens-classic-long-sleeve-oxford-shirt/",
     },
   },
+  {
+    id: "shirt_premier",
+    label: "Premier white shirt",
+    brand: "Premier",
+    colours: ["White"],
+    defaultColour: "White",
+  },
+  {
+    id: "backpack",
+    label: "Backpack",
+    brand: "BagBase",
+    colours: ["Navy"],
+    defaultColour: "Navy",
+  },
+  {
+    id: "high_vis",
+    label: "High Vis",
+    brand: "Other",
+    colours: ["Yellow"],
+    defaultColour: "Yellow",
+  },
 ];
 
 export function clothingProductByLabel(label: string): ClothingProduct | undefined {
@@ -108,4 +151,8 @@ export function coloursForItem(itemLabel: string): string[] {
 
 export function defaultColourForItem(itemLabel: string): string {
   return clothingProductByLabel(itemLabel)?.defaultColour ?? "Navy";
+}
+
+export function defaultBrandForItem(itemLabel: string): string {
+  return clothingProductByLabel(itemLabel)?.brand ?? "North Sails";
 }

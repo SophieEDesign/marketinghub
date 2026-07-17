@@ -228,7 +228,7 @@ export function EventsClient({
   initialEvents: EventItem[];
 }) {
   const { view } = useHubView();
-  const isAdmin = view === "admin";
+  const canDelete = view === "admin";
 
   const [events, setEvents] = useState(initialEvents);
   const [selected, setSelected] = useState<EventItem | null>(null);
@@ -359,7 +359,6 @@ export function EventsClient({
   }, [events]);
 
   async function createEvent() {
-    if (!isAdmin) return;
     await fetch("/api/events", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -377,7 +376,6 @@ export function EventsClient({
   }
 
   function openEdit(event: EventItem) {
-    if (!isAdmin) return;
     setEditingId(event.id);
     setEdit(toEditForm(event));
   }
@@ -388,7 +386,7 @@ export function EventsClient({
   }
 
   async function saveEdit() {
-    if (!isAdmin || !editingId || !edit) return;
+    if (!editingId || !edit) return;
     setSaving(true);
     try {
       await fetch("/api/events", {
@@ -419,7 +417,7 @@ export function EventsClient({
   }
 
   async function removeEvent(id: string) {
-    if (!isAdmin) return;
+    if (!canDelete) return;
     if (!window.confirm("Delete this event?")) return;
     await fetch("/api/events", {
       method: "POST",
@@ -436,7 +434,6 @@ export function EventsClient({
     startsAt: string,
     endsAt: string | null
   ) {
-    if (!isAdmin) return;
     setEvents((prev) =>
       prev.map((e) =>
         e.id === id
@@ -472,11 +469,7 @@ export function EventsClient({
       <FullCalendarStyles />
       <PageHeader
         title="Events"
-        description={
-          isAdmin
-            ? "Add and edit shows and meetings. Attendance lives in the event spreadsheet."
-            : "Browse upcoming shows and meetings. Switch to Admin view to add or edit events."
-        }
+        description="Add and edit shows and meetings. Attendance lives in the event spreadsheet. Only admins can delete events."
         actions={
           <>
             <button
@@ -488,15 +481,13 @@ export function EventsClient({
             >
               {viewMode === "calendar" ? "List view" : "Calendar view"}
             </button>
-            {isAdmin ? (
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={() => setShowForm(true)}
-              >
-                Add event
-              </button>
-            ) : null}
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => setShowForm(true)}
+            >
+              Add event
+            </button>
           </>
         }
       />
@@ -548,7 +539,7 @@ export function EventsClient({
         })}
       </div>
 
-      {isAdmin && showForm ? (
+      {showForm ? (
         <div className="surface-card mb-6 p-5">
           <EventFields form={form} onChange={setForm} />
           <div className="mt-4 flex gap-2">
@@ -578,8 +569,8 @@ export function EventsClient({
               initialView="dayGridMonth"
               height="auto"
               firstDay={1}
-              editable={isAdmin}
-              eventStartEditable={isAdmin}
+              editable
+              eventStartEditable
               eventDurationEditable={false}
               events={calendarEvents}
               eventClick={(info) => {
@@ -587,10 +578,6 @@ export function EventsClient({
                 setSelected(found ?? null);
               }}
               eventDrop={(info) => {
-                if (!isAdmin) {
-                  info.revert();
-                  return;
-                }
                 const id = info.event.id;
                 const existing = events.find((e) => e.id === id);
                 if (!existing?.starts_at) {
@@ -632,11 +619,7 @@ export function EventsClient({
                 center: "title",
                 right: "dayGridMonth,listMonth",
               }}
-              eventClassNames={
-                isAdmin
-                  ? "!border-0 cursor-grab active:cursor-grabbing"
-                  : "!border-0"
-              }
+              eventClassNames="!border-0 cursor-grab active:cursor-grabbing"
               eventContent={(arg) => {
                 const division = String(
                   arg.event.extendedProps.division ?? ""
@@ -762,15 +745,15 @@ export function EventsClient({
                   </div>
                 </dl>
 
-                {isAdmin ? (
-                  <div className="flex flex-wrap gap-2 border-t border-border pt-3">
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      onClick={() => openEdit(selected)}
-                    >
-                      {hasValidStart(selected) ? "Edit event" : "Add date"}
-                    </button>
+                <div className="flex flex-wrap gap-2 border-t border-border pt-3">
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => openEdit(selected)}
+                  >
+                    {hasValidStart(selected) ? "Edit event" : "Add date"}
+                  </button>
+                  {canDelete ? (
                     <button
                       type="button"
                       className="btn-ghost text-[var(--danger)]"
@@ -778,8 +761,8 @@ export function EventsClient({
                     >
                       Delete
                     </button>
-                  </div>
-                ) : null}
+                  ) : null}
+                </div>
               </div>
             ) : (
               <p className="text-sm text-muted">
@@ -830,7 +813,7 @@ export function EventsClient({
         </aside>
       </div>
 
-      {isAdmin && edit && editingEvent ? (
+      {edit && editingEvent ? (
         <>
           <div
             className="fixed inset-0 z-40 bg-black/25 md:left-sidebar"
@@ -856,7 +839,7 @@ export function EventsClient({
             <div className="flex-1 overflow-y-auto p-4">
               <EventFields form={edit} onChange={setEdit} />
             </div>
-            <div className="flex gap-2 border-t border-border px-4 py-3">
+            <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
               <button
                 type="button"
                 className="btn-primary"
@@ -872,6 +855,16 @@ export function EventsClient({
               >
                 Cancel
               </button>
+              {canDelete ? (
+                <button
+                  type="button"
+                  className="btn-ghost text-[var(--danger)]"
+                  disabled={saving}
+                  onClick={() => void removeEvent(editingEvent.id)}
+                >
+                  Delete
+                </button>
+              ) : null}
             </div>
           </aside>
         </>

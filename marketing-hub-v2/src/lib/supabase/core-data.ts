@@ -1,5 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
-import { hasSupabaseConfig } from "@/lib/auth/config";
+import { createServiceClient } from "@/lib/supabase/admin";
 
 export type CoreTable = {
   id: string;
@@ -7,18 +6,7 @@ export type CoreTable = {
   supabase_table: string;
 };
 
-export function createServiceClient() {
-  if (!hasSupabaseConfig()) {
-    throw new Error("Supabase is not configured");
-  }
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  return createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-}
+export { createServiceClient };
 
 export async function listCoreTables(): Promise<CoreTable[]> {
   const supabase = createServiceClient();

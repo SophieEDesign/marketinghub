@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireStaff } from "@/lib/api";
+import { requireAdmin } from "@/lib/api";
 import { hasSupabaseConfig } from "@/lib/auth/config";
 import { importFromCoreData } from "@/lib/supabase/import-core";
 import {
@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 
 /** Preview which Core Data tables we would use (no write). */
 export async function GET() {
-  const { error } = await requireStaff();
+  const { error } = await requireAdmin();
   if (error) return error;
 
   if (!hasSupabaseConfig()) {
@@ -38,7 +38,8 @@ export async function GET() {
         themes: "Quarterly Themes table",
         resources: "Media Links Resources → Library",
         tasks: "Tasks table",
-        localOnly: "Merch orders, staff requests, reports (hub-only)",
+        hubMirror:
+          "Also mirrored to hub tables via POST /api/supabase/export (merch, staff requests, reports included)",
         ignored: "Legacy Content table",
       },
     });
@@ -86,7 +87,7 @@ export async function GET() {
         tasks: tasks
           ? { name: tasks.name, table: tasks.supabase_table }
           : null,
-        localOnly: ["merch_orders", "staff_requests", "reports"],
+        localOnly: ["merch_orders", "merch_inventory", "staff_requests", "reports"],
         legacyContentIgnored: legacy
           ? { name: legacy.name, table: legacy.supabase_table }
           : null,
@@ -106,7 +107,7 @@ export async function GET() {
 
 /** Pull Core Data tables into the hub store (existing tables + leave hub-only like merch). */
 export async function POST() {
-  const { error } = await requireStaff();
+  const { error } = await requireAdmin();
   if (error) return error;
 
   if (!hasSupabaseConfig()) {

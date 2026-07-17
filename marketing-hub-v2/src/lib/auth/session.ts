@@ -1,6 +1,10 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { DEMO_STAFF, hasSupabaseConfig, isAuthBypass } from "@/lib/auth/config";
+import {
+  allowDemoAuth,
+  DEMO_STAFF,
+  productionAuthMisconfigured,
+} from "@/lib/auth/config";
 import {
   getProfileRoleForUser,
   hubRoleToSessionRole,
@@ -22,8 +26,15 @@ async function withProfileRole(base: SessionUser): Promise<SessionUser> {
 export async function getSessionUser(
   request?: NextRequest
 ): Promise<SessionUser | null> {
-  // Local demo: bypass flag OR no Supabase yet → staff demo user + JSON store.
-  if (isAuthBypass() || !hasSupabaseConfig()) {
+  if (productionAuthMisconfigured()) {
+    console.error(
+      "[auth] Production misconfigured: AUTH_BYPASS on or Supabase env missing"
+    );
+    return null;
+  }
+
+  // Local / preview demo only — never in production.
+  if (allowDemoAuth()) {
     return DEMO_STAFF;
   }
 

@@ -15,8 +15,33 @@ Keep the UI simple. Pull from the **tidy** Core Data tables only.
 | **Memberships** | **Memberships** → Partners (`kind=membership`) | — |
 | **Awards** | **Awards** | — |
 | **Tasks** | **Tasks** | — |
-| **Merch / staff requests / reports** | *(hub-only — not imported)* | Create/edit in the hub |
+| **Merch / staff requests / reports** | Hub store + durable Supabase (`merch_orders`, `staff_requests`, `report_links`) | — |
 | **Social calendar** | Planable API first; Social Posts as fallback cache | — |
+
+## Durable hub mirror (local store → Supabase)
+
+Alongside Core Data (`table_events`, …), the hub keeps matching **hub tables** so the local `.data/store.json` can be persisted:
+
+| Store key | Supabase table |
+|-----------|----------------|
+| `events` | `events` |
+| `content` | `content_items` |
+| `sponsorships` | `sponsorships` |
+| `contacts` | `contacts` |
+| `resources` | `resource_links` |
+| `themes` / `theme_mains` / `theme_offshoots` | `quarterly_themes` / `theme_main_content` / `theme_offshoots` |
+| `awards` | `award_entries` |
+| `tasks` | `hub_tasks` |
+| `merch_orders` | `merch_orders` |
+| `staff_requests` | `staff_requests` |
+| `reports` | `report_links` |
+
+Push the current store:
+
+```bash
+node scripts/push-store-to-supabase.mjs
+# or POST /api/supabase/export (staff + service role)
+```
 
 ## Why
 
@@ -24,9 +49,20 @@ Keep the UI simple. Pull from the **tidy** Core Data tables only.
 - Day-to-day “content” for the hub is really **Social Posts** (posts, channels, Planable links). Sorting/tidying Social Posts further can come later; we still prefer it over Content.
 - The Airtable-style builder metadata (`tables`, `views`, `view_blocks`) stays in the legacy app.
 
+## Persistence
+
+| Environment | Store |
+|-------------|--------|
+| Local demo (`AUTH_BYPASS` / no service role) | `.data/store.json` on disk |
+| Production (service role set, bypass off) | Supabase `public.hub_store` JSON snapshot (durable across serverless instances); local file used as cache only |
+
+## Unused greenfield tables
+
+The v2 schema also created empty tables such as `events`, `content_items`, `sponsorships`, `contacts`, `resource_links` (see `supabase/migrations/001_hub_v2_schema.sql`). **Do not write app data there yet** — runtime CRUD goes through the hub store. Core Data `table_*` tables remain the import source.
+
 ## Import behaviour
 
-When `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` (and usually `SUPABASE_SERVICE_ROLE_KEY`) are set:
+When `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are set:
 
 1. Resolve physical table names via `public.tables`
 2. Map rows into the simple v2 shapes
@@ -36,7 +72,7 @@ When `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` (and usually `
    - Unpack JSON attachment blobs into a plain `asset_url`
    - Humanise event types (`commercial_event` → Commercial, etc.)
    - **Dedupe** Social Posts (same title) and Events (same title + start day)
-4. Replace the local Events / Content / Sponsorships+Memberships / Contacts / Awards / Themes / Resources store sections (demo seed overwritten for those modules). **Merch, staff requests, and reports stay hub-local.**
+4. Replace the hub store Events / Content / Sponsorships+Memberships / Contacts / Awards / Themes / Resources sections (demo seed overwritten for those modules). **Merch, staff requests, and reports stay hub-local.**
 
 To re-clean an existing `.data/store.json` without re-importing:
 
@@ -44,4 +80,4 @@ To re-clean an existing `.data/store.json` without re-importing:
 node scripts/clean-store.mjs
 ```
 
-Turn off `AUTH_BYPASS` when you want real staff login against the same project.
+Turn off `AUTH_BYPASS` / `NEXT_PUBLIC_AUTH_BYPASS` in production and set Supabase env vars (including service role) for real staff login and durable store writes.

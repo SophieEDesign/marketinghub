@@ -20,6 +20,24 @@ const STATUS_LABEL: Record<ThemeStatus, string> = {
   upcoming: "Upcoming",
 };
 
+type ThemeEditForm = {
+  title: string;
+  summary: string;
+  quarter: QuarterlyTheme["quarter"];
+  year: string;
+  status: ThemeStatus;
+};
+
+function themeToForm(theme: QuarterlyTheme): ThemeEditForm {
+  return {
+    title: theme.title,
+    summary: theme.summary,
+    quarter: theme.quarter,
+    year: String(theme.year),
+    status: theme.status,
+  };
+}
+
 export function ThemesClient({
   initialThemes,
   initialMains,
@@ -38,6 +56,12 @@ export function ThemesClient({
       initialThemes[0]?.id ??
       null
   );
+  const [themeEdit, setThemeEdit] = useState<ThemeEditForm | null>(() => {
+    const initial =
+      initialThemes.find((t) => t.status === "active") ?? initialThemes[0] ?? null;
+    return initial ? themeToForm(initial) : null;
+  });
+  const [savingTheme, setSavingTheme] = useState(false);
   const [mainForm, setMainForm] = useState({ title: "", channel: "", owner: "" });
   const [offshootFor, setOffshootFor] = useState<string | null>(null);
   const [offshootForm, setOffshootForm] = useState({
@@ -63,10 +87,26 @@ export function ThemesClient({
     [themes, selectedId]
   );
 
+  useEffect(() => {
+    if (selected) setThemeEdit(themeToForm(selected));
+    else setThemeEdit(null);
+  }, [selected]);
+
   const selectedMains = useMemo(
     () => mains.filter((m) => m.theme_id === selectedId),
     [mains, selectedId]
   );
+
+  const themeDirty = useMemo(() => {
+    if (!selected || !themeEdit) return false;
+    return (
+      themeEdit.title !== selected.title ||
+      themeEdit.summary !== selected.summary ||
+      themeEdit.quarter !== selected.quarter ||
+      themeEdit.year !== String(selected.year) ||
+      themeEdit.status !== selected.status
+    );
+  }, [selected, themeEdit]);
 
   async function addMain() {
     if (!selectedId || !mainForm.title.trim()) return;
@@ -101,18 +141,61 @@ export function ThemesClient({
     await refresh();
   }
 
-  async function setThemeStatus(id: string, status: ThemeStatus) {
+  async function saveTheme() {
+    if (!selectedId || !themeEdit || !themeEdit.title.trim()) return;
+    const year = Number.parseInt(themeEdit.year, 10);
+    if (!Number.isFinite(year) || year < 2000 || year > 2100) return;
+    setSavingTheme(true);
+    try {
+      await fetch("/api/themes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "update",
+          entity: "theme",
+          id: selectedId,
+          patch: {
+            title: themeEdit.title.trim(),
+            summary: themeEdit.summary.trim(),
+            quarter: themeEdit.quarter,
+            year,
+            status: themeEdit.status,
+          },
+        }),
+      });
+      await refresh();
+    } finally {
+      setSavingTheme(false);
+    }
+  }
+
+  async function removeTheme(id: string) {
+    if (
+      !window.confirm(
+        "Delete this quarterly theme? Main content and offshoots under it will also be removed."
+      )
+    ) {
+      return;
+    }
     await fetch("/api/themes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "update",
-        entity: "theme",
-        id,
-        patch: { status },
-      }),
+      body: JSON.stringify({ action: "delete", entity: "theme", id }),
     });
-    await refresh();
+    const res = await fetch("/api/themes");
+    const data = await res.json();
+    const nextThemes = (data.themes ?? []) as QuarterlyTheme[];
+    setThemes(nextThemes);
+    setMains(data.mains ?? []);
+    setOffshoots(data.offshoots ?? []);
+    setSelectedId((current) => {
+      if (current !== id) return current;
+      return (
+        nextThemes.find((t) => t.status === "active")?.id ??
+        nextThemes[0]?.id ??
+        null
+      );
+    });
   }
 
   async function setItemStatus(
@@ -186,31 +269,101 @@ export function ThemesClient({
         })}
       </div>
 
-      {selected ? (
+      {selected && themeEdit ? (
         <div className="space-y-6">
           <div className="surface-card p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-                  Theme
-                </p>
-                <h2 className="font-display text-2xl text-brand">
-                  {selected.quarter}: {selected.title}
-                </h2>
-                <p className="mt-1 max-w-2xl text-sm text-muted">{selected.summary}</p>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                Theme
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={savingTheme || !themeDirty || !themeEdit.title.trim()}
+                  onClick={() => void saveTheme()}
+                >
+                  {savingTheme ? "Saving…" : "Save theme"}
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={!themeDirty}
+                  onClick={() => setThemeEdit(themeToForm(selected))}
+                >
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  className="text-xs text-[var(--danger)]"
+                  onClick={() => void removeTheme(selected.id)}
+                >
+                  Delete theme
+                </button>
               </div>
+            </div>
+            <div className="grid gap-3 md:grid-cols-[120px_100px_160px]">
               <select
-                className="field w-auto"
-                value={selected.status}
+                className="field"
+                value={themeEdit.quarter}
                 onChange={(e) =>
-                  void setThemeStatus(selected.id, e.target.value as ThemeStatus)
+                  setThemeEdit({
+                    ...themeEdit,
+                    quarter: e.target.value as QuarterlyTheme["quarter"],
+                  })
                 }
+                aria-label="Quarter"
+              >
+                <option value="Q1">Q1</option>
+                <option value="Q2">Q2</option>
+                <option value="Q3">Q3</option>
+                <option value="Q4">Q4</option>
+              </select>
+              <input
+                className="field"
+                type="number"
+                min={2000}
+                max={2100}
+                value={themeEdit.year}
+                onChange={(e) =>
+                  setThemeEdit({ ...themeEdit, year: e.target.value })
+                }
+                aria-label="Year"
+              />
+              <select
+                className="field"
+                value={themeEdit.status}
+                onChange={(e) =>
+                  setThemeEdit({
+                    ...themeEdit,
+                    status: e.target.value as ThemeStatus,
+                  })
+                }
+                aria-label="Status"
               >
                 <option value="previous">Previous</option>
                 <option value="active">Active</option>
                 <option value="upcoming">Upcoming</option>
               </select>
             </div>
+            <input
+              className="field mt-3"
+              value={themeEdit.title}
+              onChange={(e) =>
+                setThemeEdit({ ...themeEdit, title: e.target.value })
+              }
+              placeholder="Theme title"
+              aria-label="Theme title"
+            />
+            <textarea
+              className="field mt-3 min-h-[88px]"
+              value={themeEdit.summary}
+              onChange={(e) =>
+                setThemeEdit({ ...themeEdit, summary: e.target.value })
+              }
+              placeholder="Theme summary"
+              aria-label="Theme summary"
+            />
           </div>
 
           <div className="surface-card p-5">

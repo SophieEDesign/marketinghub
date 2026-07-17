@@ -1,27 +1,14 @@
-import { createClient, type User } from "@supabase/supabase-js";
+import type { User } from "@supabase/supabase-js";
 import { hasSupabaseConfig } from "@/lib/auth/config";
+import {
+  createAdminClient,
+  hasServiceRoleKey,
+} from "@/lib/supabase/admin";
 import type { HubAccessRole, HubUser } from "@/lib/types";
 
 const ROLES: HubAccessRole[] = ["admin", "member", "external"];
 
-export function hasServiceRoleKey() {
-  return Boolean(
-    process.env.SUPABASE_SERVICE_ROLE_KEY && hasSupabaseConfig()
-  );
-}
-
-function createAdminClient() {
-  if (!hasServiceRoleKey()) {
-    throw new Error("SUPABASE_SERVICE_ROLE_KEY is required for user admin");
-  }
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      auth: { persistSession: false, autoRefreshToken: false },
-    }
-  );
-}
+export { hasServiceRoleKey };
 
 export function normalizeHubAccessRole(value: unknown): HubAccessRole {
   const role = String(value ?? "").toLowerCase();

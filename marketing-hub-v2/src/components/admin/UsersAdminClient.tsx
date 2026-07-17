@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { HubAccessRole, HubUser } from "@/lib/types";
+import type { Contact, HubAccessRole, HubUser } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { cn } from "@/lib/utils";
@@ -39,6 +39,7 @@ export function UsersAdminClient({
   initialSource?: "supabase" | "local";
 }) {
   const [items, setItems] = useState(initial);
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const [source, setSource] = useState<"supabase" | "local">(initialSource);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -64,9 +65,29 @@ export function UsersAdminClient({
     setError(null);
   }, []);
 
+  const refreshContacts = useCallback(async () => {
+    try {
+      const res = await fetch("/api/contacts");
+      if (!res.ok) return;
+      const data = await res.json();
+      setContacts(data.contacts ?? []);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   useEffect(() => {
     void refresh();
-  }, [refresh]);
+    void refreshContacts();
+  }, [refresh, refreshContacts]);
+
+  const contactByUserId = useMemo(() => {
+    const map = new Map<string, Contact>();
+    for (const c of contacts) {
+      if (c.user_id) map.set(c.user_id, c);
+    }
+    return map;
+  }, [contacts]);
 
   const counts = useMemo(() => {
     return {
@@ -118,6 +139,25 @@ export function UsersAdminClient({
       return;
     }
     await refresh();
+  }
+
+  async function setContactLink(userId: string, contactId: string) {
+    setError(null);
+    const res = await fetch("/api/admin/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "update",
+        id: userId,
+        patch: { contact_id: contactId || null },
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error ?? "Could not link contact");
+      return;
+    }
+    await refreshContacts();
   }
 
   async function remove(id: string) {
@@ -305,10 +345,13 @@ export function UsersAdminClient({
               <th className="px-4 py-3 font-semibold">Name</th>
               <th className="px-4 py-3 font-semibold">Email</th>
               <th className="px-4 py-3 font-semibold">Role</th>
+              <th className="hidden px-4 py-3 font-semibold lg:table-cell">
+                Linked contact
+              </th>
               <th className="hidden px-4 py-3 font-semibold md:table-cell">
                 Last sign-in
               </th>
-              <th className="hidden px-4 py-3 font-semibold lg:table-cell">
+              <th className="hidden px-4 py-3 font-semibold xl:table-cell">
                 Notes
               </th>
               <th className="px-4 py-3" />
@@ -349,10 +392,35 @@ export function UsersAdminClient({
                     ))}
                   </select>
                 </td>
+                <td className="hidden px-4 py-3 lg:table-cell">
+                  <select
+                    className="field !py-1 text-xs"
+                    value={contactByUserId.get(u.id)?.id ?? ""}
+                    onChange={(e) => void setContactLink(u.id, e.target.value)}
+                    aria-label={`Linked contact for ${u.full_name || u.email}`}
+                  >
+                    <option value="">None</option>
+                    {contacts.map((c) => {
+                      const takenByOther =
+                        !!c.user_id && c.user_id !== u.id;
+                      return (
+                        <option
+                          key={c.id}
+                          value={c.id}
+                          disabled={takenByOther}
+                        >
+                          {c.name}
+                          {c.organisation ? ` · ${c.organisation}` : ""}
+                          {takenByOther ? " (linked)" : ""}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </td>
                 <td className="hidden px-4 py-3 text-muted md:table-cell">
                   {formatSignIn(u.last_sign_in_at)}
                 </td>
-                <td className="hidden px-4 py-3 text-muted lg:table-cell">
+                <td className="hidden px-4 py-3 text-muted xl:table-cell">
                   {u.notes || "—"}
                 </td>
                 <td className="px-4 py-3 text-right">

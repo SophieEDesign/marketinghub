@@ -529,7 +529,7 @@ export async function importFromCoreData(): Promise<ImportResult> {
     if (mappedTasks.length) {
       store.tasks = mappedTasks;
     }
-    // merch_orders, staff_requests, reports stay local
+    // merch_orders, merch_inventory, staff_requests, reports stay local
   });
 
   return {
@@ -552,7 +552,7 @@ export async function importFromCoreData(): Promise<ImportResult> {
     membershipsTable: membershipsTable?.name ?? null,
     tasksTable: tasksTable?.name ?? null,
     legacyContentIgnored: true,
-    localOnlyPreserved: ["merch_orders", "staff_requests", "reports"],
+    localOnlyPreserved: ["merch_orders", "merch_inventory", "staff_requests", "reports"],
     warnings,
   };
 }
@@ -620,6 +620,7 @@ function mapContactRows(
           ])
         )
       ),
+      user_id: null,
       created_at: asIsoDate(r.created_at) || now,
       updated_at: asIsoDate(r.updated_at) || now,
     };

@@ -1,8 +1,9 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { NextRequest } from "next/server";
+import { z } from "zod";
 import { jsonError, jsonOk, requireStaff } from "@/lib/api";
-import { hasSupabaseConfig } from "@/lib/auth/config";
+import { hasServiceRoleKey } from "@/lib/supabase/admin";
 import { getDataDir } from "@/lib/store/paths";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +16,6 @@ const ALLOWED = new Set([
   "image/png",
   "image/webp",
   "image/gif",
-  "image/svg+xml",
   "application/pdf",
   "video/mp4",
   "video/quicktime",
@@ -33,16 +33,10 @@ async function uploadToSupabase(
   filename: string,
   contentType: string
 ): Promise<string | null> {
-  if (!hasSupabaseConfig()) return null;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!serviceKey) return null;
+  if (!hasServiceRoleKey()) return null;
   try {
-    const { createClient } = await import("@supabase/supabase-js");
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      serviceKey,
-      { auth: { persistSession: false } }
-    );
+    const { createServiceClient } = await import("@/lib/supabase/admin");
+    const supabase = createServiceClient();
     const objectPath = `hub-content/${Date.now()}-${filename}`;
     const { error } = await supabase.storage
       .from("attachments")
@@ -80,7 +74,16 @@ export async function POST(request: NextRequest) {
   }
 
   const type = blob.type || "application/octet-stream";
-  if (!ALLOWED.has(type) && !/\.(png|jpe?g|gif|webp|svg|pdf|mp4|mov)$/i.test(blob.name)) {
+  const nameOk = z.string().min(1).max(200).safeParse(blob.name || "asset");
+  if (!nameOk.success) return jsonError("Invalid file name", 400);
+
+  // Block SVG (XSS if rendered inline).
+  if (
+    type === "image/svg+xml" ||
+    /\.svg$/i.test(blob.name) ||
+    (!ALLOWED.has(type) &&
+      !/\.(png|jpe?g|gif|webp|pdf|mp4|mov)$/i.test(blob.name))
+  ) {
     return jsonError("File type not allowed", 400);
   }
 

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { jsonError, jsonOk, requireStaff } from "@/lib/api";
+import { jsonError, jsonOk, requireAdmin, requireStaff } from "@/lib/api";
 import {
   addField,
   addRow,
@@ -29,11 +29,18 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const { error } = await requireStaff();
-  if (error) return error;
-
   const body = await request.json();
   const action = body.action as string;
+
+  // Schema / bulk destructive ops are admin-only; cell edits stay staff.
+  const adminOnly = new Set([
+    "bulkDelete",
+    "deleteRow",
+    "addField",
+    "removeField",
+  ]);
+  const gate = adminOnly.has(action) ? await requireAdmin() : await requireStaff();
+  if (gate.error) return gate.error;
 
   try {
     if (action === "updateCell") {

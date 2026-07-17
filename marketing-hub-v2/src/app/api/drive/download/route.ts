@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDriveClient, isDriveConfigured } from "@/lib/drive/client";
+import {
+  getDriveClient,
+  isDriveConfigured,
+  isSafeDriveId,
+  isUnderGalleryRoot,
+} from "@/lib/drive/client";
 import { hasMediaDownloadAccess } from "@/lib/auth/media-access";
 
 export const dynamic = "force-dynamic";
@@ -25,8 +30,16 @@ export async function GET(request: NextRequest) {
   }
 
   const fileId = request.nextUrl.searchParams.get("fileId");
-  if (!fileId) {
+  if (!fileId || !isSafeDriveId(fileId)) {
     return NextResponse.json({ error: "fileId required" }, { status: 400 });
+  }
+
+  const underRoot = await isUnderGalleryRoot(fileId);
+  if (!underRoot) {
+    return NextResponse.json(
+      { error: "File is outside the gallery root" },
+      { status: 403 }
+    );
   }
 
   try {

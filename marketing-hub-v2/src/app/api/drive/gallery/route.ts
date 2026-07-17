@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import {
   fileExtension,
   getDriveClient,
+  getDriveGalleryRootId,
   isDriveConfigured,
+  isSafeDriveId,
+  isUnderGalleryRoot,
   upsizeThumb,
 } from "@/lib/drive/client";
 import { hasMediaDownloadAccess } from "@/lib/auth/media-access";
@@ -27,9 +30,32 @@ export async function GET(request: Request) {
     );
   }
 
+  const rootId = getDriveGalleryRootId();
+  if (!rootId) {
+    return NextResponse.json(
+      { configured: false, canDownload, error: "Invalid gallery root folder id" },
+      { status: 503 }
+    );
+  }
+
   const { searchParams } = new URL(request.url);
-  const folderId =
-    searchParams.get("folderId") || process.env.DRIVE_GALLERY_ROOT_FOLDER_ID!;
+  const requested = searchParams.get("folderId") || rootId;
+  if (!isSafeDriveId(requested)) {
+    return NextResponse.json(
+      { configured: true, canDownload, error: "Invalid folderId" },
+      { status: 400 }
+    );
+  }
+
+  const underRoot = await isUnderGalleryRoot(requested);
+  if (!underRoot) {
+    return NextResponse.json(
+      { configured: true, canDownload, error: "Folder is outside the gallery root" },
+      { status: 403 }
+    );
+  }
+
+  const folderId = requested;
 
   try {
     const drive = getDriveClient();

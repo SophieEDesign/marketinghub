@@ -1,4 +1,5 @@
 import type { HubStore } from "@/lib/types";
+import { createMerchInventorySeed } from "@/lib/merch/inventory-seed";
 
 const now = new Date().toISOString();
 
@@ -146,6 +147,7 @@ export function createSeedStore(): HubStore {
         phone: "",
         tags: ["press"],
         notes: "Prefers emailed exclusives.",
+        user_id: null,
         created_at: now,
         updated_at: now,
       },
@@ -158,6 +160,7 @@ export function createSeedStore(): HubStore {
         phone: "",
         tags: ["partner", "venue"],
         notes: "",
+        user_id: null,
         created_at: now,
         updated_at: now,
       },
@@ -371,6 +374,7 @@ export function createSeedStore(): HubStore {
         status: "requested",
         notes: "North Sails Regatta polo for show season.",
         created_by: "Sophie",
+        created_by_user_id: null,
         created_at: now,
         updated_at: now,
       },
@@ -387,6 +391,7 @@ export function createSeedStore(): HubStore {
         status: "ordered",
         notes: "Navy Marstrand quilted vest.",
         created_by: "Marketing",
+        created_by_user_id: null,
         created_at: now,
         updated_at: now,
       },
@@ -405,10 +410,12 @@ export function createSeedStore(): HubStore {
         status: "approved",
         notes: "North Sails sailor jacket, net lined.",
         created_by: "Sophie",
+        created_by_user_id: null,
         created_at: now,
         updated_at: now,
       },
     ],
+    merch_inventory: createMerchInventorySeed(now),
     staff_requests: [
       {
         id: "sr_seed_1",

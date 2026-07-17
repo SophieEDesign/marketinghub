@@ -75,3 +75,45 @@ export function isDriveConfigured() {
           process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY))
   );
 }
+
+/** Drive file/folder IDs are alphanumeric with `_` / `-`. */
+export function isSafeDriveId(id: string): boolean {
+  return /^[a-zA-Z0-9_-]{10,128}$/.test(id);
+}
+
+export function getDriveGalleryRootId(): string | null {
+  const root = process.env.DRIVE_GALLERY_ROOT_FOLDER_ID?.trim();
+  if (!root || !isSafeDriveId(root)) return null;
+  return root;
+}
+
+/**
+ * True when fileOrFolderId is the gallery root or a descendant of it.
+ * Walks parents up to 25 levels (Drive folders are usually shallow).
+ */
+export async function isUnderGalleryRoot(
+  fileOrFolderId: string
+): Promise<boolean> {
+  const rootId = getDriveGalleryRootId();
+  if (!rootId || !isSafeDriveId(fileOrFolderId)) return false;
+  if (fileOrFolderId === rootId) return true;
+
+  const drive = getDriveClient();
+  let current = fileOrFolderId;
+  const seen = new Set<string>();
+
+  for (let i = 0; i < 25; i++) {
+    if (seen.has(current)) return false;
+    seen.add(current);
+    const meta = await drive.files.get({
+      fileId: current,
+      fields: "id,parents",
+      supportsAllDrives: true,
+    });
+    const parents = meta.data.parents ?? [];
+    if (parents.includes(rootId)) return true;
+    if (parents.length === 0) return false;
+    current = parents[0] as string;
+  }
+  return false;
+}

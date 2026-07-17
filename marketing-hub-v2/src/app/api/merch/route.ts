@@ -3,29 +3,61 @@ import { jsonError, jsonOk, requireStaff } from "@/lib/api";
 import {
   createMerchOrder,
   deleteMerchOrder,
+  getMerchOrder,
   listMerchOrders,
   updateMerchOrder,
 } from "@/lib/data/repos";
+import {
+  filterMerchOrdersForUser,
+  isMerchAdmin,
+  ownsMerchOrder,
+} from "@/lib/merch/access";
 
 export async function GET() {
-  const { error } = await requireStaff();
+  const { user, error } = await requireStaff();
   if (error) return error;
-  return jsonOk({ orders: await listMerchOrders() });
+  const orders = filterMerchOrdersForUser(await listMerchOrders(), user);
+  return jsonOk({ orders, canManageAll: isMerchAdmin(user) });
 }
 
 export async function POST(request: NextRequest) {
-  const { error } = await requireStaff();
+  const { user, error } = await requireStaff();
   if (error) return error;
   const body = await request.json();
   const action = body.action as string | undefined;
+  const admin = isMerchAdmin(user);
 
   if (action === "update") {
-    const updated = await updateMerchOrder(body.id, body.patch ?? {});
+    const existing = await getMerchOrder(body.id);
+    if (!existing) return jsonError("Not found", 404);
+    if (!admin && !ownsMerchOrder(existing, user)) {
+      return jsonError("Forbidden", 403);
+    }
+    const patch = { ...(body.patch ?? {}) } as Record<string, unknown>;
+    // Members cannot reassign ownership or escalate status beyond cancel.
+    delete patch.created_by_user_id;
+    if (!admin) {
+      delete patch.created_by;
+      if (
+        patch.status !== undefined &&
+        patch.status !== existing.status &&
+        patch.status !== "cancelled" &&
+        patch.status !== "requested"
+      ) {
+        return jsonError("Only marketing admins can change order status", 403);
+      }
+    }
+    const updated = await updateMerchOrder(body.id, patch);
     if (!updated) return jsonError("Not found", 404);
     return jsonOk({ item: updated });
   }
 
   if (action === "delete") {
+    const existing = await getMerchOrder(body.id);
+    if (!existing) return jsonError("Not found", 404);
+    if (!admin && !ownsMerchOrder(existing, user)) {
+      return jsonError("Forbidden", 403);
+    }
     await deleteMerchOrder(body.id);
     return jsonOk({ ok: true });
   }
@@ -36,12 +68,17 @@ export async function POST(request: NextRequest) {
     size: body.size ?? "",
     quantity: Number(body.quantity) > 0 ? Number(body.quantity) : 1,
     colour: body.colour ?? "",
-    requested_for: body.requested_for ?? "",
+    requested_for:
+      body.requested_for?.trim() ||
+      user.full_name ||
+      user.email ||
+      "Staff",
     office: body.office ?? "",
     needed_by: body.needed_by || null,
-    status: body.status ?? "requested",
+    status: admin ? body.status ?? "requested" : "requested",
     notes: body.notes ?? "",
-    created_by: body.created_by ?? "Staff",
+    created_by: user.full_name || user.email || "Staff",
+    created_by_user_id: user.id,
   });
   return jsonOk({ item }, { status: 201 });
 }

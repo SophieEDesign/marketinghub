@@ -5,6 +5,7 @@ import type { PartnerKind, Sponsorship, SponsorshipStatus } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { ContactOwnerSelect } from "@/components/ui/ContactOwnerSelect";
+import { useHubView } from "@/lib/hub-view";
 import { format, parseISO, startOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -82,6 +83,9 @@ export function SponsorshipsClient({
   kind?: PartnerKind | "all";
   hideHeader?: boolean;
 }) {
+  const { view: hubView } = useHubView();
+  const isAdminView = hubView === "admin";
+
   const [items, setItems] = useState(initial);
   const [view, setView] = useState<ViewId>("list");
   const [showForm, setShowForm] = useState(false);
@@ -95,14 +99,23 @@ export function SponsorshipsClient({
   const createKind: PartnerKind =
     kind === "membership" ? "membership" : "sponsorship";
   const isMembership = kind === "membership";
-  const showKindPicker = kind === "all";
-  const [formKind, setFormKind] = useState<PartnerKind>("sponsorship");
-  const activeCreateKind = showKindPicker ? formKind : createKind;
+  const showKindPicker = kind === "all" && isAdminView;
+  const [formKind, setFormKind] = useState<PartnerKind>("membership");
+  const activeCreateKind: PartnerKind = !isAdminView
+    ? "membership"
+    : showKindPicker
+      ? formKind
+      : createKind;
+  /** Members can add memberships; sponsorships are admin-only. */
+  const canCreate =
+    isAdminView || kind === "membership" || kind === "all";
+  const canManageItem = (item: Sponsorship) =>
+    isAdminView || partnerKind(item) === "membership";
   const noun =
-    kind === "all"
-      ? "partner"
-      : isMembership
-        ? "membership"
+    !isAdminView || kind === "membership"
+      ? "membership"
+      : kind === "all"
+        ? "partner"
         : "sponsorship";
   const nounTitle =
     kind === "all"
@@ -114,6 +127,10 @@ export function SponsorshipsClient({
     activeCreateKind === "membership" ? "Tier / package" : "Package";
   const nameLabel =
     activeCreateKind === "membership" ? "Organisation" : "Partner";
+
+  useEffect(() => {
+    if (!isAdminView) setFormKind("membership");
+  }, [isAdminView]);
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/sponsorships");
@@ -160,6 +177,7 @@ export function SponsorshipsClient({
   );
 
   async function create() {
+    if (!canCreate) return;
     await fetch("/api/sponsorships", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -176,6 +194,7 @@ export function SponsorshipsClient({
   }
 
   function openEdit(item: Sponsorship) {
+    if (!canManageItem(item)) return;
     setEditingId(item.id);
     setEdit(toEditForm(item));
   }
@@ -187,6 +206,8 @@ export function SponsorshipsClient({
 
   async function saveEdit() {
     if (!editingId || !edit) return;
+    const current = items.find((i) => i.id === editingId);
+    if (!current || !canManageItem(current)) return;
     setSaving(true);
     try {
       await fetch("/api/sponsorships", {
@@ -211,6 +232,8 @@ export function SponsorshipsClient({
   }
 
   async function setStatus(id: string, status: SponsorshipStatus) {
+    const item = items.find((i) => i.id === id);
+    if (!item || !canManageItem(item)) return;
     await fetch("/api/sponsorships", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -221,6 +244,8 @@ export function SponsorshipsClient({
   }
 
   async function remove(id: string) {
+    const item = items.find((i) => i.id === id);
+    if (!item || !canManageItem(item)) return;
     if (!window.confirm(`Delete this ${noun}?`)) return;
     await fetch("/api/sponsorships", {
       method: "POST",
@@ -236,29 +261,34 @@ export function SponsorshipsClient({
     : null;
 
   function CardActions({ item }: { item: Sponsorship }) {
+    const manageable = canManageItem(item);
     return (
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          className="btn-secondary px-2.5 py-1.5 text-xs"
-          onClick={() => openEdit(item)}
-        >
-          Edit
-        </button>
-        <select
-          className="field !w-auto py-1.5 text-xs"
-          value={item.status}
-          onChange={(e) =>
-            void setStatus(item.id, e.target.value as SponsorshipStatus)
-          }
-          aria-label="Change status"
-        >
-          {STATUSES.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.label}
-            </option>
-          ))}
-        </select>
+        {manageable ? (
+          <>
+            <button
+              type="button"
+              className="btn-secondary px-2.5 py-1.5 text-xs"
+              onClick={() => openEdit(item)}
+            >
+              Edit
+            </button>
+            <select
+              className="field !w-auto py-1.5 text-xs"
+              value={item.status}
+              onChange={(e) =>
+                void setStatus(item.id, e.target.value as SponsorshipStatus)
+              }
+              aria-label="Change status"
+            >
+              {STATUSES.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </>
+        ) : null}
         {item.onedrive_url ? (
           <a
             href={item.onedrive_url.startsWith("http") ? item.onedrive_url : undefined}
@@ -276,18 +306,26 @@ export function SponsorshipsClient({
     );
   }
 
+  const addButton =
+    canCreate && (isAdminView || kind !== "sponsorship") ? (
+      <button
+        type="button"
+        className="btn-primary"
+        onClick={() => {
+          if (!isAdminView) setFormKind("membership");
+          setShowForm(true);
+        }}
+      >
+        Add {isAdminView && kind === "all" ? "partner" : noun}
+      </button>
+    ) : null;
+
   return (
     <div>
       {hideHeader ? (
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-display text-xl text-brand">{nounTitle}</h2>
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={() => setShowForm(true)}
-          >
-            Add {noun}
-          </button>
+          {addButton}
         </div>
       ) : (
         <PageHeader
@@ -297,15 +335,7 @@ export function SponsorshipsClient({
               ? "Industry associations and memberships — renewals, fees, and benefits."
               : "Sponsorship partners, packages, deliverables, and docs."
           }
-          actions={
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => setShowForm(true)}
-            >
-              Add {noun}
-            </button>
-          }
+          actions={addButton}
         />
       )}
 
@@ -353,7 +383,7 @@ export function SponsorshipsClient({
         ]}
       />
 
-      {showForm ? (
+      {showForm && canCreate ? (
         <div className="surface-card mb-6 grid gap-3 p-5 md:grid-cols-2">
           {showKindPicker ? (
             <div className="md:col-span-2">
@@ -368,6 +398,11 @@ export function SponsorshipsClient({
                 <option value="sponsorship">Sponsorship</option>
                 <option value="membership">Membership</option>
               </select>
+            </div>
+          ) : !isAdminView ? (
+            <div className="md:col-span-2 rounded-xl border border-border bg-sand/40 px-3 py-2 text-xs text-muted">
+              Adding a <span className="font-medium text-foreground">membership</span>
+              . Sponsorships are managed in Admin view.
             </div>
           ) : null}
           {(
