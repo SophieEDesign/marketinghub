@@ -102,7 +102,6 @@ function OptionsEditor({
                 disabled={disabled}
                 onChange={(e) => {
                   const label = e.target.value;
-                  const value = opt.value || label;
                   updateAt(index, {
                     label,
                     value:
