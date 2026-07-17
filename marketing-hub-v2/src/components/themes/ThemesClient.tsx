@@ -43,7 +43,7 @@ function pickDefaultTheme(list: QuarterlyTheme[]) {
 }
 
 function uniqueYears(list: QuarterlyTheme[]) {
-  return [...new Set(list.map((t) => t.year))].sort((a, b) => a - b);
+  return Array.from(new Set(list.map((t) => t.year))).sort((a, b) => a - b);
 }
 
 export function ThemesClient({
@@ -59,7 +59,7 @@ export function ThemesClient({
   const [mains, setMains] = useState(initialMains);
   const [offshoots, setOffshoots] = useState(initialOffshoots);
   const initialSelected = pickDefaultTheme(initialThemes);
-  const [selectedId, setSelectedId] = useState(
+  const [selectedId, setSelectedId] = useState<string | null>(
     () => initialSelected?.id ?? null
   );
   const [yearTab, setYearTab] = useState<number>(() => {

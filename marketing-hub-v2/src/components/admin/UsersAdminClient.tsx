@@ -6,10 +6,41 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { cn } from "@/lib/utils";
 
-const ROLE_OPTIONS: { value: HubAccessRole; label: string; hint: string }[] = [
-  { value: "admin", label: "Admin", hint: "Full hub + data tables" },
-  { value: "member", label: "Member", hint: "Day-to-day staff access" },
-  { value: "external", label: "External", hint: "Outside / media access" },
+const ROLE_OPTIONS: {
+  value: HubAccessRole;
+  label: string;
+  hint: string;
+  process: string[];
+}[] = [
+  {
+    value: "admin",
+    label: "Admin",
+    hint: "Full hub + data tables",
+    process: [
+      "Full hub access plus Admin → Users and data tables.",
+      "Use sparingly — prefer Member for day-to-day staff.",
+    ],
+  },
+  {
+    value: "member",
+    label: "Member",
+    hint: "Day-to-day staff access",
+    process: [
+      "Invite → they set a password from the email.",
+      "Sign in at /login → land in /app as staff.",
+      "Optional: link a Contact so they can edit My details.",
+    ],
+  },
+  {
+    value: "external",
+    label: "External",
+    hint: "Outside / media access",
+    process: [
+      "Invite → they set a password from the email.",
+      "Sign in → redirected to /media only (no /app).",
+      "Mark relevant Media folders Public so they can see them.",
+    ],
+  },
 ];
 
 function roleBadgeClass(role: HubAccessRole) {
@@ -106,6 +137,9 @@ export function UsersAdminClient({
       return true;
     });
   }, [items, search, roleFilter]);
+
+  const selectedRoleOption =
+    ROLE_OPTIONS.find((r) => r.value === form.role) ?? ROLE_OPTIONS[1];
 
   async function create() {
     setSaving(true);
@@ -307,13 +341,23 @@ export function UsersAdminClient({
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
             />
           </div>
-          {source === "supabase" ? (
-            <p className="text-xs text-muted md:col-span-2">
-              Sends a Supabase invite email. Role is stored on{" "}
-              <code className="text-[11px]">profiles</code> and{" "}
-              <code className="text-[11px]">app_metadata</code>.
+          <div className="rounded-xl border border-border bg-sand/40 px-4 py-3 text-xs text-muted md:col-span-2">
+            <p className="font-medium text-foreground">
+              {selectedRoleOption.label}: suggested process
             </p>
-          ) : null}
+            <ul className="mt-1.5 list-inside list-disc space-y-0.5">
+              {selectedRoleOption.process.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ul>
+            {source === "supabase" ? (
+              <p className="mt-2">
+                Sends a Supabase invite email. Role is stored on{" "}
+                <code className="text-[11px]">profiles</code> and{" "}
+                <code className="text-[11px]">app_metadata</code>.
+              </p>
+            ) : null}
+          </div>
           <div className="flex gap-2 md:col-span-2">
             <button
               type="button"

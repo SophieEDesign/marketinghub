@@ -10,6 +10,26 @@ import {
 
 export const dynamic = "force-dynamic";
 
+type UploadFile = {
+  url: string;
+  name: string;
+  type?: string;
+  size?: number | null;
+};
+
+function parseUploadFile(raw: unknown): UploadFile | null {
+  if (!raw || typeof raw !== "object") return null;
+  const f = raw as Record<string, unknown>;
+  const url = typeof f.url === "string" ? f.url.trim() : "";
+  if (!url) return null;
+  return {
+    url,
+    name: typeof f.name === "string" ? f.name : "File",
+    type: typeof f.type === "string" ? f.type : "",
+    size: typeof f.size === "number" ? f.size : null,
+  };
+}
+
 export async function POST(request: NextRequest) {
   const { user, error } = await requireStaff();
   if (error) return error;
@@ -53,26 +73,6 @@ export async function POST(request: NextRequest) {
 
     const name = typeof body.name === "string" ? body.name : "";
     if (!name.trim()) return jsonError("Name is required");
-
-    type UploadFile = {
-      url: string;
-      name: string;
-      type?: string;
-      size?: number | null;
-    };
-
-    function parseUploadFile(raw: unknown): UploadFile | null {
-      if (!raw || typeof raw !== "object") return null;
-      const f = raw as Record<string, unknown>;
-      const url = typeof f.url === "string" ? f.url.trim() : "";
-      if (!url) return null;
-      return {
-        url,
-        name: typeof f.name === "string" ? f.name : "File",
-        type: typeof f.type === "string" ? f.type : "",
-        size: typeof f.size === "number" ? f.size : null,
-      };
-    }
 
     const files: UploadFile[] = [];
     if (Array.isArray(body.files)) {
