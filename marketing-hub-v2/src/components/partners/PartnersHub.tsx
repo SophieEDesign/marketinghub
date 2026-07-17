@@ -4,7 +4,6 @@ import { useState } from "react";
 import { SponsorshipsClient } from "@/components/sponsorships/SponsorshipsClient";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentFilter } from "@/components/ui/SegmentFilter";
-import { ImportFromSupabaseButton } from "@/components/supabase/ImportFromSupabaseButton";
 import type { PartnerKind, Sponsorship } from "@/lib/types";
 
 type Tab = "all" | PartnerKind;
@@ -15,13 +14,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "membership", label: "Memberships" },
 ];
 
-export function PartnersHub({
-  initial,
-  supabaseReady,
-}: {
-  initial: Sponsorship[];
-  supabaseReady: boolean;
-}) {
+export function PartnersHub({ initial }: { initial: Sponsorship[] }) {
   const [tab, setTab] = useState<Tab>("all");
 
   return (
@@ -29,11 +22,6 @@ export function PartnersHub({
       <PageHeader
         title="Partners"
         description="Sponsorships and industry memberships in one place — packages, renewals, and deliverables."
-        actions={
-          supabaseReady ? (
-            <ImportFromSupabaseButton label="Refresh sponsorships" />
-          ) : null
-        }
       />
 
       <SegmentFilter

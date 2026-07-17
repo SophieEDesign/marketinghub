@@ -6,7 +6,9 @@ import type {
   ContentItem,
   ContentStatus,
   EventItem,
+  HubAccessRole,
   HubTask,
+  HubUser,
   MerchOrder,
   QuarterlyTheme,
   ReportLink,
@@ -658,5 +660,81 @@ export async function updateTask(id: string, patch: Partial<HubTask>) {
 export async function deleteTask(id: string) {
   await updateStore((s) => {
     s.tasks = (s.tasks ?? []).filter((c) => c.id !== id);
+  });
+}
+
+const HUB_ACCESS_ROLES: HubAccessRole[] = ["admin", "member", "external"];
+
+function normalizeHubAccessRole(value: unknown): HubAccessRole {
+  const role = String(value ?? "").toLowerCase();
+  return HUB_ACCESS_ROLES.includes(role as HubAccessRole)
+    ? (role as HubAccessRole)
+    : "member";
+}
+
+export async function listHubUsers() {
+  const store = await readStore();
+  return [...(store.hub_users ?? [])].sort((a, b) => {
+    const roleOrder = { admin: 0, member: 1, external: 2 } as const;
+    const byRole = roleOrder[a.role] - roleOrder[b.role];
+    if (byRole !== 0) return byRole;
+    return a.full_name.localeCompare(b.full_name);
+  });
+}
+
+/** Resolve Admin → Users directory role for a signed-in email. */
+export async function getHubAccessRoleByEmail(
+  email: string
+): Promise<HubAccessRole | null> {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return null;
+  const users = await listHubUsers();
+  return users.find((u) => u.email === normalized)?.role ?? null;
+}
+
+export async function createHubUser(
+  input: Omit<HubUser, "id" | "created_at" | "updated_at">
+) {
+  const item: HubUser = {
+    ...input,
+    role: normalizeHubAccessRole(input.role),
+    email: input.email.trim().toLowerCase(),
+    full_name: input.full_name.trim() || input.email.trim(),
+    notes: input.notes ?? "",
+    id: uid("usr"),
+    created_at: nowIso(),
+    updated_at: nowIso(),
+  };
+  await updateStore((s) => {
+    if (!s.hub_users) s.hub_users = [];
+    s.hub_users.push(item);
+  });
+  return item;
+}
+
+export async function updateHubUser(id: string, patch: Partial<HubUser>) {
+  let updated: HubUser | null = null;
+  await updateStore((s) => {
+    if (!s.hub_users) s.hub_users = [];
+    const idx = s.hub_users.findIndex((u) => u.id === id);
+    if (idx === -1) return;
+    const next = {
+      ...s.hub_users[idx],
+      ...patch,
+      id,
+      updated_at: nowIso(),
+    };
+    if (patch.role !== undefined) next.role = normalizeHubAccessRole(patch.role);
+    if (patch.email !== undefined) next.email = patch.email.trim().toLowerCase();
+    if (patch.full_name !== undefined) next.full_name = patch.full_name.trim();
+    s.hub_users[idx] = next;
+    updated = s.hub_users[idx];
+  });
+  return updated;
+}
+
+export async function deleteHubUser(id: string) {
+  await updateStore((s) => {
+    s.hub_users = (s.hub_users ?? []).filter((u) => u.id !== id);
   });
 }

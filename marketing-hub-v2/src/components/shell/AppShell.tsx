@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Database, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { navForView } from "@/lib/nav";
 import { HubViewProvider, useHubView } from "@/lib/hub-view";
 import { MemberRouteGuard } from "@/components/shell/MemberRouteGuard";
@@ -97,7 +97,10 @@ function ShellInner({
             Peters &amp; May
           </p>
           <p className="text-xs text-muted">Marketing Hub</p>
-          <div className="mt-4">
+          <div className="mt-4 space-y-1.5">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted">
+              View
+            </p>
             <ViewToggle />
           </div>
         </div>
@@ -105,20 +108,6 @@ function ShellInner({
         <div className="border-t border-border px-5 py-4 text-xs text-muted">
           <p>Signed in as {userName}</p>
           <p className="mt-1 capitalize text-[11px]">{view} view</p>
-          {view === "admin" ? (
-            <Link
-              href="/app/data"
-              className={cn(
-                "mt-3 inline-flex items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] font-medium transition",
-                pathname.startsWith("/app/data")
-                  ? "bg-accent-soft text-brand"
-                  : "text-muted hover:bg-sand hover:text-foreground"
-              )}
-            >
-              <Database className="h-3.5 w-3.5" />
-              Data tables
-            </Link>
-          ) : null}
         </div>
       </aside>
 

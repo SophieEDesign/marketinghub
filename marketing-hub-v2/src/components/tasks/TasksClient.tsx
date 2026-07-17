@@ -6,8 +6,11 @@ import type { HubTask, TaskStatus } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { ContactOwnerSelect } from "@/components/ui/ContactOwnerSelect";
-import { ImportFromSupabaseButton } from "@/components/supabase/ImportFromSupabaseButton";
 import { cn } from "@/lib/utils";
+import {
+  TASK_CATEGORIES,
+  selectOptionsWithCurrent,
+} from "@/lib/data/collections";
 
 const STATUSES: { id: TaskStatus; label: string }[] = [
   { id: "todo", label: "To do" },
@@ -19,7 +22,7 @@ const emptyForm = {
   title: "",
   details: "",
   due_date: "",
-  category: "",
+  category: "Events",
   status: "todo" as TaskStatus,
   owner: "",
 };
@@ -52,13 +55,7 @@ function isOverdue(item: HubTask) {
   }
 }
 
-export function TasksClient({
-  initial,
-  supabaseReady,
-}: {
-  initial: HubTask[];
-  supabaseReady?: boolean;
-}) {
+export function TasksClient({ initial }: { initial: HubTask[] }) {
   const [items, setItems] = useState(initial);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -181,18 +178,13 @@ export function TasksClient({
         title="Tasks"
         description="Marketing to-dos — keep it light. Status, owner, and due date."
         actions={
-          <>
-            {supabaseReady ? (
-              <ImportFromSupabaseButton label="Refresh from Tasks" />
-            ) : null}
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => setShowForm(true)}
-            >
-              Add task
-            </button>
-          </>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => setShowForm(true)}
+          >
+            Add task
+          </button>
         }
       />
 
@@ -248,11 +240,17 @@ export function TasksClient({
           </div>
           <div>
             <label className="label">Category</label>
-            <input
+            <select
               className="field"
               value={form.category}
               onChange={(e) => setForm({ ...form, category: e.target.value })}
-            />
+            >
+              {TASK_CATEGORIES.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="label">Owner</label>
@@ -428,13 +426,21 @@ export function TasksClient({
               </div>
               <div>
                 <label className="label">Category</label>
-                <input
+                <select
                   className="field"
                   value={edit.category}
                   onChange={(e) =>
                     setEdit({ ...edit, category: e.target.value })
                   }
-                />
+                >
+                  {selectOptionsWithCurrent(TASK_CATEGORIES, edit.category).map(
+                    (o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    )
+                  )}
+                </select>
               </div>
               <div>
                 <label className="label">Owner</label>

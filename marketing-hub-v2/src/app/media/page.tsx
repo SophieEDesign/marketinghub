@@ -27,9 +27,10 @@ export default async function PublicMediaPage() {
       </div>
       <MediaGallery
         title="Media gallery"
-        description="Browse logos and brand photos in collections — view freely, sign in to download."
+        description="Browse logos and presentations — view freely, sign in to download."
         showStaffChrome={false}
         initialCanDownload={canDownload}
+        scope="public"
       />
     </div>
   );

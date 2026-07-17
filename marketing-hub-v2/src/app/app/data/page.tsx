@@ -1,5 +1,6 @@
-import { DataAdminClient } from "@/components/data/DataAdminClient";
+import { redirect } from "next/navigation";
 
+/** Data tables live under Admin — keep this path as a redirect. */
 export default function DataAdminPage() {
-  return <DataAdminClient />;
+  redirect("/app/admin/data");
 }

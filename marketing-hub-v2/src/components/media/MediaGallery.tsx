@@ -12,7 +12,11 @@ import {
   X,
 } from "lucide-react";
 import { EmptyState, PageHeader } from "@/components/ui/PageHeader";
-import type { MediaFile, MediaListItem } from "@/lib/supabase/media-list";
+import {
+  MEDIA_HUB_CATEGORIES,
+  type MediaFile,
+  type MediaListItem,
+} from "@/lib/supabase/media-list";
 import { cn } from "@/lib/utils";
 
 type ListResponse = {
@@ -31,6 +35,10 @@ type GalleryPhoto = {
   category: string;
 };
 
+function itemDisplayName(item: MediaListItem) {
+  return item.display_name || item.public_title || item.name;
+}
+
 function isImageFile(file: MediaFile) {
   return (
     file.type.startsWith("image/") ||
@@ -47,7 +55,7 @@ function photosFromItems(items: MediaListItem[]): GalleryPhoto[] {
         id: `${item.id}__${file.url}`,
         url: file.url,
         name: file.name,
-        itemName: item.name,
+        itemName: itemDisplayName(item),
         category: item.category,
       });
     }
@@ -55,35 +63,54 @@ function photosFromItems(items: MediaListItem[]): GalleryPhoto[] {
   return photos;
 }
 
+const EMPTY_FORM = {
+  name: "",
+  public_title: "",
+  category: "Logos",
+  document_link: "",
+  notes: "",
+};
+
 export function MediaGallery({
   title = "Media",
   description = "Browse brand assets in a gallery-style collection view.",
   showStaffChrome = true,
   initialCanDownload = false,
   hideHeader = false,
+  /** Public gallery: Logos + Presentations only. Staff library: all categories. */
+  scope = "public",
+  /** Admin view: show Add media / delete. Member & public: browse only. */
+  allowManage = false,
 }: {
   title?: string;
   description?: string;
   showStaffChrome?: boolean;
   initialCanDownload?: boolean;
   hideHeader?: boolean;
+  scope?: "public" | "all";
+  allowManage?: boolean;
 }) {
   const [data, setData] = useState<ListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [canDownload, setCanDownload] = useState(initialCanDownload);
   const [collection, setCollection] = useState<string | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [file, setFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await fetch("/api/media/list");
+    const res = await fetch(`/api/media/list?scope=${scope}`);
     const json = (await res.json()) as ListResponse;
     setData(json);
     if (typeof json.canDownload === "boolean") {
       setCanDownload(json.canDownload);
     }
     setLoading(false);
-  }, []);
+  }, [scope]);
 
   useEffect(() => {
     void load();
@@ -137,8 +164,98 @@ export function MediaGallery({
 
   const loginHref = `/login?intent=media&next=${encodeURIComponent("/media")}`;
 
+  async function createMedia() {
+    if (!allowManage || saving) return;
+    if (!form.name.trim()) {
+      setFormError("Name is required");
+      return;
+    }
+    setSaving(true);
+    setFormError(null);
+    try {
+      let uploaded:
+        | { url: string; name: string; type?: string; size?: number | null }
+        | undefined;
+      if (file) {
+        const body = new FormData();
+        body.append("file", file);
+        const uploadRes = await fetch("/api/content/upload", {
+          method: "POST",
+          body,
+        });
+        const uploadJson = (await uploadRes.json()) as {
+          url?: string;
+          name?: string;
+          error?: string;
+        };
+        if (!uploadRes.ok || !uploadJson.url) {
+          throw new Error(uploadJson.error || "File upload failed");
+        }
+        uploaded = {
+          url: uploadJson.url,
+          name: uploadJson.name || file.name,
+          type: file.type,
+          size: file.size,
+        };
+      }
+
+      const res = await fetch("/api/media", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name,
+          public_title: form.public_title,
+          category: form.category,
+          document_link: form.document_link,
+          notes: form.notes,
+          file: uploaded,
+        }),
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(json.error || "Could not save media");
+
+      setShowForm(false);
+      setForm(EMPTY_FORM);
+      setFile(null);
+      if (form.category) setCollection(form.category);
+      await load();
+    } catch (e) {
+      setFormError(e instanceof Error ? e.message : "Could not save media");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeMedia(id: string) {
+    if (!allowManage) return;
+    if (!window.confirm("Remove this media item?")) return;
+    await fetch("/api/media", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "delete", id }),
+    });
+    await load();
+  }
+
+  const manageActions = allowManage ? (
+    <button
+      type="button"
+      className="btn-primary"
+      onClick={() => {
+        setShowForm(true);
+        setFormError(null);
+      }}
+    >
+      Add media
+    </button>
+  ) : undefined;
+
   const header = hideHeader ? null : showStaffChrome ? (
-    <PageHeader title={title} description={description} />
+    <PageHeader
+      title={title}
+      description={description}
+      actions={manageActions}
+    />
   ) : (
     <div className="mb-8 text-center">
       <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-muted">
@@ -168,6 +285,126 @@ export function MediaGallery({
   return (
     <div>
       {header}
+
+      {hideHeader ? (
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-display text-xl text-brand">Media</h2>
+            {!allowManage ? (
+              <p className="mt-0.5 text-xs text-muted">
+                Browse and download brand assets
+              </p>
+            ) : null}
+          </div>
+          {manageActions}
+        </div>
+      ) : null}
+
+      {allowManage && showForm ? (
+        <div className="surface-card mb-6 grid gap-3 p-5 md:grid-cols-2">
+          <div>
+            <label className="label">Name (internal)</label>
+            <input
+              className="field"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="e.g. Primary logo pack"
+            />
+          </div>
+          <div>
+            <label className="label">Public title</label>
+            <input
+              className="field"
+              value={form.public_title}
+              onChange={(e) =>
+                setForm({ ...form, public_title: e.target.value })
+              }
+              placeholder="Shown on public gallery (optional)"
+            />
+          </div>
+          <div>
+            <label className="label">Category</label>
+            <select
+              className="field"
+              value={form.category}
+              onChange={(e) => setForm({ ...form, category: e.target.value })}
+            >
+              {MEDIA_HUB_CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+              {categories
+                .filter(
+                  (c) =>
+                    !(MEDIA_HUB_CATEGORIES as readonly string[]).includes(c)
+                )
+                .map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Document / link URL</label>
+            <input
+              className="field"
+              value={form.document_link}
+              onChange={(e) =>
+                setForm({ ...form, document_link: e.target.value })
+              }
+              placeholder="https://…"
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="label">Upload file (optional)</label>
+            <input
+              className="field"
+              type="file"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            />
+            {file ? (
+              <p className="mt-1 text-xs text-muted">{file.name}</p>
+            ) : null}
+          </div>
+          <div className="md:col-span-2">
+            <label className="label">Notes</label>
+            <textarea
+              className="field min-h-[70px]"
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            />
+          </div>
+          {formError ? (
+            <p className="md:col-span-2 text-sm text-[var(--danger)]">
+              {formError}
+            </p>
+          ) : null}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className={cn("btn-primary", saving && "opacity-70")}
+              disabled={saving}
+              onClick={() => void createMedia()}
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={saving}
+              onClick={() => {
+                setShowForm(false);
+                setFormError(null);
+                setFile(null);
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {loading ? (
         <p className="text-sm text-muted">Loading gallery…</p>
@@ -224,7 +461,11 @@ export function MediaGallery({
           {collections.length === 0 ? (
             <EmptyState
               title="No collections yet"
-              description="Add rows to Media Links Resources in Supabase."
+              description={
+                allowManage
+                  ? "Add media to create your first collection."
+                  : "Add rows to Media Links Resources in Supabase."
+              }
             />
           ) : null}
         </div>
@@ -314,29 +555,35 @@ export function MediaGallery({
                     className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{item.name}</p>
+                      <p className="truncate text-sm font-medium">
+                        {itemDisplayName(item)}
+                      </p>
                       <p className="text-xs text-muted">
-                        {item.status || item.owned_by || "Asset"}
+                        {scope === "all" &&
+                        item.public_title &&
+                        item.public_title !== item.name
+                          ? `Public: ${item.public_title}`
+                          : item.status || item.owned_by || "Asset"}
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {item.files
                         .filter((f) => !isImageFile(f))
-                        .map((file) =>
+                        .map((fileItem) =>
                           canDownload ? (
                             <a
-                              key={file.url}
-                              href={file.url}
+                              key={fileItem.url}
+                              href={fileItem.url}
                               target="_blank"
                               rel="noreferrer"
                               className="btn-secondary px-2.5 py-1.5 text-xs"
                             >
                               <Download className="h-3.5 w-3.5" />
-                              {file.name.slice(0, 18)}
+                              {fileItem.name.slice(0, 18)}
                             </a>
                           ) : (
                             <Link
-                              key={file.url}
+                              key={fileItem.url}
                               href={loginHref}
                               className="btn-ghost px-2.5 py-1.5 text-xs"
                             >
@@ -378,6 +625,42 @@ export function MediaGallery({
               title="Empty collection"
               description="No photos or files in this category yet."
             />
+          ) : null}
+
+          {allowManage && activeCollection ? (
+            <div className="mt-10">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted">
+                Manage assets
+              </h3>
+              <ul className="divide-y divide-border rounded-2xl border border-border bg-white">
+                {items
+                  .filter((i) => i.category === collection)
+                  .map((item) => (
+                    <li
+                      key={`manage-${item.id}`}
+                      className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">
+                          {item.name}
+                        </p>
+                        <p className="text-xs text-muted">
+                          {item.public_title && item.public_title !== item.name
+                            ? `Public: ${item.public_title}`
+                            : `${item.files.length} file${item.files.length === 1 ? "" : "s"}`}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-ghost px-2.5 py-1.5 text-xs text-[var(--danger)]"
+                        onClick={() => void removeMedia(item.id)}
+                      >
+                        Remove
+                      </button>
+                    </li>
+                  ))}
+              </ul>
+            </div>
           ) : null}
         </div>
       )}

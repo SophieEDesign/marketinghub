@@ -50,6 +50,7 @@ function withDefaults(store: Partial<HubStore>): HubStore {
     staff_requests: store.staff_requests ?? seed.staff_requests,
     awards: store.awards ?? seed.awards,
     tasks: store.tasks ?? seed.tasks,
+    hub_users: store.hub_users ?? seed.hub_users,
   };
 }
 
@@ -67,7 +68,8 @@ async function ensureStore(): Promise<HubStore> {
       !parsed.merch_orders ||
       !parsed.staff_requests ||
       !parsed.awards ||
-      !parsed.tasks
+      !parsed.tasks ||
+      !parsed.hub_users
     ) {
       await writeStore(merged);
     }

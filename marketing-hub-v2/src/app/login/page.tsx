@@ -71,7 +71,7 @@ function LoginForm() {
       </h1>
       <p className="mt-2 text-sm text-muted">
         {isMediaIntent
-          ? "You can browse the media gallery without an account. Sign in to download logos and files."
+          ? "You can browse logos and presentations without an account. Sign in to download."
           : "Internal access to events, content, sponsorships, and more."}
       </p>
 

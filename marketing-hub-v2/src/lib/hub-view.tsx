@@ -23,7 +23,7 @@ type HubViewContextValue = {
 const HubViewContext = createContext<HubViewContextValue | null>(null);
 
 export function HubViewProvider({ children }: { children: React.ReactNode }) {
-  const [view, setViewState] = useState<HubViewMode>("member");
+  const [view, setViewState] = useState<HubViewMode>("admin");
   const [ready, setReady] = useState(false);
 
   useEffect(() => {

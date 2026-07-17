@@ -52,9 +52,11 @@ export function LibraryHub({
       {tab === "media" ? (
         <MediaGallery
           title="Media"
-          description="Pixieset-style collections of logos and brand photos."
+          description="Logos, presentations, and brand assets — public gallery shows Logos & Presentations only for now."
           initialCanDownload
           hideHeader
+          scope="all"
+          allowManage={!isMember}
         />
       ) : null}
 

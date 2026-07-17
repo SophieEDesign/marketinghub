@@ -42,6 +42,10 @@ alter table public.quarterly_themes enable row level security;
 alter table public.theme_main_content enable row level security;
 alter table public.theme_offshoots enable row level security;
 
+drop policy if exists "staff_all_themes" on public.quarterly_themes;
+drop policy if exists "staff_all_theme_mains" on public.theme_main_content;
+drop policy if exists "staff_all_theme_offshoots" on public.theme_offshoots;
+
 create policy "staff_all_themes" on public.quarterly_themes
   for all to authenticated using (true) with check (true);
 create policy "staff_all_theme_mains" on public.theme_main_content

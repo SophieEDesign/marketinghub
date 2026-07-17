@@ -33,9 +33,10 @@ Data persists in `.data/store.json` while Supabase is not configured.
 
 ## Media access
 
-- **Browse:** public at `/media` (no login)
+- **Browse:** public at `/media` (no login) — **Logos** and **Presentations** only for now (gallery/Images next)
 - **Download:** requires sign-in (`/login?intent=media`) or staff hub session
-- Downloads go through `/api/drive/download` (not raw Drive links for guests)
+- **Titles:** `name` = internal reference; `public_title` = shown on the public gallery (falls back to `name` if blank)
+- Staff Library (`/app/library`) can still see all categories
 
 
 See [`.env.example`](.env.example).

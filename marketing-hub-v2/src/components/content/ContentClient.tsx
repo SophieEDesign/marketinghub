@@ -25,6 +25,11 @@ import {
   HUB_CALENDAR_CSS,
 } from "@/components/content/ContentCalendarCard";
 import { AssetUploadField } from "@/components/content/AssetUploadField";
+import {
+  CHANNELS,
+  CONTENT_TYPES,
+  selectOptionsWithCurrent,
+} from "@/lib/data/collections";
 
 const COLUMNS: { id: ContentStatus; label: string }[] = [
   { id: "idea", label: "Idea" },
@@ -560,20 +565,26 @@ export function ContentClient({
                 setForm({ ...form, content_type: e.target.value })
               }
             >
-              <option value="Social">Social</option>
-              <option value="Editorial">Editorial</option>
-              <option value="Newsletter">Newsletter</option>
-              <option value="Sponsorship">Sponsorship</option>
-              <option value="PR">PR</option>
+              {CONTENT_TYPES.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
             </select>
           </div>
           <div>
             <label className="label">Channel</label>
-            <input
+            <select
               className="field"
               value={form.channel}
               onChange={(e) => setForm({ ...form, channel: e.target.value })}
-            />
+            >
+              {CHANNELS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="label">Due date</label>
@@ -942,22 +953,33 @@ export function ContentClient({
                       setEdit({ ...edit, content_type: e.target.value })
                     }
                   >
-                    <option value="Social">Social</option>
-                    <option value="Editorial">Editorial</option>
-                    <option value="Newsletter">Newsletter</option>
-                    <option value="Sponsorship">Sponsorship</option>
-                    <option value="PR">PR</option>
+                    {selectOptionsWithCurrent(
+                      CONTENT_TYPES,
+                      edit.content_type
+                    ).map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
                   <label className="label">Channel</label>
-                  <input
+                  <select
                     className="field"
                     value={edit.channel}
                     onChange={(e) =>
                       setEdit({ ...edit, channel: e.target.value })
                     }
-                  />
+                  >
+                    {selectOptionsWithCurrent(CHANNELS, edit.channel).map(
+                      (o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      )
+                    )}
+                  </select>
                 </div>
                 <div>
                   <label className="label">Due date</label>

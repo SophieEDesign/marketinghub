@@ -12,6 +12,7 @@ import type {
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ContactOwnerSelect } from "@/components/ui/ContactOwnerSelect";
 import { cn } from "@/lib/utils";
+import { CHANNELS, selectOptionsWithCurrent } from "@/lib/data/collections";
 
 const STATUS_LABEL: Record<ThemeStatus, string> = {
   previous: "Previous",
@@ -229,14 +230,20 @@ export function ThemesClient({
                 value={mainForm.title}
                 onChange={(e) => setMainForm({ ...mainForm, title: e.target.value })}
               />
-              <input
+              <select
                 className="field"
-                placeholder="Channel"
                 value={mainForm.channel}
                 onChange={(e) =>
                   setMainForm({ ...mainForm, channel: e.target.value })
                 }
-              />
+              >
+                <option value="">Channel</option>
+                {CHANNELS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
               <ContactOwnerSelect
                 className="field"
                 value={mainForm.owner}
@@ -383,9 +390,8 @@ export function ThemesClient({
                             })
                           }
                         />
-                        <input
+                        <select
                           className="field"
-                          placeholder="Channel"
                           value={offshootForm.channel}
                           onChange={(e) =>
                             setOffshootForm({
@@ -393,7 +399,17 @@ export function ThemesClient({
                               channel: e.target.value,
                             })
                           }
-                        />
+                        >
+                          <option value="">Channel</option>
+                          {selectOptionsWithCurrent(
+                            CHANNELS,
+                            offshootForm.channel
+                          ).map((o) => (
+                            <option key={o.value} value={o.value}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
                         <ContactOwnerSelect
                           value={offshootForm.owner}
                           onChange={(owner) =>

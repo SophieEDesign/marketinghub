@@ -1,6 +1,7 @@
 import type { HubStore } from "@/lib/types";
 
-export type CollectionKey = Exclude<keyof HubStore, never>;
+/** Spreadsheet collections — excludes hub_users (managed under Admin → Users). */
+export type CollectionKey = Exclude<keyof HubStore, "hub_users">;
 
 export type FieldType =
   | "text"
@@ -82,7 +83,7 @@ const STAFF_REQUEST_STATUS: FieldOption[] = [
   { value: "done", label: "Done" },
 ];
 
-const EVENT_TYPES: FieldOption[] = [
+export const EVENT_TYPES: FieldOption[] = [
   { value: "Trade show", label: "Trade show" },
   { value: "Commercial", label: "Commercial" },
   { value: "Awards", label: "Awards" },
@@ -93,7 +94,7 @@ const EVENT_TYPES: FieldOption[] = [
   { value: "Event", label: "Event" },
 ];
 
-const CHANNELS: FieldOption[] = [
+export const CHANNELS: FieldOption[] = [
   { value: "LinkedIn", label: "LinkedIn" },
   { value: "Instagram", label: "Instagram" },
   { value: "Facebook", label: "Facebook" },
@@ -105,14 +106,51 @@ const CHANNELS: FieldOption[] = [
   { value: "PR", label: "PR" },
   { value: "Article", label: "Article" },
   { value: "Sponsorship", label: "Sponsorship" },
+  { value: "Case study", label: "Case study" },
 ];
 
-const CONTENT_TYPES: FieldOption[] = [
+export const CONTENT_TYPES: FieldOption[] = [
   { value: "Social", label: "Social" },
   { value: "Editorial", label: "Editorial" },
   { value: "Newsletter", label: "Newsletter" },
   { value: "Sponsorship", label: "Sponsorship" },
   { value: "PR", label: "PR" },
+];
+
+export const TASK_CATEGORIES: FieldOption[] = [
+  { value: "Events", label: "Events" },
+  { value: "Website", label: "Website" },
+  { value: "Content", label: "Content" },
+  { value: "Social", label: "Social" },
+  { value: "Press", label: "Press" },
+  { value: "Partners", label: "Partners" },
+  { value: "Admin", label: "Admin" },
+];
+
+export const RESOURCE_CATEGORIES: FieldOption[] = [
+  { value: "Brand", label: "Brand" },
+  { value: "Press", label: "Press" },
+  { value: "Web", label: "Web" },
+  { value: "Templates", label: "Templates" },
+  { value: "General", label: "General" },
+];
+
+export const REPORT_CATEGORIES: FieldOption[] = [
+  { value: "Website", label: "Website" },
+  { value: "Ads", label: "Ads" },
+  { value: "SEO", label: "SEO" },
+  { value: "Enquiries", label: "Enquiries" },
+  { value: "Social", label: "Social" },
+  { value: "Dashboards", label: "Dashboards" },
+];
+
+export const REPORT_TOOLS: FieldOption[] = [
+  { value: "Google Analytics", label: "Google Analytics" },
+  { value: "Google Ads", label: "Google Ads" },
+  { value: "SE Ranking", label: "SE Ranking" },
+  { value: "Looker Studio", label: "Looker Studio" },
+  { value: "Enquiries", label: "Enquiries" },
+  { value: "Other", label: "Other" },
 ];
 
 const QUARTERS: FieldOption[] = [
@@ -305,7 +343,7 @@ export const DATA_COLLECTIONS: CollectionDef[] = [
       f("title"),
       f("description", { type: "longtext" }),
       f("url", { type: "url" }),
-      f("category"),
+      f("category", { type: "select", options: RESOURCE_CATEGORIES }),
       f("created_at", { type: "readonly", locked: true }),
       f("updated_at", { type: "readonly", locked: true }),
     ],
@@ -319,8 +357,8 @@ export const DATA_COLLECTIONS: CollectionDef[] = [
       f("title"),
       f("description", { type: "longtext" }),
       f("url", { type: "url" }),
-      f("category"),
-      f("tool"),
+      f("category", { type: "select", options: REPORT_CATEGORIES }),
+      f("tool", { type: "select", options: REPORT_TOOLS }),
       f("created_at", { type: "readonly", locked: true }),
       f("updated_at", { type: "readonly", locked: true }),
     ],
@@ -418,7 +456,7 @@ export const DATA_COLLECTIONS: CollectionDef[] = [
       f("title"),
       f("details", { type: "longtext" }),
       f("due_date", { type: "date", label: "Due date" }),
-      f("category"),
+      f("category", { type: "select", options: TASK_CATEGORIES }),
       f("status", {
         type: "select",
         options: [
@@ -440,6 +478,16 @@ export function getCollection(key: string): CollectionDef | undefined {
 
 export function isCollectionKey(key: string): key is CollectionKey {
   return DATA_COLLECTIONS.some((c) => c.key === key);
+}
+
+/** Keep a legacy/custom value selectable when it is not in the option list. */
+export function selectOptionsWithCurrent(
+  options: FieldOption[],
+  currentValue?: string
+): FieldOption[] {
+  const current = (currentValue ?? "").trim();
+  if (!current || options.some((o) => o.value === current)) return options;
+  return [{ value: current, label: `${current} (custom)` }, ...options];
 }
 
 /** Build owner dropdown options from the contacts table. */

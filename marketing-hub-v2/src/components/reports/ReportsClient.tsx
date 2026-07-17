@@ -4,15 +4,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { BarChart3, ExternalLink } from "lucide-react";
 import type { ReportLink } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
+import {
+  REPORT_CATEGORIES,
+  REPORT_TOOLS,
+} from "@/lib/data/collections";
 
-const CATEGORY_ORDER = [
-  "Website",
-  "Ads",
-  "SEO",
-  "Enquiries",
-  "Social",
-  "Dashboards",
-];
+const CATEGORY_ORDER = REPORT_CATEGORIES.map((c) => c.value);
 
 export function ReportsClient({ initial }: { initial: ReportLink[] }) {
   const [items, setItems] = useState(initial);
@@ -24,7 +21,7 @@ export function ReportsClient({ initial }: { initial: ReportLink[] }) {
     description: "",
     url: "",
     category: "Dashboards",
-    tool: "",
+    tool: "Google Analytics",
   });
 
   const refresh = useCallback(async () => {
@@ -62,7 +59,7 @@ export function ReportsClient({ initial }: { initial: ReportLink[] }) {
       description: "",
       url: "",
       category: "Dashboards",
-      tool: "",
+      tool: "Google Analytics",
     });
     await refresh();
   }
@@ -129,23 +126,50 @@ export function ReportsClient({ initial }: { initial: ReportLink[] }) {
 
       {showForm ? (
         <div className="surface-card mb-6 grid gap-3 p-5 md:grid-cols-2">
-          {(
-            [
-              ["title", "Title"],
-              ["tool", "Tool (e.g. Google Analytics)"],
-              ["category", "Category"],
-              ["url", "URL"],
-            ] as const
-          ).map(([key, label]) => (
-            <div key={key}>
-              <label className="label">{label}</label>
-              <input
-                className="field"
-                value={form[key]}
-                onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-              />
-            </div>
-          ))}
+          <div>
+            <label className="label">Title</label>
+            <input
+              className="field"
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="label">Tool</label>
+            <select
+              className="field"
+              value={form.tool}
+              onChange={(e) => setForm({ ...form, tool: e.target.value })}
+            >
+              {REPORT_TOOLS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Category</label>
+            <select
+              className="field"
+              value={form.category}
+              onChange={(e) => setForm({ ...form, category: e.target.value })}
+            >
+              {REPORT_CATEGORIES.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">URL</label>
+            <input
+              className="field"
+              value={form.url}
+              onChange={(e) => setForm({ ...form, url: e.target.value })}
+            />
+          </div>
           <div className="md:col-span-2">
             <label className="label">Description</label>
             <textarea

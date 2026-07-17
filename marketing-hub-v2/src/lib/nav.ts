@@ -9,6 +9,7 @@ import {
   Handshake,
   Home,
   Library,
+  Settings,
   Sparkles,
   Users,
 } from "lucide-react";
@@ -96,6 +97,12 @@ export const STAFF_NAV: NavItem[] = [
     label: "Contacts",
     description: "Press, partners, and venues",
     icon: Contact,
+  },
+  {
+    href: "/app/admin",
+    label: "Admin",
+    description: "Users and data tables",
+    icon: Settings,
   },
 ];
 

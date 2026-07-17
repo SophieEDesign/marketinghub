@@ -1,6 +1,10 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { DEMO_STAFF, hasSupabaseConfig, isAuthBypass } from "@/lib/auth/config";
+import {
+  getProfileRoleForUser,
+  hubRoleToSessionRole,
+} from "@/lib/supabase/hub-users";
 
 export type SessionUser = {
   id: string;
@@ -8,6 +12,12 @@ export type SessionUser = {
   full_name: string;
   role: "admin" | "staff" | "media_guest";
 };
+
+async function withProfileRole(base: SessionUser): Promise<SessionUser> {
+  const hubRole = await getProfileRoleForUser(base.id);
+  if (!hubRole) return base;
+  return { ...base, role: hubRoleToSessionRole(hubRole) };
+}
 
 export async function getSessionUser(
   request?: NextRequest
@@ -41,7 +51,7 @@ export async function getSessionUser(
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return null;
-    return {
+    return withProfileRole({
       id: user.id,
       email: user.email ?? "",
       full_name:
@@ -49,7 +59,7 @@ export async function getSessionUser(
         user.email ??
         "Staff",
       role: "staff",
-    };
+    });
   }
 
   const { createClient } = await import("@/lib/supabase/server");
@@ -58,7 +68,7 @@ export async function getSessionUser(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return null;
-  return {
+  return withProfileRole({
     id: user.id,
     email: user.email ?? "",
     full_name:
@@ -66,5 +76,5 @@ export async function getSessionUser(
       user.email ??
       "Staff",
     role: "staff",
-  };
+  });
 }

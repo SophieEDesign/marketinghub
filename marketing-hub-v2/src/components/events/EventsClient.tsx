@@ -21,6 +21,7 @@ import {
   eventTypeColor,
   normalizeEventTypeLabel,
 } from "@/lib/events/event-type-colors";
+import { EVENT_TYPES, selectOptionsWithCurrent } from "@/lib/data/collections";
 
 const emptyForm = {
   title: "",
@@ -173,11 +174,17 @@ function EventFields({
       </div>
       <div>
         <label className="label">Type</label>
-        <input
+        <select
           className="field"
           value={form.event_type}
           onChange={(e) => onChange({ ...form, event_type: e.target.value })}
-        />
+        >
+          {selectOptionsWithCurrent(EVENT_TYPES, form.event_type).map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
       </div>
       <div>
         <label className="label">Division</label>

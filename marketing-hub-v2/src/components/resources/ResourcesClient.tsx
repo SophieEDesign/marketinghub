@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Download, ExternalLink } from "lucide-react";
 import type { ResourceLink } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { RESOURCE_CATEGORIES } from "@/lib/data/collections";
 
 export function ResourcesClient({
   initial,
@@ -114,11 +115,17 @@ export function ResourcesClient({
           </div>
           <div>
             <label className="label">Category</label>
-            <input
+            <select
               className="field"
               value={form.category}
               onChange={(e) => setForm({ ...form, category: e.target.value })}
-            />
+            >
+              {RESOURCE_CATEGORIES.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="md:col-span-2">
             <label className="label">URL</label>

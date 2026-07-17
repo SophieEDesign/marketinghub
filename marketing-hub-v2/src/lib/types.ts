@@ -7,6 +7,21 @@ export type Profile = {
   role: UserRole;
 };
 
+/** Hub access directory roles (Admin → Users). */
+export type HubAccessRole = "admin" | "member" | "external";
+
+export type HubUser = {
+  id: string;
+  email: string;
+  full_name: string;
+  role: HubAccessRole;
+  notes: string;
+  /** Present when loaded from Supabase Auth. */
+  last_sign_in_at?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type EventItem = {
   id: string;
   title: string;
@@ -244,4 +259,6 @@ export type HubStore = {
   staff_requests: StaffRequest[];
   awards: AwardEntry[];
   tasks: HubTask[];
+  /** Access directory — managed under Admin → Users, not data tables. */
+  hub_users: HubUser[];
 };
