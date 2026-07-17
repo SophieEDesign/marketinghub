@@ -61,6 +61,7 @@ export function AwardsClient({ initial }: { initial: AwardEntry[] }) {
   const [items, setItems] = useState(initial);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const [selected, setSelected] = useState<AwardEntry | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [edit, setEdit] = useState<EditForm | null>(null);
   const [saving, setSaving] = useState(false);
@@ -77,6 +78,14 @@ export function AwardsClient({ initial }: { initial: AwardEntry[] }) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!selected) return;
+    const next = items.find((i) => i.id === selected.id) ?? null;
+    setSelected(next);
+    // Only re-sync when the list or selected id changes, not on every selected object update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- selected intentionally omitted
+  }, [items, selected?.id]);
 
   const years = useMemo(() => {
     const set = new Set(items.map((i) => String(i.year)));
@@ -167,7 +176,21 @@ export function AwardsClient({ initial }: { initial: AwardEntry[] }) {
       body: JSON.stringify({ action: "delete", id }),
     });
     if (editingId === id) closeEdit();
+    if (selected?.id === id) setSelected(null);
     await refresh();
+  }
+
+  function statusLabel(status: AwardStatus) {
+    return STATUSES.find((s) => s.id === status)?.label ?? status;
+  }
+
+  function formatCeremony(value: string | null) {
+    if (!value) return "—";
+    try {
+      return format(parseISO(value), "d MMM yyyy");
+    } catch {
+      return value;
+    }
   }
 
   return (
@@ -238,7 +261,14 @@ export function AwardsClient({ initial }: { initial: AwardEntry[] }) {
 
       <ul className="space-y-3">
         {filtered.map((item) => (
-          <li key={item.id} className="surface-card p-4">
+          <li
+            key={item.id}
+            className={cn(
+              "surface-card cursor-pointer p-4 transition hover:border-brand/30 hover:shadow-md",
+              selected?.id === item.id && "ring-2 ring-brand/30"
+            )}
+            onClick={() => setSelected(item)}
+          >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
@@ -249,8 +279,7 @@ export function AwardsClient({ initial }: { initial: AwardEntry[] }) {
                       statusTone(item.status)
                     )}
                   >
-                    {STATUSES.find((s) => s.id === item.status)?.label ??
-                      item.status}
+                    {statusLabel(item.status)}
                   </span>
                 </div>
                 <p className="mt-1 text-sm text-muted">
@@ -271,13 +300,17 @@ export function AwardsClient({ initial }: { initial: AwardEntry[] }) {
                   <a
                     href="/app/events"
                     className="mt-2 inline-block text-xs font-medium text-brand underline-offset-2 hover:underline"
+                    onClick={(e) => e.stopPropagation()}
                   >
                     Linked from Events
                   </a>
                 ) : null}
               </div>
               {isAdmin ? (
-                <div className="flex gap-2">
+                <div
+                  className="flex gap-2"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <button
                     type="button"
                     className="btn-secondary"
@@ -304,6 +337,123 @@ export function AwardsClient({ initial }: { initial: AwardEntry[] }) {
           </li>
         ) : null}
       </ul>
+
+      {selected && !edit ? (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/25 md:left-sidebar"
+            onClick={() => setSelected(null)}
+            aria-hidden
+          />
+          <aside
+            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border bg-white shadow-soft"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${selected.title} details`}
+          >
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <h2 className="text-sm font-semibold text-brand">
+                Award details
+              </h2>
+              <button
+                type="button"
+                className="btn-ghost px-2.5 py-1.5 text-xs"
+                onClick={() => setSelected(null)}
+              >
+                Close
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="font-display text-2xl text-brand">
+                    {selected.title}
+                  </h3>
+                  <div className="mt-2">
+                    <span
+                      className={cn(
+                        "inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium",
+                        statusTone(selected.status)
+                      )}
+                    >
+                      {statusLabel(selected.status)}
+                    </span>
+                  </div>
+                </div>
+
+                <dl className="space-y-3 text-sm">
+                  <div>
+                    <dt className="label !mb-0.5">Organisation</dt>
+                    <dd>{selected.organisation || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="label !mb-0.5">Category</dt>
+                    <dd>{selected.category || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="label !mb-0.5">Year</dt>
+                    <dd>{selected.year || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="label !mb-0.5">Ceremony date</dt>
+                    <dd>{formatCeremony(selected.ceremony_at)}</dd>
+                  </div>
+                  <div>
+                    <dt className="label !mb-0.5">Owner</dt>
+                    <dd>{selected.owner || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="label !mb-0.5">Notes</dt>
+                    <dd className="whitespace-pre-wrap text-foreground/90">
+                      {selected.notes || "—"}
+                    </dd>
+                  </div>
+                  {selected.event_id ? (
+                    <div>
+                      <dt className="label !mb-0.5">Linked event</dt>
+                      <dd>
+                        <a
+                          href="/app/events"
+                          className="text-brand underline-offset-2 hover:underline"
+                        >
+                          Open in Events
+                        </a>
+                      </dd>
+                    </div>
+                  ) : null}
+                </dl>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
+              {isAdmin ? (
+                <>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={() => openEdit(selected)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-ghost text-[var(--danger)]"
+                    onClick={() => void remove(selected.id)}
+                  >
+                    Delete
+                  </button>
+                </>
+              ) : null}
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setSelected(null)}
+              >
+                Close
+              </button>
+            </div>
+          </aside>
+        </>
+      ) : null}
 
       {isAdmin && edit && editingId ? (
         <>

@@ -1,9 +1,8 @@
 import { NextRequest } from "next/server";
 import { jsonError, jsonOk, requireStaff } from "@/lib/api";
 import {
-  createContent,
   createTheme,
-  createThemeMain,
+  createThemeMainWithContent,
   createThemeOffshoot,
   deleteTheme,
   deleteThemeMain,
@@ -34,6 +33,17 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const { error } = await requireStaff();
   if (error) return error;
+  try {
+    return await handleThemesPost(request);
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Failed to save theme data";
+    console.error("[api/themes] POST failed", err);
+    return jsonError(message, 500);
+  }
+}
+
+async function handleThemesPost(request: NextRequest) {
   const body = await request.json();
   const action = body.action as string | undefined;
   const entity = body.entity as "theme" | "main" | "offshoot" | undefined;
@@ -100,32 +110,19 @@ export async function POST(request: NextRequest) {
   }
 
   if (entity === "main") {
-    const title = body.title ?? "Main content";
-    const channel = body.channel ?? "";
-    const owner = body.owner ?? "";
-    const status = body.status ?? "idea";
-    const notes = body.notes ?? "";
-    const content = await createContent({
-      title,
-      channel: channel || "Editorial",
-      content_type: body.content_type ?? "Editorial",
-      owner,
-      due_date: null,
-      status,
-      planable_url: "",
-      asset_url: "",
-      notes,
-    });
-    const item = await createThemeMain({
+    const created = await createThemeMainWithContent({
       theme_id: body.theme_id,
-      content_id: content.id,
-      title,
-      channel,
-      owner,
-      status,
-      notes,
+      title: body.title ?? "Main content",
+      channel: body.channel ?? "",
+      owner: body.owner ?? "",
+      status: body.status ?? "idea",
+      notes: body.notes ?? "",
+      content_type: body.content_type ?? "Editorial",
     });
-    return jsonOk({ item, content }, { status: 201 });
+    if (!created) {
+      return jsonError("Theme not found or theme_id missing", 400);
+    }
+    return jsonOk(created, { status: 201 });
   }
 
   if (entity === "offshoot") {

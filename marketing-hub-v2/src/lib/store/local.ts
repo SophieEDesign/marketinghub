@@ -262,11 +262,23 @@ export async function writeStore(store: HubStore): Promise<void> {
   await writeLocalFile(store);
 }
 
+/** Serialize store mutations on this process so concurrent writes can't clobber each other. */
+let updateStoreChain: Promise<unknown> = Promise.resolve();
+
 export async function updateStore(
   mutator: (store: HubStore) => HubStore | void
 ): Promise<HubStore> {
-  const store = await readStore();
-  const next = mutator(store) ?? store;
-  await writeStore(next);
-  return next;
+  const run = async () => {
+    const store = await readStore();
+    const next = mutator(store) ?? store;
+    await writeStore(next);
+    return next;
+  };
+  // Always continue the queue after failures so one bad write doesn't deadlock updates.
+  const result = updateStoreChain.then(run, run);
+  updateStoreChain = result.then(
+    () => undefined,
+    () => undefined
+  );
+  return result;
 }

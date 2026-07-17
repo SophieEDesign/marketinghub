@@ -127,10 +127,17 @@ export function ThemesClient({
   const [contentEdit, setContentEdit] = useState<ContentEditForm | null>(null);
   const [savingContent, setSavingContent] = useState(false);
   const [openingContent, setOpeningContent] = useState(false);
+  const [addingMain, setAddingMain] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/themes");
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(
+        typeof data.error === "string" ? data.error : "Could not refresh themes"
+      );
+    }
     setThemes(data.themes ?? []);
     setMains(data.mains ?? []);
     setOffshoots(data.offshoots ?? []);
@@ -138,7 +145,9 @@ export function ThemesClient({
   }, []);
 
   useEffect(() => {
-    void refresh();
+    void refresh().catch((e) => {
+      setError(e instanceof Error ? e.message : "Could not refresh themes");
+    });
   }, [refresh]);
 
   const years = useMemo(() => uniqueYears(themes), [themes]);
@@ -206,35 +215,66 @@ export function ThemesClient({
 
   async function addMain() {
     if (!selectedId || !mainForm.title.trim()) return;
-    await fetch("/api/themes", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        entity: "main",
-        theme_id: selectedId,
-        ...mainForm,
-        status: "idea",
-      }),
-    });
-    setMainForm({ title: "", channel: "", owner: "" });
-    await refresh();
+    setAddingMain(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/themes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entity: "main",
+          theme_id: selectedId,
+          ...mainForm,
+          status: "idea",
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(
+          typeof data.error === "string"
+            ? data.error
+            : "Could not save main content. Please try again."
+        );
+        return;
+      }
+      setMainForm({ title: "", channel: "", owner: "" });
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save main content.");
+    } finally {
+      setAddingMain(false);
+    }
   }
 
   async function addOffshoot(mainId: string) {
     if (!offshootForm.title.trim()) return;
-    await fetch("/api/themes", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        entity: "offshoot",
-        main_content_id: mainId,
-        ...offshootForm,
-        status: "idea",
-      }),
-    });
-    setOffshootForm({ title: "", channel: "", owner: "" });
-    setOffshootFor(null);
-    await refresh();
+    setError(null);
+    try {
+      const res = await fetch("/api/themes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entity: "offshoot",
+          main_content_id: mainId,
+          ...offshootForm,
+          status: "idea",
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(
+          typeof data.error === "string"
+            ? data.error
+            : "Could not save offshoot. Please try again."
+        );
+        return;
+      }
+      setOffshootForm({ title: "", channel: "", owner: "" });
+      setOffshootFor(null);
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save offshoot.");
+    }
   }
 
   async function saveTheme() {
@@ -242,8 +282,9 @@ export function ThemesClient({
     const year = Number.parseInt(themeEdit.year, 10);
     if (!Number.isFinite(year) || year < 2000 || year > 2100) return;
     setSavingTheme(true);
+    setError(null);
     try {
-      await fetch("/api/themes", {
+      const res = await fetch("/api/themes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -259,8 +300,19 @@ export function ThemesClient({
           },
         }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(
+          typeof data.error === "string"
+            ? data.error
+            : "Could not save theme. Please try again."
+        );
+        return;
+      }
       setYearTab(year);
       await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save theme.");
     } finally {
       setSavingTheme(false);
     }
@@ -338,8 +390,9 @@ export function ThemesClient({
   async function saveContentEdit() {
     if (!editingContentId || !contentEdit) return;
     setSavingContent(true);
+    setError(null);
     try {
-      await fetch("/api/themes", {
+      const res = await fetch("/api/themes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -358,8 +411,19 @@ export function ThemesClient({
           },
         }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(
+          typeof data.error === "string"
+            ? data.error
+            : "Could not save content. Please try again."
+        );
+        return;
+      }
       await refresh();
       closeContentEdit();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save content.");
     } finally {
       setSavingContent(false);
     }
@@ -405,6 +469,15 @@ export function ThemesClient({
           </Link>
         }
       />
+
+      {error ? (
+        <div
+          className="mb-4 rounded-2xl border border-[var(--danger)]/30 bg-[var(--danger)]/5 px-4 py-3 text-sm text-[var(--danger)]"
+          role="alert"
+        >
+          {error}
+        </div>
+      ) : null}
 
       {years.length > 0 ? (
         <div
@@ -611,9 +684,14 @@ export function ThemesClient({
                 value={mainForm.owner}
                 onChange={(owner) => setMainForm({ ...mainForm, owner })}
               />
-              <button type="button" className="btn-primary" onClick={() => void addMain()}>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={addingMain || !mainForm.title.trim()}
+                onClick={() => void addMain()}
+              >
                 <Plus className="h-4 w-4" />
-                Add
+                {addingMain ? "Saving…" : "Add"}
               </button>
             </div>
 

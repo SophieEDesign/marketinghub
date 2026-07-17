@@ -90,6 +90,7 @@ export function SponsorshipsClient({
   const [view, setView] = useState<ViewId>("list");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const [selected, setSelected] = useState<Sponsorship | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [edit, setEdit] = useState<EditForm | null>(null);
   const [saving, setSaving] = useState(false);
@@ -141,6 +142,14 @@ export function SponsorshipsClient({
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!selected) return;
+    const next = items.find((i) => i.id === selected.id) ?? null;
+    setSelected(next);
+    // Only re-sync when the list or selected id changes, not on every selected object update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- selected intentionally omitted
+  }, [items, selected?.id]);
 
   const scoped = useMemo(() => {
     if (kind === "all") return items;
@@ -253,6 +262,7 @@ export function SponsorshipsClient({
       body: JSON.stringify({ action: "delete", id }),
     });
     if (editingId === id) closeEdit();
+    if (selected?.id === id) setSelected(null);
     await refresh();
   }
 
@@ -260,10 +270,22 @@ export function SponsorshipsClient({
     ? items.find((i) => i.id === editingId) ?? null
     : null;
 
+  function formatDateLabel(value: string | null) {
+    if (!value) return "—";
+    try {
+      return format(parseISO(value), "d MMM yyyy");
+    } catch {
+      return value;
+    }
+  }
+
   function CardActions({ item }: { item: Sponsorship }) {
     const manageable = canManageItem(item);
     return (
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div
+        className="mt-3 flex flex-wrap items-center gap-2"
+        onClick={(e) => e.stopPropagation()}
+      >
         {manageable ? (
           <>
             <button
@@ -500,7 +522,14 @@ export function SponsorshipsClient({
           {view === "list" ? (
             <div className="space-y-3">
               {filtered.map((item) => (
-                <article key={item.id} className="surface-card p-5">
+                <article
+                  key={item.id}
+                  className={cn(
+                    "surface-card cursor-pointer p-5 transition hover:border-brand/30 hover:shadow-md",
+                    selected?.id === item.id && "ring-2 ring-brand/30"
+                  )}
+                  onClick={() => setSelected(item)}
+                >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <h2 className="font-display text-xl text-brand">
@@ -557,7 +586,11 @@ export function SponsorshipsClient({
                       {colItems.map((item) => (
                         <article
                           key={item.id}
-                          className="rounded-xl border border-border bg-sand/60 p-3"
+                          className={cn(
+                            "cursor-pointer rounded-xl border border-border bg-sand/60 p-3 transition hover:border-brand/30 hover:shadow-sm",
+                            selected?.id === item.id && "ring-2 ring-brand/30"
+                          )}
+                          onClick={() => setSelected(item)}
                         >
                           <p className="text-sm font-medium">{item.partner}</p>
                           <p className="mt-1 text-xs text-muted">
@@ -606,7 +639,7 @@ export function SponsorshipsClient({
                           <button
                             type="button"
                             className="pt-1 text-right"
-                            onClick={() => openEdit(item)}
+                            onClick={() => setSelected(item)}
                           >
                             <span className="block font-display text-xl leading-none text-brand md:text-2xl">
                               {format(due, "d")}
@@ -628,13 +661,14 @@ export function SponsorshipsClient({
                           <div
                             className={cn(
                               "rounded-xl border border-border bg-white p-3 text-left shadow-sm transition hover:border-brand/30 hover:shadow-md",
-                              isPast && "opacity-75"
+                              isPast && "opacity-75",
+                              selected?.id === item.id && "ring-2 ring-brand/30"
                             )}
                           >
                             <button
                               type="button"
                               className="w-full text-left"
-                              onClick={() => openEdit(item)}
+                              onClick={() => setSelected(item)}
                             >
                               <div className="mb-1.5 flex flex-wrap items-center gap-2">
                                 <span
@@ -687,6 +721,146 @@ export function SponsorshipsClient({
             </div>
           ) : null}
       </div>
+
+      {selected && !edit ? (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/25 md:left-sidebar"
+            onClick={() => setSelected(null)}
+            aria-hidden
+          />
+          <aside
+            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border bg-white shadow-soft"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${selected.partner} details`}
+          >
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <h2 className="text-sm font-semibold text-brand">
+                Partner details
+              </h2>
+              <button
+                type="button"
+                className="btn-ghost px-2.5 py-1.5 text-xs"
+                onClick={() => setSelected(null)}
+              >
+                Close
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="font-display text-2xl text-brand">
+                    {selected.partner}
+                  </h3>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <span
+                      className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white"
+                      style={{ background: STATUS_COLOR[selected.status] }}
+                    >
+                      {statusLabel(selected.status)}
+                    </span>
+                    <span className="rounded-full bg-sand px-2.5 py-0.5 text-[11px] font-medium text-muted">
+                      {partnerKind(selected) === "membership"
+                        ? "Membership"
+                        : "Sponsorship"}
+                    </span>
+                  </div>
+                </div>
+
+                <dl className="space-y-3 text-sm">
+                  <div>
+                    <dt className="label !mb-0.5">
+                      {partnerKind(selected) === "membership"
+                        ? "Tier / package"
+                        : "Package"}
+                    </dt>
+                    <dd>{selected.package_name || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="label !mb-0.5">
+                      {partnerKind(selected) === "membership"
+                        ? "Fee / value"
+                        : "Value"}
+                    </dt>
+                    <dd>{selected.value || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="label !mb-0.5">Starts</dt>
+                    <dd>{formatDateLabel(selected.starts_at)}</dd>
+                  </div>
+                  <div>
+                    <dt className="label !mb-0.5">Ends</dt>
+                    <dd>{formatDateLabel(selected.ends_at)}</dd>
+                  </div>
+                  <div>
+                    <dt className="label !mb-0.5">Owner</dt>
+                    <dd>{selected.owner || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="label !mb-0.5">Deliverables</dt>
+                    <dd className="whitespace-pre-wrap text-foreground/90">
+                      {selected.deliverables || "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="label !mb-0.5">Notes</dt>
+                    <dd className="whitespace-pre-wrap text-foreground/90">
+                      {selected.notes || "—"}
+                    </dd>
+                  </div>
+                  {selected.onedrive_url ? (
+                    <div>
+                      <dt className="label !mb-0.5">Docs</dt>
+                      <dd>
+                        {selected.onedrive_url.startsWith("http") ? (
+                          <a
+                            href={selected.onedrive_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-brand underline-offset-2 hover:underline"
+                          >
+                            Open docs
+                          </a>
+                        ) : (
+                          selected.onedrive_url
+                        )}
+                      </dd>
+                    </div>
+                  ) : null}
+                </dl>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
+              {canManageItem(selected) ? (
+                <>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={() => openEdit(selected)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-ghost text-[var(--danger)]"
+                    onClick={() => void remove(selected.id)}
+                  >
+                    Delete
+                  </button>
+                </>
+              ) : null}
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setSelected(null)}
+              >
+                Close
+              </button>
+            </div>
+          </aside>
+        </>
+      ) : null}
 
       {edit && editingItem ? (
         <>

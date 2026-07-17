@@ -302,7 +302,7 @@ export function createSeedStore(): HubStore {
         title: "Operational credibility",
         quarter: "Q2",
         year: 2026,
-        status: "active",
+        status: "previous",
         summary: "Show how complex moves become simple for customers.",
         created_at: now,
         updated_at: now,
@@ -312,7 +312,7 @@ export function createSeedStore(): HubStore {
         title: "Reliability & execution",
         quarter: "Q3",
         year: 2026,
-        status: "upcoming",
+        status: "active",
         summary: "Proof points from live projects and on-time delivery.",
         created_at: now,
         updated_at: now,
@@ -331,7 +331,7 @@ export function createSeedStore(): HubStore {
     theme_mains: [
       {
         id: "tmc_seed_1",
-        theme_id: "thm_seed_q2",
+        theme_id: "thm_seed_q3",
         content_id: "cnt_seed_theme_1",
         title:
           "Global forwarding is becoming more complex — customers expect it simpler",
@@ -344,7 +344,7 @@ export function createSeedStore(): HubStore {
       },
       {
         id: "tmc_seed_2",
-        theme_id: "thm_seed_q2",
+        theme_id: "thm_seed_q3",
         content_id: "cnt_seed_theme_2",
         title: "The Middle East is still moving — the route looks different",
         channel: "Case study",

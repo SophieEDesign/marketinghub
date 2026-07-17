@@ -82,17 +82,27 @@ function eventLastDateKey(event: EventItem): string | null {
   return iso.slice(0, 10);
 }
 
-function matchesDateFilter(
+/** First day of the event. */
+function eventFirstDateKey(event: EventItem): string | null {
+  if (!hasValidStart(event)) return null;
+  return event.starts_at!.slice(0, 10);
+}
+
+/**
+ * Event overlaps [from, to] (inclusive). Empty bound = open-ended.
+ * Undated events always pass (shown under Needs a date).
+ */
+function matchesDateRange(
   event: EventItem,
-  dateFilter: "upcoming" | "past" | "all"
+  from: string,
+  to: string
 ): boolean {
-  if (dateFilter === "all") return true;
+  const first = eventFirstDateKey(event);
   const last = eventLastDateKey(event);
-  // Undated events stay visible — they live in "Needs a date".
-  if (!last) return true;
-  const today = todayDateKey();
-  if (dateFilter === "upcoming") return last >= today;
-  return last < today;
+  if (!first || !last) return true;
+  if (from && last < from) return false;
+  if (to && first > to) return false;
+  return true;
 }
 
 /** Midnight / date-only ISO — avoid showing as "1a" in BST. */
@@ -273,13 +283,12 @@ export function EventsClient({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [edit, setEdit] = useState<EventForm | null>(null);
   const [saving, setSaving] = useState(false);
-  const [viewMode, setViewMode] = useState<"calendar" | "list">("list");
+  const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [divisionFilter, setDivisionFilter] = useState("all");
-  const [dateFilter, setDateFilter] = useState<"upcoming" | "past" | "all">(
-    "upcoming"
-  );
+  const [dateFrom, setDateFrom] = useState(() => todayDateKey());
+  const [dateTo, setDateTo] = useState("");
   const [attendance, setAttendance] = useState<EventAttendance[]>([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [attendanceSaving, setAttendanceSaving] = useState(false);
@@ -422,10 +431,10 @@ export function EventsClient({
       ) {
         return false;
       }
-      if (!matchesDateFilter(e, dateFilter)) return false;
+      if (!matchesDateRange(e, dateFrom, dateTo)) return false;
       return true;
     });
-  }, [events, search, typeFilter, divisionFilter, dateFilter]);
+  }, [events, search, typeFilter, divisionFilter, dateFrom, dateTo]);
 
   const dated = useMemo(
     () => filtered.filter((e) => hasValidStart(e)),
@@ -651,20 +660,15 @@ export function EventsClient({
         searchPlaceholder="Search events, location, notes…"
         resultCount={filtered.length}
         totalCount={events.length}
+        dateRange={{
+          from: dateFrom,
+          to: dateTo,
+          onFromChange: setDateFrom,
+          onToChange: setDateTo,
+          clearFrom: todayDateKey(),
+          clearTo: "",
+        }}
         selects={[
-          {
-            id: "date",
-            label: "Date",
-            value: dateFilter,
-            onChange: (value) =>
-              setDateFilter(value as "upcoming" | "past" | "all"),
-            clearValue: "upcoming",
-            options: [
-              { value: "upcoming", label: "Today onwards" },
-              { value: "past", label: "Past" },
-              { value: "all", label: "All dates" },
-            ],
-          },
           {
             id: "type",
             label: "Type",

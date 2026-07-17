@@ -29,6 +29,11 @@ export type MediaListItem = {
    * Non-gallery categories ignore this; missing values treat as public.
    */
   subfolder_visibility: GalleryFolderVisibility;
+  /**
+   * Per-item visibility. Overrides folder when folder is public and item is internal.
+   * When folder is set to internal, all items are forced internal.
+   */
+  visibility: GalleryFolderVisibility;
   status: string;
   owned_by: string;
   notes: string;
@@ -36,6 +41,7 @@ export type MediaListItem = {
   document_link: string;
   files: MediaFile[];
   cover_url: string | null;
+  created_at: string | null;
   updated_at: string | null;
 };
 
@@ -113,16 +119,33 @@ function isGalleryCategoryName(category: string): boolean {
   return category.trim().toLowerCase() === GALLERY_CATEGORY.toLowerCase();
 }
 
-/** Public scope: public categories; Gallery subfolders must be public. */
+/** Public scope: public categories; Gallery needs public folder + public item. */
 function isVisibleInPublicScope(item: {
   category: string;
   subfolder_visibility: GalleryFolderVisibility;
+  visibility: GalleryFolderVisibility;
 }): boolean {
   if (!isPublicCategory(item.category)) return false;
   if (isGalleryCategoryName(item.category)) {
-    return item.subfolder_visibility === "public";
+    // Folder internal → nothing public. Folder public → item can still hide itself.
+    return (
+      item.subfolder_visibility === "public" && item.visibility === "public"
+    );
   }
-  return true;
+  return item.visibility === "public";
+}
+
+/** Effective visibility for display badges (folder ∩ item for Gallery). */
+export function effectiveMediaVisibility(item: {
+  category: string;
+  subfolder_visibility: GalleryFolderVisibility;
+  visibility: GalleryFolderVisibility;
+}): GalleryFolderVisibility {
+  if (isGalleryCategoryName(item.category)) {
+    if (item.subfolder_visibility === "internal") return "internal";
+    return item.visibility === "public" ? "public" : "internal";
+  }
+  return item.visibility === "public" ? "public" : "internal";
 }
 
 export async function listMediaFromSupabase(options?: {
@@ -201,6 +224,14 @@ export async function listMediaFromSupabase(options?: {
           ])
         )
       );
+      const rawItemVis = asString(
+        pickField(r, [/^visibility$/i, /^item_?visibility$/i])
+      );
+      const visibility: GalleryFolderVisibility = rawItemVis.trim()
+        ? normalizeGalleryVisibility(rawItemVis)
+        : isGalleryCategoryName(category)
+          ? subfolder_visibility
+          : "public";
 
       const internalName = name.trim();
       const publicName = publicTitle.trim();
@@ -217,6 +248,7 @@ export async function listMediaFromSupabase(options?: {
         category,
         subfolder: subfolder.trim(),
         subfolder_visibility,
+        visibility,
         status: asString(pickField(r, [/^status$/i])) || "",
         owned_by: asString(
           pickField(r, [/^owned_?by$/i, /^owner$/i, /^assignee$/i])
@@ -226,6 +258,7 @@ export async function listMediaFromSupabase(options?: {
         document_link,
         files,
         cover_url: cover,
+        created_at: asString(r.created_at) || null,
         updated_at: asString(r.updated_at) || null,
       } satisfies MediaListItem;
     })
@@ -266,6 +299,8 @@ export type CreateMediaInput = {
   subfolder?: string;
   /** public = external gallery; internal = staff only. Gallery only. */
   subfolder_visibility?: GalleryFolderVisibility;
+  /** Per-item visibility; defaults to folder visibility for Gallery, else public. */
+  visibility?: GalleryFolderVisibility;
   document_link?: string;
   notes?: string;
   status?: string;
@@ -332,6 +367,9 @@ export async function createMediaInSupabase(
   const subfolder_visibility: GalleryFolderVisibility = isGallery
     ? normalizeGalleryVisibility(input.subfolder_visibility ?? "internal")
     : "public";
+  const visibility: GalleryFolderVisibility = normalizeGalleryVisibility(
+    input.visibility ?? (isGallery ? subfolder_visibility : "public")
+  );
   const publicTitle = input.public_title?.trim() || "";
   const documentLink = normalizeLink(input.document_link ?? "");
   const notes = input.notes?.trim() || "";
@@ -367,6 +405,7 @@ export async function createMediaInSupabase(
     hub_category: category,
     subfolder: subfolder || null,
     subfolder_visibility: isGallery ? subfolder_visibility : null,
+    visibility,
     document_link: documentLink || null,
     notes: notes || null,
     status,
@@ -397,6 +436,7 @@ export async function createMediaInSupabase(
     category,
     subfolder,
     subfolder_visibility,
+    visibility,
     status,
     owned_by: asString(r.owned_by),
     notes,
@@ -407,11 +447,19 @@ export async function createMediaInSupabase(
       files.find((f) => f.type.startsWith("image/"))?.url ??
       files[0]?.url ??
       null,
+    created_at: now,
     updated_at: asString(r.updated_at) || now,
   };
 }
 
-/** Set public/internal for every item in a Gallery subfolder (empty = Unsorted). */
+/** Set public/internal for every item in a Gallery subfolder (empty = Unsorted).
+ *
+ * Rules:
+ * - Folder → internal: every file becomes internal (clears public overrides).
+ * - Folder → public: folder is public; every file becomes public so they match
+ *   the folder. After that, an individual file can be set back to internal to
+ *   override the public folder.
+ */
 export async function setGallerySubfolderVisibility(input: {
   subfolder: string;
   visibility: GalleryFolderVisibility;
@@ -430,11 +478,13 @@ export async function setGallerySubfolderVisibility(input: {
   const now = new Date().toISOString();
   const supabase = createServiceClient();
 
-  // Match Unsorted (blank subfolder) or exact name.
+  // Always cascade folder choice onto items. Individual overrides are applied
+  // afterwards via updateMediaItemInSupabase({ visibility }).
   let query = supabase
     .from(mediaTable.supabase_table)
     .update({
       subfolder_visibility: visibility,
+      visibility,
       updated_at: now,
       updated_by: actorId,
     })
@@ -485,6 +535,10 @@ export async function updateMediaItemInSupabase(input: {
   name?: string;
   public_title?: string;
   notes?: string;
+  category?: string;
+  subfolder?: string;
+  document_link?: string;
+  visibility?: GalleryFolderVisibility;
 }): Promise<MediaListItem> {
   const id = input.id.trim();
   if (!id) throw new Error("id is required");
@@ -510,6 +564,31 @@ export async function updateMediaItemInSupabase(input: {
   }
   if (input.notes !== undefined) {
     patch.notes = input.notes.trim() || null;
+  }
+  if (input.document_link !== undefined) {
+    patch.document_link = normalizeLink(input.document_link) || null;
+  }
+  if (input.visibility !== undefined) {
+    patch.visibility = normalizeGalleryVisibility(input.visibility);
+  }
+
+  let nextCategory: string | undefined;
+  if (input.category !== undefined) {
+    nextCategory = input.category.trim();
+    if (!nextCategory) throw new Error("Category is required");
+    patch.hub_category = nextCategory;
+  }
+
+  if (nextCategory !== undefined) {
+    const gallery =
+      nextCategory.toLowerCase() === GALLERY_CATEGORY.toLowerCase();
+    if (!gallery) {
+      patch.subfolder = null;
+    } else if (input.subfolder !== undefined) {
+      patch.subfolder = input.subfolder.trim() || null;
+    }
+  } else if (input.subfolder !== undefined) {
+    patch.subfolder = input.subfolder.trim() || null;
   }
 
   const supabase = createServiceClient();
@@ -686,6 +765,17 @@ function mapMediaRow(
   const subfolder = asString(
     pickField(r, [/^subfolder$/i, /^gallery_?folder$/i, /^album$/i])
   );
+  const subfolder_visibility = normalizeGalleryVisibility(
+    pickField(r, [/^subfolder_?visibility$/i, /^gallery_?visibility$/i])
+  );
+  const rawItemVis = asString(
+    pickField(r, [/^visibility$/i, /^item_?visibility$/i])
+  );
+  const visibility: GalleryFolderVisibility = rawItemVis.trim()
+    ? normalizeGalleryVisibility(rawItemVis)
+    : isGalleryCategoryName(category)
+      ? subfolder_visibility
+      : "public";
   const internalName = name.trim();
   const publicName = publicTitle.trim();
   return {
@@ -696,9 +786,8 @@ function mapMediaRow(
       scope === "public" ? publicName || internalName : internalName,
     category,
     subfolder: subfolder.trim(),
-    subfolder_visibility: normalizeGalleryVisibility(
-      pickField(r, [/^subfolder_?visibility$/i, /^gallery_?visibility$/i])
-    ),
+    subfolder_visibility,
+    visibility,
     status: asString(pickField(r, [/^status$/i])) || "",
     owned_by: asString(
       pickField(r, [/^owned_?by$/i, /^owner$/i, /^assignee$/i])
@@ -708,6 +797,7 @@ function mapMediaRow(
     document_link,
     files,
     cover_url: cover,
+    created_at: asString(r.created_at) || null,
     updated_at: asString(r.updated_at) || null,
   };
 }

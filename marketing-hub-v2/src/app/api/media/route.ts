@@ -69,6 +69,20 @@ export async function POST(request: NextRequest) {
         public_title:
           typeof body.public_title === "string" ? body.public_title : undefined,
         notes: typeof body.notes === "string" ? body.notes : undefined,
+        category:
+          typeof body.category === "string" ? body.category : undefined,
+        subfolder:
+          typeof body.subfolder === "string" ? body.subfolder : undefined,
+        document_link:
+          typeof body.document_link === "string"
+            ? body.document_link
+            : undefined,
+        visibility:
+          typeof body.visibility === "string"
+            ? body.visibility.trim().toLowerCase() === "internal"
+              ? "internal"
+              : "public"
+            : undefined,
       });
       return jsonOk({ item });
     }
@@ -137,6 +151,14 @@ export async function POST(request: NextRequest) {
     const subfolder_visibility: GalleryFolderVisibility =
       rawVis.trim().toLowerCase() === "public" ? "public" : "internal";
 
+    const rawItemVis =
+      typeof body.visibility === "string" ? body.visibility : "";
+    const visibility: GalleryFolderVisibility | undefined = rawItemVis.trim()
+      ? rawItemVis.trim().toLowerCase() === "internal"
+        ? "internal"
+        : "public"
+      : undefined;
+
     const item = await createMediaInSupabase({
       name,
       public_title:
@@ -144,6 +166,7 @@ export async function POST(request: NextRequest) {
       category: typeof body.category === "string" ? body.category : "Documents",
       subfolder: typeof body.subfolder === "string" ? body.subfolder : "",
       subfolder_visibility,
+      visibility,
       document_link:
         typeof body.document_link === "string" ? body.document_link : "",
       notes: typeof body.notes === "string" ? body.notes : "",

@@ -573,6 +573,68 @@ export async function createThemeMain(
   return item;
 }
 
+/**
+ * Create a Content row + Theme main in one store write so neither can be
+ * lost to a read/modify/write race between two separate updates.
+ */
+export async function createThemeMainWithContent(input: {
+  theme_id: string;
+  title: string;
+  channel: string;
+  owner: string;
+  status: ContentStatus;
+  notes?: string;
+  content_type?: string;
+}): Promise<{ item: ThemeMainContent; content: ContentItem } | null> {
+  const themeId = String(input.theme_id ?? "").trim();
+  if (!themeId) return null;
+
+  const now = nowIso();
+  const title = input.title.trim() || "Main content";
+  const channel = input.channel.trim();
+  const owner = input.owner.trim();
+  const notes = (input.notes ?? "").trim();
+  const status = input.status;
+
+  const content: ContentItem = {
+    id: uid("cnt"),
+    title,
+    channel: channel || "Editorial",
+    content_type: input.content_type?.trim() || "Editorial",
+    owner,
+    due_date: null,
+    status,
+    planable_url: "",
+    asset_url: "",
+    notes,
+    created_at: now,
+    updated_at: now,
+  };
+
+  const item: ThemeMainContent = {
+    id: uid("tmc"),
+    theme_id: themeId,
+    content_id: content.id,
+    title,
+    channel,
+    owner,
+    status,
+    notes,
+    created_at: now,
+    updated_at: now,
+  };
+
+  let created = false;
+  await updateStore((s) => {
+    if (!s.themes.some((t) => t.id === themeId)) return;
+    s.content.push(content);
+    s.theme_mains.push(item);
+    created = true;
+  });
+  if (!created) return null;
+  return { item, content };
+}
+
 /** Create a Content table row for a theme main if missing, and return both. */
 export async function ensureThemeMainContentLink(mainId: string) {
   const store = await readStore();
@@ -584,7 +646,9 @@ export async function ensureThemeMainContentLink(mainId: string) {
     if (existing) return { main, content: existing };
   }
 
-  const content = await createContent({
+  const now = nowIso();
+  const content: ContentItem = {
+    id: uid("cnt"),
     title: main.title,
     channel: main.channel || "Editorial",
     content_type: "Editorial",
@@ -594,9 +658,25 @@ export async function ensureThemeMainContentLink(mainId: string) {
     planable_url: "",
     asset_url: "",
     notes: main.notes ?? "",
+    created_at: now,
+    updated_at: now,
+  };
+
+  let updatedMain: ThemeMainContent | null = null;
+  await updateStore((s) => {
+    const idx = s.theme_mains.findIndex((m) => m.id === mainId);
+    if (idx === -1) return;
+    s.content.push(content);
+    const next: ThemeMainContent = {
+      ...s.theme_mains[idx],
+      content_id: content.id,
+      updated_at: now,
+    };
+    s.theme_mains[idx] = next;
+    updatedMain = next;
   });
-  const updated = await updateThemeMain(mainId, { content_id: content.id });
-  return { main: updated ?? { ...main, content_id: content.id }, content };
+  if (!updatedMain) return null;
+  return { main: updatedMain, content };
 }
 
 export async function updateThemeMain(

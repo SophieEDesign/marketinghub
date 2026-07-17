@@ -13,11 +13,24 @@ export type FilterSelect = {
   clearValue?: string;
 };
 
+export type FilterDateRange = {
+  from: string;
+  to: string;
+  onFromChange: (value: string) => void;
+  onToChange: (value: string) => void;
+  /** Defaults when Clear is pressed. Empty string = no bound. */
+  clearFrom?: string;
+  clearTo?: string;
+  fromLabel?: string;
+  toLabel?: string;
+};
+
 export function FilterBar({
   search,
   onSearchChange,
   searchPlaceholder = "Search…",
   selects = [],
+  dateRange,
   resultCount,
   totalCount,
   className,
@@ -26,17 +39,30 @@ export function FilterBar({
   onSearchChange: (value: string) => void;
   searchPlaceholder?: string;
   selects?: FilterSelect[];
+  dateRange?: FilterDateRange;
   resultCount?: number;
   totalCount?: number;
   className?: string;
 }) {
+  const rangeClearFrom = dateRange?.clearFrom ?? "";
+  const rangeClearTo = dateRange?.clearTo ?? "";
+  const rangeActive = Boolean(
+    dateRange &&
+      (dateRange.from !== rangeClearFrom || dateRange.to !== rangeClearTo)
+  );
+
   const hasActive =
     search.trim().length > 0 ||
-    selects.some((s) => s.value !== (s.clearValue ?? "all"));
+    selects.some((s) => s.value !== (s.clearValue ?? "all")) ||
+    rangeActive;
 
   function clearAll() {
     onSearchChange("");
     selects.forEach((s) => s.onChange(s.clearValue ?? "all"));
+    if (dateRange) {
+      dateRange.onFromChange(rangeClearFrom);
+      dateRange.onToChange(rangeClearTo);
+    }
   }
 
   return (
@@ -61,6 +87,37 @@ export function FilterBar({
           />
         </div>
       </div>
+
+      {dateRange ? (
+        <>
+          <div className="min-w-[140px]">
+            <label className="label" htmlFor="filter-date-from">
+              {dateRange.fromLabel ?? "From"}
+            </label>
+            <input
+              id="filter-date-from"
+              type="date"
+              className="field"
+              value={dateRange.from}
+              max={dateRange.to || undefined}
+              onChange={(e) => dateRange.onFromChange(e.target.value)}
+            />
+          </div>
+          <div className="min-w-[140px]">
+            <label className="label" htmlFor="filter-date-to">
+              {dateRange.toLabel ?? "To"}
+            </label>
+            <input
+              id="filter-date-to"
+              type="date"
+              className="field"
+              value={dateRange.to}
+              min={dateRange.from || undefined}
+              onChange={(e) => dateRange.onToChange(e.target.value)}
+            />
+          </div>
+        </>
+      ) : null}
 
       {selects.map((select) => (
         <div key={select.id} className="min-w-[140px]">

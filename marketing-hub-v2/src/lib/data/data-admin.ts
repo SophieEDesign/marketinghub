@@ -3,7 +3,7 @@ import path from "path";
 import { uid } from "@/lib/utils";
 import { readStore, updateStore } from "@/lib/store/local";
 import { getDataDir } from "@/lib/store/paths";
-import type { HubStore } from "@/lib/types";
+import type { ContentStatus, HubStore } from "@/lib/types";
 import {
   DATA_COLLECTIONS,
   contactOwnerOptions,
@@ -211,7 +211,42 @@ export async function addRow(collection: string, patch: Record<string, unknown> 
         ? []
         : field.key === "quantity" || field.key === "year"
           ? 0
-          : "";
+          : field.key === "content_id"
+            ? null
+            : "";
+  }
+
+  // Theme mains must create a linked Content row in the same write, otherwise
+  // the Themes page / Content table look empty after "add".
+  if (collection === "theme_mains") {
+    const contentId = uid("cnt");
+    const title = String(row.title || "Main content");
+    const channel = String(row.channel || "");
+    const owner = String(row.owner || "");
+    const status = String(row.status || "idea");
+    const notes = String(row.notes || "");
+    row.content_id = contentId;
+    row.title = title;
+    await updateStore((store) => {
+      store.content.push({
+        id: contentId,
+        title,
+        channel: channel || "Editorial",
+        content_type: "Editorial",
+        owner,
+        due_date: null,
+        status: (status as ContentStatus) || "idea",
+        planable_url: "",
+        asset_url: "",
+        notes,
+        created_at: now,
+        updated_at: now,
+      });
+      const rows = asRows(store, collection);
+      rows.push(row);
+      (store as HubStore)[collection] = rows as never;
+    });
+    return row;
   }
 
   await updateStore((store) => {

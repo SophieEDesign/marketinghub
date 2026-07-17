@@ -18,13 +18,11 @@ import {
   X,
 } from "lucide-react";
 import { EmptyState, PageHeader } from "@/components/ui/PageHeader";
-import {
-  MediaDetailPanel,
-  type SelectedMediaFile,
-} from "@/components/media/MediaDetailPanel";
+import { MediaDetailPanel } from "@/components/media/MediaDetailPanel";
 import {
   GALLERY_CATEGORY,
   MEDIA_HUB_CATEGORIES,
+  effectiveMediaVisibility,
   normalizeGalleryVisibility,
   type GalleryFolderVisibility,
   type MediaFile,
@@ -50,10 +48,14 @@ type GalleryPhoto = {
   publicTitle: string;
   notes: string;
   category: string;
+  visibility: GalleryFolderVisibility;
+  subfolderVisibility: GalleryFolderVisibility;
+  type: string;
+  size: number | null;
+  createdAt: string | null;
 };
 
 const UNSORTED_SUBFOLDER = "Unsorted";
-const NEW_FOLDER_VALUE = "__new_folder__";
 const NEW_SUBFOLDER_VALUE = "__new_subfolder__";
 const MEDIA_ACCEPT =
   "image/jpeg,image/png,image/webp,image/gif,application/pdf,video/mp4,video/quicktime,.jpg,.jpeg,.png,.webp,.gif,.pdf,.mp4,.mov";
@@ -78,11 +80,52 @@ function filesFromList(list: FileList | File[] | null | undefined): File[] {
 }
 
 function nameFromFile(file: File) {
-  return file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim();
+  return nameFromFileName(file.name);
+}
+
+function nameFromFileName(fileName: string) {
+  return fileName.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim() || fileName;
 }
 
 function formatMb(bytes: number) {
   return `${Math.round(bytes / (1024 * 1024))}MB`;
+}
+
+function formatFileSizeLabel(bytes: number | null | undefined) {
+  if (bytes == null || !Number.isFinite(bytes) || bytes < 0) return null;
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024)
+    return `${(bytes / 1024).toFixed(bytes < 10 * 1024 ? 1 : 0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(bytes < 10 * 1024 * 1024 ? 1 : 0)} MB`;
+}
+
+function formatFileTypeLabel(file: { name: string; type: string }) {
+  const mime = (file.type || "").trim().toLowerCase();
+  if (mime.startsWith("image/")) {
+    const sub = mime.slice(6);
+    if (sub === "jpeg") return "JPEG";
+    if (sub === "svg+xml") return "SVG";
+    return sub.toUpperCase() || "Image";
+  }
+  if (mime === "application/pdf") return "PDF";
+  if (mime.startsWith("video/")) {
+    const sub = mime.slice(6);
+    if (sub === "quicktime") return "MOV";
+    return sub.toUpperCase() || "Video";
+  }
+  const ext = file.name.match(/\.([^.]+)$/)?.[1];
+  return ext ? ext.toUpperCase() : mime || "File";
+}
+
+function formatFileDateLabel(value: string | null | undefined) {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 async function readErrorMessage(res: Response, fallback: string) {
@@ -450,6 +493,11 @@ function photosFromItems(items: MediaListItem[]): GalleryPhoto[] {
         publicTitle: item.public_title || "",
         notes: item.notes || "",
         category: item.category,
+        visibility: item.visibility || "internal",
+        subfolderVisibility: item.subfolder_visibility || "internal",
+        type: file.type || "",
+        size: file.size,
+        createdAt: item.created_at || item.updated_at,
       });
     }
   }
@@ -491,7 +539,8 @@ export function MediaGallery({
   const [collection, setCollection] = useState<string | null>(null);
   const [activeSubfolder, setActiveSubfolder] = useState<string | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [focusedFileUrl, setFocusedFileUrl] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [folderMode, setFolderMode] = useState<"existing" | "new">("existing");
@@ -569,11 +618,16 @@ export function MediaGallery({
     return names.map((name) => {
       const inFolder = galleryItems.filter((i) => itemSubfolder(i) === name);
       const photos = photosFromItems(inFolder);
-      const visibility: GalleryFolderVisibility = inFolder.every(
+      // Folder visibility comes from subfolder_visibility (synced), not item overrides.
+      const publicCount = inFolder.filter(
         (i) => itemFolderVisibility(i) === "public"
-      )
-        ? "public"
-        : "internal";
+      ).length;
+      const visibility: GalleryFolderVisibility =
+        inFolder.length === 0
+          ? "internal"
+          : publicCount >= inFolder.length - publicCount
+            ? "public"
+            : "internal";
       return {
         name,
         photos,
@@ -629,80 +683,58 @@ export function MediaGallery({
   const lightboxPhoto =
     lightboxIndex != null ? photos[lightboxIndex] ?? null : null;
 
-  const selectedPhoto = useMemo(() => {
-    if (!selectedPhotoId) return null;
-    const fromGrid = photos.find((p) => p.id === selectedPhotoId);
-    if (fromGrid) return fromGrid;
-
-    const sep = selectedPhotoId.indexOf("__");
-    if (sep < 0) return null;
-    const itemId = selectedPhotoId.slice(0, sep);
-    const url = selectedPhotoId.slice(sep + 2);
-    const item = items.find((i) => i.id === itemId);
-    if (!item) return null;
-    const file = item.files.find((f) => f.url === url);
-    if (!file) return null;
-    return {
-      id: selectedPhotoId,
-      itemId,
-      url: file.url,
-      name: file.name,
-      itemName: item.name || itemDisplayName(item),
-      publicTitle: item.public_title || "",
-      notes: item.notes || "",
-      category: item.category,
-    } satisfies GalleryPhoto;
-  }, [photos, selectedPhotoId, items]);
-
-  const selectedDetail: SelectedMediaFile | null = selectedPhoto
-    ? {
-        itemId: selectedPhoto.itemId,
-        url: selectedPhoto.url,
-        fileName: selectedPhoto.name,
-        itemName: selectedPhoto.itemName,
-        publicTitle: selectedPhoto.publicTitle,
-        notes: selectedPhoto.notes,
-      }
-    : null;
-
   const selectedItem =
-    selectedPhoto != null
-      ? items.find((i) => i.id === selectedPhoto.itemId) ?? null
+    selectedItemId != null
+      ? items.find((i) => i.id === selectedItemId) ?? null
       : null;
 
   useEffect(() => {
-    if (!selectedPhotoId) return;
-    if (selectedPhoto) return;
-    // Selection pointed at a deleted file
-    setSelectedPhotoId(null);
-  }, [selectedPhotoId, selectedPhoto]);
+    if (!selectedItemId) return;
+    if (selectedItem) return;
+    setSelectedItemId(null);
+    setFocusedFileUrl(null);
+  }, [selectedItemId, selectedItem]);
 
   useEffect(() => {
-    if (!selectedPhotoId) return;
+    if (!selectedItemId) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setSelectedPhotoId(null);
+      if (e.key === "Escape") {
+        setSelectedItemId(null);
+        setFocusedFileUrl(null);
+      }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedPhotoId]);
+  }, [selectedItemId]);
+
+  function closeMediaPanel() {
+    setSelectedItemId(null);
+    setFocusedFileUrl(null);
+  }
 
   function openPhoto(index: number) {
     const photo = photos[index];
     if (!photo) return;
-    if (allowManage) {
-      setSelectedPhotoId(photo.id);
-      setLightboxIndex(null);
+    // External / public gallery: lightbox view + download only (no detail panel).
+    if (!isInternal) {
+      closeMediaPanel();
+      setLightboxIndex(index);
       return;
     }
-    setSelectedPhotoId(null);
-    setLightboxIndex(index);
+    setSelectedItemId(photo.itemId);
+    setFocusedFileUrl(photo.url);
+    setLightboxIndex(null);
   }
 
-  function openItemInPanel(item: MediaListItem) {
-    if (!allowManage) return;
-    const image = item.files.find(isImageFile) ?? item.files[0];
-    if (!image) return;
-    setSelectedPhotoId(`${item.id}__${image.url}`);
+  function openItemInPanel(item: MediaListItem, fileUrl?: string) {
+    if (!isInternal) return;
+    const preferred =
+      (fileUrl && item.files.find((f) => f.url === fileUrl)) ||
+      item.files.find(isImageFile) ||
+      item.files[0] ||
+      null;
+    setSelectedItemId(item.id);
+    setFocusedFileUrl(preferred?.url ?? null);
     setLightboxIndex(null);
   }
 
@@ -832,10 +864,7 @@ export function MediaGallery({
 
   async function createMedia() {
     if (!allowManage || saving) return;
-    if (!form.name.trim()) {
-      setFormError("Name is required");
-      return;
-    }
+
     const folderName =
       folderMode === "new" ? newFolderName.trim() : form.category.trim();
     if (!folderName) {
@@ -857,6 +886,13 @@ export function MediaGallery({
       setFormError("Enter a subfolder name");
       return;
     }
+
+    const multiFile = files.length > 1;
+    if (!multiFile && !form.name.trim() && files.length === 0) {
+      setFormError("Name is required");
+      return;
+    }
+
     setSaving(true);
     setFormError(null);
     try {
@@ -896,26 +932,78 @@ export function MediaGallery({
         }
       }
 
-      const res = await fetch("/api/media", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: form.name,
-          public_title: form.public_title,
-          category: folderName,
-          subfolder: subfolderName,
-          subfolder_visibility: gallerySelected
-            ? form.subfolder_visibility
-            : undefined,
-          document_link: form.document_link,
-          notes: form.notes,
-          files: uploaded.length > 0 ? uploaded : undefined,
-        }),
-      });
-      if (!res.ok) {
-        throw new Error(
-          await readErrorMessage(res, "Could not save media")
-        );
+      const shared = {
+        public_title: form.public_title,
+        category: folderName,
+        subfolder: subfolderName,
+        subfolder_visibility: gallerySelected
+          ? form.subfolder_visibility
+          : undefined,
+        // New files inherit folder visibility; can override later per item.
+        visibility: gallerySelected
+          ? form.subfolder_visibility
+          : ("public" as const),
+        notes: form.notes,
+      };
+
+      if (uploaded.length === 0) {
+        if (!form.name.trim()) {
+          throw new Error("Name is required");
+        }
+        const res = await fetch("/api/media", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: form.name,
+            document_link: form.document_link,
+            ...shared,
+          }),
+        });
+        if (!res.ok) {
+          throw new Error(
+            await readErrorMessage(res, "Could not save media")
+          );
+        }
+      } else if (uploaded.length === 1) {
+        const file = uploaded[0];
+        const res = await fetch("/api/media", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: form.name.trim() || nameFromFileName(file.name),
+            document_link: form.document_link,
+            files: [file],
+            ...shared,
+          }),
+        });
+        if (!res.ok) {
+          throw new Error(
+            await readErrorMessage(res, "Could not save media")
+          );
+        }
+      } else {
+        // One media row per file — same folder/subfolder, independent delete/edit
+        for (let i = 0; i < uploaded.length; i++) {
+          const file = uploaded[i];
+          const res = await fetch("/api/media", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: nameFromFileName(file.name),
+              document_link: i === 0 ? form.document_link : "",
+              files: [file],
+              ...shared,
+            }),
+          });
+          if (!res.ok) {
+            throw new Error(
+              await readErrorMessage(
+                res,
+                `Could not save ${file.name} (${i + 1}/${uploaded.length})`
+              )
+            );
+          }
+        }
       }
 
       if (gallerySelected) {
@@ -952,6 +1040,7 @@ export function MediaGallery({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "delete", id }),
     });
+    if (selectedItemId === id) closeMediaPanel();
     await load();
   }
 
@@ -1071,8 +1160,17 @@ export function MediaGallery({
               className="field"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="e.g. Primary logo pack"
+              placeholder={
+                files.length > 1
+                  ? "Optional — each file uses its own name"
+                  : "e.g. Primary logo pack"
+              }
             />
+            {files.length > 1 ? (
+              <p className="mt-1 text-xs text-muted">
+                Multiple files are saved as separate assets (one per image)
+              </p>
+            ) : null}
           </div>
           <div>
             <label className="label">Public title</label>
@@ -1087,41 +1185,62 @@ export function MediaGallery({
           </div>
           <div>
             <label className="label">Category</label>
-            <select
-              className="field"
-              value={folderMode === "new" ? NEW_FOLDER_VALUE : form.category}
-              onChange={(e) => {
-                const value = e.target.value;
-                if (value === NEW_FOLDER_VALUE) {
-                  setFolderMode("new");
-                  return;
-                }
-                setFolderMode("existing");
-                setForm({ ...form, category: value, subfolder: "" });
-                setSubfolderMode("existing");
-                setNewSubfolderName("");
-              }}
-              aria-label="Category"
-            >
-              {folderOptions.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-              <option value={NEW_FOLDER_VALUE}>+ Add new category…</option>
-            </select>
             {folderMode === "new" ? (
-              <input
-                className="field mt-2"
-                value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
-                placeholder="e.g. Presentations"
-                autoFocus
-              />
+              <div className="space-y-2">
+                <input
+                  className="field"
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  placeholder="e.g. Presentations"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  className="btn-ghost px-2.5 py-1.5 text-xs"
+                  onClick={() => {
+                    setFolderMode("existing");
+                    setNewFolderName("");
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
             ) : (
-              <p className="mt-1 text-xs text-muted">
-                Presentations, Logos, Gallery, Documents, and more
-              </p>
+              <div className="space-y-2">
+                <select
+                  className="field"
+                  value={form.category}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setForm({ ...form, category: value, subfolder: "" });
+                    setSubfolderMode("existing");
+                    setNewSubfolderName("");
+                  }}
+                  aria-label="Category"
+                >
+                  {folderOptions.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="btn-secondary w-full px-2.5 py-1.5 text-xs"
+                  onClick={() => {
+                    setFolderMode("new");
+                    setNewFolderName("");
+                    setForm({ ...form, subfolder: "" });
+                    setSubfolderMode("existing");
+                    setNewSubfolderName("");
+                  }}
+                >
+                  + Add new category
+                </button>
+                <p className="text-xs text-muted">
+                  Presentations, Logos, Gallery, Documents, and more
+                </p>
+              </div>
             )}
           </div>
           {formIsGallery ? (
@@ -1282,8 +1401,8 @@ export function MediaGallery({
                 Drag &amp; drop files here
               </p>
               <p className="mt-1 text-xs text-muted">
-                Drop a folder of images or pick multiple files · uploads go
-                straight to storage (max {formatMb(MAX_UPLOAD_BYTES)} each)
+                Drop a folder of images or pick multiple files · each file
+                becomes its own asset (max {formatMb(MAX_UPLOAD_BYTES)} each)
               </p>
               <input
                 ref={fileInputRef}
@@ -1342,9 +1461,11 @@ export function MediaGallery({
             >
               {saving
                 ? files.length > 1
-                  ? `Uploading ${files.length} files…`
+                  ? `Saving ${files.length} assets…`
                   : "Saving…"
-                : "Save"}
+                : files.length > 1
+                  ? `Save ${files.length} assets`
+                  : "Save"}
             </button>
             <button
               type="button"
@@ -1573,7 +1694,13 @@ export function MediaGallery({
                 {photos.length > 0
                   ? `${photos.length} photo${photos.length === 1 ? "" : "s"}`
                   : "Documents & links"}
-                {canDownload ? " · Click a photo to preview & download" : ""}
+                {isInternal
+                  ? canDownload
+                    ? " · Click a photo to open details & download"
+                    : " · Click a photo to open details"
+                  : canDownload
+                    ? " · Click a photo to view & download"
+                    : " · Click a photo to view"}
               </p>
               {allowManage && inGallery && activeSubfolder ? (
                 <div
@@ -1626,12 +1753,32 @@ export function MediaGallery({
                   key={photo.id}
                   className="group relative mb-2 break-inside-avoid overflow-hidden rounded-lg bg-[#f0f2f3] lg:mb-3"
                 >
+                  {allowManage ? (
+                    <span
+                      className={cn(
+                        "absolute left-2 top-2 z-10 rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide shadow-sm",
+                        effectiveMediaVisibility({
+                          category: photo.category,
+                          subfolder_visibility: photo.subfolderVisibility,
+                          visibility: photo.visibility,
+                        }) === "public"
+                          ? "bg-white/95 text-brand"
+                          : "bg-black/70 text-white"
+                      )}
+                    >
+                      {effectiveMediaVisibility({
+                        category: photo.category,
+                        subfolder_visibility: photo.subfolderVisibility,
+                        visibility: photo.visibility,
+                      })}
+                    </span>
+                  ) : null}
                   <button
                     type="button"
                     className={cn(
                       "block w-full text-left",
-                      allowManage &&
-                        selectedPhotoId === photo.id &&
+                      selectedItemId === photo.itemId &&
+                        focusedFileUrl === photo.url &&
                         "ring-2 ring-brand ring-offset-2"
                     )}
                     onClick={() => openPhoto(index)}
@@ -1656,6 +1803,18 @@ export function MediaGallery({
                               {photo.itemName}
                             </span>
                           ) : null}
+                          <span className="mt-0.5 block truncate text-[10px] text-white/70">
+                            {[
+                              formatFileDateLabel(photo.createdAt),
+                              formatFileTypeLabel({
+                                name: photo.name,
+                                type: photo.type,
+                              }),
+                              formatFileSizeLabel(photo.size),
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </span>
                         </>
                       ) : (
                         photoPublicLabel(photo)
@@ -1689,34 +1848,70 @@ export function MediaGallery({
                 {docs.map((item) => (
                   <li
                     key={item.id}
-                    className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+                    className={cn(
+                      "flex flex-wrap items-center justify-between gap-3 px-4 py-3",
+                      isInternal &&
+                        selectedItemId === item.id &&
+                        "bg-accent-soft/40"
+                    )}
                   >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">
-                        {isInternal
-                          ? item.name || itemDisplayName(item)
-                          : itemPublicLabel(item)}
-                      </p>
-                      <p className="text-xs text-muted">
-                        {isInternal
-                          ? [
-                              item.public_title &&
-                              item.public_title !== item.name
-                                ? `Public: ${item.public_title}`
+                    {isInternal ? (
+                      <button
+                        type="button"
+                        className="min-w-0 flex-1 text-left"
+                        onClick={() => openItemInPanel(item)}
+                      >
+                        <p className="truncate text-sm font-medium">
+                          {item.name || itemDisplayName(item)}
+                        </p>
+                        <p className="text-xs text-muted">
+                          {[
+                            item.public_title &&
+                            item.public_title !== item.name
+                              ? `Public: ${item.public_title}`
+                              : null,
+                            item.files
+                              .filter((f) => !isImageFile(f))
+                              .map((f) => f.name)
+                              .slice(0, 2)
+                              .join(", ") || null,
+                            formatFileDateLabel(
+                              item.created_at || item.updated_at
+                            ),
+                            item.files[0]
+                              ? formatFileTypeLabel(item.files[0])
+                              : item.document_link || item.document_url
+                                ? "Link"
                                 : null,
-                              item.files
-                                .filter((f) => !isImageFile(f))
-                                .map((f) => f.name)
-                                .slice(0, 2)
-                                .join(", ") || null,
-                              item.status || item.owned_by || null,
-                            ]
-                              .filter(Boolean)
-                              .join(" · ") || "Asset"
-                          : item.status || "Asset"}
-                      </p>
-                    </div>
+                            item.files[0]
+                              ? formatFileSizeLabel(item.files[0].size)
+                              : null,
+                            item.status || item.owned_by || null,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ") || "Asset"}
+                        </p>
+                      </button>
+                    ) : (
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">
+                          {itemPublicLabel(item)}
+                        </p>
+                        <p className="text-xs text-muted">
+                          {item.status || "Asset"}
+                        </p>
+                      </div>
+                    )}
                     <div className="flex flex-wrap gap-2">
+                      {isInternal ? (
+                        <button
+                          type="button"
+                          className="btn-secondary px-2.5 py-1.5 text-xs"
+                          onClick={() => openItemInPanel(item)}
+                        >
+                          {allowManage ? "Edit" : "Details"}
+                        </button>
+                      ) : null}
                       {item.files
                         .filter((f) => !isImageFile(f))
                         .map((fileItem) =>
@@ -1727,6 +1922,7 @@ export function MediaGallery({
                               target="_blank"
                               rel="noreferrer"
                               className="btn-secondary px-2.5 py-1.5 text-xs"
+                              onClick={(e) => e.stopPropagation()}
                             >
                               <Download className="h-3.5 w-3.5" />
                               {fileItem.name.slice(0, 18)}
@@ -1749,6 +1945,7 @@ export function MediaGallery({
                             target="_blank"
                             rel="noreferrer"
                             className="btn-secondary px-2.5 py-1.5 text-xs"
+                            onClick={(e) => e.stopPropagation()}
                           >
                             Open
                             <ExternalLink className="h-3.5 w-3.5" />
@@ -1762,6 +1959,15 @@ export function MediaGallery({
                             Sign in
                           </Link>
                         ))}
+                      {allowManage ? (
+                        <button
+                          type="button"
+                          className="btn-ghost px-2.5 py-1.5 text-xs text-[var(--danger)]"
+                          onClick={() => void removeMedia(item.id)}
+                        >
+                          Remove
+                        </button>
+                      ) : null}
                     </div>
                   </li>
                 ))}
@@ -1775,73 +1981,19 @@ export function MediaGallery({
               description="No photos or files in this folder yet."
             />
           ) : null}
-
-          {allowManage && visibleItems.length > 0 ? (
-            <div className="mt-10">
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted">
-                Manage assets
-              </h3>
-              <ul className="divide-y divide-border rounded-2xl border border-border bg-white">
-                {visibleItems.map((item) => (
-                    <li
-                      key={`manage-${item.id}`}
-                      className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
-                    >
-                      <button
-                        type="button"
-                        className="min-w-0 flex-1 text-left"
-                        onClick={() => openItemInPanel(item)}
-                      >
-                        <p className="truncate text-sm font-medium">
-                          {item.name}
-                        </p>
-                        <p className="text-xs text-muted">
-                          {[
-                            item.files.map((f) => f.name).slice(0, 3).join(", ") ||
-                              null,
-                            item.files.length > 3
-                              ? `+${item.files.length - 3} more`
-                              : null,
-                            item.subfolder
-                              ? `Subfolder: ${item.subfolder}`
-                              : null,
-                            item.public_title && item.public_title !== item.name
-                              ? `Public: ${item.public_title}`
-                              : null,
-                          ]
-                            .filter(Boolean)
-                            .join(" · ") || "Asset"}
-                        </p>
-                      </button>
-                      <div className="flex shrink-0 gap-2">
-                        <button
-                          type="button"
-                          className="btn-secondary px-2.5 py-1.5 text-xs"
-                          onClick={() => openItemInPanel(item)}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-ghost px-2.5 py-1.5 text-xs text-[var(--danger)]"
-                          onClick={() => void removeMedia(item.id)}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-              </ul>
-            </div>
-          ) : null}
         </div>
       )}
 
-      {allowManage && selectedDetail ? (
+      {isInternal && selectedItem ? (
         <MediaDetailPanel
-          selected={selectedDetail}
           item={selectedItem}
-          onClose={() => setSelectedPhotoId(null)}
+          focusedFileUrl={focusedFileUrl}
+          categories={folderOptions}
+          knownSubfolders={knownSubfolders}
+          canEdit={allowManage}
+          canDownload={canDownload}
+          onClose={closeMediaPanel}
+          onFocusFile={setFocusedFileUrl}
           onSaved={async () => {
             await load();
           }}
@@ -1850,19 +2002,19 @@ export function MediaGallery({
 
       {lightboxPhoto && lightboxIndex != null ? (
         <div
-          className="fixed inset-0 z-50 flex flex-col bg-black/92 md:left-sidebar"
+          className="fixed inset-0 z-50 flex flex-col bg-black md:left-sidebar"
           role="dialog"
           aria-modal="true"
           aria-label={lightboxPhoto.name}
         >
-          <div className="flex items-center justify-between gap-3 px-4 py-3 text-white/90">
+          <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-black px-4 py-3 text-white">
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">
                 {isInternal
                   ? lightboxPhoto.itemName
                   : photoPublicLabel(lightboxPhoto)}
               </p>
-              <p className="truncate text-xs text-white/60">
+              <p className="truncate text-xs text-white/70">
                 {isInternal
                   ? `${lightboxPhoto.name} · ${lightboxIndex + 1} / ${photos.length}`
                   : `${lightboxIndex + 1} / ${photos.length}`}
@@ -1875,7 +2027,7 @@ export function MediaGallery({
                   download={lightboxPhoto.name}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2 text-sm hover:bg-white/15"
+                  className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-medium text-brand shadow-sm hover:bg-sand"
                 >
                   <Download className="h-4 w-4" />
                   Download
@@ -1883,7 +2035,7 @@ export function MediaGallery({
               ) : (
                 <Link
                   href={loginHref}
-                  className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2 text-sm hover:bg-white/15"
+                  className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-medium text-brand shadow-sm hover:bg-sand"
                 >
                   <Lock className="h-4 w-4" />
                   Sign in
@@ -1891,7 +2043,7 @@ export function MediaGallery({
               )}
               <button
                 type="button"
-                className="rounded-xl bg-white/10 p-2 hover:bg-white/15"
+                className="rounded-xl bg-white/15 p-2 text-white hover:bg-white/25"
                 onClick={() => setLightboxIndex(null)}
                 aria-label="Close"
               >
@@ -1900,11 +2052,11 @@ export function MediaGallery({
             </div>
           </div>
 
-          <div className="relative flex min-h-0 flex-1 items-center justify-center px-4 pb-6">
+          <div className="relative flex min-h-0 flex-1 items-center justify-center bg-black px-4 pb-6">
             {lightboxIndex > 0 ? (
               <button
                 type="button"
-                className="absolute left-3 z-10 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 md:left-6"
+                className="absolute left-3 z-10 rounded-full bg-white/15 p-2 text-white hover:bg-white/25 md:left-6"
                 onClick={() => setLightboxIndex(lightboxIndex - 1)}
                 aria-label="Previous photo"
               >
@@ -1920,7 +2072,7 @@ export function MediaGallery({
             {lightboxIndex < photos.length - 1 ? (
               <button
                 type="button"
-                className="absolute right-3 z-10 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 md:right-6"
+                className="absolute right-3 z-10 rounded-full bg-white/15 p-2 text-white hover:bg-white/25 md:right-6"
                 onClick={() => setLightboxIndex(lightboxIndex + 1)}
                 aria-label="Next photo"
               >
