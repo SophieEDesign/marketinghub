@@ -3,8 +3,11 @@ import { jsonError, jsonOk, requireStaff } from "@/lib/api";
 import { hasSupabaseConfig } from "@/lib/auth/config";
 import {
   createMediaInSupabase,
+  deleteMediaFileInSupabase,
+  renameMediaFileInSupabase,
   setGallerySubfolderVisibility,
   softDeleteMediaInSupabase,
+  updateMediaItemInSupabase,
   type GalleryFolderVisibility,
 } from "@/lib/supabase/media-list";
 
@@ -54,6 +57,49 @@ export async function POST(request: NextRequest) {
       if (!id) return jsonError("id is required");
       await softDeleteMediaInSupabase(id, user.id);
       return jsonOk({ ok: true });
+    }
+
+    if (action === "update") {
+      const id = typeof body.id === "string" ? body.id : "";
+      if (!id) return jsonError("id is required");
+      const item = await updateMediaItemInSupabase({
+        id,
+        actorId: user.id,
+        name: typeof body.name === "string" ? body.name : undefined,
+        public_title:
+          typeof body.public_title === "string" ? body.public_title : undefined,
+        notes: typeof body.notes === "string" ? body.notes : undefined,
+      });
+      return jsonOk({ item });
+    }
+
+    if (action === "rename_file") {
+      const id = typeof body.id === "string" ? body.id : "";
+      const fileUrl = typeof body.fileUrl === "string" ? body.fileUrl : "";
+      const newName = typeof body.newName === "string" ? body.newName : "";
+      if (!id) return jsonError("id is required");
+      if (!fileUrl) return jsonError("fileUrl is required");
+      if (!newName.trim()) return jsonError("File name is required");
+      const item = await renameMediaFileInSupabase({
+        id,
+        fileUrl,
+        newName,
+        actorId: user.id,
+      });
+      return jsonOk({ item });
+    }
+
+    if (action === "delete_file") {
+      const id = typeof body.id === "string" ? body.id : "";
+      const fileUrl = typeof body.fileUrl === "string" ? body.fileUrl : "";
+      if (!id) return jsonError("id is required");
+      if (!fileUrl) return jsonError("fileUrl is required");
+      const result = await deleteMediaFileInSupabase({
+        id,
+        fileUrl,
+        actorId: user.id,
+      });
+      return jsonOk(result);
     }
 
     if (action === "set_subfolder_visibility") {

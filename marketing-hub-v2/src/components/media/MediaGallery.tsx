@@ -19,6 +19,10 @@ import {
 } from "lucide-react";
 import { EmptyState, PageHeader } from "@/components/ui/PageHeader";
 import {
+  MediaDetailPanel,
+  type SelectedMediaFile,
+} from "@/components/media/MediaDetailPanel";
+import {
   GALLERY_CATEGORY,
   MEDIA_HUB_CATEGORIES,
   normalizeGalleryVisibility,
@@ -39,9 +43,12 @@ type ListResponse = {
 
 type GalleryPhoto = {
   id: string;
+  itemId: string;
   url: string;
   name: string;
   itemName: string;
+  publicTitle: string;
+  notes: string;
   category: string;
 };
 
@@ -94,6 +101,14 @@ async function readErrorMessage(res: Response, fallback: string) {
 
 function itemDisplayName(item: MediaListItem) {
   return item.display_name || item.public_title || item.name;
+}
+
+function itemPublicLabel(item: MediaListItem) {
+  return item.public_title?.trim() || item.name || itemDisplayName(item);
+}
+
+function photoPublicLabel(photo: GalleryPhoto) {
+  return photo.publicTitle.trim() || photo.itemName;
 }
 
 function isImageFile(file: MediaFile) {
@@ -428,9 +443,12 @@ function photosFromItems(items: MediaListItem[]): GalleryPhoto[] {
       if (!isImageFile(file)) continue;
       photos.push({
         id: `${item.id}__${file.url}`,
+        itemId: item.id,
         url: file.url,
         name: file.name,
-        itemName: itemDisplayName(item),
+        itemName: item.name || itemDisplayName(item),
+        publicTitle: item.public_title || "",
+        notes: item.notes || "",
         category: item.category,
       });
     }
@@ -473,6 +491,7 @@ export function MediaGallery({
   const [collection, setCollection] = useState<string | null>(null);
   const [activeSubfolder, setActiveSubfolder] = useState<string | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [folderMode, setFolderMode] = useState<"existing" | "new">("existing");
@@ -505,6 +524,7 @@ export function MediaGallery({
 
   const items = useMemo(() => data?.items ?? [], [data?.items]);
   const categories = useMemo(() => data?.categories ?? [], [data?.categories]);
+  const isInternal = scope === "all";
 
   const collections = useMemo(() => {
     return categories.map((name) => {
@@ -522,12 +542,16 @@ export function MediaGallery({
         docs,
         previews: previewUrlsFromItems(inCat),
         kind: detectFolderKind(inCat),
-        sampleTitle: inCat[0] ? itemDisplayName(inCat[0]) : undefined,
+        sampleTitle: inCat[0]
+          ? scope === "all"
+            ? itemDisplayName(inCat[0])
+            : itemPublicLabel(inCat[0])
+          : undefined,
         photoCount: photos.length,
         assetCount: inCat.length,
       };
     });
-  }, [categories, items]);
+  }, [categories, items, scope]);
 
   const galleryItems = useMemo(
     () => items.filter((i) => isGalleryCategory(i.category)),
@@ -555,13 +579,17 @@ export function MediaGallery({
         photos,
         previews: previewUrlsFromItems(inFolder),
         kind: detectFolderKind(inFolder),
-        sampleTitle: inFolder[0] ? itemDisplayName(inFolder[0]) : undefined,
+        sampleTitle: inFolder[0]
+          ? scope === "all"
+            ? itemDisplayName(inFolder[0])
+            : itemPublicLabel(inFolder[0])
+          : undefined,
         photoCount: photos.length,
         assetCount: inFolder.length,
         visibility,
       };
     });
-  }, [galleryItems]);
+  }, [galleryItems, scope]);
 
   const knownSubfolders = useMemo(() => {
     return Array.from(
@@ -600,6 +628,83 @@ export function MediaGallery({
   );
   const lightboxPhoto =
     lightboxIndex != null ? photos[lightboxIndex] ?? null : null;
+
+  const selectedPhoto = useMemo(() => {
+    if (!selectedPhotoId) return null;
+    const fromGrid = photos.find((p) => p.id === selectedPhotoId);
+    if (fromGrid) return fromGrid;
+
+    const sep = selectedPhotoId.indexOf("__");
+    if (sep < 0) return null;
+    const itemId = selectedPhotoId.slice(0, sep);
+    const url = selectedPhotoId.slice(sep + 2);
+    const item = items.find((i) => i.id === itemId);
+    if (!item) return null;
+    const file = item.files.find((f) => f.url === url);
+    if (!file) return null;
+    return {
+      id: selectedPhotoId,
+      itemId,
+      url: file.url,
+      name: file.name,
+      itemName: item.name || itemDisplayName(item),
+      publicTitle: item.public_title || "",
+      notes: item.notes || "",
+      category: item.category,
+    } satisfies GalleryPhoto;
+  }, [photos, selectedPhotoId, items]);
+
+  const selectedDetail: SelectedMediaFile | null = selectedPhoto
+    ? {
+        itemId: selectedPhoto.itemId,
+        url: selectedPhoto.url,
+        fileName: selectedPhoto.name,
+        itemName: selectedPhoto.itemName,
+        publicTitle: selectedPhoto.publicTitle,
+        notes: selectedPhoto.notes,
+      }
+    : null;
+
+  const selectedItem =
+    selectedPhoto != null
+      ? items.find((i) => i.id === selectedPhoto.itemId) ?? null
+      : null;
+
+  useEffect(() => {
+    if (!selectedPhotoId) return;
+    if (selectedPhoto) return;
+    // Selection pointed at a deleted file
+    setSelectedPhotoId(null);
+  }, [selectedPhotoId, selectedPhoto]);
+
+  useEffect(() => {
+    if (!selectedPhotoId) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setSelectedPhotoId(null);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedPhotoId]);
+
+  function openPhoto(index: number) {
+    const photo = photos[index];
+    if (!photo) return;
+    if (allowManage) {
+      setSelectedPhotoId(photo.id);
+      setLightboxIndex(null);
+      return;
+    }
+    setSelectedPhotoId(null);
+    setLightboxIndex(index);
+  }
+
+  function openItemInPanel(item: MediaListItem) {
+    if (!allowManage) return;
+    const image = item.files.find(isImageFile) ?? item.files[0];
+    if (!image) return;
+    setSelectedPhotoId(`${item.id}__${image.url}`);
+    setLightboxIndex(null);
+  }
 
   const formIsGallery = isGalleryCategory(
     folderMode === "new" ? newFolderName : form.category
@@ -736,8 +841,8 @@ export function MediaGallery({
     if (!folderName) {
       setFormError(
         folderMode === "new"
-          ? "Enter a folder name"
-          : "Select a folder"
+          ? "Enter a category name"
+          : "Select a category"
       );
       return;
     }
@@ -981,7 +1086,7 @@ export function MediaGallery({
             />
           </div>
           <div>
-            <label className="label">Folder</label>
+            <label className="label">Category</label>
             <select
               className="field"
               value={folderMode === "new" ? NEW_FOLDER_VALUE : form.category}
@@ -996,23 +1101,28 @@ export function MediaGallery({
                 setSubfolderMode("existing");
                 setNewSubfolderName("");
               }}
+              aria-label="Category"
             >
               {folderOptions.map((c) => (
                 <option key={c} value={c}>
                   {c}
                 </option>
               ))}
-              <option value={NEW_FOLDER_VALUE}>+ Add new folder…</option>
+              <option value={NEW_FOLDER_VALUE}>+ Add new category…</option>
             </select>
             {folderMode === "new" ? (
               <input
                 className="field mt-2"
                 value={newFolderName}
                 onChange={(e) => setNewFolderName(e.target.value)}
-                placeholder="New folder name"
+                placeholder="e.g. Presentations"
                 autoFocus
               />
-            ) : null}
+            ) : (
+              <p className="mt-1 text-xs text-muted">
+                Presentations, Logos, Gallery, Documents, and more
+              </p>
+            )}
           </div>
           {formIsGallery ? (
             <div>
@@ -1265,7 +1375,7 @@ export function MediaGallery({
       ) : !collection ? (
         <div>
           <p className="mb-5 text-center text-xs font-semibold uppercase tracking-[0.18em] text-muted">
-            Folders
+            Categories
           </p>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {collections.map((col) => (
@@ -1299,10 +1409,10 @@ export function MediaGallery({
           </div>
           {collections.length === 0 ? (
             <EmptyState
-              title="No folders yet"
+              title="No categories yet"
               description={
                 allowManage
-                  ? "Add media to create your first folder."
+                  ? "Add media and pick a category (e.g. Presentations, Logos)."
                   : "Add rows to Media Links Resources in Supabase."
               }
             />
@@ -1320,7 +1430,7 @@ export function MediaGallery({
                 setLightboxIndex(null);
               }}
             >
-              ← All folders
+              ← All categories
             </button>
             <h2 className="font-display text-3xl text-brand md:text-4xl">
               Gallery
@@ -1423,7 +1533,7 @@ export function MediaGallery({
               title="No Gallery subfolders yet"
               description={
                 allowManage
-                  ? "Add media with Folder = Gallery and create a subfolder to sort images."
+                  ? "Add media with Category = Gallery and create a subfolder to sort images."
                   : "Gallery images will appear here once sorted into subfolders."
               }
             />
@@ -1449,7 +1559,7 @@ export function MediaGallery({
               >
                 {inGallery && activeSubfolder
                   ? "← Gallery subfolders"
-                  : "← All folders"}
+                  : "← All categories"}
               </button>
               <h2 className="font-display text-3xl text-brand md:text-4xl">
                 {inGallery && activeSubfolder
@@ -1518,8 +1628,13 @@ export function MediaGallery({
                 >
                   <button
                     type="button"
-                    className="block w-full text-left"
-                    onClick={() => setLightboxIndex(index)}
+                    className={cn(
+                      "block w-full text-left",
+                      allowManage &&
+                        selectedPhotoId === photo.id &&
+                        "ring-2 ring-brand ring-offset-2"
+                    )}
+                    onClick={() => openPhoto(index)}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -1531,7 +1646,20 @@ export function MediaGallery({
                   </button>
                   <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
                     <span className="min-w-0 truncate text-left text-[11px] text-white">
-                      {photo.itemName}
+                      {isInternal ? (
+                        <>
+                          <span className="block truncate font-medium">
+                            {photo.name}
+                          </span>
+                          {photo.itemName && photo.itemName !== photo.name ? (
+                            <span className="block truncate text-[10px] text-white/75">
+                              {photo.itemName}
+                            </span>
+                          ) : null}
+                        </>
+                      ) : (
+                        photoPublicLabel(photo)
+                      )}
                     </span>
                     {canDownload ? (
                       <a
@@ -1565,14 +1693,27 @@ export function MediaGallery({
                   >
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">
-                        {itemDisplayName(item)}
+                        {isInternal
+                          ? item.name || itemDisplayName(item)
+                          : itemPublicLabel(item)}
                       </p>
                       <p className="text-xs text-muted">
-                        {scope === "all" &&
-                        item.public_title &&
-                        item.public_title !== item.name
-                          ? `Public: ${item.public_title}`
-                          : item.status || item.owned_by || "Asset"}
+                        {isInternal
+                          ? [
+                              item.public_title &&
+                              item.public_title !== item.name
+                                ? `Public: ${item.public_title}`
+                                : null,
+                              item.files
+                                .filter((f) => !isImageFile(f))
+                                .map((f) => f.name)
+                                .slice(0, 2)
+                                .join(", ") || null,
+                              item.status || item.owned_by || null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ") || "Asset"
+                          : item.status || "Asset"}
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -1646,25 +1787,48 @@ export function MediaGallery({
                       key={`manage-${item.id}`}
                       className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
                     >
-                      <div className="min-w-0">
+                      <button
+                        type="button"
+                        className="min-w-0 flex-1 text-left"
+                        onClick={() => openItemInPanel(item)}
+                      >
                         <p className="truncate text-sm font-medium">
                           {item.name}
                         </p>
                         <p className="text-xs text-muted">
-                          {item.subfolder
-                            ? `Subfolder: ${item.subfolder}`
-                            : item.public_title && item.public_title !== item.name
+                          {[
+                            item.files.map((f) => f.name).slice(0, 3).join(", ") ||
+                              null,
+                            item.files.length > 3
+                              ? `+${item.files.length - 3} more`
+                              : null,
+                            item.subfolder
+                              ? `Subfolder: ${item.subfolder}`
+                              : null,
+                            item.public_title && item.public_title !== item.name
                               ? `Public: ${item.public_title}`
-                              : `${item.files.length} file${item.files.length === 1 ? "" : "s"}`}
+                              : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ") || "Asset"}
                         </p>
-                      </div>
-                      <button
-                        type="button"
-                        className="btn-ghost px-2.5 py-1.5 text-xs text-[var(--danger)]"
-                        onClick={() => void removeMedia(item.id)}
-                      >
-                        Remove
                       </button>
+                      <div className="flex shrink-0 gap-2">
+                        <button
+                          type="button"
+                          className="btn-secondary px-2.5 py-1.5 text-xs"
+                          onClick={() => openItemInPanel(item)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-ghost px-2.5 py-1.5 text-xs text-[var(--danger)]"
+                          onClick={() => void removeMedia(item.id)}
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </li>
                   ))}
               </ul>
@@ -1672,6 +1836,17 @@ export function MediaGallery({
           ) : null}
         </div>
       )}
+
+      {allowManage && selectedDetail ? (
+        <MediaDetailPanel
+          selected={selectedDetail}
+          item={selectedItem}
+          onClose={() => setSelectedPhotoId(null)}
+          onSaved={async () => {
+            await load();
+          }}
+        />
+      ) : null}
 
       {lightboxPhoto && lightboxIndex != null ? (
         <div
@@ -1683,10 +1858,14 @@ export function MediaGallery({
           <div className="flex items-center justify-between gap-3 px-4 py-3 text-white/90">
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">
-                {lightboxPhoto.itemName}
+                {isInternal
+                  ? lightboxPhoto.itemName
+                  : photoPublicLabel(lightboxPhoto)}
               </p>
               <p className="truncate text-xs text-white/60">
-                {lightboxPhoto.name} · {lightboxIndex + 1} / {photos.length}
+                {isInternal
+                  ? `${lightboxPhoto.name} · ${lightboxIndex + 1} / ${photos.length}`
+                  : `${lightboxIndex + 1} / ${photos.length}`}
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">

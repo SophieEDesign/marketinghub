@@ -39,6 +39,7 @@ function migrateMerch(items: MerchOrder[] | undefined): MerchOrder[] | undefined
   return items.map((item) => ({
     ...item,
     fit: item.fit === "female" || item.fit === "male" ? item.fit : "",
+    logo: item.logo ?? "Commercial",
     created_by_user_id: item.created_by_user_id ?? null,
   }));
 }

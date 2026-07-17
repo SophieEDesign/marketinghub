@@ -243,6 +243,7 @@ export const MEDIA_HUB_CATEGORIES = [
   "Presentations",
   "Images",
   "Documents",
+  "Videos",
   "Brand Guidelines",
   "Design Assets",
   "Templates",
@@ -476,4 +477,237 @@ export async function softDeleteMediaInSupabase(
     .is("deleted_at", null);
 
   if (error) throw new Error(error.message);
+}
+
+export async function updateMediaItemInSupabase(input: {
+  id: string;
+  actorId: string;
+  name?: string;
+  public_title?: string;
+  notes?: string;
+}): Promise<MediaListItem> {
+  const id = input.id.trim();
+  if (!id) throw new Error("id is required");
+
+  const tables = await listCoreTables();
+  const mediaTable = findMediaTable(tables);
+  if (!mediaTable) {
+    throw new Error("Media Links Resources table not found");
+  }
+
+  const actorId = await resolveMediaActorId(input.actorId);
+  const patch: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+    updated_by: actorId,
+  };
+  if (input.name !== undefined) {
+    const name = input.name.trim();
+    if (!name) throw new Error("Name is required");
+    patch.name = name;
+  }
+  if (input.public_title !== undefined) {
+    patch.public_title = input.public_title.trim() || null;
+  }
+  if (input.notes !== undefined) {
+    patch.notes = input.notes.trim() || null;
+  }
+
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from(mediaTable.supabase_table)
+    .update(patch)
+    .eq("id", id)
+    .is("deleted_at", null)
+    .select("*")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return mapMediaRow(data as Record<string, unknown>, "all");
+}
+
+export async function renameMediaFileInSupabase(input: {
+  id: string;
+  fileUrl: string;
+  newName: string;
+  actorId: string;
+}): Promise<MediaListItem> {
+  const id = input.id.trim();
+  const fileUrl = input.fileUrl.trim();
+  const newName = input.newName.trim();
+  if (!id) throw new Error("id is required");
+  if (!fileUrl) throw new Error("fileUrl is required");
+  if (!newName) throw new Error("File name is required");
+
+  const tables = await listCoreTables();
+  const mediaTable = findMediaTable(tables);
+  if (!mediaTable) {
+    throw new Error("Media Links Resources table not found");
+  }
+
+  const actorId = await resolveMediaActorId(input.actorId);
+  const supabase = createServiceClient();
+  const { data: existing, error: readError } = await supabase
+    .from(mediaTable.supabase_table)
+    .select("*")
+    .eq("id", id)
+    .is("deleted_at", null)
+    .single();
+
+  if (readError) throw new Error(readError.message);
+  const row = existing as Record<string, unknown>;
+  const files = parseFiles(row.media);
+  const next = files.map((f) =>
+    f.url === fileUrl ? { ...f, name: newName } : f
+  );
+  if (!files.some((f) => f.url === fileUrl)) {
+    throw new Error("File not found on this asset");
+  }
+
+  const { data, error } = await supabase
+    .from(mediaTable.supabase_table)
+    .update({
+      media: next,
+      updated_at: new Date().toISOString(),
+      updated_by: actorId,
+    })
+    .eq("id", id)
+    .is("deleted_at", null)
+    .select("*")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return mapMediaRow(data as Record<string, unknown>, "all");
+}
+
+export async function deleteMediaFileInSupabase(input: {
+  id: string;
+  fileUrl: string;
+  actorId: string;
+}): Promise<{ deletedItem: boolean; item: MediaListItem | null }> {
+  const id = input.id.trim();
+  const fileUrl = input.fileUrl.trim();
+  if (!id) throw new Error("id is required");
+  if (!fileUrl) throw new Error("fileUrl is required");
+
+  const tables = await listCoreTables();
+  const mediaTable = findMediaTable(tables);
+  if (!mediaTable) {
+    throw new Error("Media Links Resources table not found");
+  }
+
+  const actorId = await resolveMediaActorId(input.actorId);
+  const supabase = createServiceClient();
+  const { data: existing, error: readError } = await supabase
+    .from(mediaTable.supabase_table)
+    .select("*")
+    .eq("id", id)
+    .is("deleted_at", null)
+    .single();
+
+  if (readError) throw new Error(readError.message);
+  const row = existing as Record<string, unknown>;
+  const files = parseFiles(row.media);
+  if (!files.some((f) => f.url === fileUrl)) {
+    throw new Error("File not found on this asset");
+  }
+
+  const next = files.filter((f) => f.url !== fileUrl);
+  const documentLink = normalizeLink(asString(row.document_link));
+  const documentRaw = asString(row.document);
+  const hasOtherContent =
+    next.length > 0 ||
+    !!documentLink ||
+    !!extractUrlFromDocumentField(documentRaw);
+
+  if (!hasOtherContent) {
+    await softDeleteMediaInSupabase(id, actorId);
+    return { deletedItem: true, item: null };
+  }
+
+  const { data, error } = await supabase
+    .from(mediaTable.supabase_table)
+    .update({
+      media: next.length > 0 ? next : null,
+      updated_at: new Date().toISOString(),
+      updated_by: actorId,
+    })
+    .eq("id", id)
+    .is("deleted_at", null)
+    .select("*")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return {
+    deletedItem: false,
+    item: mapMediaRow(data as Record<string, unknown>, "all"),
+  };
+}
+
+function mapMediaRow(
+  r: Record<string, unknown>,
+  scope: MediaListScope
+): MediaListItem {
+  const name =
+    asString(pickField(r, [/^name$/i, /^title$/i, /^asset$/i])) ||
+    "Untitled asset";
+  const publicTitle = asString(
+    pickField(r, [/^public_?title$/i, /^display_?title$/i, /^public_?name$/i])
+  );
+  const files = parseFiles(
+    pickField(r, [/^media$/i, /^attachments?/i, /^files?/i, /^images?/i])
+  );
+  const documentRaw = asString(
+    pickField(r, [/^document$/i, /^file$/i, /^attachment$/i])
+  );
+  const document_url = extractUrlFromDocumentField(documentRaw);
+  const document_link = normalizeLink(
+    asString(
+      pickField(r, [
+        /^document_?link$/i,
+        /^link$/i,
+        /^url$/i,
+        /^onedrive/i,
+      ])
+    )
+  );
+  const cover =
+    files.find((f) => f.type.startsWith("image/"))?.url ??
+    files[0]?.url ??
+    null;
+  const category =
+    asString(
+      pickField(r, [
+        /^hub_?category$/i,
+        /^category$/i,
+        /^folder$/i,
+        /^type$/i,
+      ])
+    ) || "General";
+  const subfolder = asString(
+    pickField(r, [/^subfolder$/i, /^gallery_?folder$/i, /^album$/i])
+  );
+  const internalName = name.trim();
+  const publicName = publicTitle.trim();
+  return {
+    id: asString(r.id),
+    name: internalName,
+    public_title: publicName,
+    display_name:
+      scope === "public" ? publicName || internalName : internalName,
+    category,
+    subfolder: subfolder.trim(),
+    subfolder_visibility: normalizeGalleryVisibility(
+      pickField(r, [/^subfolder_?visibility$/i, /^gallery_?visibility$/i])
+    ),
+    status: asString(pickField(r, [/^status$/i])) || "",
+    owned_by: asString(
+      pickField(r, [/^owned_?by$/i, /^owner$/i, /^assignee$/i])
+    ),
+    notes: asString(pickField(r, [/^notes$/i, /^description$/i])),
+    document_url,
+    document_link,
+    files,
+    cover_url: cover,
+    updated_at: asString(r.updated_at) || null,
+  };
 }

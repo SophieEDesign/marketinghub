@@ -2,6 +2,12 @@
 
 export type ClothingFit = "male" | "female";
 
+export type ClothingLogo =
+  | "Commercial"
+  | "Yacht Transport"
+  | "Forwarding"
+  | "Other";
+
 export type ClothingBrand =
   | "North Sails"
   | "Henbury"
@@ -26,6 +32,15 @@ export const CLOTHING_FITS: { id: ClothingFit; label: string }[] = [
   { id: "male", label: "Male" },
   { id: "female", label: "Female" },
 ];
+
+export const CLOTHING_LOGOS: { id: ClothingLogo; label: string }[] = [
+  { id: "Commercial", label: "Commercial" },
+  { id: "Yacht Transport", label: "Yacht Transport" },
+  { id: "Forwarding", label: "Forwarding" },
+  { id: "Other", label: "Other" },
+];
+
+export const DEFAULT_CLOTHING_LOGO: ClothingLogo = "Commercial";
 
 export const CLOTHING_SIZES = [
   "XS",
@@ -155,4 +170,13 @@ export function defaultColourForItem(itemLabel: string): string {
 
 export function defaultBrandForItem(itemLabel: string): string {
   return clothingProductByLabel(itemLabel)?.brand ?? "North Sails";
+}
+
+export function isClothingLogo(value: unknown): value is ClothingLogo {
+  return (
+    value === "Commercial" ||
+    value === "Yacht Transport" ||
+    value === "Forwarding" ||
+    value === "Other"
+  );
 }

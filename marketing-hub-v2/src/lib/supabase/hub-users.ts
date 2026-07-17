@@ -175,6 +175,7 @@ export async function inviteSupabaseHubUser(input: {
   full_name: string;
   role: HubAccessRole;
   notes?: string;
+  organisation?: string;
 }): Promise<HubUser> {
   const supabase = createAdminClient();
   const email = input.email.trim().toLowerCase();
@@ -195,6 +196,15 @@ export async function inviteSupabaseHubUser(input: {
 
   await upsertProfile(user.id, email, role);
   await syncAuthMetadata(user.id, role, fullName, notes, user);
+
+  const { ensureContactForUser } = await import("@/lib/data/repos");
+  await ensureContactForUser({
+    userId: user.id,
+    email,
+    full_name: fullName,
+    organisation: input.organisation,
+    notes,
+  });
 
   return toHubUser(
     {
@@ -254,6 +264,17 @@ export async function updateSupabaseHubUser(
 
   await syncAuthMetadata(id, role, fullName, notes, existing.user);
   await upsertProfile(id, email, role);
+
+  if (patch.email && patch.email.trim().toLowerCase() !== (existing.user.email ?? "").toLowerCase()) {
+    const { ensureContactForUser } = await import("@/lib/data/repos");
+    await ensureContactForUser({
+      userId: id,
+      email,
+      full_name: fullName,
+      notes,
+      createIfMissing: false,
+    });
+  }
 
   const { data: refreshed, error: refreshError } =
     await supabase.auth.admin.getUserById(id);

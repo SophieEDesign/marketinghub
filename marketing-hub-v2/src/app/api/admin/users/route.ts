@@ -119,6 +119,10 @@ export async function POST(request: NextRequest) {
           notes: body.notes ?? "",
         });
 
+    if (body.contact_id !== undefined && body.contact_id !== null && body.contact_id !== "") {
+      await linkUserToContact(item.id, String(body.contact_id));
+    }
+
     return jsonOk(
       { item, source: useSupabase ? "supabase" : "local" },
       { status: 201 }

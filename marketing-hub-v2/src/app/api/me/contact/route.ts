@@ -2,9 +2,8 @@ import { NextRequest } from "next/server";
 import { jsonError, jsonOk, requireStaff } from "@/lib/api";
 import {
   createContact,
-  getContactByEmail,
+  ensureContactForUser,
   getContactByUserId,
-  linkUserToContact,
   updateContact,
 } from "@/lib/data/repos";
 
@@ -13,13 +12,12 @@ export async function GET() {
   const { user, error } = await requireStaff();
   if (error) return error;
 
-  let contact = await getContactByUserId(user.id);
-  if (!contact && user.email) {
-    const byEmail = await getContactByEmail(user.email);
-    if (byEmail && !byEmail.user_id) {
-      contact = (await linkUserToContact(user.id, byEmail.id)) ?? byEmail;
-    }
-  }
+  const contact = await ensureContactForUser({
+    userId: user.id,
+    email: user.email ?? "",
+    full_name: user.full_name,
+    createIfMissing: true,
+  });
 
   return jsonOk({ contact });
 }
@@ -31,13 +29,12 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const action = body.action as string | undefined;
 
-  let contact = await getContactByUserId(user.id);
-  if (!contact && user.email) {
-    const byEmail = await getContactByEmail(user.email);
-    if (byEmail && !byEmail.user_id) {
-      contact = (await linkUserToContact(user.id, byEmail.id)) ?? byEmail;
-    }
-  }
+  let contact = await ensureContactForUser({
+    userId: user.id,
+    email: user.email ?? "",
+    full_name: user.full_name,
+    createIfMissing: false,
+  });
 
   if (action === "create" || (!contact && action !== "update")) {
     if (contact) {
@@ -60,6 +57,10 @@ export async function POST(request: NextRequest) {
       user_id: user.id,
     });
     return jsonOk({ contact: item }, { status: 201 });
+  }
+
+  if (!contact) {
+    contact = await getContactByUserId(user.id);
   }
 
   if (!contact) {

@@ -18,6 +18,7 @@ async function inviteForRequest(input: {
   full_name: string;
   role: "member" | "external";
   notes?: string;
+  organisation?: string;
 }) {
   if (hasServiceRoleKey()) {
     return inviteSupabaseHubUser({
@@ -25,6 +26,7 @@ async function inviteForRequest(input: {
       full_name: input.full_name,
       role: input.role,
       notes: input.notes ?? "",
+      organisation: input.organisation,
     });
   }
   return createHubUser({
@@ -32,6 +34,7 @@ async function inviteForRequest(input: {
     full_name: input.full_name,
     role: input.role,
     notes: input.notes ?? "",
+    organisation: input.organisation,
   });
 }
 
@@ -77,6 +80,7 @@ export async function POST(request: NextRequest) {
         email: existing.email,
         full_name: existing.full_name,
         role: "external",
+        organisation: existing.organisation,
         notes: existing.organisation
           ? `Access request — ${existing.organisation}`
           : "Access request (external)",
@@ -139,6 +143,7 @@ export async function POST(request: NextRequest) {
         email,
         full_name: fullName,
         role: "member",
+        organisation,
         notes: organisation
           ? `Auto Member — ${organisation}`
           : "Auto Member (Peters & May email)",

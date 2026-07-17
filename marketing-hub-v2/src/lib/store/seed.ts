@@ -398,6 +398,7 @@ export function createSeedStore(): HubStore {
         size: "M",
         quantity: 1,
         colour: "Navy",
+        logo: "Commercial",
         requested_for: "Sophie Edgerley",
         office: "Southampton",
         needed_by: new Date(Date.now() + 1000 * 60 * 60 * 24 * 21)
@@ -417,6 +418,7 @@ export function createSeedStore(): HubStore {
         size: "L",
         quantity: 1,
         colour: "Navy",
+        logo: "Yacht Transport",
         requested_for: "Ops — Southampton",
         office: "Southampton",
         needed_by: null,
@@ -434,6 +436,7 @@ export function createSeedStore(): HubStore {
         size: "XL",
         quantity: 2,
         colour: "Navy",
+        logo: "Forwarding",
         requested_for: "Loadmasters",
         office: "Southampton",
         needed_by: new Date(Date.now() + 1000 * 60 * 60 * 24 * 45)

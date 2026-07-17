@@ -8,12 +8,16 @@ import { cn } from "@/lib/utils";
 import {
   CLOTHING_BRAND,
   CLOTHING_FITS,
+  CLOTHING_LOGOS,
   CLOTHING_PRODUCTS,
   CLOTHING_SIZES,
+  DEFAULT_CLOTHING_LOGO,
   clothingProductByLabel,
   coloursForItem,
   defaultColourForItem,
+  isClothingLogo,
   type ClothingFit,
+  type ClothingLogo,
 } from "@/lib/merch/north-sails";
 
 const STATUSES: { id: MerchStatus; label: string }[] = [
@@ -38,6 +42,7 @@ function buildEmptyForm(viewerName = "") {
     size: "M",
     quantity: "1",
     colour: defaultColourForItem(DEFAULT_ITEM),
+    logo: DEFAULT_CLOTHING_LOGO as ClothingLogo,
     requested_for: viewerName,
     office: "Southampton",
     needed_by: "",
@@ -56,6 +61,7 @@ function toEditForm(order: MerchOrder): EditForm {
     size: order.size,
     quantity: String(order.quantity),
     colour: order.colour,
+    logo: isClothingLogo(order.logo) ? order.logo : DEFAULT_CLOTHING_LOGO,
     requested_for: order.requested_for,
     office: order.office,
     needed_by: order.needed_by ?? "",
@@ -190,6 +196,22 @@ function OrderFields({
         </select>
       </div>
       <div>
+        <label className="label">Logo</label>
+        <select
+          className="field"
+          value={form.logo}
+          onChange={(e) =>
+            onChange({ ...form, logo: e.target.value as ClothingLogo })
+          }
+        >
+          {CLOTHING_LOGOS.map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
         <label className="label">Quantity</label>
         <input
           className="field"
@@ -293,6 +315,7 @@ export function MerchClient({
           o.fit,
           o.size,
           o.colour,
+          o.logo,
           o.requested_for,
           o.office,
           o.notes,
@@ -496,6 +519,7 @@ export function MerchClient({
                 </h2>
                 <p className="mt-1 text-sm text-muted">
                   {order.colour || "—"}
+                  {order.logo ? ` · ${order.logo} logo` : ""}
                   {order.requested_for ? ` · for ${order.requested_for}` : ""}
                   {order.office ? ` · ${order.office}` : ""}
                   {order.needed_by ? ` · needed ${order.needed_by}` : ""}

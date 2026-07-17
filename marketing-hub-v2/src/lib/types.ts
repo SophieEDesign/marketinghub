@@ -202,6 +202,8 @@ export type MerchOrder = {
   size: string;
   quantity: number;
   colour: string;
+  /** Embroidered / printed logo variant */
+  logo: string;
   requested_for: string;
   office: string;
   needed_by: string | null;

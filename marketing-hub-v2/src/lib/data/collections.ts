@@ -197,6 +197,13 @@ const MERCH_COLOURS: FieldOption[] = [
   { value: "Yellow", label: "Yellow" },
 ];
 
+const MERCH_LOGOS: FieldOption[] = [
+  { value: "Commercial", label: "Commercial" },
+  { value: "Yacht Transport", label: "Yacht Transport" },
+  { value: "Forwarding", label: "Forwarding" },
+  { value: "Other", label: "Other" },
+];
+
 const MERCH_BRANDS: FieldOption[] = [
   { value: "North Sails", label: "North Sails" },
   { value: "Henbury", label: "Henbury" },
@@ -446,6 +453,7 @@ export const DATA_COLLECTIONS: CollectionDef[] = [
       f("size", { type: "select", options: MERCH_SIZES }),
       f("quantity", { type: "number" }),
       f("colour", { type: "select", options: MERCH_COLOURS }),
+      f("logo", { type: "select", options: MERCH_LOGOS, label: "Logo" }),
       f("requested_for", { label: "Requested for" }),
       f("office"),
       f("needed_by", { type: "date", label: "Needed by" }),

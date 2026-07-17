@@ -12,6 +12,10 @@ import {
   isMerchAdmin,
   ownsMerchOrder,
 } from "@/lib/merch/access";
+import {
+  DEFAULT_CLOTHING_LOGO,
+  isClothingLogo,
+} from "@/lib/merch/north-sails";
 
 export async function GET() {
   const { user, error } = await requireStaff();
@@ -73,6 +77,7 @@ export async function POST(request: NextRequest) {
     size: body.size ?? "",
     quantity: Number(body.quantity) > 0 ? Number(body.quantity) : 1,
     colour: body.colour ?? "",
+    logo: isClothingLogo(body.logo) ? body.logo : DEFAULT_CLOTHING_LOGO,
     requested_for:
       body.requested_for?.trim() ||
       user.full_name ||

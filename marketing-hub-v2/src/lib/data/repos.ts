@@ -310,6 +310,50 @@ export async function linkUserToContact(
   return linked;
 }
 
+/**
+ * Match a hub user to a contact by email, or create a contact when missing.
+ * Does not steal a contact already linked to a different user.
+ */
+export async function ensureContactForUser(input: {
+  userId: string;
+  email: string;
+  full_name?: string;
+  organisation?: string;
+  role?: string;
+  notes?: string;
+  /** When false, only match/link — do not create. Default true. */
+  createIfMissing?: boolean;
+}): Promise<Contact | null> {
+  const email = input.email.trim().toLowerCase();
+  if (!input.userId || !email) return null;
+
+  const existing = await getContactByUserId(input.userId);
+  if (existing) return existing;
+
+  const byEmail = await getContactByEmail(email);
+  if (byEmail) {
+    if (!byEmail.user_id || byEmail.user_id === input.userId) {
+      return (await linkUserToContact(input.userId, byEmail.id)) ?? byEmail;
+    }
+    return null;
+  }
+
+  if (input.createIfMissing === false) return null;
+
+  const name =
+    (input.full_name ?? "").trim() || email.split("@")[0] || "Contact";
+  return createContact({
+    name,
+    organisation: input.organisation ?? "",
+    role: input.role ?? "",
+    email,
+    phone: "",
+    tags: [],
+    notes: input.notes ?? "",
+    user_id: input.userId,
+  });
+}
+
 export async function createContact(
   input: Omit<Contact, "id" | "created_at" | "updated_at">
 ) {
@@ -641,6 +685,7 @@ export async function createMerchOrder(
 ) {
   const item: MerchOrder = {
     ...input,
+    logo: input.logo || "Commercial",
     created_by_user_id: input.created_by_user_id ?? null,
     id: uid("mrc"),
     created_at: nowIso(),
@@ -942,14 +987,16 @@ export async function getHubAccessRoleByEmail(
 }
 
 export async function createHubUser(
-  input: Omit<HubUser, "id" | "created_at" | "updated_at">
+  input: Omit<HubUser, "id" | "created_at" | "updated_at"> & {
+    organisation?: string;
+  }
 ) {
   const item: HubUser = {
-    ...input,
-    role: normalizeHubAccessRole(input.role),
     email: input.email.trim().toLowerCase(),
     full_name: input.full_name.trim() || input.email.trim(),
+    role: normalizeHubAccessRole(input.role),
     notes: input.notes ?? "",
+    last_sign_in_at: input.last_sign_in_at ?? null,
     id: uid("usr"),
     created_at: nowIso(),
     updated_at: nowIso(),
@@ -958,11 +1005,19 @@ export async function createHubUser(
     if (!s.hub_users) s.hub_users = [];
     s.hub_users.push(item);
   });
+  await ensureContactForUser({
+    userId: item.id,
+    email: item.email,
+    full_name: item.full_name,
+    organisation: input.organisation,
+    notes: item.notes,
+  });
   return item;
 }
 
 export async function updateHubUser(id: string, patch: Partial<HubUser>) {
   let updated: HubUser | null = null;
+  let emailChanged = false;
   await updateStore((s) => {
     if (!s.hub_users) s.hub_users = [];
     const idx = s.hub_users.findIndex((u) => u.id === id);
@@ -974,11 +1029,23 @@ export async function updateHubUser(id: string, patch: Partial<HubUser>) {
       updated_at: nowIso(),
     };
     if (patch.role !== undefined) next.role = normalizeHubAccessRole(patch.role);
-    if (patch.email !== undefined) next.email = patch.email.trim().toLowerCase();
+    if (patch.email !== undefined) {
+      next.email = patch.email.trim().toLowerCase();
+      emailChanged = next.email !== s.hub_users[idx].email;
+    }
     if (patch.full_name !== undefined) next.full_name = patch.full_name.trim();
     s.hub_users[idx] = next;
     updated = s.hub_users[idx];
   });
+  if (updated && emailChanged) {
+    await ensureContactForUser({
+      userId: updated.id,
+      email: updated.email,
+      full_name: updated.full_name,
+      notes: updated.notes,
+      createIfMissing: false,
+    });
+  }
   return updated;
 }
 
