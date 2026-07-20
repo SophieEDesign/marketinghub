@@ -1031,6 +1031,8 @@ export async function createTask(
   };
   await updateStore((s) => {
     if (!s.tasks) s.tasks = [];
+    // Idempotent across CAS retries — never insert the same id twice.
+    if (s.tasks.some((t) => t.id === item.id)) return;
     s.tasks.push(item);
   });
   return item;

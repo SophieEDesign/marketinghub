@@ -226,13 +226,25 @@ async function writeLocalFile(store: HubStore): Promise<void> {
   }
 }
 
-async function readRemoteStore(): Promise<Partial<HubStore> | null> {
+type RemoteStoreRow = {
+  payload: Partial<HubStore>;
+  updatedAt: string;
+};
+
+class StoreConflictError extends Error {
+  constructor() {
+    super("Hub store write conflict");
+    this.name = "StoreConflictError";
+  }
+}
+
+async function readRemoteStore(): Promise<RemoteStoreRow | null> {
   try {
     const { createServiceClient } = await import("@/lib/supabase/admin");
     const supabase = createServiceClient();
     const { data, error } = await supabase
       .from("hub_store")
-      .select("payload")
+      .select("payload, updated_at")
       .eq("id", HUB_STORE_ID)
       .maybeSingle();
     if (error) {
@@ -240,17 +252,43 @@ async function readRemoteStore(): Promise<Partial<HubStore> | null> {
       return null;
     }
     if (!data?.payload || typeof data.payload !== "object") return null;
-    return data.payload as Partial<HubStore>;
+    if (!data.updated_at) return null;
+    return {
+      payload: data.payload as Partial<HubStore>,
+      updatedAt: String(data.updated_at),
+    };
   } catch (err) {
     console.error("[store] remote read error", err);
     return null;
   }
 }
 
-async function writeRemoteStore(store: HubStore): Promise<boolean> {
+/**
+ * Persist to hub_store. When `expectedUpdatedAt` is set, uses compare-and-swap
+ * so concurrent serverless writes cannot silently clobber each other.
+ */
+async function writeRemoteStore(
+  store: HubStore,
+  expectedUpdatedAt: string | null
+): Promise<"ok" | "conflict" | "error"> {
   try {
     const { createServiceClient } = await import("@/lib/supabase/admin");
     const supabase = createServiceClient();
+
+    if (expectedUpdatedAt) {
+      const { data, error } = await supabase.rpc("hub_store_cas_update", {
+        p_id: HUB_STORE_ID,
+        p_payload: store,
+        p_expected_updated_at: expectedUpdatedAt,
+      });
+      if (error) {
+        console.error("[store] remote CAS write failed", error.message);
+        return "error";
+      }
+      if (data == null) return "conflict";
+      return "ok";
+    }
+
     const { error } = await supabase.from("hub_store").upsert(
       {
         id: HUB_STORE_ID,
@@ -261,72 +299,137 @@ async function writeRemoteStore(store: HubStore): Promise<boolean> {
     );
     if (error) {
       console.error("[store] remote write failed", error.message);
-      return false;
+      return "error";
     }
-    return true;
+    return "ok";
   } catch (err) {
     console.error("[store] remote write error", err);
-    return false;
+    return "error";
   }
 }
 
-async function ensureStore(): Promise<HubStore> {
+type StoreRead = {
+  store: HubStore;
+  /** Remote row version for CAS; null when using local-only disk store. */
+  remoteUpdatedAt: string | null;
+};
+
+async function ensureStore(): Promise<StoreRead> {
   if (shouldUseDurableSupabaseStore()) {
     const remote = await readRemoteStore();
     const local = await readLocalFile();
-    const preferred = pickPreferredStore(remote, local);
+    const preferred = pickPreferredStore(remote?.payload ?? null, local);
 
     if (!preferred) {
       // First-run only: never seed-overwrite an existing remote row.
       const seed = createSeedStore();
-      await writeRemoteStore(seed);
+      const written = await writeRemoteStore(seed, null);
+      if (written === "error") {
+        throw new Error("Failed to initialize hub store in Supabase");
+      }
       await writeLocalFile(seed);
-      return seed;
+      // Re-read so CAS version matches the row we just wrote.
+      const again = await readRemoteStore();
+      return {
+        store: seed,
+        remoteUpdatedAt: again?.updatedAt ?? null,
+      };
     }
 
     const merged = withDefaults(preferred);
     const upgradingFromSeed =
-      looksLikeSeedStore(remote) && !looksLikeSeedStore(preferred);
-    const remoteMissing = !remote;
+      looksLikeSeedStore(remote?.payload ?? null) &&
+      !looksLikeSeedStore(preferred);
+
+    // Remote read failed but we have a local cache — serve it read-only.
+    // Never upsert local over an unknown remote (that resurrects stale /tmp).
+    if (!remote) {
+      console.error(
+        "[store] remote read unavailable; serving local cache without durable write"
+      );
+      return { store: merged, remoteUpdatedAt: null };
+    }
 
     // Do NOT write remote on every read — that races with restores and can
     // push stale /tmp seed back over a good hub_store snapshot.
-    if (remoteMissing || upgradingFromSeed || needsKeyMigration(preferred)) {
-      await writeRemoteStore(merged);
+    // Migration writes use CAS; on conflict another writer already persisted.
+    if (upgradingFromSeed || needsKeyMigration(preferred)) {
+      const result = await writeRemoteStore(merged, remote.updatedAt);
+      if (result === "ok") {
+        await writeLocalFile(merged);
+        const again = await readRemoteStore();
+        return {
+          store: merged,
+          remoteUpdatedAt: again?.updatedAt ?? remote.updatedAt,
+        };
+      }
+      if (result === "conflict") {
+        // Latest remote won — return it rather than clobbering.
+        const latest = await readRemoteStore();
+        if (latest) {
+          const latestMerged = withDefaults(latest.payload);
+          await writeLocalFile(latestMerged);
+          return {
+            store: latestMerged,
+            remoteUpdatedAt: latest.updatedAt,
+          };
+        }
+      }
+      if (result === "error") {
+        console.error("[store] migration write failed; serving merged cache");
+      }
     }
     await writeLocalFile(merged);
-    return merged;
+    return {
+      store: merged,
+      remoteUpdatedAt: remote.updatedAt,
+    };
   }
 
   const parsed = await readLocalFile();
   if (!parsed) {
     const seed = createSeedStore();
     await writeLocalFile(seed);
-    return seed;
+    return { store: seed, remoteUpdatedAt: null };
   }
   const merged = withDefaults(parsed);
   if (needsKeyMigration(parsed)) {
     await writeLocalFile(merged);
   }
-  return merged;
+  return { store: merged, remoteUpdatedAt: null };
 }
 
 export async function readStore(): Promise<HubStore> {
-  return ensureStore();
+  return (await ensureStore()).store;
 }
 
-export async function writeStore(store: HubStore): Promise<void> {
+export async function writeStore(
+  store: HubStore,
+  expectedRemoteUpdatedAt: string | null = null
+): Promise<void> {
   if (shouldUseDurableSupabaseStore()) {
-    const ok = await writeRemoteStore(store);
-    await writeLocalFile(store);
-    if (!ok) {
+    let version = expectedRemoteUpdatedAt;
+    if (!version) {
+      const remote = await readRemoteStore();
+      if (remote) {
+        // Row exists — never blind-upsert; force CAS retry with a version.
+        throw new StoreConflictError();
+      }
+      // Truly missing row — allow insert.
+    }
+    const result = await writeRemoteStore(store, version);
+    if (result === "conflict") throw new StoreConflictError();
+    if (result === "error") {
       console.error("[store] durable write failed; local cache updated only");
       throw new Error("Failed to persist hub store to Supabase");
     }
+    await writeLocalFile(store);
     return;
   }
   await writeLocalFile(store);
 }
+
+const MAX_STORE_WRITE_ATTEMPTS = 8;
 
 /** Serialize store mutations on this process so concurrent writes can't clobber each other. */
 let updateStoreChain: Promise<unknown> = Promise.resolve();
@@ -335,10 +438,25 @@ export async function updateStore(
   mutator: (store: HubStore) => HubStore | void
 ): Promise<HubStore> {
   const run = async () => {
-    const store = await readStore();
-    const next = mutator(store) ?? store;
-    await writeStore(next);
-    return next;
+    let lastError: unknown;
+    for (let attempt = 0; attempt < MAX_STORE_WRITE_ATTEMPTS; attempt++) {
+      const { store, remoteUpdatedAt } = await ensureStore();
+      const next = mutator(store) ?? store;
+      try {
+        await writeStore(next, remoteUpdatedAt);
+        return next;
+      } catch (err) {
+        lastError = err;
+        if (err instanceof StoreConflictError) {
+          // Another instance wrote first — re-read and re-apply mutator.
+          continue;
+        }
+        throw err;
+      }
+    }
+    throw lastError instanceof Error
+      ? lastError
+      : new Error("Failed to persist hub store after conflicts");
   };
   // Always continue the queue after failures so one bad write doesn't deadlock updates.
   const result = updateStoreChain.then(run, run);

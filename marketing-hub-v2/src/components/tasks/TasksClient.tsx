@@ -91,9 +91,12 @@ export function TasksClient({
   const [view, setView] = useState<ViewId>("kanban");
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<TaskStatus | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/tasks");
+    if (!res.ok) return;
     const data = await res.json();
     setItems(data.tasks ?? []);
   }, []);
@@ -134,24 +137,48 @@ export function TasksClient({
   }, [items, search, statusFilter, ownerFilter]);
 
   async function create() {
-    await fetch("/api/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...form,
-        due_date: form.due_date || null,
-      }),
-    });
-    setShowForm(false);
-    setForm(emptyForm);
-    await refresh();
+    if (creating) return;
+    setCreating(true);
+    setFormError(null);
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...form,
+          title: form.title.trim() || "Untitled task",
+          due_date: form.due_date || null,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setFormError(
+          typeof data.error === "string" ? data.error : "Could not save task"
+        );
+        return;
+      }
+      if (data.item) {
+        setItems((prev) => {
+          if (prev.some((t) => t.id === data.item.id)) return prev;
+          return [...prev, data.item as HubTask];
+        });
+      }
+      setShowForm(false);
+      setForm(emptyForm);
+      await refresh();
+    } catch {
+      setFormError("Could not save task");
+    } finally {
+      setCreating(false);
+    }
   }
 
   async function saveEdit() {
     if (!editingId || !edit) return;
     setSaving(true);
+    setFormError(null);
     try {
-      await fetch("/api/tasks", {
+      const res = await fetch("/api/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -167,6 +194,13 @@ export function TasksClient({
           },
         }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setFormError(
+          typeof data.error === "string" ? data.error : "Could not save changes"
+        );
+        return;
+      }
       setEditingId(null);
       setEdit(null);
       await refresh();
@@ -262,7 +296,10 @@ export function TasksClient({
           <button
             type="button"
             className="btn-primary"
-            onClick={() => setShowForm(true)}
+            onClick={() => {
+              setFormError(null);
+              setShowForm(true);
+            }}
           >
             Add task
           </button>
@@ -394,17 +431,31 @@ export function TasksClient({
               minHeight="70px"
             />
           </div>
-          <div className="flex gap-2">
-            <button type="button" className="btn-primary" onClick={() => void create()}>
-              Save
+          <div className="md:col-span-2 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={creating}
+              onClick={() => void create()}
+            >
+              {creating ? "Saving…" : "Save"}
             </button>
             <button
               type="button"
               className="btn-secondary"
-              onClick={() => setShowForm(false)}
+              disabled={creating}
+              onClick={() => {
+                setShowForm(false);
+                setFormError(null);
+              }}
             >
               Cancel
             </button>
+            {formError && !editingId ? (
+              <p className="text-sm text-rose-700" role="alert">
+                {formError}
+              </p>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -705,7 +756,7 @@ export function TasksClient({
                 />
               </div>
             </div>
-            <div className="flex gap-2 border-t border-border p-4">
+            <div className="flex flex-wrap items-center gap-2 border-t border-border p-4">
               <button
                 type="button"
                 className="btn-primary"
@@ -720,10 +771,16 @@ export function TasksClient({
                 onClick={() => {
                   setEditingId(null);
                   setEdit(null);
+                  setFormError(null);
                 }}
               >
                 Cancel
               </button>
+              {formError && editingId ? (
+                <p className="text-sm text-rose-700" role="alert">
+                  {formError}
+                </p>
+              ) : null}
             </div>
           </aside>
         </>
