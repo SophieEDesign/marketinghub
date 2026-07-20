@@ -1,20 +1,60 @@
 "use client";
 
-import { Download, ExternalLink, Trash2, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import {
+  Download,
+  ExternalLink,
+  Globe,
+  Lock,
+  Shield,
+  Trash2,
+  Upload,
+  X,
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
   GALLERY_CATEGORY,
-  GALLERY_VISIBILITY_OPTIONS,
   MEDIA_HUB_CATEGORIES,
   visibilityLabel,
   type GalleryFolderVisibility,
   type MediaListItem,
 } from "@/lib/supabase/media-list";
+import {
+  DIVISION_OPTIONS,
+  divisionColor,
+  normalizeDivision,
+} from "@/lib/events/division-colors";
+import { uploadAssetDirect } from "@/lib/upload/client-upload";
 import { cn } from "@/lib/utils";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
 
 const NEW_SUBFOLDER_VALUE = "__new_subfolder__";
+const MEDIA_ACCEPT =
+  "image/jpeg,image/png,image/webp,image/gif,application/pdf,video/mp4,video/quicktime,.jpg,.jpeg,.png,.webp,.gif,.pdf,.mp4,.mov";
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+
+const VISIBILITY_CONTROL_OPTIONS = [
+  { id: "public", label: "Public", icon: Globe },
+  { id: "internal", label: "Internal", icon: Lock },
+  { id: "admin", label: "Admin only", icon: Shield },
+] as const;
+
+function isAcceptedMediaFile(file: File) {
+  if (
+    file.type.startsWith("image/") ||
+    file.type === "application/pdf" ||
+    file.type === "video/mp4" ||
+    file.type === "video/quicktime"
+  ) {
+    return true;
+  }
+  return /\.(png|jpe?g|gif|webp|svg|pdf|mp4|mov)$/i.test(file.name);
+}
+
+function filesFromList(list: FileList | File[] | null | undefined): File[] {
+  if (!list) return [];
+  return Array.from(list).filter(isAcceptedMediaFile);
+}
 
 function isImageFile(file: { url: string; name: string; type: string }) {
   if (file.type.startsWith("image/")) return true;
@@ -120,9 +160,15 @@ export function MediaDetailPanel({
   const [visibility, setVisibility] = useState<GalleryFolderVisibility>(
     item.visibility || "internal"
   );
+  const [division, setDivision] = useState(
+    normalizeDivision(item.division) || "All"
+  );
   const [fileName, setFileName] = useState(focusedFile?.name ?? "");
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setItemName(item.name);
@@ -136,6 +182,7 @@ export function MediaDetailPanel({
     setSubfolderMode("existing");
     setNewSubfolder("");
     setVisibility(item.visibility || "internal");
+    setDivision(normalizeDivision(item.division) || "All");
     setError(null);
     // Only reset when switching assets — not on every item object refresh.
   }, [item.id]);
@@ -147,6 +194,7 @@ export function MediaDetailPanel({
     setNotes(item.notes);
     setDocumentLink(item.document_link);
     setVisibility(item.visibility || "internal");
+    setDivision(normalizeDivision(item.division) || "All");
     if (categoryMode !== "new") {
       setCategory(item.category || GALLERY_CATEGORY);
     }
@@ -160,6 +208,7 @@ export function MediaDetailPanel({
     item.notes,
     item.document_link,
     item.visibility,
+    item.division,
     item.category,
     item.subfolder,
   ]);
@@ -221,6 +270,7 @@ export function MediaDetailPanel({
           subfolder: resolvedSubfolder,
           document_link: documentLink,
           visibility,
+          division,
         }),
       });
       const json = (await res.json()) as { error?: string };
@@ -289,6 +339,93 @@ export function MediaDetailPanel({
     } finally {
       setSaving(false);
     }
+  }
+
+  async function uploadFiles(incoming: File[]) {
+    if (!canEdit || uploading || saving || incoming.length === 0) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const oversized = incoming.filter((f) => f.size > MAX_UPLOAD_BYTES);
+      if (oversized.length > 0) {
+        throw new Error(
+          `These files are over ${Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))}MB: ${oversized
+            .map((f) => f.name)
+            .slice(0, 3)
+            .join(", ")}`
+        );
+      }
+
+      const uploaded: {
+        url: string;
+        name: string;
+        type?: string;
+        size?: number | null;
+      }[] = [];
+
+      for (let i = 0; i < incoming.length; i++) {
+        const file = incoming[i];
+        try {
+          const uploadedFile = await uploadAssetDirect(file);
+          uploaded.push({
+            url: uploadedFile.url,
+            name: uploadedFile.name || file.name,
+            type: file.type,
+            size: file.size,
+          });
+        } catch (e) {
+          throw new Error(
+            e instanceof Error
+              ? `${e.message} (${i + 1}/${incoming.length})`
+              : `Upload failed for ${file.name}`
+          );
+        }
+      }
+
+      const res = await fetch("/api/media", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "add_files",
+          id: item.id,
+          files: uploaded,
+        }),
+      });
+      const json = (await res.json()) as {
+        error?: string;
+        item?: MediaListItem;
+      };
+      if (!res.ok) throw new Error(json.error || "Could not add files");
+      const firstNew = uploaded[0]?.url ?? null;
+      await onSaved();
+      if (firstNew) onFocusFile?.(firstNew);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not upload files");
+    } finally {
+      setUploading(false);
+      setDragActive(false);
+    }
+  }
+
+  function onDragOver(e: DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!canEdit || uploading) return;
+    setDragActive(true);
+  }
+
+  function onDragLeave(e: DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+  }
+
+  function onDropFiles(e: DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (!canEdit || uploading) return;
+    void uploadFiles(filesFromList(e.dataTransfer.files));
   }
 
   const previewUrl = useMemo(() => {
@@ -404,7 +541,7 @@ export function MediaDetailPanel({
             </dl>
           ) : null}
 
-          {item.files.length > 1 ? (
+          {item.files.length > 0 ? (
             <div className="mt-3">
               <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted">
                 Files in this asset
@@ -427,6 +564,64 @@ export function MediaDetailPanel({
                   </li>
                 ))}
               </ul>
+            </div>
+          ) : null}
+
+          {canEdit ? (
+            <div className="mt-3">
+              <label className="label">
+                {item.files.length > 0 ? "Add files" : "Upload files"}
+              </label>
+              <div
+                role="button"
+                tabIndex={0}
+                className={cn(
+                  "cursor-pointer rounded-2xl border-2 border-dashed px-3 py-5 text-center transition",
+                  dragActive
+                    ? "border-brand bg-brand/5"
+                    : "border-border bg-sand/30 hover:border-brand/40 hover:bg-sand/50",
+                  (uploading || saving) && "pointer-events-none opacity-70"
+                )}
+                onClick={() => fileInputRef.current?.click()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    fileInputRef.current?.click();
+                  }
+                }}
+                onDragEnter={onDragOver}
+                onDragOver={onDragOver}
+                onDragLeave={onDragLeave}
+                onDrop={onDropFiles}
+              >
+                <Upload
+                  className={cn(
+                    "mx-auto h-6 w-6",
+                    dragActive ? "text-brand" : "text-muted"
+                  )}
+                />
+                <p className="mt-1.5 text-sm font-medium text-brand">
+                  {uploading
+                    ? "Uploading…"
+                    : "Drop files here or click to upload"}
+                </p>
+                <p className="mt-1 text-xs text-muted">
+                  Images, PDF, or short video · max{" "}
+                  {Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))}MB each
+                </p>
+                <input
+                  ref={fileInputRef}
+                  className="hidden"
+                  type="file"
+                  multiple
+                  accept={MEDIA_ACCEPT}
+                  disabled={uploading || saving}
+                  onChange={(e) => {
+                    void uploadFiles(filesFromList(e.target.files));
+                    e.target.value = "";
+                  }}
+                />
+              </div>
             </div>
           ) : null}
 
@@ -598,25 +793,29 @@ export function MediaDetailPanel({
               {canEdit ? (
                 <>
                   <div
-                    className="inline-flex rounded-xl border border-border bg-sand/60 p-1"
+                    className="inline-flex w-full rounded-xl border border-border bg-sand/60 p-1"
                     role="group"
                     aria-label="Item visibility"
                   >
-                    {GALLERY_VISIBILITY_OPTIONS.map((option) => (
-                      <button
-                        key={option.id}
-                        type="button"
-                        className={cn(
-                          "rounded-lg px-3 py-1.5 text-xs font-medium transition",
-                          visibility === option.id
-                            ? "bg-white text-brand shadow-sm"
-                            : "text-muted hover:text-foreground"
-                        )}
-                        onClick={() => setVisibility(option.id)}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
+                    {VISIBILITY_CONTROL_OPTIONS.map((option) => {
+                      const Icon = option.icon;
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          className={cn(
+                            "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition",
+                            visibility === option.id
+                              ? "bg-white text-brand shadow-sm"
+                              : "text-muted hover:text-foreground"
+                          )}
+                          onClick={() => setVisibility(option.id)}
+                        >
+                          <Icon className="h-3.5 w-3.5" />
+                          {option.label}
+                        </button>
+                      );
+                    })}
                   </div>
                   {isGallery && item.subfolder_visibility === "public" ? (
                     <p className="mt-1 text-xs text-muted">
@@ -637,7 +836,8 @@ export function MediaDetailPanel({
                   ) : (
                     <p className="mt-1 text-xs text-muted">
                       Public appears externally. Internal is staff-only. Admin
-                      only is hidden from members.
+                      only is hidden from members — use for marketing-only
+                      assets.
                     </p>
                   )}
                 </>
@@ -649,6 +849,40 @@ export function MediaDetailPanel({
                   visibility !== "public"
                     ? " (overrides public folder)"
                     : ""}
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="label">Division</label>
+              {canEdit ? (
+                <>
+                  <select
+                    className="field"
+                    value={division}
+                    onChange={(e) => setDivision(e.target.value)}
+                  >
+                    {DIVISION_OPTIONS.map((d) => (
+                      <option key={d} value={d}>
+                        {d === "All" ? "All (shared)" : d}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-muted">
+                    Tag the department. &quot;All&quot; appears in every
+                    division filter.
+                  </p>
+                </>
+              ) : (
+                <p className="field bg-sand/40 text-sm">
+                  <span
+                    className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium"
+                    style={{
+                      backgroundColor: divisionColor(division).bg,
+                      color: divisionColor(division).text,
+                    }}
+                  >
+                    {normalizeDivision(division) || "All"}
+                  </span>
                 </p>
               )}
             </div>
@@ -687,8 +921,8 @@ export function MediaDetailPanel({
             {canEdit ? (
               <button
                 type="button"
-                className={cn("btn-primary", saving && "opacity-70")}
-                disabled={saving}
+                className={cn("btn-primary", (saving || uploading) && "opacity-70")}
+                disabled={saving || uploading}
                 onClick={() => void save()}
               >
                 {saving ? "Saving…" : "Save"}

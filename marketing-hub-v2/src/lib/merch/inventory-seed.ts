@@ -4,7 +4,10 @@ import type { MerchInventoryItem } from "@/lib/types";
 export function createMerchInventorySeed(
   now: string
 ): MerchInventoryItem[] {
-  const rows: Omit<MerchInventoryItem, "id" | "created_at" | "updated_at">[] = [
+  const rows: Omit<
+    MerchInventoryItem,
+    "id" | "created_at" | "updated_at" | "image_url"
+  >[] = [
     {
       item: "Gilet — Marstrand (navy)",
       brand: "North Sails",
@@ -216,6 +219,7 @@ export function createMerchInventorySeed(
 
   return rows.map((row, i) => ({
     ...row,
+    image_url: "",
     id: `inv_seed_${i + 1}`,
     created_at: now,
     updated_at: now,

@@ -5,6 +5,7 @@ import {
   listCoreTables,
   pickField,
 } from "@/lib/supabase/core-data";
+import { normalizeDivision } from "@/lib/events/division-colors";
 
 export type MediaFile = {
   url: string;
@@ -26,7 +27,7 @@ export type MediaListItem = {
   subfolder: string;
   /**
    * Gallery subfolder visibility: public (external), internal (staff), or admin.
-   * Non-gallery categories ignore this; missing values treat as public.
+   * Non-gallery categories ignore this; missing values treat as internal.
    */
   subfolder_visibility: GalleryFolderVisibility;
   /**
@@ -34,6 +35,11 @@ export type MediaListItem = {
    * When folder is set to internal/admin, items are cascaded to match.
    */
   visibility: GalleryFolderVisibility;
+  /**
+   * Business division (All, Racing, Commercial, Leisure, Forwarding, CMT).
+   * "All" = company-wide / shared across departments.
+   */
+  division: string;
   status: string;
   owned_by: string;
   notes: string;
@@ -71,8 +77,8 @@ export function normalizeGalleryVisibility(
   if (value === "admin" || value === "admin only" || value === "admin_only") {
     return "admin";
   }
-  if (value === "internal") return "internal";
-  return "public";
+  if (value === "public") return "public";
+  return "internal";
 }
 
 function visibilityRank(value: GalleryFolderVisibility): number {
@@ -93,6 +99,21 @@ export function visibilityLabel(value: GalleryFolderVisibility): string {
   if (value === "admin") return "Admin only";
   if (value === "internal") return "Internal";
   return "Public";
+}
+
+export function normalizeMediaDivision(raw: string | null | undefined): string {
+  return normalizeDivision(raw) || "All";
+}
+
+/** Department filter: specific division also includes company-wide (All) assets. */
+export function matchesMediaDivisionFilter(
+  itemDivision: string | null | undefined,
+  filter: string
+): boolean {
+  if (!filter || filter === "all") return true;
+  const division = normalizeMediaDivision(itemDivision);
+  if (division === "All") return true;
+  return division === filter;
 }
 
 function parseFiles(raw: unknown): MediaFile[] {
@@ -259,7 +280,10 @@ export async function listMediaFromSupabase(options?: {
         ? normalizeGalleryVisibility(rawItemVis)
         : isGalleryCategoryName(category)
           ? subfolder_visibility
-          : "public";
+          : "internal";
+      const division = normalizeMediaDivision(
+        asString(pickField(r, [/^division$/i, /^department$/i, /^dept$/i]))
+      );
 
       const internalName = name.trim();
       const publicName = publicTitle.trim();
@@ -277,6 +301,7 @@ export async function listMediaFromSupabase(options?: {
         subfolder: subfolder.trim(),
         subfolder_visibility,
         visibility,
+        division,
         status: asString(pickField(r, [/^status$/i])) || "",
         owned_by: asString(
           pickField(r, [/^owned_?by$/i, /^owner$/i, /^assignee$/i])
@@ -331,8 +356,10 @@ export type CreateMediaInput = {
   subfolder?: string;
   /** public = external; internal = staff; admin = admins only. Gallery only. */
   subfolder_visibility?: GalleryFolderVisibility;
-  /** Per-item visibility; defaults to folder visibility for Gallery, else public. */
+  /** Per-item visibility; defaults to folder visibility for Gallery, else internal. */
   visibility?: GalleryFolderVisibility;
+  /** Business division; defaults to All (company-wide). */
+  division?: string;
   document_link?: string;
   notes?: string;
   status?: string;
@@ -398,10 +425,11 @@ export async function createMediaInSupabase(
   const subfolder = isGallery ? (input.subfolder?.trim() || "") : "";
   const subfolder_visibility: GalleryFolderVisibility = isGallery
     ? normalizeGalleryVisibility(input.subfolder_visibility ?? "internal")
-    : "public";
+    : "internal";
   const visibility: GalleryFolderVisibility = normalizeGalleryVisibility(
-    input.visibility ?? (isGallery ? subfolder_visibility : "public")
+    input.visibility ?? (isGallery ? subfolder_visibility : "internal")
   );
+  const division = normalizeMediaDivision(input.division);
   const publicTitle = input.public_title?.trim() || "";
   const documentLink = normalizeLink(input.document_link ?? "");
   const notes = input.notes?.trim() || "";
@@ -438,6 +466,7 @@ export async function createMediaInSupabase(
     subfolder: subfolder || null,
     subfolder_visibility: isGallery ? subfolder_visibility : null,
     visibility,
+    division,
     document_link: documentLink || null,
     notes: notes || null,
     status,
@@ -469,6 +498,7 @@ export async function createMediaInSupabase(
     subfolder,
     subfolder_visibility,
     visibility,
+    division,
     status,
     owned_by: asString(r.owned_by),
     notes,
@@ -570,6 +600,7 @@ export async function updateMediaItemInSupabase(input: {
   subfolder?: string;
   document_link?: string;
   visibility?: GalleryFolderVisibility;
+  division?: string;
 }): Promise<MediaListItem> {
   const id = input.id.trim();
   if (!id) throw new Error("id is required");
@@ -601,6 +632,9 @@ export async function updateMediaItemInSupabase(input: {
   }
   if (input.visibility !== undefined) {
     patch.visibility = normalizeGalleryVisibility(input.visibility);
+  }
+  if (input.division !== undefined) {
+    patch.division = normalizeMediaDivision(input.division);
   }
 
   let nextCategory: string | undefined;
@@ -753,6 +787,69 @@ export async function deleteMediaFileInSupabase(input: {
   };
 }
 
+/** Append uploaded files to an existing media asset (keeps link + existing files). */
+export async function addMediaFilesInSupabase(input: {
+  id: string;
+  actorId: string;
+  files: MediaUploadFile[];
+}): Promise<MediaListItem> {
+  const id = input.id.trim();
+  if (!id) throw new Error("id is required");
+  const incoming = (input.files ?? []).filter((f) => !!f?.url?.trim());
+  if (incoming.length === 0) throw new Error("At least one file is required");
+
+  const tables = await listCoreTables();
+  const mediaTable = findMediaTable(tables);
+  if (!mediaTable) {
+    throw new Error("Media Links Resources table not found");
+  }
+
+  const actorId = await resolveMediaActorId(input.actorId);
+  const supabase = createServiceClient();
+  const { data: existing, error: readError } = await supabase
+    .from(mediaTable.supabase_table)
+    .select("*")
+    .eq("id", id)
+    .is("deleted_at", null)
+    .single();
+
+  if (readError) throw new Error(readError.message);
+  const row = existing as Record<string, unknown>;
+  const current = parseFiles(row.media);
+  const seen = new Set(current.map((f) => f.url));
+  const appended: MediaFile[] = [];
+  for (const f of incoming) {
+    const url = f.url.trim();
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    appended.push({
+      url,
+      name: f.name || "File",
+      type: f.type || "",
+      size: typeof f.size === "number" ? f.size : null,
+    });
+  }
+  if (appended.length === 0) {
+    throw new Error("Those files are already on this asset");
+  }
+
+  const next = [...current, ...appended];
+  const { data, error } = await supabase
+    .from(mediaTable.supabase_table)
+    .update({
+      media: next,
+      updated_at: new Date().toISOString(),
+      updated_by: actorId,
+    })
+    .eq("id", id)
+    .is("deleted_at", null)
+    .select("*")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return mapMediaRow(data as Record<string, unknown>, "all");
+}
+
 function mapMediaRow(
   r: Record<string, unknown>,
   scope: MediaListScope
@@ -808,7 +905,10 @@ function mapMediaRow(
     ? normalizeGalleryVisibility(rawItemVis)
     : isGalleryCategoryName(category)
       ? subfolder_visibility
-      : "public";
+      : "internal";
+  const division = normalizeMediaDivision(
+    asString(pickField(r, [/^division$/i, /^department$/i, /^dept$/i]))
+  );
   const internalName = name.trim();
   const publicName = publicTitle.trim();
   return {
@@ -821,6 +921,7 @@ function mapMediaRow(
     subfolder: subfolder.trim(),
     subfolder_visibility,
     visibility,
+    division,
     status: asString(pickField(r, [/^status$/i])) || "",
     owned_by: asString(
       pickField(r, [/^owned_?by$/i, /^owner$/i, /^assignee$/i])

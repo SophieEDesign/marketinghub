@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { jsonError, jsonOk, requireStaff } from "@/lib/api";
 import { hasSupabaseConfig } from "@/lib/auth/config";
 import {
+  addMediaFilesInSupabase,
   createMediaInSupabase,
   deleteMediaFileInSupabase,
   normalizeGalleryVisibility,
@@ -81,6 +82,8 @@ export async function POST(request: NextRequest) {
           typeof body.visibility === "string"
             ? normalizeGalleryVisibility(body.visibility)
             : undefined,
+        division:
+          typeof body.division === "string" ? body.division : undefined,
       });
       return jsonOk({ item });
     }
@@ -112,6 +115,27 @@ export async function POST(request: NextRequest) {
         actorId: user.id,
       });
       return jsonOk(result);
+    }
+
+    if (action === "add_files") {
+      const id = typeof body.id === "string" ? body.id : "";
+      if (!id) return jsonError("id is required");
+      const files: UploadFile[] = [];
+      if (Array.isArray(body.files)) {
+        for (const entry of body.files) {
+          const parsed = parseUploadFile(entry);
+          if (parsed) files.push(parsed);
+        }
+      }
+      const single = parseUploadFile(body.file);
+      if (single) files.push(single);
+      if (files.length === 0) return jsonError("At least one file is required");
+      const item = await addMediaFilesInSupabase({
+        id,
+        files,
+        actorId: user.id,
+      });
+      return jsonOk({ item });
     }
 
     if (action === "set_subfolder_visibility") {
@@ -163,6 +187,7 @@ export async function POST(request: NextRequest) {
       subfolder: typeof body.subfolder === "string" ? body.subfolder : "",
       subfolder_visibility,
       visibility,
+      division: typeof body.division === "string" ? body.division : "All",
       document_link:
         typeof body.document_link === "string" ? body.document_link : "",
       notes: typeof body.notes === "string" ? body.notes : "",

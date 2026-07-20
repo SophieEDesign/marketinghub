@@ -240,6 +240,8 @@ export type MerchInventoryItem = {
   size: string;
   colour: string;
   quantity: number;
+  /** Optional photo of the stock item */
+  image_url: string;
   notes: string;
   created_at: string;
   updated_at: string;

@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
     size: body.size ?? "M",
     colour: body.colour || defaultColourForItem(itemLabel),
     quantity: Number(body.quantity) >= 0 ? Math.floor(Number(body.quantity)) : 0,
+    image_url: typeof body.image_url === "string" ? body.image_url : "",
     notes: body.notes ?? "",
   });
   return jsonOk({ item }, { status: 201 });

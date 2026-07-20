@@ -4,6 +4,7 @@ import type {
   ContentItem,
   EventItem,
   HubStore,
+  MerchInventoryItem,
   MerchOrder,
   StaffRequest,
 } from "@/lib/types";
@@ -113,6 +114,16 @@ function migrateStaffRequests(
   }));
 }
 
+function migrateMerchInventory(
+  items: MerchInventoryItem[] | undefined
+): MerchInventoryItem[] | undefined {
+  if (!items) return items;
+  return items.map((item) => ({
+    ...item,
+    image_url: item.image_url ?? "",
+  }));
+}
+
 function withDefaults(store: Partial<HubStore>): HubStore {
   const seed = createSeedStore();
   // Only fill missing collections with demo rows when the snapshot itself is seed.
@@ -133,7 +144,7 @@ function withDefaults(store: Partial<HubStore>): HubStore {
       migrateMerch(store.merch_orders) ??
       (fillMissingFromSeed ? seed.merch_orders : []),
     merch_inventory:
-      store.merch_inventory ??
+      migrateMerchInventory(store.merch_inventory) ??
       (fillMissingFromSeed ? seed.merch_inventory : []),
     staff_requests:
       migrateStaffRequests(store.staff_requests) ?? seed.staff_requests,

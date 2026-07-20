@@ -25,6 +25,7 @@ import {
   GALLERY_VISIBILITY_OPTIONS,
   MEDIA_HUB_CATEGORIES,
   effectiveMediaVisibility,
+  matchesMediaDivisionFilter,
   moreRestrictiveVisibility,
   normalizeGalleryVisibility,
   visibilityLabel,
@@ -32,6 +33,11 @@ import {
   type MediaFile,
   type MediaListItem,
 } from "@/lib/supabase/media-list";
+import {
+  DIVISION_OPTIONS,
+  divisionColor,
+  normalizeDivision,
+} from "@/lib/events/division-colors";
 import { uploadAssetDirect } from "@/lib/upload/client-upload";
 import { cn } from "@/lib/utils";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
@@ -515,9 +521,49 @@ const EMPTY_FORM = {
   category: GALLERY_CATEGORY,
   subfolder: "",
   subfolder_visibility: "internal" as GalleryFolderVisibility,
+  visibility: "internal" as GalleryFolderVisibility,
+  division: "All",
   document_link: "",
   notes: "",
 };
+
+const VISIBILITY_CONTROL_OPTIONS = [
+  { id: "public", label: "Public", icon: Globe },
+  { id: "internal", label: "Internal", icon: Lock },
+  { id: "admin", label: "Admin only", icon: Shield },
+] as const;
+
+const DIVISION_FILTER_OPTIONS = [
+  { id: "all", label: "All divisions" },
+  ...DIVISION_OPTIONS.filter((d) => d !== "All").map((d) => ({
+    id: d,
+    label: d,
+  })),
+] as const;
+
+function DivisionPill({
+  division,
+  compact = false,
+}: {
+  division: string;
+  compact?: boolean;
+}) {
+  const color = divisionColor(division);
+  const label = normalizeDivision(division) || "All";
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center font-medium",
+        compact
+          ? "rounded px-1.5 py-px text-[10px]"
+          : "rounded-full px-2 py-0.5 text-[11px]"
+      )}
+      style={{ backgroundColor: color.bg, color: color.text }}
+    >
+      {label}
+    </span>
+  );
+}
 
 export function MediaGallery({
   title = "Media",
@@ -562,6 +608,7 @@ export function MediaGallery({
   const [saving, setSaving] = useState(false);
   const [visibilitySaving, setVisibilitySaving] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [divisionFilter, setDivisionFilter] = useState("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -581,11 +628,20 @@ export function MediaGallery({
 
   const items = useMemo(() => {
     const all = data?.items ?? [];
-    if (showAdminOnly || scope === "public") return all;
-    return all.filter((i) => effectiveMediaVisibility(i) !== "admin");
-  }, [data?.items, showAdminOnly, scope]);
+    let next = all;
+    if (!(showAdminOnly || scope === "public")) {
+      next = next.filter((i) => effectiveMediaVisibility(i) !== "admin");
+    }
+    if (scope === "all") {
+      next = next.filter((i) =>
+        matchesMediaDivisionFilter(i.division, divisionFilter)
+      );
+    }
+    return next;
+  }, [data?.items, showAdminOnly, scope, divisionFilter]);
   const categories = useMemo(() => data?.categories ?? [], [data?.categories]);
   const isInternal = scope === "all";
+  const totalItemCount = data?.items?.length ?? 0;
 
   const collections = useMemo(() => {
     return categories.map((name) => {
@@ -796,6 +852,7 @@ export function MediaGallery({
       category: preferredFolder || EMPTY_FORM.category,
       subfolder,
       subfolder_visibility: inherited ?? "internal",
+      visibility: inherited ?? "internal",
     });
     setFolderMode("existing");
     setNewFolderName("");
@@ -950,10 +1007,9 @@ export function MediaGallery({
         subfolder_visibility: gallerySelected
           ? form.subfolder_visibility
           : undefined,
-        // New files inherit folder visibility; can override later per item.
-        visibility: gallerySelected
-          ? form.subfolder_visibility
-          : ("public" as const),
+        // New files use the form visibility (Gallery inherits folder choice).
+        visibility: form.visibility,
+        division: form.division,
         notes: form.notes,
       };
 
@@ -1163,6 +1219,77 @@ export function MediaGallery({
         </div>
       ) : null}
 
+      {isInternal ? (
+        <div className="mb-5">
+          <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
+            <label className="label !mb-0" htmlFor="media-division-filter">
+              Division
+            </label>
+            <div className="flex items-center gap-2 sm:hidden">
+              <select
+                id="media-division-filter"
+                className="field min-w-[160px]"
+                value={divisionFilter}
+                onChange={(e) => setDivisionFilter(e.target.value)}
+              >
+                {DIVISION_FILTER_OPTIONS.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {divisionFilter !== "all" ? (
+              <span className="text-xs text-muted">
+                {items.length} of {totalItemCount} assets
+                <span className="ml-1 hidden sm:inline">
+                  · shared (All) assets always included
+                </span>
+              </span>
+            ) : null}
+          </div>
+          <div
+            className="hidden flex-wrap gap-1.5 sm:flex"
+            role="group"
+            aria-label="Filter by division"
+          >
+            {DIVISION_FILTER_OPTIONS.map((opt) => {
+              const selected = divisionFilter === opt.id;
+              const color =
+                opt.id === "all" ? null : divisionColor(opt.id);
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setDivisionFilter(opt.id)}
+                  className={cn(
+                    "rounded-full px-3 py-1.5 text-xs font-semibold transition",
+                    selected
+                      ? "shadow-sm ring-2 ring-brand/30 ring-offset-1"
+                      : "opacity-80 hover:opacity-100",
+                    opt.id === "all" &&
+                      (selected
+                        ? "bg-brand text-white"
+                        : "bg-sand text-muted hover:text-foreground")
+                  )}
+                  style={
+                    opt.id === "all" || !color
+                      ? undefined
+                      : {
+                          backgroundColor: selected ? color.bg : `${color.bg}22`,
+                          color: selected ? color.text : color.border,
+                          border: `1px solid ${color.border}`,
+                        }
+                  }
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
       {allowManage && showForm ? (
         <div className="surface-card mb-6 grid gap-3 p-5 md:grid-cols-2">
           <div>
@@ -1272,6 +1399,7 @@ export function MediaGallery({
                       ...form,
                       subfolder: "",
                       subfolder_visibility: "internal",
+                      visibility: "internal",
                     });
                     return;
                   }
@@ -1280,10 +1408,12 @@ export function MediaGallery({
                   const inherited = gallerySubfolders.find(
                     (sf) => sf.name === folderKey
                   )?.visibility;
+                  const nextVis = inherited ?? "internal";
                   setForm({
                     ...form,
                     subfolder: value,
-                    subfolder_visibility: inherited ?? "internal",
+                    subfolder_visibility: nextVis,
+                    visibility: nextVis,
                   });
                 }}
               >
@@ -1330,13 +1460,7 @@ export function MediaGallery({
                 role="group"
                 aria-label="Folder visibility"
               >
-                {(
-                  [
-                    { id: "public", label: "Public", icon: Globe },
-                    { id: "internal", label: "Internal", icon: Lock },
-                    { id: "admin", label: "Admin only", icon: Shield },
-                  ] as const
-                ).map((option) => {
+                {VISIBILITY_CONTROL_OPTIONS.map((option) => {
                   const Icon = option.icon;
                   return (
                     <button
@@ -1352,6 +1476,7 @@ export function MediaGallery({
                         setForm({
                           ...form,
                           subfolder_visibility: option.id,
+                          visibility: option.id,
                         })
                       }
                     >
@@ -1366,7 +1491,65 @@ export function MediaGallery({
                 hidden from members.
               </p>
             </div>
-          ) : null}
+          ) : (
+            <div>
+              <label className="label">Visibility</label>
+              <div
+                className="inline-flex w-full rounded-xl border border-border bg-sand/60 p-1"
+                role="group"
+                aria-label="Visibility"
+              >
+                {VISIBILITY_CONTROL_OPTIONS.map((option) => {
+                  const Icon = option.icon;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      className={cn(
+                        "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition",
+                        form.visibility === option.id
+                          ? "bg-white text-brand shadow-sm"
+                          : "text-muted hover:text-foreground"
+                      )}
+                      onClick={() =>
+                        setForm({
+                          ...form,
+                          visibility: option.id,
+                        })
+                      }
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-1 text-xs text-muted">
+                Public appears externally. Internal is staff-only. Admin only is
+                hidden from members — use for marketing-only assets.
+              </p>
+            </div>
+          )}
+          <div>
+            <label className="label">Division</label>
+            <select
+              className="field"
+              value={form.division}
+              onChange={(e) =>
+                setForm({ ...form, division: e.target.value })
+              }
+            >
+              {DIVISION_OPTIONS.map((d) => (
+                <option key={d} value={d}>
+                  {d === "All" ? "All (shared)" : d}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-muted">
+              Tag the department this asset belongs to. &quot;All&quot; shows
+              for every division filter.
+            </p>
+          </div>
           {formIsGallery ? (
             <div className="md:col-span-2">
               <label className="label">Document / link URL</label>
@@ -1880,6 +2063,11 @@ export function MediaGallery({
                         </p>
                         <p className="text-xs text-muted">
                           {[
+                            allowManage
+                              ? visibilityLabel(
+                                  effectiveMediaVisibility(item)
+                                )
+                              : null,
                             item.public_title &&
                             item.public_title !== item.name
                               ? `Public: ${item.public_title}`
@@ -1905,6 +2093,11 @@ export function MediaGallery({
                             .filter(Boolean)
                             .join(" · ") || "Asset"}
                         </p>
+                        {item.division ? (
+                          <div className="mt-1">
+                            <DivisionPill division={item.division} compact />
+                          </div>
+                        ) : null}
                       </button>
                     ) : (
                       <div className="min-w-0">

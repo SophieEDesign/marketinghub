@@ -6,6 +6,8 @@ import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { cn } from "@/lib/utils";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { plainTextFromHtml } from "@/lib/sanitize";
+import { AssetUploadField } from "@/components/content/AssetUploadField";
+import { isImageUrl } from "@/lib/social/platforms";
 import {
   CLOTHING_FITS,
   CLOTHING_PRODUCTS,
@@ -25,6 +27,7 @@ const emptyForm = {
   size: "M",
   colour: defaultColourForItem(DEFAULT_ITEM),
   quantity: "1",
+  image_url: "",
   notes: "",
 };
 
@@ -38,6 +41,7 @@ function toEditForm(row: MerchInventoryItem): EditForm {
     size: row.size || "M",
     colour: row.colour || defaultColourForItem(row.item),
     quantity: String(row.quantity),
+    image_url: row.image_url || "",
     notes: row.notes,
   };
 }
@@ -150,6 +154,14 @@ function InventoryFields({
           min={0}
           value={form.quantity}
           onChange={(e) => onChange({ ...form, quantity: e.target.value })}
+        />
+      </div>
+      <div className="md:col-span-2">
+        <AssetUploadField
+          value={form.image_url}
+          onChange={(image_url) => onChange({ ...form, image_url })}
+          label="Photo"
+          hint="Optional photo of this stock item · images preferred · max 25MB."
         />
       </div>
       <div className="md:col-span-2">
@@ -402,12 +414,26 @@ export function InventoryClient({
                 )}
               >
                 <td className="px-4 py-3">
-                  <div className="font-medium text-foreground">{row.item}</div>
-                  <div className="text-xs text-muted">
-                    {row.brand || "—"}
-                    {plainTextFromHtml(row.notes)
-                      ? ` · ${plainTextFromHtml(row.notes)}`
-                      : ""}
+                  <div className="flex items-start gap-3">
+                    {row.image_url && isImageUrl(row.image_url) ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={row.image_url}
+                        alt=""
+                        className="h-10 w-10 shrink-0 rounded-lg border border-border object-cover"
+                      />
+                    ) : null}
+                    <div className="min-w-0">
+                      <div className="font-medium text-foreground">
+                        {row.item}
+                      </div>
+                      <div className="text-xs text-muted">
+                        {row.brand || "—"}
+                        {plainTextFromHtml(row.notes)
+                          ? ` · ${plainTextFromHtml(row.notes)}`
+                          : ""}
+                      </div>
+                    </div>
                   </div>
                 </td>
                 <td className="px-4 py-3 text-muted">{fitLabel(row.fit)}</td>

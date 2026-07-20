@@ -564,6 +564,7 @@ export const DATA_COLLECTIONS: CollectionDef[] = [
       f("size", { type: "select", options: INVENTORY_SIZES }),
       f("colour", { type: "select", options: MERCH_COLOURS }),
       f("quantity", { type: "number" }),
+      f("image_url", { type: "url", label: "Image" }),
       f("notes", { type: "longtext" }),
       f("created_at", { type: "readonly", locked: true }),
       f("updated_at", { type: "readonly", locked: true }),
