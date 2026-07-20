@@ -28,6 +28,9 @@ export function HomeStats({
   const { view } = useHubView();
   const isAdmin = view === "admin";
 
+  const kpiClassName =
+    "surface-card block p-5 transition hover:-translate-y-0.5 hover:border-accent";
+
   return (
     <>
       <div
@@ -35,41 +38,41 @@ export function HomeStats({
           isAdmin ? "lg:grid-cols-4" : "lg:grid-cols-2"
         }`}
       >
-        <div className="surface-card p-5">
+        <Link href="/app/events" className={kpiClassName}>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted">
             Upcoming events
           </p>
           <p className="mt-2 font-display text-3xl text-brand">
             {stats.upcomingCount}
           </p>
-        </div>
+        </Link>
         {isAdmin ? (
-          <div className="surface-card p-5">
+          <Link href="/app/content" className={kpiClassName}>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">
               Content in flight
             </p>
             <p className="mt-2 font-display text-3xl text-brand">
               {stats.inFlight}
             </p>
-          </div>
+          </Link>
         ) : null}
-        <div className="surface-card p-5">
+        <Link href="/app/partners" className={kpiClassName}>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted">
             Active partners
           </p>
           <p className="mt-2 font-display text-3xl text-brand">
             {stats.activeSponsors}
           </p>
-        </div>
+        </Link>
         {isAdmin ? (
-          <div className="surface-card p-5">
+          <Link href="/app/tasks" className={kpiClassName}>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">
               Open tasks
             </p>
             <p className="mt-2 font-display text-3xl text-brand">
               {stats.openTaskCount}
             </p>
-          </div>
+          </Link>
         ) : null}
       </div>
 
@@ -83,21 +86,23 @@ export function HomeStats({
           </div>
           <ul className="mt-3 divide-y divide-border">
             {openTasks.map((t) => (
-              <li
-                key={t.id}
-                className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"
-              >
-                <span className="font-medium">{t.title}</span>
-                <span className="text-xs text-muted">
-                  {[
-                    t.owner,
-                    t.due_date
-                      ? format(new Date(t.due_date), "d MMM yyyy")
-                      : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </span>
+              <li key={t.id}>
+                <Link
+                  href="/app/tasks"
+                  className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm transition hover:text-brand"
+                >
+                  <span className="font-medium">{t.title}</span>
+                  <span className="text-xs text-muted">
+                    {[
+                      t.owner,
+                      t.due_date
+                        ? format(new Date(t.due_date), "d MMM yyyy")
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                </Link>
               </li>
             ))}
           </ul>

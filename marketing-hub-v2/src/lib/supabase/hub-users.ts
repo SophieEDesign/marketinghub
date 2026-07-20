@@ -314,6 +314,14 @@ export async function updateSupabaseHubUser(
 
 export async function deleteSupabaseHubUser(id: string): Promise<void> {
   const supabase = createAdminClient();
+
+  // Clear NO ACTION / RESTRICT FKs (e.g. automation_runs.created_by) first.
+  const { error: clearError } = await supabase.rpc(
+    "clear_auth_user_restrict_refs",
+    { target_user_id: id }
+  );
+  if (clearError) throw new Error(clearError.message);
+
   const { error } = await supabase.auth.admin.deleteUser(id);
   if (error) throw new Error(error.message);
 }
@@ -413,6 +421,31 @@ export async function sendPasswordResetForHubUser(id: string): Promise<void> {
   if (!email) throw new Error("User not found or has no email");
 
   await sendRecoveryEmail(email);
+}
+
+/**
+ * Set a user's password directly via the Auth admin API (no email).
+ */
+export async function setPasswordForHubUser(
+  id: string,
+  password: string
+): Promise<void> {
+  if (!password || password.length < 8) {
+    throw new Error("Password must be at least 8 characters");
+  }
+
+  const supabase = createAdminClient();
+  const { data: existing, error: getError } =
+    await supabase.auth.admin.getUserById(id);
+  if (getError) throw new Error(getError.message);
+  if (!existing.user) throw new Error("User not found");
+
+  const { error } = await supabase.auth.admin.updateUserById(id, {
+    password,
+    // So invite-pending users can sign in immediately after an admin sets a password.
+    email_confirm: true,
+  });
+  if (error) throw new Error(error.message);
 }
 
 /** Resolve hub role from profiles (preferred) or app_metadata. */

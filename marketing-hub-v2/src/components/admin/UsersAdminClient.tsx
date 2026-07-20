@@ -94,6 +94,11 @@ export function UsersAdminClient({
   const [saving, setSaving] = useState(false);
   const [actingRequestId, setActingRequestId] = useState<string | null>(null);
   const [actingUserKey, setActingUserKey] = useState<string | null>(null);
+  const [passwordUser, setPasswordUser] = useState<HubUser | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [settingPassword, setSettingPassword] = useState(false);
   const [form, setForm] = useState({
     full_name: "",
     email: "",
@@ -312,6 +317,60 @@ export function UsersAdminClient({
       return;
     }
     setNotice(data.message ?? `Password reset sent to ${email}`);
+  }
+
+  function openSetPassword(user: HubUser) {
+    setPasswordUser(user);
+    setNewPassword("");
+    setConfirmPassword("");
+    setPasswordError(null);
+    setError(null);
+    setNotice(null);
+  }
+
+  function closeSetPassword() {
+    setPasswordUser(null);
+    setNewPassword("");
+    setConfirmPassword("");
+    setPasswordError(null);
+    setSettingPassword(false);
+  }
+
+  async function submitSetPassword() {
+    if (!passwordUser) return;
+    if (newPassword.length < 8) {
+      setPasswordError("Password must be at least 8 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError("Passwords do not match.");
+      return;
+    }
+
+    setSettingPassword(true);
+    setPasswordError(null);
+    setError(null);
+    setNotice(null);
+    const res = await fetch("/api/admin/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "set_password",
+        id: passwordUser.id,
+        password: newPassword,
+      }),
+    });
+    const data = await res.json();
+    setSettingPassword(false);
+    if (!res.ok) {
+      setPasswordError(data.error ?? "Could not set password");
+      return;
+    }
+    setNotice(
+      data.message ??
+        `Password updated for ${passwordUser.email || passwordUser.full_name}`
+    );
+    closeSetPassword();
   }
 
   async function decideAccessRequest(
@@ -571,6 +630,80 @@ export function UsersAdminClient({
         </div>
       ) : null}
 
+      {passwordUser ? (
+        <div className="surface-card mb-6 max-w-md space-y-3 p-5">
+          <div>
+            <p className="font-medium text-foreground">Set password</p>
+            <p className="mt-1 text-xs text-muted">
+              Set a new password for{" "}
+              <span className="text-foreground">
+                {passwordUser.email || passwordUser.full_name || "this user"}
+              </span>
+              . They can sign in with it immediately — no email is sent.
+            </p>
+          </div>
+          <div>
+            <label className="label" htmlFor="admin-new-password">
+              New password
+            </label>
+            <input
+              id="admin-new-password"
+              className="field"
+              type="password"
+              autoComplete="new-password"
+              value={newPassword}
+              onChange={(e) => {
+                setNewPassword(e.target.value);
+                if (passwordError) setPasswordError(null);
+              }}
+              placeholder="At least 8 characters"
+              minLength={8}
+            />
+          </div>
+          <div>
+            <label className="label" htmlFor="admin-confirm-password">
+              Confirm password
+            </label>
+            <input
+              id="admin-confirm-password"
+              className="field"
+              type="password"
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(e) => {
+                setConfirmPassword(e.target.value);
+                if (passwordError) setPasswordError(null);
+              }}
+              placeholder="Confirm password"
+              minLength={8}
+            />
+          </div>
+          {passwordError ? (
+            <p className="text-sm text-[var(--danger)]">{passwordError}</p>
+          ) : null}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={
+                settingPassword || !newPassword || !confirmPassword
+              }
+              onClick={() => void submitSetPassword()}
+            >
+              {settingPassword ? "Saving…" : "Set password"}
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={settingPassword}
+              onClick={closeSetPassword}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <div className="surface-card overflow-hidden">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-border bg-sand/50 text-xs uppercase tracking-wide text-muted">
@@ -686,6 +819,13 @@ export function UsersAdminClient({
                           {actingUserKey === `${u.id}:reset`
                             ? "Sending…"
                             : "Send password reset"}
+                        </button>
+                        <button
+                          type="button"
+                          className="text-xs text-brand hover:underline"
+                          onClick={() => openSetPassword(u)}
+                        >
+                          Set password
                         </button>
                       </>
                     ) : null}

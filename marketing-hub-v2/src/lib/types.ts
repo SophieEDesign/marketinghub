@@ -326,6 +326,11 @@ export type AccessRequest = {
   updated_at: string;
 };
 
+/** Singleton page reference notes (HTML), keyed by page id. */
+export type HubPageNotes = {
+  social_monthly_plan?: string;
+};
+
 export type HubStore = {
   events: EventItem[];
   /** Per-user RSVP rows for Events. */
@@ -347,4 +352,6 @@ export type HubStore = {
   hub_users: HubUser[];
   /** Login access requests — managed under Admin → Users. */
   access_requests: AccessRequest[];
+  /** Shared page reference notes (not a spreadsheet collection). */
+  page_notes: HubPageNotes;
 };

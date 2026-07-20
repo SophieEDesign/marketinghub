@@ -18,6 +18,7 @@ import {
   platformKey,
 } from "@/lib/social/platforms";
 import { HUB_CALENDAR_CSS } from "@/components/content/ContentCalendarCard";
+import { SocialMonthlyPlan } from "@/components/social/SocialMonthlyPlan";
 
 type SocialPost = {
   id: string;
@@ -424,6 +425,8 @@ export function SocialClient({ hideHeader = false }: { hideHeader?: boolean }) {
           }
         />
       )}
+
+      <SocialMonthlyPlan />
 
       <FilterBar
         search={search}

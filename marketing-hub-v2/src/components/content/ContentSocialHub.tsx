@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ExternalLink } from "lucide-react";
 import { ContentClient } from "@/components/content/ContentClient";
 import { SocialClient } from "@/components/social/SocialClient";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -15,6 +16,9 @@ const SCOPES: { id: Scope; label: string }[] = [
   { id: "social", label: "Social" },
 ];
 
+const PLANABLE_CALENDAR_URL =
+  "https://app.planable.io/calendar/25GtzkN5qqaTuMfEH";
+
 export function ContentSocialHub({
   initialContent,
 }: {
@@ -27,6 +31,17 @@ export function ContentSocialHub({
       <PageHeader
         title="Content & Social"
         description="Pipeline planning and the social calendar in one place. Use the filter to focus."
+        actions={
+          <a
+            href={PLANABLE_CALENDAR_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="btn-primary"
+          >
+            Open Planable
+            <ExternalLink className="h-4 w-4" />
+          </a>
+        }
       />
 
       <SegmentFilter

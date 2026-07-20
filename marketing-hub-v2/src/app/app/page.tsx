@@ -117,19 +117,26 @@ export default async function AppHomePage() {
 
       {upcoming.length > 0 ? (
         <div className="surface-card mb-8 p-5">
-          <h2 className="font-display text-xl text-brand">Next up</h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-display text-xl text-brand">Next up</h2>
+            <Link href="/app/events" className="btn-secondary shrink-0 text-xs">
+              All events
+            </Link>
+          </div>
           <ul className="mt-3 divide-y divide-border">
             {upcoming.map((e) => (
-              <li
-                key={e.id}
-                className="flex items-center justify-between py-3 text-sm"
-              >
-                <span className="font-medium">{e.title}</span>
-                <span className="text-muted">
-                  {e.starts_at
-                    ? format(new Date(e.starts_at), "d MMM yyyy")
-                    : "Date TBD"}
-                </span>
+              <li key={e.id}>
+                <Link
+                  href="/app/events"
+                  className="flex items-center justify-between py-3 text-sm transition hover:text-brand"
+                >
+                  <span className="font-medium">{e.title}</span>
+                  <span className="text-muted">
+                    {e.starts_at
+                      ? format(new Date(e.starts_at), "d MMM yyyy")
+                      : "Date TBD"}
+                  </span>
+                </Link>
               </li>
             ))}
           </ul>

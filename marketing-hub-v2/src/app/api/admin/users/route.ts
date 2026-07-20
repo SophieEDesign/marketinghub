@@ -15,6 +15,7 @@ import {
   listSupabaseHubUsers,
   reinviteSupabaseHubUser,
   sendPasswordResetForHubUser,
+  setPasswordForHubUser,
   updateSupabaseHubUser,
 } from "@/lib/supabase/hub-users";
 
@@ -133,6 +134,26 @@ export async function POST(request: NextRequest) {
         ok: true,
         source: "supabase",
         message: "Password reset email sent",
+      });
+    }
+
+    if (action === "set_password") {
+      if (!useSupabase) {
+        return jsonError(
+          "Set password requires SUPABASE_SERVICE_ROLE_KEY",
+          400
+        );
+      }
+      if (!body.id) return jsonError("User id is required");
+      const password = String(body.password ?? "");
+      if (password.length < 8) {
+        return jsonError("Password must be at least 8 characters");
+      }
+      await setPasswordForHubUser(String(body.id), password);
+      return jsonOk({
+        ok: true,
+        source: "supabase",
+        message: "Password updated",
       });
     }
 

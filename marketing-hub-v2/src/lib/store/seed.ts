@@ -616,5 +616,6 @@ export function createSeedStore(): HubStore {
       },
     ],
     access_requests: [],
+    page_notes: {},
   };
 }

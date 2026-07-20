@@ -3,7 +3,7 @@ import type { HubStore } from "@/lib/types";
 /** Spreadsheet collections — excludes users/access requests (Admin → Users). */
 export type CollectionKey = Exclude<
   keyof HubStore,
-  "hub_users" | "access_requests" | "event_attendance"
+  "hub_users" | "access_requests" | "event_attendance" | "page_notes"
 >;
 
 export type FieldType =
