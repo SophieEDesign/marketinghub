@@ -12,7 +12,6 @@ import { FullCalendarStyles } from "@/components/ui/FullCalendarStyles";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { useHubView } from "@/lib/hub-view";
 import {
-  DIVISION_OPTIONS,
   divisionColor,
   normalizeDivision,
 } from "@/lib/events/division-colors";
@@ -21,7 +20,14 @@ import {
   eventTypeColor,
   normalizeEventTypeLabel,
 } from "@/lib/events/event-type-colors";
-import { EVENT_TYPES, selectOptionsWithCurrent } from "@/lib/data/collections";
+import {
+  DIVISIONS,
+  EVENT_TYPES,
+  optionsForField,
+  orderedFilterValues,
+  selectOptionsWithCurrent,
+  type FieldOption,
+} from "@/lib/data/collections";
 import {
   downloadCalendarIcs,
   downloadEventIcs,
@@ -184,9 +190,13 @@ function TypeSwatch({ eventType }: { eventType: string }) {
 function EventFields({
   form,
   onChange,
+  eventTypeOptions,
+  divisionOptions,
 }: {
   form: EventForm;
   onChange: (next: EventForm) => void;
+  eventTypeOptions: FieldOption[];
+  divisionOptions: FieldOption[];
 }) {
   return (
     <div className="grid gap-3 md:grid-cols-2">
@@ -231,7 +241,7 @@ function EventFields({
           value={form.event_type}
           onChange={(e) => onChange({ ...form, event_type: e.target.value })}
         >
-          {selectOptionsWithCurrent(EVENT_TYPES, form.event_type).map((o) => (
+          {selectOptionsWithCurrent(eventTypeOptions, form.event_type).map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
             </option>
@@ -246,9 +256,9 @@ function EventFields({
           onChange={(e) => onChange({ ...form, division: e.target.value })}
         >
           <option value="">Unassigned</option>
-          {DIVISION_OPTIONS.map((d) => (
-            <option key={d} value={d}>
-              {d}
+          {selectOptionsWithCurrent(divisionOptions, form.division).map((d) => (
+            <option key={d.value} value={d.value}>
+              {d.label}
             </option>
           ))}
         </select>
@@ -279,14 +289,28 @@ export function EventsClient({
   initialEvents,
   currentUserId,
   currentUserName,
+  fieldOptions,
 }: {
   initialEvents: EventItem[];
   currentUserId: string | null;
   currentUserName: string | null;
+  /** From Field Manager — drives select option order on this page. */
+  fieldOptions?: Record<string, FieldOption[]>;
 }) {
   const { view } = useHubView();
   const canDelete = view === "admin";
   const showUndatedQueue = view === "admin";
+
+  const eventTypeOptions = optionsForField(
+    fieldOptions,
+    "event_type",
+    EVENT_TYPES
+  );
+  const divisionOptions = optionsForField(
+    fieldOptions,
+    "division",
+    DIVISIONS
+  );
 
   const [events, setEvents] = useState(initialEvents);
   const [selected, setSelected] = useState<EventItem | null>(null);
@@ -412,18 +436,16 @@ export function EventsClient({
   );
 
   const eventTypes = useMemo(() => {
-    const set = new Set(
-      events.map((e) => e.event_type.trim()).filter(Boolean)
-    );
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [events]);
+    const present = events.map((e) => e.event_type.trim()).filter(Boolean);
+    return orderedFilterValues(eventTypeOptions, present);
+  }, [events, eventTypeOptions]);
 
   const divisions = useMemo(() => {
-    const set = new Set(
-      events.map((e) => normalizeDivision(e.division)).filter(Boolean)
-    );
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [events]);
+    const present = events
+      .map((e) => normalizeDivision(e.division))
+      .filter(Boolean);
+    return orderedFilterValues(divisionOptions, present);
+  }, [events, divisionOptions]);
 
   const filtered = useMemo(() => {
     return events.filter((e) => {
@@ -843,7 +865,12 @@ export function EventsClient({
 
       {showForm ? (
         <div className="surface-card mb-6 p-5">
-          <EventFields form={form} onChange={setForm} />
+          <EventFields
+            form={form}
+            onChange={setForm}
+            eventTypeOptions={eventTypeOptions}
+            divisionOptions={divisionOptions}
+          />
           <div className="mt-4 flex gap-2">
             <button
               type="button"
@@ -1246,7 +1273,12 @@ export function EventsClient({
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-4">
-              <EventFields form={edit} onChange={setEdit} />
+              <EventFields
+                form={edit}
+                onChange={setEdit}
+                eventTypeOptions={eventTypeOptions}
+                divisionOptions={divisionOptions}
+              />
             </div>
             <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
               <button

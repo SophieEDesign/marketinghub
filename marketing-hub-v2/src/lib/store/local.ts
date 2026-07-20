@@ -153,6 +153,7 @@ function withDefaults(store: Partial<HubStore>): HubStore {
     hub_users: store.hub_users ?? seed.hub_users,
     access_requests: store.access_requests ?? seed.access_requests,
     page_notes: store.page_notes ?? seed.page_notes ?? {},
+    field_extras: store.field_extras ?? seed.field_extras ?? {},
   };
   return syncThemeIdsOntoContent(base);
 }
@@ -202,7 +203,8 @@ function needsKeyMigration(store: Partial<HubStore>): boolean {
     !store.tasks ||
     !store.hub_users ||
     !store.access_requests ||
-    !store.page_notes
+    !store.page_notes ||
+    store.field_extras === undefined
   );
 }
 

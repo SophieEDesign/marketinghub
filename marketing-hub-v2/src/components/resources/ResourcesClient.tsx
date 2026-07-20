@@ -4,7 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import { Download, ExternalLink } from "lucide-react";
 import type { ResourceLink } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { RESOURCE_CATEGORIES } from "@/lib/data/collections";
+import {
+  optionsForField,
+  RESOURCE_CATEGORIES,
+  type FieldOption,
+} from "@/lib/data/collections";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
 import { plainTextFromHtml } from "@/lib/sanitize";
@@ -13,12 +17,19 @@ export function ResourcesClient({
   initial,
   hideHeader = false,
   allowManage = true,
+  fieldOptions,
 }: {
   initial: ResourceLink[];
   hideHeader?: boolean;
   /** When false (Member view), hide add/delete — open & download only. */
   allowManage?: boolean;
+  fieldOptions?: Record<string, FieldOption[]>;
 }) {
+  const categoryOptions = optionsForField(
+    fieldOptions,
+    "category",
+    RESOURCE_CATEGORIES
+  );
   const [items, setItems] = useState(initial);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
@@ -123,7 +134,7 @@ export function ResourcesClient({
               value={form.category}
               onChange={(e) => setForm({ ...form, category: e.target.value })}
             >
-              {RESOURCE_CATEGORIES.map((o) => (
+              {categoryOptions.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>

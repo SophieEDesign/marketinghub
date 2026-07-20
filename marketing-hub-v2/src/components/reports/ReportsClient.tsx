@@ -7,14 +7,28 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import {
   REPORT_CATEGORIES,
   REPORT_TOOLS,
+  optionsForField,
+  type FieldOption,
 } from "@/lib/data/collections";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
 import { plainTextFromHtml } from "@/lib/sanitize";
 
-const CATEGORY_ORDER = REPORT_CATEGORIES.map((c) => c.value);
+export function ReportsClient({
+  initial,
+  fieldOptions,
+}: {
+  initial: ReportLink[];
+  fieldOptions?: Record<string, FieldOption[]>;
+}) {
+  const categoryOptions = optionsForField(
+    fieldOptions,
+    "category",
+    REPORT_CATEGORIES
+  );
+  const toolOptions = optionsForField(fieldOptions, "tool", REPORT_TOOLS);
+  const categoryOrder = categoryOptions.map((c) => c.value);
 
-export function ReportsClient({ initial }: { initial: ReportLink[] }) {
   const [items, setItems] = useState(initial);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -44,11 +58,11 @@ export function ReportsClient({ initial }: { initial: ReportLink[] }) {
       return acc;
     }, {});
     const keys = [
-      ...CATEGORY_ORDER.filter((c) => map[c]?.length),
-      ...Object.keys(map).filter((k) => !CATEGORY_ORDER.includes(k)),
+      ...categoryOrder.filter((c) => map[c]?.length),
+      ...Object.keys(map).filter((k) => !categoryOrder.includes(k)),
     ];
     return keys.map((k) => [k, map[k]] as const);
-  }, [items]);
+  }, [items, categoryOrder]);
 
   async function create() {
     await fetch("/api/reports", {
@@ -144,7 +158,7 @@ export function ReportsClient({ initial }: { initial: ReportLink[] }) {
               value={form.tool}
               onChange={(e) => setForm({ ...form, tool: e.target.value })}
             >
-              {REPORT_TOOLS.map((o) => (
+              {toolOptions.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>
@@ -158,7 +172,7 @@ export function ReportsClient({ initial }: { initial: ReportLink[] }) {
               value={form.category}
               onChange={(e) => setForm({ ...form, category: e.target.value })}
             >
-              {REPORT_CATEGORIES.map((o) => (
+              {categoryOptions.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>

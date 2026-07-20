@@ -331,6 +331,17 @@ export type HubPageNotes = {
   social_monthly_plan?: string;
 };
 
+/** Field Manager overrides (labels, types, select/tags option order). */
+export type HubStoredFieldDef = {
+  key: string;
+  label: string;
+  type: string;
+  options?: { value: string; label: string }[];
+  custom?: boolean;
+};
+
+export type HubFieldExtras = Partial<Record<string, HubStoredFieldDef[]>>;
+
 export type HubStore = {
   events: EventItem[];
   /** Per-user RSVP rows for Events. */
@@ -354,4 +365,9 @@ export type HubStore = {
   access_requests: AccessRequest[];
   /** Shared page reference notes (not a spreadsheet collection). */
   page_notes: HubPageNotes;
+  /**
+   * Field Manager schema extras — durable with the rest of hub_store so
+   * option order / custom fields reach page views across deploys.
+   */
+  field_extras: HubFieldExtras;
 };

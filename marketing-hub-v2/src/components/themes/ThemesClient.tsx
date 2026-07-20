@@ -21,7 +21,9 @@ import {
   CONTENT_CATEGORIES,
   CONTENT_PRIORITIES,
   CONTENT_TYPES,
+  optionsForField,
   selectOptionsWithCurrent,
+  type FieldOption,
 } from "@/lib/data/collections";
 import { isSocialContentItem } from "@/lib/data/normalize";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
@@ -113,12 +115,36 @@ export function ThemesClient({
   initialMains,
   initialOffshoots,
   initialContent,
+  contentFieldOptions,
 }: {
   initialThemes: QuarterlyTheme[];
   initialMains: ThemeMainContent[];
   initialOffshoots: ThemeOffshoot[];
   initialContent: ContentItem[];
+  /** Content collection Field Manager options (shared with Content page). */
+  contentFieldOptions?: Record<string, FieldOption[]>;
 }) {
+  const channelOptions = optionsForField(
+    contentFieldOptions,
+    "channel",
+    CHANNELS
+  );
+  const contentTypeOptions = optionsForField(
+    contentFieldOptions,
+    "content_type",
+    CONTENT_TYPES
+  );
+  const categoryOptions = optionsForField(
+    contentFieldOptions,
+    "category",
+    CONTENT_CATEGORIES
+  );
+  const priorityOptions = optionsForField(
+    contentFieldOptions,
+    "priority",
+    CONTENT_PRIORITIES
+  );
+
   const [themes, setThemes] = useState(initialThemes);
   const [mains, setMains] = useState(initialMains);
   const [offshoots, setOffshoots] = useState(initialOffshoots);
@@ -708,7 +734,7 @@ export function ThemesClient({
                 }
               >
                 <option value="">Channel</option>
-                {CHANNELS.map((o) => (
+                {channelOptions.map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.label}
                   </option>
@@ -885,7 +911,7 @@ export function ThemesClient({
                         >
                           <option value="">Channel</option>
                           {selectOptionsWithCurrent(
-                            CHANNELS,
+                            channelOptions,
                             offshootForm.channel
                           ).map((o) => (
                             <option key={o.value} value={o.value}>
@@ -979,7 +1005,7 @@ export function ThemesClient({
                     }
                   >
                     {selectOptionsWithCurrent(
-                      CONTENT_TYPES,
+                      contentTypeOptions,
                       contentEdit.content_type
                     ).map((o) => (
                       <option key={o.value} value={o.value}>
@@ -992,7 +1018,7 @@ export function ThemesClient({
                   <label className="label">Channels</label>
                   <ChannelMultiSelect
                     value={contentEdit.channel}
-                    options={CHANNELS}
+                    options={channelOptions}
                     onChange={(channel) =>
                       setContentEdit({ ...contentEdit, channel })
                     }
@@ -1050,7 +1076,7 @@ export function ThemesClient({
                   >
                     <option value="">Select…</option>
                     {selectOptionsWithCurrent(
-                      CONTENT_CATEGORIES,
+                      categoryOptions,
                       contentEdit.category
                     ).map((o) => (
                       <option key={o.value} value={o.value}>
@@ -1073,7 +1099,7 @@ export function ThemesClient({
                   >
                     <option value="">None</option>
                     {selectOptionsWithCurrent(
-                      CONTENT_PRIORITIES,
+                      priorityOptions,
                       contentEdit.priority
                     ).map((o) => (
                       <option key={o.value} value={o.value}>

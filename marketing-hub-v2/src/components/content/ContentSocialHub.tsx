@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { ExternalLink } from "lucide-react";
@@ -6,6 +6,7 @@ import { ContentClient } from "@/components/content/ContentClient";
 import { SocialClient } from "@/components/social/SocialClient";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentFilter } from "@/components/ui/SegmentFilter";
+import type { FieldOption } from "@/lib/data/collections";
 import type { ContentItem } from "@/lib/types";
 
 type Scope = "all" | "content" | "social";
@@ -21,8 +22,10 @@ const PLANABLE_CALENDAR_URL =
 
 export function ContentSocialHub({
   initialContent,
+  fieldOptions,
 }: {
   initialContent: ContentItem[];
+  fieldOptions?: Record<string, FieldOption[]>;
 }) {
   const [scope, setScope] = useState<Scope>("all");
 
@@ -59,6 +62,7 @@ export function ContentSocialHub({
           initial={initialContent}
           hideHeader
           scope={scope === "all" ? "all" : "content"}
+          fieldOptions={fieldOptions}
         />
       )}
     </div>

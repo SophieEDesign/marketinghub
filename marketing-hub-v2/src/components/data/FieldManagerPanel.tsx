@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Settings2, Trash2, X } from "lucide-react";
+import { GripVertical, Plus, Settings2, Trash2, X } from "lucide-react";
 import {
   MANAGEABLE_FIELD_TYPES,
   type FieldDef,
@@ -61,6 +61,9 @@ function OptionsEditor({
   onChange: (next: FieldOption[]) => void;
   disabled?: boolean;
 }) {
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
+
   function updateAt(index: number, patch: Partial<FieldOption>) {
     onChange(
       options.map((opt, i) => (i === index ? { ...opt, ...patch } : opt))
@@ -75,10 +78,36 @@ function OptionsEditor({
     onChange([...options, { value: "", label: "" }]);
   }
 
+  function moveOption(from: number, to: number) {
+    if (
+      from === to ||
+      from < 0 ||
+      to < 0 ||
+      from >= options.length ||
+      to >= options.length
+    ) {
+      return;
+    }
+    const next = [...options];
+    const [item] = next.splice(from, 1);
+    next.splice(to, 0, item);
+    onChange(next);
+  }
+
+  function clearDrag() {
+    setDragFrom(null);
+    setDragOver(null);
+  }
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <label className="label mb-0">Options</label>
+        <div>
+          <label className="label mb-0">Options</label>
+          {options.length > 1 && !disabled ? (
+            <p className="mt-0.5 text-[11px] text-muted">Drag to reorder.</p>
+          ) : null}
+        </div>
         <button
           type="button"
           className="btn-ghost text-xs"
@@ -94,7 +123,52 @@ function OptionsEditor({
       ) : (
         <ul className="space-y-2">
           {options.map((opt, index) => (
-            <li key={index} className="flex items-center gap-2">
+            <li
+              key={index}
+              className={cn(
+                "flex items-center gap-1.5 rounded-lg",
+                dragOver === index && dragFrom !== index && "ring-2 ring-brand/30 bg-brand/5",
+                dragFrom === index && "opacity-50"
+              )}
+              onDragOver={(e) => {
+                if (disabled || dragFrom === null) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                if (dragOver !== index) setDragOver(index);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (disabled) return;
+                const fromStr = e.dataTransfer.getData("text/plain");
+                const from = Number.parseInt(fromStr, 10);
+                if (Number.isFinite(from)) moveOption(from, index);
+                clearDrag();
+              }}
+              onDragLeave={() => {
+                if (dragOver === index) setDragOver(null);
+              }}
+            >
+              <button
+                type="button"
+                className={cn(
+                  "shrink-0 select-none rounded p-1 text-muted",
+                  disabled
+                    ? "cursor-not-allowed opacity-40"
+                    : "cursor-grab hover:bg-sand hover:text-foreground active:cursor-grabbing"
+                )}
+                disabled={disabled}
+                draggable={!disabled}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("text/plain", String(index));
+                  e.dataTransfer.effectAllowed = "move";
+                  setDragFrom(index);
+                }}
+                onDragEnd={clearDrag}
+                aria-label="Drag to reorder"
+                title="Drag to reorder"
+              >
+                <GripVertical className="h-4 w-4" />
+              </button>
               <input
                 className="field flex-1"
                 placeholder="Label"

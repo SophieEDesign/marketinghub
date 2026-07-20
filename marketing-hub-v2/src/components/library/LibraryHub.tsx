@@ -6,6 +6,7 @@ import { ResourcesClient } from "@/components/resources/ResourcesClient";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentFilter } from "@/components/ui/SegmentFilter";
 import { useHubView } from "@/lib/hub-view";
+import type { FieldOption } from "@/lib/data/collections";
 import type { ResourceLink } from "@/lib/types";
 import { useState } from "react";
 
@@ -21,10 +22,12 @@ export function LibraryHub({
   resources,
   logoUrl,
   guideUrl,
+  resourceFieldOptions,
 }: {
   resources: ResourceLink[];
   logoUrl: string;
   guideUrl: string;
+  resourceFieldOptions?: Record<string, FieldOption[]>;
 }) {
   const [tab, setTab] = useState<Tab>("media");
   const { view } = useHubView();
@@ -101,6 +104,7 @@ export function LibraryHub({
           initial={resources}
           hideHeader
           allowManage={canManage}
+          fieldOptions={resourceFieldOptions}
         />
       ) : null}
     </div>

@@ -6,6 +6,7 @@ import {
   bulkDelete,
   bulkUpdate,
   deleteRow,
+  getFieldOptionsMap,
   getTable,
   listCollectionSummaries,
   removeField,
@@ -23,6 +24,12 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    if (request.nextUrl.searchParams.get("fieldsOnly") === "1") {
+      return jsonOk({
+        collection,
+        fieldOptions: await getFieldOptionsMap(collection),
+      });
+    }
     return jsonOk(await getTable(collection));
   } catch (e) {
     return jsonError(e instanceof Error ? e.message : "Failed", 400);

@@ -1,4 +1,5 @@
 import { LibraryHub } from "@/components/library/LibraryHub";
+import { getFieldOptionsMap } from "@/lib/data/data-admin";
 import { listResources } from "@/lib/data/repos";
 import { listMediaFromSupabase } from "@/lib/supabase/media-list";
 import { hasSupabaseConfig } from "@/lib/auth/config";
@@ -44,11 +45,18 @@ export default async function LibraryPage() {
     }
   }
 
+  const [resources, resourceFieldOptions] = await Promise.all([
+    listResources(),
+    getFieldOptionsMap("resources"),
+  ]);
+
   return (
     <LibraryHub
-      resources={await listResources()}
+      resources={resources}
       logoUrl={logoUrl}
       guideUrl={guideUrl}
+      resourceFieldOptions={resourceFieldOptions}
     />
   );
 }
+

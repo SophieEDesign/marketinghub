@@ -12,7 +12,9 @@ import { RichTextView } from "@/components/ui/RichTextView";
 import { plainTextFromHtml } from "@/lib/sanitize";
 import {
   TASK_CATEGORIES,
+  optionsForField,
   selectOptionsWithCurrent,
+  type FieldOption,
 } from "@/lib/data/collections";
 
 const STATUSES: { id: TaskStatus; label: string }[] = [
@@ -65,7 +67,18 @@ function isOverdue(item: HubTask) {
   }
 }
 
-export function TasksClient({ initial }: { initial: HubTask[] }) {
+export function TasksClient({
+  initial,
+  fieldOptions,
+}: {
+  initial: HubTask[];
+  fieldOptions?: Record<string, FieldOption[]>;
+}) {
+  const categoryOptions = optionsForField(
+    fieldOptions,
+    "category",
+    TASK_CATEGORIES
+  );
   const [items, setItems] = useState(initial);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -342,7 +355,7 @@ export function TasksClient({ initial }: { initial: HubTask[] }) {
               value={form.category}
               onChange={(e) => setForm({ ...form, category: e.target.value })}
             >
-              {TASK_CATEGORIES.map((o) => (
+              {categoryOptions.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>
@@ -650,7 +663,7 @@ export function TasksClient({ initial }: { initial: HubTask[] }) {
                     setEdit({ ...edit, category: e.target.value })
                   }
                 >
-                  {selectOptionsWithCurrent(TASK_CATEGORIES, edit.category).map(
+                  {selectOptionsWithCurrent(categoryOptions, edit.category).map(
                     (o) => (
                       <option key={o.value} value={o.value}>
                         {o.label}

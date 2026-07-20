@@ -114,7 +114,7 @@ function normalizeStoredField(
   };
 }
 
-async function readExtras(): Promise<FieldExtras> {
+async function readExtrasFile(): Promise<FieldExtras> {
   try {
     const raw = await fs.readFile(EXTRAS_PATH, "utf8");
     const parsed = JSON.parse(raw) as Record<string, unknown>;
@@ -135,13 +135,54 @@ async function readExtras(): Promise<FieldExtras> {
   }
 }
 
-async function writeExtras(extras: FieldExtras) {
+function normalizeExtrasPayload(raw: unknown): FieldExtras {
+  if (!raw || typeof raw !== "object") return {};
+  const extras: FieldExtras = {};
+  for (const [collection, value] of Object.entries(
+    raw as Record<string, unknown>
+  )) {
+    if (!isCollectionKey(collection) || !Array.isArray(value)) continue;
+    const fields = value
+      .map((item) => normalizeStoredField(item))
+      .filter((f): f is StoredFieldDef => Boolean(f));
+    const byKey = new Map<string, StoredFieldDef>();
+    for (const field of fields) byKey.set(field.key, field);
+    extras[collection] = Array.from(byKey.values());
+  }
+  return extras;
+}
+
+async function writeExtrasFile(extras: FieldExtras) {
   try {
     await fs.mkdir(DATA_DIR, { recursive: true });
     await fs.writeFile(EXTRAS_PATH, JSON.stringify(extras, null, 2), "utf8");
   } catch (err) {
-    console.error("[field-extras] write failed", err);
+    console.error("[field-extras] file write failed", err);
   }
+}
+
+async function readExtras(): Promise<FieldExtras> {
+  const store = await readStore();
+  const fromStore = normalizeExtrasPayload(store.field_extras);
+  if (Object.keys(fromStore).length > 0) return fromStore;
+
+  // One-time migrate legacy field-extras.json into durable hub_store.
+  const fromFile = await readExtrasFile();
+  if (Object.keys(fromFile).length > 0) {
+    await updateStore((s) => {
+      s.field_extras = fromFile;
+    });
+    return fromFile;
+  }
+  return {};
+}
+
+async function writeExtras(extras: FieldExtras) {
+  await updateStore((store) => {
+    store.field_extras = extras;
+  });
+  // Keep local file as a cache mirror for local/dev inspection.
+  await writeExtrasFile(extras);
 }
 
 function emptyValueForType(type: FieldType): unknown {
@@ -267,6 +308,18 @@ export async function getTable(collection: string) {
     rows,
     count: rows.length,
   };
+}
+
+/** Field options map for page UIs (Field Manager order preserved). */
+export async function getFieldOptionsMap(
+  collection: string
+): Promise<Record<string, FieldOption[]>> {
+  const table = await getTable(collection);
+  const map: Record<string, FieldOption[]> = {};
+  for (const field of table.fields) {
+    if (field.options?.length) map[field.key] = field.options;
+  }
+  return map;
 }
 
 export async function updateCell(

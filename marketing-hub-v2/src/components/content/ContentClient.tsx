@@ -31,12 +31,16 @@ import {
 import { AssetUploadField } from "@/components/content/AssetUploadField";
 import { ChannelMultiSelect } from "@/components/ui/ChannelMultiSelect";
 import {
+  CHANNELS,
   CONTENT_CATEGORIES,
   CONTENT_OUTLETS,
   CONTENT_PRIORITIES,
   CONTENT_TYPES,
   SOCIAL_CHANNELS,
+  optionsForField,
+  orderedFilterValues,
   selectOptionsWithCurrent,
+  type FieldOption,
 } from "@/lib/data/collections";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
@@ -119,10 +123,22 @@ function toEditForm(item: ContentItem): EditForm {
   };
 }
 
-function channelOptionsForType(contentType: string, current: string[] = []) {
-  const base = isSocialContentItem({ content_type: contentType, channel: [] })
-    ? SOCIAL_CHANNELS
-    : CONTENT_OUTLETS;
+function channelOptionsForType(
+  contentType: string,
+  current: string[] = [],
+  allChannels: FieldOption[] = CHANNELS
+) {
+  const socialValues = new Set(SOCIAL_CHANNELS.map((o) => o.value));
+  const isSocial = isSocialContentItem({ content_type: contentType, channel: [] });
+  const filtered = allChannels.filter((o) =>
+    isSocial ? socialValues.has(o.value) : !socialValues.has(o.value)
+  );
+  const base =
+    filtered.length > 0
+      ? filtered
+      : isSocial
+        ? SOCIAL_CHANNELS
+        : CONTENT_OUTLETS;
   const extras = current.filter(
     (c) => c && !base.some((o) => o.value === c)
   );
@@ -165,12 +181,32 @@ export function ContentClient({
   initial,
   hideHeader = false,
   scope = "all",
+  fieldOptions,
 }: {
   initial: ContentItem[];
   hideHeader?: boolean;
   /** When "content", hide social posts; when "social", only social. */
   scope?: "all" | "content" | "social";
+  /** From Field Manager — drives select option order on this page. */
+  fieldOptions?: Record<string, FieldOption[]>;
 }) {
+  const contentTypeOptions = optionsForField(
+    fieldOptions,
+    "content_type",
+    CONTENT_TYPES
+  );
+  const categoryOptions = optionsForField(
+    fieldOptions,
+    "category",
+    CONTENT_CATEGORIES
+  );
+  const priorityOptions = optionsForField(
+    fieldOptions,
+    "priority",
+    CONTENT_PRIORITIES
+  );
+  const channelOptions = optionsForField(fieldOptions, "channel", CHANNELS);
+
   const [items, setItems] = useState(initial);
   const [view, setView] = useState<ContentView>("calendar");
   const [showForm, setShowForm] = useState(false);
@@ -214,18 +250,18 @@ export function ContentClient({
   }, [items, scope]);
 
   const channels = useMemo(() => {
-    const set = new Set(
-      scopedItems.flatMap((i) => parseChannels(i.channel)).filter(Boolean)
-    );
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [scopedItems]);
+    const present = scopedItems
+      .flatMap((i) => parseChannels(i.channel))
+      .filter(Boolean);
+    return orderedFilterValues(channelOptions, present);
+  }, [scopedItems, channelOptions]);
 
   const contentTypes = useMemo(() => {
-    const set = new Set(
-      scopedItems.map((i) => (i.content_type || "").trim()).filter(Boolean)
-    );
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [scopedItems]);
+    const present = scopedItems
+      .map((i) => (i.content_type || "").trim())
+      .filter(Boolean);
+    return orderedFilterValues(contentTypeOptions, present);
+  }, [scopedItems, contentTypeOptions]);
 
   const filtered = useMemo(() => {
     return scopedItems.filter((item) => {
@@ -649,7 +685,7 @@ export function ContentClient({
                 });
               }}
             >
-              {CONTENT_TYPES.map((o) => (
+              {contentTypeOptions.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>
@@ -676,7 +712,7 @@ export function ContentClient({
               onChange={(e) => setForm({ ...form, category: e.target.value })}
             >
               <option value="">Select…</option>
-              {CONTENT_CATEGORIES.map((o) => (
+              {categoryOptions.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>
@@ -691,7 +727,7 @@ export function ContentClient({
               onChange={(e) => setForm({ ...form, priority: e.target.value })}
             >
               <option value="">None</option>
-              {CONTENT_PRIORITIES.map((o) => (
+              {priorityOptions.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>
@@ -704,7 +740,11 @@ export function ContentClient({
             </label>
             <ChannelMultiSelect
               value={form.channel}
-              options={channelOptionsForType(form.content_type, form.channel)}
+              options={channelOptionsForType(
+                form.content_type,
+                form.channel,
+                channelOptions
+              )}
               onChange={(channel) => setForm({ ...form, channel })}
             />
           </div>
@@ -1134,7 +1174,7 @@ export function ContentClient({
                     }}
                   >
                     {selectOptionsWithCurrent(
-                      CONTENT_TYPES,
+                      contentTypeOptions,
                       edit.content_type
                     ).map((o) => (
                       <option key={o.value} value={o.value}>
@@ -1169,7 +1209,7 @@ export function ContentClient({
                   >
                     <option value="">Select…</option>
                     {selectOptionsWithCurrent(
-                      CONTENT_CATEGORIES,
+                      categoryOptions,
                       edit.category
                     ).map((o) => (
                       <option key={o.value} value={o.value}>
@@ -1189,7 +1229,7 @@ export function ContentClient({
                   >
                     <option value="">None</option>
                     {selectOptionsWithCurrent(
-                      CONTENT_PRIORITIES,
+                      priorityOptions,
                       edit.priority
                     ).map((o) => (
                       <option key={o.value} value={o.value}>
@@ -1206,7 +1246,8 @@ export function ContentClient({
                     value={edit.channel}
                     options={channelOptionsForType(
                       edit.content_type,
-                      edit.channel
+                      edit.channel,
+                      channelOptions
                     )}
                     onChange={(channel) => setEdit({ ...edit, channel })}
                   />

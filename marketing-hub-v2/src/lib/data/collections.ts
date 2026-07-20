@@ -292,7 +292,7 @@ const PARTNER_KINDS: FieldOption[] = [
   { value: "membership", label: "Membership" },
 ];
 
-const DIVISIONS: FieldOption[] = [
+export const DIVISIONS: FieldOption[] = [
   { value: "All", label: "All" },
   { value: "Racing", label: "Racing" },
   { value: "Commercial", label: "Commercial" },
@@ -633,6 +633,42 @@ export function selectOptionsWithCurrent(
   const current = (currentValue ?? "").trim();
   if (!current || options.some((o) => o.value === current)) return options;
   return [{ value: current, label: `${current} (custom)` }, ...options];
+}
+
+/** Resolve Field Manager options for a key, falling back to the built-in list. */
+export function optionsForField(
+  fieldOptions: Record<string, FieldOption[]> | undefined | null,
+  key: string,
+  fallback: FieldOption[]
+): FieldOption[] {
+  const opts = fieldOptions?.[key];
+  return opts?.length ? opts : fallback;
+}
+
+/**
+ * Order filter values by Field Manager option order, then append any
+ * extra values present in the data (alphabetically).
+ */
+export function orderedFilterValues(
+  managed: FieldOption[] | undefined,
+  present: Iterable<string>
+): string[] {
+  const presentSet = new Set(
+    Array.from(present)
+      .map((v) => v.trim())
+      .filter(Boolean)
+  );
+  if (!managed?.length) {
+    return Array.from(presentSet).sort((a, b) => a.localeCompare(b));
+  }
+  const ordered = managed
+    .map((o) => o.value)
+    .filter((v) => presentSet.has(v));
+  const managedSet = new Set(managed.map((o) => o.value));
+  const extras = Array.from(presentSet)
+    .filter((v) => !managedSet.has(v))
+    .sort((a, b) => a.localeCompare(b));
+  return [...ordered, ...extras];
 }
 
 /** Build owner dropdown options from the contacts table. */
