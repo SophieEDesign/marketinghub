@@ -25,13 +25,13 @@ export type MediaListItem = {
   /** Optional folder under Gallery (and similar) for sorting images. */
   subfolder: string;
   /**
-   * Gallery subfolder visibility: public (external) or internal (staff).
+   * Gallery subfolder visibility: public (external), internal (staff), or admin.
    * Non-gallery categories ignore this; missing values treat as public.
    */
   subfolder_visibility: GalleryFolderVisibility;
   /**
-   * Per-item visibility. Overrides folder when folder is public and item is internal.
-   * When folder is set to internal, all items are forced internal.
+   * Per-item visibility. More restrictive than the folder wins.
+   * When folder is set to internal/admin, items are cascaded to match.
    */
   visibility: GalleryFolderVisibility;
   status: string;
@@ -45,9 +45,15 @@ export type MediaListItem = {
   updated_at: string | null;
 };
 
-export type GalleryFolderVisibility = "public" | "internal";
+export type GalleryFolderVisibility = "public" | "internal" | "admin";
 
 export const GALLERY_CATEGORY = "Gallery";
+
+export const GALLERY_VISIBILITY_OPTIONS = [
+  { id: "public", label: "Public" },
+  { id: "internal", label: "Internal" },
+  { id: "admin", label: "Admin only" },
+] as const;
 
 /** Categories visible on the public /media gallery and external library view. */
 export const PUBLIC_MEDIA_CATEGORIES = [
@@ -61,9 +67,32 @@ export type MediaListScope = "public" | "all";
 export function normalizeGalleryVisibility(
   raw: string | null | undefined
 ): GalleryFolderVisibility {
-  return (raw ?? "").trim().toLowerCase() === "internal"
-    ? "internal"
-    : "public";
+  const value = (raw ?? "").trim().toLowerCase();
+  if (value === "admin" || value === "admin only" || value === "admin_only") {
+    return "admin";
+  }
+  if (value === "internal") return "internal";
+  return "public";
+}
+
+function visibilityRank(value: GalleryFolderVisibility): number {
+  if (value === "admin") return 2;
+  if (value === "internal") return 1;
+  return 0;
+}
+
+/** More restrictive of two visibility levels (public < internal < admin). */
+export function moreRestrictiveVisibility(
+  a: GalleryFolderVisibility,
+  b: GalleryFolderVisibility
+): GalleryFolderVisibility {
+  return visibilityRank(a) >= visibilityRank(b) ? a : b;
+}
+
+export function visibilityLabel(value: GalleryFolderVisibility): string {
+  if (value === "admin") return "Admin only";
+  if (value === "internal") return "Internal";
+  return "Public";
 }
 
 function parseFiles(raw: unknown): MediaFile[] {
@@ -126,13 +155,7 @@ function isVisibleInPublicScope(item: {
   visibility: GalleryFolderVisibility;
 }): boolean {
   if (!isPublicCategory(item.category)) return false;
-  if (isGalleryCategoryName(item.category)) {
-    // Folder internal → nothing public. Folder public → item can still hide itself.
-    return (
-      item.subfolder_visibility === "public" && item.visibility === "public"
-    );
-  }
-  return item.visibility === "public";
+  return effectiveMediaVisibility(item) === "public";
 }
 
 /** Effective visibility for display badges (folder ∩ item for Gallery). */
@@ -142,20 +165,25 @@ export function effectiveMediaVisibility(item: {
   visibility: GalleryFolderVisibility;
 }): GalleryFolderVisibility {
   if (isGalleryCategoryName(item.category)) {
-    if (item.subfolder_visibility === "internal") return "internal";
-    return item.visibility === "public" ? "public" : "internal";
+    return moreRestrictiveVisibility(
+      item.subfolder_visibility,
+      item.visibility
+    );
   }
-  return item.visibility === "public" ? "public" : "internal";
+  return item.visibility;
 }
 
 export async function listMediaFromSupabase(options?: {
   scope?: MediaListScope;
+  /** When false, admin-only items are hidden (members / non-admins). */
+  includeAdmin?: boolean;
 }): Promise<{
   items: MediaListItem[];
   tableName: string | null;
   scope: MediaListScope;
 }> {
   const scope: MediaListScope = options?.scope === "all" ? "all" : "public";
+  const includeAdmin = options?.includeAdmin === true;
   const tables = await listCoreTables();
   const mediaTable = findMediaTable(tables);
   if (!mediaTable) {
@@ -262,9 +290,13 @@ export async function listMediaFromSupabase(options?: {
         updated_at: asString(r.updated_at) || null,
       } satisfies MediaListItem;
     })
-    .filter((item) =>
-      scope === "public" ? isVisibleInPublicScope(item) : true
-    )
+    .filter((item) => {
+      if (scope === "public") return isVisibleInPublicScope(item);
+      if (!includeAdmin && effectiveMediaVisibility(item) === "admin") {
+        return false;
+      }
+      return true;
+    })
     .sort((a, b) => a.display_name.localeCompare(b.display_name));
 
   return { items, tableName: mediaTable.name, scope };
@@ -297,7 +329,7 @@ export type CreateMediaInput = {
   category?: string;
   /** Folder under Gallery for sorting images. */
   subfolder?: string;
-  /** public = external gallery; internal = staff only. Gallery only. */
+  /** public = external; internal = staff; admin = admins only. Gallery only. */
   subfolder_visibility?: GalleryFolderVisibility;
   /** Per-item visibility; defaults to folder visibility for Gallery, else public. */
   visibility?: GalleryFolderVisibility;
@@ -452,13 +484,12 @@ export async function createMediaInSupabase(
   };
 }
 
-/** Set public/internal for every item in a Gallery subfolder (empty = Unsorted).
+/** Set public/internal/admin for every item in a Gallery subfolder (empty = Unsorted).
  *
  * Rules:
- * - Folder → internal: every file becomes internal (clears public overrides).
- * - Folder → public: folder is public; every file becomes public so they match
- *   the folder. After that, an individual file can be set back to internal to
- *   override the public folder.
+ * - Folder → admin/internal/public: every file is cascaded to match.
+ * - After a public folder is set, an individual file can be set to internal or
+ *   admin to override the public folder.
  */
 export async function setGallerySubfolderVisibility(input: {
   subfolder: string;

@@ -4,7 +4,9 @@ import { Download, ExternalLink, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   GALLERY_CATEGORY,
+  GALLERY_VISIBILITY_OPTIONS,
   MEDIA_HUB_CATEGORIES,
+  visibilityLabel,
   type GalleryFolderVisibility,
   type MediaListItem,
 } from "@/lib/supabase/media-list";
@@ -600,12 +602,7 @@ export function MediaDetailPanel({
                     role="group"
                     aria-label="Item visibility"
                   >
-                    {(
-                      [
-                        { id: "public", label: "Public" },
-                        { id: "internal", label: "Internal" },
-                      ] as const
-                    ).map((option) => (
+                    {GALLERY_VISIBILITY_OPTIONS.map((option) => (
                       <button
                         key={option.id}
                         type="button"
@@ -623,26 +620,33 @@ export function MediaDetailPanel({
                   </div>
                   {isGallery && item.subfolder_visibility === "public" ? (
                     <p className="mt-1 text-xs text-muted">
-                      Overrides the folder when set to Internal. If the folder
-                      is set to Internal, all files become Internal.
+                      Overrides the folder when set to Internal or Admin only.
+                      If the folder is Internal or Admin only, all files match
+                      the folder.
                     </p>
                   ) : isGallery && item.subfolder_visibility === "internal" ? (
                     <p className="mt-1 text-xs text-muted">
-                      Folder is Internal — this file stays hidden externally
-                      until the folder is Public.
+                      Folder is Internal — hidden externally. You can still set
+                      this file to Admin only.
+                    </p>
+                  ) : isGallery && item.subfolder_visibility === "admin" ? (
+                    <p className="mt-1 text-xs text-muted">
+                      Folder is Admin only — this file stays admin-only until
+                      the folder is changed.
                     </p>
                   ) : (
                     <p className="mt-1 text-xs text-muted">
-                      Public appears on the external media gallery
+                      Public appears externally. Internal is staff-only. Admin
+                      only is hidden from members.
                     </p>
                   )}
                 </>
               ) : (
-                <p className="field bg-sand/40 text-sm capitalize">
-                  {visibility}
+                <p className="field bg-sand/40 text-sm">
+                  {visibilityLabel(visibility)}
                   {isGallery &&
                   item.subfolder_visibility === "public" &&
-                  visibility === "internal"
+                  visibility !== "public"
                     ? " (overrides public folder)"
                     : ""}
                 </p>

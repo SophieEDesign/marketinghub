@@ -14,6 +14,7 @@ import {
   Link2,
   Lock,
   Presentation,
+  Shield,
   Upload,
   X,
 } from "lucide-react";
@@ -21,9 +22,12 @@ import { EmptyState, PageHeader } from "@/components/ui/PageHeader";
 import { MediaDetailPanel } from "@/components/media/MediaDetailPanel";
 import {
   GALLERY_CATEGORY,
+  GALLERY_VISIBILITY_OPTIONS,
   MEDIA_HUB_CATEGORIES,
   effectiveMediaVisibility,
+  moreRestrictiveVisibility,
   normalizeGalleryVisibility,
+  visibilityLabel,
   type GalleryFolderVisibility,
   type MediaFile,
   type MediaListItem,
@@ -525,6 +529,8 @@ export function MediaGallery({
   scope = "public",
   /** Admin view: show Add media / delete. Member & public: browse only. */
   allowManage = false,
+  /** Admin view: include admin-only assets. Off for member preview / members. */
+  showAdminOnly = false,
 }: {
   title?: string;
   description?: string;
@@ -533,6 +539,7 @@ export function MediaGallery({
   hideHeader?: boolean;
   scope?: "public" | "all";
   allowManage?: boolean;
+  showAdminOnly?: boolean;
 }) {
   const [data, setData] = useState<ListResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -572,7 +579,11 @@ export function MediaGallery({
     void load();
   }, [load]);
 
-  const items = useMemo(() => data?.items ?? [], [data?.items]);
+  const items = useMemo(() => {
+    const all = data?.items ?? [];
+    if (showAdminOnly || scope === "public") return all;
+    return all.filter((i) => effectiveMediaVisibility(i) !== "admin");
+  }, [data?.items, showAdminOnly, scope]);
   const categories = useMemo(() => data?.categories ?? [], [data?.categories]);
   const isInternal = scope === "all";
 
@@ -620,15 +631,14 @@ export function MediaGallery({
       const inFolder = galleryItems.filter((i) => itemSubfolder(i) === name);
       const photos = photosFromItems(inFolder);
       // Folder visibility comes from subfolder_visibility (synced), not item overrides.
-      const publicCount = inFolder.filter(
-        (i) => itemFolderVisibility(i) === "public"
-      ).length;
       const visibility: GalleryFolderVisibility =
         inFolder.length === 0
           ? "internal"
-          : publicCount >= inFolder.length - publicCount
-            ? "public"
-            : "internal";
+          : inFolder.reduce(
+              (acc, i) =>
+                moreRestrictiveVisibility(acc, itemFolderVisibility(i)),
+              "public" as GalleryFolderVisibility
+            );
       return {
         name,
         photos,
@@ -1324,6 +1334,7 @@ export function MediaGallery({
                   [
                     { id: "public", label: "Public", icon: Globe },
                     { id: "internal", label: "Internal", icon: Lock },
+                    { id: "admin", label: "Admin only", icon: Shield },
                   ] as const
                 ).map((option) => {
                   const Icon = option.icon;
@@ -1351,8 +1362,8 @@ export function MediaGallery({
                 })}
               </div>
               <p className="mt-1 text-xs text-muted">
-                Public folders appear on the external media gallery. Internal
-                stay staff-only.
+                Public appears externally. Internal is staff-only. Admin only is
+                hidden from members.
               </p>
             </div>
           ) : null}
@@ -1561,7 +1572,7 @@ export function MediaGallery({
             <p className="mt-1 text-sm text-muted">
               Choose a subfolder to browse images
               {allowManage
-                ? " — set each folder Public (external) or Internal (staff)"
+                ? " — set each folder Public, Internal, or Admin only"
                 : ""}
             </p>
           </div>
@@ -1597,7 +1608,7 @@ export function MediaGallery({
                           ? `${sf.photoCount} photo${sf.photoCount === 1 ? "" : "s"}`
                           : `${sf.assetCount} asset${sf.assetCount === 1 ? "" : "s"}`}
                         {" · "}
-                        {sf.visibility === "public" ? "Public" : "Internal"}
+                        {visibilityLabel(sf.visibility)}
                       </p>
                     </div>
                     <span
@@ -1605,32 +1616,31 @@ export function MediaGallery({
                         "absolute right-3 top-3 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
                         sf.visibility === "public"
                           ? "bg-white/90 text-brand"
-                          : "bg-black/50 text-white"
+                          : sf.visibility === "admin"
+                            ? "bg-brand/90 text-white"
+                            : "bg-black/50 text-white"
                       )}
                     >
                       {sf.visibility === "public" ? (
                         <Globe className="h-3 w-3" />
+                      ) : sf.visibility === "admin" ? (
+                        <Shield className="h-3 w-3" />
                       ) : (
                         <Lock className="h-3 w-3" />
                       )}
-                      {sf.visibility}
+                      {visibilityLabel(sf.visibility)}
                     </span>
                   </div>
                 </button>
                 {allowManage ? (
                   <div className="flex border-t border-border p-1">
-                    {(
-                      [
-                        { id: "public", label: "Public" },
-                        { id: "internal", label: "Internal" },
-                      ] as const
-                    ).map((option) => (
+                    {GALLERY_VISIBILITY_OPTIONS.map((option) => (
                       <button
                         key={option.id}
                         type="button"
                         disabled={visibilitySaving === sf.name}
                         className={cn(
-                          "flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition",
+                          "flex-1 rounded-lg px-1.5 py-1.5 text-[11px] font-medium transition sm:text-xs",
                           sf.visibility === option.id
                             ? "bg-accent-soft text-brand"
                             : "text-muted hover:text-foreground"
@@ -1642,7 +1652,9 @@ export function MediaGallery({
                         {visibilitySaving === sf.name &&
                         sf.visibility !== option.id
                           ? "…"
-                          : option.label}
+                          : option.id === "admin"
+                            ? "Admin"
+                            : option.label}
                       </button>
                     ))}
                   </div>
@@ -1710,12 +1722,7 @@ export function MediaGallery({
                   role="group"
                   aria-label="Folder visibility"
                 >
-                  {(
-                    [
-                      { id: "public", label: "Public" },
-                      { id: "internal", label: "Internal" },
-                    ] as const
-                  ).map((option) => {
+                  {GALLERY_VISIBILITY_OPTIONS.map((option) => {
                     const current =
                       gallerySubfolders.find((sf) => sf.name === activeSubfolder)
                         ?.visibility ?? "internal";
@@ -1759,20 +1766,25 @@ export function MediaGallery({
                     <span
                       className={cn(
                         "absolute left-2 top-2 z-10 rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide shadow-sm",
+                        (() => {
+                          const vis = effectiveMediaVisibility({
+                            category: photo.category,
+                            subfolder_visibility: photo.subfolderVisibility,
+                            visibility: photo.visibility,
+                          });
+                          if (vis === "public") return "bg-white/95 text-brand";
+                          if (vis === "admin") return "bg-brand/90 text-white";
+                          return "bg-black/70 text-white";
+                        })()
+                      )}
+                    >
+                      {visibilityLabel(
                         effectiveMediaVisibility({
                           category: photo.category,
                           subfolder_visibility: photo.subfolderVisibility,
                           visibility: photo.visibility,
-                        }) === "public"
-                          ? "bg-white/95 text-brand"
-                          : "bg-black/70 text-white"
+                        })
                       )}
-                    >
-                      {effectiveMediaVisibility({
-                        category: photo.category,
-                        subfolder_visibility: photo.subfolderVisibility,
-                        visibility: photo.visibility,
-                      })}
                     </span>
                   ) : null}
                   <button

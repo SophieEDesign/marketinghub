@@ -84,6 +84,7 @@ export function LibraryHub({
           hideHeader
           scope="all"
           allowManage={canManage}
+          showAdminOnly={canManage}
         />
       ) : null}
 

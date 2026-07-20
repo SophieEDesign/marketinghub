@@ -4,11 +4,11 @@ import { hasSupabaseConfig } from "@/lib/auth/config";
 import {
   createMediaInSupabase,
   deleteMediaFileInSupabase,
+  normalizeGalleryVisibility,
   renameMediaFileInSupabase,
   setGallerySubfolderVisibility,
   softDeleteMediaInSupabase,
   updateMediaItemInSupabase,
-  type GalleryFolderVisibility,
 } from "@/lib/supabase/media-list";
 
 export const dynamic = "force-dynamic";
@@ -79,9 +79,7 @@ export async function POST(request: NextRequest) {
             : undefined,
         visibility:
           typeof body.visibility === "string"
-            ? body.visibility.trim().toLowerCase() === "internal"
-              ? "internal"
-              : "public"
+            ? normalizeGalleryVisibility(body.visibility)
             : undefined,
       });
       return jsonOk({ item });
@@ -121,8 +119,7 @@ export async function POST(request: NextRequest) {
         typeof body.subfolder === "string" ? body.subfolder : "";
       const rawVis =
         typeof body.visibility === "string" ? body.visibility : "";
-      const visibility: GalleryFolderVisibility =
-        rawVis.trim().toLowerCase() === "internal" ? "internal" : "public";
+      const visibility = normalizeGalleryVisibility(rawVis);
       const result = await setGallerySubfolderVisibility({
         subfolder,
         visibility,
@@ -148,15 +145,14 @@ export async function POST(request: NextRequest) {
       typeof body.subfolder_visibility === "string"
         ? body.subfolder_visibility
         : "";
-    const subfolder_visibility: GalleryFolderVisibility =
-      rawVis.trim().toLowerCase() === "public" ? "public" : "internal";
+    const subfolder_visibility = normalizeGalleryVisibility(
+      rawVis.trim() ? rawVis : "internal"
+    );
 
     const rawItemVis =
       typeof body.visibility === "string" ? body.visibility : "";
-    const visibility: GalleryFolderVisibility | undefined = rawItemVis.trim()
-      ? rawItemVis.trim().toLowerCase() === "internal"
-        ? "internal"
-        : "public"
+    const visibility = rawItemVis.trim()
+      ? normalizeGalleryVisibility(rawItemVis)
       : undefined;
 
     const item = await createMediaInSupabase({

@@ -19,6 +19,12 @@ async function canListAllMedia(): Promise<boolean> {
   return !!user && user.role !== "media_guest";
 }
 
+async function canIncludeAdminMedia(): Promise<boolean> {
+  if (allowDemoAuth()) return true;
+  const user = await getSessionUser();
+  return user?.role === "admin";
+}
+
 export async function GET(request: Request) {
   const canDownload = await hasMediaDownloadAccess();
   const url = new URL(request.url);
@@ -26,6 +32,8 @@ export async function GET(request: Request) {
   // Full catalogue is staff-only; public + media guests stay on Logos, Presentations, Gallery.
   const scope: MediaListScope =
     requestedScope === "all" && (await canListAllMedia()) ? "all" : "public";
+  const includeAdmin =
+    scope === "all" && (await canIncludeAdminMedia());
 
   if (!hasSupabaseConfig()) {
     return NextResponse.json(
@@ -43,7 +51,10 @@ export async function GET(request: Request) {
   }
 
   try {
-    const { items, tableName } = await listMediaFromSupabase({ scope });
+    const { items, tableName } = await listMediaFromSupabase({
+      scope,
+      includeAdmin,
+    });
     const fromItems = items.map((i) => i.category).filter(Boolean);
     // Always surface Gallery even when empty (staff + public/external).
     const categories = Array.from(
