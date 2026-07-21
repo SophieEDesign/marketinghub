@@ -8,6 +8,7 @@ import {
   serializeMonthlyPlan,
   SOCIAL_MONTHLY_PLAN_KEY,
   type PageNoteKey,
+  type SocialMonthlyPlanMatrix,
 } from "@/lib/social/monthly-plan";
 import type { HubPageNotes } from "@/lib/types";
 
@@ -60,7 +61,7 @@ export async function PUT(request: NextRequest) {
 
   let body: string;
   if (key === SOCIAL_MONTHLY_PLAN_KEY) {
-    const plan =
+    const plan: SocialMonthlyPlanMatrix | null =
       payload.plan && isMonthlyPlanMatrix(payload.plan)
         ? payload.plan
         : typeof payload.body === "string"
