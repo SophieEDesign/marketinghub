@@ -177,14 +177,6 @@ async function readExtras(): Promise<FieldExtras> {
   return {};
 }
 
-async function writeExtras(extras: FieldExtras) {
-  await updateStore((store) => {
-    store.field_extras = extras;
-  });
-  // Keep local file as a cache mirror for local/dev inspection.
-  await writeExtrasFile(extras);
-}
-
 function emptyValueForType(type: FieldType): unknown {
   if (type === "tags") return [];
   if (type === "number") return null;
@@ -522,16 +514,23 @@ export async function addField(
     options,
     custom: true,
   };
-  extras[collection] = [...list, stored];
-  await writeExtras(extras);
 
-  // Initialise empty value on existing rows so the column is visible
+  // Single write: field schema + empty values on existing rows.
   await updateStore((store) => {
+    const nextExtras = normalizeExtrasPayload(store.field_extras);
+    const current = nextExtras[collection] ?? [];
+    if (current.some((f) => f.key === key)) return;
+    nextExtras[collection] = [...current, stored];
+    store.field_extras = nextExtras;
+
     const rows = asRows(store, collection).map((r) =>
       key in r ? r : { ...r, [key]: emptyValueForType(type) }
     );
     (store as HubStore)[collection] = rows as never;
   });
+  await writeExtrasFile(
+    normalizeExtrasPayload((await readStore()).field_extras)
+  );
 
   return stored;
 }
@@ -612,17 +611,16 @@ export async function updateField(
     custom: isCustom,
   };
 
-  if (existingIdx >= 0) {
-    const nextList = [...list];
-    nextList[existingIdx] = stored;
-    extras[collection] = nextList;
-  } else {
-    extras[collection] = [...list, stored];
-  }
-  await writeExtras(extras);
+  await updateStore((store) => {
+    const nextExtras = normalizeExtrasPayload(store.field_extras);
+    const current = [...(nextExtras[collection] ?? [])];
+    const idx = current.findIndex((f) => f.key === key);
+    if (idx >= 0) current[idx] = stored;
+    else current.push(stored);
+    nextExtras[collection] = current;
+    store.field_extras = nextExtras;
 
-  if (nextKey !== key) {
-    await updateStore((store) => {
+    if (nextKey !== key) {
       const rows = asRows(store, collection).map((r) => {
         if (!(key in r)) return { ...r, [nextKey]: emptyValueForType(nextType) };
         const next = { ...r, [nextKey]: r[key] };
@@ -630,8 +628,11 @@ export async function updateField(
         return next;
       });
       (store as HubStore)[collection] = rows as never;
-    });
-  }
+    }
+  });
+  await writeExtrasFile(
+    normalizeExtrasPayload((await readStore()).field_extras)
+  );
 
   return stored;
 }
@@ -642,13 +643,15 @@ export async function removeField(collection: string, name: string) {
   const core = def.fields.find((f) => f.key === name);
   if (core?.locked) throw new Error("Cannot remove locked field");
 
-  const extras = await readExtras();
-  extras[collection] = (extras[collection] ?? []).filter((f) => f.key !== name);
-  await writeExtras(extras);
-
-  // Core fields: clear values but keep the column concept via schema;
-  // still strip the key from rows so data is gone. Core schema remains in code.
   await updateStore((store) => {
+    const nextExtras = normalizeExtrasPayload(store.field_extras);
+    nextExtras[collection] = (nextExtras[collection] ?? []).filter(
+      (f) => f.key !== name
+    );
+    store.field_extras = nextExtras;
+
+    // Core fields: clear values but keep the column concept via schema;
+    // still strip the key from rows so data is gone. Core schema remains in code.
     const rows = asRows(store, collection).map((r) => {
       if (!(name in r)) return r;
       const next = { ...r };
@@ -657,4 +660,7 @@ export async function removeField(collection: string, name: string) {
     });
     (store as HubStore)[collection] = rows as never;
   });
+  await writeExtrasFile(
+    normalizeExtrasPayload((await readStore()).field_extras)
+  );
 }

@@ -28,6 +28,7 @@ import {
   selectOptionsWithCurrent,
   type FieldOption,
 } from "@/lib/data/collections";
+import { useManagedFieldOptions } from "@/lib/data/useManagedFieldOptions";
 import {
   downloadCalendarIcs,
   downloadEventIcs,
@@ -289,7 +290,7 @@ export function EventsClient({
   initialEvents,
   currentUserId,
   currentUserName,
-  fieldOptions,
+  fieldOptions: fieldOptionsProp,
 }: {
   initialEvents: EventItem[];
   currentUserId: string | null;
@@ -301,6 +302,7 @@ export function EventsClient({
   const canDelete = view === "admin";
   const showUndatedQueue = view === "admin";
 
+  const fieldOptions = useManagedFieldOptions("events", fieldOptionsProp);
   const eventTypeOptions = optionsForField(
     fieldOptions,
     "event_type",

@@ -25,6 +25,7 @@ import {
   selectOptionsWithCurrent,
   type FieldOption,
 } from "@/lib/data/collections";
+import { useManagedFieldOptions } from "@/lib/data/useManagedFieldOptions";
 import { isSocialContentItem } from "@/lib/data/normalize";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
@@ -115,7 +116,7 @@ export function ThemesClient({
   initialMains,
   initialOffshoots,
   initialContent,
-  contentFieldOptions,
+  contentFieldOptions: contentFieldOptionsProp,
 }: {
   initialThemes: QuarterlyTheme[];
   initialMains: ThemeMainContent[];
@@ -124,6 +125,10 @@ export function ThemesClient({
   /** Content collection Field Manager options (shared with Content page). */
   contentFieldOptions?: Record<string, FieldOption[]>;
 }) {
+  const contentFieldOptions = useManagedFieldOptions(
+    "content",
+    contentFieldOptionsProp
+  );
   const channelOptions = optionsForField(
     contentFieldOptions,
     "channel",

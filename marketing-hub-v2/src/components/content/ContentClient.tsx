@@ -42,6 +42,7 @@ import {
   selectOptionsWithCurrent,
   type FieldOption,
 } from "@/lib/data/collections";
+import { useManagedFieldOptions } from "@/lib/data/useManagedFieldOptions";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
 import { plainTextFromHtml } from "@/lib/sanitize";
@@ -181,7 +182,7 @@ export function ContentClient({
   initial,
   hideHeader = false,
   scope = "all",
-  fieldOptions,
+  fieldOptions: fieldOptionsProp,
 }: {
   initial: ContentItem[];
   hideHeader?: boolean;
@@ -190,6 +191,7 @@ export function ContentClient({
   /** From Field Manager — drives select option order on this page. */
   fieldOptions?: Record<string, FieldOption[]>;
 }) {
+  const fieldOptions = useManagedFieldOptions("content", fieldOptionsProp);
   const contentTypeOptions = optionsForField(
     fieldOptions,
     "content_type",

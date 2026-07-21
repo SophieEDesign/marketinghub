@@ -10,17 +10,19 @@ import {
   optionsForField,
   type FieldOption,
 } from "@/lib/data/collections";
+import { useManagedFieldOptions } from "@/lib/data/useManagedFieldOptions";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
 import { plainTextFromHtml } from "@/lib/sanitize";
 
 export function ReportsClient({
   initial,
-  fieldOptions,
+  fieldOptions: fieldOptionsProp,
 }: {
   initial: ReportLink[];
   fieldOptions?: Record<string, FieldOption[]>;
 }) {
+  const fieldOptions = useManagedFieldOptions("reports", fieldOptionsProp);
   const categoryOptions = optionsForField(
     fieldOptions,
     "category",

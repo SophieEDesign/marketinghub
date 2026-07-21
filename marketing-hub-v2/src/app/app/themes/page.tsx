@@ -7,6 +7,8 @@ import {
   listThemes,
 } from "@/lib/data/repos";
 
+export const dynamic = "force-dynamic";
+
 export default async function ThemesPage() {
   const [themes, mains, offshoots, content, contentFieldOptions] =
     await Promise.all([

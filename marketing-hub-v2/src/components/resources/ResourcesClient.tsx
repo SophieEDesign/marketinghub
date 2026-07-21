@@ -9,6 +9,7 @@ import {
   RESOURCE_CATEGORIES,
   type FieldOption,
 } from "@/lib/data/collections";
+import { useManagedFieldOptions } from "@/lib/data/useManagedFieldOptions";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
 import { plainTextFromHtml } from "@/lib/sanitize";
@@ -17,7 +18,7 @@ export function ResourcesClient({
   initial,
   hideHeader = false,
   allowManage = true,
-  fieldOptions,
+  fieldOptions: fieldOptionsProp,
 }: {
   initial: ResourceLink[];
   hideHeader?: boolean;
@@ -25,6 +26,7 @@ export function ResourcesClient({
   allowManage?: boolean;
   fieldOptions?: Record<string, FieldOption[]>;
 }) {
+  const fieldOptions = useManagedFieldOptions("resources", fieldOptionsProp);
   const categoryOptions = optionsForField(
     fieldOptions,
     "category",

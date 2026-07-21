@@ -3,6 +3,8 @@ import { getSessionUser } from "@/lib/auth/session";
 import { getFieldOptionsMap } from "@/lib/data/data-admin";
 import { listEvents } from "@/lib/data/repos";
 
+export const dynamic = "force-dynamic";
+
 export default async function EventsPage() {
   const [events, user, fieldOptions] = await Promise.all([
     listEvents(),

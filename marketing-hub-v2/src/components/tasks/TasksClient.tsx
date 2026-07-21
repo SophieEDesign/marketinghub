@@ -16,6 +16,7 @@ import {
   selectOptionsWithCurrent,
   type FieldOption,
 } from "@/lib/data/collections";
+import { useManagedFieldOptions } from "@/lib/data/useManagedFieldOptions";
 
 const STATUSES: { id: TaskStatus; label: string }[] = [
   { id: "todo", label: "To do" },
@@ -69,11 +70,12 @@ function isOverdue(item: HubTask) {
 
 export function TasksClient({
   initial,
-  fieldOptions,
+  fieldOptions: fieldOptionsProp,
 }: {
   initial: HubTask[];
   fieldOptions?: Record<string, FieldOption[]>;
 }) {
+  const fieldOptions = useManagedFieldOptions("tasks", fieldOptionsProp);
   const categoryOptions = optionsForField(
     fieldOptions,
     "category",
