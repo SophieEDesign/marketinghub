@@ -6,9 +6,10 @@ import {
   joinAssetUrls,
   parseAssetUrls,
 } from "@/lib/data/normalize";
-import { isImageUrl } from "@/lib/social/platforms";
+import { isCanvaUrl, isImageUrl } from "@/lib/social/platforms";
 import { uploadAssetDirect } from "@/lib/upload/client-upload";
 import { cn } from "@/lib/utils";
+import { CanvaPreviewTile } from "@/components/content/CanvaPreviewTile";
 
 type SingleProps = {
   multiple?: false;
@@ -94,6 +95,16 @@ export function AssetUploadField({
               alt=""
               className="max-h-40 w-full object-contain"
             />
+          </a>
+        ) : single && isCanvaUrl(single) ? (
+          <a
+            href={single}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block overflow-hidden rounded-xl border border-border transition hover:border-brand/40"
+            title="Open in Canva"
+          >
+            <CanvaPreviewTile url={single} compact={false} />
           </a>
         ) : single ? (
           <a
@@ -184,6 +195,20 @@ export function AssetUploadField({
                     src={url}
                     alt=""
                     className="h-full w-full object-cover"
+                  />
+                </a>
+              ) : isCanvaUrl(url) ? (
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-border"
+                  title="Open in Canva"
+                >
+                  <CanvaPreviewTile
+                    url={url}
+                    compact
+                    className="aspect-auto h-full rounded-lg"
                   />
                 </a>
               ) : (

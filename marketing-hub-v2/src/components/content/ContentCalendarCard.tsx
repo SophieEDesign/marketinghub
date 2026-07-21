@@ -7,14 +7,12 @@ import {
   formatChannels,
   isSocialContentItem,
   parseChannels,
-  primaryAssetUrl,
+  primaryCanvaUrl,
+  primaryImageUrl,
 } from "@/lib/data/normalize";
-import {
-  PLATFORM_META,
-  isImageUrl,
-  platformKey,
-} from "@/lib/social/platforms";
+import { PLATFORM_META, platformKey } from "@/lib/social/platforms";
 import { plainTextFromHtml } from "@/lib/sanitize";
+import { CanvaPreviewTile } from "@/components/content/CanvaPreviewTile";
 
 const STATUS_LABEL: Record<ContentStatus, string> = {
   idea: "Idea",
@@ -62,11 +60,10 @@ export function ContentCalendarCard({
 }) {
   const social = isSocialContentItem(item);
   const channels = parseChannels(item.channel);
-  const asset = primaryAssetUrl(item.asset_url);
-  const hasMedia = isImageUrl(asset);
+  const image = primaryImageUrl(item.asset_url);
+  const canva = !image ? primaryCanvaUrl(item.asset_url) : "";
   const notesPreview = plainTextFromHtml(item.notes).slice(0, 120);
-  const preview =
-    item.title?.trim() || notesPreview || "Untitled";
+  const preview = item.title?.trim() || notesPreview || "Untitled";
   const shownChannels = channels.slice(0, 2);
   const extraChannels = channels.length - shownChannels.length;
 
@@ -101,16 +98,18 @@ export function ContentCalendarCard({
         </div>
       </div>
 
-      {hasMedia ? (
+      {image ? (
         <div className="relative aspect-[16/10] w-full overflow-hidden rounded-md bg-slate-100">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={asset}
+            src={image}
             alt=""
             className="h-full w-full object-cover"
             loading="lazy"
           />
         </div>
+      ) : canva ? (
+        <CanvaPreviewTile url={canva} compact />
       ) : (
         <div
           className={cn(

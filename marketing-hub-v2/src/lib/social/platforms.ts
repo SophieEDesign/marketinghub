@@ -39,3 +39,41 @@ export function isImageUrl(url: string | null | undefined): boolean {
   if (u.startsWith("data:image")) return true;
   return /\.(png|jpe?g|gif|webp|avif)(\?|$)/i.test(u) || u.includes("image");
 }
+
+/** True for Canva design / share links (not CDN image exports). */
+export function isCanvaUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
+    if (!(host === "canva.com" || host.endsWith(".canva.com"))) return false;
+    // Skip media CDN hosts — those are image/file assets, not editor links.
+    if (host.includes("media") || host.startsWith("export.")) return false;
+    return /\/design\//i.test(parsed.pathname);
+  } catch {
+    return /canva\.com\/design\//i.test(url);
+  }
+}
+
+/** Normalize a Canva design link to the /view URL. */
+export function toCanvaViewUrl(url: string): string | null {
+  if (!isCanvaUrl(url)) return null;
+  try {
+    const u = new URL(url);
+    let path = u.pathname.replace(/\/+$/, "");
+    path = path.replace(/\/(edit|view|watch|present)$/i, "");
+    u.pathname = `${path}/view`;
+    u.search = "";
+    u.hash = "";
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
+/** Canva public/share embed URL (shows the actual design when embedding is allowed). */
+export function toCanvaEmbedUrl(url: string): string | null {
+  const view = toCanvaViewUrl(url);
+  if (!view) return null;
+  return `${view}?embed`;
+}

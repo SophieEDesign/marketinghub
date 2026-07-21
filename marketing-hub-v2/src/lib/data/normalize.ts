@@ -1,6 +1,7 @@
 /** Shared clean-up for hub store + Supabase import. */
 
 import { normalizeRichTextStorage } from "@/lib/sanitize";
+import { isCanvaUrl, isImageUrl } from "@/lib/social/platforms";
 
 const PLATFORM_HINTS: { re: RegExp; channel: string }[] = [
   { re: /\blinkedin\b|\bli\b|#linkedin/i, channel: "LinkedIn" },
@@ -85,6 +86,20 @@ export function primaryAssetUrl(
   raw: string | string[] | null | undefined
 ): string {
   return parseAssetUrls(raw)[0] ?? "";
+}
+
+/** First image URL among assets (skips Canva / PDF / other links). */
+export function primaryImageUrl(
+  raw: string | string[] | null | undefined
+): string {
+  return parseAssetUrls(raw).find((u) => isImageUrl(u)) ?? "";
+}
+
+/** First Canva design URL among assets. */
+export function primaryCanvaUrl(
+  raw: string | string[] | null | undefined
+): string {
+  return parseAssetUrls(raw).find((u) => isCanvaUrl(u)) ?? "";
 }
 
 function detectPlatform(...parts: string[]): string | null {

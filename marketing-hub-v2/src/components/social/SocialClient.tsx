@@ -11,13 +11,15 @@ import { FullCalendarStyles } from "@/components/ui/FullCalendarStyles";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { cn } from "@/lib/utils";
 import type { ContentItem } from "@/lib/types";
-import { isSocialContentItem, primaryAssetUrl } from "@/lib/data/normalize";
+import { isSocialContentItem, primaryCanvaUrl, primaryImageUrl } from "@/lib/data/normalize";
 import {
   PLATFORM_META,
+  isCanvaUrl,
   isImageUrl,
   platformKey,
 } from "@/lib/social/platforms";
 import { HUB_CALENDAR_CSS } from "@/components/content/ContentCalendarCard";
+import { CanvaPreviewTile } from "@/components/content/CanvaPreviewTile";
 import { SocialMonthlyPlan } from "@/components/social/SocialMonthlyPlan";
 
 type SocialPost = {
@@ -100,6 +102,7 @@ function PostCard({
   const shown = platforms.slice(0, 2);
   const extra = platforms.length - shown.length;
   const hasMedia = isImageUrl(post.mediaUrl);
+  const hasCanva = !hasMedia && isCanvaUrl(post.mediaUrl);
   const time =
     post.scheduledAt && !Number.isNaN(parseISO(post.scheduledAt).getTime())
       ? format(parseISO(post.scheduledAt), "HH:mm")
@@ -142,6 +145,8 @@ function PostCard({
             loading="lazy"
           />
         </div>
+      ) : hasCanva ? (
+        <CanvaPreviewTile url={post.mediaUrl!} compact />
       ) : (
         <div className="flex aspect-[16/10] w-full items-center justify-center rounded-md bg-gradient-to-br from-sky-50 to-slate-100 text-sky-200">
           <ImageIcon className="h-5 w-5" />
@@ -251,7 +256,10 @@ export function SocialClient({ hideHeader = false }: { hideHeader?: boolean }) {
             url: c.planable_url || null,
             platform,
             platforms: unique.length ? unique : [platform],
-            mediaUrl: primaryAssetUrl(c.asset_url) || null,
+            mediaUrl:
+              primaryImageUrl(c.asset_url) ||
+              primaryCanvaUrl(c.asset_url) ||
+              null,
             source: "hub" as const,
           };
         })
@@ -628,6 +636,15 @@ export function SocialClient({ hideHeader = false }: { hideHeader?: boolean }) {
                     className="max-h-56 w-full object-cover"
                   />
                 </div>
+              ) : isCanvaUrl(selected.mediaUrl) ? (
+                <a
+                  href={selected.mediaUrl!}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block overflow-hidden rounded-lg border border-border"
+                >
+                  <CanvaPreviewTile url={selected.mediaUrl!} compact={false} />
+                </a>
               ) : null}
               <p className="whitespace-pre-wrap text-base font-medium leading-relaxed">
                 {selected.text}
@@ -684,6 +701,17 @@ export function SocialClient({ hideHeader = false }: { hideHeader?: boolean }) {
                   Edit in Content planner
                 </a>
               )}
+              {isCanvaUrl(selected.mediaUrl) ? (
+                <a
+                  href={selected.mediaUrl!}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn-secondary"
+                >
+                  Open in Canva
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              ) : null}
               <button
                 type="button"
                 className="btn-ghost"

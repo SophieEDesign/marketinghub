@@ -22,6 +22,22 @@ const STATUSES: { id: AwardStatus; label: string }[] = [
   { id: "not_won", label: "Not won" },
 ];
 
+const STATUS_COLOR: Record<AwardStatus, string> = {
+  watching: "#94a3b8",
+  entering: "#0ea5e9",
+  submitted: "#5b6ee1",
+  shortlisted: "#c47b3a",
+  won: "#3d8b5c",
+  not_won: "#64748b",
+};
+
+const VIEWS = [
+  { id: "list", label: "List" },
+  { id: "timeline", label: "Timeline" },
+] as const;
+
+type ViewId = (typeof VIEWS)[number]["id"];
+
 const emptyForm = {
   title: "",
   organisation: "",
@@ -63,6 +79,7 @@ export function AwardsClient({ initial }: { initial: AwardEntry[] }) {
   const isAdmin = view === "admin";
 
   const [items, setItems] = useState(initial);
+  const [view, setView] = useState<ViewId>("list");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [selected, setSelected] = useState<AwardEntry | null>(null);
@@ -114,6 +131,39 @@ export function AwardsClient({ initial }: { initial: AwardEntry[] }) {
       return true;
     });
   }, [items, search, statusFilter, yearFilter]);
+
+  /** Awards with a usable year, grouped ascending for the yearly timeline. */
+  const timelineByYear = useMemo(() => {
+    const withYear = filtered.filter(
+      (item) => Number.isFinite(item.year) && item.year > 0
+    );
+    const yearKeys = Array.from(
+      new Set(withYear.map((item) => item.year))
+    ).sort((a, b) => a - b);
+
+    return yearKeys.map((year) => ({
+      year,
+      awards: withYear
+        .filter((item) => item.year === year)
+        .sort((a, b) => {
+          const aDate = a.ceremony_at ?? "";
+          const bDate = b.ceremony_at ?? "";
+          if (aDate && bDate) return aDate.localeCompare(bDate);
+          if (aDate) return -1;
+          if (bDate) return 1;
+          return a.title.localeCompare(b.title);
+        }),
+    }));
+  }, [filtered]);
+
+  const undatedYearCount = useMemo(
+    () =>
+      filtered.filter((item) => !Number.isFinite(item.year) || item.year <= 0)
+        .length,
+    [filtered]
+  );
+
+  const currentYear = new Date().getFullYear();
 
   async function create() {
     if (!isAdmin) return;
@@ -215,6 +265,30 @@ export function AwardsClient({ initial }: { initial: AwardEntry[] }) {
         }
       />
 
+      <div
+        className="mb-5 inline-flex flex-wrap gap-1 rounded-2xl border border-border bg-white p-1"
+        role="tablist"
+        aria-label="Awards views"
+      >
+        {VIEWS.map((v) => (
+          <button
+            key={v.id}
+            type="button"
+            role="tab"
+            aria-selected={view === v.id}
+            className={cn(
+              "rounded-xl px-3.5 py-2 text-sm font-medium transition",
+              view === v.id
+                ? "bg-brand text-white shadow-sm"
+                : "text-muted hover:bg-sand hover:text-foreground"
+            )}
+            onClick={() => setView(v.id)}
+          >
+            {v.label}
+          </button>
+        ))}
+      </div>
+
       <FilterBar
         search={search}
         onSearchChange={setSearch}
@@ -263,87 +337,203 @@ export function AwardsClient({ initial }: { initial: AwardEntry[] }) {
         </div>
       ) : null}
 
-      <ul className="space-y-3">
-        {filtered.map((item) => (
-          <li
-            key={item.id}
-            className={cn(
-              "surface-card cursor-pointer p-4 transition hover:border-brand/30 hover:shadow-md",
-              selected?.id === item.id && "ring-2 ring-brand/30"
-            )}
-            onClick={() => setSelected(item)}
-          >
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="font-medium text-brand">{item.title}</h2>
-                  <span
-                    className={cn(
-                      "inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium",
-                      statusTone(item.status)
-                    )}
-                  >
-                    {statusLabel(item.status)}
-                  </span>
+      {view === "list" ? (
+        <ul className="space-y-3">
+          {filtered.map((item) => (
+            <li
+              key={item.id}
+              className={cn(
+                "surface-card cursor-pointer p-4 transition hover:border-brand/30 hover:shadow-md",
+                selected?.id === item.id && "ring-2 ring-brand/30"
+              )}
+              onClick={() => setSelected(item)}
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="font-medium text-brand">{item.title}</h2>
+                    <span
+                      className={cn(
+                        "inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium",
+                        statusTone(item.status)
+                      )}
+                    >
+                      {statusLabel(item.status)}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm text-muted">
+                    {[item.organisation, item.category, String(item.year)]
+                      .filter(Boolean)
+                      .join(" · ")}
+                    {item.ceremony_at
+                      ? ` · ceremony ${format(parseISO(item.ceremony_at), "d MMM yyyy")}`
+                      : ""}
+                    {item.owner ? ` · ${item.owner}` : ""}
+                  </p>
+                  {plainTextFromHtml(item.notes) ? (
+                    <RichTextView
+                      html={item.notes}
+                      plain
+                      clampLines={2}
+                      className="mt-2 text-sm text-foreground/80"
+                    />
+                  ) : null}
+                  {item.event_id ? (
+                    <a
+                      href="/app/events"
+                      className="mt-2 inline-block text-xs font-medium text-brand underline-offset-2 hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      Linked from Events
+                    </a>
+                  ) : null}
                 </div>
-                <p className="mt-1 text-sm text-muted">
-                  {[item.organisation, item.category, String(item.year)]
-                    .filter(Boolean)
-                    .join(" · ")}
-                  {item.ceremony_at
-                    ? ` · ceremony ${format(parseISO(item.ceremony_at), "d MMM yyyy")}`
-                    : ""}
-                  {item.owner ? ` · ${item.owner}` : ""}
-                </p>
-                {plainTextFromHtml(item.notes) ? (
-                  <RichTextView
-                    html={item.notes}
-                    plain
-                    clampLines={2}
-                    className="mt-2 text-sm text-foreground/80"
-                  />
-                ) : null}
-                {item.event_id ? (
-                  <a
-                    href="/app/events"
-                    className="mt-2 inline-block text-xs font-medium text-brand underline-offset-2 hover:underline"
+                {isAdmin ? (
+                  <div
+                    className="flex gap-2"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    Linked from Events
-                  </a>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => openEdit(item)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-ghost text-[var(--danger)]"
+                      onClick={() => void remove(item.id)}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 ) : null}
               </div>
-              {isAdmin ? (
-                <div
-                  className="flex gap-2"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    onClick={() => openEdit(item)}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-ghost text-[var(--danger)]"
-                    onClick={() => void remove(item.id)}
-                  >
-                    Delete
-                  </button>
+            </li>
+          ))}
+          {filtered.length === 0 ? (
+            <li className="rounded-2xl border border-dashed border-border px-5 py-10 text-center text-sm text-muted">
+              No awards match your filters.
+              {isAdmin
+                ? " Add one, or sync Events that include award ceremonies."
+                : ""}
+            </li>
+          ) : null}
+        </ul>
+      ) : null}
+
+      {view === "timeline" ? (
+        <div className="surface-card overflow-hidden p-4">
+          {timelineByYear.length === 0 ? (
+            <p className="text-sm text-muted">
+              No awards with a year in this filter. Add a year on each award to
+              see them on the timeline.
+            </p>
+          ) : (
+            <>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-muted">
+                  Yearly timeline — click an award to open.
+                </p>
+                <p className="text-xs text-muted">
+                  {timelineByYear[0].year}
+                  {timelineByYear.length > 1
+                    ? ` – ${timelineByYear[timelineByYear.length - 1].year}`
+                    : ""}
+                </p>
+              </div>
+              <div className="-mx-1 overflow-x-auto pb-1">
+                <div className="flex w-max min-w-full gap-3 px-1">
+                  {timelineByYear.map(({ year, awards }) => {
+                    const isCurrent = year === currentYear;
+                    return (
+                      <section
+                        key={year}
+                        className={cn(
+                          "flex w-56 shrink-0 flex-col rounded-xl border border-border bg-sand/40",
+                          isCurrent && "border-brand/40 ring-1 ring-brand/20"
+                        )}
+                      >
+                        <header
+                          className={cn(
+                            "sticky top-0 z-[1] rounded-t-xl border-b border-border px-3 py-2.5",
+                            isCurrent
+                              ? "bg-brand/10 text-brand"
+                              : "bg-white/80 text-foreground"
+                          )}
+                        >
+                          <h3 className="text-sm font-semibold tabular-nums">
+                            {year}
+                          </h3>
+                          <p className="text-[11px] text-muted">
+                            {awards.length} award
+                            {awards.length === 1 ? "" : "s"}
+                          </p>
+                        </header>
+                        <ul className="flex flex-1 flex-col gap-2 p-2">
+                          {awards.map((item) => (
+                            <li key={item.id}>
+                              <button
+                                type="button"
+                                onClick={() => setSelected(item)}
+                                className={cn(
+                                  "w-full rounded-lg border border-border bg-white p-2.5 text-left shadow-sm transition hover:border-brand/40 hover:shadow-md",
+                                  selected?.id === item.id &&
+                                    "ring-2 ring-brand/30"
+                                )}
+                              >
+                                <div className="flex items-start gap-2">
+                                  <span
+                                    className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
+                                    style={{
+                                      background: STATUS_COLOR[item.status],
+                                    }}
+                                    aria-hidden
+                                  />
+                                  <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm font-medium text-brand">
+                                      {item.title}
+                                    </p>
+                                    <p className="mt-0.5 truncate text-[11px] text-muted">
+                                      {[
+                                        statusLabel(item.status),
+                                        item.organisation,
+                                        item.category,
+                                      ]
+                                        .filter(Boolean)
+                                        .join(" · ")}
+                                    </p>
+                                    {item.ceremony_at ? (
+                                      <p className="mt-1 text-[11px] text-muted">
+                                        Ceremony{" "}
+                                        {format(
+                                          parseISO(item.ceremony_at),
+                                          "d MMM"
+                                        )}
+                                      </p>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
+                    );
+                  })}
                 </div>
-              ) : null}
-            </div>
-          </li>
-        ))}
-        {filtered.length === 0 ? (
-          <li className="rounded-2xl border border-dashed border-border px-5 py-10 text-center text-sm text-muted">
-            No awards match your filters.
-            {isAdmin ? " Add one, or sync Events that include award ceremonies." : ""}
-          </li>
-        ) : null}
-      </ul>
+              </div>
+            </>
+          )}
+          {undatedYearCount > 0 ? (
+            <p className="mt-4 text-xs text-muted">
+              {undatedYearCount} award(s) have no year and are hidden here —
+              switch to List to edit them.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       {selected && !edit ? (
         <>
