@@ -7,10 +7,14 @@ import type { WebEnquiry } from "@/lib/types";
 import {
   computeEnquiryStats,
   enquiryInDateRange,
+  enquiryReferrerKey,
+  enquiryReferrerLabel,
   enquirySourceLabel,
+  isGoogleAdsEnquiry,
 } from "@/lib/data/web-enquiries-stats";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
+import { EnquiryYearCompare } from "@/components/enquiries/EnquiryYearCompare";
 import { cn } from "@/lib/utils";
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -498,6 +502,7 @@ export function EnquiriesClient({
   const [dateTo, setDateTo] = useState("");
   const [officeFilter, setOfficeFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
+  const [referrerFilter, setReferrerFilter] = useState("all");
   const [showTest, setShowTest] = useState(false);
   const [selected, setSelected] = useState<WebEnquiry | null>(null);
   const [saving, setSaving] = useState(false);
@@ -522,7 +527,7 @@ export function EnquiriesClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync by id only
   }, [items, selected?.id]);
 
-  /** Date + test filter — drives KPIs and office/source summaries. */
+  /** Date + test filter — base pool for list/options. */
   const dated = useMemo(() => {
     return items.filter((e) => {
       if (!showTest && e.is_test) return false;
@@ -535,37 +540,55 @@ export function EnquiriesClient({
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [dated]);
 
-  const filtered = useMemo(() => {
-    return dated.filter((e) => {
-      if (officeFilter !== "all") {
-        const office = e.selected_office?.trim() || "Unassigned";
-        if (office !== officeFilter) return false;
-      }
-      if (sourceFilter !== "all" && enquirySourceLabel(e) !== sourceFilter) {
-        return false;
-      }
-      return matchesSearch(search, [
-        e.submission_id,
-        e.customer_name,
-        e.customer_email,
-        e.customer_phone,
-        e.customer_country,
-        e.final_service_category,
-        e.user_selected_service,
-        e.collection_location,
-        e.delivery_location,
-        e.selected_office,
-        e.routing_reason,
-        enquiryMessage(e),
-        enquirySourceLabel(e),
-      ]);
-    });
-  }, [dated, search, officeFilter, sourceFilter]);
+  function matchesListFilters(e: WebEnquiry): boolean {
+    if (officeFilter !== "all") {
+      const office = e.selected_office?.trim() || "Unassigned";
+      if (office !== officeFilter) return false;
+    }
+    if (sourceFilter !== "all" && enquirySourceLabel(e) !== sourceFilter) {
+      return false;
+    }
+    if (referrerFilter !== "all") {
+      if (!isGoogleAdsEnquiry(e)) return false;
+      if (enquiryReferrerKey(e) !== referrerFilter) return false;
+    }
+    return matchesSearch(search, [
+      e.submission_id,
+      e.customer_name,
+      e.customer_email,
+      e.customer_phone,
+      e.customer_country,
+      e.final_service_category,
+      e.user_selected_service,
+      e.collection_location,
+      e.delivery_location,
+      e.selected_office,
+      e.routing_reason,
+      enquiryMessage(e),
+      enquirySourceLabel(e),
+      enquiryReferrerKey(e),
+    ]);
+  }
 
+  const filtered = useMemo(() => {
+    return dated.filter(matchesListFilters);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- matchesListFilters closes over filter state
+  }, [dated, search, officeFilter, sourceFilter, referrerFilter]);
+
+  /** KPIs + summary chips follow the same filters as the list. */
   const stats = useMemo(
-    () => computeEnquiryStats(dated, { includeTest: true }),
-    [dated]
+    () => computeEnquiryStats(filtered, { includeTest: true }),
+    [filtered]
   );
+
+  /** YoY table respects attribute filters, but not the date range (needs full years). */
+  const yearCompareItems = useMemo(() => {
+    return items.filter((e) => {
+      if (!showTest && e.is_test) return false;
+      return matchesListFilters(e);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, showTest, search, officeFilter, sourceFilter, referrerFilter]);
 
   async function remove(id: string) {
     if (!confirm("Delete this enquiry from the hub?")) return;
@@ -638,6 +661,8 @@ export function EnquiriesClient({
         ))}
       </div>
 
+      <EnquiryYearCompare items={yearCompareItems} includeTest />
+
       {stats.byOffice.length > 0 ? (
         <div className="surface-card mb-4 p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted">
@@ -669,7 +694,7 @@ export function EnquiriesClient({
       ) : null}
 
       {stats.topSources.length > 0 ? (
-        <div className="surface-card mb-6 p-4">
+        <div className="surface-card mb-4 p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted">
             How they heard about us
           </p>
@@ -696,9 +721,70 @@ export function EnquiriesClient({
             ))}
           </ul>
           <p className="mt-2 text-xs text-muted">
-            Summaries respect the date range. Google / Ads uses “How did you
+            Summaries follow the active filters. Google / Ads uses “How did you
             hear” plus Google click IDs / UTM when present. Live Ads spend stays
             in Reporting → Google Ads.
+          </p>
+        </div>
+      ) : null}
+
+      {stats.googleAdsByReferrer.length > 0 ? (
+        <div className="surface-card mb-6 p-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+              Google Ads by referrer link
+            </p>
+            <p className="text-xs text-muted">
+              {stats.googleAds} Google / Ads in range
+            </p>
+          </div>
+          <ul className="mt-3 divide-y divide-border/70 overflow-hidden rounded-xl border border-border">
+            {stats.googleAdsByReferrer.map((r) => {
+              const active = referrerFilter === r.label;
+              const share =
+                stats.googleAds > 0
+                  ? Math.round((r.count / stats.googleAds) * 100)
+                  : 0;
+              return (
+                <li key={r.label}>
+                  <button
+                    type="button"
+                    title={r.label}
+                    className={cn(
+                      "flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition",
+                      active
+                        ? "bg-accent-soft/70"
+                        : "bg-white hover:bg-sand/40"
+                    )}
+                    onClick={() =>
+                      setReferrerFilter((cur) =>
+                        cur === r.label ? "all" : r.label
+                      )
+                    }
+                  >
+                    <span className="min-w-0 flex-1 truncate font-medium text-foreground">
+                      {enquiryReferrerLabel(r.label, 64)}
+                    </span>
+                    <span className="shrink-0 tabular-nums text-xs text-muted">
+                      {share}%
+                    </span>
+                    <span
+                      className={cn(
+                        "shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums",
+                        active
+                          ? "bg-brand text-white"
+                          : "bg-sand text-foreground"
+                      )}
+                    >
+                      {r.count}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="mt-2 text-xs text-muted">
+            Only Google / Ads enquiries. Click a link to filter the list.
           </p>
         </div>
       ) : null}
@@ -744,16 +830,19 @@ export function EnquiriesClient({
           />
           Show test / staging rows
         </label>
-        {officeFilter !== "all" || sourceFilter !== "all" ? (
+        {officeFilter !== "all" ||
+        sourceFilter !== "all" ||
+        referrerFilter !== "all" ? (
           <button
             type="button"
             className="btn-ghost text-xs"
             onClick={() => {
               setOfficeFilter("all");
               setSourceFilter("all");
+              setReferrerFilter("all");
             }}
           >
-            Clear office / source filters
+            Clear office / source / referrer filters
           </button>
         ) : null}
       </div>
