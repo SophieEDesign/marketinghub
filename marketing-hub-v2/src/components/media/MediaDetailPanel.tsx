@@ -185,6 +185,7 @@ export function MediaDetailPanel({
     setDivision(normalizeDivision(item.division) || "All");
     setError(null);
     // Only reset when switching assets — not on every item object refresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.id]);
 
   useEffect(() => {

@@ -408,7 +408,7 @@ export async function writeStore(
   expectedRemoteUpdatedAt: string | null = null
 ): Promise<void> {
   if (shouldUseDurableSupabaseStore()) {
-    let version = expectedRemoteUpdatedAt;
+    const version = expectedRemoteUpdatedAt;
     if (!version) {
       const remote = await readRemoteStore();
       if (remote) {
