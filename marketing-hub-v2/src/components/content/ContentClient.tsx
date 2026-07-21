@@ -1050,8 +1050,8 @@ export function ContentClient({
             </div>
             {editLocked ? (
               <p className="border-b border-border bg-emerald-50 px-4 py-2 text-xs text-emerald-900">
-                Published in Planable — caption, media, channels, and date are
-                locked. Approve and publish stay in Planable.
+                Published — editing is locked. You can only delete this piece
+                from the Hub. Approve and publish stay in Planable.
               </p>
             ) : null}
             <div className="flex-1 overflow-y-auto p-4">
@@ -1277,7 +1277,7 @@ export function ContentClient({
                 disabled={saving}
                 onClick={closeEdit}
               >
-                Cancel
+                {editLocked ? "Close" : "Cancel"}
               </button>
               <button
                 type="button"

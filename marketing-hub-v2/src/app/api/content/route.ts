@@ -48,15 +48,10 @@ export async function POST(request: NextRequest) {
     if (!existing) return jsonError("Not found", 404);
 
     if (existing.status === "published") {
-      const allowed = new Set(["notes"]); // view-only lock; notes optional
-      const patchKeys = Object.keys(body.patch ?? {});
-      const blocked = patchKeys.filter((k) => !allowed.has(k));
-      if (blocked.length > 0) {
-        return jsonError(
-          "This post is published in Planable and is locked in the Hub.",
-          403
-        );
-      }
+      return jsonError(
+        "This post is published and locked in the Hub. You can only delete it.",
+        403
+      );
     }
 
     const patch = { ...(body.patch ?? {}) } as Record<string, unknown>;

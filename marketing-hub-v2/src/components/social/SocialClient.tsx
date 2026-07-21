@@ -406,6 +406,9 @@ export function SocialClient({ hideHeader = false }: { hideHeader?: boolean }) {
   );
 
   async function rescheduleHubPost(id: string, dueDate: string) {
+    const post = posts.find((p) => p.id === id);
+    if (!post || post.source !== "hub") return;
+    if (post.status.toLowerCase() === "published") return;
     setPosts((prev) =>
       prev.map((p) =>
         p.id === id
@@ -568,7 +571,11 @@ export function SocialClient({ hideHeader = false }: { hideHeader?: boolean }) {
                 const id = String(
                   info.event.extendedProps.postId ?? info.event.id
                 );
-                if (source !== "hub") {
+                const post = posts.find((p) => p.id === id);
+                if (
+                  source !== "hub" ||
+                  post?.status.toLowerCase() === "published"
+                ) {
                   info.revert();
                   return;
                 }
