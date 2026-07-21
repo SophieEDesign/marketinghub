@@ -102,28 +102,6 @@ function pickMediaUrls(p: Record<string, unknown>): string[] {
   return out;
 }
 
-function pickMediaUrl(p: Record<string, unknown>): string | null {
-  return pickMediaUrls(p)[0] ?? null;
-}
-
-function pickStatus(p: Record<string, unknown>): string {
-  if (p.published === true) return "Published";
-  if (p.approved === true) return "Approved";
-  const approval = p.approval as
-    | { status?: string; approved?: boolean }
-    | undefined;
-  if (approval?.approved === true) return "Approved";
-  if (approval?.status && /approv/i.test(approval.status)) return "Approved";
-  if (approval?.status && /pending|sent|waiting/i.test(approval.status)) {
-    return "Review";
-  }
-  const raw = String(p.status ?? p.state ?? "").trim();
-  if (!raw || raw.toLowerCase() === "default") {
-    return p.scheduledAt ? "Scheduled" : "Draft";
-  }
-  return raw;
-}
-
 function pickPlatforms(
   p: Record<string, unknown>,
   pagesById: Map<string, PlanablePage>
@@ -249,33 +227,6 @@ export function channelToPageIds(
     if (page && !ids.includes(page.id)) ids.push(page.id);
   }
   return ids;
-}
-
-function mapRawPost(
-  p: Record<string, unknown>,
-  pagesById: Map<string, PlanablePage>
-): PlanablePost {
-  const id = String(p.id ?? p._id ?? crypto.randomUUID());
-  const scheduled =
-    (p.scheduledAt as string | undefined) ||
-    (p.scheduled_at as string | undefined) ||
-    (p.publishAt as string | undefined) ||
-    null;
-  const platforms = pickPlatforms(p, pagesById);
-  const pageId = p.pageId != null ? String(p.pageId) : null;
-  const page = pageId ? pagesById.get(pageId) : undefined;
-  return {
-    id,
-    text: String(
-      p.plainText ?? p.text ?? p.caption ?? p.title ?? "Untitled post"
-    ).slice(0, 280),
-    status: pickStatus({ ...p, scheduledAt: scheduled }),
-    scheduledAt: scheduled,
-    url: (p.url as string | undefined) ?? null,
-    pageName: page?.name ?? platforms[0] ?? null,
-    mediaUrl: pickMediaUrl(p),
-    platforms,
-  };
 }
 
 function toRawPost(
