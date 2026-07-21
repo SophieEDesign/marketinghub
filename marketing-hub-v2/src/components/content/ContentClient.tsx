@@ -3,10 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   addDays,
-  differenceInCalendarDays,
   format,
-  max as maxDate,
-  min as minDate,
   parseISO,
   startOfDay,
 } from "date-fns";
@@ -18,6 +15,7 @@ import type { ContentItem, ContentStatus } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { FullCalendarStyles } from "@/components/ui/FullCalendarStyles";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
+import { TimelineChart } from "@/components/ui/TimelineChart";
 import { cn } from "@/lib/utils";
 import {
   formatChannels,
@@ -46,6 +44,7 @@ import { useManagedFieldOptions } from "@/lib/data/useManagedFieldOptions";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
 import { plainTextFromHtml } from "@/lib/sanitize";
+import { RelatedTasksPanel } from "@/components/tasks/RelatedTasksPanel";
 
 const COLUMNS: { id: ContentStatus; label: string }[] = [
   { id: "idea", label: "Idea" },
@@ -59,7 +58,6 @@ const VIEWS = [
   { id: "calendar", label: "Calendar" },
   { id: "kanban", label: "Kanban" },
   { id: "timeline", label: "Timeline" },
-  { id: "gantt", label: "Gantt" },
 ] as const;
 
 type ContentView = (typeof VIEWS)[number]["id"];
@@ -296,7 +294,7 @@ export function ContentClient({
     typeFilter,
   ]);
 
-  /** Lists / Kanban / Timeline / Gantt — future-focused unless date filter opened up. */
+  /** Lists / Kanban / Timeline — future-focused unless date filter opened up. */
   const listItems = useMemo(
     () => filtered.filter((item) => matchesDateWindow(item, datedOnly)),
     [filtered, datedOnly]
@@ -339,18 +337,8 @@ export function ContentClient({
     return map;
   }, [calendarItems]);
 
-  const timelineEntries = useMemo(() => {
-    const dated = listItems
-      .map((item) => ({ item, due: parseDue(item) }))
-      .filter((x): x is { item: ContentItem; due: Date } => !!x.due)
-      .sort((a, b) => a.due.getTime() - b.due.getTime());
-
-    const undated = listItems.filter((i) => !i.due_date);
-    return { dated, undated };
-  }, [listItems]);
-
-  const gantt = useMemo(() => {
-    const dated = listItems
+  const timelineItems = useMemo(() => {
+    return listItems
       .map((item) => {
         const due = parseDue(item);
         if (!due) return null;
@@ -359,40 +347,28 @@ export function ContentClient({
           : addDays(due, -7);
         const start =
           created.getTime() <= due.getTime() ? created : addDays(due, -7);
-        return { item, start, end: due };
+        return {
+          id: item.id,
+          label: item.title,
+          subtitle: [
+            statusLabel(item.status),
+            formatChannels(item.channel),
+            item.content_type,
+          ]
+            .filter(Boolean)
+            .join(" · "),
+          start,
+          end: due,
+          color: STATUS_COLOR[item.status],
+        };
       })
-      .filter(
-        (x): x is { item: ContentItem; start: Date; end: Date } => x !== null
-      )
-      .sort((a, b) => a.end.getTime() - b.end.getTime());
-
-    if (dated.length === 0) {
-      return {
-        rows: [],
-        rangeStart: new Date(),
-        rangeEnd: addDays(new Date(), 28),
-        days: 28,
-      };
-    }
-
-    const rangeStart = addDays(minDate(dated.map((d) => d.start)), -2);
-    const rangeEnd = addDays(maxDate(dated.map((d) => d.end)), 7);
-    const days = Math.max(
-      14,
-      differenceInCalendarDays(rangeEnd, rangeStart) || 14
-    );
-
-    const rows = dated.map(({ item, start, end }) => {
-      const left = (differenceInCalendarDays(start, rangeStart) / days) * 100;
-      const width = Math.max(
-        1.5,
-        (differenceInCalendarDays(end, start) / days) * 100
-      );
-      return { item, left, width, start, end };
-    });
-
-    return { rows, rangeStart, rangeEnd, days };
+      .filter((x): x is NonNullable<typeof x> => x !== null);
   }, [listItems]);
+
+  const undatedCount = useMemo(
+    () => listItems.filter((i) => !i.due_date).length,
+    [listItems]
+  );
 
   async function create() {
     await fetch("/api/content", {
@@ -566,7 +542,7 @@ export function ContentClient({
       ) : (
         <PageHeader
           title="Content planner"
-          description="Switch between Kanban, calendar, timeline, or Gantt. Synced data comes from Social Posts."
+          description="Switch between Kanban, calendar, or timeline. Synced data comes from Social Posts."
           actions={
             <button
               type="button"
@@ -703,7 +679,7 @@ export function ContentClient({
               onChange={(e) => setForm({ ...form, due_date: e.target.value })}
             />
             <p className="mt-1 text-xs text-muted">
-              Publish or go-live date — used on calendar, timeline, and Gantt.
+              Publish or go-live date — used on calendar and timeline.
             </p>
           </div>
           <div>
@@ -914,203 +890,22 @@ export function ContentClient({
           ) : null}
 
           {view === "timeline" ? (
-            <div className="surface-card p-4 md:p-6">
-              {timelineEntries.dated.length > 0 ? (
-                <ol className="relative ml-2 space-y-0 md:ml-3">
-                  {/* Continuous spine */}
-                  <span
-                    className="absolute bottom-2 left-[2.65rem] top-2 w-px bg-border md:left-[3.15rem]"
-                    aria-hidden
-                  />
-                  {timelineEntries.dated.map(({ item, due }, index) => {
-                    const prev = timelineEntries.dated[index - 1];
-                    const showMonth =
-                      !prev ||
-                      format(prev.due, "yyyy-MM") !== format(due, "yyyy-MM");
-                    const isPast = due.getTime() < startOfDay(new Date()).getTime();
-                    return (
-                      <li key={item.id}>
-                        {showMonth ? (
-                          <div className="relative z-10 mb-3 mt-2 first:mt-0">
-                            <span className="inline-flex rounded-full bg-brand px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white">
-                              {format(due, "MMMM yyyy")}
-                            </span>
-                          </div>
-                        ) : null}
-                        <div className="relative grid grid-cols-[3.25rem_1.25rem_1fr] items-start gap-2 pb-5 md:grid-cols-[4rem_1.5rem_1fr] md:gap-3">
-                          <button
-                            type="button"
-                            className="pt-1 text-right"
-                            onClick={() => openEdit(item)}
-                          >
-                            <span className="block font-display text-xl leading-none text-brand md:text-2xl">
-                              {format(due, "d")}
-                            </span>
-                            <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wide text-muted">
-                              {format(due, "EEE")}
-                            </span>
-                          </button>
-                          <div className="relative flex justify-center pt-2">
-                            <span
-                              className={cn(
-                                "relative z-10 h-3.5 w-3.5 rounded-full border-2 border-white shadow-sm ring-2",
-                                isPast ? "ring-slate-300" : "ring-brand/30"
-                              )}
-                              style={{ background: STATUS_COLOR[item.status] }}
-                              aria-hidden
-                            />
-                          </div>
-                          <button
-                            type="button"
-                            className={cn(
-                              "rounded-xl border border-border bg-white p-3 text-left shadow-sm transition hover:border-brand/30 hover:shadow-md",
-                              isPast && "opacity-75"
-                            )}
-                            onClick={() => openEdit(item)}
-                          >
-                            <div className="mb-1.5 flex flex-wrap items-center gap-2">
-                              <span
-                                className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white"
-                                style={{ background: STATUS_COLOR[item.status] }}
-                              >
-                                {statusLabel(item.status)}
-                              </span>
-                              <span className="text-xs text-muted">
-                                {formatChannels(item.channel)}
-                                {item.content_type
-                                  ? ` · ${item.content_type}`
-                                  : ""}
-                              </span>
-                            </div>
-                            <p className="font-medium text-foreground">
-                              {item.title}
-                            </p>
-                            {plainTextFromHtml(item.notes) ? (
-                              <RichTextView
-                                html={item.notes}
-                                plain
-                                clampLines={2}
-                                className="mt-1 text-xs text-muted"
-                              />
-                            ) : null}
-                          </button>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ol>
-              ) : (
-                <p className="text-sm text-muted">
-                  No dated pieces in this filter. Add due dates, or set When to
-                  All dates / Past.
-                </p>
-              )}
-
-              {timelineEntries.undated.length > 0 ? (
-                <section className="mt-8 border-t border-border pt-6">
-                  <h2 className="mb-3 text-sm font-semibold text-brand">
-                    No due date
-                  </h2>
-                  <div className="grid gap-2 md:grid-cols-2">
-                    {timelineEntries.undated.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        className="rounded-xl border border-border bg-sand/60 p-3 text-left hover:border-brand/30"
-                        onClick={() => openEdit(item)}
-                      >
-                        <CardSummary item={item} />
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              ) : null}
-            </div>
-          ) : null}
-
-          {view === "gantt" ? (
-            <div className="surface-card overflow-x-auto p-4">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs text-muted">
-                  Bars run from created/start toward the due date. Click a bar to
-                  edit.
-                </p>
-                <p className="text-xs text-muted">
-                  {format(gantt.rangeStart, "d MMM")} –{" "}
-                  {format(gantt.rangeEnd, "d MMM yyyy")}
-                </p>
-              </div>
-
-              {gantt.rows.length === 0 ? (
-                <p className="text-sm text-muted">
-                  Add due dates to see pieces on the Gantt chart.
-                </p>
-              ) : (
-                <div className="min-w-[720px]">
-                  <div className="mb-2 grid grid-cols-[200px_1fr] gap-3 text-[11px] font-semibold uppercase tracking-wide text-muted">
-                    <div>Piece</div>
-                    <div className="relative h-6">
-                      {[0, 0.25, 0.5, 0.75, 1].map((t) => (
-                        <span
-                          key={t}
-                          className="absolute top-0 -translate-x-1/2"
-                          style={{ left: `${t * 100}%` }}
-                        >
-                          {format(
-                            addDays(gantt.rangeStart, Math.round(gantt.days * t)),
-                            "d MMM"
-                          )}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    {gantt.rows.map(({ item, left, width, end }) => (
-                      <div
-                        key={item.id}
-                        className="grid grid-cols-[200px_1fr] items-center gap-3"
-                      >
-                        <button
-                          type="button"
-                          className="truncate text-left text-sm font-medium hover:text-brand"
-                          onClick={() => openEdit(item)}
-                          title={item.title}
-                        >
-                          {item.title}
-                        </button>
-                        <div className="relative h-9 rounded-lg bg-sand/80">
-                          <button
-                            type="button"
-                            className="absolute top-1.5 h-6 rounded-md px-2 text-left text-[11px] font-medium text-white shadow-sm transition hover:opacity-90"
-                            style={{
-                              left: `${Math.min(98, Math.max(0, left))}%`,
-                              width: `${Math.min(100 - left, width)}%`,
-                              minWidth: "4.5rem",
-                              background: STATUS_COLOR[item.status],
-                            }}
-                            onClick={() => openEdit(item)}
-                            title={`${item.title} · due ${format(end, "d MMM")}`}
-                          >
-                            <span className="block truncate">
-                              {statusLabel(item.status)} · {format(end, "d MMM")}
-                            </span>
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {listItems.some((i) => !i.due_date) ? (
-                    <p className="mt-4 text-xs text-muted">
-                      {listItems.filter((i) => !i.due_date).length} piece(s) have no
-                      due date and are hidden here — switch to Kanban or Timeline
-                      to edit them.
-                    </p>
-                  ) : null}
-                </div>
-              )}
-            </div>
+            <TimelineChart
+              items={timelineItems}
+              onSelect={(id) => {
+                const item = listItems.find((i) => i.id === id);
+                if (item) openEdit(item);
+              }}
+              emptyMessage="No dated pieces in this filter. Add due dates, or set When to All dates / Past."
+              footer={
+                undatedCount > 0 ? (
+                  <p className="mt-4 text-xs text-muted">
+                    {undatedCount} piece(s) have no due date and are hidden here
+                    — switch to Kanban to edit them.
+                  </p>
+                ) : null
+              }
+            />
           ) : null}
       </div>
 
@@ -1196,8 +991,7 @@ export function ContentClient({
                     }
                   />
                   <p className="mt-1 text-xs text-muted">
-                    Publish or go-live date — used on calendar, timeline, and
-                    Gantt.
+                    Publish or go-live date — used on calendar and timeline.
                   </p>
                 </div>
                 <div>
@@ -1337,6 +1131,10 @@ export function ContentClient({
                     onChange={(asset_url) => setEdit({ ...edit, asset_url })}
                   />
                 </div>
+                <RelatedTasksPanel
+                  relatedType="content"
+                  relatedId={editingId}
+                />
               </div>
             </div>
             <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">

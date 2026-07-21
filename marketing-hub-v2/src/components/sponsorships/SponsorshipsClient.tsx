@@ -6,11 +6,13 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { ContactOwnerSelect } from "@/components/ui/ContactOwnerSelect";
 import { useHubView } from "@/lib/hub-view";
-import { format, parseISO, startOfDay } from "date-fns";
+import { format, parseISO, addDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
 import { plainTextFromHtml } from "@/lib/sanitize";
+import { RelatedTasksPanel } from "@/components/tasks/RelatedTasksPanel";
+import { TimelineChart } from "@/components/ui/TimelineChart";
 
 const STATUSES: { id: SponsorshipStatus; label: string }[] = [
   { id: "prospect", label: "Prospect" },
@@ -185,6 +187,34 @@ export function SponsorshipsClient({
       filtered
         .filter((i) => i.starts_at)
         .sort((a, b) => String(a.starts_at).localeCompare(String(b.starts_at))),
+    [filtered]
+  );
+
+  const timelineItems = useMemo(() => {
+    return dated.map((item) => {
+      const start = parseISO(item.starts_at!);
+      const end = item.ends_at
+        ? parseISO(item.ends_at)
+        : addDays(start, 30);
+      return {
+        id: item.id,
+        label: item.partner,
+        subtitle: [
+          statusLabel(item.status),
+          item.package_name,
+          item.value,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+        start,
+        end: end.getTime() >= start.getTime() ? end : start,
+        color: STATUS_COLOR[item.status],
+      };
+    });
+  }, [dated]);
+
+  const undatedCount = useMemo(
+    () => filtered.filter((i) => !i.starts_at).length,
     [filtered]
   );
 
@@ -616,117 +646,22 @@ export function SponsorshipsClient({
           ) : null}
 
           {view === "timeline" ? (
-            <div className="surface-card p-4 md:p-6">
-              {dated.length > 0 ? (
-                <ol className="relative ml-2 space-y-0 md:ml-3">
-                  <span
-                    className="absolute bottom-2 left-[2.65rem] top-2 w-px bg-border md:left-[3.15rem]"
-                    aria-hidden
-                  />
-                  {dated.map((item, index) => {
-                    const due = parseISO(item.starts_at!);
-                    const prev = dated[index - 1];
-                    const prevDue = prev?.starts_at
-                      ? parseISO(prev.starts_at)
-                      : null;
-                    const showMonth =
-                      !prevDue ||
-                      format(prevDue, "yyyy-MM") !== format(due, "yyyy-MM");
-                    const isPast =
-                      due.getTime() < startOfDay(new Date()).getTime();
-                    return (
-                      <li key={item.id}>
-                        {showMonth ? (
-                          <div className="relative z-10 mb-3 mt-2 first:mt-0">
-                            <span className="inline-flex rounded-full bg-brand px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white">
-                              {format(due, "MMMM yyyy")}
-                            </span>
-                          </div>
-                        ) : null}
-                        <div className="relative grid grid-cols-[3.25rem_1.25rem_1fr] items-start gap-2 pb-5 md:grid-cols-[4rem_1.5rem_1fr] md:gap-3">
-                          <button
-                            type="button"
-                            className="pt-1 text-right"
-                            onClick={() => setSelected(item)}
-                          >
-                            <span className="block font-display text-xl leading-none text-brand md:text-2xl">
-                              {format(due, "d")}
-                            </span>
-                            <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wide text-muted">
-                              {format(due, "EEE")}
-                            </span>
-                          </button>
-                          <div className="relative flex justify-center pt-2">
-                            <span
-                              className={cn(
-                                "relative z-10 h-3.5 w-3.5 rounded-full border-2 border-white shadow-sm ring-2",
-                                isPast ? "ring-slate-300" : "ring-brand/30"
-                              )}
-                              style={{ background: STATUS_COLOR[item.status] }}
-                              aria-hidden
-                            />
-                          </div>
-                          <div
-                            className={cn(
-                              "rounded-xl border border-border bg-white p-3 text-left shadow-sm transition hover:border-brand/30 hover:shadow-md",
-                              isPast && "opacity-75",
-                              selected?.id === item.id && "ring-2 ring-brand/30"
-                            )}
-                          >
-                            <button
-                              type="button"
-                              className="w-full text-left"
-                              onClick={() => setSelected(item)}
-                            >
-                              <div className="mb-1.5 flex flex-wrap items-center gap-2">
-                                <span
-                                  className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white"
-                                  style={{
-                                    background: STATUS_COLOR[item.status],
-                                  }}
-                                >
-                                  {statusLabel(item.status)}
-                                </span>
-                                {item.kind === "membership" ? (
-                                  <span className="text-xs text-muted">
-                                    Membership
-                                  </span>
-                                ) : (
-                                  <span className="text-xs text-muted">
-                                    Sponsorship
-                                  </span>
-                                )}
-                              </div>
-                              <p className="font-medium">{item.partner}</p>
-                              <p className="mt-0.5 text-sm text-muted">
-                                {item.package_name || "No package"}
-                                {item.value ? ` · ${item.value}` : ""}
-                              </p>
-                              {item.ends_at ? (
-                                <p className="mt-1 text-xs text-muted">
-                                  Until{" "}
-                                  {format(
-                                    parseISO(item.ends_at),
-                                    "d MMM yyyy"
-                                  )}
-                                </p>
-                              ) : null}
-                            </button>
-                            <div className="mt-2">
-                              <CardActions item={item} />
-                            </div>
-                          </div>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ol>
-              ) : (
-                <p className="text-sm text-muted">
-                  Add start dates to see a timeline — or use List / Kanban.
-                </p>
-              )}
-            </div>
+            <TimelineChart
+              items={timelineItems}
+              onSelect={(id) => {
+                const item = filtered.find((i) => i.id === id);
+                if (item) setSelected(item);
+              }}
+              emptyMessage="Add start dates to see a timeline — or use List / Kanban."
+              footer={
+                undatedCount > 0 ? (
+                  <p className="mt-4 text-xs text-muted">
+                    {undatedCount} partner(s) have no start date and are hidden
+                    here — switch to List or Kanban to edit them.
+                  </p>
+                ) : null
+              }
+            />
           ) : null}
       </div>
 
@@ -837,6 +772,11 @@ export function SponsorshipsClient({
                     </div>
                   ) : null}
                 </dl>
+                <RelatedTasksPanel
+                  className="mt-4"
+                  relatedType="sponsorship"
+                  relatedId={selected.id}
+                />
               </div>
             </div>
             <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
@@ -984,6 +924,10 @@ export function SponsorshipsClient({
                     minHeight="90px"
                   />
                 </div>
+                <RelatedTasksPanel
+                  relatedType="sponsorship"
+                  relatedId={editingId}
+                />
               </div>
             </div>
             <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">

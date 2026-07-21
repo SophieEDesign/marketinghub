@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react";
-import { format, parseISO, isBefore, startOfDay } from "date-fns";
+import { format, parseISO, isBefore, startOfDay, addDays } from "date-fns";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { FullCalendarStyles } from "@/components/ui/FullCalendarStyles";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { ContactOwnerSelect } from "@/components/ui/ContactOwnerSelect";
+import { TimelineChart } from "@/components/ui/TimelineChart";
 import { cn } from "@/lib/utils";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
@@ -220,14 +221,36 @@ export function TasksClient({
     return map;
   }, [filtered]);
 
-  const timelineEntries = useMemo(() => {
-    const dated = filtered
-      .map((item) => ({ item, due: parseDue(item) }))
-      .filter((x): x is { item: HubTask; due: Date } => !!x.due)
-      .sort((a, b) => a.due.getTime() - b.due.getTime());
-    const undated = filtered.filter((i) => !i.due_date);
-    return { dated, undated };
-  }, [filtered]);
+  const timelineItems = useMemo(() => {
+    return filtered
+      .map((item) => {
+        const due = parseDue(item);
+        if (!due) return null;
+        const created = item.created_at
+          ? parseISO(item.created_at.slice(0, 10))
+          : addDays(due, -5);
+        const start =
+          created.getTime() <= due.getTime() ? created : addDays(due, -5);
+        const statusLabel =
+          statusColumns.find((s) => s.id === item.status)?.label ?? item.status;
+        return {
+          id: item.id,
+          label: item.title,
+          subtitle: [statusLabel, item.category, item.owner]
+            .filter(Boolean)
+            .join(" · "),
+          start,
+          end: due,
+          color: statusDotColor(item.status),
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
+  }, [filtered, statusColumns]);
+
+  const undatedCount = useMemo(
+    () => filtered.filter((i) => !i.due_date).length,
+    [filtered]
+  );
 
   async function create() {
     if (creating) return;
@@ -925,140 +948,22 @@ export function TasksClient({
       ) : null}
 
       {view === "timeline" ? (
-        <div className="surface-card p-4 md:p-6">
-          {timelineEntries.dated.length > 0 ? (
-            <ol className="relative ml-2 space-y-0 md:ml-3">
-              <span
-                className="absolute bottom-2 left-[2.65rem] top-2 w-px bg-border md:left-[3.15rem]"
-                aria-hidden
-              />
-              {timelineEntries.dated.map(({ item, due }, index) => {
-                const prev = timelineEntries.dated[index - 1];
-                const showMonth =
-                  !prev ||
-                  format(prev.due, "yyyy-MM") !== format(due, "yyyy-MM");
-                const past = due.getTime() < startOfDay(new Date()).getTime();
-                const statusLabel =
-                  statusColumns.find((s) => s.id === item.status)?.label ??
-                  item.status;
-                return (
-                  <li key={item.id}>
-                    {showMonth ? (
-                      <div className="relative z-10 mb-3 mt-2 first:mt-0">
-                        <span className="inline-flex rounded-full bg-brand px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white">
-                          {format(due, "MMMM yyyy")}
-                        </span>
-                      </div>
-                    ) : null}
-                    <div className="relative grid grid-cols-[3.25rem_1.25rem_1fr] items-start gap-2 pb-5 md:grid-cols-[4rem_1.5rem_1fr] md:gap-3">
-                      <button
-                        type="button"
-                        className="pt-1 text-right"
-                        onClick={() => openEdit(item)}
-                      >
-                        <span className="block font-display text-xl leading-none text-brand md:text-2xl">
-                          {format(due, "d")}
-                        </span>
-                        <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wide text-muted">
-                          {format(due, "EEE")}
-                        </span>
-                      </button>
-                      <div className="relative flex justify-center pt-2">
-                        <span
-                          className={cn(
-                            "relative z-10 h-3.5 w-3.5 rounded-full border-2 border-white shadow-sm ring-2",
-                            past ? "ring-slate-300" : "ring-brand/30"
-                          )}
-                          style={{ background: statusDotColor(item.status) }}
-                          aria-hidden
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        className={cn(
-                          "rounded-xl border border-border bg-white p-3 text-left shadow-sm transition hover:border-brand/30 hover:shadow-md",
-                          past && !isClosedTaskStatus(item.status) && "opacity-80"
-                        )}
-                        onClick={() => openEdit(item)}
-                      >
-                        <div className="mb-1.5 flex flex-wrap items-center gap-2">
-                          <span
-                            className={cn(
-                              "rounded-full border px-2 py-0.5 text-[10px] font-semibold",
-                              statusTone(item.status)
-                            )}
-                          >
-                            {statusLabel}
-                          </span>
-                          {isOverdue(item) ? (
-                            <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-medium text-rose-800">
-                              Overdue
-                            </span>
-                          ) : null}
-                          <TaskRelatedChip
-                            related_type={item.related_type}
-                            related_id={item.related_id}
-                          />
-                          <span className="text-xs text-muted">
-                            {[item.category, item.owner]
-                              .filter(Boolean)
-                              .join(" · ")}
-                          </span>
-                        </div>
-                        <p className="font-medium text-foreground">
-                          {item.title}
-                        </p>
-                        {plainTextFromHtml(item.details) ? (
-                          <RichTextView
-                            html={item.details}
-                            plain
-                            clampLines={2}
-                            className="mt-1 text-xs text-muted"
-                          />
-                        ) : null}
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
-          ) : (
-            <p className="text-sm text-muted">
-              No dated tasks in this filter. Add due dates to see them on the
-              timeline.
-            </p>
-          )}
-
-          {timelineEntries.undated.length > 0 ? (
-            <section className="mt-8 border-t border-border pt-6">
-              <h2 className="mb-3 text-sm font-semibold text-brand">
-                No due date
-              </h2>
-              <div className="grid gap-2 md:grid-cols-2">
-                {timelineEntries.undated.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className="rounded-xl border border-border bg-sand/60 p-3 text-left hover:border-brand/30"
-                    onClick={() => openEdit(item)}
-                  >
-                    <p className="text-sm font-medium">{item.title}</p>
-                    <p className="mt-1 text-xs text-muted">
-                      {[
-                        statusColumns.find((s) => s.id === item.status)
-                          ?.label ?? item.status,
-                        item.category,
-                        item.owner,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </p>
-                  </button>
-                ))}
-              </div>
-            </section>
-          ) : null}
-        </div>
+        <TimelineChart
+          items={timelineItems}
+          onSelect={(id) => {
+            const item = filtered.find((i) => i.id === id);
+            if (item) openEdit(item);
+          }}
+          emptyMessage="No dated tasks in this filter. Add due dates to see them on the timeline."
+          footer={
+            undatedCount > 0 ? (
+              <p className="mt-4 text-xs text-muted">
+                {undatedCount} task(s) have no due date and are hidden here —
+                switch to Kanban or List to edit them.
+              </p>
+            ) : null
+          }
+        />
       ) : null}
 
       {edit && editingId ? (

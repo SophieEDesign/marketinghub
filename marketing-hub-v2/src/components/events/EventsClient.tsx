@@ -39,6 +39,7 @@ import {
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
 import { plainTextFromHtml } from "@/lib/sanitize";
+import { RelatedTasksPanel } from "@/components/tasks/RelatedTasksPanel";
 
 const ATTENDANCE_OPTIONS: { value: EventAttendanceStatus; label: string }[] = [
   { value: "attending", label: "Attending" },
@@ -1098,6 +1099,12 @@ export function EventsClient({
                   </div>
                 </dl>
 
+                <RelatedTasksPanel
+                  className="mt-4"
+                  relatedType="event"
+                  relatedId={selected.id}
+                />
+
                 {currentUserId ? (
                   <div className="border-t border-border pt-3">
                     <p className="label !mb-2">Your attendance</p>
@@ -1280,6 +1287,11 @@ export function EventsClient({
                 onChange={setEdit}
                 eventTypeOptions={eventTypeOptions}
                 divisionOptions={divisionOptions}
+              />
+              <RelatedTasksPanel
+                className="mt-4"
+                relatedType="event"
+                relatedId={editingId}
               />
             </div>
             <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">

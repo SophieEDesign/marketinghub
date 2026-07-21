@@ -30,6 +30,7 @@ import { isSocialContentItem } from "@/lib/data/normalize";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
 import { plainTextFromHtml } from "@/lib/sanitize";
+import { RelatedTasksPanel } from "@/components/tasks/RelatedTasksPanel";
 
 const STATUS_LABEL: Record<ThemeStatus, string> = {
   previous: "Previous",
@@ -708,6 +709,11 @@ export function ThemesClient({
               placeholder="Theme summary"
               minHeight="88px"
             />
+            <RelatedTasksPanel
+              className="mt-4"
+              relatedType="theme"
+              relatedId={selectedId}
+            />
           </div>
 
           <div className="surface-card p-5">
@@ -1197,6 +1203,11 @@ export function ThemesClient({
                   onChange={(asset_url) =>
                     setContentEdit({ ...contentEdit, asset_url })
                   }
+                />
+                <RelatedTasksPanel
+                  className="mt-4"
+                  relatedType="content"
+                  relatedId={editingContentId}
                 />
               </div>
             </div>

@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
 import { plainTextFromHtml } from "@/lib/sanitize";
+import { RelatedTasksPanel } from "@/components/tasks/RelatedTasksPanel";
 
 const STATUSES: { id: AwardStatus; label: string }[] = [
   { id: "watching", label: "Watching" },
@@ -428,6 +429,11 @@ export function AwardsClient({ initial }: { initial: AwardEntry[] }) {
                     </div>
                   ) : null}
                 </dl>
+                <RelatedTasksPanel
+                  className="mt-4"
+                  relatedType="award"
+                  relatedId={selected.id}
+                />
               </div>
             </div>
             <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
@@ -486,6 +492,11 @@ export function AwardsClient({ initial }: { initial: AwardEntry[] }) {
             </div>
             <div className="flex-1 overflow-y-auto p-4">
               <AwardFields form={edit} onChange={setEdit} />
+              <RelatedTasksPanel
+                className="mt-4"
+                relatedType="award"
+                relatedId={editingId}
+              />
             </div>
             <div className="flex gap-2 border-t border-border px-4 py-3">
               <button
