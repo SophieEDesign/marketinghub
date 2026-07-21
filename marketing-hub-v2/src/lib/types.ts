@@ -89,6 +89,16 @@ export type ContentItem = {
   /** Linked quarterly theme (content lives here; Themes page may still use mains for tree). */
   theme_id: string | null;
   planable_url: string;
+  /** Planable post id (primary page when multi-page group). */
+  planable_post_id: string;
+  /** Planable groupId — one Hub card for multi-channel posts. */
+  planable_group_id: string;
+  /** Planable page ids linked to this piece. */
+  planable_page_ids: string[];
+  /** Last successful Planable sync timestamp (ISO). */
+  last_synced_at: string | null;
+  /** Who last wrote syncable fields — loop prevention. */
+  sync_source: "hub" | "planable" | "";
   /** Asset / Canva URLs (newline-separated when multiple) */
   asset_url: string;
   notes: string;

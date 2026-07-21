@@ -167,7 +167,7 @@ export function SponsorshipsClient({
         !matchesSearch(search, [
           item.partner,
           item.package_name,
-          item.value,
+          ...(isAdminView ? [item.value] : []),
           item.owner,
           plainTextFromHtml(item.deliverables),
           plainTextFromHtml(item.notes),
@@ -180,7 +180,7 @@ export function SponsorshipsClient({
       if (statusFilter !== "all" && item.status !== statusFilter) return false;
       return true;
     });
-  }, [scoped, search, statusFilter]);
+  }, [scoped, search, statusFilter, isAdminView]);
 
   const dated = useMemo(
     () =>
@@ -202,7 +202,7 @@ export function SponsorshipsClient({
         subtitle: [
           statusLabel(item.status),
           item.package_name,
-          item.value,
+          ...(isAdminView ? [item.value] : []),
         ]
           .filter(Boolean)
           .join(" · "),
@@ -211,7 +211,7 @@ export function SponsorshipsClient({
         color: STATUS_COLOR[item.status],
       };
     });
-  }, [dated]);
+  }, [dated, isAdminView]);
 
   const undatedCount = useMemo(
     () => filtered.filter((i) => !i.starts_at).length,
@@ -220,11 +220,13 @@ export function SponsorshipsClient({
 
   async function create() {
     if (!canCreate) return;
+    const { value, ...rest } = form;
     await fetch("/api/sponsorships", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        ...form,
+        ...rest,
+        ...(isAdminView ? { value } : {}),
         kind: activeCreateKind,
         starts_at: form.starts_at || null,
         ends_at: form.ends_at || null,
@@ -252,6 +254,7 @@ export function SponsorshipsClient({
     if (!current || !canManageItem(current)) return;
     setSaving(true);
     try {
+      const { value, ...rest } = edit;
       await fetch("/api/sponsorships", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -259,7 +262,8 @@ export function SponsorshipsClient({
           action: "update",
           id: editingId,
           patch: {
-            ...edit,
+            ...rest,
+            ...(isAdminView ? { value } : {}),
             partner: edit.partner.trim() || "Untitled partner",
             starts_at: edit.starts_at || null,
             ends_at: edit.ends_at || null,
@@ -464,10 +468,16 @@ export function SponsorshipsClient({
             [
               ["partner", nameLabel],
               ["package_name", packageLabel],
-              [
-                "value",
-                activeCreateKind === "membership" ? "Fee / value" : "Value",
-              ],
+              ...(isAdminView
+                ? ([
+                    [
+                      "value",
+                      activeCreateKind === "membership"
+                        ? "Fee / value"
+                        : "Value",
+                    ],
+                  ] as const)
+                : []),
               ["onedrive_url", "Docs / OneDrive URL"],
             ] as const
           ).map(([key, label]) => (
@@ -571,8 +581,9 @@ export function SponsorshipsClient({
                         {item.partner}
                       </h2>
                       <p className="text-sm text-muted">
-                        {item.package_name || "No package"} ·{" "}
-                        {item.value || "—"} · {statusLabel(item.status)}
+                        {item.package_name || "No package"}
+                        {isAdminView ? ` · ${item.value || "—"}` : ""} ·{" "}
+                        {statusLabel(item.status)}
                       </p>
                     </div>
                   </div>
@@ -633,7 +644,9 @@ export function SponsorshipsClient({
                           <p className="text-sm font-medium">{item.partner}</p>
                           <p className="mt-1 text-xs text-muted">
                             {item.package_name || "No package"}
-                            {item.value ? ` · ${item.value}` : ""}
+                            {isAdminView && item.value
+                              ? ` · ${item.value}`
+                              : ""}
                           </p>
                           <CardActions item={item} />
                         </article>
@@ -720,14 +733,16 @@ export function SponsorshipsClient({
                     </dt>
                     <dd>{selected.package_name || "—"}</dd>
                   </div>
-                  <div>
-                    <dt className="label !mb-0.5">
-                      {partnerKind(selected) === "membership"
-                        ? "Fee / value"
-                        : "Value"}
-                    </dt>
-                    <dd>{selected.value || "—"}</dd>
-                  </div>
+                  {isAdminView ? (
+                    <div>
+                      <dt className="label !mb-0.5">
+                        {partnerKind(selected) === "membership"
+                          ? "Fee / value"
+                          : "Value"}
+                      </dt>
+                      <dd>{selected.value || "—"}</dd>
+                    </div>
+                  ) : null}
                   <div>
                     <dt className="label !mb-0.5">Starts</dt>
                     <dd>{formatDateLabel(selected.starts_at)}</dd>
@@ -841,7 +856,14 @@ export function SponsorshipsClient({
                   [
                     ["partner", nameLabel],
                     ["package_name", packageLabel],
-                    ["value", isMembership ? "Fee / value" : "Value"],
+                    ...(isAdminView
+                      ? ([
+                          [
+                            "value",
+                            isMembership ? "Fee / value" : "Value",
+                          ],
+                        ] as const)
+                      : []),
                     ["onedrive_url", "Docs / OneDrive URL"],
                   ] as const
                 ).map(([key, label]) => (

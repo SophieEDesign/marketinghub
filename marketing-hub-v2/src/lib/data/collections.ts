@@ -408,6 +408,36 @@ export const DATA_COLLECTIONS: CollectionDef[] = [
       f("caption", { type: "longtext", label: "Caption / post text" }),
       f("website", { type: "url", label: "Website / publication URL" }),
       f("planable_url", { type: "url", label: "Planable URL" }),
+      f("planable_post_id", {
+        type: "text",
+        label: "Planable post ID",
+        locked: true,
+      }),
+      f("planable_group_id", {
+        type: "text",
+        label: "Planable group ID",
+        locked: true,
+      }),
+      f("planable_page_ids", {
+        type: "text",
+        label: "Planable page IDs",
+        locked: true,
+      }),
+      f("last_synced_at", {
+        type: "readonly",
+        label: "Last Planable sync",
+        locked: true,
+      }),
+      f("sync_source", {
+        type: "select",
+        label: "Sync source",
+        locked: true,
+        options: [
+          { value: "", label: "—" },
+          { value: "hub", label: "Hub" },
+          { value: "planable", label: "Planable" },
+        ],
+      }),
       f("asset_url", { type: "url", label: "Assets / Canva URLs" }),
       f("notes", { type: "longtext" }),
       f("created_at", { type: "readonly", locked: true }),

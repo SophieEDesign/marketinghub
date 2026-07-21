@@ -7,6 +7,7 @@ import {
   listSponsorships,
   updateSponsorship,
 } from "@/lib/data/repos";
+import type { Sponsorship } from "@/lib/types";
 
 function isAdminUser(role: string) {
   return role === "admin";
@@ -16,10 +17,21 @@ function partnerKindOf(kind: unknown): "membership" | "sponsorship" {
   return kind === "membership" ? "membership" : "sponsorship";
 }
 
+/** Value / fee is internal (admin) only — redact for members. */
+function redactPartnerValue(item: Sponsorship): Sponsorship {
+  return { ...item, value: "" };
+}
+
 export async function GET() {
-  const { error } = await requireStaff();
+  const { user, error } = await requireStaff();
   if (error) return error;
-  return jsonOk({ sponsorships: await listSponsorships() });
+  const sponsorships = await listSponsorships();
+  if (!isAdminUser(user.role)) {
+    return jsonOk({
+      sponsorships: sponsorships.map(redactPartnerValue),
+    });
+  }
+  return jsonOk({ sponsorships });
 }
 
 export async function POST(request: NextRequest) {
@@ -41,10 +53,16 @@ export async function POST(request: NextRequest) {
     if (!admin && patch.kind !== undefined && patch.kind !== "membership") {
       return jsonError("Members can only manage memberships", 403);
     }
-    if (!admin) patch.kind = "membership";
+    if (!admin) {
+      patch.kind = "membership";
+      // Preserve existing fee/value — members cannot read or change it.
+      delete patch.value;
+    }
     const updated = await updateSponsorship(body.id, patch);
     if (!updated) return jsonError("Not found", 404);
-    return jsonOk({ item: updated });
+    return jsonOk({
+      item: admin ? updated : redactPartnerValue(updated),
+    });
   }
 
   if (action === "delete") {
@@ -68,12 +86,15 @@ export async function POST(request: NextRequest) {
     package_name: body.package_name ?? "",
     starts_at: body.starts_at ?? null,
     ends_at: body.ends_at ?? null,
-    value: body.value ?? "",
+    value: admin ? (body.value ?? "") : "",
     status: body.status ?? "prospect",
     deliverables: body.deliverables ?? "",
     owner: body.owner ?? "",
     onedrive_url: body.onedrive_url ?? "",
     notes: body.notes ?? "",
   });
-  return jsonOk({ item }, { status: 201 });
+  return jsonOk(
+    { item: admin ? item : redactPartnerValue(item) },
+    { status: 201 }
+  );
 }

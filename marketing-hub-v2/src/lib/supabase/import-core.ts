@@ -377,6 +377,15 @@ export async function importFromCoreData(): Promise<ImportResult> {
             caption: cleaned.caption,
             theme_id: null,
             planable_url: cleaned.planable_url,
+            planable_post_id: asString(
+              pickField(r, [/^planable_?post_?id$/i])
+            ),
+            planable_group_id: asString(
+              pickField(r, [/^planable_?group_?id$/i])
+            ),
+            planable_page_ids: [],
+            last_synced_at: null,
+            sync_source: "",
             asset_url: cleaned.asset_url,
             notes: cleaned.notes,
             created_at: asIsoDate(r.created_at) || now,

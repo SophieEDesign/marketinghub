@@ -28,6 +28,22 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+/** Backfill Planable sync fields for older hub_store rows. */
+export function withContentPlanableDefaults(
+  item: ContentItem
+): ContentItem {
+  return {
+    ...item,
+    planable_post_id: item.planable_post_id ?? "",
+    planable_group_id: item.planable_group_id ?? "",
+    planable_page_ids: Array.isArray(item.planable_page_ids)
+      ? item.planable_page_ids
+      : [],
+    last_synced_at: item.last_synced_at ?? null,
+    sync_source: item.sync_source ?? "",
+  };
+}
+
 export async function listEvents() {
   const store = await readStore();
   return [...store.events].sort((a, b) => {
@@ -136,7 +152,7 @@ export async function upsertEventAttendance(input: {
 
 export async function listContent() {
   const store = await readStore();
-  return store.content;
+  return store.content.map(withContentPlanableDefaults);
 }
 
 export async function createContent(
@@ -163,7 +179,7 @@ export async function updateContent(
     const idx = s.content.findIndex((c) => c.id === id);
     if (idx === -1) return;
     const next: ContentItem = {
-      ...s.content[idx],
+      ...withContentPlanableDefaults(s.content[idx]),
       ...patch,
       id,
       updated_at: nowIso(),
@@ -611,6 +627,11 @@ export async function createThemeMainWithContent(input: {
     caption: "",
     theme_id: themeId,
     planable_url: "",
+    planable_post_id: "",
+    planable_group_id: "",
+    planable_page_ids: [],
+    last_synced_at: null,
+    sync_source: "",
     asset_url: "",
     notes,
     created_at: now,
@@ -668,6 +689,11 @@ export async function ensureThemeMainContentLink(mainId: string) {
     caption: "",
     theme_id: main.theme_id,
     planable_url: "",
+    planable_post_id: "",
+    planable_group_id: "",
+    planable_page_ids: [],
+    last_synced_at: null,
+    sync_source: "",
     asset_url: "",
     notes: main.notes ?? "",
     created_at: now,

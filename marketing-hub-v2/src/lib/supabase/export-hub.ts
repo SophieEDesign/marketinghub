@@ -85,6 +85,13 @@ export async function exportStoreToSupabase(
       caption: c.caption ?? "",
       theme_id: c.theme_id ?? "",
       planable_url: c.planable_url ?? "",
+      planable_post_id: c.planable_post_id ?? "",
+      planable_group_id: c.planable_group_id ?? "",
+      planable_page_ids: Array.isArray(c.planable_page_ids)
+        ? c.planable_page_ids
+        : [],
+      last_synced_at: c.last_synced_at ?? null,
+      sync_source: c.sync_source ?? "",
       asset_url: c.asset_url ?? "",
       notes: c.notes ?? "",
       created_at: c.created_at,

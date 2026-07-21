@@ -1,4 +1,4 @@
-import type { HubStore } from "@/lib/types";
+﻿import type { HubStore } from "@/lib/types";
 import { createMerchInventorySeed } from "@/lib/merch/inventory-seed";
 
 const now = new Date().toISOString();
@@ -54,6 +54,11 @@ export function createSeedStore(): HubStore {
         caption: "",
         theme_id: null,
         planable_url: "",
+        planable_post_id: "",
+        planable_group_id: "",
+        planable_page_ids: [],
+        last_synced_at: null,
+        sync_source: "",
         asset_url: "",
         notes: "Need deck cargo B-roll.",
         created_at: now,
@@ -61,7 +66,7 @@ export function createSeedStore(): HubStore {
       },
       {
         id: "cnt_seed_2",
-        title: "LinkedIn case study — yacht move",
+        title: "LinkedIn case study â€” yacht move",
         channel: ["LinkedIn"],
         content_type: "Social",
         owner: "Marketing",
@@ -76,6 +81,11 @@ export function createSeedStore(): HubStore {
         caption: "",
         theme_id: null,
         planable_url: "",
+        planable_post_id: "",
+        planable_group_id: "",
+        planable_page_ids: [],
+        last_synced_at: null,
+        sync_source: "",
         asset_url: "",
         notes: "",
         created_at: now,
@@ -83,7 +93,7 @@ export function createSeedStore(): HubStore {
       },
       {
         id: "cnt_seed_3",
-        title: "Press release — new route",
+        title: "Press release â€” new route",
         channel: ["PR"],
         content_type: "PR",
         owner: "Sophie",
@@ -96,6 +106,11 @@ export function createSeedStore(): HubStore {
         caption: "",
         theme_id: null,
         planable_url: "",
+        planable_post_id: "",
+        planable_group_id: "",
+        planable_page_ids: [],
+        last_synced_at: null,
+        sync_source: "",
         asset_url: "",
         notes: "Legal check pending.",
         created_at: now,
@@ -104,7 +119,7 @@ export function createSeedStore(): HubStore {
       {
         id: "cnt_seed_theme_1",
         title:
-          "Global forwarding is becoming more complex — customers expect it simpler",
+          "Global forwarding is becoming more complex â€” customers expect it simpler",
         channel: ["Article"],
         content_type: "Editorial",
         owner: "Sophie",
@@ -117,6 +132,11 @@ export function createSeedStore(): HubStore {
         caption: "",
         theme_id: "thm_seed_q3",
         planable_url: "",
+        planable_post_id: "",
+        planable_group_id: "",
+        planable_page_ids: [],
+        last_synced_at: null,
+        sync_source: "",
         asset_url: "",
         notes: "Core thought-leadership piece for the quarter.",
         created_at: now,
@@ -124,7 +144,7 @@ export function createSeedStore(): HubStore {
       },
       {
         id: "cnt_seed_theme_2",
-        title: "The Middle East is still moving — the route looks different",
+        title: "The Middle East is still moving â€” the route looks different",
         channel: ["Case study"],
         content_type: "Editorial",
         owner: "Marketing",
@@ -137,6 +157,11 @@ export function createSeedStore(): HubStore {
         caption: "",
         theme_id: "thm_seed_q3",
         planable_url: "",
+        planable_post_id: "",
+        planable_group_id: "",
+        planable_page_ids: [],
+        last_synced_at: null,
+        sync_source: "",
         asset_url: "",
         notes: "",
         created_at: now,
@@ -153,7 +178,7 @@ export function createSeedStore(): HubStore {
         ends_at: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365)
           .toISOString()
           .slice(0, 10),
-        value: "£12,000",
+        value: "Â£12,000",
         status: "active",
         deliverables: "4 features, logo on site, 2 social mentions/month",
         owner: "Sophie",
@@ -171,12 +196,12 @@ export function createSeedStore(): HubStore {
         ends_at: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365)
           .toISOString()
           .slice(0, 10),
-        value: "£2,400 / year",
+        value: "Â£2,400 / year",
         status: "active",
         deliverables: "Listing, events access, member rates",
         owner: "Sophie",
         onedrive_url: "",
-        notes: "Renews annually — diary reminder Q4.",
+        notes: "Renews annually â€” diary reminder Q4.",
         created_at: now,
         updated_at: now,
       },
@@ -229,7 +254,7 @@ export function createSeedStore(): HubStore {
       {
         id: "res_seed_1",
         title: "Brand guidelines (PDF)",
-        description: "Full brand guide — also in Library → Brand",
+        description: "Full brand guide â€” also in Library â†’ Brand",
         url: "https://hwtycgvclhckglmuwnmw.supabase.co/storage/v1/object/public/attachments/attachments/table_media_1768074185692/19e724de-39c2-4ee5-b545-dae584996d8c/media/4363f3e1-1bb0-49f4-ad10-7f6d92ea52e0.pdf",
         category: "Brand",
         created_at: now,
@@ -298,7 +323,7 @@ export function createSeedStore(): HubStore {
       {
         id: "rpt_seed_enq",
         title: "Web enquiries",
-        description: "In-hub list — see Web Enquiries tab (or paste an external sheet URL)",
+        description: "In-hub list â€” see Web Enquiries tab (or paste an external sheet URL)",
         url: "/app/enquiries",
         category: "Enquiries",
         tool: "Sheet / CRM",
@@ -308,7 +333,7 @@ export function createSeedStore(): HubStore {
       {
         id: "rpt_seed_social",
         title: "Social performance",
-        description: "Reach and engagement — Planable analytics or native insights",
+        description: "Reach and engagement â€” Planable analytics or native insights",
         url: "https://app.planable.io/",
         category: "Social",
         tool: "Planable / native",
@@ -323,7 +348,7 @@ export function createSeedStore(): HubStore {
         quarter: "Q1",
         year: 2026,
         status: "previous",
-        summary: "Set the year’s narrative and prep major campaigns.",
+        summary: "Set the yearâ€™s narrative and prep major campaigns.",
         created_at: now,
         updated_at: now,
       },
@@ -364,7 +389,7 @@ export function createSeedStore(): HubStore {
         theme_id: "thm_seed_q3",
         content_id: "cnt_seed_theme_1",
         title:
-          "Global forwarding is becoming more complex — customers expect it simpler",
+          "Global forwarding is becoming more complex â€” customers expect it simpler",
         channel: "Article",
         owner: "Sophie",
         status: "draft",
@@ -376,7 +401,7 @@ export function createSeedStore(): HubStore {
         id: "tmc_seed_2",
         theme_id: "thm_seed_q3",
         content_id: "cnt_seed_theme_2",
-        title: "The Middle East is still moving — the route looks different",
+        title: "The Middle East is still moving â€” the route looks different",
         channel: "Case study",
         owner: "Marketing",
         status: "idea",
@@ -400,7 +425,7 @@ export function createSeedStore(): HubStore {
       {
         id: "tof_seed_2",
         main_content_id: "tmc_seed_1",
-        title: "Short reel — deck cargo B-roll",
+        title: "Short reel â€” deck cargo B-roll",
         channel: "Instagram",
         owner: "Sophie",
         status: "idea",
@@ -423,7 +448,7 @@ export function createSeedStore(): HubStore {
     merch_orders: [
       {
         id: "mrc_seed_1",
-        item: "Polo — Regatta (polyester)",
+        item: "Polo â€” Regatta (polyester)",
         fit: "female",
         size: "M",
         quantity: 1,
@@ -443,13 +468,13 @@ export function createSeedStore(): HubStore {
       },
       {
         id: "mrc_seed_2",
-        item: "Gilet — Marstrand (navy)",
+        item: "Gilet â€” Marstrand (navy)",
         fit: "male",
         size: "L",
         quantity: 1,
         colour: "Navy",
         logo: "Yacht Transport",
-        requested_for: "Ops — Southampton",
+        requested_for: "Ops â€” Southampton",
         office: "Southampton",
         needed_by: null,
         status: "ordered",
@@ -487,7 +512,7 @@ export function createSeedStore(): HubStore {
         kind: "asset",
         category: "Image",
         title: "High-res yacht load photos for LinkedIn",
-        details: "Need 4–6 images from Rotterdam project for next week’s post.",
+        details: "Need 4â€“6 images from Rotterdam project for next weekâ€™s post.",
         requested_by: "Marketing",
         needed_by: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7)
           .toISOString()
@@ -564,7 +589,7 @@ export function createSeedStore(): HubStore {
       {
         id: "tsk_seed_1",
         title: "Update boat show attendance sheet",
-        details: "Confirm who’s going to Monaco and Southampton.",
+        details: "Confirm whoâ€™s going to Monaco and Southampton.",
         due_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 5)
           .toISOString()
           .slice(0, 10),
@@ -628,3 +653,4 @@ export function createSeedStore(): HubStore {
     field_extras: {},
   };
 }
+

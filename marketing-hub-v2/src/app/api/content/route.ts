@@ -5,8 +5,30 @@ import {
   deleteContent,
   listContent,
   updateContent,
+  withContentPlanableDefaults,
 } from "@/lib/data/repos";
-import { normalizeChannels } from "@/lib/data/normalize";
+import {
+  isSocialContentItem,
+  normalizeChannels,
+} from "@/lib/data/normalize";
+import { pushContentToPlanable } from "@/lib/planable/sync";
+import type { ContentItem } from "@/lib/types";
+
+async function maybePushPlanable(
+  item: ContentItem
+): Promise<{ item: ContentItem; planableSyncError?: string }> {
+  if (!isSocialContentItem(item)) {
+    return { item };
+  }
+  if (item.status === "published") {
+    return { item };
+  }
+  const result = await pushContentToPlanable(item);
+  return {
+    item: result.item,
+    ...(result.error ? { planableSyncError: result.error } : {}),
+  };
+}
 
 export async function GET() {
   const { error } = await requireStaff();
@@ -21,13 +43,41 @@ export async function POST(request: NextRequest) {
   const action = body.action as string | undefined;
 
   if (action === "update") {
+    const existingList = await listContent();
+    const existing = existingList.find((c) => c.id === body.id);
+    if (!existing) return jsonError("Not found", 404);
+
+    if (existing.status === "published") {
+      const allowed = new Set(["notes"]); // view-only lock; notes optional
+      const patchKeys = Object.keys(body.patch ?? {});
+      const blocked = patchKeys.filter((k) => !allowed.has(k));
+      if (blocked.length > 0) {
+        return jsonError(
+          "This post is published in Planable and is locked in the Hub.",
+          403
+        );
+      }
+    }
+
     const patch = { ...(body.patch ?? {}) } as Record<string, unknown>;
     if (patch.channel !== undefined) {
       patch.channel = normalizeChannels(patch.channel);
     }
+    // User edits mark hub as source before push
+    if (isSocialContentItem({ ...existing, ...patch } as ContentItem)) {
+      patch.sync_source = "hub";
+    }
+
     const updated = await updateContent(body.id, patch);
     if (!updated) return jsonError("Not found", 404);
-    return jsonOk({ item: updated });
+
+    const pushed = await maybePushPlanable(withContentPlanableDefaults(updated));
+    return jsonOk({
+      item: pushed.item,
+      ...(pushed.planableSyncError
+        ? { planableSyncError: pushed.planableSyncError }
+        : {}),
+    });
   }
 
   if (action === "delete") {
@@ -49,8 +99,25 @@ export async function POST(request: NextRequest) {
     caption: body.caption ?? "",
     theme_id: body.theme_id || null,
     planable_url: body.planable_url ?? "",
+    planable_post_id: body.planable_post_id ?? "",
+    planable_group_id: body.planable_group_id ?? "",
+    planable_page_ids: Array.isArray(body.planable_page_ids)
+      ? body.planable_page_ids.map(String)
+      : [],
+    last_synced_at: null,
+    sync_source: "hub",
     asset_url: body.asset_url ?? "",
     notes: body.notes ?? "",
   });
-  return jsonOk({ item }, { status: 201 });
+
+  const pushed = await maybePushPlanable(withContentPlanableDefaults(item));
+  return jsonOk(
+    {
+      item: pushed.item,
+      ...(pushed.planableSyncError
+        ? { planableSyncError: pushed.planableSyncError }
+        : {}),
+    },
+    { status: 201 }
+  );
 }

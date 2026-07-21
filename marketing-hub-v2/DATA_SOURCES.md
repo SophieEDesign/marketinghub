@@ -16,7 +16,7 @@ Keep the UI simple. Pull from the **tidy** Core Data tables only.
 | **Awards** | **Awards** | — |
 | **Tasks** | **Tasks** | — |
 | **Merch / staff requests / reports** | Hub store + durable Supabase (`merch_orders`, `staff_requests`, `report_links`) | — |
-| **Social calendar** | Planable API first; Social Posts as fallback cache | — |
+| **Social calendar** | Hub social `content` synced with Planable (`POST /api/planable/sync`); live Planable API as fallback | — |
 
 ## Durable hub mirror (local store → Supabase)
 

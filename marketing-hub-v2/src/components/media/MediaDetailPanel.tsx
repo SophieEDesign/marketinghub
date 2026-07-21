@@ -10,7 +10,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
 import {
   GALLERY_CATEGORY,
   MEDIA_HUB_CATEGORIES,
@@ -54,6 +54,20 @@ function isAcceptedMediaFile(file: File) {
 function filesFromList(list: FileList | File[] | null | undefined): File[] {
   if (!list) return [];
   return Array.from(list).filter(isAcceptedMediaFile);
+}
+
+/** Clipboard screenshots often arrive as generic `image.png` — rename for the library. */
+function fileFromClipboardImage(file: File): File {
+  const ext =
+    file.type === "image/jpeg" || file.type === "image/jpg"
+      ? "jpg"
+      : file.type === "image/webp"
+        ? "webp"
+        : file.type === "image/gif"
+          ? "gif"
+          : "png";
+  const name = `preview-${new Date().toISOString().slice(0, 10)}.${ext}`;
+  return new File([file], name, { type: file.type || "image/png" });
 }
 
 function isImageFile(file: { url: string; name: string; type: string }) {
@@ -429,11 +443,30 @@ export function MediaDetailPanel({
     void uploadFiles(filesFromList(e.dataTransfer.files));
   }
 
+  function onPasteFiles(e: ClipboardEvent) {
+    if (!canEdit || uploading || saving) return;
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const images: File[] = [];
+    for (const item of Array.from(items)) {
+      if (!item.type.startsWith("image/")) continue;
+      const raw = item.getAsFile();
+      if (!raw) continue;
+      images.push(fileFromClipboardImage(raw));
+    }
+    if (images.length === 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    void uploadFiles(images);
+  }
+
   const previewUrl = useMemo(() => {
     if (focusedFile && isImageFile(focusedFile)) return focusedFile.url;
     const cover = item.files.find(isImageFile);
     return cover?.url ?? null;
   }, [focusedFile, item.files]);
+
+  const needsPreviewImage = !previewUrl && canEdit;
 
   return (
     <>
@@ -448,6 +481,7 @@ export function MediaDetailPanel({
         role="dialog"
         aria-modal="true"
         aria-label={canEdit ? "Edit media" : "Media details"}
+        onPaste={onPasteFiles}
       >
         <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
           <div className="min-w-0">
@@ -479,10 +513,25 @@ export function MediaDetailPanel({
               />
             </div>
           ) : (
-            <div className="rounded-2xl border border-dashed border-border bg-sand/40 px-4 py-8 text-center text-sm text-muted">
-              {focusedFile?.name ||
-                item.document_link ||
-                "No image preview for this asset"}
+            <div
+              className={cn(
+                "rounded-2xl border border-dashed px-4 py-8 text-center text-sm",
+                needsPreviewImage
+                  ? "border-amber-300 bg-amber-50/80 text-amber-950"
+                  : "border-border bg-sand/40 text-muted"
+              )}
+            >
+              <p className="font-medium">
+                {focusedFile?.name ||
+                  item.document_link ||
+                  "No image preview for this asset"}
+              </p>
+              {needsPreviewImage ? (
+                <p className="mt-2 text-xs text-amber-900/80">
+                  Paste a screenshot (Ctrl+V) or upload an image below to use as
+                  the library preview. Keep the PDF/file as well.
+                </p>
+              ) : null}
             </div>
           )}
 
@@ -604,11 +653,16 @@ export function MediaDetailPanel({
                 <p className="mt-1.5 text-sm font-medium text-brand">
                   {uploading
                     ? "Uploading…"
-                    : "Drop files here or click to upload"}
+                    : needsPreviewImage
+                      ? "Drop, click, or paste (Ctrl+V) a preview image"
+                      : "Drop files here, click, or paste (Ctrl+V)"}
                 </p>
                 <p className="mt-1 text-xs text-muted">
                   Images, PDF, or short video · max{" "}
                   {Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))}MB each
+                  {needsPreviewImage
+                    ? " · screenshots become the gallery thumbnail"
+                    : ""}
                 </p>
                 <input
                   ref={fileInputRef}

@@ -188,55 +188,19 @@ export function SocialClient({ hideHeader = false }: { hideHeader?: boolean }) {
     "upcoming"
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const planableRes = await fetch("/api/planable/posts");
+      const [planableRes, contentRes] = await Promise.all([
+        fetch("/api/planable/posts"),
+        fetch("/api/content"),
+      ]);
       const planable = await planableRes.json();
-      setOpenUrl(planable.openUrl ?? "https://app.planable.io");
-
-      const fromPlanable: SocialPost[] = (planable.posts ?? []).map(
-        (p: {
-          id: string;
-          text: string;
-          status: string;
-          scheduledAt: string | null;
-          url: string | null;
-          pageName: string | null;
-          mediaUrl?: string | null;
-          platforms?: string[];
-        }) => {
-          const platforms = (p.platforms?.length
-            ? p.platforms
-            : p.pageName
-              ? [p.pageName]
-              : ["Social"]
-          ).map(normalizePlatform);
-          return {
-            id: `pl_${p.id}`,
-            text: stripHtml(p.text),
-            status: normalizeStatus(p.status),
-            scheduledAt: p.scheduledAt,
-            url: p.url,
-            platform: platforms[0] ?? "Social",
-            platforms,
-            mediaUrl: p.mediaUrl ?? null,
-            source: "planable" as const,
-          };
-        }
-      );
-
-      if (planable.configured && fromPlanable.length > 0) {
-        setPosts(fromPlanable);
-        setSourceLabel("Planable");
-        setLoading(false);
-        return;
-      }
-
-      const contentRes = await fetch("/api/content");
       const contentData = await contentRes.json();
+      setOpenUrl(planable.openUrl ?? "https://app.planable.io");
 
       const fromHub: SocialPost[] = (
         (contentData.content ?? []) as ContentItem[]
@@ -248,9 +212,12 @@ export function SocialClient({ hideHeader = false }: { hideHeader?: boolean }) {
             .map((ch) => normalizePlatform(String(ch)));
           const unique = Array.from(new Set(platforms));
           const platform = unique[0] ?? "Social";
+          const text = stripHtml(
+            c.caption || c.title || c.notes || "Untitled post"
+          );
           return {
             id: c.id,
-            text: stripHtml(c.title || c.notes || "Untitled post"),
+            text,
             status: normalizeStatus(c.status),
             scheduledAt: c.due_date ? `${c.due_date}T09:00:00.000Z` : null,
             url: c.planable_url || null,
@@ -267,12 +234,57 @@ export function SocialClient({ hideHeader = false }: { hideHeader?: boolean }) {
           String(a.scheduledAt ?? "").localeCompare(String(b.scheduledAt ?? ""))
         );
 
-      setPosts(fromHub);
-      setSourceLabel(
-        planable.configured
-          ? "Planable (empty) · Social Posts"
-          : "Social Posts"
-      );
+      const syncedHub = fromHub.filter((p) => {
+        const raw = (contentData.content as ContentItem[]).find(
+          (c) => c.id === p.id
+        );
+        return Boolean(raw?.planable_post_id);
+      });
+
+      // Hub-first: prefer synced (or any) Hub social rows; live Planable only as fallback.
+      if (fromHub.length > 0) {
+        setPosts(fromHub);
+        setSourceLabel(
+          syncedHub.length > 0
+            ? "Hub (synced with Planable)"
+            : "Hub Social Posts"
+        );
+      } else {
+        const fromPlanable: SocialPost[] = (planable.posts ?? []).map(
+          (p: {
+            id: string;
+            text: string;
+            status: string;
+            scheduledAt: string | null;
+            url: string | null;
+            pageName: string | null;
+            mediaUrl?: string | null;
+            platforms?: string[];
+          }) => {
+            const platforms = (p.platforms?.length
+              ? p.platforms
+              : p.pageName
+                ? [p.pageName]
+                : ["Social"]
+            ).map(normalizePlatform);
+            return {
+              id: `pl_${p.id}`,
+              text: stripHtml(p.text),
+              status: normalizeStatus(p.status),
+              scheduledAt: p.scheduledAt,
+              url: p.url,
+              platform: platforms[0] ?? "Social",
+              platforms,
+              mediaUrl: p.mediaUrl ?? null,
+              source: "planable" as const,
+            };
+          }
+        );
+        setPosts(fromPlanable);
+        setSourceLabel(
+          planable.configured ? "Planable (live)" : "Social Posts"
+        );
+      }
       if (planable.error) setError(planable.error);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load social posts");
@@ -280,6 +292,26 @@ export function SocialClient({ hideHeader = false }: { hideHeader?: boolean }) {
     }
     setLoading(false);
   }, []);
+
+  async function syncFromPlanable() {
+    setSyncing(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/planable/sync", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setError(data.error || "Planable sync failed");
+      } else {
+        setSourceLabel(
+          `Synced · ${data.created ?? 0} new · ${data.updated ?? 0} updated`
+        );
+      }
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Planable sync failed");
+    }
+    setSyncing(false);
+  }
 
   useEffect(() => {
     void load();
@@ -364,8 +396,8 @@ export function SocialClient({ hideHeader = false }: { hideHeader?: boolean }) {
           title: p.text.slice(0, 40),
           start: allDay ? iso.slice(0, 10) : iso,
           allDay,
-          editable: p.source === "hub",
-          startEditable: p.source === "hub",
+          editable: p.source === "hub" && p.status.toLowerCase() !== "published",
+          startEditable: p.source === "hub" && p.status.toLowerCase() !== "published",
           durationEditable: false,
           extendedProps: { postId: p.id, source: p.source },
         };
@@ -406,21 +438,15 @@ export function SocialClient({ hideHeader = false }: { hideHeader?: boolean }) {
           <h2 className="font-display text-xl text-brand">
             Social Media Calendar
           </h2>
-          <a
-            href={openUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="btn-primary"
-          >
-            Open Planable
-            <ExternalLink className="h-4 w-4" />
-          </a>
-        </div>
-      ) : (
-        <PageHeader
-          title="Social Media Calendar"
-          description="Planable-style view of scheduled posts — platform, media, and caption preview."
-          actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={syncing || loading}
+              onClick={() => void syncFromPlanable()}
+            >
+              {syncing ? "Syncing…" : "Sync from Planable"}
+            </button>
             <a
               href={openUrl}
               target="_blank"
@@ -430,6 +456,32 @@ export function SocialClient({ hideHeader = false }: { hideHeader?: boolean }) {
               Open Planable
               <ExternalLink className="h-4 w-4" />
             </a>
+          </div>
+        </div>
+      ) : (
+        <PageHeader
+          title="Social Media Calendar"
+          description="Hub social drafts synced with Planable — approve and publish in Planable."
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={syncing || loading}
+                onClick={() => void syncFromPlanable()}
+              >
+                {syncing ? "Syncing…" : "Sync from Planable"}
+              </button>
+              <a
+                href={openUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="btn-primary"
+              >
+                Open Planable
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            </div>
           }
         />
       )}

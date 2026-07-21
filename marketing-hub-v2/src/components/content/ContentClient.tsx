@@ -20,12 +20,16 @@ import {
   formatChannels,
   isSocialContentItem,
   parseChannels,
+  primaryCanvaUrl,
+  primaryImageUrl,
 } from "@/lib/data/normalize";
 import {
   ContentCalendarCard,
   HUB_CALENDAR_CSS,
 } from "@/components/content/ContentCalendarCard";
 import { AssetUploadField } from "@/components/content/AssetUploadField";
+import { CanvaPreviewTile } from "@/components/content/CanvaPreviewTile";
+import { FileText, ImageIcon } from "lucide-react";
 import { ChannelMultiSelect } from "@/components/ui/ChannelMultiSelect";
 import {
   CHANNELS,
@@ -213,6 +217,8 @@ export function ContentClient({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [edit, setEdit] = useState<EditForm | null>(null);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [channelFilter, setChannelFilter] = useState("all");
@@ -313,6 +319,29 @@ export function ContentClient({
   const editingItem = editingId
     ? items.find((i) => i.id === editingId) ?? null
     : null;
+  const editLocked = editingItem?.status === "published";
+
+  async function syncFromPlanable() {
+    setSyncing(true);
+    setSyncMessage(null);
+    try {
+      const res = await fetch("/api/planable/sync", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setSyncMessage(data.error || "Planable sync failed");
+      } else {
+        setSyncMessage(
+          `Planable sync: ${data.created ?? 0} new, ${data.updated ?? 0} updated`
+        );
+      }
+      await refresh();
+    } catch (e) {
+      setSyncMessage(
+        e instanceof Error ? e.message : "Planable sync failed"
+      );
+    }
+    setSyncing(false);
+  }
 
   const calendarEvents = useMemo(
     () =>
@@ -370,7 +399,8 @@ export function ContentClient({
   );
 
   async function create() {
-    await fetch("/api/content", {
+    setSyncMessage(null);
+    const res = await fetch("/api/content", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -380,6 +410,10 @@ export function ContentClient({
         status: "idea",
       }),
     });
+    const data = await res.json().catch(() => ({}));
+    if (data.planableSyncError) {
+      setSyncMessage(data.planableSyncError);
+    }
     setShowForm(false);
     setForm(emptyFormForScope(scope));
     await refresh();
@@ -397,9 +431,14 @@ export function ContentClient({
 
   async function saveEdit() {
     if (!editingId || !edit) return;
+    if (edit.status === "published" || editLocked) {
+      closeEdit();
+      return;
+    }
     setSaving(true);
+    setSyncMessage(null);
     try {
-      await fetch("/api/content", {
+      const res = await fetch("/api/content", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -422,6 +461,14 @@ export function ContentClient({
           },
         }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSyncMessage(data.error || "Save failed");
+        return;
+      }
+      if (data.planableSyncError) {
+        setSyncMessage(data.planableSyncError);
+      }
       closeEdit();
       await refresh();
     } finally {
@@ -430,6 +477,8 @@ export function ContentClient({
   }
 
   async function move(id: string, status: ContentStatus) {
+    const item = items.find((i) => i.id === id);
+    if (item?.status === "published") return;
     await fetch("/api/content", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -442,6 +491,8 @@ export function ContentClient({
   }
 
   async function reschedule(id: string, dueDate: string) {
+    const item = items.find((i) => i.id === id);
+    if (item?.status === "published") return;
     setItems((prev) =>
       prev.map((i) => (i.id === id ? { ...i, due_date: dueDate } : i))
     );
@@ -471,17 +522,45 @@ export function ContentClient({
   }
 
   function CardSummary({ item }: { item: ContentItem }) {
+    const social = isSocialContentItem(item);
+    const image = primaryImageUrl(item.asset_url);
+    const canva = !image ? primaryCanvaUrl(item.asset_url) : "";
+
     return (
       <>
+        {image ? (
+          <div className="mb-2 aspect-[16/10] w-full overflow-hidden rounded-lg bg-slate-100">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={image}
+              alt=""
+              className="h-full w-full object-cover"
+              loading="lazy"
+            />
+          </div>
+        ) : canva ? (
+          <div className="mb-2">
+            <CanvaPreviewTile url={canva} compact={false} />
+          </div>
+        ) : social ? (
+          <div className="mb-2 flex aspect-[16/10] w-full items-center justify-center rounded-lg bg-gradient-to-br from-sky-50 to-slate-100 text-sky-200">
+            <ImageIcon className="h-7 w-7" />
+          </div>
+        ) : (
+          <div className="mb-2 flex aspect-[16/10] w-full items-center justify-center rounded-lg bg-gradient-to-br from-slate-100 to-sand text-slate-300">
+            <FileText className="h-7 w-7" />
+          </div>
+        )}
         <p className="text-sm font-medium">{item.title}</p>
         <p className="mt-1 text-xs text-muted">
           {item.content_type ? `${item.content_type} · ` : ""}
           {formatChannels(item.channel)}
           {item.due_date ? ` · due ${item.due_date}` : ""}
+          {item.status === "published" ? " · Locked" : ""}
         </p>
-        {plainTextFromHtml(item.notes) ? (
+        {plainTextFromHtml(item.caption || item.notes) ? (
           <RichTextView
-            html={item.notes}
+            html={item.caption || item.notes}
             plain
             clampLines={2}
             className="mt-2 text-xs text-foreground/70"
@@ -493,11 +572,12 @@ export function ContentClient({
             className="btn-secondary px-2.5 py-1.5 text-xs"
             onClick={() => openEdit(item)}
           >
-            Edit
+            {item.status === "published" ? "View" : "Edit"}
           </button>
           <select
             className="field !w-auto py-1.5 text-xs"
             value={item.status}
+            disabled={item.status === "published"}
             onChange={(e) =>
               void move(item.id, e.target.value as ContentStatus)
             }
@@ -508,6 +588,7 @@ export function ContentClient({
                 {c.label}
               </option>
             ))}
+            <option value="published">Published</option>
           </select>
         </div>
       </>
@@ -527,22 +608,17 @@ export function ContentClient({
                 ? "Content planner"
                 : "Content"}
           </h2>
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={() => {
-              setForm(emptyFormForScope(scope));
-              setShowForm(true);
-            }}
-          >
-            Add piece
-          </button>
-        </div>
-      ) : (
-        <PageHeader
-          title="Content planner"
-          description="Switch between Kanban, calendar, or timeline. Synced data comes from Social Posts."
-          actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {scope !== "content" ? (
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={syncing}
+                onClick={() => void syncFromPlanable()}
+              >
+                {syncing ? "Syncing…" : "Sync from Planable"}
+              </button>
+            ) : null}
             <button
               type="button"
               className="btn-primary"
@@ -553,9 +629,42 @@ export function ContentClient({
             >
               Add piece
             </button>
+          </div>
+        </div>
+      ) : (
+        <PageHeader
+          title="Content planner"
+          description="Draft social in the Hub; approve and publish in Planable. Published posts are locked."
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
+              {scope !== "content" ? (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={syncing}
+                  onClick={() => void syncFromPlanable()}
+                >
+                  {syncing ? "Syncing…" : "Sync from Planable"}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => {
+                  setForm(emptyFormForScope(scope));
+                  setShowForm(true);
+                }}
+              >
+                Add piece
+              </button>
+            </div>
           }
         />
       )}
+
+      {syncMessage ? (
+        <p className="mb-4 text-xs text-muted">{syncMessage}</p>
+      ) : null}
 
       <div
         className="mb-5 inline-flex flex-wrap gap-1 rounded-2xl border border-border bg-white p-1"
@@ -859,6 +968,11 @@ export function ContentClient({
                   const id = String(
                     info.event.extendedProps.itemId ?? info.event.id
                   );
+                  const item = items.find((i) => i.id === id);
+                  if (item?.status === "published") {
+                    info.revert();
+                    return;
+                  }
                   const next = info.event.startStr.slice(0, 10);
                   if (!next) {
                     info.revert();
@@ -923,7 +1037,9 @@ export function ContentClient({
             aria-label="Edit content piece"
           >
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <h2 className="text-sm font-semibold text-brand">Edit piece</h2>
+              <h2 className="text-sm font-semibold text-brand">
+                {editLocked ? "Published piece (locked)" : "Edit piece"}
+              </h2>
               <button
                 type="button"
                 className="btn-ghost px-2.5 py-1.5 text-xs"
@@ -932,8 +1048,14 @@ export function ContentClient({
                 Close
               </button>
             </div>
+            {editLocked ? (
+              <p className="border-b border-border bg-emerald-50 px-4 py-2 text-xs text-emerald-900">
+                Published in Planable — caption, media, channels, and date are
+                locked. Approve and publish stay in Planable.
+              </p>
+            ) : null}
             <div className="flex-1 overflow-y-auto p-4">
-              <div className="grid gap-2">
+              <fieldset disabled={editLocked} className="grid gap-2 disabled:opacity-80">
                 <div>
                   <label className="label">Title</label>
                   <input
@@ -1136,17 +1258,19 @@ export function ContentClient({
                   relatedType="content"
                   relatedId={editingId}
                 />
-              </div>
+              </fieldset>
             </div>
             <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
-              <button
-                type="button"
-                className="btn-primary"
-                disabled={saving}
-                onClick={() => void saveEdit()}
-              >
-                {saving ? "Saving…" : "Save"}
-              </button>
+              {!editLocked ? (
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={saving}
+                  onClick={() => void saveEdit()}
+                >
+                  {saving ? "Saving…" : "Save"}
+                </button>
+              ) : null}
               <button
                 type="button"
                 className="btn-secondary"
