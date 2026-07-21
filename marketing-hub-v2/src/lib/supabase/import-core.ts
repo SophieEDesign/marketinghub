@@ -1039,6 +1039,10 @@ function mapTaskRows(
           pickField(r, [/^description$/i, /^details$/i, /^notes$/i, /^body$/i])
         )
       ),
+      start_date:
+        asIsoDate(
+          pickField(r, [/^start_?date$/i, /^from$/i, /^starts?$/i])
+        )?.slice(0, 10) ?? null,
       due_date:
         asIsoDate(
           pickField(r, [/^due_?date$/i, /^deadline$/i, /^due$/i])
