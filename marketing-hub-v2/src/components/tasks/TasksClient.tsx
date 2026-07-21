@@ -12,17 +12,13 @@ import { RichTextView } from "@/components/ui/RichTextView";
 import { plainTextFromHtml } from "@/lib/sanitize";
 import {
   TASK_CATEGORIES,
+  TASK_STATUSES,
+  isClosedTaskStatus,
   optionsForField,
   selectOptionsWithCurrent,
   type FieldOption,
 } from "@/lib/data/collections";
 import { useManagedFieldOptions } from "@/lib/data/useManagedFieldOptions";
-
-const STATUSES: { id: TaskStatus; label: string }[] = [
-  { id: "todo", label: "To do" },
-  { id: "doing", label: "Doing" },
-  { id: "done", label: "Done" },
-];
 
 const VIEWS = [
   { id: "list", label: "List" },
@@ -54,13 +50,23 @@ function toEditForm(item: HubTask): EditForm {
 }
 
 function statusTone(status: TaskStatus) {
-  if (status === "done") return "bg-emerald-50 text-emerald-800 border-emerald-200";
-  if (status === "doing") return "bg-sky-50 text-sky-800 border-sky-200";
+  const s = status.trim().toLowerCase();
+  if (isClosedTaskStatus(s)) {
+    return "bg-emerald-50 text-emerald-800 border-emerald-200";
+  }
+  if (
+    s === "doing" ||
+    s === "inprogress" ||
+    s.includes("progress") ||
+    s.includes("wait")
+  ) {
+    return "bg-sky-50 text-sky-800 border-sky-200";
+  }
   return "bg-amber-50 text-amber-900 border-amber-200";
 }
 
 function isOverdue(item: HubTask) {
-  if (!item.due_date || item.status === "done") return false;
+  if (!item.due_date || isClosedTaskStatus(item.status)) return false;
   try {
     return isBefore(parseISO(item.due_date), startOfDay(new Date()));
   } catch {
@@ -81,7 +87,24 @@ export function TasksClient({
     "category",
     TASK_CATEGORIES
   );
+  const statusOptions = optionsForField(
+    fieldOptions,
+    "status",
+    TASK_STATUSES
+  );
   const [items, setItems] = useState(initial);
+  const statusColumns = useMemo(() => {
+    const cols = statusOptions.map((o) => ({ id: o.value, label: o.label }));
+    const known = new Set(cols.map((c) => c.id));
+    for (const item of items) {
+      const status = item.status?.trim();
+      if (status && !known.has(status)) {
+        known.add(status);
+        cols.push({ id: status, label: status });
+      }
+    }
+    return cols;
+  }, [statusOptions, items]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -125,7 +148,8 @@ export function TasksClient({
       ) {
         return false;
       }
-      if (statusFilter === "open" && item.status === "done") return false;
+      if (statusFilter === "open" && isClosedTaskStatus(item.status))
+        return false;
       if (
         statusFilter !== "all" &&
         statusFilter !== "open" &&
@@ -350,9 +374,9 @@ export function TasksClient({
             value: statusFilter,
             onChange: setStatusFilter,
             options: [
-              { value: "open", label: "Open (to do + doing)" },
+              { value: "open", label: "Open (not completed)" },
               { value: "all", label: "All statuses" },
-              ...STATUSES.map((s) => ({ value: s.id, label: s.label })),
+              ...statusColumns.map((s) => ({ value: s.id, label: s.label })),
             ],
           },
           {
@@ -417,8 +441,8 @@ export function TasksClient({
                 setForm({ ...form, status: e.target.value as TaskStatus })
               }
             >
-              {STATUSES.map((s) => (
-                <option key={s.id} value={s.id}>
+              {selectOptionsWithCurrent(statusOptions, form.status).map((s) => (
+                <option key={s.value} value={s.value}>
                   {s.label}
                 </option>
               ))}
@@ -475,7 +499,7 @@ export function TasksClient({
                       statusTone(item.status)
                     )}
                   >
-                    {STATUSES.find((s) => s.id === item.status)?.label ??
+                    {statusColumns.find((s) => s.id === item.status)?.label ??
                       item.status}
                   </span>
                   {isOverdue(item) ? (
@@ -513,11 +537,13 @@ export function TasksClient({
                   }
                   aria-label="Change status"
                 >
-                  {STATUSES.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.label}
-                    </option>
-                  ))}
+                  {selectOptionsWithCurrent(statusOptions, item.status).map(
+                    (s) => (
+                      <option key={s.value} value={s.value}>
+                        {s.label}
+                      </option>
+                    )
+                  )}
                 </select>
                 <button
                   type="button"
@@ -549,7 +575,7 @@ export function TasksClient({
 
       {view === "kanban" ? (
         <div className="flex gap-4 overflow-x-auto pb-2">
-          {STATUSES.map((col) => {
+          {statusColumns.map((col) => {
             const colItems = filtered.filter((i) => i.status === col.id);
             const isDropTarget = dropTarget === col.id;
             return (
@@ -620,8 +646,11 @@ export function TasksClient({
                           }
                           aria-label="Change status"
                         >
-                          {STATUSES.map((s) => (
-                            <option key={s.id} value={s.id}>
+                          {selectOptionsWithCurrent(
+                            statusOptions,
+                            item.status
+                          ).map((s) => (
+                            <option key={s.value} value={s.value}>
                               {s.label}
                             </option>
                           ))}
@@ -741,11 +770,13 @@ export function TasksClient({
                     setEdit({ ...edit, status: e.target.value as TaskStatus })
                   }
                 >
-                  {STATUSES.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.label}
-                    </option>
-                  ))}
+                  {selectOptionsWithCurrent(statusOptions, edit.status).map(
+                    (s) => (
+                      <option key={s.value} value={s.value}>
+                        {s.label}
+                      </option>
+                    )
+                  )}
                 </select>
               </div>
               <div>

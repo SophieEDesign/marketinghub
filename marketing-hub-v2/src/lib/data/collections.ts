@@ -181,6 +181,24 @@ export const TASK_CATEGORIES: FieldOption[] = [
   { value: "Admin", label: "Admin" },
 ];
 
+export const TASK_STATUSES: FieldOption[] = [
+  { value: "todo", label: "To do" },
+  { value: "doing", label: "Doing" },
+  { value: "done", label: "Done" },
+];
+
+/** Closed / finished task statuses (built-in + common Field Manager renames). */
+export function isClosedTaskStatus(status: string): boolean {
+  const s = status.trim().toLowerCase();
+  return (
+    s === "done" ||
+    s === "completed" ||
+    s === "complete" ||
+    s === "closed" ||
+    s.includes("complet")
+  );
+}
+
 export const RESOURCE_CATEGORIES: FieldOption[] = [
   { value: "Brand", label: "Brand" },
   { value: "Press", label: "Press" },
@@ -604,11 +622,7 @@ export const DATA_COLLECTIONS: CollectionDef[] = [
       f("category", { type: "select", options: TASK_CATEGORIES }),
       f("status", {
         type: "select",
-        options: [
-          { value: "todo", label: "To do" },
-          { value: "doing", label: "Doing" },
-          { value: "done", label: "Done" },
-        ],
+        options: TASK_STATUSES,
       }),
       ownerField(),
       f("created_at", { type: "readonly", locked: true }),

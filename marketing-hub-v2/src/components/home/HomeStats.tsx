@@ -9,6 +9,7 @@ type Stats = {
   inFlight: number;
   activeSponsors: number;
   openTaskCount: number;
+  newEnquiries?: number;
 };
 
 type OpenTask = {
@@ -35,7 +36,7 @@ export function HomeStats({
     <>
       <div
         className={`mb-8 grid gap-4 sm:grid-cols-2 ${
-          isAdmin ? "lg:grid-cols-4" : "lg:grid-cols-2"
+          isAdmin ? "lg:grid-cols-5" : "lg:grid-cols-3"
         }`}
       >
         <Link href="/app/events" className={kpiClassName}>
@@ -62,6 +63,14 @@ export function HomeStats({
           </p>
           <p className="mt-2 font-display text-3xl text-brand">
             {stats.activeSponsors}
+          </p>
+        </Link>
+        <Link href="/app/enquiries" className={kpiClassName}>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+            New enquiries
+          </p>
+          <p className="mt-2 font-display text-3xl text-brand">
+            {stats.newEnquiries ?? 0}
           </p>
         </Link>
         {isAdmin ? (

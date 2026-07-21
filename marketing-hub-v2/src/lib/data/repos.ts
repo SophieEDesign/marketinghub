@@ -1011,8 +1011,22 @@ export async function deleteAward(id: string) {
 export async function listTasks() {
   const store = await readStore();
   return [...(store.tasks ?? [])].sort((a, b) => {
-    const statusRank = { todo: 0, doing: 1, done: 2 };
-    const sr = (statusRank[a.status] ?? 9) - (statusRank[b.status] ?? 9);
+    const rank = (status: string) => {
+      const s = status.trim().toLowerCase();
+      if (s === "todo") return 0;
+      if (s.includes("wait")) return 1;
+      if (s === "doing" || s === "inprogress" || s.includes("progress")) return 2;
+      if (
+        s === "done" ||
+        s === "completed" ||
+        s === "complete" ||
+        s.includes("complet")
+      ) {
+        return 9;
+      }
+      return 5;
+    };
+    const sr = rank(a.status) - rank(b.status);
     if (sr !== 0) return sr;
     const da = a.due_date || "9999-12-31";
     const db = b.due_date || "9999-12-31";

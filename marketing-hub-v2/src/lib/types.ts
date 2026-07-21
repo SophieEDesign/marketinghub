@@ -291,8 +291,8 @@ export type AwardEntry = {
   updated_at: string;
 };
 
-/** Marketing to-dos (from Supabase Tasks table) */
-export type TaskStatus = "todo" | "doing" | "done";
+/** Marketing to-dos — status values come from Field Manager options. */
+export type TaskStatus = string;
 
 export type HubTask = {
   id: string;
@@ -323,6 +323,34 @@ export type AccessRequest = {
   decided_by?: string | null;
   error_message?: string;
   created_at: string;
+  updated_at: string;
+};
+
+/** WordPress Quote Builder → hub webhook enquiries. */
+export type WebEnquiryStatus = "new" | "in_progress" | "done";
+
+export type WebEnquiry = {
+  id: string;
+  submission_id: string;
+  created_at: string | null;
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string;
+  customer_country: string;
+  final_service_category: string;
+  user_selected_service: string;
+  collection_location: string;
+  delivery_location: string;
+  selected_office: string;
+  office_email: string;
+  needs_manual_review: boolean;
+  marketing_emails_consent: boolean;
+  routing_reason: string;
+  is_test: boolean;
+  status: WebEnquiryStatus;
+  make_fields: Record<string, unknown>;
+  raw_payload: Record<string, unknown>;
+  received_at: string;
   updated_at: string;
 };
 

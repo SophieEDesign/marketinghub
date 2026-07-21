@@ -298,8 +298,8 @@ export function createSeedStore(): HubStore {
       {
         id: "rpt_seed_enq",
         title: "Web enquiries",
-        description: "Form submissions / CRM enquiry stats — add your sheet or dashboard URL",
-        url: "",
+        description: "In-hub list — see Web Enquiries tab (or paste an external sheet URL)",
+        url: "/app/enquiries",
         category: "Enquiries",
         tool: "Sheet / CRM",
         created_at: now,

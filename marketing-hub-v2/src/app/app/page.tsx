@@ -10,11 +10,14 @@ import {
   listThemeMains,
   listThemes,
 } from "@/lib/data/repos";
+import { listWebEnquiries } from "@/lib/data/web-enquiries";
+import { isClosedTaskStatus } from "@/lib/data/collections";
 import { format } from "date-fns";
 import { hasSupabaseConfig } from "@/lib/auth/config";
+import { hasServiceRoleKey } from "@/lib/supabase/admin";
 
 export default async function AppHomePage() {
-  const [events, content, sponsorships, themes, mains, tasks] =
+  const [events, content, sponsorships, themes, mains, tasks, enquiries] =
     await Promise.all([
       listEvents(),
       listContent(),
@@ -22,6 +25,9 @@ export default async function AppHomePage() {
       listThemes(),
       listThemeMains(),
       listTasks(),
+      hasServiceRoleKey()
+        ? listWebEnquiries({ includeTest: false }).catch(() => [])
+        : Promise.resolve([]),
     ]);
   const supabaseReady = hasSupabaseConfig();
 
@@ -39,9 +45,12 @@ export default async function AppHomePage() {
     ["confirmed", "active", "negotiating"].includes(s.status)
   ).length;
   const openTasks = tasks
-    .filter((t) => t.status !== "done")
+    .filter((t) => !isClosedTaskStatus(t.status))
     .slice(0, 5);
-  const openTaskCount = tasks.filter((t) => t.status !== "done").length;
+  const openTaskCount = tasks.filter(
+    (t) => !isClosedTaskStatus(t.status)
+  ).length;
+  const newEnquiries = enquiries.filter((e) => e.status === "new").length;
 
   const currentTheme =
     themes.find((t) => t.status === "active") ?? themes[0] ?? null;
@@ -106,6 +115,7 @@ export default async function AppHomePage() {
           inFlight,
           activeSponsors,
           openTaskCount,
+          newEnquiries,
         }}
         openTasks={openTasks.map((t) => ({
           id: t.id,

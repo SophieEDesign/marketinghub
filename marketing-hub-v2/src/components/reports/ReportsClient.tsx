@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { BarChart3, ExternalLink } from "lucide-react";
 import type { ReportLink } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -111,7 +112,7 @@ export function ReportsClient({
     <div>
       <PageHeader
         title="Reporting"
-        description="One place to open the tools you already use — Analytics, Ads, SE Ranking, Looker Studio, enquiries. We link out rather than rebuild the data."
+        description="One place to open the tools you already use — Analytics, Ads, SE Ranking, Looker Studio. Web enquiries live in the hub."
         actions={
           <button type="button" className="btn-primary" onClick={() => setShowForm(true)}>
             Add report link
@@ -135,7 +136,11 @@ export function ReportsClient({
             <strong>Looker Studio</strong> (Data Studio) — one shared dashboard that pulls the above together
           </li>
           <li>
-            <strong>Enquiries</strong> — form/CRM sheet or dashboard for web leads
+            <strong>Web Enquiries</strong> — quote form submissions are in the{" "}
+            <Link href="/app/enquiries" className="text-brand underline-offset-2 hover:underline">
+              Web Enquiries
+            </Link>{" "}
+            tab (WordPress webhook)
           </li>
         </ul>
         <p className="mt-3">

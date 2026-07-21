@@ -8,6 +8,7 @@ import {
   Contact,
   Handshake,
   Home,
+  Inbox,
   Library,
   Settings,
   Sparkles,
@@ -95,6 +96,13 @@ export const STAFF_NAV: NavItem[] = [
     label: "My details",
     description: "Your linked contact profile",
     icon: UserCircle,
+    member: true,
+  },
+  {
+    href: "/app/enquiries",
+    label: "Web Enquiries",
+    description: "Website quote form submissions",
+    icon: Inbox,
     member: true,
   },
   {
