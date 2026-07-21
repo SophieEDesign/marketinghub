@@ -1013,6 +1013,7 @@ export async function listTasks() {
   return [...(store.tasks ?? [])]
     .map((t) => ({
       ...t,
+      start_date: t.start_date ?? null,
       related_type: t.related_type ?? "",
       related_id: t.related_id ?? null,
     }))
@@ -1045,6 +1046,7 @@ export async function createTask(
 ) {
   const item: HubTask = {
     ...input,
+    start_date: input.start_date || null,
     related_type: input.related_type || "",
     related_id: input.related_id || null,
     id: uid("tsk"),

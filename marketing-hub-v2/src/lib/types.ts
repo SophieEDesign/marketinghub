@@ -306,6 +306,9 @@ export type HubTask = {
   id: string;
   title: string;
   details: string;
+  /** When work starts (optional). */
+  start_date: string | null;
+  /** Deadline / due date (optional). */
   due_date: string | null;
   category: string;
   status: TaskStatus;

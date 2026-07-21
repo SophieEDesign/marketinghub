@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
     const item = await createTask({
       title: body.title ?? "Untitled task",
       details: body.details ?? "",
+      start_date: body.start_date || null,
       due_date: body.due_date || null,
       category: body.category ?? "",
       status: body.status ?? "todo",

@@ -568,6 +568,9 @@ export function createSeedStore(): HubStore {
         due_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 5)
           .toISOString()
           .slice(0, 10),
+        start_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 2)
+          .toISOString()
+          .slice(0, 10),
         category: "Events",
         status: "todo",
         owner: "Sophie",
@@ -580,6 +583,7 @@ export function createSeedStore(): HubStore {
         id: "tsk_seed_2",
         title: "Add new testimonials to website",
         details: "",
+        start_date: null,
         due_date: null,
         category: "Website",
         status: "doing",

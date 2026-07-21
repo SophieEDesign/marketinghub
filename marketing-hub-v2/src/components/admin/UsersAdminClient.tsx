@@ -55,7 +55,8 @@ function roleBadgeClass(role: HubAccessRole) {
 function formatSignIn(value: string | null | undefined) {
   if (!value) return "Never";
   try {
-    return new Date(value).toLocaleDateString(undefined, {
+    // Fixed locale avoids SSR/client hydration mismatches (React #418/#425).
+    return new Date(value).toLocaleDateString("en-GB", {
       day: "numeric",
       month: "short",
       year: "numeric",

@@ -40,18 +40,30 @@ export function AssetUploadField({
     <div className="space-y-2">
       <label className="label">{label}</label>
       {value && isImageUrl(value) ? (
-        <div className="overflow-hidden rounded-xl border border-border bg-sand/40">
+        <a
+          href={value}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block overflow-hidden rounded-xl border border-border bg-sand/40 transition hover:border-brand/40"
+          title="Open asset"
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={value}
             alt=""
             className="max-h-40 w-full object-contain"
           />
-        </div>
+        </a>
       ) : value ? (
-        <p className="truncate rounded-xl border border-border bg-sand/40 px-3 py-2 text-xs text-muted">
+        <a
+          href={value}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block truncate rounded-xl border border-border bg-sand/40 px-3 py-2 text-xs text-brand underline-offset-2 hover:underline"
+          title="Open asset"
+        >
           {value}
-        </p>
+        </a>
       ) : null}
 
       <div className="flex flex-wrap gap-2">

@@ -42,6 +42,7 @@ type ViewId = (typeof VIEWS)[number]["id"];
 const emptyForm = {
   title: "",
   details: "",
+  start_date: "",
   due_date: "",
   category: "Events",
   status: "todo" as TaskStatus,
@@ -56,6 +57,7 @@ function toEditForm(item: HubTask): EditForm {
   return {
     title: item.title,
     details: item.details,
+    start_date: item.start_date ?? "",
     due_date: item.due_date ?? "",
     category: item.category,
     status: item.status,
@@ -65,13 +67,28 @@ function toEditForm(item: HubTask): EditForm {
   };
 }
 
-function parseDue(item: HubTask): Date | null {
-  if (!item.due_date) return null;
+function parseDay(value: string | null | undefined): Date | null {
+  if (!value) return null;
   try {
-    return parseISO(item.due_date.slice(0, 10));
+    return parseISO(value.slice(0, 10));
   } catch {
     return null;
   }
+}
+
+function formatTaskSchedule(item: HubTask): string | null {
+  const from = parseDay(item.start_date);
+  const deadline = parseDay(item.due_date);
+  try {
+    if (from && deadline) {
+      return `${format(from, "d MMM yyyy")} → ${format(deadline, "d MMM yyyy")}`;
+    }
+    if (deadline) return `Deadline ${format(deadline, "d MMM yyyy")}`;
+    if (from) return `From ${format(from, "d MMM yyyy")}`;
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 function statusDotColor(status: TaskStatus) {
@@ -204,14 +221,27 @@ export function TasksClient({
   const calendarEvents = useMemo(
     () =>
       filtered
-        .filter((i) => i.due_date)
-        .map((i) => ({
-          id: i.id,
-          title: i.title,
-          start: i.due_date!,
-          allDay: true,
-          extendedProps: { itemId: i.id },
-        })),
+        .filter((i) => i.due_date || i.start_date)
+        .map((i) => {
+          const hasRange =
+            Boolean(i.start_date && i.due_date) &&
+            i.start_date! <= i.due_date!;
+          return {
+            id: i.id,
+            title: i.title,
+            start: (i.start_date || i.due_date) as string,
+            ...(hasRange
+              ? {
+                  end: format(
+                    addDays(parseISO(i.due_date!), 1),
+                    "yyyy-MM-dd"
+                  ),
+                }
+              : {}),
+            allDay: true,
+            extendedProps: { itemId: i.id },
+          };
+        }),
     [filtered]
   );
 
@@ -224,13 +254,14 @@ export function TasksClient({
   const timelineItems = useMemo(() => {
     return filtered
       .map((item) => {
-        const due = parseDue(item);
-        if (!due) return null;
-        const created = item.created_at
-          ? parseISO(item.created_at.slice(0, 10))
-          : addDays(due, -5);
+        const due = parseDay(item.due_date);
+        const from = parseDay(item.start_date);
+        if (!due && !from) return null;
+        const end = due ?? from!;
         const start =
-          created.getTime() <= due.getTime() ? created : addDays(due, -5);
+          from && from.getTime() <= end.getTime()
+            ? from
+            : addDays(end, -5);
         const statusLabel =
           statusColumns.find((s) => s.id === item.status)?.label ?? item.status;
         return {
@@ -240,7 +271,7 @@ export function TasksClient({
             .filter(Boolean)
             .join(" · "),
           start,
-          end: due,
+          end,
           color: statusDotColor(item.status),
         };
       })
@@ -248,7 +279,7 @@ export function TasksClient({
   }, [filtered, statusColumns]);
 
   const undatedCount = useMemo(
-    () => filtered.filter((i) => !i.due_date).length,
+    () => filtered.filter((i) => !i.due_date && !i.start_date).length,
     [filtered]
   );
 
@@ -263,6 +294,7 @@ export function TasksClient({
         body: JSON.stringify({
           ...form,
           title: form.title.trim() || "Untitled task",
+          start_date: form.start_date || null,
           due_date: form.due_date || null,
         }),
       });
@@ -303,6 +335,7 @@ export function TasksClient({
           patch: {
             title: edit.title.trim() || "Untitled task",
             details: edit.details,
+            start_date: edit.start_date || null,
             due_date: edit.due_date || null,
             category: edit.category,
             status: edit.status,
@@ -381,11 +414,19 @@ export function TasksClient({
     }
   }
 
-  async function setDueDate(id: string, dueDate: string) {
-    const previous = items.find((i) => i.id === id)?.due_date ?? null;
+  async function setTaskDates(
+    id: string,
+    startDate: string | null,
+    dueDate: string | null
+  ) {
+    const previous = items.find((i) => i.id === id);
+    const prevStart = previous?.start_date ?? null;
+    const prevDue = previous?.due_date ?? null;
     setItems((prev) =>
       prev.map((item) =>
-        item.id === id ? { ...item, due_date: dueDate || null } : item
+        item.id === id
+          ? { ...item, start_date: startDate, due_date: dueDate }
+          : item
       )
     );
     try {
@@ -395,18 +436,20 @@ export function TasksClient({
         body: JSON.stringify({
           action: "update",
           id,
-          patch: { due_date: dueDate || null },
+          patch: { start_date: startDate, due_date: dueDate },
         }),
       });
-      if (!res.ok) throw new Error("Failed to update due date");
+      if (!res.ok) throw new Error("Failed to update dates");
       await refresh();
     } catch {
       setItems((prev) =>
         prev.map((item) =>
-          item.id === id ? { ...item, due_date: previous } : item
+          item.id === id
+            ? { ...item, start_date: prevStart, due_date: prevDue }
+            : item
         )
       );
-      throw new Error("Failed to update due date");
+      throw new Error("Failed to update dates");
     }
   }
 
@@ -470,7 +513,7 @@ export function TasksClient({
     <div>
       <PageHeader
         title="Tasks"
-        description="Marketing to-dos — Kanban, list, calendar, or timeline by due date."
+        description="Marketing to-dos — Kanban, list, calendar, or timeline by From / Deadline."
         actions={
           <button
             type="button"
@@ -565,7 +608,16 @@ export function TasksClient({
             />
           </div>
           <div>
-            <label className="label">Due date</label>
+            <label className="label">From</label>
+            <input
+              className="field"
+              type="date"
+              value={form.start_date}
+              onChange={(e) => setForm({ ...form, start_date: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="label">Deadline</label>
             <input
               className="field"
               type="date"
@@ -677,13 +729,7 @@ export function TasksClient({
                   />
                 </div>
                 <p className="mt-1 text-xs text-muted">
-                  {[
-                    item.category,
-                    item.owner,
-                    item.due_date
-                      ? `Due ${format(parseISO(item.due_date), "d MMM yyyy")}`
-                      : null,
-                  ]
+                  {[item.category, item.owner, formatTaskSchedule(item)]
                     .filter(Boolean)
                     .join(" · ")}
                 </p>
@@ -794,13 +840,7 @@ export function TasksClient({
                         />
                       </div>
                       <p className="mt-1 text-xs text-muted">
-                        {[
-                          item.category,
-                          item.owner,
-                          item.due_date
-                            ? `Due ${format(parseISO(item.due_date), "d MMM yyyy")}`
-                            : null,
-                        ]
+                        {[item.category, item.owner, formatTaskSchedule(item)]
                           .filter(Boolean)
                           .join(" · ")}
                       </p>
@@ -876,7 +916,8 @@ export function TasksClient({
       {view === "calendar" ? (
         <div className="hub-fc surface-card overflow-hidden p-3 md:p-4">
           <p className="mb-3 text-xs text-muted">
-            Tasks with a due date. Drag to reschedule, or click to edit.
+            Tasks with a From or Deadline date. Drag to reschedule, or click to
+            edit.
           </p>
           <FullCalendar
             plugins={[dayGridPlugin, interactionPlugin, listPlugin]}
@@ -904,12 +945,35 @@ export function TasksClient({
               const id = String(
                 info.event.extendedProps.itemId ?? info.event.id
               );
-              const next = info.event.startStr.slice(0, 10);
-              if (!next) {
+              const item = items.find((i) => i.id === id);
+              const nextStart = info.event.startStr.slice(0, 10);
+              if (!nextStart) {
                 info.revert();
                 return;
               }
-              void setDueDate(id, next).catch(() => info.revert());
+              const hadRange = Boolean(item?.start_date && item?.due_date);
+              if (hadRange && info.event.end) {
+                const exclusiveEnd = info.event.endStr.slice(0, 10);
+                const nextDue = format(
+                  addDays(parseISO(exclusiveEnd), -1),
+                  "yyyy-MM-dd"
+                );
+                void setTaskDates(id, nextStart, nextDue).catch(() =>
+                  info.revert()
+                );
+                return;
+              }
+              if (item?.start_date && !item.due_date) {
+                void setTaskDates(id, nextStart, null).catch(() =>
+                  info.revert()
+                );
+                return;
+              }
+              void setTaskDates(
+                id,
+                item?.start_date ?? null,
+                nextStart
+              ).catch(() => info.revert());
             }}
             eventContent={(arg) => {
               const id = String(
@@ -954,12 +1018,12 @@ export function TasksClient({
             const item = filtered.find((i) => i.id === id);
             if (item) openEdit(item);
           }}
-          emptyMessage="No dated tasks in this filter. Add due dates to see them on the timeline."
+          emptyMessage="No dated tasks in this filter. Add a From or Deadline date to see them on the timeline."
           footer={
             undatedCount > 0 ? (
               <p className="mt-4 text-xs text-muted">
-                {undatedCount} task(s) have no due date and are hidden here —
-                switch to Kanban or List to edit them.
+                {undatedCount} task(s) have no From or Deadline and are hidden
+                here — switch to Kanban or List to edit them.
               </p>
             ) : null
           }
@@ -1005,7 +1069,18 @@ export function TasksClient({
                 />
               </div>
               <div>
-                <label className="label">Due date</label>
+                <label className="label">From</label>
+                <input
+                  className="field"
+                  type="date"
+                  value={edit.start_date}
+                  onChange={(e) =>
+                    setEdit({ ...edit, start_date: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <label className="label">Deadline</label>
                 <input
                   className="field"
                   type="date"

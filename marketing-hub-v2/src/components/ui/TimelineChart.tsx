@@ -110,22 +110,20 @@ export function TimelineChart({
   }
 
   return (
-    <div className={cn("surface-card overflow-x-auto p-4", className)}>
+    <div className={cn("surface-card overflow-hidden p-4", className)}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-muted">
-          Drag the chart sideways if needed. Click a bar to open.
-        </p>
+        <p className="text-xs text-muted">Click a bar to open.</p>
         <p className="text-xs text-muted">
           {format(chart.rangeStart, "MMM yyyy")} –{" "}
           {format(chart.rangeEnd, "MMM yyyy")}
         </p>
       </div>
 
-      <div className="min-w-[720px]">
+      <div className="w-full min-w-0">
         {/* Month header */}
-        <div className="mb-1 grid grid-cols-[180px_1fr] gap-3 md:grid-cols-[200px_1fr]">
+        <div className="mb-1 grid grid-cols-[minmax(0,5.5rem)_minmax(0,1fr)] gap-2 sm:grid-cols-[minmax(0,8rem)_minmax(0,1fr)] sm:gap-3 md:grid-cols-[minmax(0,11rem)_minmax(0,1fr)]">
           <div />
-          <div className="relative h-8 border-b border-border">
+          <div className="relative h-8 min-w-0 border-b border-border">
             {chart.months.map((month) => {
               const left =
                 (differenceInCalendarDays(month, chart.rangeStart) /
@@ -133,15 +131,15 @@ export function TimelineChart({
                 100;
               const monthEnd = endOfMonth(month);
               const width =
-                (differenceInCalendarDays(monthEnd, month) + 1) /
-                chart.days *
+                ((differenceInCalendarDays(monthEnd, month) + 1) /
+                  chart.days) *
                 100;
               const isCurrent = isSameMonth(month, new Date());
               return (
                 <div
                   key={month.toISOString()}
                   className={cn(
-                    "absolute bottom-0 top-0 flex items-end border-l border-border/70 px-1.5 pb-1 text-[10px] font-semibold uppercase tracking-wide",
+                    "absolute bottom-0 top-0 flex items-end border-l border-border/70 px-0.5 pb-1 text-[9px] font-semibold uppercase tracking-wide sm:px-1.5 sm:text-[10px]",
                     isCurrent ? "bg-brand/10 text-brand" : "text-muted"
                   )}
                   style={{
@@ -150,7 +148,10 @@ export function TimelineChart({
                   }}
                 >
                   <span className="truncate">
-                    {format(month, chart.months.length > 8 ? "MMM" : "MMM yyyy")}
+                    {format(
+                      month,
+                      chart.months.length > 6 ? "MMM" : "MMM yyyy"
+                    )}
                   </span>
                 </div>
               );
@@ -161,28 +162,28 @@ export function TimelineChart({
         {/* Rows */}
         <div className="space-y-1.5">
           {chart.rows.map((row) => {
-            const labelFits = row.width >= 12;
+            const labelFits = row.width >= 14;
+            const barWidth = Math.min(100 - clampPct(row.left), row.width);
             return (
               <div
                 key={row.id}
-                className="grid grid-cols-[180px_1fr] items-center gap-3 md:grid-cols-[200px_1fr]"
+                className="grid grid-cols-[minmax(0,5.5rem)_minmax(0,1fr)] items-center gap-2 sm:grid-cols-[minmax(0,8rem)_minmax(0,1fr)] sm:gap-3 md:grid-cols-[minmax(0,11rem)_minmax(0,1fr)]"
               >
                 <button
                   type="button"
-                  className="truncate text-left text-sm font-medium hover:text-brand"
+                  className="min-w-0 truncate text-left text-xs font-medium hover:text-brand sm:text-sm"
                   onClick={() => onSelect?.(row.id)}
                   title={row.label}
                 >
                   {row.label}
                   {row.subtitle ? (
-                    <span className="mt-0.5 block truncate text-[11px] font-normal text-muted">
+                    <span className="mt-0.5 block truncate text-[10px] font-normal text-muted sm:text-[11px]">
                       {row.subtitle}
                     </span>
                   ) : null}
                 </button>
 
-                <div className="relative h-9 overflow-hidden rounded-lg bg-sand/70">
-                  {/* Month grid lines */}
+                <div className="relative h-9 min-w-0 overflow-hidden rounded-lg bg-sand/70">
                   {chart.months.map((month) => {
                     const left =
                       (differenceInCalendarDays(month, chart.rangeStart) /
@@ -198,7 +199,6 @@ export function TimelineChart({
                     );
                   })}
 
-                  {/* Today marker */}
                   {chart.todayPct != null ? (
                     <span
                       className="absolute bottom-0 top-0 z-10 w-0.5 bg-rose-500"
@@ -210,13 +210,12 @@ export function TimelineChart({
                   <button
                     type="button"
                     className={cn(
-                      "absolute top-1.5 z-[1] h-6 rounded-md px-2 text-left text-[11px] font-medium text-white shadow-sm transition hover:opacity-90",
-                      !labelFits && "min-w-[0.75rem] px-0"
+                      "absolute top-1.5 z-[1] h-6 max-w-full rounded-md text-left text-[11px] font-medium text-white shadow-sm transition hover:opacity-90",
+                      labelFits ? "px-2" : "px-0"
                     )}
                     style={{
                       left: `${clampPct(row.left)}%`,
-                      width: `${Math.min(100 - clampPct(row.left), row.width)}%`,
-                      minWidth: labelFits ? "4rem" : "0.75rem",
+                      width: `${barWidth}%`,
                       background: row.color,
                     }}
                     onClick={() => onSelect?.(row.id)}
@@ -227,11 +226,10 @@ export function TimelineChart({
                     ) : null}
                   </button>
 
-                  {/* Label to the right when bar is too short */}
                   {!labelFits ? (
                     <button
                       type="button"
-                      className="absolute top-1.5 z-[1] max-w-[40%] truncate pl-1 text-left text-[11px] font-medium text-foreground hover:text-brand"
+                      className="absolute top-1.5 z-[1] max-w-[35%] truncate pl-1 text-left text-[11px] font-medium text-foreground hover:text-brand"
                       style={{
                         left: `${clampPct(row.left + row.width)}%`,
                       }}

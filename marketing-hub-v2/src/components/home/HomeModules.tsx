@@ -12,7 +12,7 @@ export function HomeModules({ supabaseReady }: { supabaseReady: boolean }) {
     <>
       <p className="mb-6 text-sm text-muted">
         {view === "member"
-          ? "Member view — events, partners, awards, library, Requests, Web Enquiries, and My details. Switch to Admin for Content & Social, Tasks, Themes, Reporting, and Contacts."
+          ? "Member view — events, partners, awards, library, Requests, and Web Enquiries. Switch to Admin for Content & Social, Tasks, Themes, Reporting, and Contacts."
           : view === "external"
             ? "External view — preview the public library (logos, presentations, and gallery) that media guests see."
             : supabaseReady

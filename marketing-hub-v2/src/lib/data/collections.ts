@@ -626,7 +626,8 @@ export const DATA_COLLECTIONS: CollectionDef[] = [
       f("id", { type: "readonly", locked: true }),
       f("title"),
       f("details", { type: "longtext" }),
-      f("due_date", { type: "date", label: "Due date" }),
+      f("start_date", { type: "date", label: "From" }),
+      f("due_date", { type: "date", label: "Deadline" }),
       f("category", { type: "select", options: TASK_CATEGORIES }),
       f("status", {
         type: "select",

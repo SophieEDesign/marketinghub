@@ -10,6 +10,7 @@ import {
   enquiryReferrerKey,
   enquiryReferrerLabel,
   enquirySourceLabel,
+  getEnquiryAttribution,
   isGoogleAdsEnquiry,
 } from "@/lib/data/web-enquiries-stats";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -30,6 +31,21 @@ function asString(value: unknown): string {
     return String(value);
   }
   return "";
+}
+
+function vesselLabel(e: WebEnquiry): string {
+  const raw = asRecord(e.raw_payload);
+  const shipment = asRecord(raw.shipment);
+  const form = asRecord(raw.form_fields);
+  const make = asRecord(e.make_fields);
+  return (
+    asString(shipment.yacht_vessel_name) ||
+    asString(form["Yacht Name"]) ||
+    asString(make.yacht_vessel_name) ||
+    asString(shipment.make_model) ||
+    asString(form["Make & Model"]) ||
+    ""
+  );
 }
 
 function formatDate(value: string | null | undefined) {
@@ -141,13 +157,6 @@ function buildDetailSections(e: WebEnquiry) {
     {
       label: "Company",
       value: asString(customer.company) || asString(make.company),
-    },
-    {
-      label: "How they heard about us",
-      value:
-        asString(tracking.heard_about) ||
-        asString(make.heard_about) ||
-        asString(form["How did you hear about us?"]),
     },
   ].filter((r) => r.value);
 
@@ -306,13 +315,26 @@ function buildDetailSections(e: WebEnquiry) {
       sailing_schedule_vessel_slug: "Schedule vessel",
       sailing_departure_region: "Departure region",
       sailing_arrival_region: "Arrival region",
-      current_page_url: "Page",
-      referrer: "Referrer",
-      utm_source: "UTM source",
-      utm_medium: "UTM medium",
-      utm_campaign: "UTM campaign",
-      gclid: "Google Ads click ID",
     }),
+  ].filter((r) => r.value);
+
+  const attr = getEnquiryAttribution(e);
+  const attributionRows = [
+    { label: "Source", value: attr.sourceLabel },
+    { label: "How they heard about us", value: attr.heardAbout },
+    { label: "Campaign", value: attr.utmCampaign },
+    { label: "Keyword / term", value: attr.utmTerm },
+    { label: "UTM source", value: attr.utmSource },
+    { label: "UTM medium", value: attr.utmMedium },
+    { label: "UTM content", value: attr.utmContent },
+    { label: "Google click ID (gclid)", value: attr.gclid },
+    { label: "gbraid", value: attr.gbraid },
+    { label: "wbraid", value: attr.wbraid },
+    { label: "Ads campaign ID (hsa_cam)", value: attr.hsaCam },
+    { label: "Ads ad ID (hsa_ad)", value: attr.hsaAd },
+    { label: "Ads group ID (hsa_grp)", value: attr.hsaGrp },
+    { label: "Referrer", value: attr.referrer },
+    { label: "Landing / page URL", value: attr.pageUrl },
   ].filter((r) => r.value);
 
   const racingRows = entriesFrom(racing, {
@@ -346,6 +368,7 @@ function buildDetailSections(e: WebEnquiry) {
       ...serviceRows,
       ...vesselRows,
       ...journeyRows,
+      ...attributionRows,
       ...racingRows,
       ...timingRows,
       ...membershipRows,
@@ -403,6 +426,9 @@ function buildDetailSections(e: WebEnquiry) {
         "Value (approx)",
         "Own cradle",
         "Own container",
+        "Referrer",
+        "Page Location",
+        "How did you hear about us?",
       ].includes(k)
     ) {
       continue;
@@ -417,6 +443,7 @@ function buildDetailSections(e: WebEnquiry) {
     serviceRows,
     vesselRows,
     journeyRows,
+    attributionRows,
     racingRows,
     timingRows,
     membershipRows,
@@ -503,7 +530,10 @@ export function EnquiriesClient({
   const [officeFilter, setOfficeFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [referrerFilter, setReferrerFilter] = useState("all");
+  const [manualRouteOnly, setManualRouteOnly] = useState(false);
   const [showTest, setShowTest] = useState(false);
+  const [showHistory, setShowHistory] = useState(true);
+  const [showAdsCampaigns, setShowAdsCampaigns] = useState(false);
   const [selected, setSelected] = useState<WebEnquiry | null>(null);
   const [saving, setSaving] = useState(false);
   const [showRaw, setShowRaw] = useState(false);
@@ -541,6 +571,7 @@ export function EnquiriesClient({
   }, [dated]);
 
   function matchesListFilters(e: WebEnquiry): boolean {
+    if (manualRouteOnly && !e.needs_manual_review) return false;
     if (officeFilter !== "all") {
       const office = e.selected_office?.trim() || "Unassigned";
       if (office !== officeFilter) return false;
@@ -567,18 +598,26 @@ export function EnquiriesClient({
       enquiryMessage(e),
       enquirySourceLabel(e),
       enquiryReferrerKey(e),
+      vesselLabel(e),
     ]);
   }
 
   const filtered = useMemo(() => {
     return dated.filter(matchesListFilters);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- matchesListFilters closes over filter state
-  }, [dated, search, officeFilter, sourceFilter, referrerFilter]);
+  }, [
+    dated,
+    search,
+    officeFilter,
+    sourceFilter,
+    referrerFilter,
+    manualRouteOnly,
+  ]);
 
-  /** KPIs + summary chips follow the same filters as the list. */
-  const stats = useMemo(
-    () => computeEnquiryStats(filtered, { includeTest: true }),
-    [filtered]
+  /** Overview KPIs + summaries for the date range (before chip filters). */
+  const rangeStats = useMemo(
+    () => computeEnquiryStats(dated, { includeTest: true }),
+    [dated]
   );
 
   /** YoY table respects attribute filters, but not the date range (needs full years). */
@@ -588,7 +627,28 @@ export function EnquiriesClient({
       return matchesListFilters(e);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, showTest, search, officeFilter, sourceFilter, referrerFilter]);
+  }, [
+    items,
+    showTest,
+    search,
+    officeFilter,
+    sourceFilter,
+    referrerFilter,
+    manualRouteOnly,
+  ]);
+
+  const hasActiveChips =
+    officeFilter !== "all" ||
+    sourceFilter !== "all" ||
+    referrerFilter !== "all" ||
+    manualRouteOnly;
+
+  function clearChips() {
+    setOfficeFilter("all");
+    setSourceFilter("all");
+    setReferrerFilter("all");
+    setManualRouteOnly(false);
+  }
 
   async function remove(id: string) {
     if (!confirm("Delete this enquiry from the hub?")) return;
@@ -617,7 +677,7 @@ export function EnquiriesClient({
     <div>
       <PageHeader
         title="Web Enquiries"
-        description="Quote form submissions from the website — received via WordPress webhook."
+        description="Website quote form submissions — live via WordPress webhook, with imported history."
         actions={
           <button
             type="button"
@@ -644,155 +704,10 @@ export function EnquiriesClient({
         </div>
       ) : null}
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        {[
-          { label: "This week", value: stats.thisWeek },
-          { label: "This month", value: stats.thisMonth },
-          { label: "In range", value: stats.total },
-          { label: "Google / Ads", value: stats.googleAds },
-          { label: "Needs review", value: stats.needsReview },
-        ].map((kpi) => (
-          <div key={kpi.label} className="surface-card p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-              {kpi.label}
-            </p>
-            <p className="mt-1 font-display text-2xl text-brand">{kpi.value}</p>
-          </div>
-        ))}
-      </div>
-
-      <EnquiryYearCompare items={yearCompareItems} includeTest />
-
-      {stats.byOffice.length > 0 ? (
-        <div className="surface-card mb-4 p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-            By office
-          </p>
-          <ul className="mt-3 flex flex-wrap gap-2">
-            {stats.byOffice.map((o) => (
-              <li key={o.label}>
-                <button
-                  type="button"
-                  className={cn(
-                    "rounded-full border border-border px-3 py-1 text-xs transition",
-                    officeFilter === o.label
-                      ? "border-brand bg-accent-soft text-brand"
-                      : "bg-sand/50 text-muted hover:text-foreground"
-                  )}
-                  onClick={() =>
-                    setOfficeFilter((cur) =>
-                      cur === o.label ? "all" : o.label
-                    )
-                  }
-                >
-                  {o.label} · {o.count}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {stats.topSources.length > 0 ? (
-        <div className="surface-card mb-4 p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-            How they heard about us
-          </p>
-          <ul className="mt-3 flex flex-wrap gap-2">
-            {stats.topSources.map((s) => (
-              <li key={s.label}>
-                <button
-                  type="button"
-                  className={cn(
-                    "rounded-full border border-border px-3 py-1 text-xs transition",
-                    sourceFilter === s.label
-                      ? "border-brand bg-accent-soft text-brand"
-                      : "bg-sand/50 text-muted hover:text-foreground"
-                  )}
-                  onClick={() =>
-                    setSourceFilter((cur) =>
-                      cur === s.label ? "all" : s.label
-                    )
-                  }
-                >
-                  {s.label} · {s.count}
-                </button>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-2 text-xs text-muted">
-            Summaries follow the active filters. Google / Ads uses “How did you
-            hear” plus Google click IDs / UTM when present. Live Ads spend stays
-            in Reporting → Google Ads.
-          </p>
-        </div>
-      ) : null}
-
-      {stats.googleAdsByReferrer.length > 0 ? (
-        <div className="surface-card mb-6 p-4">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-              Google Ads by referrer link
-            </p>
-            <p className="text-xs text-muted">
-              {stats.googleAds} Google / Ads in range
-            </p>
-          </div>
-          <ul className="mt-3 divide-y divide-border/70 overflow-hidden rounded-xl border border-border">
-            {stats.googleAdsByReferrer.map((r) => {
-              const active = referrerFilter === r.label;
-              const share =
-                stats.googleAds > 0
-                  ? Math.round((r.count / stats.googleAds) * 100)
-                  : 0;
-              return (
-                <li key={r.label}>
-                  <button
-                    type="button"
-                    title={r.label}
-                    className={cn(
-                      "flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition",
-                      active
-                        ? "bg-accent-soft/70"
-                        : "bg-white hover:bg-sand/40"
-                    )}
-                    onClick={() =>
-                      setReferrerFilter((cur) =>
-                        cur === r.label ? "all" : r.label
-                      )
-                    }
-                  >
-                    <span className="min-w-0 flex-1 truncate font-medium text-foreground">
-                      {enquiryReferrerLabel(r.label, 64)}
-                    </span>
-                    <span className="shrink-0 tabular-nums text-xs text-muted">
-                      {share}%
-                    </span>
-                    <span
-                      className={cn(
-                        "shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums",
-                        active
-                          ? "bg-brand text-white"
-                          : "bg-sand text-foreground"
-                      )}
-                    >
-                      {r.count}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-          <p className="mt-2 text-xs text-muted">
-            Only Google / Ads enquiries. Click a link to filter the list.
-          </p>
-        </div>
-      ) : null}
-
       <FilterBar
         search={search}
         onSearchChange={setSearch}
-        searchPlaceholder="Search name, email, route, office…"
+        searchPlaceholder="Search name, email, vessel, route, office…"
         resultCount={filtered.length}
         totalCount={dated.length}
         dateRange={{
@@ -812,7 +727,7 @@ export function EnquiriesClient({
             options: [
               { value: "all", label: "All offices" },
               ...offices.map((o) => ({ value: o, label: o })),
-              ...(stats.byOffice.some((o) => o.label === "Unassigned")
+              ...(rangeStats.byOffice.some((o) => o.label === "Unassigned")
                 ? [{ value: "Unassigned", label: "Unassigned" }]
                 : []),
             ],
@@ -820,7 +735,21 @@ export function EnquiriesClient({
         ]}
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <div className="mb-5 flex flex-wrap items-center gap-3">
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-muted">
+          <input
+            type="checkbox"
+            className="rounded border-border"
+            checked={manualRouteOnly}
+            onChange={(e) => setManualRouteOnly(e.target.checked)}
+          />
+          Manual routing only
+          {rangeStats.needsReview > 0 ? (
+            <span className="rounded-full bg-sand px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-foreground">
+              {rangeStats.needsReview}
+            </span>
+          ) : null}
+        </label>
         <label className="flex cursor-pointer items-center gap-2 text-sm text-muted">
           <input
             type="checkbox"
@@ -828,41 +757,220 @@ export function EnquiriesClient({
             checked={showTest}
             onChange={(e) => setShowTest(e.target.checked)}
           />
-          Show test / staging rows
+          Show test rows
         </label>
-        {officeFilter !== "all" ||
-        sourceFilter !== "all" ||
-        referrerFilter !== "all" ? (
+        {hasActiveChips ? (
+          <button type="button" className="btn-ghost text-xs" onClick={clearChips}>
+            Clear filters
+          </button>
+        ) : null}
+      </div>
+
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="surface-card p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+            This week
+          </p>
+          <p className="mt-1 font-display text-2xl text-brand">
+            {rangeStats.thisWeek}
+          </p>
+        </div>
+        <div className="surface-card p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+            This month
+          </p>
+          <p className="mt-1 font-display text-2xl text-brand">
+            {rangeStats.thisMonth}
+          </p>
+        </div>
+        <div className="surface-card p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+            {dateFrom || dateTo ? "In date range" : "Total"}
+          </p>
+          <p className="mt-1 font-display text-2xl text-brand">
+            {rangeStats.total}
+          </p>
+        </div>
+        <button
+          type="button"
+          className={cn(
+            "surface-card p-4 text-left transition hover:-translate-y-0.5 hover:border-accent",
+            sourceFilter === "Google Ads" && "border-brand bg-accent-soft/40"
+          )}
+          onClick={() =>
+            setSourceFilter((cur) =>
+              cur === "Google Ads" ? "all" : "Google Ads"
+            )
+          }
+        >
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+            Google Ads
+          </p>
+          <p className="mt-1 font-display text-2xl text-brand">
+            {rangeStats.googleAds}
+          </p>
+        </button>
+      </div>
+
+      <div className="mb-6 grid gap-4 lg:grid-cols-2">
+        {rangeStats.byOffice.length > 0 ? (
+          <div className="surface-card p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+              By office
+            </p>
+            <ul className="mt-3 flex flex-wrap gap-2">
+              {rangeStats.byOffice.map((o) => (
+                <li key={o.label}>
+                  <button
+                    type="button"
+                    className={cn(
+                      "rounded-full border border-border px-3 py-1 text-xs transition",
+                      officeFilter === o.label
+                        ? "border-brand bg-accent-soft text-brand"
+                        : "bg-sand/50 text-muted hover:text-foreground"
+                    )}
+                    onClick={() =>
+                      setOfficeFilter((cur) =>
+                        cur === o.label ? "all" : o.label
+                      )
+                    }
+                  >
+                    {o.label} · {o.count}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {rangeStats.topSources.length > 0 ? (
+          <div className="surface-card p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+              Source
+            </p>
+            <ul className="mt-3 flex flex-wrap gap-2">
+              {rangeStats.topSources.map((s) => (
+                <li key={s.label}>
+                  <button
+                    type="button"
+                    className={cn(
+                      "rounded-full border border-border px-3 py-1 text-xs transition",
+                      sourceFilter === s.label
+                        ? "border-brand bg-accent-soft text-brand"
+                        : "bg-sand/50 text-muted hover:text-foreground"
+                    )}
+                    onClick={() =>
+                      setSourceFilter((cur) =>
+                        cur === s.label ? "all" : s.label
+                      )
+                    }
+                  >
+                    {s.label} · {s.count}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-xs text-muted">
+              Google Ads from page/referrer params (gclid, utm, hsa_*).
+            </p>
+          </div>
+        ) : null}
+      </div>
+
+      {rangeStats.googleAdsByReferrer.length > 0 ? (
+        <div className="surface-card mb-6 overflow-hidden">
           <button
             type="button"
-            className="btn-ghost text-xs"
-            onClick={() => {
-              setOfficeFilter("all");
-              setSourceFilter("all");
-              setReferrerFilter("all");
-            }}
+            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+            onClick={() => setShowAdsCampaigns((v) => !v)}
           >
-            Clear office / source / referrer filters
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                Google Ads campaigns
+              </p>
+              <p className="mt-0.5 text-sm text-foreground">
+                {rangeStats.googleAds} attributed ·{" "}
+                {rangeStats.googleAdsByReferrer.length} campaigns
+              </p>
+            </div>
+            <span className="text-xs font-medium text-brand">
+              {showAdsCampaigns ? "Hide" : "Show"}
+            </span>
           </button>
+          {showAdsCampaigns ? (
+            <ul className="divide-y divide-border border-t border-border">
+              {rangeStats.googleAdsByReferrer.map((r) => {
+                const active = referrerFilter === r.label;
+                const share =
+                  rangeStats.googleAds > 0
+                    ? Math.round((r.count / rangeStats.googleAds) * 100)
+                    : 0;
+                return (
+                  <li key={r.label}>
+                    <button
+                      type="button"
+                      title={r.label}
+                      className={cn(
+                        "flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition",
+                        active
+                          ? "bg-accent-soft/70"
+                          : "bg-white hover:bg-sand/40"
+                      )}
+                      onClick={() => {
+                        setSourceFilter("Google Ads");
+                        setReferrerFilter((cur) =>
+                          cur === r.label ? "all" : r.label
+                        );
+                      }}
+                    >
+                      <span className="min-w-0 flex-1 truncate font-medium text-foreground">
+                        {enquiryReferrerLabel(r.label, 64)}
+                      </span>
+                      <span className="shrink-0 tabular-nums text-xs text-muted">
+                        {share}%
+                      </span>
+                      <span className="shrink-0 rounded-full bg-sand px-2 py-0.5 text-xs font-semibold tabular-nums">
+                        {r.count}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="mb-6">
+        <button
+          type="button"
+          className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted hover:text-brand"
+          onClick={() => setShowHistory((v) => !v)}
+        >
+          Enquiry history {showHistory ? "▾" : "▸"}
+        </button>
+        {showHistory ? (
+          <EnquiryYearCompare items={yearCompareItems} includeTest />
         ) : null}
       </div>
 
       {filtered.length === 0 ? (
         <div className="surface-card flex flex-col items-center gap-3 px-6 py-16 text-center">
           <Inbox className="h-8 w-8 text-muted" />
-          <p className="text-sm font-medium text-foreground">No enquiries yet</p>
+          <p className="text-sm font-medium text-foreground">No enquiries match</p>
           <p className="max-w-md text-sm text-muted">
-            When the Quote Builder primary webhook points at this hub, new form
-            submissions will appear here.
+            Try clearing the date range or filters. New submissions appear when
+            the Quote Builder webhook is connected.
           </p>
         </div>
       ) : (
         <div className="surface-card overflow-x-auto">
-          <table className="w-full min-w-[720px] text-left text-sm">
+          <table className="w-full min-w-[860px] text-left text-sm">
             <thead className="border-b border-border bg-sand/40 text-xs uppercase tracking-wide text-muted">
               <tr>
                 <th className="px-4 py-3 font-medium">Date</th>
                 <th className="px-4 py-3 font-medium">Customer</th>
+                <th className="px-4 py-3 font-medium">Vessel</th>
                 <th className="px-4 py-3 font-medium">Service</th>
                 <th className="px-4 py-3 font-medium">Route</th>
                 <th className="px-4 py-3 font-medium">Office</th>
@@ -870,62 +978,67 @@ export function EnquiriesClient({
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filtered.map((e) => (
-                <tr
-                  key={e.id}
-                  className={cn(
-                    "cursor-pointer transition hover:bg-sand/50",
-                    selected?.id === e.id && "bg-accent-soft/40"
-                  )}
-                  onClick={() => {
-                    setSelected(e);
-                    setShowRaw(false);
-                  }}
-                >
-                  <td className="whitespace-nowrap px-4 py-3 text-muted">
-                    {formatDate(e.created_at ?? e.received_at)}
-                    {e.is_test ? (
-                      <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-amber-800">
-                        Test
-                      </span>
-                    ) : null}
-                  </td>
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-foreground">
-                      {e.customer_name || "—"}
-                    </p>
-                    <p className="text-xs text-muted">{e.customer_email}</p>
-                  </td>
-                  <td className="px-4 py-3 capitalize text-muted">
-                    {(
-                      e.final_service_category ||
-                      e.user_selected_service ||
-                      "—"
-                    ).replace(/_/g, " ")}
-                    {e.needs_manual_review ? (
-                      <span className="mt-1 block text-[10px] font-medium uppercase text-[var(--danger)]">
-                        Review
-                      </span>
-                    ) : null}
-                  </td>
-                  <td className="max-w-[180px] truncate px-4 py-3 text-muted">
-                    {[e.collection_location, e.delivery_location]
-                      .filter(Boolean)
-                      .join(" → ") || "—"}
-                  </td>
-                  <td className="px-4 py-3 text-muted">
-                    {e.selected_office || "—"}
-                  </td>
-                  <td className="px-4 py-3 text-muted">
-                    {enquirySourceLabel(e)}
-                  </td>
-                </tr>
-              ))}
+              {filtered.map((e) => {
+                const vessel = vesselLabel(e);
+                return (
+                  <tr
+                    key={e.id}
+                    className={cn(
+                      "cursor-pointer transition hover:bg-sand/50",
+                      selected?.id === e.id && "bg-accent-soft/40"
+                    )}
+                    onClick={() => {
+                      setSelected(e);
+                      setShowRaw(false);
+                    }}
+                  >
+                    <td className="whitespace-nowrap px-4 py-3 text-muted">
+                      {formatDate(e.created_at ?? e.received_at)}
+                      {e.is_test ? (
+                        <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-amber-800">
+                          Test
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-foreground">
+                        {e.customer_name || "—"}
+                      </p>
+                      <p className="text-xs text-muted">{e.customer_email}</p>
+                    </td>
+                    <td className="max-w-[140px] truncate px-4 py-3 text-muted">
+                      {vessel || "—"}
+                    </td>
+                    <td className="px-4 py-3 capitalize text-muted">
+                      {(
+                        e.final_service_category ||
+                        e.user_selected_service ||
+                        "—"
+                      ).replace(/_/g, " ")}
+                      {e.needs_manual_review ? (
+                        <span className="mt-1 block text-[10px] font-medium uppercase text-[var(--danger)]">
+                          Manual route
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="max-w-[160px] truncate px-4 py-3 text-muted">
+                      {[e.collection_location, e.delivery_location]
+                        .filter(Boolean)
+                        .join(" → ") || "—"}
+                    </td>
+                    <td className="px-4 py-3 text-muted">
+                      {e.selected_office || "—"}
+                    </td>
+                    <td className="px-4 py-3 text-muted">
+                      {enquirySourceLabel(e)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       )}
-
       {selected && detail ? (
         <>
           <div
@@ -973,6 +1086,10 @@ export function EnquiriesClient({
               <DetailSection title="Vessel / cargo" rows={detail.vesselRows} />
               <DetailSection title="Service & routing" rows={detail.serviceRows} />
               <DetailSection title="Journey" rows={detail.journeyRows} />
+              <DetailSection
+                title="Attribution / Google Ads"
+                rows={detail.attributionRows}
+              />
               <DetailSection title="Racing" rows={detail.racingRows} />
               <DetailSection title="Timing" rows={detail.timingRows} />
               <DetailSection title="Membership" rows={detail.membershipRows} />

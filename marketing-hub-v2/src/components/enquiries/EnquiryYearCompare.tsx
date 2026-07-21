@@ -89,9 +89,9 @@ export function EnquiryYearCompare({
     <div className="surface-card mb-6 overflow-hidden">
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border bg-sand/30 px-5 py-4">
         <div>
-          <h2 className="font-display text-lg text-brand">Year comparison</h2>
+          <h2 className="font-display text-lg text-brand">Enquiry history</h2>
           <p className="mt-0.5 text-sm text-muted">
-            Monthly enquiry counts
+            Full monthly history by year (not limited by the date filter)
             {data.compareYear != null && data.priorYear != null
               ? ` · Δ / % vs ${data.priorYear}`
               : null}

@@ -116,9 +116,18 @@ export function RelatedTasksPanel({
                 <p className="mt-0.5 text-[11px] text-muted">
                   {[
                     task.owner,
-                    task.due_date
-                      ? `Due ${format(parseISO(task.due_date), "d MMM yyyy")}`
-                      : null,
+                    (() => {
+                      const from = task.start_date
+                        ? format(parseISO(task.start_date), "d MMM yyyy")
+                        : null;
+                      const deadline = task.due_date
+                        ? format(parseISO(task.due_date), "d MMM yyyy")
+                        : null;
+                      if (from && deadline) return `${from} → ${deadline}`;
+                      if (deadline) return `Deadline ${deadline}`;
+                      if (from) return `From ${from}`;
+                      return null;
+                    })(),
                   ]
                     .filter(Boolean)
                     .join(" · ")}

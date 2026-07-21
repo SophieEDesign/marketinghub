@@ -313,17 +313,39 @@ export async function updateSupabaseHubUser(
 }
 
 export async function deleteSupabaseHubUser(id: string): Promise<void> {
+  const userId = String(id ?? "").trim();
+  if (!userId) throw new Error("User id is required");
+
   const supabase = createAdminClient();
 
   // Clear NO ACTION / RESTRICT FKs (e.g. automation_runs.created_by) first.
   const { error: clearError } = await supabase.rpc(
     "clear_auth_user_restrict_refs",
-    { target_user_id: id }
+    { target_user_id: userId }
   );
-  if (clearError) throw new Error(clearError.message);
+  if (clearError) {
+    throw new Error(
+      clearError.message || "Failed to clear user references before delete"
+    );
+  }
 
-  const { error } = await supabase.auth.admin.deleteUser(id);
-  if (error) throw new Error(error.message);
+  const { error } = await supabase.auth.admin.deleteUser(userId);
+  if (!error) return;
+
+  // Retry once: first clear can miss rows if a concurrent write re-linked the user.
+  const { error: retryClearError } = await supabase.rpc(
+    "clear_auth_user_restrict_refs",
+    { target_user_id: userId }
+  );
+  if (retryClearError) {
+    throw new Error(
+      retryClearError.message ||
+        "Failed to clear user references before delete retry"
+    );
+  }
+
+  const { error: retryError } = await supabase.auth.admin.deleteUser(userId);
+  if (retryError) throw new Error(retryError.message);
 }
 
 /**

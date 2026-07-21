@@ -12,7 +12,6 @@ import {
   Library,
   Settings,
   Sparkles,
-  UserCircle,
   Users,
 } from "lucide-react";
 
@@ -89,13 +88,6 @@ export const STAFF_NAV: NavItem[] = [
     label: "Requests",
     description: "Clothes, merch, asset asks, and staff social forms",
     icon: Users,
-    member: true,
-  },
-  {
-    href: "/app/me",
-    label: "My details",
-    description: "Your linked contact profile",
-    icon: UserCircle,
     member: true,
   },
   {
