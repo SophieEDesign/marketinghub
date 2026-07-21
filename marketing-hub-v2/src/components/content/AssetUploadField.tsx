@@ -5,6 +5,8 @@ import { ExternalLink, ImagePlus, Loader2, Plus, Trash2 } from "lucide-react";
 import {
   joinAssetUrls,
   parseAssetUrls,
+  primaryCanvaUrl,
+  primaryImageUrl,
 } from "@/lib/data/normalize";
 import { isCanvaUrl, isImageUrl } from "@/lib/social/platforms";
 import { uploadAssetDirect } from "@/lib/upload/client-upload";
@@ -28,7 +30,7 @@ export function AssetUploadField({
   onChange,
   multiple = false,
   label,
-  hint = "Images, PDF or short video · max 25MB. Shows on the calendar card.",
+  hint,
 }: {
   label?: string;
   hint?: string;
@@ -40,6 +42,14 @@ export function AssetUploadField({
 
   const fieldLabel = label ?? (multiple ? "Assets" : "Asset");
   const urls = multiple ? parseAssetUrls(value) : value ? [value] : [];
+  const hasCanva = Boolean(primaryCanvaUrl(value));
+  const hasImage = Boolean(primaryImageUrl(value));
+  const needsPreviewImage = hasCanva && !hasImage;
+  const resolvedHint =
+    hint ??
+    (needsPreviewImage
+      ? "Canva link saved — also upload/paste a PNG or JPG so the calendar can show the real design."
+      : "Images, PDF or short video · max 25MB. Shows on the calendar card. Paste a Canva link and a preview image together.");
 
   function commit(next: string[]) {
     const cleaned = parseAssetUrls(next);
@@ -65,6 +75,19 @@ export function AssetUploadField({
     }
   }
 
+  async function onPasteImage(e: React.ClipboardEvent) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of Array.from(items)) {
+      if (!item.type.startsWith("image/")) continue;
+      const file = item.getAsFile();
+      if (!file) continue;
+      e.preventDefault();
+      await onFile(file);
+      return;
+    }
+  }
+
   function addPastedUrl() {
     const next = pasteUrl.trim();
     if (!next) return;
@@ -79,7 +102,7 @@ export function AssetUploadField({
   if (!multiple) {
     const single = urls[0] ?? "";
     return (
-      <div className="space-y-2">
+      <div className="space-y-2" onPaste={(e) => void onPasteImage(e)}>
         <label className="label">{fieldLabel}</label>
         {single && isImageUrl(single) ? (
           <a
@@ -118,6 +141,13 @@ export function AssetUploadField({
           </a>
         ) : null}
 
+        {needsPreviewImage ? (
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-900">
+            Private Canva links can’t be previewed automatically. Upload or paste
+            (Ctrl+V) a PNG/JPG export for the calendar thumbnail.
+          </p>
+        ) : null}
+
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -132,9 +162,11 @@ export function AssetUploadField({
             )}
             {uploading
               ? "Uploading…"
-              : single
-                ? "Replace asset"
-                : "Upload asset"}
+              : needsPreviewImage
+                ? "Upload preview image"
+                : single
+                  ? "Replace asset"
+                  : "Upload asset"}
           </button>
           {single ? (
             <button
@@ -166,14 +198,24 @@ export function AssetUploadField({
           placeholder="Or paste an asset URL…"
         />
         {error ? <p className="text-xs text-[var(--danger)]">{error}</p> : null}
-        {hint ? <p className="text-[11px] text-muted">{hint}</p> : null}
+        {resolvedHint ? (
+          <p className="text-[11px] text-muted">{resolvedHint}</p>
+        ) : null}
       </div>
     );
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" onPaste={(e) => void onPasteImage(e)}>
       <label className="label">{fieldLabel}</label>
+
+      {needsPreviewImage ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-900">
+          Private Canva links can’t be previewed automatically. Keep the Canva
+          link and also upload or paste (Ctrl+V) a PNG/JPG — the calendar uses
+          the image.
+        </p>
+      ) : null}
 
       {urls.length > 0 ? (
         <ul className="space-y-2">
@@ -261,9 +303,11 @@ export function AssetUploadField({
           )}
           {uploading
             ? "Uploading…"
-            : urls.length
-              ? "Add asset"
-              : "Upload asset"}
+            : needsPreviewImage
+              ? "Add preview image"
+              : urls.length
+                ? "Add asset"
+                : "Upload asset"}
         </button>
       </div>
 
@@ -299,7 +343,9 @@ export function AssetUploadField({
       </div>
 
       {error ? <p className="text-xs text-[var(--danger)]">{error}</p> : null}
-      {hint ? <p className="text-[11px] text-muted">{hint}</p> : null}
+      {resolvedHint ? (
+        <p className="text-[11px] text-muted">{resolvedHint}</p>
+      ) : null}
     </div>
   );
 }

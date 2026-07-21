@@ -637,14 +637,9 @@ export function SocialClient({ hideHeader = false }: { hideHeader?: boolean }) {
                   />
                 </div>
               ) : isCanvaUrl(selected.mediaUrl) ? (
-                <a
-                  href={selected.mediaUrl!}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block overflow-hidden rounded-lg border border-border"
-                >
+                <div className="overflow-hidden rounded-lg border border-border">
                   <CanvaPreviewTile url={selected.mediaUrl!} compact={false} />
-                </a>
+                </div>
               ) : null}
               <p className="whitespace-pre-wrap text-base font-medium leading-relaxed">
                 {selected.text}
