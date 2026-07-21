@@ -24,6 +24,12 @@ export type PlanablePost = {
   platforms: string[];
 };
 
+type PlanablePage = {
+  id: string;
+  name: string | null;
+  platform: string | null;
+};
+
 function pickMediaUrl(p: Record<string, unknown>): string | null {
   const media = p.media as
     | Array<{ url?: string; thumbnailUrl?: string; type?: string }>
@@ -45,18 +51,69 @@ function pickMediaUrl(p: Record<string, unknown>): string | null {
   return thumb || null;
 }
 
-function pickPlatforms(p: Record<string, unknown>): string[] {
-  const pages = p.pages as Array<{ name?: string; type?: string }> | undefined;
+function pickPlatforms(
+  p: Record<string, unknown>,
+  pagesById: Map<string, PlanablePage>
+): string[] {
+  const pages = p.pages as Array<{ name?: string; type?: string; platform?: string }> | undefined;
   if (Array.isArray(pages) && pages.length) {
     return pages
-      .map((x) => x.name || x.type || "")
+      .map((x) => x.platform || x.type || x.name || "")
       .filter(Boolean)
       .map(String);
   }
+
+  const pageId = p.pageId != null ? String(p.pageId) : null;
+  if (pageId && pagesById.has(pageId)) {
+    const page = pagesById.get(pageId)!;
+    if (page.platform) return [page.platform];
+    if (page.name) return [page.name];
+  }
+
   const pageName =
     (p.pageName as string | undefined) ||
     (p.page as { name?: string } | undefined)?.name;
   return pageName ? [pageName] : [];
+}
+
+async function fetchPlanablePages(
+  token: string,
+  workspaceId: string
+): Promise<Map<string, PlanablePage>> {
+  const map = new Map<string, PlanablePage>();
+  try {
+    const res = await fetch(
+      `${PLANABLE_API_BASE_URL}/pages?workspaceId=${encodeURIComponent(workspaceId)}&limit=100`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+        next: { revalidate: 300 },
+      }
+    );
+    if (!res.ok) return map;
+    const data = (await res.json()) as {
+      data?: Array<Record<string, unknown>>;
+    };
+    for (const page of data.data ?? []) {
+      const id = page.id != null ? String(page.id) : "";
+      if (!id) continue;
+      map.set(id, {
+        id,
+        name: page.name != null ? String(page.name) : null,
+        platform:
+          page.platform != null
+            ? String(page.platform)
+            : page.type != null
+              ? String(page.type)
+              : null,
+      });
+    }
+  } catch {
+    /* pages are optional enrichment */
+  }
+  return map;
 }
 
 export async function fetchPlanablePosts(): Promise<{
@@ -76,16 +133,19 @@ export async function fetchPlanablePosts(): Promise<{
   }
 
   try {
-    const res = await fetch(
-      `${PLANABLE_API_BASE_URL}/workspaces/${config.workspaceId}/posts?limit=50`,
-      {
-        headers: {
-          Authorization: `Bearer ${config.token}`,
-          Accept: "application/json",
-        },
-        next: { revalidate: 120 },
-      }
-    );
+    const [res, pagesById] = await Promise.all([
+      fetch(
+        `${PLANABLE_API_BASE_URL}/posts?workspaceId=${encodeURIComponent(config.workspaceId)}&limit=50`,
+        {
+          headers: {
+            Authorization: `Bearer ${config.token}`,
+            Accept: "application/json",
+          },
+          next: { revalidate: 120 },
+        }
+      ),
+      fetchPlanablePages(config.token, config.workspaceId),
+    ]);
 
     if (!res.ok) {
       const text = await res.text();
@@ -110,17 +170,18 @@ export async function fetchPlanablePosts(): Promise<{
         (p.scheduled_at as string | undefined) ||
         (p.publishAt as string | undefined) ||
         null;
-      const platforms = pickPlatforms(p);
+      const platforms = pickPlatforms(p, pagesById);
+      const pageId = p.pageId != null ? String(p.pageId) : null;
+      const page = pageId ? pagesById.get(pageId) : undefined;
       return {
         id,
-        text: String(p.text ?? p.caption ?? p.title ?? "Untitled post").slice(
-          0,
-          280
-        ),
+        text: String(
+          p.plainText ?? p.text ?? p.caption ?? p.title ?? "Untitled post"
+        ).slice(0, 280),
         status: String(p.status ?? p.state ?? "unknown"),
         scheduledAt: scheduled,
         url: (p.url as string | undefined) ?? null,
-        pageName: platforms[0] ?? null,
+        pageName: page?.name ?? platforms[0] ?? null,
         mediaUrl: pickMediaUrl(p),
         platforms,
       };

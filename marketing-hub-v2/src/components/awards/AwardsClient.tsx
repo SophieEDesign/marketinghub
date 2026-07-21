@@ -75,8 +75,8 @@ function statusTone(status: AwardStatus) {
 }
 
 export function AwardsClient({ initial }: { initial: AwardEntry[] }) {
-  const { view } = useHubView();
-  const isAdmin = view === "admin";
+  const { view: hubView } = useHubView();
+  const isAdmin = hubView === "admin";
 
   const [items, setItems] = useState(initial);
   const [view, setView] = useState<ViewId>("list");
