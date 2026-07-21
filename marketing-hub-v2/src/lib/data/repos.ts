@@ -1010,7 +1010,13 @@ export async function deleteAward(id: string) {
 
 export async function listTasks() {
   const store = await readStore();
-  return [...(store.tasks ?? [])].sort((a, b) => {
+  return [...(store.tasks ?? [])]
+    .map((t) => ({
+      ...t,
+      related_type: t.related_type ?? "",
+      related_id: t.related_id ?? null,
+    }))
+    .sort((a, b) => {
     const rank = (status: string) => {
       const s = status.trim().toLowerCase();
       if (s === "todo") return 0;
@@ -1039,6 +1045,8 @@ export async function createTask(
 ) {
   const item: HubTask = {
     ...input,
+    related_type: input.related_type || "",
+    related_id: input.related_id || null,
     id: uid("tsk"),
     created_at: nowIso(),
     updated_at: nowIso(),

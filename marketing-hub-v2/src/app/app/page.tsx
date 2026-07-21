@@ -11,6 +11,7 @@ import {
   listThemes,
 } from "@/lib/data/repos";
 import { listWebEnquiries } from "@/lib/data/web-enquiries";
+import { computeEnquiryStats } from "@/lib/data/web-enquiries-stats";
 import { isClosedTaskStatus } from "@/lib/data/collections";
 import { format } from "date-fns";
 import { hasSupabaseConfig } from "@/lib/auth/config";
@@ -50,7 +51,8 @@ export default async function AppHomePage() {
   const openTaskCount = tasks.filter(
     (t) => !isClosedTaskStatus(t.status)
   ).length;
-  const newEnquiries = enquiries.filter((e) => e.status === "new").length;
+  const enquiryStats = computeEnquiryStats(enquiries);
+  const newEnquiries = enquiryStats.thisWeek;
 
   const currentTheme =
     themes.find((t) => t.status === "active") ?? themes[0] ?? null;

@@ -2,8 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react";
 import { format, parseISO, isBefore, startOfDay } from "date-fns";
-import type { HubTask, TaskStatus } from "@/lib/types";
+import FullCalendar from "@fullcalendar/react";
+import dayGridPlugin from "@fullcalendar/daygrid";
+import interactionPlugin from "@fullcalendar/interaction";
+import listPlugin from "@fullcalendar/list";
+import type { HubTask, TaskRelatedType, TaskStatus } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { FullCalendarStyles } from "@/components/ui/FullCalendarStyles";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { ContactOwnerSelect } from "@/components/ui/ContactOwnerSelect";
 import { cn } from "@/lib/utils";
@@ -19,10 +24,16 @@ import {
   type FieldOption,
 } from "@/lib/data/collections";
 import { useManagedFieldOptions } from "@/lib/data/useManagedFieldOptions";
+import {
+  TaskRelatedChip,
+  TaskRelatedFields,
+} from "@/components/tasks/TaskRelatedFields";
 
 const VIEWS = [
-  { id: "list", label: "List" },
   { id: "kanban", label: "Kanban" },
+  { id: "list", label: "List" },
+  { id: "calendar", label: "Calendar" },
+  { id: "timeline", label: "Timeline" },
 ] as const;
 
 type ViewId = (typeof VIEWS)[number]["id"];
@@ -34,6 +45,8 @@ const emptyForm = {
   category: "Events",
   status: "todo" as TaskStatus,
   owner: "",
+  related_type: "" as TaskRelatedType | "",
+  related_id: null as string | null,
 };
 
 type EditForm = typeof emptyForm;
@@ -46,7 +59,32 @@ function toEditForm(item: HubTask): EditForm {
     category: item.category,
     status: item.status,
     owner: item.owner,
+    related_type: item.related_type || "",
+    related_id: item.related_id ?? null,
   };
+}
+
+function parseDue(item: HubTask): Date | null {
+  if (!item.due_date) return null;
+  try {
+    return parseISO(item.due_date.slice(0, 10));
+  } catch {
+    return null;
+  }
+}
+
+function statusDotColor(status: TaskStatus) {
+  const s = status.trim().toLowerCase();
+  if (isClosedTaskStatus(s)) return "#059669";
+  if (
+    s === "doing" ||
+    s === "inprogress" ||
+    s.includes("progress") ||
+    s.includes("wait")
+  ) {
+    return "#0284c7";
+  }
+  return "#d97706";
 }
 
 function statusTone(status: TaskStatus) {
@@ -162,6 +200,35 @@ export function TasksClient({
     });
   }, [items, search, statusFilter, ownerFilter]);
 
+  const calendarEvents = useMemo(
+    () =>
+      filtered
+        .filter((i) => i.due_date)
+        .map((i) => ({
+          id: i.id,
+          title: i.title,
+          start: i.due_date!,
+          allDay: true,
+          extendedProps: { itemId: i.id },
+        })),
+    [filtered]
+  );
+
+  const calendarItemById = useMemo(() => {
+    const map = new Map<string, HubTask>();
+    for (const i of filtered) map.set(i.id, i);
+    return map;
+  }, [filtered]);
+
+  const timelineEntries = useMemo(() => {
+    const dated = filtered
+      .map((item) => ({ item, due: parseDue(item) }))
+      .filter((x): x is { item: HubTask; due: Date } => !!x.due)
+      .sort((a, b) => a.due.getTime() - b.due.getTime());
+    const undated = filtered.filter((i) => !i.due_date);
+    return { dated, undated };
+  }, [filtered]);
+
   async function create() {
     if (creating) return;
     setCreating(true);
@@ -217,6 +284,8 @@ export function TasksClient({
             category: edit.category,
             status: edit.status,
             owner: edit.owner,
+            related_type: edit.related_type || "",
+            related_id: edit.related_id || null,
           },
         }),
       });
@@ -250,7 +319,7 @@ export function TasksClient({
       if (!res.ok) throw new Error("Failed to update status");
       await refresh();
     } catch {
-      if (previous) {
+      if (previous !== undefined) {
         setItems((prev) =>
           prev.map((item) =>
             item.id === id ? { ...item, status: previous } : item
@@ -260,6 +329,67 @@ export function TasksClient({
         await refresh();
       }
     }
+  }
+
+  async function setOwner(id: string, owner: string) {
+    const previous = items.find((i) => i.id === id)?.owner;
+    if (previous === owner) return;
+    setItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, owner } : item))
+    );
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update", id, patch: { owner } }),
+      });
+      if (!res.ok) throw new Error("Failed to update owner");
+      await refresh();
+    } catch {
+      if (previous !== undefined) {
+        setItems((prev) =>
+          prev.map((item) =>
+            item.id === id ? { ...item, owner: previous } : item
+          )
+        );
+      } else {
+        await refresh();
+      }
+    }
+  }
+
+  async function setDueDate(id: string, dueDate: string) {
+    const previous = items.find((i) => i.id === id)?.due_date ?? null;
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, due_date: dueDate || null } : item
+      )
+    );
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "update",
+          id,
+          patch: { due_date: dueDate || null },
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to update due date");
+      await refresh();
+    } catch {
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === id ? { ...item, due_date: previous } : item
+        )
+      );
+      throw new Error("Failed to update due date");
+    }
+  }
+
+  function openEdit(item: HubTask) {
+    setEditingId(item.id);
+    setEdit(toEditForm(item));
   }
 
   function onCardDragStart(e: DragEvent, id: string) {
@@ -317,7 +447,7 @@ export function TasksClient({
     <div>
       <PageHeader
         title="Tasks"
-        description="Marketing to-dos — keep it light. Status, owner, and due date."
+        description="Marketing to-dos — Kanban, list, calendar, or timeline by due date."
         actions={
           <button
             type="button"
@@ -331,6 +461,8 @@ export function TasksClient({
           </button>
         }
       />
+
+      <FullCalendarStyles />
 
       <div
         className="mb-5 inline-flex flex-wrap gap-1 rounded-2xl border border-border bg-white p-1"
@@ -403,6 +535,13 @@ export function TasksClient({
             />
           </div>
           <div>
+            <label className="label">Assign to</label>
+            <ContactOwnerSelect
+              value={form.owner}
+              onChange={(owner) => setForm({ ...form, owner })}
+            />
+          </div>
+          <div>
             <label className="label">Due date</label>
             <input
               className="field"
@@ -426,13 +565,6 @@ export function TasksClient({
             </select>
           </div>
           <div>
-            <label className="label">Owner</label>
-            <ContactOwnerSelect
-              value={form.owner}
-              onChange={(owner) => setForm({ ...form, owner })}
-            />
-          </div>
-          <div>
             <label className="label">Status</label>
             <select
               className="field"
@@ -447,6 +579,15 @@ export function TasksClient({
                 </option>
               ))}
             </select>
+          </div>
+          <div className="md:col-span-2">
+            <TaskRelatedFields
+              value={{
+                related_type: form.related_type,
+                related_id: form.related_id,
+              }}
+              onChange={(related) => setForm({ ...form, ...related })}
+            />
           </div>
           <div className="md:col-span-2">
             <label className="label">Details</label>
@@ -507,6 +648,10 @@ export function TasksClient({
                       Overdue
                     </span>
                   ) : null}
+                  <TaskRelatedChip
+                    related_type={item.related_type}
+                    related_id={item.related_id}
+                  />
                 </div>
                 <p className="mt-1 text-xs text-muted">
                   {[
@@ -545,6 +690,12 @@ export function TasksClient({
                     )
                   )}
                 </select>
+                <ContactOwnerSelect
+                  value={item.owner}
+                  onChange={(owner) => void setOwner(item.id, owner)}
+                  className="!w-auto min-w-[9rem] py-1.5 text-xs"
+                  aria-label="Assign person"
+                />
                 <button
                   type="button"
                   className="btn-secondary px-2.5 py-1.5 text-xs"
@@ -614,6 +765,10 @@ export function TasksClient({
                             Overdue
                           </span>
                         ) : null}
+                        <TaskRelatedChip
+                          related_type={item.related_type}
+                          related_id={item.related_id}
+                        />
                       </div>
                       <p className="mt-1 text-xs text-muted">
                         {[
@@ -634,9 +789,9 @@ export function TasksClient({
                           className="mt-2 text-xs text-foreground/80"
                         />
                       ) : null}
-                      <div className="mt-3 flex flex-wrap gap-2">
+                      <div className="mt-3 flex flex-col gap-2">
                         <select
-                          className="field !w-auto py-1.5 text-xs"
+                          className="field w-full py-1.5 text-xs"
                           value={item.status}
                           onChange={(e) =>
                             void setStatus(
@@ -655,23 +810,31 @@ export function TasksClient({
                             </option>
                           ))}
                         </select>
-                        <button
-                          type="button"
-                          className="btn-secondary px-2.5 py-1.5 text-xs"
-                          onClick={() => {
-                            setEditingId(item.id);
-                            setEdit(toEditForm(item));
-                          }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-ghost px-2.5 py-1.5 text-xs text-[var(--danger)]"
-                          onClick={() => void remove(item.id)}
-                        >
-                          Delete
-                        </button>
+                        <ContactOwnerSelect
+                          value={item.owner}
+                          onChange={(owner) => void setOwner(item.id, owner)}
+                          className="w-full py-1.5 text-xs"
+                          aria-label="Assign person"
+                        />
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            className="btn-secondary px-2.5 py-1.5 text-xs"
+                            onClick={() => {
+                              setEditingId(item.id);
+                              setEdit(toEditForm(item));
+                            }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-ghost px-2.5 py-1.5 text-xs text-[var(--danger)]"
+                            onClick={() => void remove(item.id)}
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </div>
                     </article>
                   ))}
@@ -684,6 +847,217 @@ export function TasksClient({
               </div>
             );
           })}
+        </div>
+      ) : null}
+
+      {view === "calendar" ? (
+        <div className="hub-fc surface-card overflow-hidden p-3 md:p-4">
+          <p className="mb-3 text-xs text-muted">
+            Tasks with a due date. Drag to reschedule, or click to edit.
+          </p>
+          <FullCalendar
+            plugins={[dayGridPlugin, interactionPlugin, listPlugin]}
+            initialView="dayGridMonth"
+            headerToolbar={{
+              left: "prev,next today",
+              center: "title",
+              right: "dayGridMonth,listWeek",
+            }}
+            height="auto"
+            firstDay={1}
+            dayMaxEvents={4}
+            moreLinkClick="popover"
+            editable
+            eventStartEditable
+            eventDurationEditable={false}
+            events={calendarEvents}
+            eventClassNames="!border-0 !bg-transparent cursor-grab active:cursor-grabbing"
+            eventClick={(info) => {
+              info.jsEvent.preventDefault();
+              const item = items.find((i) => i.id === info.event.id);
+              if (item) openEdit(item);
+            }}
+            eventDrop={(info) => {
+              const id = String(
+                info.event.extendedProps.itemId ?? info.event.id
+              );
+              const next = info.event.startStr.slice(0, 10);
+              if (!next) {
+                info.revert();
+                return;
+              }
+              void setDueDate(id, next).catch(() => info.revert());
+            }}
+            eventContent={(arg) => {
+              const id = String(
+                arg.event.extendedProps.itemId ?? arg.event.id
+              );
+              const item = calendarItemById.get(id);
+              if (!item) {
+                return (
+                  <span className="truncate text-[10px] text-slate-600">
+                    {arg.event.title}
+                  </span>
+                );
+              }
+              return (
+                <div
+                  className={cn(
+                    "w-full truncate rounded-md border px-1.5 py-0.5 text-[10px] font-medium leading-tight",
+                    statusTone(item.status),
+                    isOverdue(item) && "ring-1 ring-rose-300"
+                  )}
+                  title={[item.title, item.owner, item.category]
+                    .filter(Boolean)
+                    .join(" · ")}
+                >
+                  {item.title}
+                </div>
+              );
+            }}
+          />
+          {calendarEvents.length === 0 ? (
+            <p className="mt-4 text-sm text-muted">
+              No dated tasks yet — add a due date when creating or editing.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {view === "timeline" ? (
+        <div className="surface-card p-4 md:p-6">
+          {timelineEntries.dated.length > 0 ? (
+            <ol className="relative ml-2 space-y-0 md:ml-3">
+              <span
+                className="absolute bottom-2 left-[2.65rem] top-2 w-px bg-border md:left-[3.15rem]"
+                aria-hidden
+              />
+              {timelineEntries.dated.map(({ item, due }, index) => {
+                const prev = timelineEntries.dated[index - 1];
+                const showMonth =
+                  !prev ||
+                  format(prev.due, "yyyy-MM") !== format(due, "yyyy-MM");
+                const past = due.getTime() < startOfDay(new Date()).getTime();
+                const statusLabel =
+                  statusColumns.find((s) => s.id === item.status)?.label ??
+                  item.status;
+                return (
+                  <li key={item.id}>
+                    {showMonth ? (
+                      <div className="relative z-10 mb-3 mt-2 first:mt-0">
+                        <span className="inline-flex rounded-full bg-brand px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white">
+                          {format(due, "MMMM yyyy")}
+                        </span>
+                      </div>
+                    ) : null}
+                    <div className="relative grid grid-cols-[3.25rem_1.25rem_1fr] items-start gap-2 pb-5 md:grid-cols-[4rem_1.5rem_1fr] md:gap-3">
+                      <button
+                        type="button"
+                        className="pt-1 text-right"
+                        onClick={() => openEdit(item)}
+                      >
+                        <span className="block font-display text-xl leading-none text-brand md:text-2xl">
+                          {format(due, "d")}
+                        </span>
+                        <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wide text-muted">
+                          {format(due, "EEE")}
+                        </span>
+                      </button>
+                      <div className="relative flex justify-center pt-2">
+                        <span
+                          className={cn(
+                            "relative z-10 h-3.5 w-3.5 rounded-full border-2 border-white shadow-sm ring-2",
+                            past ? "ring-slate-300" : "ring-brand/30"
+                          )}
+                          style={{ background: statusDotColor(item.status) }}
+                          aria-hidden
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        className={cn(
+                          "rounded-xl border border-border bg-white p-3 text-left shadow-sm transition hover:border-brand/30 hover:shadow-md",
+                          past && !isClosedTaskStatus(item.status) && "opacity-80"
+                        )}
+                        onClick={() => openEdit(item)}
+                      >
+                        <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                          <span
+                            className={cn(
+                              "rounded-full border px-2 py-0.5 text-[10px] font-semibold",
+                              statusTone(item.status)
+                            )}
+                          >
+                            {statusLabel}
+                          </span>
+                          {isOverdue(item) ? (
+                            <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-medium text-rose-800">
+                              Overdue
+                            </span>
+                          ) : null}
+                          <TaskRelatedChip
+                            related_type={item.related_type}
+                            related_id={item.related_id}
+                          />
+                          <span className="text-xs text-muted">
+                            {[item.category, item.owner]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </span>
+                        </div>
+                        <p className="font-medium text-foreground">
+                          {item.title}
+                        </p>
+                        {plainTextFromHtml(item.details) ? (
+                          <RichTextView
+                            html={item.details}
+                            plain
+                            clampLines={2}
+                            className="mt-1 text-xs text-muted"
+                          />
+                        ) : null}
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          ) : (
+            <p className="text-sm text-muted">
+              No dated tasks in this filter. Add due dates to see them on the
+              timeline.
+            </p>
+          )}
+
+          {timelineEntries.undated.length > 0 ? (
+            <section className="mt-8 border-t border-border pt-6">
+              <h2 className="mb-3 text-sm font-semibold text-brand">
+                No due date
+              </h2>
+              <div className="grid gap-2 md:grid-cols-2">
+                {timelineEntries.undated.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="rounded-xl border border-border bg-sand/60 p-3 text-left hover:border-brand/30"
+                    onClick={() => openEdit(item)}
+                  >
+                    <p className="text-sm font-medium">{item.title}</p>
+                    <p className="mt-1 text-xs text-muted">
+                      {[
+                        statusColumns.find((s) => s.id === item.status)
+                          ?.label ?? item.status,
+                        item.category,
+                        item.owner,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </section>
+          ) : null}
         </div>
       ) : null}
 
@@ -755,7 +1129,7 @@ export function TasksClient({
                 </select>
               </div>
               <div>
-                <label className="label">Owner</label>
+                <label className="label">Assign to</label>
                 <ContactOwnerSelect
                   value={edit.owner}
                   onChange={(owner) => setEdit({ ...edit, owner })}
@@ -779,6 +1153,13 @@ export function TasksClient({
                   )}
                 </select>
               </div>
+              <TaskRelatedFields
+                value={{
+                  related_type: edit.related_type,
+                  related_id: edit.related_id,
+                }}
+                onChange={(related) => setEdit({ ...edit, ...related })}
+              />
               <div>
                 <label className="label">Details</label>
                 <RichTextEditor

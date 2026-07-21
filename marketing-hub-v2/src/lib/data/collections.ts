@@ -187,6 +187,14 @@ export const TASK_STATUSES: FieldOption[] = [
   { value: "done", label: "Done" },
 ];
 
+export const TASK_RELATED_TYPES: FieldOption[] = [
+  { value: "content", label: "Content / Social" },
+  { value: "theme", label: "Theme" },
+  { value: "sponsorship", label: "Partner" },
+  { value: "award", label: "Award" },
+  { value: "event", label: "Event" },
+];
+
 /** Closed / finished task statuses (built-in + common Field Manager renames). */
 export function isClosedTaskStatus(status: string): boolean {
   const s = status.trim().toLowerCase();
@@ -625,6 +633,12 @@ export const DATA_COLLECTIONS: CollectionDef[] = [
         options: TASK_STATUSES,
       }),
       ownerField(),
+      f("related_type", {
+        type: "select",
+        label: "Linked to",
+        options: TASK_RELATED_TYPES,
+      }),
+      f("related_id", { label: "Linked record id" }),
       f("created_at", { type: "readonly", locked: true }),
       f("updated_at", { type: "readonly", locked: true }),
     ],

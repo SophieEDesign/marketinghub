@@ -294,6 +294,14 @@ export type AwardEntry = {
 /** Marketing to-dos — status values come from Field Manager options. */
 export type TaskStatus = string;
 
+/** Optional link from a task to another hub record. */
+export type TaskRelatedType =
+  | "content"
+  | "theme"
+  | "sponsorship"
+  | "award"
+  | "event";
+
 export type HubTask = {
   id: string;
   title: string;
@@ -302,6 +310,9 @@ export type HubTask = {
   category: string;
   status: TaskStatus;
   owner: string;
+  /** Linked record kind — empty/null when unlinked. */
+  related_type: TaskRelatedType | "";
+  related_id: string | null;
   created_at: string;
   updated_at: string;
 };

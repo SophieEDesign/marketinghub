@@ -67,7 +67,7 @@ export function HomeStats({
         </Link>
         <Link href="/app/enquiries" className={kpiClassName}>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-            New enquiries
+            Enquiries this week
           </p>
           <p className="mt-2 font-display text-3xl text-brand">
             {stats.newEnquiries ?? 0}

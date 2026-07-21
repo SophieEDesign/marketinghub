@@ -38,6 +38,8 @@ export async function POST(request: NextRequest) {
       category: body.category ?? "",
       status: body.status ?? "todo",
       owner: body.owner ?? "",
+      related_type: body.related_type || "",
+      related_id: body.related_id || null,
     });
     return jsonOk({ item }, { status: 201 });
   } catch (err) {

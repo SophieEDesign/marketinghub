@@ -11,12 +11,14 @@ export function ContactOwnerSelect({
   className,
   id,
   disabled,
+  "aria-label": ariaLabel,
 }: {
   value: string;
   onChange: (next: string) => void;
   className?: string;
   id?: string;
   disabled?: boolean;
+  "aria-label"?: string;
 }) {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -47,10 +49,11 @@ export function ContactOwnerSelect({
       id={id}
       className={cn("field", className)}
       value={value}
-      disabled={disabled}
+      disabled={disabled || !loaded}
+      aria-label={ariaLabel ?? "Owner"}
       onChange={(e) => onChange(e.target.value)}
     >
-      <option value="">{loaded ? "Select contact…" : "Loading…"}</option>
+      <option value="">{loaded ? "Assign person…" : "Loading…"}</option>
       {options.map((o) => (
         <option key={o.value} value={o.value}>
           {o.label}
