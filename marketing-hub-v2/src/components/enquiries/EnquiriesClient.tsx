@@ -57,7 +57,8 @@ function enquiryMessage(e: WebEnquiry): string {
 
 function entriesFrom(
   obj: Record<string, unknown> | undefined,
-  labels?: Record<string, string>
+  labels?: Record<string, string>,
+  opts?: { keepNo?: boolean }
 ): { label: string; value: string }[] {
   if (!obj) return [];
   const out: { label: string; value: string }[] = [];
@@ -65,13 +66,25 @@ function entriesFrom(
     if (val == null || val === "") continue;
     if (typeof val === "object") continue;
     const value = asString(val);
-    if (!value || value === "no" || value === "n/a" || value === "-") continue;
+    if (!value) continue;
+    const lower = value.toLowerCase();
+    if (!opts?.keepNo && (lower === "n/a" || lower === "-")) continue;
     out.push({
       label: labels?.[key] ?? key.replace(/_/g, " "),
       value,
     });
   }
   return out;
+}
+
+function pickField(
+  ...candidates: unknown[]
+): string {
+  for (const c of candidates) {
+    const v = asString(c);
+    if (v) return v;
+  }
+  return "";
 }
 
 function DetailSection({
@@ -111,6 +124,7 @@ function buildDetailSections(e: WebEnquiry) {
   const tracking = asRecord(raw.tracking);
   const form = asRecord(raw.form_fields);
   const make = asRecord(e.make_fields);
+  const nonEmpty = asRecord(raw.non_empty_form_fields);
 
   const customerRows = [
     { label: "Name", value: e.customer_name || asString(customer.name) },
@@ -150,6 +164,120 @@ function buildDetailSections(e: WebEnquiry) {
     { label: "Routing", value: e.routing_reason },
   ].filter((r) => r.value);
 
+  const vesselName = pickField(
+    shipment.yacht_vessel_name,
+    form["Yacht Name"],
+    nonEmpty.yacht_vessel_name,
+    nonEmpty.yacht_name,
+    make.yacht_vessel_name
+  );
+  const makeModel = pickField(
+    shipment.make_model,
+    form["Make & Model"],
+    nonEmpty.make_model,
+    nonEmpty.yacht_make_model
+  );
+
+  const vesselRows = [
+    { label: "Yacht / vessel name", value: vesselName },
+    { label: "Make & model", value: makeModel },
+    {
+      label: "Year of build",
+      value: pickField(
+        shipment.yacht_year_of_build,
+        form["Year of build"],
+        nonEmpty.yacht_year_of_build
+      ),
+    },
+    {
+      label: "Length",
+      value: pickField(shipment.length, form.Length, nonEmpty.length),
+    },
+    {
+      label: "Width",
+      value: pickField(shipment.width, form.Width, nonEmpty.width),
+    },
+    {
+      label: "Draft",
+      value: pickField(shipment.draft, form.Draft, nonEmpty.draft),
+    },
+    {
+      label: "Height",
+      value: pickField(shipment.height, form.Height, nonEmpty.height),
+    },
+    {
+      label: "Weight",
+      value: pickField(shipment.weight, form.Weight, nonEmpty.weight),
+    },
+    {
+      label: "Approx. value",
+      value: pickField(
+        shipment.approximate_value,
+        form["Value (approx)"],
+        nonEmpty.approximate_value
+      ),
+    },
+    {
+      label: "Own cradle",
+      value: pickField(shipment.own_cradle, form["Own cradle"]),
+    },
+    {
+      label: "Own container",
+      value: pickField(shipment.own_container, form["Own container"]),
+    },
+    {
+      label: "Cargo description",
+      value: pickField(
+        shipment.cargo_description,
+        form["Cargo Description"],
+        nonEmpty.cargo_description
+      ),
+    },
+    {
+      label: "Hazardous goods",
+      value: pickField(
+        shipment.hazardous_goods,
+        form["Hazardous goods"],
+        form.hazardous_goods
+      ),
+    },
+    {
+      label: "Goods in transit insurance",
+      value: pickField(
+        shipment.goods_in_transit_insurance,
+        form["Goods in Transit insurance"],
+        form.goods_in_transit_insurance
+      ),
+    },
+    {
+      label: "Reason for shipping",
+      value: pickField(
+        shipment.reason_for_shipping,
+        form["Reason for shipping"],
+        form.reason_for_shipping
+      ),
+    },
+    {
+      label: "Vehicle",
+      value: pickField(
+        shipment.vehicle_make_model_year,
+        form.Vehicle,
+        nonEmpty.vehicle_make_model_year
+      ),
+    },
+    {
+      label: "Vehicle driveable",
+      value: pickField(shipment.vehicle_driveable, form["Vehicle driveable"]),
+    },
+    {
+      label: "Cargo context",
+      value: pickField(
+        shipment.general_cargo_context,
+        form["Cargo context (general cargo)"]
+      ),
+    },
+  ].filter((r) => r.value);
+
   const journeyRows = [
     {
       label: "From",
@@ -171,7 +299,7 @@ function buildDetailSections(e: WebEnquiry) {
     },
     ...entriesFrom(tracking, {
       sailing_schedule_reference: "Sailing schedule",
-      sailing_schedule_vessel_slug: "Vessel",
+      sailing_schedule_vessel_slug: "Schedule vessel",
       sailing_departure_region: "Departure region",
       sailing_arrival_region: "Arrival region",
       current_page_url: "Page",
@@ -182,22 +310,6 @@ function buildDetailSections(e: WebEnquiry) {
       gclid: "Google Ads click ID",
     }),
   ].filter((r) => r.value);
-
-  const shipmentRows = entriesFrom(shipment, {
-    yacht_vessel_name: "Yacht / vessel",
-    make_model: "Make & model",
-    yacht_year_of_build: "Year of build",
-    approximate_value: "Approx. value",
-    own_cradle: "Own cradle",
-    own_container: "Own container",
-    cargo_description: "Cargo description",
-    hazardous_goods: "Hazardous goods",
-    goods_in_transit_insurance: "Goods in transit insurance",
-    reason_for_shipping: "Reason for shipping",
-    vehicle_make_model_year: "Vehicle",
-    vehicle_driveable: "Vehicle driveable",
-    general_cargo_context: "Cargo context",
-  });
 
   const racingRows = entriesFrom(racing, {
     regatta_event: "Regatta / event",
@@ -224,13 +336,12 @@ function buildDetailSections(e: WebEnquiry) {
     data_processing_consent: "Data processing",
   });
 
-  // Any leftover form fields not already shown
   const shown = new Set(
     [
       ...customerRows,
       ...serviceRows,
+      ...vesselRows,
       ...journeyRows,
-      ...shipmentRows,
       ...racingRows,
       ...timingRows,
       ...membershipRows,
@@ -248,7 +359,6 @@ function buildDetailSections(e: WebEnquiry) {
     ) {
       continue;
     }
-    // Skip duplicates of flat columns already covered
     if (
       [
         "Name",
@@ -278,6 +388,17 @@ function buildDetailSections(e: WebEnquiry) {
         "Routing Basis",
         "Routing Reason",
         "routing_reason",
+        "Yacht Name",
+        "Make & Model",
+        "Year of build",
+        "Length",
+        "Width",
+        "Draft",
+        "Height",
+        "Weight",
+        "Value (approx)",
+        "Own cradle",
+        "Own container",
       ].includes(k)
     ) {
       continue;
@@ -286,10 +407,12 @@ function buildDetailSections(e: WebEnquiry) {
   }
 
   return {
+    vesselName,
+    makeModel,
     customerRows,
     serviceRows,
+    vesselRows,
     journeyRows,
-    shipmentRows,
     racingRows,
     timingRows,
     membershipRows,
@@ -733,6 +856,15 @@ export function EnquiriesClient({
                   {selected.customer_name || "Enquiry"}
                 </h2>
                 <p className="text-xs text-muted">{selected.submission_id}</p>
+                {detail.vesselName ? (
+                  <p className="mt-1 text-sm text-foreground">
+                    <span className="text-muted">Vessel:</span>{" "}
+                    {detail.vesselName}
+                    {detail.makeModel ? (
+                      <span className="text-muted"> · {detail.makeModel}</span>
+                    ) : null}
+                  </p>
+                ) : null}
               </div>
               <button
                 type="button"
@@ -749,9 +881,9 @@ export function EnquiriesClient({
               </p>
 
               <DetailSection title="Customer" rows={detail.customerRows} />
+              <DetailSection title="Vessel / cargo" rows={detail.vesselRows} />
               <DetailSection title="Service & routing" rows={detail.serviceRows} />
               <DetailSection title="Journey" rows={detail.journeyRows} />
-              <DetailSection title="Shipment" rows={detail.shipmentRows} />
               <DetailSection title="Racing" rows={detail.racingRows} />
               <DetailSection title="Timing" rows={detail.timingRows} />
               <DetailSection title="Membership" rows={detail.membershipRows} />

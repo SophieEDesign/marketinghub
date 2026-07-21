@@ -1048,6 +1048,8 @@ function mapTaskRows(
       ),
       status: mapTaskStatus(asString(pickField(r, [/^status$/i, /^state$/i]))),
       owner,
+      related_type: "",
+      related_id: null,
       created_at: asIsoDate(r.created_at) || now,
       updated_at: asIsoDate(r.updated_at) || now,
     };
