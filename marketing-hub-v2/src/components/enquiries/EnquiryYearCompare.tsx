@@ -91,7 +91,7 @@ export function EnquiryYearCompare({
         <div>
           <h2 className="font-display text-lg text-brand">Enquiry history</h2>
           <p className="mt-0.5 text-sm text-muted">
-            Full monthly history by year (not limited by the date filter)
+            2023–2025 monthly totals + live hub years
             {data.compareYear != null && data.priorYear != null
               ? ` · Δ / % vs ${data.priorYear}`
               : null}
@@ -146,10 +146,11 @@ export function EnquiryYearCompare({
             {ENQUIRY_MONTH_LABELS.map((label, month) => {
               const inYtd = ytdSet.has(month);
               const cur =
-                compareYi >= 0 ? data.months[month]?.[compareYi] ?? 0 : null;
+                compareYi >= 0 ? data.months[month]?.[compareYi] ?? null : null;
               const prior =
-                priorYi >= 0 ? data.months[month]?.[priorYi] ?? 0 : null;
-              const showChange = inYtd && cur != null && prior != null;
+                priorYi >= 0 ? data.months[month]?.[priorYi] ?? null : null;
+              const showChange =
+                inYtd && typeof cur === "number" && typeof prior === "number";
               const delta = showChange ? cur - prior : null;
               const pct =
                 showChange && prior !== 0
@@ -172,7 +173,7 @@ export function EnquiryYearCompare({
                     {label}
                   </th>
                   {data.years.map((y, yi) => {
-                    const value = data.months[month]?.[yi] ?? 0;
+                    const value = data.months[month]?.[yi] ?? null;
                     const isFutureCompare =
                       y === data.compareYear && !inYtd;
                     return (
@@ -183,12 +184,13 @@ export function EnquiryYearCompare({
                           y === data.compareYear && "bg-accent-soft/25"
                         )}
                         style={{
-                          color: isFutureCompare
-                            ? undefined
-                            : yearColor(y, data.years),
+                          color:
+                            isFutureCompare || value == null
+                              ? undefined
+                              : yearColor(y, data.years),
                         }}
                       >
-                        {isFutureCompare ? (
+                        {isFutureCompare || value == null ? (
                           <span className="text-muted/50">—</span>
                         ) : (
                           value

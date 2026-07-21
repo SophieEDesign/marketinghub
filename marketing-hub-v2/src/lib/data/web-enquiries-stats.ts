@@ -1,4 +1,8 @@
 import type { WebEnquiry } from "@/lib/types";
+import {
+  ENQUIRY_HISTORY_BASE_YEARS,
+  HISTORICAL_MONTHLY_ENQUIRIES,
+} from "@/lib/data/enquiry-history-monthly";
 
 export type WebEnquiryStats = {
   thisWeek: number;
@@ -357,8 +361,8 @@ export const ENQUIRY_MONTH_LABELS = [
 
 export type EnquiryYearCompare = {
   years: number[];
-  /** [monthIndex 0–11][yearIndex] count */
-  months: number[][];
+  /** [monthIndex 0–11][yearIndex] count — null when no historical/live data */
+  months: (number | null)[][];
   /** Latest year with any data — used for Δ / % vs prior year. */
   compareYear: number | null;
   priorYear: number | null;
@@ -374,9 +378,14 @@ function pctChange(current: number, prior: number): number | null {
   return ((current - prior) / prior) * 100;
 }
 
+function emptyYear(): (number | null)[] {
+  return Array.from({ length: 12 }, () => null);
+}
+
 /**
- * Month × year matrix for enquiries. Ignores page date filters — uses the full list
- * (caller should already apply test-row visibility).
+ * Month × year matrix for enquiries.
+ * Always includes 2023–2025 historical monthly totals (from P&M chart),
+ * merged with live hub rows (live wins where present).
  */
 export function computeEnquiryYearCompare(
   items: WebEnquiry[],
@@ -387,19 +396,38 @@ export function computeEnquiryYearCompare(
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth();
 
-  const counts = new Map<number, number[]>();
+  /** Start from historical chart series. */
+  const counts = new Map<number, (number | null)[]>();
+  for (const y of ENQUIRY_HISTORY_BASE_YEARS) {
+    const hist = HISTORICAL_MONTHLY_ENQUIRIES[y];
+    counts.set(
+      y,
+      hist ? hist.map((v) => (v == null ? null : v)) : emptyYear()
+    );
+  }
+
+  /** Overlay live hub counts (replace month when we have live rows). */
+  const live = new Map<number, number[]>();
   for (const e of list) {
     const d = enquiryDate(e);
     if (!d) continue;
     const y = d.getFullYear();
     const m = d.getMonth();
-    if (!counts.has(y)) counts.set(y, Array.from({ length: 12 }, () => 0));
-    counts.get(y)![m] += 1;
+    if (!live.has(y)) live.set(y, Array.from({ length: 12 }, () => 0));
+    live.get(y)![m] += 1;
+  }
+
+  for (const [y, monthsLive] of live) {
+    const row = counts.get(y) ?? emptyYear();
+    for (let m = 0; m < 12; m += 1) {
+      if (monthsLive[m]! > 0) row[m] = monthsLive[m]!;
+    }
+    counts.set(y, row);
   }
 
   const years = [...counts.keys()].sort((a, b) => a - b);
   const months = Array.from({ length: 12 }, (_, month) =>
-    years.map((y) => counts.get(y)?.[month] ?? 0)
+    years.map((y) => counts.get(y)?.[month] ?? null)
   );
 
   const compareYear =
@@ -409,14 +437,14 @@ export function computeEnquiryYearCompare(
       ? [...years].reverse().find((y) => y < compareYear) ?? null
       : null;
 
-  /** YTD = months through latest month that is “in” for compare year. */
+  /** YTD through current month for current year; else through last known month. */
   let ytdThrough = -1;
   if (compareYear != null) {
     if (compareYear === currentYear) {
       ytdThrough = currentMonth;
     } else {
       for (let m = 11; m >= 0; m -= 1) {
-        if ((counts.get(compareYear)?.[m] ?? 0) > 0) {
+        if (counts.get(compareYear)?.[m] != null) {
           ytdThrough = m;
           break;
         }
@@ -429,10 +457,10 @@ export function computeEnquiryYearCompare(
 
   const ytdTotals: Record<number, number> = {};
   for (const y of years) {
-    ytdTotals[y] = ytdMonthIndexes.reduce(
-      (sum, m) => sum + (counts.get(y)?.[m] ?? 0),
-      0
-    );
+    ytdTotals[y] = ytdMonthIndexes.reduce((sum, m) => {
+      const v = counts.get(y)?.[m];
+      return sum + (typeof v === "number" ? v : 0);
+    }, 0);
   }
 
   let ytdDelta: number | null = null;
