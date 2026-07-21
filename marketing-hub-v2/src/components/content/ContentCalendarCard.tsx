@@ -7,6 +7,7 @@ import {
   formatChannels,
   isSocialContentItem,
   parseChannels,
+  primaryAssetUrl,
 } from "@/lib/data/normalize";
 import {
   PLATFORM_META,
@@ -61,7 +62,8 @@ export function ContentCalendarCard({
 }) {
   const social = isSocialContentItem(item);
   const channels = parseChannels(item.channel);
-  const hasMedia = isImageUrl(item.asset_url);
+  const asset = primaryAssetUrl(item.asset_url);
+  const hasMedia = isImageUrl(asset);
   const notesPreview = plainTextFromHtml(item.notes).slice(0, 120);
   const preview =
     item.title?.trim() || notesPreview || "Untitled";
@@ -103,7 +105,7 @@ export function ContentCalendarCard({
         <div className="relative aspect-[16/10] w-full overflow-hidden rounded-md bg-slate-100">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={item.asset_url}
+            src={asset}
             alt=""
             className="h-full w-full object-cover"
             loading="lazy"

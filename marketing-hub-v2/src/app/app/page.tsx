@@ -14,10 +14,15 @@ import { listWebEnquiries } from "@/lib/data/web-enquiries";
 import { computeEnquiryStats } from "@/lib/data/web-enquiries-stats";
 import { isClosedTaskStatus } from "@/lib/data/collections";
 import { format } from "date-fns";
-import { hasSupabaseConfig } from "@/lib/auth/config";
+import { allowDemoAuth, DEMO_STAFF, hasSupabaseConfig } from "@/lib/auth/config";
+import { getSessionUser } from "@/lib/auth/session";
 import { hasServiceRoleKey } from "@/lib/supabase/admin";
 
 export default async function AppHomePage() {
+  const user =
+    (await getSessionUser()) ?? (allowDemoAuth() ? DEMO_STAFF : null);
+  const isAdmin = user?.role === "admin";
+
   const [events, content, sponsorships, themes, mains, tasks, enquiries] =
     await Promise.all([
       listEvents(),
@@ -25,7 +30,7 @@ export default async function AppHomePage() {
       listSponsorships(),
       listThemes(),
       listThemeMains(),
-      listTasks(),
+      isAdmin ? listTasks() : Promise.resolve([]),
       hasServiceRoleKey()
         ? listWebEnquiries({ includeTest: false }).catch(() => [])
         : Promise.resolve([]),
@@ -45,12 +50,12 @@ export default async function AppHomePage() {
   const activeSponsors = sponsorships.filter((s) =>
     ["confirmed", "active", "negotiating"].includes(s.status)
   ).length;
-  const openTasks = tasks
-    .filter((t) => !isClosedTaskStatus(t.status))
-    .slice(0, 5);
-  const openTaskCount = tasks.filter(
-    (t) => !isClosedTaskStatus(t.status)
-  ).length;
+  const openTasks = isAdmin
+    ? tasks.filter((t) => !isClosedTaskStatus(t.status)).slice(0, 5)
+    : [];
+  const openTaskCount = isAdmin
+    ? tasks.filter((t) => !isClosedTaskStatus(t.status)).length
+    : 0;
   const enquiryStats = computeEnquiryStats(enquiries);
   const newEnquiries = enquiryStats.thisWeek;
 

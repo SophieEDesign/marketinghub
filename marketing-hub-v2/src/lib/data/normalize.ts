@@ -52,6 +52,41 @@ export function extractAssetUrl(raw: string): string {
   return s.length < 500 ? s : "";
 }
 
+/** Parse one or more asset URLs (newline-separated, JSON array, or single). */
+export function parseAssetUrls(raw: string | string[] | null | undefined): string[] {
+  if (Array.isArray(raw)) {
+    return raw.map((u) => extractAssetUrl(String(u ?? ""))).filter(Boolean);
+  }
+  const s = (raw ?? "").trim();
+  if (!s) return [];
+  if (s.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(s) as unknown;
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((u) => extractAssetUrl(String(u ?? "")))
+          .filter(Boolean);
+      }
+    } catch {
+      // fall through
+    }
+  }
+  return s
+    .split(/\n+/)
+    .map((line) => extractAssetUrl(line))
+    .filter(Boolean);
+}
+
+export function joinAssetUrls(urls: string[]): string {
+  return parseAssetUrls(urls).join("\n");
+}
+
+export function primaryAssetUrl(
+  raw: string | string[] | null | undefined
+): string {
+  return parseAssetUrls(raw)[0] ?? "";
+}
+
 function detectPlatform(...parts: string[]): string | null {
   const hay = parts.filter(Boolean).join(" ");
   for (const hint of PLATFORM_HINTS) {
@@ -281,7 +316,7 @@ export function cleanContentFields(item: {
     category: (item.category ?? "").trim(),
     priority: normalizeContentPriority(item.priority ?? ""),
     website: (item.website ?? "").trim(),
-    asset_url: extractAssetUrl(item.asset_url),
+    asset_url: joinAssetUrls(parseAssetUrls(item.asset_url)),
     planable_url: (item.planable_url ?? "").trim(),
   };
 }

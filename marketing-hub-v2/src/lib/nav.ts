@@ -52,7 +52,7 @@ export const STAFF_NAV: NavItem[] = [
   {
     href: "/app/tasks",
     label: "Tasks",
-    description: "Marketing to-dos — owner, due date, status",
+    description: "Marketing to-dos — From, Deadline, status (admin only)",
     icon: CheckSquare,
   },
   {

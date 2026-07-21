@@ -5,6 +5,7 @@ import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import type { HubTask, TaskRelatedType } from "@/lib/types";
 import { isClosedTaskStatus } from "@/lib/data/collections";
+import { useHubView } from "@/lib/hub-view";
 import { cn } from "@/lib/utils";
 
 function statusTone(status: string) {
@@ -25,6 +26,7 @@ function statusTone(status: string) {
 
 /**
  * Reverse lookup: tasks that link to this content / theme / partner / award / event.
+ * Admin-only — members do not see Tasks.
  */
 export function RelatedTasksPanel({
   relatedType,
@@ -35,6 +37,7 @@ export function RelatedTasksPanel({
   relatedId: string | null | undefined;
   className?: string;
 }) {
+  const { view } = useHubView();
   const [tasks, setTasks] = useState<HubTask[]>([]);
   const [loaded, setLoaded] = useState(false);
 
@@ -61,11 +64,12 @@ export function RelatedTasksPanel({
   }, [relatedType, relatedId]);
 
   useEffect(() => {
+    if (view !== "admin") return;
     setLoaded(false);
     void refresh();
-  }, [refresh]);
+  }, [refresh, view]);
 
-  if (!relatedId) return null;
+  if (view !== "admin" || !relatedId) return null;
 
   return (
     <section

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { jsonError, jsonOk, requireStaff } from "@/lib/api";
+import { jsonError, jsonOk, requireAdmin } from "@/lib/api";
 import {
   createTask,
   deleteTask,
@@ -8,13 +8,13 @@ import {
 } from "@/lib/data/repos";
 
 export async function GET() {
-  const { error } = await requireStaff();
+  const { error } = await requireAdmin();
   if (error) return error;
   return jsonOk({ tasks: await listTasks() });
 }
 
 export async function POST(request: NextRequest) {
-  const { error } = await requireStaff();
+  const { error } = await requireAdmin();
   if (error) return error;
   try {
     const body = await request.json();

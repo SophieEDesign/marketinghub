@@ -89,6 +89,7 @@ export type ContentItem = {
   /** Linked quarterly theme (content lives here; Themes page may still use mains for tree). */
   theme_id: string | null;
   planable_url: string;
+  /** Asset / Canva URLs (newline-separated when multiple) */
   asset_url: string;
   notes: string;
   created_at: string;

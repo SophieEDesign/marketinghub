@@ -1199,6 +1199,7 @@ export function ThemesClient({
                   />
                 </div>
                 <AssetUploadField
+                  multiple
                   value={contentEdit.asset_url}
                   onChange={(asset_url) =>
                     setContentEdit({ ...contentEdit, asset_url })

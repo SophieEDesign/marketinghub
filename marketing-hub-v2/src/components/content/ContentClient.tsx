@@ -773,6 +773,7 @@ export function ContentClient({
           </div>
           <div className="md:col-span-2">
             <AssetUploadField
+              multiple
               value={form.asset_url}
               onChange={(asset_url) => setForm({ ...form, asset_url })}
             />
@@ -1126,6 +1127,7 @@ export function ContentClient({
                 </div>
                 <div>
                   <AssetUploadField
+                    multiple
                     value={edit.asset_url}
                     onChange={(asset_url) => setEdit({ ...edit, asset_url })}
                   />

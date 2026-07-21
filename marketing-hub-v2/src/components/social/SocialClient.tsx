@@ -11,7 +11,7 @@ import { FullCalendarStyles } from "@/components/ui/FullCalendarStyles";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { cn } from "@/lib/utils";
 import type { ContentItem } from "@/lib/types";
-import { isSocialContentItem } from "@/lib/data/normalize";
+import { isSocialContentItem, primaryAssetUrl } from "@/lib/data/normalize";
 import {
   PLATFORM_META,
   isImageUrl,
@@ -251,7 +251,7 @@ export function SocialClient({ hideHeader = false }: { hideHeader?: boolean }) {
             url: c.planable_url || null,
             platform,
             platforms: unique.length ? unique : [platform],
-            mediaUrl: c.asset_url || null,
+            mediaUrl: primaryAssetUrl(c.asset_url) || null,
             source: "hub" as const,
           };
         })

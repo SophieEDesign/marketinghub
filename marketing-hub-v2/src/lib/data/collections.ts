@@ -408,7 +408,7 @@ export const DATA_COLLECTIONS: CollectionDef[] = [
       f("caption", { type: "longtext", label: "Caption / post text" }),
       f("website", { type: "url", label: "Website / publication URL" }),
       f("planable_url", { type: "url", label: "Planable URL" }),
-      f("asset_url", { type: "url", label: "Asset / Canva URL" }),
+      f("asset_url", { type: "url", label: "Assets / Canva URLs" }),
       f("notes", { type: "longtext" }),
       f("created_at", { type: "readonly", locked: true }),
       f("updated_at", { type: "readonly", locked: true }),
