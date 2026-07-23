@@ -1,17 +1,34 @@
 "use client";
 
-import { Search, X } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
+import { Check, ChevronDown, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type FilterSelect = {
+export type FilterSelectOption = { value: string; label: string };
+
+export type FilterSelectSingle = {
   id: string;
   label: string;
+  multiple?: false;
   value: string;
-  options: { value: string; label: string }[];
+  options: FilterSelectOption[];
   onChange: (value: string) => void;
   /** Value treated as inactive / used by Clear. Defaults to "all". */
   clearValue?: string;
 };
+
+export type FilterSelectMulti = {
+  id: string;
+  label: string;
+  multiple: true;
+  value: string[];
+  options: FilterSelectOption[];
+  onChange: (value: string[]) => void;
+  /** Shown when nothing is selected (means “all”). Defaults to "All". */
+  allLabel?: string;
+};
+
+export type FilterSelect = FilterSelectSingle | FilterSelectMulti;
 
 export type FilterDateRange = {
   from: string;
@@ -24,6 +41,157 @@ export type FilterDateRange = {
   fromLabel?: string;
   toLabel?: string;
 };
+
+function isMulti(select: FilterSelect): select is FilterSelectMulti {
+  return select.multiple === true;
+}
+
+function selectIsActive(select: FilterSelect): boolean {
+  if (isMulti(select)) return select.value.length > 0;
+  return select.value !== (select.clearValue ?? "all");
+}
+
+function MultiFilterSelect({ select }: { select: FilterSelectMulti }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const listId = useId();
+  const selected = new Set(select.value);
+  const allLabel = select.allLabel ?? "All";
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(e: PointerEvent) {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  function toggle(optionValue: string) {
+    if (selected.has(optionValue)) {
+      select.onChange(select.value.filter((v) => v !== optionValue));
+      return;
+    }
+    select.onChange([...select.value, optionValue]);
+  }
+
+  const summary =
+    select.value.length === 0
+      ? allLabel
+      : select.value.length === 1
+        ? (select.options.find((o) => o.value === select.value[0])?.label ??
+          select.value[0])
+        : `${select.value.length} selected`;
+
+  return (
+    <div ref={rootRef} className="relative min-w-[140px]">
+      <label className="label" htmlFor={`filter-${select.id}`}>
+        {select.label}
+      </label>
+      <button
+        id={`filter-${select.id}`}
+        type="button"
+        className={cn(
+          "field flex w-full items-center justify-between gap-2 text-left",
+          open && "border-brand/50 ring-2 ring-brand/15"
+        )}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={listId}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span
+          className={cn(
+            "truncate",
+            select.value.length === 0 ? "text-muted" : "text-foreground"
+          )}
+        >
+          {summary}
+        </span>
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 shrink-0 text-muted transition",
+            open && "rotate-180"
+          )}
+        />
+      </button>
+      {open ? (
+        <div
+          id={listId}
+          role="listbox"
+          aria-multiselectable="true"
+          className="absolute left-0 right-0 z-30 mt-1 max-h-56 overflow-y-auto rounded-xl border border-border bg-white p-1 shadow-lg"
+        >
+          <button
+            type="button"
+            role="option"
+            aria-selected={select.value.length === 0}
+            className={cn(
+              "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition",
+              select.value.length === 0
+                ? "bg-brand/10 text-foreground"
+                : "text-muted hover:bg-sand hover:text-foreground"
+            )}
+            onClick={() => select.onChange([])}
+          >
+            <span
+              className={cn(
+                "flex h-4 w-4 shrink-0 items-center justify-center rounded border",
+                select.value.length === 0
+                  ? "border-brand bg-brand text-white"
+                  : "border-border bg-white"
+              )}
+            >
+              {select.value.length === 0 ? (
+                <Check className="h-3 w-3" strokeWidth={3} />
+              ) : null}
+            </span>
+            {allLabel}
+          </button>
+          {select.options.map((opt) => {
+            const checked = selected.has(opt.value);
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                role="option"
+                aria-selected={checked}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition",
+                  checked
+                    ? "bg-brand/10 text-foreground"
+                    : "text-muted hover:bg-sand hover:text-foreground"
+                )}
+                onClick={() => toggle(opt.value)}
+              >
+                <span
+                  className={cn(
+                    "flex h-4 w-4 shrink-0 items-center justify-center rounded border",
+                    checked
+                      ? "border-brand bg-brand text-white"
+                      : "border-border bg-white"
+                  )}
+                >
+                  {checked ? (
+                    <Check className="h-3 w-3" strokeWidth={3} />
+                  ) : null}
+                </span>
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 export function FilterBar({
   search,
@@ -53,12 +221,15 @@ export function FilterBar({
 
   const hasActive =
     search.trim().length > 0 ||
-    selects.some((s) => s.value !== (s.clearValue ?? "all")) ||
+    selects.some(selectIsActive) ||
     rangeActive;
 
   function clearAll() {
     onSearchChange("");
-    selects.forEach((s) => s.onChange(s.clearValue ?? "all"));
+    selects.forEach((s) => {
+      if (isMulti(s)) s.onChange([]);
+      else s.onChange(s.clearValue ?? "all");
+    });
     if (dateRange) {
       dateRange.onFromChange(rangeClearFrom);
       dateRange.onToChange(rangeClearTo);
@@ -119,25 +290,29 @@ export function FilterBar({
         </>
       ) : null}
 
-      {selects.map((select) => (
-        <div key={select.id} className="min-w-[140px]">
-          <label className="label" htmlFor={`filter-${select.id}`}>
-            {select.label}
-          </label>
-          <select
-            id={`filter-${select.id}`}
-            className="field"
-            value={select.value}
-            onChange={(e) => select.onChange(e.target.value)}
-          >
-            {select.options.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      ))}
+      {selects.map((select) =>
+        isMulti(select) ? (
+          <MultiFilterSelect key={select.id} select={select} />
+        ) : (
+          <div key={select.id} className="min-w-[140px]">
+            <label className="label" htmlFor={`filter-${select.id}`}>
+              {select.label}
+            </label>
+            <select
+              id={`filter-${select.id}`}
+              className="field"
+              value={select.value}
+              onChange={(e) => select.onChange(e.target.value)}
+            >
+              {select.options.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )
+      )}
 
       <div className="flex items-center gap-2 pb-0.5">
         {typeof resultCount === "number" && typeof totalCount === "number" ? (

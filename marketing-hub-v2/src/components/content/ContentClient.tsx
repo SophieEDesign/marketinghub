@@ -223,9 +223,9 @@ export function ContentClient({
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [channelFilter, setChannelFilter] = useState("all");
-  const [typeFilter, setTypeFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [channelFilter, setChannelFilter] = useState<string[]>([]);
+  const [typeFilter, setTypeFilter] = useState<string[]>([]);
   const [datedOnly, setDatedOnly] = useState<"upcoming" | "past" | "all" | "undated">(
     "upcoming"
   );
@@ -284,14 +284,24 @@ export function ContentClient({
       ) {
         return false;
       }
-      if (statusFilter !== "all" && item.status !== statusFilter) return false;
       if (
-        channelFilter !== "all" &&
-        !parseChannels(item.channel).includes(channelFilter)
+        statusFilter.length > 0 &&
+        !statusFilter.includes(item.status)
       ) {
         return false;
       }
-      if (typeFilter !== "all" && item.content_type !== typeFilter) return false;
+      if (
+        channelFilter.length > 0 &&
+        !parseChannels(item.channel).some((c) => channelFilter.includes(c))
+      ) {
+        return false;
+      }
+      if (
+        typeFilter.length > 0 &&
+        !typeFilter.includes(item.content_type)
+      ) {
+        return false;
+      }
       return true;
     });
   }, [
@@ -706,32 +716,29 @@ export function ContentClient({
           {
             id: "status",
             label: "Status",
+            multiple: true,
             value: statusFilter,
             onChange: setStatusFilter,
-            options: [
-              { value: "all", label: "All statuses" },
-              ...COLUMNS.map((c) => ({ value: c.id, label: c.label })),
-            ],
+            allLabel: "All statuses",
+            options: COLUMNS.map((c) => ({ value: c.id, label: c.label })),
           },
           {
             id: "type",
             label: "Type",
+            multiple: true,
             value: typeFilter,
             onChange: setTypeFilter,
-            options: [
-              { value: "all", label: "All types" },
-              ...contentTypes.map((t) => ({ value: t, label: t })),
-            ],
+            allLabel: "All types",
+            options: contentTypes.map((t) => ({ value: t, label: t })),
           },
           {
             id: "channel",
             label: "Channel",
+            multiple: true,
             value: channelFilter,
             onChange: setChannelFilter,
-            options: [
-              { value: "all", label: "All channels" },
-              ...channels.map((c) => ({ value: c, label: c })),
-            ],
+            allLabel: "All channels",
+            options: channels.map((c) => ({ value: c, label: c })),
           },
           {
             id: "dated",
@@ -739,6 +746,7 @@ export function ContentClient({
             value: datedOnly,
             onChange: (v) =>
               setDatedOnly(v as "upcoming" | "past" | "all" | "undated"),
+            clearValue: "upcoming",
             options: [
               { value: "upcoming", label: "Upcoming (default)" },
               { value: "past", label: "Past only" },
