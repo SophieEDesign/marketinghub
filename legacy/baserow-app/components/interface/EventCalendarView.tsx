@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useMemo } from "react"
+import { useCallback, useMemo, useRef } from "react"
 import FullCalendar from "@fullcalendar/react"
 import dayGridPlugin from "@fullcalendar/daygrid"
 import timeGridPlugin from "@fullcalendar/timegrid"
@@ -34,6 +34,8 @@ interface EventCalendarViewProps {
   cursorDate: Date
   selectedId: string | null
   onEventClick?: (id: string) => void
+  /** Empty day cell click — dateStr is yyyy-MM-dd (or datetime in week view). */
+  onDateClick?: (dateStr: string) => void
   onDatesChange?: (date: Date) => void
   className?: string
   compact?: boolean
@@ -49,6 +51,7 @@ export default function EventCalendarView({
   cursorDate,
   selectedId,
   onEventClick,
+  onDateClick,
   onDatesChange,
   className,
   compact = false,
@@ -86,6 +89,18 @@ export default function EventCalendarView({
     },
     [onEventClick]
   )
+
+  // Stable ref avoids FullCalendar re-binding dateClick on every parent render (FC React #185).
+  const onDateClickRef = useRef(onDateClick)
+  onDateClickRef.current = onDateClick
+
+  const handleDateClick = useCallback((arg: { dateStr: string }) => {
+    if (onDateClickRef.current && arg.dateStr) {
+      onDateClickRef.current(arg.dateStr)
+    }
+  }, [])
+
+  const canDayClick = !!onDateClick
 
   const eventContent = useCallback(
     (arg: EventContentArg) => <EventCalendarEventCard arg={arg} />,
@@ -141,7 +156,12 @@ export default function EventCalendarView({
         className
       )}
     >
-      <div className="calendar-embed calendar-embed--events h-full min-h-0 p-2 md:p-3">
+      <div
+        className={cn(
+          "calendar-embed calendar-embed--events h-full min-h-0 p-2 md:p-3",
+          canDayClick && "calendar-embed--day-clickable"
+        )}
+      >
         <FullCalendar
           key={`${viewMode}-${initialDate.toISOString()}`}
           plugins={CALENDAR_PLUGINS}
@@ -152,6 +172,7 @@ export default function EventCalendarView({
           height="auto"
           aspectRatio={viewMode === "week" ? 1.1 : 1.35}
           eventClick={handleEventClick}
+          dateClick={canDayClick ? handleDateClick : undefined}
           eventContent={eventContent}
           eventDidMount={handleEventDidMount}
           eventDisplay="block"

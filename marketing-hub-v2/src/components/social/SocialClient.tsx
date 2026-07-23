@@ -21,10 +21,14 @@ import {
 import { HUB_CALENDAR_CSS } from "@/components/content/ContentCalendarCard";
 import { CanvaPreviewTile } from "@/components/content/CanvaPreviewTile";
 import { SocialMonthlyPlan } from "@/components/social/SocialMonthlyPlan";
+import { RichTextView } from "@/components/ui/RichTextView";
+import { plainTextFromHtml } from "@/lib/sanitize";
 
 type SocialPost = {
   id: string;
   text: string;
+  /** Original caption/notes HTML for detail panel (Hub). */
+  html?: string | null;
   status: string;
   scheduledAt: string | null;
   url: string | null;
@@ -219,12 +223,14 @@ export function SocialClient({
             .map((ch) => normalizePlatform(String(ch)));
           const unique = Array.from(new Set(platforms));
           const platform = unique[0] ?? "Social";
-          const text = stripHtml(
+          const rawHtml = c.caption || c.notes || "";
+          const text = plainTextFromHtml(
             c.caption || c.title || c.notes || "Untitled post"
           );
           return {
             id: c.id,
-            text,
+            text: text || "Untitled post",
+            html: rawHtml || null,
             status: normalizeStatus(c.status),
             scheduledAt: c.due_date ? `${c.due_date}T09:00:00.000Z` : null,
             url: c.planable_url || null,
@@ -271,6 +277,7 @@ export function SocialClient({
               return {
                 id: `pl_${p.id}`,
                 text: stripHtml(p.text),
+                html: null,
                 status: normalizeStatus(p.status),
                 scheduledAt: p.scheduledAt,
                 url: p.url,
@@ -730,9 +737,17 @@ export function SocialClient({
                   <CanvaPreviewTile url={selected.mediaUrl!} compact={false} />
                 </div>
               ) : null}
-              <p className="whitespace-pre-wrap text-base font-medium leading-relaxed">
-                {selected.text}
-              </p>
+              {selected.html ? (
+                <RichTextView
+                  html={selected.html}
+                  className="text-base font-medium leading-relaxed"
+                  empty="Untitled post"
+                />
+              ) : (
+                <p className="whitespace-pre-wrap text-base font-medium leading-relaxed">
+                  {selected.text}
+                </p>
+              )}
               <div className="flex flex-wrap gap-2">
                 {selected.platforms.map((p) => (
                   <span

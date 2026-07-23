@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,6 +18,8 @@ export interface EventMemberSubmissionSheetProps {
   fields: ContentEventFieldMap
   workflow: EventCalendarWorkflowConfig
   onSubmitted: () => void
+  /** Prefill start (and end) when opened from a calendar day click. */
+  initialStartDate?: string | null
 }
 
 export default function EventMemberSubmissionSheet({
@@ -27,6 +29,7 @@ export default function EventMemberSubmissionSheet({
   fields,
   workflow,
   onSubmitted,
+  initialStartDate = null,
 }: EventMemberSubmissionSheetProps) {
   const [title, setTitle] = useState("")
   const [eventType, setEventType] = useState("")
@@ -40,6 +43,14 @@ export default function EventMemberSubmissionSheet({
   const [website, setWebsite] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    if (initialStartDate) {
+      setStartDate(initialStartDate)
+      setEndDate(initialStartDate)
+    }
+  }, [open, initialStartDate])
 
   const handleSubmit = async () => {
     if (!title.trim()) {

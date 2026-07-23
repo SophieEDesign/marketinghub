@@ -53,4 +53,14 @@ describe("Event Calendar one contextual drawer", () => {
     const panel = read("components/records/RecordPanel.tsx")
     expect(panel).toContain("md:left-sidebar")
   })
+
+  it("wires day click create with date prefill into openRecordModal", () => {
+    const core = read("components/interface/EventCalendarCore.tsx")
+    const view = read("components/interface/EventCalendarView.tsx")
+    expect(view).toContain("dateClick={canDayClick ? handleDateClick : undefined}")
+    expect(view).toContain("onDateClick")
+    expect(core).toContain("handleCalendarDateClick")
+    expect(core).toContain("buildEventCalendarCreateInitialData")
+    expect(core).toContain("onDateClick={showAddButton ? handleCalendarDateClick : undefined}")
+  })
 })

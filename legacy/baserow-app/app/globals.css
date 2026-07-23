@@ -1154,6 +1154,15 @@
   background: hsl(var(--muted) / 0.35);
 }
 
+.calendar-embed--day-clickable .fc-daygrid-day-frame,
+.calendar-embed--day-clickable .fc-timegrid-slot {
+  cursor: pointer;
+}
+
+.calendar-embed--day-clickable .fc-daygrid-day-frame:hover {
+  background: hsl(var(--muted) / 0.35);
+}
+
 /* Accessibility: reduce non-essential animations when user requests less motion. */
 @media (prefers-reduced-motion: reduce) {
   *,

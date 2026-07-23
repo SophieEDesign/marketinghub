@@ -990,6 +990,54 @@ export function eventSpansMultipleDays(item: Pick<MarketingEventItem, "startDate
   return differenceInDays(startOfDay(item.endDate), startOfDay(item.startDate)) >= 1
 }
 
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/
+
+/** Normalize FullCalendar dateClick dateStr (yyyy-MM-dd or datetime) to yyyy-MM-dd. */
+export function normalizeEventCalendarDateStr(dateStr: string | null | undefined): string | null {
+  if (!dateStr) return null
+  const trimmed = dateStr.trim()
+  if (DATE_ONLY_RE.test(trimmed)) return trimmed
+  if (trimmed.length >= 10 && DATE_ONLY_RE.test(trimmed.slice(0, 10))) return trimmed.slice(0, 10)
+  const d = new Date(trimmed)
+  if (isNaN(d.getTime())) return null
+  return format(d, "yyyy-MM-dd")
+}
+
+/**
+ * Initial field values for new event rows — content type default, then start/end from day click.
+ */
+export function buildEventCalendarCreateInitialData(params: {
+  fields: ContentEventFieldMap | EventFieldMap | null
+  contentTypeDefault?: string | null
+  /** Start date from day click (yyyy-MM-dd or FullCalendar dateStr). */
+  scheduleDate?: string | Date | null
+}): Record<string, unknown> {
+  const { fields, contentTypeDefault, scheduleDate } = params
+  const initial: Record<string, unknown> = {}
+
+  if (fields && "contentType" in fields && fields.contentType && contentTypeDefault) {
+    initial[fields.contentType] = contentTypeDefault
+  } else if (contentTypeDefault) {
+    initial.content_type = contentTypeDefault
+  }
+
+  let dateValue: string | null = null
+  if (scheduleDate != null) {
+    if (typeof scheduleDate === "string") {
+      dateValue = normalizeEventCalendarDateStr(scheduleDate)
+    } else if (!isNaN(scheduleDate.getTime())) {
+      dateValue = format(scheduleDate, "yyyy-MM-dd")
+    }
+  }
+
+  if (dateValue) {
+    if (fields?.startDate) initial[fields.startDate] = dateValue
+    if (fields?.endDate) initial[fields.endDate] = dateValue
+  }
+
+  return initial
+}
+
 export function buildEventCalendarEvents(items: MarketingEventItem[]): EventCalendarEvent[] {
   return items
     .filter((item) => item.startDate)

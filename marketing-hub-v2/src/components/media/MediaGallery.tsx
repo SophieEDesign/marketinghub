@@ -39,6 +39,11 @@ import {
   normalizeDivision,
 } from "@/lib/events/division-colors";
 import { uploadAssetDirect } from "@/lib/upload/client-upload";
+import {
+  isAllowedUpload,
+  MAX_UPLOAD_BYTES,
+  UPLOAD_ACCEPT,
+} from "@/lib/upload/allowed-types";
 import { cn } from "@/lib/utils";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 
@@ -68,21 +73,10 @@ type GalleryPhoto = {
 
 const UNSORTED_SUBFOLDER = "Unsorted";
 const NEW_SUBFOLDER_VALUE = "__new_subfolder__";
-const MEDIA_ACCEPT =
-  "image/jpeg,image/png,image/webp,image/gif,application/pdf,video/mp4,video/quicktime,.jpg,.jpeg,.png,.webp,.gif,.pdf,.mp4,.mov";
-/** Keep in sync with /api/content/upload MAX_BYTES */
-const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+const MEDIA_ACCEPT = UPLOAD_ACCEPT;
 
 function isAcceptedMediaFile(file: File) {
-  if (
-    file.type.startsWith("image/") ||
-    file.type === "application/pdf" ||
-    file.type === "video/mp4" ||
-    file.type === "video/quicktime"
-  ) {
-    return true;
-  }
-  return /\.(png|jpe?g|gif|webp|svg|pdf|mp4|mov)$/i.test(file.name);
+  return isAllowedUpload(file.name, file.type);
 }
 
 function filesFromList(list: FileList | File[] | null | undefined): File[] {

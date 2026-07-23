@@ -2,20 +2,13 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { jsonError, jsonOk, requireStaff } from "@/lib/api";
 import { hasServiceRoleKey } from "@/lib/supabase/admin";
+import {
+  isAllowedUpload,
+  MAX_UPLOAD_BYTES,
+} from "@/lib/upload/allowed-types";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-const MAX_BYTES = 25 * 1024 * 1024;
-const ALLOWED = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-  "application/pdf",
-  "video/mp4",
-  "video/quicktime",
-]);
 
 function safeName(name: string) {
   return name
@@ -57,19 +50,14 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) return jsonError("Invalid upload request", 400);
 
   const { name, type = "application/octet-stream", size } = parsed.data;
-  if (typeof size === "number" && size > MAX_BYTES) {
+  if (typeof size === "number" && size > MAX_UPLOAD_BYTES) {
     return jsonError(
-      `File too large (max ${Math.round(MAX_BYTES / (1024 * 1024))}MB): ${name}`,
+      `File too large (max ${Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))}MB): ${name}`,
       413
     );
   }
 
-  if (
-    type === "image/svg+xml" ||
-    /\.svg$/i.test(name) ||
-    (!ALLOWED.has(type) &&
-      !/\.(png|jpe?g|gif|webp|pdf|mp4|mov)$/i.test(name))
-  ) {
+  if (!isAllowedUpload(name, type)) {
     return jsonError("File type not allowed", 400);
   }
 

@@ -3,22 +3,15 @@ import path from "path";
 import { NextRequest, NextResponse } from "next/server";
 import { requireStaff } from "@/lib/api";
 import { getDataDir } from "@/lib/store/paths";
+import {
+  isForcedDownloadExt,
+  MIME_BY_EXT,
+} from "@/lib/upload/allowed-types";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const UPLOAD_ROOT = path.join(getDataDir(), "uploads", "content");
-
-const MIME: Record<string, string> = {
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".gif": "image/gif",
-  ".webp": "image/webp",
-  ".pdf": "application/pdf",
-  ".mp4": "video/mp4",
-  ".mov": "video/quicktime",
-};
 
 export async function GET(
   _request: NextRequest,
@@ -40,11 +33,10 @@ export async function GET(
     if (ext === ".svg") {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-    const isDownload =
-      ext === ".pdf" || ext === ".mp4" || ext === ".mov";
+    const isDownload = isForcedDownloadExt(ext);
     return new NextResponse(data, {
       headers: {
-        "Content-Type": MIME[ext] || "application/octet-stream",
+        "Content-Type": MIME_BY_EXT[ext] || "application/octet-stream",
         "Cache-Control": "private, max-age=3600",
         ...(isDownload
           ? {

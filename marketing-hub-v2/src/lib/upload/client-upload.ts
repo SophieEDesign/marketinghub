@@ -5,7 +5,7 @@
  * Flow: ask the API for a signed Supabase URL → PUT the file directly.
  */
 
-const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+import { MAX_UPLOAD_BYTES } from "@/lib/upload/allowed-types";
 
 export type UploadedAsset = {
   url: string;

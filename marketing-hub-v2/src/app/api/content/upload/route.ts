@@ -5,21 +5,15 @@ import { z } from "zod";
 import { jsonError, jsonOk, requireStaff } from "@/lib/api";
 import { hasServiceRoleKey } from "@/lib/supabase/admin";
 import { getDataDir } from "@/lib/store/paths";
+import {
+  isAllowedUpload,
+  MAX_UPLOAD_BYTES,
+} from "@/lib/upload/allowed-types";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const UPLOAD_ROOT = path.join(getDataDir(), "uploads", "content");
-const MAX_BYTES = 25 * 1024 * 1024; // 25MB per file
-const ALLOWED = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-  "application/pdf",
-  "video/mp4",
-  "video/quicktime",
-]);
 
 function safeName(name: string) {
   return name
@@ -69,9 +63,9 @@ export async function POST(request: NextRequest) {
 
   const blob = file as File;
   if (blob.size <= 0) return jsonError("Empty file", 400);
-  if (blob.size > MAX_BYTES) {
+  if (blob.size > MAX_UPLOAD_BYTES) {
     return jsonError(
-      `File too large (max ${Math.round(MAX_BYTES / (1024 * 1024))}MB): ${blob.name || "file"}`,
+      `File too large (max ${Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))}MB): ${blob.name || "file"}`,
       413
     );
   }
@@ -80,13 +74,7 @@ export async function POST(request: NextRequest) {
   const nameOk = z.string().min(1).max(200).safeParse(blob.name || "asset");
   if (!nameOk.success) return jsonError("Invalid file name", 400);
 
-  // Block SVG (XSS if rendered inline).
-  if (
-    type === "image/svg+xml" ||
-    /\.svg$/i.test(blob.name) ||
-    (!ALLOWED.has(type) &&
-      !/\.(png|jpe?g|gif|webp|pdf|mp4|mov)$/i.test(blob.name))
-  ) {
+  if (!isAllowedUpload(blob.name, type)) {
     return jsonError("File type not allowed", 400);
   }
 

@@ -35,10 +35,12 @@ import {
 } from "@/lib/marketing/event-calendar-ics"
 import {
   buildEventCalendarEvents,
+  buildEventCalendarCreateInitialData,
   computeEventMetrics,
   eventCalendarSettingsFromConfig,
   EVENT_TYPE_LEGEND,
   filterEventItems,
+  normalizeEventCalendarDateStr,
   type EventAttendanceStatus,
   type EventCalendarBlockSettings,
   type EventCalendarFilters,
@@ -140,6 +142,7 @@ export function EventCalendarCore({
   const [filterOwner, setFilterOwner] = useState("all")
   const [isMobile, setIsMobile] = useState(false)
   const [memberSubmitOpen, setMemberSubmitOpen] = useState(false)
+  const [memberSubmitDate, setMemberSubmitDate] = useState<string | null>(null)
 
   useEffect(() => {
     setViewMode(settings.defaultView)
@@ -223,49 +226,66 @@ export function EventCalendarCore({
     [isEditing, settings.clickAction, openRecordForEvent]
   )
 
-  const handleAddEvent = useCallback(() => {
-    if (isEditing) return
-    if (!tableIds?.contentTableId) {
-      toast({
-        title: "Add event unavailable",
-        description: "Connect a source table in block settings.",
+  const handleAddEvent = useCallback(
+    (scheduleDate?: string) => {
+      if (isEditing) return
+      if (!tableIds?.contentTableId) {
+        toast({
+          title: "Add event unavailable",
+          description: "Connect a source table in block settings.",
+        })
+        return
+      }
+
+      if (!canEdit && settings.allowMemberSubmissions) {
+        setMemberSubmitDate(normalizeEventCalendarDateStr(scheduleDate) ?? null)
+        setMemberSubmitOpen(true)
+        return
+      }
+
+      const initialData = buildEventCalendarCreateInitialData({
+        fields,
+        contentTypeDefault: workflow.contentTypeDefault,
+        scheduleDate,
       })
-      return
-    }
 
-    if (!canEdit && settings.allowMemberSubmissions) {
-      setMemberSubmitOpen(true)
-      return
-    }
-
-    const initialData: Record<string, unknown> = {}
-    if (fields?.contentType) {
-      initialData[fields.contentType] = workflow.contentTypeDefault
-    } else {
-      initialData.content_type = workflow.contentTypeDefault
-    }
-
-    openRecordModal({
-      tableId: tableIds.contentTableId,
-      recordId: null,
-      supabaseTableName: tableIds.contentSupabaseTable,
+      openRecordModal({
+        tableId: tableIds.contentTableId,
+        recordId: null,
+        supabaseTableName: tableIds.contentSupabaseTable,
+        interfaceMode,
+        recordLayoutType: "event",
+        initialData,
+        onRecordUpdated: () => reload(),
+      })
+    },
+    [
+      isEditing,
+      tableIds,
+      fields,
+      canEdit,
+      settings.allowMemberSubmissions,
+      workflow.contentTypeDefault,
+      openRecordModal,
       interfaceMode,
-      recordLayoutType: "event",
-      initialData,
-      onRecordUpdated: () => reload(),
-    })
-  }, [
-    isEditing,
-    tableIds,
-    fields,
-    canEdit,
-    settings.allowMemberSubmissions,
-    workflow.contentTypeDefault,
-    openRecordModal,
-    interfaceMode,
-    reload,
-    toast,
-  ])
+      reload,
+      toast,
+    ]
+  )
+
+  const canCreateFromCalendar =
+    settings.showAddButton &&
+    !isEditing &&
+    (canEdit || settings.allowMemberSubmissions) &&
+    !!tableIds?.contentTableId
+
+  const handleCalendarDateClick = useCallback(
+    (dateStr: string) => {
+      if (!canCreateFromCalendar) return
+      handleAddEvent(dateStr)
+    },
+    [canCreateFromCalendar, handleAddEvent]
+  )
 
   const handleAttendanceChange = useCallback(
     async (status: EventAttendanceStatus) => {
@@ -405,11 +425,7 @@ export function EventCalendarCore({
     })
   }, [config?.table_id, config?.event_calendar_feed_scope, externalMode, toast])
 
-  const showAddButton =
-    settings.showAddButton &&
-    !isEditing &&
-    (canEdit || settings.allowMemberSubmissions) &&
-    !!tableIds?.contentTableId
+  const showAddButton = canCreateFromCalendar
 
   if (loading) {
     return (
@@ -499,7 +515,7 @@ export function EventCalendarCore({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleAddEvent}>
+                  <DropdownMenuItem onClick={() => handleAddEvent()}>
                     {canEdit ? "Create full event" : "Submit event for approval"}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -559,7 +575,7 @@ export function EventCalendarCore({
 
       {showEmpty ? (
         <EventEmptyState
-          onAddEvent={showAddButton ? handleAddEvent : undefined}
+          onAddEvent={showAddButton ? () => handleAddEvent() : undefined}
           canEdit={showAddButton}
         />
       ) : (
@@ -572,6 +588,7 @@ export function EventCalendarCore({
               cursorDate={cursorDate}
               selectedId={selectedEventId}
               onEventClick={handleEventClick}
+              onDateClick={showAddButton ? handleCalendarDateClick : undefined}
               onDatesChange={setCursorDate}
               compact={settings.density === "compact"}
               isEditing={isEditing}
@@ -615,10 +632,14 @@ export function EventCalendarCore({
       {fields && tableIds?.contentSupabaseTable ? (
         <EventMemberSubmissionSheet
           open={memberSubmitOpen}
-          onClose={() => setMemberSubmitOpen(false)}
+          onClose={() => {
+            setMemberSubmitOpen(false)
+            setMemberSubmitDate(null)
+          }}
           supabaseTable={tableIds.contentSupabaseTable}
           fields={fields}
           workflow={workflow}
+          initialStartDate={memberSubmitDate}
           onSubmitted={() => {
             reload()
             toast({ title: "Event submitted", description: "Pending approval." })

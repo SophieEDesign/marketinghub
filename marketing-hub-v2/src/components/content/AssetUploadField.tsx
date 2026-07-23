@@ -10,6 +10,7 @@ import {
 } from "@/lib/data/normalize";
 import { isCanvaUrl, isImageUrl } from "@/lib/social/platforms";
 import { uploadAssetDirect } from "@/lib/upload/client-upload";
+import { UPLOAD_ACCEPT } from "@/lib/upload/allowed-types";
 import { cn } from "@/lib/utils";
 import { CanvaPreviewTile } from "@/components/content/CanvaPreviewTile";
 
@@ -49,7 +50,7 @@ export function AssetUploadField({
     hint ??
     (needsPreviewImage
       ? "Canva link saved — also upload/paste a PNG or JPG so the calendar can show the real design."
-      : "Images, PDF or short video · max 25MB. Shows on the calendar card. Paste a Canva link and a preview image together.");
+      : "Images, PDF, Word, Excel, PowerPoint, CSV or short video · max 25MB. Shows on the calendar card. Paste a Canva link and a preview image together.");
 
   function commit(next: string[]) {
     const cleaned = parseAssetUrls(next);
@@ -185,7 +186,7 @@ export function AssetUploadField({
           ref={inputRef}
           type="file"
           className="hidden"
-          accept="image/*,.pdf,video/mp4,video/quicktime"
+          accept={UPLOAD_ACCEPT}
           onChange={(e) => void onFile(e.target.files?.[0] ?? null)}
         />
 
@@ -315,7 +316,7 @@ export function AssetUploadField({
         ref={inputRef}
         type="file"
         className="hidden"
-        accept="image/*,.pdf,video/mp4,video/quicktime"
+        accept={UPLOAD_ACCEPT}
         onChange={(e) => void onFile(e.target.files?.[0] ?? null)}
       />
 

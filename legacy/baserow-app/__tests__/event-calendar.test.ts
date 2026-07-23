@@ -7,6 +7,8 @@ import {
   isEventCalendarPage,
   isEventContentRecord,
   buildEventCalendarEvents,
+  buildEventCalendarCreateInitialData,
+  normalizeEventCalendarDateStr,
   eventSpansMultipleDays,
   formatEventDateRange,
   computeEventMetrics,
@@ -611,5 +613,39 @@ describe("filterEventItems", () => {
     )
     expect(filtered).toHaveLength(1)
     expect(filtered[0].id).toBe("e2")
+  })
+})
+
+describe("buildEventCalendarCreateInitialData", () => {
+  const fields = {
+    eventName: "name",
+    startDate: "start_date",
+    endDate: "end_date",
+    contentType: "content_type",
+  } as any
+
+  it("sets content type default without a date", () => {
+    const initial = buildEventCalendarCreateInitialData({
+      fields,
+      contentTypeDefault: "Event",
+    })
+    expect(initial.content_type).toBe("Event")
+    expect(initial.start_date).toBeUndefined()
+  })
+
+  it("prefills start and end date from day click", () => {
+    const initial = buildEventCalendarCreateInitialData({
+      fields,
+      contentTypeDefault: "Event",
+      scheduleDate: "2026-07-23",
+    })
+    expect(initial.start_date).toBe("2026-07-23")
+    expect(initial.end_date).toBe("2026-07-23")
+    expect(initial.content_type).toBe("Event")
+  })
+
+  it("normalizes FullCalendar datetime dateStr to yyyy-MM-dd", () => {
+    expect(normalizeEventCalendarDateStr("2026-07-23T14:30:00")).toBe("2026-07-23")
+    expect(normalizeEventCalendarDateStr("2026-07-23")).toBe("2026-07-23")
   })
 })
