@@ -14,14 +14,20 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "membership", label: "Memberships" },
 ];
 
-export function PartnersHub({ initial }: { initial: Sponsorship[] }) {
+export function PartnersHub({
+  initial,
+  currentUserId = null,
+}: {
+  initial: Sponsorship[];
+  currentUserId?: string | null;
+}) {
   const [tab, setTab] = useState<Tab>("all");
 
   return (
     <div>
       <PageHeader
         title="Partners"
-        description="Sponsorships and industry memberships in one place — packages, renewals, and deliverables. Members can add and update memberships."
+        description="Sponsorships and industry memberships in one place — packages, renewals, and deliverables. Members can add memberships and edit ones they added."
       />
 
       <SegmentFilter
@@ -37,6 +43,7 @@ export function PartnersHub({ initial }: { initial: Sponsorship[] }) {
         initial={initial}
         kind={tab}
         hideHeader
+        currentUserId={currentUserId}
       />
     </div>
   );

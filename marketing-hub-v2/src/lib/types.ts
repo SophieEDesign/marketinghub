@@ -130,6 +130,10 @@ export type Sponsorship = {
   owner: string;
   onedrive_url: string;
   notes: string;
+  /** Display name of who added the record. */
+  created_by: string;
+  /** Auth user id of who added — members edit only their own memberships. */
+  created_by_user_id: string | null;
   created_at: string;
   updated_at: string;
 };

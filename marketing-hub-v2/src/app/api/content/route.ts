@@ -55,6 +55,12 @@ export async function POST(request: NextRequest) {
     }
 
     const patch = { ...(body.patch ?? {}) } as Record<string, unknown>;
+    if (patch.status === "published") {
+      return jsonError(
+        "Publish only in Planable. Sync from Planable to mark it published in the Hub.",
+        403
+      );
+    }
     if (patch.channel !== undefined) {
       patch.channel = normalizeChannels(patch.channel);
     }
@@ -78,6 +84,13 @@ export async function POST(request: NextRequest) {
   if (action === "delete") {
     await deleteContent(body.id);
     return jsonOk({ ok: true });
+  }
+
+  if (body.status === "published") {
+    return jsonError(
+      "Publish only in Planable. Create as draft/scheduled in the Hub.",
+      403
+    );
   }
 
   const item = await createContent({

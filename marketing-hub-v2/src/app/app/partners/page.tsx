@@ -11,5 +11,5 @@ export default async function PartnersPage() {
     user?.role === "admin"
       ? sponsorships
       : sponsorships.map((s) => ({ ...s, value: "" }));
-  return <PartnersHub initial={initial} />;
+  return <PartnersHub initial={initial} currentUserId={user?.id ?? null} />;
 }

@@ -83,6 +83,21 @@ function migrateMerch(items: MerchOrder[] | undefined): MerchOrder[] | undefined
   }));
 }
 
+function migrateSponsorships(
+  items: HubStore["sponsorships"] | undefined
+): HubStore["sponsorships"] | undefined {
+  if (!items) return items;
+  return items.map((item) => ({
+    ...item,
+    kind:
+      item.kind === "membership" || item.kind === "sponsorship"
+        ? item.kind
+        : ("sponsorship" as const),
+    created_by: item.created_by ?? "",
+    created_by_user_id: item.created_by_user_id ?? null,
+  }));
+}
+
 function migrateContacts(
   items: HubStore["contacts"] | undefined
 ): HubStore["contacts"] | undefined {
@@ -133,7 +148,8 @@ function withDefaults(store: Partial<HubStore>): HubStore {
     events: migrateEvents(store.events) ?? seed.events,
     event_attendance: store.event_attendance ?? seed.event_attendance,
     content: migrateContent(store.content) ?? seed.content,
-    sponsorships: store.sponsorships ?? seed.sponsorships,
+    sponsorships:
+      migrateSponsorships(store.sponsorships) ?? seed.sponsorships,
     contacts: migrateContacts(store.contacts) ?? seed.contacts,
     resources: store.resources ?? seed.resources,
     reports: store.reports ?? seed.reports,

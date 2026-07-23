@@ -82,11 +82,14 @@ export function SponsorshipsClient({
   initial,
   kind = "all",
   hideHeader = false,
+  currentUserId = null,
 }: {
   initial: Sponsorship[];
   /** Filter to one partner type, or show all */
   kind?: PartnerKind | "all";
   hideHeader?: boolean;
+  /** Signed-in user — members may only edit memberships they added. */
+  currentUserId?: string | null;
 }) {
   const { view: hubView } = useHubView();
   const isAdminView = hubView === "admin";
@@ -115,8 +118,15 @@ export function SponsorshipsClient({
   /** Members can add memberships; sponsorships are admin-only. */
   const canCreate =
     isAdminView || kind === "membership" || kind === "all";
-  const canManageItem = (item: Sponsorship) =>
-    isAdminView || partnerKind(item) === "membership";
+  const canManageItem = (item: Sponsorship) => {
+    if (isAdminView) return true;
+    if (partnerKind(item) !== "membership") return false;
+    if (!currentUserId) return false;
+    if (item.created_by_user_id) {
+      return item.created_by_user_id === currentUserId;
+    }
+    return false;
+  };
   const noun =
     !isAdminView || kind === "membership"
       ? "membership"

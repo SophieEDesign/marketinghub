@@ -7,11 +7,11 @@ import {
   listSponsorships,
   updateSponsorship,
 } from "@/lib/data/repos";
+import {
+  canManagePartnerRecord,
+  isPartnersAdmin,
+} from "@/lib/partners/access";
 import type { Sponsorship } from "@/lib/types";
-
-function isAdminUser(role: string) {
-  return role === "admin";
-}
 
 function partnerKindOf(kind: unknown): "membership" | "sponsorship" {
   return kind === "membership" ? "membership" : "sponsorship";
@@ -26,7 +26,7 @@ export async function GET() {
   const { user, error } = await requireStaff();
   if (error) return error;
   const sponsorships = await listSponsorships();
-  if (!isAdminUser(user.role)) {
+  if (!isPartnersAdmin(user)) {
     return jsonOk({
       sponsorships: sponsorships.map(redactPartnerValue),
     });
@@ -39,20 +39,27 @@ export async function POST(request: NextRequest) {
   if (error) return error;
   const body = await request.json();
   const action = body.action as string | undefined;
-  const admin = isAdminUser(user.role);
+  const admin = isPartnersAdmin(user);
 
   if (action === "update") {
     const existing = await getSponsorship(body.id);
     if (!existing) return jsonError("Not found", 404);
-    const existingKind = partnerKindOf(existing.kind);
-    if (!admin && existingKind !== "membership") {
-      return jsonError("Only admins can edit sponsorships", 403);
+    if (!canManagePartnerRecord(existing, user)) {
+      return jsonError(
+        existing.kind === "membership"
+          ? "You can only edit memberships you added"
+          : "Only admins can edit sponsorships",
+        403
+      );
     }
     const patch = { ...(body.patch ?? {}) } as Record<string, unknown>;
     // Members cannot convert a membership into a sponsorship.
     if (!admin && patch.kind !== undefined && patch.kind !== "membership") {
       return jsonError("Members can only manage memberships", 403);
     }
+    // Never allow clients to reassign ownership.
+    delete patch.created_by_user_id;
+    delete patch.created_by;
     if (!admin) {
       patch.kind = "membership";
       // Preserve existing fee/value — members cannot read or change it.
@@ -68,8 +75,13 @@ export async function POST(request: NextRequest) {
   if (action === "delete") {
     const existing = await getSponsorship(body.id);
     if (!existing) return jsonError("Not found", 404);
-    if (!admin && partnerKindOf(existing.kind) !== "membership") {
-      return jsonError("Only admins can delete sponsorships", 403);
+    if (!canManagePartnerRecord(existing, user)) {
+      return jsonError(
+        existing.kind === "membership"
+          ? "You can only delete memberships you added"
+          : "Only admins can delete sponsorships",
+        403
+      );
     }
     await deleteSponsorship(body.id);
     return jsonOk({ ok: true });
@@ -92,6 +104,8 @@ export async function POST(request: NextRequest) {
     owner: body.owner ?? "",
     onedrive_url: body.onedrive_url ?? "",
     notes: body.notes ?? "",
+    created_by: user.full_name || user.email || "Staff",
+    created_by_user_id: user.id,
   });
   return jsonOk(
     { item: admin ? item : redactPartnerValue(item) },

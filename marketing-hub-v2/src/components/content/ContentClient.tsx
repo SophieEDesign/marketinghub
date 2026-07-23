@@ -57,6 +57,9 @@ const COLUMNS: { id: ContentStatus; label: string }[] = [
   { id: "published", label: "Published" },
 ];
 
+/** Hub can move pieces through these; Published only arrives from Planable sync. */
+const HUB_EDITABLE_STATUSES = COLUMNS.filter((c) => c.id !== "published");
+
 const VIEWS = [
   { id: "calendar", label: "Calendar" },
   { id: "kanban", label: "Kanban" },
@@ -479,6 +482,7 @@ export function ContentClient({
   async function move(id: string, status: ContentStatus) {
     const item = items.find((i) => i.id === id);
     if (item?.status === "published") return;
+    if (status === "published") return;
     await fetch("/api/content", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -583,12 +587,14 @@ export function ContentClient({
             }
             aria-label="Move to status"
           >
-            {COLUMNS.map((c) => (
+            {item.status === "published" ? (
+              <option value="published">Published (Planable)</option>
+            ) : null}
+            {HUB_EDITABLE_STATUSES.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.label}
               </option>
             ))}
-            <option value="published">Published</option>
           </select>
         </div>
       </>
@@ -1182,12 +1188,21 @@ export function ContentClient({
                       })
                     }
                   >
-                    {COLUMNS.map((c) => (
+                    {edit.status === "published" ? (
+                      <option value="published">Published (Planable)</option>
+                    ) : null}
+                    {HUB_EDITABLE_STATUSES.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.label}
                       </option>
                     ))}
                   </select>
+                  {editIsSocial ? (
+                    <p className="mt-1 text-xs text-muted">
+                      Publish only happens in Planable — then Sync from Planable
+                      locks this piece.
+                    </p>
+                  ) : null}
                 </div>
                 {editIsSocial ? (
                   <>

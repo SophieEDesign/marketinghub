@@ -202,12 +202,23 @@ export async function moveContentStatus(id: string, status: ContentStatus) {
 
 export async function listSponsorships() {
   const store = await readStore();
-  // Backfill kind for older rows
+  // Backfill kind / ownership fields for older rows
   let changed = false;
   const items = store.sponsorships.map((s) => {
-    if (s.kind === "sponsorship" || s.kind === "membership") return s;
-    changed = true;
-    return { ...s, kind: "sponsorship" as const };
+    let next = s;
+    if (s.kind !== "sponsorship" && s.kind !== "membership") {
+      changed = true;
+      next = { ...next, kind: "sponsorship" as const };
+    }
+    if (next.created_by === undefined || next.created_by_user_id === undefined) {
+      changed = true;
+      next = {
+        ...next,
+        created_by: next.created_by ?? "",
+        created_by_user_id: next.created_by_user_id ?? null,
+      };
+    }
+    return next;
   });
   if (changed) {
     await updateStore((st) => {

@@ -43,7 +43,7 @@ See [`.env.example`](.env.example).
 
 - **Auth:** Set Supabase URL/keys and turn off `AUTH_BYPASS` for real staff login.
 - **Drive:** Service account with Viewer on the gallery folder + `DRIVE_GALLERY_ROOT_FOLDER_ID`.
-- **Planable:** `PLANABLE_API_TOKEN` (Write scope) + `PLANABLE_WORKSPACE_ID`. Two-way sync: **Sync from Planable** pulls drafts into Hub social content; saving Social pieces pushes drafts back. Published posts lock in the Hub — approve/publish stays in Planable.
+- **Planable:** `PLANABLE_API_TOKEN` (Write scope) + `PLANABLE_WORKSPACE_ID`. Two-way sync: **Sync from Planable** pulls drafts into Hub social content; saving Social pieces pushes drafts back. Status stays linked (idea → scheduled); **publish only in Planable**, then sync to lock the Hub piece.
 
 SQL for a dedicated Supabase project: [`supabase/migrations/001_hub_v2_schema.sql`](supabase/migrations/001_hub_v2_schema.sql).
 

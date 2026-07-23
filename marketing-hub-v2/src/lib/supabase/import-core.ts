@@ -744,6 +744,8 @@ function mapSponsorshipRows(
       notes: stripHtml(
         asString(pickField(r, [/^notes$/i, /^description$/i, /^details$/i]))
       ),
+      created_by: "",
+      created_by_user_id: null,
       created_at: asIsoDate(r.created_at) || now,
       updated_at: asIsoDate(r.updated_at) || now,
     };
@@ -995,6 +997,8 @@ function mapMembershipRows(
       owner: "",
       onedrive_url: "",
       notes: region ? `Region: ${region}` : "",
+      created_by: "",
+      created_by_user_id: null,
       created_at: asIsoDate(r.created_at) || now,
       updated_at: asIsoDate(r.updated_at) || now,
     });
