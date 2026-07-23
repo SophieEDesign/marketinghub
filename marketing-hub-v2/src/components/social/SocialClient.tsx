@@ -175,7 +175,14 @@ function PostCard({
   );
 }
 
-export function SocialClient({ hideHeader = false }: { hideHeader?: boolean }) {
+export function SocialClient({
+  hideHeader = false,
+  memberView = false,
+}: {
+  hideHeader?: boolean;
+  /** Members: scheduled/published only, read-only calendar. */
+  memberView?: boolean;
+}) {
   const [posts, setPosts] = useState<SocialPost[]>([]);
   const [openUrl, setOpenUrl] = useState("https://app.planable.io");
   const [sourceLabel, setSourceLabel] = useState("Social Posts");
@@ -242,56 +249,64 @@ export function SocialClient({ hideHeader = false }: { hideHeader?: boolean }) {
       });
 
       // Hub-first: prefer synced (or any) Hub social rows; live Planable only as fallback.
-      if (fromHub.length > 0) {
-        setPosts(fromHub);
+      let nextPosts =
+        fromHub.length > 0
+          ? fromHub
+          : ((planable.posts ?? []) as Array<{
+              id: string;
+              text: string;
+              status: string;
+              scheduledAt: string | null;
+              url: string | null;
+              pageName: string | null;
+              mediaUrl?: string | null;
+              platforms?: string[];
+            }>).map((p) => {
+              const platforms = (p.platforms?.length
+                ? p.platforms
+                : p.pageName
+                  ? [p.pageName]
+                  : ["Social"]
+              ).map(normalizePlatform);
+              return {
+                id: `pl_${p.id}`,
+                text: stripHtml(p.text),
+                status: normalizeStatus(p.status),
+                scheduledAt: p.scheduledAt,
+                url: p.url,
+                platform: platforms[0] ?? "Social",
+                platforms,
+                mediaUrl: p.mediaUrl ?? null,
+                source: "planable" as const,
+              };
+            });
+
+      if (memberView) {
+        nextPosts = nextPosts.filter((p) => {
+          const s = p.status.toLowerCase();
+          return s === "scheduled" || s === "published";
+        });
+        setSourceLabel("Scheduled & published");
+      } else if (fromHub.length > 0) {
         setSourceLabel(
           syncedHub.length > 0
             ? "Hub (synced with Planable)"
             : "Hub Social Posts"
         );
       } else {
-        const fromPlanable: SocialPost[] = (planable.posts ?? []).map(
-          (p: {
-            id: string;
-            text: string;
-            status: string;
-            scheduledAt: string | null;
-            url: string | null;
-            pageName: string | null;
-            mediaUrl?: string | null;
-            platforms?: string[];
-          }) => {
-            const platforms = (p.platforms?.length
-              ? p.platforms
-              : p.pageName
-                ? [p.pageName]
-                : ["Social"]
-            ).map(normalizePlatform);
-            return {
-              id: `pl_${p.id}`,
-              text: stripHtml(p.text),
-              status: normalizeStatus(p.status),
-              scheduledAt: p.scheduledAt,
-              url: p.url,
-              platform: platforms[0] ?? "Social",
-              platforms,
-              mediaUrl: p.mediaUrl ?? null,
-              source: "planable" as const,
-            };
-          }
-        );
-        setPosts(fromPlanable);
         setSourceLabel(
           planable.configured ? "Planable (live)" : "Social Posts"
         );
       }
-      if (planable.error) setError(planable.error);
+
+      setPosts(nextPosts);
+      if (planable.error && !memberView) setError(planable.error);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load social posts");
       setPosts([]);
     }
     setLoading(false);
-  }, []);
+  }, [memberView]);
 
   async function syncFromPlanable() {
     setSyncing(true);
@@ -396,16 +411,23 @@ export function SocialClient({ hideHeader = false }: { hideHeader?: boolean }) {
           title: p.text.slice(0, 40),
           start: allDay ? iso.slice(0, 10) : iso,
           allDay,
-          editable: p.source === "hub" && p.status.toLowerCase() !== "published",
-          startEditable: p.source === "hub" && p.status.toLowerCase() !== "published",
+          editable:
+            !memberView &&
+            p.source === "hub" &&
+            p.status.toLowerCase() !== "published",
+          startEditable:
+            !memberView &&
+            p.source === "hub" &&
+            p.status.toLowerCase() !== "published",
           durationEditable: false,
           extendedProps: { postId: p.id, source: p.source },
         };
       }),
-    [calendarPosts]
+    [calendarPosts, memberView]
   );
 
   async function rescheduleHubPost(id: string, dueDate: string) {
+    if (memberView) return;
     const post = posts.find((p) => p.id === id);
     if (!post || post.source !== "hub") return;
     if (post.status.toLowerCase() === "published") return;
@@ -442,14 +464,16 @@ export function SocialClient({ hideHeader = false }: { hideHeader?: boolean }) {
             Social Media Calendar
           </h2>
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className="btn-secondary"
-              disabled={syncing || loading}
-              onClick={() => void syncFromPlanable()}
-            >
-              {syncing ? "Syncing…" : "Sync from Planable"}
-            </button>
+            {!memberView ? (
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={syncing || loading}
+                onClick={() => void syncFromPlanable()}
+              >
+                {syncing ? "Syncing…" : "Sync from Planable"}
+              </button>
+            ) : null}
             <a
               href={openUrl}
               target="_blank"
@@ -464,17 +488,23 @@ export function SocialClient({ hideHeader = false }: { hideHeader?: boolean }) {
       ) : (
         <PageHeader
           title="Social Media Calendar"
-          description="Hub social drafts synced with Planable — approve and publish in Planable."
+          description={
+            memberView
+              ? "Scheduled and published posts across channels."
+              : "Hub social drafts synced with Planable — approve and publish in Planable."
+          }
           actions={
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                className="btn-secondary"
-                disabled={syncing || loading}
-                onClick={() => void syncFromPlanable()}
-              >
-                {syncing ? "Syncing…" : "Sync from Planable"}
-              </button>
+              {!memberView ? (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={syncing || loading}
+                  onClick={() => void syncFromPlanable()}
+                >
+                  {syncing ? "Syncing…" : "Sync from Planable"}
+                </button>
+              ) : null}
               <a
                 href={openUrl}
                 target="_blank"
@@ -489,7 +519,7 @@ export function SocialClient({ hideHeader = false }: { hideHeader?: boolean }) {
         />
       )}
 
-      <SocialMonthlyPlan />
+      {!memberView ? <SocialMonthlyPlan /> : null}
 
       <FilterBar
         search={search}
@@ -551,8 +581,8 @@ export function SocialClient({ hideHeader = false }: { hideHeader?: boolean }) {
               events={calendarEvents}
               dayMaxEvents={3}
               moreLinkClick="popover"
-              editable
-              eventStartEditable
+              editable={!memberView}
+              eventStartEditable={!memberView}
               eventDurationEditable={false}
               headerToolbar={{
                 left: "prev,next today",

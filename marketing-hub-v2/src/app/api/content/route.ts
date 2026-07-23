@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { jsonError, jsonOk, requireStaff } from "@/lib/api";
+import { jsonError, jsonOk, requireAdmin, requireStaff } from "@/lib/api";
 import {
   createContent,
   deleteContent,
@@ -30,14 +30,27 @@ async function maybePushPlanable(
   };
 }
 
+/** Members only see scheduled/published social — not drafts/pipeline. */
+function contentVisibleToMember(items: ContentItem[]): ContentItem[] {
+  return items.filter(
+    (c) =>
+      isSocialContentItem(c) &&
+      (c.status === "scheduled" || c.status === "published")
+  );
+}
+
 export async function GET() {
-  const { error } = await requireStaff();
+  const { user, error } = await requireStaff();
   if (error) return error;
-  return jsonOk({ content: await listContent() });
+  const content = await listContent();
+  if (user.role !== "admin") {
+    return jsonOk({ content: contentVisibleToMember(content) });
+  }
+  return jsonOk({ content });
 }
 
 export async function POST(request: NextRequest) {
-  const { error } = await requireStaff();
+  const { error } = await requireAdmin();
   if (error) return error;
   const body = await request.json();
   const action = body.action as string | undefined;

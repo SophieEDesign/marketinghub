@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireStaff } from "@/lib/api";
+import { requireAdmin, requireStaff } from "@/lib/api";
 import { getPlanableConfig } from "@/lib/planable/client";
 import { syncPlanableIntoHub } from "@/lib/planable/sync";
 
@@ -17,9 +17,9 @@ export async function GET() {
   });
 }
 
-/** Pull Planable posts into Hub social content (staff). */
+/** Pull Planable posts into Hub social content (admin). */
 export async function POST() {
-  const { error } = await requireStaff();
+  const { error } = await requireAdmin();
   if (error) return error;
   const result = await syncPlanableIntoHub();
   return NextResponse.json(result, {

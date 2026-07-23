@@ -46,8 +46,9 @@ export const STAFF_NAV: NavItem[] = [
   {
     href: "/app/content",
     label: "Content & Social",
-    description: "Pipeline and social calendar — filter All / Content / Social",
+    description: "Social calendar (scheduled & published) — full pipeline in Admin view",
     icon: Clapperboard,
+    member: true,
   },
   {
     href: "/app/tasks",

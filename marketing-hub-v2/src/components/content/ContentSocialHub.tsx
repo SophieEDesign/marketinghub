@@ -6,6 +6,7 @@ import { ContentClient } from "@/components/content/ContentClient";
 import { SocialClient } from "@/components/social/SocialClient";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentFilter } from "@/components/ui/SegmentFilter";
+import { useHubView } from "@/lib/hub-view";
 import type { FieldOption } from "@/lib/data/collections";
 import type { ContentItem } from "@/lib/types";
 
@@ -27,6 +28,8 @@ export function ContentSocialHub({
   initialContent: ContentItem[];
   fieldOptions?: Record<string, FieldOption[]>;
 }) {
+  const { view } = useHubView();
+  const isMemberView = view !== "admin";
   const [scope, setScope] = useState<Scope>("all");
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
@@ -48,6 +51,29 @@ export function ContentSocialHub({
       setSyncMessage(e instanceof Error ? e.message : "Planable sync failed");
     }
     setSyncing(false);
+  }
+
+  if (isMemberView) {
+    return (
+      <div>
+        <PageHeader
+          title="Social calendar"
+          description="Scheduled and published posts only — drafts stay with the marketing team."
+          actions={
+            <a
+              href={PLANABLE_CALENDAR_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="btn-primary"
+            >
+              Open Planable
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          }
+        />
+        <SocialClient hideHeader memberView />
+      </div>
+    );
   }
 
   return (

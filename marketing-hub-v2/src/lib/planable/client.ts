@@ -48,6 +48,8 @@ export type PlanableRawPost = {
   scheduledAt: string | null;
   published: boolean;
   approved: boolean;
+  /** True when a real schedule was set in Planable (not just a default date). */
+  scheduledSet: boolean;
   archived: boolean;
   mediaUrls: string[];
   platforms: string[];
@@ -260,6 +262,7 @@ function toRawPost(
     scheduledAt: scheduled,
     published: p.published === true,
     approved: p.approved === true,
+    scheduledSet: p.scheduledSet === true,
     archived: p.archived === true,
     mediaUrls: pickMediaUrls(p),
     platforms:
@@ -390,13 +393,13 @@ export async function fetchPlanablePosts(): Promise<{
     posts: result.posts.map((p) => ({
       id: p.id,
       text: p.plainText.slice(0, 280) || "Untitled post",
-      status: p.published
-        ? "Published"
-        : p.approved
-          ? "Approved"
-          : p.scheduledAt
-            ? "Scheduled"
-            : "Draft",
+      status: (() => {
+        const hub = hubStatusFromPlanable(p);
+        if (hub === "published") return "Published";
+        if (hub === "scheduled") return "Scheduled";
+        if (hub === "review") return "Review";
+        return "Draft";
+      })(),
       scheduledAt: p.scheduledAt,
       url: p.url,
       pageName: p.pageName,
@@ -604,10 +607,13 @@ export function hubStatusFromPlanable(post: {
   published: boolean;
   approved: boolean;
   scheduledAt: string | null;
+  scheduledSet?: boolean;
 }): ContentStatus {
   if (post.published) return "published";
-  if (post.approved) return "scheduled";
-  if (post.scheduledAt) return "scheduled";
+  // Planable drafts often include a date with scheduledSet=false — stay Draft.
+  // Scheduled in the Hub only when approved AND actually scheduled.
+  if (post.approved && post.scheduledSet === true) return "scheduled";
+  if (post.approved) return "review";
   return "draft";
 }
 

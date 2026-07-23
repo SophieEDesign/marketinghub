@@ -174,6 +174,7 @@ export async function syncPlanableIntoHub(): Promise<PlanableSyncResult> {
 
     const published = group.posts.some((p) => p.published);
     const approved = group.posts.some((p) => p.approved);
+    const scheduledSet = group.posts.some((p) => p.scheduledSet);
     const caption = captionFromGroup(group.posts);
     const channels = channelsFromGroup(group.posts);
     const due_date = dueDateFromScheduledAt(
@@ -195,6 +196,7 @@ export async function syncPlanableIntoHub(): Promise<PlanableSyncResult> {
       published,
       approved,
       scheduledAt: primary.scheduledAt,
+      scheduledSet,
     });
     const planable_url =
       primary.url || planableDeepLink(primary.id, config);
