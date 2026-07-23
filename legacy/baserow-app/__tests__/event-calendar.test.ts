@@ -8,6 +8,7 @@ import {
   isEventContentRecord,
   buildEventCalendarEvents,
   buildEventCalendarCreateInitialData,
+  buildEventCalendarRescheduleUpdates,
   normalizeEventCalendarDateStr,
   eventSpansMultipleDays,
   formatEventDateRange,
@@ -647,5 +648,44 @@ describe("buildEventCalendarCreateInitialData", () => {
   it("normalizes FullCalendar datetime dateStr to yyyy-MM-dd", () => {
     expect(normalizeEventCalendarDateStr("2026-07-23T14:30:00")).toBe("2026-07-23")
     expect(normalizeEventCalendarDateStr("2026-07-23")).toBe("2026-07-23")
+  })
+})
+
+describe("buildEventCalendarRescheduleUpdates", () => {
+  const fields = { startDate: "start_date", endDate: "end_date" }
+
+  it("updates start and end for a single-day move", () => {
+    const updates = buildEventCalendarRescheduleUpdates({
+      fields,
+      newStart: new Date(2026, 6, 25),
+      previousStart: new Date(2026, 6, 20),
+      previousEnd: new Date(2026, 6, 20),
+    })
+    expect(updates).toEqual({
+      start_date: "2026-07-25",
+      end_date: "2026-07-25",
+    })
+  })
+
+  it("preserves multi-day span when dragging", () => {
+    const updates = buildEventCalendarRescheduleUpdates({
+      fields,
+      newStart: new Date(2026, 7, 1),
+      previousStart: new Date(2026, 6, 20),
+      previousEnd: new Date(2026, 6, 22),
+    })
+    expect(updates).toEqual({
+      start_date: "2026-08-01",
+      end_date: "2026-08-03",
+    })
+  })
+
+  it("returns null without a start date field", () => {
+    expect(
+      buildEventCalendarRescheduleUpdates({
+        fields: { startDate: null, endDate: "end_date" },
+        newStart: new Date(2026, 6, 25),
+      })
+    ).toBeNull()
   })
 })

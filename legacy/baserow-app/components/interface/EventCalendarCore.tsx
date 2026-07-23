@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useRecordModal } from "@/contexts/RecordModalContext"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
+import { createClient } from "@/lib/supabase/client"
 import type { EventRecordContextualPayload } from "@/lib/records/record-drawer-mode"
 import type { MarketingEventItem } from "@/lib/marketing/events"
 import { useEventCalendarData } from "@/hooks/useEventCalendarData"
@@ -36,6 +37,7 @@ import {
 import {
   buildEventCalendarEvents,
   buildEventCalendarCreateInitialData,
+  buildEventCalendarRescheduleUpdates,
   computeEventMetrics,
   eventCalendarSettingsFromConfig,
   EVENT_TYPE_LEGEND,
@@ -277,6 +279,8 @@ export function EventCalendarCore({
     settings.showAddButton &&
     !isEditing &&
     (canEdit || settings.allowMemberSubmissions) &&
+    demoState.useLiveData &&
+    !forceMock &&
     !!tableIds?.contentTableId
 
   const handleCalendarDateClick = useCallback(
@@ -285,6 +289,57 @@ export function EventCalendarCore({
       handleAddEvent(dateStr)
     },
     [canCreateFromCalendar, handleAddEvent]
+  )
+
+  const calendarEditable =
+    canEdit &&
+    !isEditing &&
+    demoState.useLiveData &&
+    !forceMock &&
+    !!tableIds?.contentSupabaseTable &&
+    !!fields?.startDate
+
+  const handleEventDateChange = useCallback(
+    async (recordId: string, newDate: Date): Promise<boolean> => {
+      if (!calendarEditable || !tableIds?.contentSupabaseTable || !fields?.startDate) {
+        return false
+      }
+      const previous = filteredItems.find((item) => item.id === recordId)
+      const updates = buildEventCalendarRescheduleUpdates({
+        fields,
+        newStart: newDate,
+        previousStart: previous?.startDate ?? null,
+        previousEnd: previous?.endDate ?? null,
+      })
+      if (!updates) return false
+
+      try {
+        const supabase = createClient()
+        const { error: updateError } = await supabase
+          .from(tableIds.contentSupabaseTable)
+          .update(updates)
+          .eq("id", recordId)
+        if (updateError) throw updateError
+        reload()
+        return true
+      } catch (err) {
+        console.error("Event calendar: failed to reschedule event", err)
+        toast({
+          title: "Could not reschedule event",
+          description: err instanceof Error ? err.message : "Try again",
+          variant: "destructive",
+        })
+        return false
+      }
+    },
+    [
+      calendarEditable,
+      tableIds?.contentSupabaseTable,
+      fields,
+      filteredItems,
+      reload,
+      toast,
+    ]
   )
 
   const handleAttendanceChange = useCallback(
@@ -589,6 +644,8 @@ export function EventCalendarCore({
               selectedId={selectedEventId}
               onEventClick={handleEventClick}
               onDateClick={showAddButton ? handleCalendarDateClick : undefined}
+              onEventDateChange={calendarEditable ? handleEventDateChange : undefined}
+              editable={calendarEditable}
               onDatesChange={setCursorDate}
               compact={settings.density === "compact"}
               isEditing={isEditing}

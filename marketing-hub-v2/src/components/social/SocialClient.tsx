@@ -325,7 +325,7 @@ export function SocialClient({
         setError(data.error || "Planable sync failed");
       } else {
         setSourceLabel(
-          `Synced · ${data.created ?? 0} new · ${data.updated ?? 0} updated`
+          `Synced · ${data.created ?? 0} new · ${data.updated ?? 0} updated · ${data.removed ?? 0} removed`
         );
       }
       await load();

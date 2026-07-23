@@ -63,4 +63,15 @@ describe("Event Calendar one contextual drawer", () => {
     expect(core).toContain("buildEventCalendarCreateInitialData")
     expect(core).toContain("onDateClick={showAddButton ? handleCalendarDateClick : undefined}")
   })
+
+  it("wires drag reschedule with live-data gating", () => {
+    const core = read("components/interface/EventCalendarCore.tsx")
+    const view = read("components/interface/EventCalendarView.tsx")
+    expect(view).toContain("eventDrop={canDrag ? handleEventDrop : undefined}")
+    expect(view).toContain("eventDurationEditable={false}")
+    expect(core).toContain("buildEventCalendarRescheduleUpdates")
+    expect(core).toContain("demoState.useLiveData")
+    expect(core).toContain("!forceMock")
+    expect(core).toContain("onEventDateChange={calendarEditable ? handleEventDateChange : undefined}")
+  })
 })

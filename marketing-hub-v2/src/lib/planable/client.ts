@@ -544,6 +544,103 @@ export async function updatePlanablePost(
   }
 }
 
+export async function getPlanablePost(
+  postId: string
+): Promise<
+  | { ok: true; post: PlanableRawPost }
+  | { ok: false; notFound?: boolean; error: string }
+> {
+  const config = getPlanableConfig();
+  if (!config.configured || !config.token || !config.workspaceId) {
+    return { ok: false, error: "Planable is not configured." };
+  }
+  try {
+    const res = await fetch(`${PLANABLE_API_BASE_URL}/posts/${postId}`, {
+      headers: authHeaders(config.token),
+    });
+    if (res.status === 404) {
+      return { ok: false, notFound: true, error: "Post not found" };
+    }
+    const text = await res.text();
+    let json: unknown = null;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      /* ignore */
+    }
+    if (!res.ok) {
+      const err = (json as { error?: { message?: string } } | null)?.error
+        ?.message;
+      return {
+        ok: false,
+        error: err || `Planable get ${res.status}: ${text.slice(0, 200)}`,
+      };
+    }
+    const raw = extractPostFromResponse(json);
+    if (!raw?.id) {
+      return { ok: false, notFound: true, error: "Post not found" };
+    }
+    const pagesById = await fetchPlanablePages(
+      config.token,
+      config.workspaceId
+    );
+    return { ok: true, post: toRawPost(raw, pagesById) };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Planable get failed",
+    };
+  }
+}
+
+/** Archive (preferred) or delete a Planable post — unpublished only for hard deletes. */
+export async function archivePlanablePost(
+  postId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const config = getPlanableConfig();
+  if (!config.configured || !config.token) {
+    return { ok: false, error: "Planable is not configured." };
+  }
+
+  try {
+    const patchRes = await fetch(`${PLANABLE_API_BASE_URL}/posts/${postId}`, {
+      method: "PATCH",
+      headers: authHeaders(config.token, true),
+      body: JSON.stringify({ archived: true }),
+    });
+    if (patchRes.ok || patchRes.status === 404) {
+      return { ok: true };
+    }
+
+    const delRes = await fetch(`${PLANABLE_API_BASE_URL}/posts/${postId}`, {
+      method: "DELETE",
+      headers: authHeaders(config.token),
+    });
+    if (delRes.ok || delRes.status === 404) {
+      return { ok: true };
+    }
+
+    const text = await delRes.text();
+    let json: unknown = null;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      /* ignore */
+    }
+    const err = (json as { error?: { message?: string } } | null)?.error
+      ?.message;
+    return {
+      ok: false,
+      error: err || `Planable archive/delete ${delRes.status}`,
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Planable archive failed",
+    };
+  }
+}
+
 /** Upload media from a public URL into the Planable workspace. */
 export async function uploadPlanableMediaFromUrl(
   url: string

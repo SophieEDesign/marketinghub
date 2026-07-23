@@ -1038,6 +1038,40 @@ export function buildEventCalendarCreateInitialData(params: {
   return initial
 }
 
+export function eventCalendarDateFieldValue(date: Date): string {
+  return format(startOfDay(date), "yyyy-MM-dd")
+}
+
+/**
+ * Field updates when dragging an event to a new start date.
+ * Preserves multi-day span by shifting end by the same day delta.
+ */
+export function buildEventCalendarRescheduleUpdates(params: {
+  fields: Pick<EventFieldMap, "startDate" | "endDate"> | null
+  newStart: Date
+  previousStart?: Date | null
+  previousEnd?: Date | null
+}): Record<string, string> | null {
+  const { fields, newStart, previousStart, previousEnd } = params
+  if (!fields?.startDate || isNaN(newStart.getTime())) return null
+
+  const nextStart = startOfDay(newStart)
+  const updates: Record<string, string> = {
+    [fields.startDate]: eventCalendarDateFieldValue(nextStart),
+  }
+
+  if (fields.endDate) {
+    if (previousStart && previousEnd && !isNaN(previousStart.getTime()) && !isNaN(previousEnd.getTime())) {
+      const deltaDays = differenceInDays(nextStart, startOfDay(previousStart))
+      updates[fields.endDate] = eventCalendarDateFieldValue(addDays(startOfDay(previousEnd), deltaDays))
+    } else {
+      updates[fields.endDate] = eventCalendarDateFieldValue(nextStart)
+    }
+  }
+
+  return updates
+}
+
 export function buildEventCalendarEvents(items: MarketingEventItem[]): EventCalendarEvent[] {
   return items
     .filter((item) => item.startDate)

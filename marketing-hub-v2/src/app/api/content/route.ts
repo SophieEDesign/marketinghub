@@ -11,7 +11,7 @@ import {
   isSocialContentItem,
   normalizeChannels,
 } from "@/lib/data/normalize";
-import { pushContentToPlanable } from "@/lib/planable/sync";
+import { pushContentToPlanable, removeContentFromPlanable } from "@/lib/planable/sync";
 import type { ContentItem } from "@/lib/types";
 
 async function maybePushPlanable(
@@ -95,6 +95,18 @@ export async function POST(request: NextRequest) {
   }
 
   if (action === "delete") {
+    const existingList = await listContent();
+    const existing = existingList.find((c) => c.id === body.id);
+    if (existing) {
+      const planable = await removeContentFromPlanable(
+        withContentPlanableDefaults(existing)
+      );
+      await deleteContent(body.id);
+      return jsonOk({
+        ok: true,
+        ...(planable.error ? { planableSyncError: planable.error } : {}),
+      });
+    }
     await deleteContent(body.id);
     return jsonOk({ ok: true });
   }

@@ -1163,6 +1163,16 @@
   background: hsl(var(--muted) / 0.35);
 }
 
+.calendar-embed--draggable .fc-event.fc-event-draggable {
+  cursor: grab;
+}
+
+.calendar-embed--draggable .fc-event.fc-event-dragging {
+  cursor: grabbing;
+  opacity: 0.9;
+  box-shadow: 0 8px 24px hsl(var(--foreground) / 0.12);
+}
+
 /* Accessibility: reduce non-essential animations when user requests less motion. */
 @media (prefers-reduced-motion: reduce) {
   *,

@@ -4,7 +4,7 @@ import { useCallback, useMemo, useRef } from "react"
 import FullCalendar from "@fullcalendar/react"
 import dayGridPlugin from "@fullcalendar/daygrid"
 import timeGridPlugin from "@fullcalendar/timegrid"
-import interactionPlugin from "@fullcalendar/interaction"
+import interactionPlugin, { type EventDropArg } from "@fullcalendar/interaction"
 import type { EventClickArg, EventContentArg, EventMountArg, EventInput } from "@fullcalendar/core"
 import { mountCalendarEventKeyboard } from "@/lib/a11y/calendar-event-keyboard"
 import { EventListView } from "@/components/interface/events/EventListView"
@@ -36,6 +36,9 @@ interface EventCalendarViewProps {
   onEventClick?: (id: string) => void
   /** Empty day cell click — dateStr is yyyy-MM-dd (or datetime in week view). */
   onDateClick?: (dateStr: string) => void
+  /** When set and editable is true, dropping an event updates the record schedule date. */
+  onEventDateChange?: (recordId: string, newDate: Date) => Promise<boolean>
+  editable?: boolean
   onDatesChange?: (date: Date) => void
   className?: string
   compact?: boolean
@@ -52,6 +55,8 @@ export default function EventCalendarView({
   selectedId,
   onEventClick,
   onDateClick,
+  onEventDateChange,
+  editable = false,
   onDatesChange,
   className,
   compact = false,
@@ -100,7 +105,22 @@ export default function EventCalendarView({
     }
   }, [])
 
+  const handleEventDrop = useCallback(
+    async (info: EventDropArg) => {
+      const recordId = info.event.id ? String(info.event.id) : null
+      const newStart = info.event.start
+      if (!recordId || !newStart || !onEventDateChange) {
+        info.revert()
+        return
+      }
+      const ok = await onEventDateChange(recordId, newStart)
+      if (!ok) info.revert()
+    },
+    [onEventDateChange]
+  )
+
   const canDayClick = !!onDateClick
+  const canDrag = editable && !!onEventDateChange
 
   const eventContent = useCallback(
     (arg: EventContentArg) => <EventCalendarEventCard arg={arg} />,
@@ -159,7 +179,8 @@ export default function EventCalendarView({
       <div
         className={cn(
           "calendar-embed calendar-embed--events h-full min-h-0 p-2 md:p-3",
-          canDayClick && "calendar-embed--day-clickable"
+          canDayClick && "calendar-embed--day-clickable",
+          canDrag && "calendar-embed--draggable"
         )}
       >
         <FullCalendar
@@ -175,6 +196,11 @@ export default function EventCalendarView({
           dateClick={canDayClick ? handleDateClick : undefined}
           eventContent={eventContent}
           eventDidMount={handleEventDidMount}
+          editable={canDrag}
+          eventDrop={canDrag ? handleEventDrop : undefined}
+          eventDurationEditable={false}
+          eventStartEditable={canDrag}
+          eventDragMinDistance={8}
           eventDisplay="block"
           displayEventEnd={false}
           dayMaxEvents={viewMode === "month" ? 2 : 8}

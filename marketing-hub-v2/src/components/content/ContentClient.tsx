@@ -334,7 +334,7 @@ export function ContentClient({
         setSyncMessage(data.error || "Planable sync failed");
       } else {
         setSyncMessage(
-          `Planable sync: ${data.created ?? 0} new, ${data.updated ?? 0} updated`
+          `Planable sync: ${data.created ?? 0} new, ${data.updated ?? 0} updated, ${data.removed ?? 0} removed`
         );
       }
       await refresh();

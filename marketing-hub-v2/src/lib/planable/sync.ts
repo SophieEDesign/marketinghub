@@ -1,5 +1,6 @@
 import {
   createContent,
+  deleteContent,
   listContent,
   updateContent,
   withContentPlanableDefaults,
@@ -13,10 +14,12 @@ import {
 import { plainTextFromHtml } from "@/lib/sanitize";
 import type { ContentItem } from "@/lib/types";
 import {
+  archivePlanablePost,
   channelToPageIds,
   createPlanablePost,
   dueDateFromScheduledAt,
   getPlanableConfig,
+  getPlanablePost,
   hubStatusFromPlanable,
   listAllPlanablePosts,
   listPlanablePages,
@@ -33,6 +36,7 @@ export type PlanableSyncResult = {
   updated: number;
   skipped: number;
   lockedPublished: number;
+  removed: number;
   error?: string;
   openUrl: string;
 };
@@ -140,6 +144,7 @@ export async function syncPlanableIntoHub(): Promise<PlanableSyncResult> {
       updated: 0,
       skipped: 0,
       lockedPublished: 0,
+      removed: 0,
       openUrl: listed.openUrl,
       error: listed.error,
     };
@@ -151,6 +156,7 @@ export async function syncPlanableIntoHub(): Promise<PlanableSyncResult> {
       updated: 0,
       skipped: 0,
       lockedPublished: 0,
+      removed: 0,
       openUrl: listed.openUrl,
       error: listed.error,
     };
@@ -158,10 +164,20 @@ export async function syncPlanableIntoHub(): Promise<PlanableSyncResult> {
 
   const existing = (await listContent()).map(withContentPlanableDefaults);
   const groups = groupPlanablePosts(listed.posts);
+  const activePostIds = new Set(
+    listed.posts.filter((p) => !p.archived).map((p) => p.id)
+  );
+  const activeGroupIds = new Set(
+    groups.map((g) => g.groupId).filter(Boolean)
+  );
+  const archivedPostIds = new Set(
+    listed.posts.filter((p) => p.archived).map((p) => p.id)
+  );
   let created = 0;
   let updated = 0;
   let skipped = 0;
   let lockedPublished = 0;
+  let removed = 0;
   const now = new Date().toISOString();
 
   for (const group of groups) {
@@ -270,15 +286,71 @@ export async function syncPlanableIntoHub(): Promise<PlanableSyncResult> {
     if (published) lockedPublished += 1;
   }
 
+  // Remove Hub social rows whose Planable posts were archived or deleted.
+  const linked = (await listContent())
+    .map(withContentPlanableDefaults)
+    .filter(
+      (c) =>
+        isSocialContentItem(c) &&
+        Boolean(c.planable_post_id || c.planable_group_id)
+    );
+
+  for (const item of linked) {
+    const postId = item.planable_post_id;
+    const groupId = item.planable_group_id;
+
+    if (postId && archivedPostIds.has(postId)) {
+      await deleteContent(item.id);
+      removed += 1;
+      continue;
+    }
+
+    if (postId && activePostIds.has(postId)) continue;
+    if (groupId && activeGroupIds.has(groupId)) continue;
+
+    // Not in this sync page — verify live status (avoid false deletes outside window).
+    if (postId) {
+      const remote = await getPlanablePost(postId);
+      if (
+        !remote.ok &&
+        (remote.notFound || /not found|404/i.test(remote.error))
+      ) {
+        await deleteContent(item.id);
+        removed += 1;
+        continue;
+      }
+      if (remote.ok && remote.post.archived) {
+        await deleteContent(item.id);
+        removed += 1;
+      }
+    }
+  }
+
   return {
     configured: true,
     created,
     updated,
     skipped,
     lockedPublished,
+    removed,
     openUrl: listed.openUrl,
     ...(listed.error ? { error: listed.error } : {}),
   };
+}
+
+/** Archive linked Planable post(s) when a Hub piece is deleted. */
+export async function removeContentFromPlanable(
+  item: ContentItem
+): Promise<{ ok: boolean; error?: string }> {
+  const current = withContentPlanableDefaults(item);
+  if (!current.planable_post_id) {
+    return { ok: true };
+  }
+  const result = await archivePlanablePost(current.planable_post_id);
+  if (!result.ok) {
+    return { ok: false, error: result.error };
+  }
+  return { ok: true };
 }
 
 function plainCaption(item: ContentItem): string {
