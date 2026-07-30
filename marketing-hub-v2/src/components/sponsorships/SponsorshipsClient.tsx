@@ -13,6 +13,7 @@ import { RichTextView } from "@/components/ui/RichTextView";
 import { plainTextFromHtml } from "@/lib/sanitize";
 import { RelatedTasksPanel } from "@/components/tasks/RelatedTasksPanel";
 import { TimelineChart } from "@/components/ui/TimelineChart";
+import { SearchSelect } from "@/components/ui/SearchSelect";
 
 const STATUSES: { id: SponsorshipStatus; label: string }[] = [
   { id: "prospect", label: "Prospect" },
@@ -342,20 +343,15 @@ export function SponsorshipsClient({
             >
               Edit
             </button>
-            <select
+            <SearchSelect
               className="field !w-auto py-1.5 text-xs"
               value={item.status}
-              onChange={(e) =>
-                void setStatus(item.id, e.target.value as SponsorshipStatus)
+              onChange={(status) =>
+                void setStatus(item.id, status as SponsorshipStatus)
               }
               aria-label="Change status"
-            >
-              {STATUSES.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
+              options={STATUSES.map((s) => ({ value: s.id, label: s.label }))}
+            />
           </>
         ) : null}
         {item.onedrive_url ? (
@@ -457,16 +453,15 @@ export function SponsorshipsClient({
           {showKindPicker ? (
             <div className="md:col-span-2">
               <label className="label">Type</label>
-              <select
+              <SearchSelect
                 className="field"
                 value={formKind}
-                onChange={(e) =>
-                  setFormKind(e.target.value as PartnerKind)
-                }
-              >
-                <option value="sponsorship">Sponsorship</option>
-                <option value="membership">Membership</option>
-              </select>
+                onChange={(value) => setFormKind(value as PartnerKind)}
+                options={[
+                  { value: "sponsorship", label: "Sponsorship" },
+                  { value: "membership", label: "Membership" },
+                ]}
+              />
             </div>
           ) : !isAdminView ? (
             <div className="md:col-span-2 rounded-xl border border-border bg-sand/40 px-3 py-2 text-xs text-muted">
@@ -527,22 +522,17 @@ export function SponsorshipsClient({
           </div>
           <div>
             <label className="label">Status</label>
-            <select
+            <SearchSelect
               className="field"
               value={form.status}
-              onChange={(e) =>
+              onChange={(status) =>
                 setForm({
                   ...form,
-                  status: e.target.value as SponsorshipStatus,
+                  status: status as SponsorshipStatus,
                 })
               }
-            >
-              {STATUSES.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
+              options={STATUSES.map((s) => ({ value: s.id, label: s.label }))}
+            />
           </div>
           <div className="md:col-span-2">
             <label className="label">Deliverables</label>
@@ -919,22 +909,20 @@ export function SponsorshipsClient({
                 </div>
                 <div>
                   <label className="label">Status</label>
-                  <select
+                  <SearchSelect
                     className="field"
                     value={edit.status}
-                    onChange={(e) =>
+                    onChange={(status) =>
                       setEdit({
                         ...edit,
-                        status: e.target.value as SponsorshipStatus,
+                        status: status as SponsorshipStatus,
                       })
                     }
-                  >
-                    {STATUSES.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
+                    options={STATUSES.map((s) => ({
+                      value: s.id,
+                      label: s.label,
+                    }))}
+                  />
                 </div>
                 <div>
                   <label className="label">Deliverables</label>

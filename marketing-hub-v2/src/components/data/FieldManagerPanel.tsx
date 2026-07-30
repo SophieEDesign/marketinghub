@@ -9,6 +9,7 @@ import {
   type FieldType,
 } from "@/lib/data/collections";
 import { cn } from "@/lib/utils";
+import { SearchSelect } from "@/components/ui/SearchSelect";
 
 const TYPE_LABELS: Record<FieldType, string> = {
   text: "Text",
@@ -458,26 +459,24 @@ export function FieldManagerPanel({
 
               <div>
                 <label className="label">Type</label>
-                <select
+                <SearchSelect
                   className="field"
                   value={draft.type}
                   disabled={locked || busy}
-                  onChange={(e) =>
+                  onChange={(value) =>
                     setDraft((d) => ({
                       ...d,
-                      type: e.target.value as FieldType,
+                      type: value as FieldType,
                     }))
                   }
-                >
-                  {(locked
+                  options={(locked
                     ? [draft.type]
                     : MANAGEABLE_FIELD_TYPES
-                  ).map((type) => (
-                    <option key={type} value={type}>
-                      {TYPE_LABELS[type]}
-                    </option>
-                  ))}
-                </select>
+                  ).map((type) => ({
+                    value: type,
+                    label: TYPE_LABELS[type],
+                  }))}
+                />
               </div>
 
               {needsOptions ? (

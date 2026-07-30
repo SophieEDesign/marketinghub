@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { contactOwnerOptions } from "@/lib/data/collections";
 import type { Contact } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { SearchSelect } from "@/components/ui/SearchSelect";
 
 export function ContactOwnerSelect({
   value,
@@ -45,20 +45,17 @@ export function ContactOwnerSelect({
   const options = contactOwnerOptions(contacts, value);
 
   return (
-    <select
+    <SearchSelect
       id={id}
-      className={cn("field", className)}
+      className={className}
       value={value}
       disabled={disabled || !loaded}
       aria-label={ariaLabel ?? "Owner"}
-      onChange={(e) => onChange(e.target.value)}
-    >
-      <option value="">{loaded ? "Assign person…" : "Loading…"}</option>
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+      allowEmpty
+      emptyLabel={loaded ? "Assign person…" : "Loading…"}
+      placeholder={loaded ? "Assign person…" : "Loading…"}
+      options={options}
+      onChange={onChange}
+    />
   );
 }

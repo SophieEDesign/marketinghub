@@ -175,6 +175,38 @@ export type ReportLink = {
   updated_at: string;
 };
 
+export type PaidCampaignStatus = "draft" | "active" | "paused" | "complete";
+
+/** Paid media snapshot — LinkedIn, Google Ads, etc. (manual entry v1). */
+export type PaidCampaign = {
+  id: string;
+  name: string;
+  platform: string;
+  status: PaidCampaignStatus;
+  external_id: string;
+  external_url: string;
+  starts_at: string | null;
+  ends_at: string | null;
+  /** Total spend in GBP. */
+  spent: number | null;
+  goal: string;
+  key_results: string;
+  cost_per_result: number | null;
+  impressions: number | null;
+  clicks: number | null;
+  /** e.g. "0.5%" */
+  ctr: string;
+  landing_clicks: number | null;
+  /** e.g. "1.12%" — social platforms */
+  engagement_rate: string;
+  notes: string;
+  theme_id: string | null;
+  content_id: string | null;
+  event_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 /** Quarterly planning spine: Theme → main content → offshoot content */
 export type ThemeStatus = "previous" | "active" | "upcoming";
 
@@ -315,7 +347,8 @@ export type TaskRelatedType =
   | "theme"
   | "sponsorship"
   | "award"
-  | "event";
+  | "event"
+  | "asset";
 
 export type HubTask = {
   id: string;
@@ -408,6 +441,7 @@ export type HubStore = {
   contacts: Contact[];
   resources: ResourceLink[];
   reports: ReportLink[];
+  paid_campaigns: PaidCampaign[];
   themes: QuarterlyTheme[];
   theme_mains: ThemeMainContent[];
   theme_offshoots: ThemeOffshoot[];

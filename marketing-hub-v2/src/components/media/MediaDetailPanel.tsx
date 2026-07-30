@@ -32,6 +32,8 @@ import {
 import { cn } from "@/lib/utils";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
+import { SearchSelect } from "@/components/ui/SearchSelect";
+import { RelatedTasksPanel } from "@/components/tasks/RelatedTasksPanel";
 
 const NEW_SUBFOLDER_VALUE = "__new_subfolder__";
 const MEDIA_ACCEPT = UPLOAD_ACCEPT;
@@ -740,15 +742,14 @@ export function MediaDetailPanel({
                     </>
                   ) : (
                     <>
-                      <select
+                      <SearchSelect
                         className="field"
                         value={
                           categoryOptions.includes(category)
                             ? category
                             : category || GALLERY_CATEGORY
                         }
-                        onChange={(e) => {
-                          const value = e.target.value;
+                        onChange={(value) => {
                           setCategory(value);
                           if (
                             value.toLowerCase() !==
@@ -759,16 +760,16 @@ export function MediaDetailPanel({
                             setNewSubfolder("");
                           }
                         }}
-                      >
-                        {!categoryOptions.includes(category) && category ? (
-                          <option value={category}>{category}</option>
-                        ) : null}
-                        {categoryOptions.map((c) => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
-                        ))}
-                      </select>
+                        options={[
+                          ...(!categoryOptions.includes(category) && category
+                            ? [{ value: category, label: category }]
+                            : []),
+                          ...categoryOptions.map((c) => ({
+                            value: c,
+                            label: c,
+                          })),
+                        ]}
+                      />
                       <button
                         type="button"
                         className="btn-secondary w-full px-2.5 py-1.5 text-xs"
@@ -794,15 +795,16 @@ export function MediaDetailPanel({
                 <label className="label">Gallery subfolder</label>
                 {canEdit ? (
                   <>
-                    <select
+                    <SearchSelect
                       className="field"
                       value={
                         subfolderMode === "new"
                           ? NEW_SUBFOLDER_VALUE
                           : subfolder || ""
                       }
-                      onChange={(e) => {
-                        const value = e.target.value;
+                      allowEmpty
+                      emptyLabel="Unsorted"
+                      onChange={(value) => {
                         if (value === NEW_SUBFOLDER_VALUE) {
                           setSubfolderMode("new");
                           return;
@@ -810,17 +812,17 @@ export function MediaDetailPanel({
                         setSubfolderMode("existing");
                         setSubfolder(value);
                       }}
-                    >
-                      <option value="">Unsorted</option>
-                      {subfolderOptions.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                      <option value={NEW_SUBFOLDER_VALUE}>
-                        + Add new subfolder…
-                      </option>
-                    </select>
+                      options={[
+                        ...subfolderOptions.map((s) => ({
+                          value: s,
+                          label: s,
+                        })),
+                        {
+                          value: NEW_SUBFOLDER_VALUE,
+                          label: "+ Add new subfolder…",
+                        },
+                      ]}
+                    />
                     {subfolderMode === "new" ? (
                       <input
                         className="field mt-2"
@@ -906,17 +908,15 @@ export function MediaDetailPanel({
               <label className="label">Division</label>
               {canEdit ? (
                 <>
-                  <select
+                  <SearchSelect
                     className="field"
                     value={division}
-                    onChange={(e) => setDivision(e.target.value)}
-                  >
-                    {DIVISION_OPTIONS.map((d) => (
-                      <option key={d} value={d}>
-                        {d === "All" ? "All (shared)" : d}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setDivision}
+                    options={DIVISION_OPTIONS.map((d) => ({
+                      value: d,
+                      label: d === "All" ? "All (shared)" : d,
+                    }))}
+                  />
                   <p className="mt-1 text-xs text-muted">
                     Tag the department. &quot;All&quot; appears in every
                     division filter.
@@ -963,6 +963,7 @@ export function MediaDetailPanel({
             {error ? (
               <p className="text-sm text-[var(--danger)]">{error}</p>
             ) : null}
+            <RelatedTasksPanel relatedType="asset" relatedId={item.id} />
           </div>
         </div>
 

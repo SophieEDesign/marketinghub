@@ -15,13 +15,20 @@ import { useManagedFieldOptions } from "@/lib/data/useManagedFieldOptions";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
 import { plainTextFromHtml } from "@/lib/sanitize";
+import { SearchSelect } from "@/components/ui/SearchSelect";
+import { PaidMediaPanel } from "@/components/reports/PaidMediaPanel";
+import type { PaidCampaign } from "@/lib/types";
 
 export function ReportsClient({
   initial,
+  paidCampaigns: initialPaidCampaigns,
   fieldOptions: fieldOptionsProp,
+  paidFieldOptions: paidFieldOptionsProp,
 }: {
   initial: ReportLink[];
+  paidCampaigns: PaidCampaign[];
   fieldOptions?: Record<string, FieldOption[]>;
+  paidFieldOptions?: Record<string, FieldOption[]>;
 }) {
   const fieldOptions = useManagedFieldOptions("reports", fieldOptionsProp);
   const categoryOptions = optionsForField(
@@ -160,31 +167,21 @@ export function ReportsClient({
           </div>
           <div>
             <label className="label">Tool</label>
-            <select
+            <SearchSelect
               className="field"
               value={form.tool}
-              onChange={(e) => setForm({ ...form, tool: e.target.value })}
-            >
-              {toolOptions.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+              onChange={(tool) => setForm({ ...form, tool })}
+              options={toolOptions}
+            />
           </div>
           <div>
             <label className="label">Category</label>
-            <select
+            <SearchSelect
               className="field"
               value={form.category}
-              onChange={(e) => setForm({ ...form, category: e.target.value })}
-            >
-              {categoryOptions.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+              onChange={(category) => setForm({ ...form, category })}
+              options={categoryOptions}
+            />
           </div>
           <div>
             <label className="label">URL</label>
@@ -213,6 +210,11 @@ export function ReportsClient({
           </div>
         </div>
       ) : null}
+
+      <PaidMediaPanel
+        initial={initialPaidCampaigns}
+        fieldOptions={paidFieldOptionsProp}
+      />
 
       <div className="space-y-8">
         {byCategory.map(([category, list]) => (

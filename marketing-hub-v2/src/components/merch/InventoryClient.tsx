@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { plainTextFromHtml } from "@/lib/sanitize";
 import { AssetUploadField } from "@/components/content/AssetUploadField";
+import { SearchSelect } from "@/components/ui/SearchSelect";
 import { isImageUrl } from "@/lib/social/platforms";
 import {
   CLOTHING_FITS,
@@ -78,17 +79,15 @@ function InventoryFields({
     <>
       <div>
         <label className="label">Item</label>
-        <select
+        <SearchSelect
           className="field"
           value={form.item}
-          onChange={(e) => onChange(applyItemChange(form, e.target.value))}
-        >
-          {CLOTHING_PRODUCTS.map((p) => (
-            <option key={p.id} value={p.label}>
-              {p.label}
-            </option>
-          ))}
-        </select>
+          onChange={(item) => onChange(applyItemChange(form, item))}
+          options={CLOTHING_PRODUCTS.map((p) => ({
+            value: p.label,
+            label: p.label,
+          }))}
+        />
       </div>
       <div>
         <label className="label">Brand</label>
@@ -100,51 +99,37 @@ function InventoryFields({
       </div>
       <div>
         <label className="label">Fit</label>
-        <select
+        <SearchSelect
           className="field"
           value={form.fit}
-          onChange={(e) =>
+          allowEmpty
+          emptyLabel="—"
+          onChange={(fit) =>
             onChange({
               ...form,
-              fit: e.target.value as ClothingFit | "",
+              fit: fit as ClothingFit | "",
             })
           }
-        >
-          <option value="">—</option>
-          {CLOTHING_FITS.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.label}
-            </option>
-          ))}
-        </select>
+          options={CLOTHING_FITS.map((f) => ({ value: f.id, label: f.label }))}
+        />
       </div>
       <div>
         <label className="label">Size</label>
-        <select
+        <SearchSelect
           className="field"
           value={form.size}
-          onChange={(e) => onChange({ ...form, size: e.target.value })}
-        >
-          {INVENTORY_SIZES.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
+          onChange={(size) => onChange({ ...form, size })}
+          options={INVENTORY_SIZES.map((s) => ({ value: s, label: s }))}
+        />
       </div>
       <div>
         <label className="label">Colour</label>
-        <select
+        <SearchSelect
           className="field"
           value={form.colour}
-          onChange={(e) => onChange({ ...form, colour: e.target.value })}
-        >
-          {colours.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
+          onChange={(colour) => onChange({ ...form, colour })}
+          options={colours.map((c) => ({ value: c, label: c }))}
+        />
       </div>
       <div>
         <label className="label">Quantity</label>

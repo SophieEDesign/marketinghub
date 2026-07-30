@@ -46,6 +46,7 @@ import {
 } from "@/lib/upload/allowed-types";
 import { cn } from "@/lib/utils";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
+import { SearchSelect } from "@/components/ui/SearchSelect";
 
 type ListResponse = {
   configured: boolean;
@@ -1220,18 +1221,16 @@ export function MediaGallery({
               Division
             </label>
             <div className="flex items-center gap-2 sm:hidden">
-              <select
+              <SearchSelect
                 id="media-division-filter"
                 className="field min-w-[160px]"
                 value={divisionFilter}
-                onChange={(e) => setDivisionFilter(e.target.value)}
-              >
-                {DIVISION_FILTER_OPTIONS.map((opt) => (
-                  <option key={opt.id} value={opt.id}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+                onChange={setDivisionFilter}
+                options={DIVISION_FILTER_OPTIONS.map((opt) => ({
+                  value: opt.id,
+                  label: opt.label,
+                }))}
+              />
             </div>
             {divisionFilter !== "all" ? (
               <span className="text-xs text-muted">
@@ -1339,23 +1338,17 @@ export function MediaGallery({
               </div>
             ) : (
               <div className="space-y-2">
-                <select
+                <SearchSelect
                   className="field"
                   value={form.category}
-                  onChange={(e) => {
-                    const value = e.target.value;
+                  onChange={(value) => {
                     setForm({ ...form, category: value, subfolder: "" });
                     setSubfolderMode("existing");
                     setNewSubfolderName("");
                   }}
                   aria-label="Category"
-                >
-                  {folderOptions.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
+                  options={folderOptions.map((c) => ({ value: c, label: c }))}
+                />
                 <button
                   type="button"
                   className="btn-secondary w-full px-2.5 py-1.5 text-xs"
@@ -1378,15 +1371,16 @@ export function MediaGallery({
           {formIsGallery ? (
             <div>
               <label className="label">Gallery subfolder</label>
-              <select
+              <SearchSelect
                 className="field"
                 value={
                   subfolderMode === "new"
                     ? NEW_SUBFOLDER_VALUE
                     : form.subfolder || ""
                 }
-                onChange={(e) => {
-                  const value = e.target.value;
+                allowEmpty
+                emptyLabel="Unsorted"
+                onChange={(value) => {
                   if (value === NEW_SUBFOLDER_VALUE) {
                     setSubfolderMode("new");
                     setForm({
@@ -1410,15 +1404,14 @@ export function MediaGallery({
                     visibility: nextVis,
                   });
                 }}
-              >
-                <option value="">Unsorted</option>
-                {knownSubfolders.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-                <option value={NEW_SUBFOLDER_VALUE}>+ Add new subfolder…</option>
-              </select>
+                options={[
+                  ...knownSubfolders.map((s) => ({ value: s, label: s })),
+                  {
+                    value: NEW_SUBFOLDER_VALUE,
+                    label: "+ Add new subfolder…",
+                  },
+                ]}
+              />
               {subfolderMode === "new" ? (
                 <input
                   className="field mt-2"
@@ -1526,19 +1519,17 @@ export function MediaGallery({
           )}
           <div>
             <label className="label">Division</label>
-            <select
+            <SearchSelect
               className="field"
               value={form.division}
-              onChange={(e) =>
-                setForm({ ...form, division: e.target.value })
+              onChange={(division) =>
+                setForm({ ...form, division })
               }
-            >
-              {DIVISION_OPTIONS.map((d) => (
-                <option key={d} value={d}>
-                  {d === "All" ? "All (shared)" : d}
-                </option>
-              ))}
-            </select>
+              options={DIVISION_OPTIONS.map((d) => ({
+                value: d,
+                label: d === "All" ? "All (shared)" : d,
+              }))}
+            />
             <p className="mt-1 text-xs text-muted">
               Tag the department this asset belongs to. &quot;All&quot; shows
               for every division filter.

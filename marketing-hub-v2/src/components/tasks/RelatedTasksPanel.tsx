@@ -25,7 +25,7 @@ function statusTone(status: string) {
 }
 
 /**
- * Reverse lookup: tasks that link to this content / theme / partner / award / event.
+ * Reverse lookup: tasks that link to this content / theme / partner / award / event / asset.
  * Admin-only — members do not see Tasks.
  */
 export function RelatedTasksPanel({

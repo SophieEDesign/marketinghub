@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
 import { plainTextFromHtml } from "@/lib/sanitize";
+import { SearchSelect } from "@/components/ui/SearchSelect";
 
 const ROLE_OPTIONS: {
   value: HubAccessRole;
@@ -567,19 +568,17 @@ export function UsersAdminClient({
           </div>
           <div>
             <label className="label">Access role</label>
-            <select
+            <SearchSelect
               className="field"
               value={form.role}
-              onChange={(e) =>
-                setForm({ ...form, role: e.target.value as HubAccessRole })
+              onChange={(role) =>
+                setForm({ ...form, role: role as HubAccessRole })
               }
-            >
-              {ROLE_OPTIONS.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
+              options={ROLE_OPTIONS.map((r) => ({
+                value: r.value,
+                label: r.label,
+              }))}
+            />
           </div>
           <div>
             <label className="label">Notes</label>
@@ -741,48 +740,40 @@ export function UsersAdminClient({
                   )}
                 </td>
                 <td className="px-4 py-3">
-                  <select
+                  <SearchSelect
                     className={cn(
                       "rounded-lg border-0 px-2 py-1 text-xs font-medium",
                       roleBadgeClass(u.role)
                     )}
                     value={u.role}
-                    onChange={(e) =>
-                      void setRole(u.id, e.target.value as HubAccessRole)
+                    onChange={(role) =>
+                      void setRole(u.id, role as HubAccessRole)
                     }
                     aria-label={`Role for ${u.full_name || u.email}`}
-                  >
-                    {ROLE_OPTIONS.map((r) => (
-                      <option key={r.value} value={r.value}>
-                        {r.label}
-                      </option>
-                    ))}
-                  </select>
+                    options={ROLE_OPTIONS.map((r) => ({
+                      value: r.value,
+                      label: r.label,
+                    }))}
+                  />
                 </td>
                 <td className="hidden px-4 py-3 lg:table-cell">
-                  <select
+                  <SearchSelect
                     className="field !py-1 text-xs"
                     value={contactByUserId.get(u.id)?.id ?? ""}
-                    onChange={(e) => void setContactLink(u.id, e.target.value)}
+                    allowEmpty
+                    emptyLabel="None"
+                    placeholder="None"
+                    onChange={(value) => void setContactLink(u.id, value)}
                     aria-label={`Linked contact for ${u.full_name || u.email}`}
-                  >
-                    <option value="">None</option>
-                    {contacts.map((c) => {
-                      const takenByOther =
-                        !!c.user_id && c.user_id !== u.id;
-                      return (
-                        <option
-                          key={c.id}
-                          value={c.id}
-                          disabled={takenByOther}
-                        >
-                          {c.name}
-                          {c.organisation ? ` · ${c.organisation}` : ""}
-                          {takenByOther ? " (linked)" : ""}
-                        </option>
-                      );
+                    options={contacts.map((c) => {
+                      const takenByOther = !!c.user_id && c.user_id !== u.id;
+                      return {
+                        value: c.id,
+                        label: `${c.name}${c.organisation ? ` · ${c.organisation}` : ""}${takenByOther ? " (linked)" : ""}`,
+                        disabled: takenByOther,
+                      };
                     })}
-                  </select>
+                  />
                 </td>
                 <td className="hidden px-4 py-3 text-muted md:table-cell">
                   <span className="block">{formatSignIn(u.last_sign_in_at)}</span>

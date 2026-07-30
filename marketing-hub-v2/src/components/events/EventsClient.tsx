@@ -40,6 +40,7 @@ import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
 import { plainTextFromHtml } from "@/lib/sanitize";
 import { RelatedTasksPanel } from "@/components/tasks/RelatedTasksPanel";
+import { SearchSelect } from "@/components/ui/SearchSelect";
 
 const ATTENDANCE_OPTIONS: { value: EventAttendanceStatus; label: string }[] = [
   { value: "attending", label: "Attending" },
@@ -238,32 +239,24 @@ function EventFields({
       </div>
       <div>
         <label className="label">Type</label>
-        <select
+        <SearchSelect
           className="field"
           value={form.event_type}
-          onChange={(e) => onChange({ ...form, event_type: e.target.value })}
-        >
-          {selectOptionsWithCurrent(eventTypeOptions, form.event_type).map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+          onChange={(event_type) => onChange({ ...form, event_type })}
+          options={selectOptionsWithCurrent(eventTypeOptions, form.event_type)}
+        />
       </div>
       <div>
         <label className="label">Division</label>
-        <select
+        <SearchSelect
           className="field"
           value={form.division}
-          onChange={(e) => onChange({ ...form, division: e.target.value })}
-        >
-          <option value="">Unassigned</option>
-          {selectOptionsWithCurrent(divisionOptions, form.division).map((d) => (
-            <option key={d.value} value={d.value}>
-              {d.label}
-            </option>
-          ))}
-        </select>
+          allowEmpty
+          emptyLabel="Unassigned"
+          placeholder="Unassigned"
+          onChange={(division) => onChange({ ...form, division })}
+          options={selectOptionsWithCurrent(divisionOptions, form.division)}
+        />
       </div>
       <div className="md:col-span-2">
         <label className="label">Link</label>

@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
 import { plainTextFromHtml } from "@/lib/sanitize";
+import { SearchSelect } from "@/components/ui/SearchSelect";
 
 const KINDS: { id: StaffRequestKind; label: string }[] = [
   { id: "asset", label: "Asset request" },
@@ -189,24 +190,18 @@ export function StaffRequestsClient({
           {!kind ? (
             <div>
               <label className="label">Kind</label>
-              <select
+              <SearchSelect
                 className="field"
                 value={form.kind}
-                onChange={(e) =>
+                onChange={(kind) =>
                   setForm({
                     ...form,
-                    kind: e.target.value as StaffRequestKind,
-                    category:
-                      e.target.value === "asset" ? form.category : "",
+                    kind: kind as StaffRequestKind,
+                    category: kind === "asset" ? form.category : "",
                   })
                 }
-              >
-                {KINDS.map((k) => (
-                  <option key={k.id} value={k.id}>
-                    {k.label}
-                  </option>
-                ))}
-              </select>
+                options={KINDS.map((k) => ({ value: k.id, label: k.label }))}
+              />
             </div>
           ) : null}
           <div className={!kind ? undefined : "md:col-span-2"}>
@@ -222,20 +217,17 @@ export function StaffRequestsClient({
           {isAssetKind(activeKind) ? (
             <div className="md:col-span-2">
               <label className="label">Asset type</label>
-              <select
+              <SearchSelect
                 className="field"
                 value={form.category}
-                onChange={(e) =>
-                  setForm({ ...form, category: e.target.value })
+                allowEmpty
+                emptyLabel="Select type…"
+                placeholder="Select type…"
+                onChange={(category) =>
+                  setForm({ ...form, category })
                 }
-              >
-                <option value="">Select type…</option>
-                {ASSET_REQUEST_CATEGORIES.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
+                options={ASSET_REQUEST_CATEGORIES}
+              />
             </div>
           ) : null}
           <div className="md:col-span-2">
@@ -343,22 +335,17 @@ export function StaffRequestsClient({
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <select
+                <SearchSelect
                   className="field py-1.5 text-sm"
                   value={item.status}
-                  onChange={(e) =>
+                  onChange={(status) =>
                     void setStatus(
                       item.id,
-                      e.target.value as StaffRequestStatus
+                      status as StaffRequestStatus
                     )
                   }
-                >
-                  {STATUSES.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
+                  options={STATUSES.map((s) => ({ value: s.id, label: s.label }))}
+                />
                 <button
                   type="button"
                   className="text-sm text-muted hover:text-red-600"

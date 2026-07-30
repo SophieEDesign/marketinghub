@@ -601,7 +601,7 @@ export async function importFromCoreData(): Promise<ImportResult> {
     membershipsTable: membershipsTable?.name ?? null,
     tasksTable: tasksTable?.name ?? null,
     legacyContentIgnored: true,
-    localOnlyPreserved: ["merch_orders", "merch_inventory", "staff_requests", "reports"],
+    localOnlyPreserved: ["merch_orders", "merch_inventory", "staff_requests", "reports", "paid_campaigns"],
     warnings,
   };
 }

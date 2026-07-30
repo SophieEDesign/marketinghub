@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { FieldDef } from "@/lib/data/collections";
 import { statusTone } from "@/lib/data/collections";
 import { cn } from "@/lib/utils";
+import { SearchSelect } from "@/components/ui/SearchSelect";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { plainTextFromHtml } from "@/lib/sanitize";
 
@@ -177,21 +178,19 @@ export function FieldControl({
             {optionLabel(field, current)}
           </span>
         ) : null}
-        <select
+        <SearchSelect
           className={inputClass}
           value={current}
-          onChange={(e) => onCommit(e.target.value || null)}
-        >
-          <option value="">—</option>
-          {field.options.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-          {current && !known ? (
-            <option value={current}>{current} (custom)</option>
-          ) : null}
-        </select>
+          allowEmpty
+          emptyLabel="—"
+          options={[
+            ...field.options,
+            ...(current && !known
+              ? [{ value: current, label: `${current} (custom)` }]
+              : []),
+          ]}
+          onChange={(next) => onCommit(next || null)}
+        />
       </div>
     );
   }
@@ -359,18 +358,13 @@ export function BulkValueControl({
 
   if (field.type === "select" && field.options?.length) {
     return (
-      <select
-        className="field"
+      <SearchSelect
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        <option value="">—</option>
-        {field.options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
+        allowEmpty
+        emptyLabel="—"
+        options={field.options}
+        onChange={onChange}
+      />
     );
   }
 

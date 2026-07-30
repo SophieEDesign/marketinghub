@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
 import { plainTextFromHtml } from "@/lib/sanitize";
+import { SearchSelect } from "@/components/ui/SearchSelect";
 import {
   CLOTHING_BRAND,
   CLOTHING_FITS,
@@ -142,77 +143,55 @@ function OrderFields({
       </div>
       <div>
         <label className="label">Item</label>
-        <select
+        <SearchSelect
           className="field"
           value={form.item}
-          onChange={(e) => onChange(applyItemChange(form, e.target.value))}
-        >
-          {CLOTHING_PRODUCTS.map((p) => (
-            <option key={p.id} value={p.label}>
-              {p.label}
-            </option>
-          ))}
-        </select>
+          onChange={(item) => onChange(applyItemChange(form, item))}
+          options={CLOTHING_PRODUCTS.map((p) => ({
+            value: p.label,
+            label: p.label,
+          }))}
+        />
       </div>
       <div>
         <label className="label">Fit</label>
-        <select
+        <SearchSelect
           className="field"
           value={form.fit || "male"}
-          onChange={(e) =>
-            onChange({ ...form, fit: e.target.value as ClothingFit })
+          onChange={(fit) =>
+            onChange({ ...form, fit: fit as ClothingFit })
           }
-        >
-          {CLOTHING_FITS.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.label}
-            </option>
-          ))}
-        </select>
+          options={CLOTHING_FITS.map((f) => ({ value: f.id, label: f.label }))}
+        />
       </div>
       <div>
         <label className="label">Size</label>
-        <select
+        <SearchSelect
           className="field"
           value={form.size}
-          onChange={(e) => onChange({ ...form, size: e.target.value })}
-        >
-          {CLOTHING_SIZES.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
+          onChange={(size) => onChange({ ...form, size })}
+          options={CLOTHING_SIZES.map((s) => ({ value: s, label: s }))}
+        />
       </div>
       <div>
         <label className="label">Colour</label>
-        <select
+        <SearchSelect
           className="field"
           value={form.colour}
-          onChange={(e) => onChange({ ...form, colour: e.target.value })}
-        >
-          {colours.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
+          onChange={(colour) => onChange({ ...form, colour })}
+          options={colours.map((c) => ({ value: c, label: c }))}
+        />
       </div>
       <div>
         <label className="label">Logo</label>
-        <select
+        <SearchSelect
           className="field"
           value={form.logo}
-          onChange={(e) =>
-            onChange({ ...form, logo: e.target.value as ClothingLogo })
+          onChange={(logo) =>
+            onChange({ ...form, logo: logo as ClothingLogo })
           }
-        >
-          {CLOTHING_LOGOS.map((l) => (
-            <option key={l.id} value={l.id}>
-              {l.label}
-            </option>
-          ))}
-        </select>
+          options={CLOTHING_LOGOS.map((l) => ({ value: l.id, label: l.label }))}
+        />
       </div>
       <div>
         <label className="label">Quantity</label>
@@ -554,25 +533,28 @@ export function MerchClient({
               {canManageAll ||
               order.status === "requested" ||
               order.status === "cancelled" ? (
-                <select
+                <SearchSelect
                   className="field !w-auto py-1.5 text-xs"
                   value={order.status}
-                  onChange={(e) =>
-                    void setStatus(order.id, e.target.value as MerchStatus)
+                  onChange={(status) =>
+                    void setStatus(order.id, status as MerchStatus)
                   }
                   aria-label="Change status"
-                >
-                  {!statusOptions.some((s) => s.id === order.status) ? (
-                    <option value={order.status}>
-                      {statusLabel(order.status)}
-                    </option>
-                  ) : null}
-                  {statusOptions.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    ...(!statusOptions.some((s) => s.id === order.status)
+                      ? [
+                          {
+                            value: order.status,
+                            label: statusLabel(order.status),
+                          },
+                        ]
+                      : []),
+                    ...statusOptions.map((s) => ({
+                      value: s.id,
+                      label: s.label,
+                    })),
+                  ]}
+                />
               ) : null}
             </div>
           </article>
@@ -614,27 +596,30 @@ export function MerchClient({
                 <OrderFields form={edit} onChange={setEdit} />
                 <div>
                   <label className="label">Status</label>
-                  <select
+                  <SearchSelect
                     className="field"
                     value={edit.status}
-                    onChange={(e) =>
+                    onChange={(status) =>
                       setEdit({
                         ...edit,
-                        status: e.target.value as MerchStatus,
+                        status: status as MerchStatus,
                       })
                     }
-                  >
-                    {!statusOptions.some((s) => s.id === edit.status) ? (
-                      <option value={edit.status}>
-                        {statusLabel(edit.status)}
-                      </option>
-                    ) : null}
-                    {statusOptions.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
+                    options={[
+                      ...(!statusOptions.some((s) => s.id === edit.status)
+                        ? [
+                            {
+                              value: edit.status,
+                              label: statusLabel(edit.status),
+                            },
+                          ]
+                        : []),
+                      ...statusOptions.map((s) => ({
+                        value: s.id,
+                        label: s.label,
+                      })),
+                    ]}
+                  />
                 </div>
               </div>
             </div>

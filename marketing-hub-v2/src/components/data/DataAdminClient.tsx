@@ -18,6 +18,7 @@ import {
 import { FieldManagerPanel } from "@/components/data/FieldManagerPanel";
 import type { FieldDef, FieldOption, FieldType } from "@/lib/data/collections";
 import { cn } from "@/lib/utils";
+import { SearchSelect } from "@/components/ui/SearchSelect";
 
 type CollectionSummary = {
   key: string;
@@ -499,21 +500,21 @@ export function DataAdminClient() {
                 </p>
                 <div className="min-w-[140px]">
                   <label className="label">Field</label>
-                  <select
+                  <SearchSelect
                     className="field"
                     value={bulkField}
-                    onChange={(e) => {
-                      setBulkField(e.target.value);
+                    allowEmpty
+                    emptyLabel="Choose field…"
+                    placeholder="Choose field…"
+                    onChange={(value) => {
+                      setBulkField(value);
                       setBulkValue("");
                     }}
-                  >
-                    <option value="">Choose field…</option>
-                    {editableFields.map((f) => (
-                      <option key={f.key} value={f.key}>
-                        {f.label}
-                      </option>
-                    ))}
-                  </select>
+                    options={editableFields.map((f) => ({
+                      value: f.key,
+                      label: f.label,
+                    }))}
+                  />
                 </div>
                 <div className="min-w-[200px] flex-1">
                   <label className="label">New value</label>

@@ -7,6 +7,7 @@ import {
   type FieldOption,
 } from "@/lib/data/collections";
 import type { TaskRelatedType } from "@/lib/types";
+import { SearchSelect } from "@/components/ui/SearchSelect";
 import { cn } from "@/lib/utils";
 
 export type TaskRelatedValue = {
@@ -20,6 +21,7 @@ const HREF: Record<TaskRelatedType, string> = {
   sponsorship: "/app/partners",
   award: "/app/awards",
   event: "/app/events",
+  asset: "/app/library",
 };
 
 const API: Record<
@@ -50,6 +52,11 @@ const API: Record<
     url: "/api/events",
     listKey: "events",
     labelKeys: ["title"],
+  },
+  asset: {
+    url: "/api/media/list?scope=all",
+    listKey: "items",
+    labelKeys: ["display_name", "name"],
   },
 };
 
@@ -106,9 +113,16 @@ export function TaskRelatedFields({
           .map((row) => {
             const id = String(row.id ?? "").trim();
             if (!id) return null;
+            let label = labelFor(row, cfg.labelKeys);
+            if (type === "asset") {
+              const category = String(row.category ?? "").trim();
+              if (category && !label.includes(category)) {
+                label = `${label} · ${category}`;
+              }
+            }
             return {
               value: id,
-              label: labelFor(row, cfg.labelKeys),
+              label,
             };
           })
           .filter((o): o is FieldOption => Boolean(o))
@@ -137,57 +151,54 @@ export function TaskRelatedFields({
     <div className={cn("grid gap-3 sm:grid-cols-2", className)}>
       <div>
         <label className="label">Linked to</label>
-        <select
-          className="field"
+        <SearchSelect
           value={type}
-          onChange={(e) => {
-            const next = e.target.value as TaskRelatedType | "";
+          allowEmpty
+          emptyLabel="Nothing linked"
+          options={TASK_RELATED_TYPES}
+          onChange={(next) => {
+            const relatedType = next as TaskRelatedType | "";
             onChange({
-              related_type: next,
-              related_id: next ? value.related_id : null,
+              related_type: relatedType,
+              related_id: relatedType === type ? value.related_id : null,
             });
           }}
-        >
-          <option value="">Nothing linked</option>
-          {TASK_RELATED_TYPES.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+        />
       </div>
       <div>
         <label className="label">Record</label>
-        <select
-          className="field"
+        <SearchSelect
           value={value.related_id ?? ""}
           disabled={!type || loading}
-          onChange={(e) =>
-            onChange({
-              related_type: type,
-              related_id: e.target.value || null,
-            })
-          }
-        >
-          <option value="">
-            {!type
+          allowEmpty
+          emptyLabel={
+            !type
               ? "Choose a type first"
               : loading
                 ? "Loading…"
-                : "Select record…"}
-          </option>
-          {value.related_id &&
-          !options.some((o) => o.value === value.related_id) ? (
-            <option value={value.related_id}>
-              {selectedLabel} (missing)
-            </option>
-          ) : null}
-          {options.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+                : "Select record…"
+          }
+          placeholder={
+            !type
+              ? "Choose a type first"
+              : loading
+                ? "Loading…"
+                : "Select record…"
+          }
+          options={[
+            ...(value.related_id &&
+            !options.some((o) => o.value === value.related_id)
+              ? [{ value: value.related_id, label: `${selectedLabel} (missing)` }]
+              : []),
+            ...options,
+          ]}
+          onChange={(next) =>
+            onChange({
+              related_type: type,
+              related_id: next || null,
+            })
+          }
+        />
       </div>
     </div>
   );

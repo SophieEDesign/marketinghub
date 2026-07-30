@@ -31,6 +31,7 @@ import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
 import { plainTextFromHtml } from "@/lib/sanitize";
 import { RelatedTasksPanel } from "@/components/tasks/RelatedTasksPanel";
+import { SearchSelect } from "@/components/ui/SearchSelect";
 
 const STATUS_LABEL: Record<ThemeStatus, string> = {
   previous: "Previous",
@@ -648,22 +649,23 @@ export function ThemesClient({
               </div>
             </div>
             <div className="grid gap-3 md:grid-cols-[120px_100px_160px]">
-              <select
+              <SearchSelect
                 className="field"
                 value={themeEdit.quarter}
-                onChange={(e) =>
+                onChange={(quarter) =>
                   setThemeEdit({
                     ...themeEdit,
-                    quarter: e.target.value as QuarterlyTheme["quarter"],
+                    quarter: quarter as QuarterlyTheme["quarter"],
                   })
                 }
                 aria-label="Quarter"
-              >
-                <option value="Q1">Q1</option>
-                <option value="Q2">Q2</option>
-                <option value="Q3">Q3</option>
-                <option value="Q4">Q4</option>
-              </select>
+                options={[
+                  { value: "Q1", label: "Q1" },
+                  { value: "Q2", label: "Q2" },
+                  { value: "Q3", label: "Q3" },
+                  { value: "Q4", label: "Q4" },
+                ]}
+              />
               <input
                 className="field"
                 type="number"
@@ -675,21 +677,22 @@ export function ThemesClient({
                 }
                 aria-label="Year"
               />
-              <select
+              <SearchSelect
                 className="field"
                 value={themeEdit.status}
-                onChange={(e) =>
+                onChange={(status) =>
                   setThemeEdit({
                     ...themeEdit,
-                    status: e.target.value as ThemeStatus,
+                    status: status as ThemeStatus,
                   })
                 }
                 aria-label="Status"
-              >
-                <option value="previous">Previous</option>
-                <option value="active">Active</option>
-                <option value="upcoming">Upcoming</option>
-              </select>
+                options={[
+                  { value: "previous", label: "Previous" },
+                  { value: "active", label: "Active" },
+                  { value: "upcoming", label: "Upcoming" },
+                ]}
+              />
             </div>
             <input
               className="field mt-3"
@@ -737,20 +740,17 @@ export function ThemesClient({
                 value={mainForm.title}
                 onChange={(e) => setMainForm({ ...mainForm, title: e.target.value })}
               />
-              <select
+              <SearchSelect
                 className="field"
                 value={mainForm.channel}
-                onChange={(e) =>
-                  setMainForm({ ...mainForm, channel: e.target.value })
+                allowEmpty
+                emptyLabel="Channel"
+                placeholder="Channel"
+                onChange={(channel) =>
+                  setMainForm({ ...mainForm, channel })
                 }
-              >
-                <option value="">Channel</option>
-                {channelOptions.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
+                options={channelOptions}
+              />
               <ContactOwnerSelect
                 className="field"
                 value={mainForm.owner}
@@ -800,23 +800,21 @@ export function ThemesClient({
                         ) : null}
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <select
+                        <SearchSelect
                           className="field w-auto py-1.5 text-xs"
                           value={main.status}
-                          onChange={(e) =>
+                          onChange={(status) =>
                             void setItemStatus(
                               "main",
                               main.id,
-                              e.target.value as ContentStatus
+                              status as ContentStatus
                             )
                           }
-                        >
-                          {CONTENT_STATUS_OPTIONS.map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.label}
-                            </option>
-                          ))}
-                        </select>
+                          options={CONTENT_STATUS_OPTIONS.map((s) => ({
+                            value: s.id,
+                            label: s.label,
+                          }))}
+                        />
                         <button
                           type="button"
                           className="btn-secondary py-1.5 text-xs"
@@ -863,23 +861,21 @@ export function ThemesClient({
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
-                              <select
+                              <SearchSelect
                                 className="field w-auto py-1 text-xs"
                                 value={kid.status}
-                                onChange={(e) =>
+                                onChange={(status) =>
                                   void setItemStatus(
                                     "offshoot",
                                     kid.id,
-                                    e.target.value as ContentStatus
+                                    status as ContentStatus
                                   )
                                 }
-                              >
-                                {CONTENT_STATUS_OPTIONS.map((s) => (
-                                  <option key={s.id} value={s.id}>
-                                    {s.label}
-                                  </option>
-                                ))}
-                              </select>
+                                options={CONTENT_STATUS_OPTIONS.map((s) => ({
+                                  value: s.id,
+                                  label: s.label,
+                                }))}
+                              />
                               <button
                                 type="button"
                                 className="text-xs text-[var(--danger)]"
@@ -910,26 +906,23 @@ export function ThemesClient({
                             })
                           }
                         />
-                        <select
+                        <SearchSelect
                           className="field"
                           value={offshootForm.channel}
-                          onChange={(e) =>
+                          allowEmpty
+                          emptyLabel="Channel"
+                          placeholder="Channel"
+                          onChange={(channel) =>
                             setOffshootForm({
                               ...offshootForm,
-                              channel: e.target.value,
+                              channel,
                             })
                           }
-                        >
-                          <option value="">Channel</option>
-                          {selectOptionsWithCurrent(
+                          options={selectOptionsWithCurrent(
                             channelOptions,
                             offshootForm.channel
-                          ).map((o) => (
-                            <option key={o.value} value={o.value}>
-                              {o.label}
-                            </option>
-                          ))}
-                        </select>
+                          )}
+                        />
                         <ContactOwnerSelect
                           value={offshootForm.owner}
                           onChange={(owner) =>
@@ -1005,25 +998,20 @@ export function ThemesClient({
                 </div>
                 <div>
                   <label className="label">Content type</label>
-                  <select
+                  <SearchSelect
                     className="field"
                     value={contentEdit.content_type}
-                    onChange={(e) =>
+                    onChange={(content_type) =>
                       setContentEdit({
                         ...contentEdit,
-                        content_type: e.target.value,
+                        content_type,
                       })
                     }
-                  >
-                    {selectOptionsWithCurrent(
+                    options={selectOptionsWithCurrent(
                       contentTypeOptions,
                       contentEdit.content_type
-                    ).map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
+                    )}
+                  />
                 </div>
                 <div className="sm:col-span-2">
                   <label className="label">Channels</label>
@@ -1075,68 +1063,60 @@ export function ThemesClient({
                 </div>
                 <div>
                   <label className="label">Category</label>
-                  <select
+                  <SearchSelect
                     className="field"
                     value={contentEdit.category}
-                    onChange={(e) =>
+                    allowEmpty
+                    emptyLabel="Select…"
+                    placeholder="Select…"
+                    onChange={(category) =>
                       setContentEdit({
                         ...contentEdit,
-                        category: e.target.value,
+                        category,
                       })
                     }
-                  >
-                    <option value="">Select…</option>
-                    {selectOptionsWithCurrent(
+                    options={selectOptionsWithCurrent(
                       categoryOptions,
                       contentEdit.category
-                    ).map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
+                    )}
+                  />
                 </div>
                 <div>
                   <label className="label">Priority</label>
-                  <select
+                  <SearchSelect
                     className="field"
                     value={contentEdit.priority}
-                    onChange={(e) =>
+                    allowEmpty
+                    emptyLabel="None"
+                    placeholder="None"
+                    onChange={(priority) =>
                       setContentEdit({
                         ...contentEdit,
-                        priority: e.target.value,
+                        priority,
                       })
                     }
-                  >
-                    <option value="">None</option>
-                    {selectOptionsWithCurrent(
+                    options={selectOptionsWithCurrent(
                       priorityOptions,
                       contentEdit.priority
-                    ).map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
+                    )}
+                  />
                 </div>
                 <div>
                   <label className="label">Status</label>
-                  <select
+                  <SearchSelect
                     className="field"
                     value={contentEdit.status}
-                    onChange={(e) =>
+                    onChange={(status) =>
                       setContentEdit({
                         ...contentEdit,
-                        status: e.target.value as ContentStatus,
+                        status: status as ContentStatus,
                       })
                     }
-                  >
-                    {CONTENT_STATUS_OPTIONS.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.label}
-                      </option>
-                    ))}
-                  </select>
+                    options={CONTENT_STATUS_OPTIONS.map((c) => ({
+                      value: c.id,
+                      label: c.label,
+                    }))}
+                  />
                 </div>
                 <div>
                   <label className="label">Website / publication URL</label>

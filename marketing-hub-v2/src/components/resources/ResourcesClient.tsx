@@ -13,6 +13,7 @@ import { useManagedFieldOptions } from "@/lib/data/useManagedFieldOptions";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
 import { plainTextFromHtml } from "@/lib/sanitize";
+import { SearchSelect } from "@/components/ui/SearchSelect";
 
 export function ResourcesClient({
   initial,
@@ -131,17 +132,12 @@ export function ResourcesClient({
           </div>
           <div>
             <label className="label">Category</label>
-            <select
+            <SearchSelect
               className="field"
               value={form.category}
-              onChange={(e) => setForm({ ...form, category: e.target.value })}
-            >
-              {categoryOptions.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+              onChange={(category) => setForm({ ...form, category })}
+              options={categoryOptions}
+            />
           </div>
           <div className="md:col-span-2">
             <label className="label">URL</label>

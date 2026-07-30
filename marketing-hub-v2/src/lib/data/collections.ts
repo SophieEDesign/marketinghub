@@ -193,6 +193,7 @@ export const TASK_RELATED_TYPES: FieldOption[] = [
   { value: "sponsorship", label: "Partner" },
   { value: "award", label: "Award" },
   { value: "event", label: "Event" },
+  { value: "asset", label: "Asset" },
 ];
 
 /** Closed / finished task statuses (built-in + common Field Manager renames). */
@@ -239,10 +240,25 @@ export const REPORT_CATEGORIES: FieldOption[] = [
 export const REPORT_TOOLS: FieldOption[] = [
   { value: "Google Analytics", label: "Google Analytics" },
   { value: "Google Ads", label: "Google Ads" },
+  { value: "LinkedIn Campaign Manager", label: "LinkedIn Campaign Manager" },
   { value: "SE Ranking", label: "SE Ranking" },
   { value: "Looker Studio", label: "Looker Studio" },
   { value: "Enquiries", label: "Enquiries" },
   { value: "Other", label: "Other" },
+];
+
+export const PAID_CAMPAIGN_PLATFORMS: FieldOption[] = [
+  { value: "LinkedIn", label: "LinkedIn" },
+  { value: "Google Ads", label: "Google Ads" },
+  { value: "Meta", label: "Meta" },
+  { value: "Other", label: "Other" },
+];
+
+const PAID_CAMPAIGN_STATUS: FieldOption[] = [
+  { value: "draft", label: "Draft" },
+  { value: "active", label: "Active" },
+  { value: "paused", label: "Paused" },
+  { value: "complete", label: "Complete" },
 ];
 
 const QUARTERS: FieldOption[] = [
@@ -527,6 +543,36 @@ export const DATA_COLLECTIONS: CollectionDef[] = [
       f("url", { type: "url" }),
       f("category", { type: "select", options: REPORT_CATEGORIES }),
       f("tool", { type: "select", options: REPORT_TOOLS }),
+      f("created_at", { type: "readonly", locked: true }),
+      f("updated_at", { type: "readonly", locked: true }),
+    ],
+  },
+  {
+    key: "paid_campaigns",
+    label: "Paid media",
+    description: "LinkedIn, Google Ads, and other paid campaign snapshots",
+    fields: [
+      f("id", { type: "readonly", locked: true }),
+      f("name", { label: "Campaign name" }),
+      f("platform", { type: "select", options: PAID_CAMPAIGN_PLATFORMS }),
+      f("status", { type: "select", options: PAID_CAMPAIGN_STATUS }),
+      f("external_id", { label: "Platform campaign ID" }),
+      f("external_url", { type: "url", label: "Platform URL" }),
+      f("starts_at", { type: "date", label: "Start date" }),
+      f("ends_at", { type: "date", label: "End date" }),
+      f("spent", { type: "number", label: "Spent (£)" }),
+      f("goal", { label: "Goal" }),
+      f("key_results", { label: "Key results" }),
+      f("cost_per_result", { type: "number", label: "Cost per result (£)" }),
+      f("impressions", { type: "number" }),
+      f("clicks", { type: "number" }),
+      f("ctr", { label: "CTR" }),
+      f("landing_clicks", { type: "number", label: "Landing page clicks" }),
+      f("engagement_rate", { label: "Engagement rate" }),
+      f("notes", { type: "longtext" }),
+      f("theme_id", { label: "Theme", optionsSource: "themes" }),
+      f("content_id", { label: "Content ID" }),
+      f("event_id", { label: "Event ID" }),
       f("created_at", { type: "readonly", locked: true }),
       f("updated_at", { type: "readonly", locked: true }),
     ],

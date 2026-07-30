@@ -12,6 +12,7 @@ import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
 import { plainTextFromHtml } from "@/lib/sanitize";
 import { RelatedTasksPanel } from "@/components/tasks/RelatedTasksPanel";
+import { SearchSelect } from "@/components/ui/SearchSelect";
 
 const STATUSES: { id: AwardStatus; label: string }[] = [
   { id: "watching", label: "Watching" },
@@ -752,19 +753,14 @@ function AwardFields({
       </div>
       <div>
         <label className="label">Status</label>
-        <select
+        <SearchSelect
           className="field"
           value={form.status}
-          onChange={(e) =>
-            onChange({ ...form, status: e.target.value as AwardStatus })
+          onChange={(status) =>
+            onChange({ ...form, status: status as AwardStatus })
           }
-        >
-          {STATUSES.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.label}
-            </option>
-          ))}
-        </select>
+          options={STATUSES.map((s) => ({ value: s.id, label: s.label }))}
+        />
       </div>
       <div>
         <label className="label">Ceremony date</label>

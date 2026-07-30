@@ -14,6 +14,7 @@ import type {
   HubUser,
   MerchInventoryItem,
   MerchOrder,
+  PaidCampaign,
   QuarterlyTheme,
   ReportLink,
   ResourceLink,
@@ -519,6 +520,60 @@ export async function updateReport(id: string, patch: Partial<ReportLink>) {
 export async function deleteReport(id: string) {
   await updateStore((s) => {
     s.reports = s.reports.filter((c) => c.id !== id);
+  });
+}
+
+export async function listPaidCampaigns() {
+  const store = await readStore();
+  return [...store.paid_campaigns].sort((a, b) => {
+    const aDate = a.starts_at ?? a.created_at;
+    const bDate = b.starts_at ?? b.created_at;
+    return bDate.localeCompare(aDate);
+  });
+}
+
+export async function getPaidCampaign(id: string) {
+  const store = await readStore();
+  return store.paid_campaigns.find((c) => c.id === id) ?? null;
+}
+
+export async function createPaidCampaign(
+  input: Omit<PaidCampaign, "id" | "created_at" | "updated_at">
+) {
+  const item: PaidCampaign = {
+    ...input,
+    id: uid("pc"),
+    created_at: nowIso(),
+    updated_at: nowIso(),
+  };
+  await updateStore((s) => {
+    s.paid_campaigns.push(item);
+  });
+  return item;
+}
+
+export async function updatePaidCampaign(
+  id: string,
+  patch: Partial<PaidCampaign>
+) {
+  let updated: PaidCampaign | null = null;
+  await updateStore((s) => {
+    const idx = s.paid_campaigns.findIndex((c) => c.id === id);
+    if (idx === -1) return;
+    s.paid_campaigns[idx] = {
+      ...s.paid_campaigns[idx],
+      ...patch,
+      id,
+      updated_at: nowIso(),
+    };
+    updated = s.paid_campaigns[idx];
+  });
+  return updated;
+}
+
+export async function deletePaidCampaign(id: string) {
+  await updateStore((s) => {
+    s.paid_campaigns = s.paid_campaigns.filter((c) => c.id !== id);
   });
 }
 

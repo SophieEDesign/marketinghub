@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { Check, ChevronDown, Search, X } from "lucide-react";
+import { SearchSelect } from "@/components/ui/SearchSelect";
 import { cn } from "@/lib/utils";
 
 export type FilterSelectOption = { value: string; label: string };
@@ -298,18 +299,12 @@ export function FilterBar({
             <label className="label" htmlFor={`filter-${select.id}`}>
               {select.label}
             </label>
-            <select
+            <SearchSelect
               id={`filter-${select.id}`}
-              className="field"
               value={select.value}
-              onChange={(e) => select.onChange(e.target.value)}
-            >
-              {select.options.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+              options={select.options}
+              onChange={select.onChange}
+            />
           </div>
         )
       )}

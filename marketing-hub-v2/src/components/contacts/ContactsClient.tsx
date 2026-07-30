@@ -8,6 +8,7 @@ import { useHubView } from "@/lib/hub-view";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
 import { plainTextFromHtml } from "@/lib/sanitize";
+import { SearchSelect } from "@/components/ui/SearchSelect";
 
 const emptyForm = {
   name: "",
@@ -517,18 +518,18 @@ function ContactFields({
       ))}
       <div className="md:col-span-2">
         <label className="label">Linked hub user</label>
-        <select
+        <SearchSelect
           className="field"
           value={form.user_id}
-          onChange={(e) => onChange({ ...form, user_id: e.target.value })}
-        >
-          <option value="">None</option>
-          {users.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.full_name || u.email} ({u.role})
-            </option>
-          ))}
-        </select>
+          allowEmpty
+          emptyLabel="None"
+          placeholder="None"
+          onChange={(user_id) => onChange({ ...form, user_id })}
+          options={users.map((u) => ({
+            value: u.id,
+            label: `${u.full_name || u.email} (${u.role})`,
+          }))}
+        />
         <p className="mt-1 text-xs text-muted">
           Linked members can edit this contact under My details.
         </p>

@@ -29,6 +29,7 @@ import {
   TaskRelatedChip,
   TaskRelatedFields,
 } from "@/components/tasks/TaskRelatedFields";
+import { SearchSelect } from "@/components/ui/SearchSelect";
 
 const VIEWS = [
   { id: "kanban", label: "Kanban" },
@@ -627,33 +628,23 @@ export function TasksClient({
           </div>
           <div>
             <label className="label">Category</label>
-            <select
+            <SearchSelect
               className="field"
               value={form.category}
-              onChange={(e) => setForm({ ...form, category: e.target.value })}
-            >
-              {categoryOptions.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+              onChange={(category) => setForm({ ...form, category })}
+              options={categoryOptions}
+            />
           </div>
           <div>
             <label className="label">Status</label>
-            <select
+            <SearchSelect
               className="field"
               value={form.status}
-              onChange={(e) =>
-                setForm({ ...form, status: e.target.value as TaskStatus })
+              onChange={(status) =>
+                setForm({ ...form, status: status as TaskStatus })
               }
-            >
-              {selectOptionsWithCurrent(statusOptions, form.status).map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
+              options={selectOptionsWithCurrent(statusOptions, form.status)}
+            />
           </div>
           <div className="md:col-span-2">
             <TaskRelatedFields
@@ -743,22 +734,15 @@ export function TasksClient({
                 ) : null}
               </div>
               <div className="flex flex-wrap gap-2">
-                <select
+                <SearchSelect
                   className="field !w-auto py-1.5 text-xs"
                   value={item.status}
-                  onChange={(e) =>
-                    void setStatus(item.id, e.target.value as TaskStatus)
+                  onChange={(status) =>
+                    void setStatus(item.id, status as TaskStatus)
                   }
                   aria-label="Change status"
-                >
-                  {selectOptionsWithCurrent(statusOptions, item.status).map(
-                    (s) => (
-                      <option key={s.value} value={s.value}>
-                        {s.label}
-                      </option>
-                    )
-                  )}
-                </select>
+                  options={selectOptionsWithCurrent(statusOptions, item.status)}
+                />
                 <ContactOwnerSelect
                   value={item.owner}
                   onChange={(owner) => void setOwner(item.id, owner)}
@@ -853,26 +837,21 @@ export function TasksClient({
                         />
                       ) : null}
                       <div className="mt-3 flex flex-col gap-2">
-                        <select
+                        <SearchSelect
                           className="field w-full py-1.5 text-xs"
                           value={item.status}
-                          onChange={(e) =>
+                          onChange={(status) =>
                             void setStatus(
                               item.id,
-                              e.target.value as TaskStatus
+                              status as TaskStatus
                             )
                           }
                           aria-label="Change status"
-                        >
-                          {selectOptionsWithCurrent(
+                          options={selectOptionsWithCurrent(
                             statusOptions,
                             item.status
-                          ).map((s) => (
-                            <option key={s.value} value={s.value}>
-                              {s.label}
-                            </option>
-                          ))}
-                        </select>
+                          )}
+                        />
                         <ContactOwnerSelect
                           value={item.owner}
                           onChange={(owner) => void setOwner(item.id, owner)}
@@ -1092,21 +1071,14 @@ export function TasksClient({
               </div>
               <div>
                 <label className="label">Category</label>
-                <select
+                <SearchSelect
                   className="field"
                   value={edit.category}
-                  onChange={(e) =>
-                    setEdit({ ...edit, category: e.target.value })
+                  onChange={(category) =>
+                    setEdit({ ...edit, category })
                   }
-                >
-                  {selectOptionsWithCurrent(categoryOptions, edit.category).map(
-                    (o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    )
-                  )}
-                </select>
+                  options={selectOptionsWithCurrent(categoryOptions, edit.category)}
+                />
               </div>
               <div>
                 <label className="label">Assign to</label>
@@ -1117,21 +1089,14 @@ export function TasksClient({
               </div>
               <div>
                 <label className="label">Status</label>
-                <select
+                <SearchSelect
                   className="field"
                   value={edit.status}
-                  onChange={(e) =>
-                    setEdit({ ...edit, status: e.target.value as TaskStatus })
+                  onChange={(status) =>
+                    setEdit({ ...edit, status: status as TaskStatus })
                   }
-                >
-                  {selectOptionsWithCurrent(statusOptions, edit.status).map(
-                    (s) => (
-                      <option key={s.value} value={s.value}>
-                        {s.label}
-                      </option>
-                    )
-                  )}
-                </select>
+                  options={selectOptionsWithCurrent(statusOptions, edit.status)}
+                />
               </div>
               <TaskRelatedFields
                 value={{

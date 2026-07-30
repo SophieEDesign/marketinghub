@@ -48,6 +48,7 @@ import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
 import { plainTextFromHtml } from "@/lib/sanitize";
 import { RelatedTasksPanel } from "@/components/tasks/RelatedTasksPanel";
+import { SearchSelect } from "@/components/ui/SearchSelect";
 
 const COLUMNS: { id: ContentStatus; label: string }[] = [
   { id: "idea", label: "Idea" },
@@ -588,24 +589,24 @@ export function ContentClient({
           >
             {item.status === "published" ? "View" : "Edit"}
           </button>
-          <select
+          <SearchSelect
             className="field !w-auto py-1.5 text-xs"
             value={item.status}
             disabled={item.status === "published"}
-            onChange={(e) =>
-              void move(item.id, e.target.value as ContentStatus)
+            onChange={(value) =>
+              void move(item.id, value as ContentStatus)
             }
             aria-label="Move to status"
-          >
-            {item.status === "published" ? (
-              <option value="published">Published (Planable)</option>
-            ) : null}
-            {HUB_EDITABLE_STATUSES.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.label}
-              </option>
-            ))}
-          </select>
+            options={[
+              ...(item.status === "published"
+                ? [{ value: "published", label: "Published (Planable)" }]
+                : []),
+              ...HUB_EDITABLE_STATUSES.map((c) => ({
+                value: c.id,
+                label: c.label,
+              })),
+            ]}
+          />
         </div>
       </>
     );
@@ -769,11 +770,10 @@ export function ContentClient({
           </div>
           <div>
             <label className="label">Content type</label>
-            <select
+            <SearchSelect
               className="field"
               value={form.content_type}
-              onChange={(e) => {
-                const content_type = e.target.value;
+              onChange={(content_type) => {
                 const social = isSocialContentItem({
                   content_type,
                   channel: [],
@@ -784,13 +784,8 @@ export function ContentClient({
                   channel: social ? ["LinkedIn"] : ["Editorial"],
                 });
               }}
-            >
-              {contentTypeOptions.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+              options={contentTypeOptions}
+            />
           </div>
           <div>
             <label className="label">Date</label>
@@ -806,33 +801,27 @@ export function ContentClient({
           </div>
           <div>
             <label className="label">Category</label>
-            <select
+            <SearchSelect
               className="field"
               value={form.category}
-              onChange={(e) => setForm({ ...form, category: e.target.value })}
-            >
-              <option value="">Select…</option>
-              {categoryOptions.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+              allowEmpty
+              emptyLabel="Select…"
+              placeholder="Select…"
+              onChange={(category) => setForm({ ...form, category })}
+              options={categoryOptions}
+            />
           </div>
           <div>
             <label className="label">Priority</label>
-            <select
+            <SearchSelect
               className="field"
               value={form.priority}
-              onChange={(e) => setForm({ ...form, priority: e.target.value })}
-            >
-              <option value="">None</option>
-              {priorityOptions.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+              allowEmpty
+              emptyLabel="None"
+              placeholder="None"
+              onChange={(priority) => setForm({ ...form, priority })}
+              options={priorityOptions}
+            />
           </div>
           <div className="md:col-span-2">
             <label className="label">
@@ -1080,11 +1069,10 @@ export function ContentClient({
                 </div>
                 <div>
                   <label className="label">Content type</label>
-                  <select
+                  <SearchSelect
                     className="field"
                     value={edit.content_type}
-                    onChange={(e) => {
-                      const content_type = e.target.value;
+                    onChange={(content_type) => {
                       const social = isSocialContentItem({
                         content_type,
                         channel: [],
@@ -1105,16 +1093,11 @@ export function ContentClient({
                             : ["Editorial"],
                       });
                     }}
-                  >
-                    {selectOptionsWithCurrent(
+                    options={selectOptionsWithCurrent(
                       contentTypeOptions,
                       edit.content_type
-                    ).map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
+                    )}
+                  />
                 </div>
                 <div>
                   <label className="label">Date</label>
@@ -1132,43 +1115,37 @@ export function ContentClient({
                 </div>
                 <div>
                   <label className="label">Category</label>
-                  <select
+                  <SearchSelect
                     className="field"
                     value={edit.category}
-                    onChange={(e) =>
-                      setEdit({ ...edit, category: e.target.value })
+                    allowEmpty
+                    emptyLabel="Select…"
+                    placeholder="Select…"
+                    onChange={(category) =>
+                      setEdit({ ...edit, category })
                     }
-                  >
-                    <option value="">Select…</option>
-                    {selectOptionsWithCurrent(
+                    options={selectOptionsWithCurrent(
                       categoryOptions,
                       edit.category
-                    ).map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
+                    )}
+                  />
                 </div>
                 <div>
                   <label className="label">Priority</label>
-                  <select
+                  <SearchSelect
                     className="field"
                     value={edit.priority}
-                    onChange={(e) =>
-                      setEdit({ ...edit, priority: e.target.value })
+                    allowEmpty
+                    emptyLabel="None"
+                    placeholder="None"
+                    onChange={(priority) =>
+                      setEdit({ ...edit, priority })
                     }
-                  >
-                    <option value="">None</option>
-                    {selectOptionsWithCurrent(
+                    options={selectOptionsWithCurrent(
                       priorityOptions,
                       edit.priority
-                    ).map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
+                    )}
+                  />
                 </div>
                 <div>
                   <label className="label">
@@ -1186,25 +1163,30 @@ export function ContentClient({
                 </div>
                 <div>
                   <label className="label">Status</label>
-                  <select
+                  <SearchSelect
                     className="field"
                     value={edit.status}
-                    onChange={(e) =>
+                    onChange={(status) =>
                       setEdit({
                         ...edit,
-                        status: e.target.value as ContentStatus,
+                        status: status as ContentStatus,
                       })
                     }
-                  >
-                    {edit.status === "published" ? (
-                      <option value="published">Published (Planable)</option>
-                    ) : null}
-                    {HUB_EDITABLE_STATUSES.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.label}
-                      </option>
-                    ))}
-                  </select>
+                    options={[
+                      ...(edit.status === "published"
+                        ? [
+                            {
+                              value: "published",
+                              label: "Published (Planable)",
+                            },
+                          ]
+                        : []),
+                      ...HUB_EDITABLE_STATUSES.map((c) => ({
+                        value: c.id,
+                        label: c.label,
+                      })),
+                    ]}
+                  />
                   {editIsSocial ? (
                     <p className="mt-1 text-xs text-muted">
                       Publish only happens in Planable — then Sync from Planable

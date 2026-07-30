@@ -153,6 +153,7 @@ function withDefaults(store: Partial<HubStore>): HubStore {
     contacts: migrateContacts(store.contacts) ?? seed.contacts,
     resources: store.resources ?? seed.resources,
     reports: store.reports ?? seed.reports,
+    paid_campaigns: store.paid_campaigns ?? seed.paid_campaigns,
     themes: store.themes ?? seed.themes,
     theme_mains: migrateThemeMains(store.theme_mains) ?? seed.theme_mains,
     theme_offshoots: store.theme_offshoots ?? seed.theme_offshoots,
@@ -212,6 +213,7 @@ function needsKeyMigration(store: Partial<HubStore>): boolean {
     !store.theme_mains ||
     !store.theme_offshoots ||
     !store.reports ||
+    !store.paid_campaigns ||
     !store.merch_orders ||
     !store.merch_inventory ||
     !store.staff_requests ||
