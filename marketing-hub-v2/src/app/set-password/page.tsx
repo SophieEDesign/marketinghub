@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, Suspense, useEffect, useState } from "react";
 import { hasSupabaseConfig } from "@/lib/auth/config-client";
 import { BrandLockup } from "@/components/shell/BrandLockup";
 
-export default function SetPasswordPage() {
+function SetPasswordForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -17,6 +18,13 @@ export default function SetPasswordPage() {
   const supabaseReady = hasSupabaseConfig();
 
   useEffect(() => {
+    const fromQuery = searchParams.get("error");
+    if (fromQuery) {
+      setError(fromQuery);
+      setReady(false);
+      return;
+    }
+
     if (!supabaseReady) {
       setError("Supabase is not configured.");
       return;
@@ -46,7 +54,7 @@ export default function SetPasswordPage() {
     return () => {
       cancelled = true;
     };
-  }, [supabaseReady]);
+  }, [supabaseReady, searchParams]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -136,5 +144,19 @@ export default function SetPasswordPage() {
         ) : null}
       </form>
     </div>
+  );
+}
+
+export default function SetPasswordPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-12">
+          <p className="text-sm text-muted">Checking your invite link…</p>
+        </div>
+      }
+    >
+      <SetPasswordForm />
+    </Suspense>
   );
 }

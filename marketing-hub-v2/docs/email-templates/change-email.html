@@ -39,7 +39,7 @@
                   <tr>
                     <td style="border-radius:8px;background:#0b3a4a;">
                       <a
-                        href="{{ .ConfirmationURL }}"
+                        href="https://marketing.petersandmay.com/auth/confirm?token_hash={{ .TokenHash }}&type=email_change&next=%2Fapp"
                         style="display:inline-block;padding:12px 22px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;"
                       >
                         Confirm new email
@@ -52,7 +52,7 @@
                 </p>
                 <p style="margin:28px 0 0;font-size:13px;line-height:1.5;color:#64748b;">
                   If the button doesn’t work, copy and paste this link into your browser:<br />
-                  <a href="{{ .ConfirmationURL }}" style="color:#0b3a4a;word-break:break-all;">{{ .ConfirmationURL }}</a>
+                  <a href="https://marketing.petersandmay.com/auth/confirm?token_hash={{ .TokenHash }}&type=email_change&next=%2Fapp" style="color:#0b3a4a;word-break:break-all;">https://marketing.petersandmay.com/auth/confirm?token_hash={{ .TokenHash }}&type=email_change&next=%2Fapp</a>
                 </p>
               </td>
             </tr>

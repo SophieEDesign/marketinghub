@@ -5,9 +5,14 @@
 import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { brandEmail } from "./brand-shell.mjs";
+import { brandEmail, SITE_URL } from "./brand-shell.mjs";
 
 const dir = dirname(fileURLToPath(import.meta.url));
+
+/** SSR-safe links: token_hash → /auth/confirm (sets session cookies). */
+function confirmLink(type, next = "/set-password") {
+  return `${SITE_URL}/auth/confirm?token_hash={{ .TokenHash }}&type=${type}&next=${encodeURIComponent(next)}`;
+}
 
 const templates = [
   {
@@ -22,6 +27,7 @@ const templates = [
         "Click the button below to accept your invitation and set your password.",
       ],
       ctaLabel: "Accept invitation",
+      ctaHref: confirmLink("invite", "/set-password"),
       afterCtaHtml: `<p style="margin:20px 0 0;font-size:13px;line-height:1.5;color:#64748b;">
                   If you didn’t expect this invitation, you can ignore this email.
                 </p>`,
@@ -39,6 +45,7 @@ const templates = [
         "Confirm your email address to finish setting up your account.",
       ],
       ctaLabel: "Confirm email",
+      ctaHref: confirmLink("signup", "/set-password"),
     }),
   },
   {
@@ -52,6 +59,7 @@ const templates = [
         "Use the button below to sign in. This link expires shortly and can only be used once.",
       ],
       ctaLabel: "Sign in",
+      ctaHref: confirmLink("magiclink", "/login"),
       afterCtaHtml: `<p style="margin:20px 0 0;font-size:13px;line-height:1.5;color:#64748b;">
                   Or enter this one-time code: <strong style="color:#0b3a4a;letter-spacing:0.08em;">{{ .Token }}</strong>
                 </p>`,
@@ -69,6 +77,7 @@ const templates = [
         "Click the button below to choose a new one.",
       ],
       ctaLabel: "Reset password",
+      ctaHref: confirmLink("recovery", "/set-password"),
       afterCtaHtml: `<p style="margin:20px 0 0;font-size:13px;line-height:1.5;color:#64748b;">
                   If you didn’t request this, you can safely ignore this email.
                 </p>`,
@@ -85,6 +94,7 @@ const templates = [
         "Follow the link below to confirm changing your Marketing Hub email to <strong>{{ .NewEmail }}</strong>.",
       ],
       ctaLabel: "Confirm new email",
+      ctaHref: confirmLink("email_change", "/app"),
       afterCtaHtml: `<p style="margin:20px 0 0;font-size:13px;line-height:1.5;color:#64748b;">
                   If you didn’t request this change, you can ignore this email.
                 </p>`,
@@ -117,9 +127,21 @@ const readme = `# Auth email templates (branded header)
 
 All Marketing Hub Auth emails share the same Peters &amp; May header (logo + teal bar) and footer.
 
+CTA links use \`/auth/confirm?token_hash=…\` so invite/reset sessions are stored in cookies (SSR-safe). Do not switch back to \`{{ .ConfirmationURL }}\` — that uses the implicit hash flow and breaks \`/set-password\`.
+
 ## Apply in Supabase (required for production)
 
-Dashboard cannot be updated from the app. For **each** template:
+### Preferred: Management API push
+
+\`\`\`bash
+# Token: https://supabase.com/dashboard/account/tokens
+$env:SUPABASE_ACCESS_TOKEN="sbp_..."
+node docs/email-templates/push-to-supabase.mjs
+\`\`\`
+
+This updates all six Auth templates (subjects + HTML) on project \`hwtycgvclhckglmuwnmw\`.
+
+### Manual (dashboard)
 
 1. Open [Authentication → Email Templates](https://supabase.com/dashboard/project/hwtycgvclhckglmuwnmw/auth/templates)
 2. Select the template name below
@@ -133,7 +155,7 @@ ${templates
   .map((t) => `| ${t.dashboard} | \`${t.file}\` | ${t.subject} |`)
   .join("\n")}
 
-Regenerate HTML after editing \`brand-shell.mjs\`:
+Regenerate HTML after editing \`brand-shell.mjs\` or \`generate.mjs\`:
 
 \`\`\`bash
 node docs/email-templates/generate.mjs

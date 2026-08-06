@@ -1,28 +1,45 @@
+import { type EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { hasSupabaseConfig } from "@/lib/auth/config";
 import { safeNextPath } from "@/lib/auth/safe-next";
 
+const OTP_TYPES: EmailOtpType[] = [
+  "signup",
+  "invite",
+  "magiclink",
+  "recovery",
+  "email_change",
+  "email",
+];
+
 /**
- * Exchanges the Auth email `code` for a session, then redirects to `next`
- * (default: /set-password for invite + recovery links).
+ * SSR-safe email link handler. Email templates should link here with
+ * token_hash + type so the session is stored in cookies (not the URL hash).
+ *
+ * Example: /auth/confirm?token_hash=…&type=invite&next=/set-password
  */
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
-  const code = searchParams.get("code");
+  const token_hash = searchParams.get("token_hash");
+  const typeParam = searchParams.get("type");
   const next = safeNextPath(searchParams.get("next"), "/set-password");
-  const errorDescription = searchParams.get("error_description");
 
-  if (errorDescription) {
-    const url = new URL("/login", origin);
-    url.searchParams.set("error", errorDescription);
+  const fail = (message: string) => {
+    const url = new URL("/set-password", origin);
+    url.searchParams.set("error", message);
     return NextResponse.redirect(url);
+  };
+
+  if (!token_hash || !typeParam || !hasSupabaseConfig()) {
+    return fail("This link is invalid or has expired.");
   }
 
-  if (!code || !hasSupabaseConfig()) {
-    return NextResponse.redirect(new URL(next, origin));
+  if (!OTP_TYPES.includes(typeParam as EmailOtpType)) {
+    return fail("This link is invalid or has expired.");
   }
 
+  const type = typeParam as EmailOtpType;
   const response = NextResponse.redirect(new URL(next, origin));
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -41,11 +58,9 @@ export async function GET(request: NextRequest) {
     }
   );
 
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  const { error } = await supabase.auth.verifyOtp({ type, token_hash });
   if (error) {
-    const url = new URL("/login", origin);
-    url.searchParams.set("error", error.message);
-    return NextResponse.redirect(url);
+    return fail(error.message || "This link is invalid or has expired.");
   }
 
   return response;

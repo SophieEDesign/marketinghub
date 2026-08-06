@@ -2,9 +2,21 @@
 
 All Marketing Hub Auth emails share the same Peters &amp; May header (logo + teal bar) and footer.
 
+CTA links use `/auth/confirm?token_hash=…` so invite/reset sessions are stored in cookies (SSR-safe). Do not switch back to `{{ .ConfirmationURL }}` — that uses the implicit hash flow and breaks `/set-password`.
+
 ## Apply in Supabase (required for production)
 
-Dashboard cannot be updated from the app. For **each** template:
+### Preferred: Management API push
+
+```bash
+# Token: https://supabase.com/dashboard/account/tokens
+$env:SUPABASE_ACCESS_TOKEN="sbp_..."
+node docs/email-templates/push-to-supabase.mjs
+```
+
+This updates all six Auth templates (subjects + HTML) on project `hwtycgvclhckglmuwnmw`.
+
+### Manual (dashboard)
 
 1. Open [Authentication → Email Templates](https://supabase.com/dashboard/project/hwtycgvclhckglmuwnmw/auth/templates)
 2. Select the template name below
@@ -21,7 +33,7 @@ Dashboard cannot be updated from the app. For **each** template:
 | Change Email Address | `change-email.html` | Confirm your new Marketing Hub email |
 | Reauthentication | `reauthentication.html` | Confirm it’s you — Marketing Hub |
 
-Regenerate HTML after editing `brand-shell.mjs`:
+Regenerate HTML after editing `brand-shell.mjs` or `generate.mjs`:
 
 ```bash
 node docs/email-templates/generate.mjs
