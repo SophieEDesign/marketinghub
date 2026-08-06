@@ -5,6 +5,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { useHubView } from "@/lib/hub-view";
 import { navForView } from "@/lib/nav";
 
+/** Account pages linked from the user menu (not sidebar nav). */
+const ALWAYS_ALLOWED = ["/app/me"];
+
 /** Redirect restricted views away from routes they should not see. */
 export function MemberRouteGuard({ children }: { children: React.ReactNode }) {
   const { view, ready } = useHubView();
@@ -14,7 +17,7 @@ export function MemberRouteGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!ready || view === "admin") return;
     const allowed = Array.from(
-      new Set(navForView(view).map((n) => n.href))
+      new Set([...ALWAYS_ALLOWED, ...navForView(view).map((n) => n.href)])
     );
     const ok = allowed.some((href) =>
       href === "/app"

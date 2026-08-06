@@ -62,6 +62,73 @@ function ChannelChip({
   );
 }
 
+const OFFICE_PALETTE = [
+  "border-teal-200 bg-teal-50 text-teal-900",
+  "border-violet-200 bg-violet-50 text-violet-900",
+  "border-rose-200 bg-rose-50 text-rose-900",
+  "border-cyan-200 bg-cyan-50 text-cyan-900",
+  "border-orange-200 bg-orange-50 text-orange-900",
+  "border-lime-200 bg-lime-50 text-lime-900",
+  "border-fuchsia-200 bg-fuchsia-50 text-fuchsia-900",
+  "border-blue-200 bg-blue-50 text-blue-900",
+] as const;
+
+/** Stable colour per office name — known hubs get fixed tones. */
+function officeChipClass(office: string): string {
+  const key = office.trim().toLowerCase();
+  if (!key || key === "unassigned") {
+    return "border-border bg-sand/60 text-muted";
+  }
+  if (/southampton|uk\b|hamble/.test(key)) {
+    return "border-sky-200 bg-sky-50 text-sky-900";
+  }
+  if (/lauderdale|miami|florida|usa|us\b/.test(key)) {
+    return "border-orange-200 bg-orange-50 text-orange-900";
+  }
+  if (/antibes|france|mediterranean|med\b/.test(key)) {
+    return "border-violet-200 bg-violet-50 text-violet-900";
+  }
+  if (/auckland|nz|new zealand/.test(key)) {
+    return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  }
+  if (/dubai|uae|middle east/.test(key)) {
+    return "border-amber-200 bg-amber-50 text-amber-900";
+  }
+  if (/singapore|asia/.test(key)) {
+    return "border-rose-200 bg-rose-50 text-rose-900";
+  }
+  if (/manual|review/.test(key)) {
+    return "border-red-200 bg-red-50 text-red-800";
+  }
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) {
+    hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  }
+  return OFFICE_PALETTE[hash % OFFICE_PALETTE.length];
+}
+
+function OfficeChip({
+  office,
+  className,
+}: {
+  office: string | null | undefined;
+  className?: string;
+}) {
+  const label = office?.trim() || "Unassigned";
+  return (
+    <span
+      className={cn(
+        "inline-flex max-w-full items-center truncate rounded-full border px-2.5 py-0.5 text-[11px] font-medium",
+        officeChipClass(label),
+        className
+      )}
+      title={label}
+    >
+      {label}
+    </span>
+  );
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -168,7 +235,9 @@ function DetailSection({
         {rows.map((r) => (
           <div key={r.label}>
             <dt className="label !mb-0.5 capitalize">{r.label}</dt>
-            <dd className="whitespace-pre-wrap text-foreground">{r.value}</dd>
+            <dd className="whitespace-pre-wrap text-foreground">
+              {r.label === "Office" ? <OfficeChip office={r.value} /> : r.value}
+            </dd>
           </div>
         ))}
       </dl>
@@ -935,10 +1004,11 @@ export function EnquiriesClient({
                   <button
                     type="button"
                     className={cn(
-                      "rounded-full border border-border px-3 py-1 text-xs transition",
+                      "rounded-full border px-3 py-1 text-xs transition",
                       officeFilter === o.label
-                        ? "border-brand bg-accent-soft text-brand"
-                        : "bg-sand/50 text-muted hover:text-foreground"
+                        ? "ring-2 ring-brand/40 ring-offset-1"
+                        : "hover:opacity-90",
+                      officeChipClass(o.label)
                     )}
                     onClick={() =>
                       setOfficeFilter((cur) =>
@@ -1141,8 +1211,8 @@ export function EnquiriesClient({
                         .filter(Boolean)
                         .join(" → ") || "—"}
                     </td>
-                    <td className="px-4 py-3 text-muted">
-                      {e.selected_office || "—"}
+                    <td className="px-4 py-3">
+                      <OfficeChip office={e.selected_office} />
                     </td>
                     <td className="px-4 py-3">
                       <ChannelChip label={attr.sourceLabel} />
@@ -1205,6 +1275,9 @@ export function EnquiriesClient({
                   Submitted{" "}
                   {formatDate(selected.created_at ?? selected.received_at)}
                 </p>
+                <OfficeChip
+                  office={selected.selected_office || "Unassigned"}
+                />
                 <ChannelChip label={detail.channel} />
                 {detail.campaign ? (
                   <span
