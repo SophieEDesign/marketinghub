@@ -77,9 +77,14 @@ function titleFromCaption(caption: string): string {
 function channelsFromGroup(posts: PlanableRawPost[]): string[] {
   const set = new Set<string>();
   for (const p of posts) {
-    for (const ch of p.platforms) {
-      const n = normalizeChannels([ch]);
-      for (const c of n) set.add(c);
+    const source =
+      p.platforms.length > 0
+        ? p.platforms
+        : p.pageName
+          ? [p.pageName]
+          : [];
+    for (const ch of source) {
+      for (const c of normalizeChannels([ch])) set.add(c);
     }
   }
   return Array.from(set);
@@ -261,7 +266,7 @@ export async function syncPlanableIntoHub(): Promise<PlanableSyncResult> {
 
     const item = await createContent({
       title: titleFromCaption(caption),
-      channel: channels.length ? channels : ["LinkedIn"],
+      channel: channels.length ? channels : ["Social"],
       content_type: "Social",
       owner: "",
       due_date,

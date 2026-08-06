@@ -64,8 +64,6 @@ export function ContentCalendarCard({
   const canva = !image ? primaryCanvaUrl(item.asset_url) : "";
   const notesPreview = plainTextFromHtml(item.notes).slice(0, 120);
   const preview = item.title?.trim() || notesPreview || "Untitled";
-  const shownChannels = channels.slice(0, 2);
-  const extraChannels = channels.length - shownChannels.length;
 
   return (
     <div
@@ -78,14 +76,9 @@ export function ContentCalendarCard({
         <div className="flex min-w-0 items-center gap-1">
           {social ? (
             <>
-              {shownChannels.map((ch) => (
+              {channels.map((ch) => (
                 <PlatformDot key={ch} channel={ch} />
               ))}
-              {extraChannels > 0 ? (
-                <span className="text-[9px] font-medium text-slate-400">
-                  +{extraChannels}
-                </span>
-              ) : null}
             </>
           ) : (
             <span className="inline-flex h-4 items-center rounded bg-slate-700 px-1 text-[8px] font-bold uppercase tracking-wide text-white">
@@ -191,4 +184,26 @@ export const HUB_CALENDAR_CSS = `
   .hub-fc th { border-color: #e8ecf0 !important; }
   .hub-fc .fc-event { cursor: grab; }
   .hub-fc .fc-event:active { cursor: grabbing; }
+  /* "+N more" popover: keep card stack readable (no full-bleed images) */
+  .hub-fc .fc-more-popover {
+    max-width: min(280px, 90vw) !important;
+    width: 260px !important;
+    max-height: min(70vh, 520px) !important;
+    z-index: 50 !important;
+  }
+  .hub-fc .fc-more-popover .fc-popover-body {
+    max-height: min(60vh, 440px);
+    overflow-y: auto;
+    padding: 6px !important;
+  }
+  .hub-fc .fc-more-popover .fc-daygrid-event {
+    margin: 4px 0 !important;
+  }
+  .hub-fc .fc-more-popover .hub-cal-card {
+    max-width: 100%;
+  }
+  .hub-fc .fc-more-popover .hub-cal-card img {
+    max-height: 96px;
+    object-fit: cover;
+  }
 `;

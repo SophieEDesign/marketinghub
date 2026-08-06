@@ -59,17 +59,6 @@ export function ContentSocialHub({
         <PageHeader
           title="Social calendar"
           description="Scheduled and published posts only — drafts stay with the marketing team."
-          actions={
-            <a
-              href={PLANABLE_CALENDAR_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="btn-primary"
-            >
-              Open Planable
-              <ExternalLink className="h-4 w-4" />
-            </a>
-          }
         />
         <SocialClient hideHeader memberView />
       </div>

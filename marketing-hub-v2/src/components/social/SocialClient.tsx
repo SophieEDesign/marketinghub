@@ -11,7 +11,12 @@ import { FullCalendarStyles } from "@/components/ui/FullCalendarStyles";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { cn } from "@/lib/utils";
 import type { ContentItem } from "@/lib/types";
-import { isSocialContentItem, primaryCanvaUrl, primaryImageUrl } from "@/lib/data/normalize";
+import {
+  isSocialContentItem,
+  normalizeChannels,
+  primaryCanvaUrl,
+  primaryImageUrl,
+} from "@/lib/data/normalize";
 import {
   PLATFORM_META,
   isCanvaUrl,
@@ -41,6 +46,21 @@ type SocialPost = {
 function normalizePlatform(raw: string | null | undefined): string {
   const key = platformKey(raw ?? "");
   return PLATFORM_META[key].label;
+}
+
+/** Split + normalize channel tags so multi-network posts keep IG/FB/LI separate. */
+function platformsFromChannel(
+  channel: ContentItem["channel"],
+  title?: string,
+  notes?: string
+): string[] {
+  const normalized = normalizeChannels(channel, title ?? "", notes ?? "");
+  const labels = normalized.map((ch) => normalizePlatform(ch));
+  const unique: string[] = [];
+  for (const label of labels) {
+    if (!unique.includes(label)) unique.push(label);
+  }
+  return unique.length ? unique : ["Social"];
 }
 
 function normalizeStatus(raw: string): string {
@@ -103,8 +123,6 @@ function PostCard({
   const platforms = post.platforms.length
     ? post.platforms
     : [post.platform];
-  const shown = platforms.slice(0, 2);
-  const extra = platforms.length - shown.length;
   const hasMedia = isImageUrl(post.mediaUrl);
   const hasCanva = !hasMedia && isCanvaUrl(post.mediaUrl);
   const time =
@@ -122,14 +140,9 @@ function PostCard({
     >
       <div className="flex items-center justify-between gap-1">
         <div className="flex min-w-0 items-center gap-0.5">
-          {shown.map((p) => (
+          {platforms.map((p) => (
             <PlatformBadge key={p} name={p} />
           ))}
-          {extra > 0 ? (
-            <span className="text-[9px] font-medium text-slate-500">
-              +{extra}
-            </span>
-          ) : null}
         </div>
         {showTime ? (
           <span className="inline-flex shrink-0 items-center gap-0.5 text-[9px] tabular-nums text-slate-500">
@@ -199,6 +212,10 @@ export function SocialClient({
     "upcoming"
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [overflowDay, setOverflowDay] = useState<{
+    dateLabel: string;
+    posts: SocialPost[];
+  } | null>(null);
   const [syncing, setSyncing] = useState(false);
 
   const load = useCallback(async () => {
@@ -218,10 +235,11 @@ export function SocialClient({
       )
         .filter((c) => isSocialContentItem(c) && !!c.due_date)
         .map((c) => {
-          const platforms = (Array.isArray(c.channel) ? c.channel : [c.channel])
-            .filter(Boolean)
-            .map((ch) => normalizePlatform(String(ch)));
-          const unique = Array.from(new Set(platforms));
+          const unique = platformsFromChannel(
+            c.channel,
+            c.title,
+            c.caption || c.notes
+          );
           const platform = unique[0] ?? "Social";
           const rawHtml = c.caption || c.notes || "";
           const text = plainTextFromHtml(
@@ -235,7 +253,7 @@ export function SocialClient({
             scheduledAt: c.due_date ? `${c.due_date}T09:00:00.000Z` : null,
             url: c.planable_url || null,
             platform,
-            platforms: unique.length ? unique : [platform],
+            platforms: unique,
             mediaUrl:
               primaryImageUrl(c.asset_url) ||
               primaryCanvaUrl(c.asset_url) ||
@@ -470,8 +488,8 @@ export function SocialClient({
           <h2 className="font-display text-xl text-brand">
             Social Media Calendar
           </h2>
-          <div className="flex flex-wrap items-center gap-2">
-            {!memberView ? (
+          {!memberView ? (
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 className="btn-secondary"
@@ -480,38 +498,6 @@ export function SocialClient({
               >
                 {syncing ? "Syncing…" : "Sync from Planable"}
               </button>
-            ) : null}
-            <a
-              href={openUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="btn-primary"
-            >
-              Open Planable
-              <ExternalLink className="h-4 w-4" />
-            </a>
-          </div>
-        </div>
-      ) : (
-        <PageHeader
-          title="Social Media Calendar"
-          description={
-            memberView
-              ? "Scheduled and published posts across channels."
-              : "Hub social drafts synced with Planable — approve and publish in Planable."
-          }
-          actions={
-            <div className="flex flex-wrap items-center gap-2">
-              {!memberView ? (
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  disabled={syncing || loading}
-                  onClick={() => void syncFromPlanable()}
-                >
-                  {syncing ? "Syncing…" : "Sync from Planable"}
-                </button>
-              ) : null}
               <a
                 href={openUrl}
                 target="_blank"
@@ -522,6 +508,38 @@ export function SocialClient({
                 <ExternalLink className="h-4 w-4" />
               </a>
             </div>
+          ) : null}
+        </div>
+      ) : (
+        <PageHeader
+          title="Social Media Calendar"
+          description={
+            memberView
+              ? "Scheduled and published posts across channels."
+              : "Hub social drafts synced with Planable — approve and publish in Planable."
+          }
+          actions={
+            !memberView ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={syncing || loading}
+                  onClick={() => void syncFromPlanable()}
+                >
+                  {syncing ? "Syncing…" : "Sync from Planable"}
+                </button>
+                <a
+                  href={openUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn-primary"
+                >
+                  Open Planable
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              </div>
+            ) : undefined
           }
         />
       )}
@@ -587,7 +605,21 @@ export function SocialClient({
               firstDay={1}
               events={calendarEvents}
               dayMaxEvents={3}
-              moreLinkClick="popover"
+              moreLinkClick={(arg) => {
+                const key = format(arg.date, "yyyy-MM-dd");
+                const dayPosts = calendarPosts.filter((p) => {
+                  if (!p.scheduledAt) return false;
+                  try {
+                    return format(parseISO(p.scheduledAt), "yyyy-MM-dd") === key;
+                  } catch {
+                    return p.scheduledAt.slice(0, 10) === key;
+                  }
+                });
+                setOverflowDay({
+                  dateLabel: format(arg.date, "EEEE d MMMM yyyy"),
+                  posts: dayPosts,
+                });
+              }}
               editable={!memberView}
               eventStartEditable={!memberView}
               eventDurationEditable={false}
@@ -699,6 +731,56 @@ export function SocialClient({
         </div>
       )}
 
+      {overflowDay ? (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/25 md:left-sidebar"
+            onClick={() => setOverflowDay(null)}
+            aria-hidden
+          />
+          <div
+            className="fixed left-1/2 top-[12%] z-50 w-[min(100%-1.5rem,280px)] -translate-x-1/2 overflow-hidden rounded-xl border border-border bg-white shadow-soft md:left-[calc(50%+var(--shell-sidebar-width)/2)]"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Posts on ${overflowDay.dateLabel}`}
+          >
+            <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
+              <h2 className="text-sm font-semibold text-brand">
+                {overflowDay.dateLabel}
+              </h2>
+              <button
+                type="button"
+                className="btn-ghost px-2 py-1 text-xs"
+                onClick={() => setOverflowDay(null)}
+              >
+                Close
+              </button>
+            </div>
+            <div className="max-h-[min(70vh,520px)] space-y-2 overflow-y-auto p-2.5">
+              {overflowDay.posts.length === 0 ? (
+                <p className="px-2 py-6 text-center text-sm text-muted">
+                  No posts on this day.
+                </p>
+              ) : (
+                overflowDay.posts.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className="block w-full text-left transition hover:opacity-90"
+                    onClick={() => {
+                      setSelectedId(p.id);
+                      setOverflowDay(null);
+                    }}
+                  >
+                    <PostCard post={p} compact />
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </>
+      ) : null}
+
       {selected ? (
         <>
           <div
@@ -779,13 +861,15 @@ export function SocialClient({
                     )
                   : "No schedule date"}
               </p>
-              <p className="text-xs text-muted">
-                Source:{" "}
-                {selected.source === "planable" ? "Planable" : "Hub Content"}
-              </p>
+              {!memberView ? (
+                <p className="text-xs text-muted">
+                  Source:{" "}
+                  {selected.source === "planable" ? "Planable" : "Hub Content"}
+                </p>
+              ) : null}
             </div>
             <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
-              {selected.url ? (
+              {!memberView && selected.url ? (
                 <a
                   href={selected.url}
                   target="_blank"
@@ -795,11 +879,12 @@ export function SocialClient({
                   Open in Planable
                   <ExternalLink className="h-4 w-4" />
                 </a>
-              ) : (
+              ) : null}
+              {!memberView && !selected.url ? (
                 <a href="/app/content" className="btn-secondary">
                   Edit in Content planner
                 </a>
-              )}
+              ) : null}
               {isCanvaUrl(selected.mediaUrl) ? (
                 <a
                   href={selected.mediaUrl!}

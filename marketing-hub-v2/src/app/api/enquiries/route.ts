@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { jsonError, jsonOk, requireStaff } from "@/lib/api";
+import { jsonError, jsonOk, requireAdmin, requireStaff } from "@/lib/api";
 import {
   deleteWebEnquiry,
   listWebEnquiries,
@@ -13,7 +13,7 @@ import { hasServiceRoleKey } from "@/lib/supabase/admin";
 /**
  * Staff list: GET with session.
  * Webhook ingest: POST with ?key= / X-Webhook-Secret / Bearer (no session).
- * Staff mutations: POST with session + action update|delete.
+ * Staff mutations: POST with session + action update|delete (delete = admin only).
  */
 export async function GET(request: NextRequest) {
   const { error } = await requireStaff();
@@ -47,10 +47,10 @@ export async function POST(request: NextRequest) {
 
   const action = typeof body.action === "string" ? body.action : undefined;
 
-  // Staff mutations (session auth)
+  // Staff mutations (session auth) — delete is admin-only
   if (action === "update" || action === "delete") {
-    const { error } = await requireStaff();
-    if (error) return error;
+    const gate = action === "delete" ? await requireAdmin() : await requireStaff();
+    if (gate.error) return gate.error;
 
     if (!hasServiceRoleKey()) {
       return jsonError("Enquiries storage is not configured", 503);

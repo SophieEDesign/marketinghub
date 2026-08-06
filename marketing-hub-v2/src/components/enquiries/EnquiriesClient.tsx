@@ -16,6 +16,7 @@ import {
 import { PageHeader } from "@/components/ui/PageHeader";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { EnquiryYearCompare } from "@/components/enquiries/EnquiryYearCompare";
+import { useHubView } from "@/lib/hub-view";
 import { cn } from "@/lib/utils";
 
 const MARKETING_SOURCE_UPDATE_KEY = "web-enquiries-marketing-source-1.3.24";
@@ -580,6 +581,9 @@ export function EnquiriesClient({
   initial: WebEnquiry[];
   configured: boolean;
 }) {
+  const { canToggleAdminView } = useHubView();
+  const canDelete = canToggleAdminView;
+
   const [items, setItems] = useState(initial);
   const [configured, setConfigured] = useState(initialConfigured);
   const [search, setSearch] = useState("");
@@ -722,6 +726,7 @@ export function EnquiriesClient({
   }
 
   async function remove(id: string) {
+    if (!canDelete) return;
     if (!confirm("Delete this enquiry from the hub?")) return;
     setSaving(true);
     try {
@@ -1317,16 +1322,18 @@ export function EnquiriesClient({
                 </pre>
               ) : null}
             </div>
-            <div className="flex gap-2 border-t border-border px-4 py-3">
-              <button
-                type="button"
-                className="btn-ghost text-[var(--danger)]"
-                disabled={saving}
-                onClick={() => void remove(selected.id)}
-              >
-                Delete
-              </button>
-            </div>
+            {canDelete ? (
+              <div className="flex gap-2 border-t border-border px-4 py-3">
+                <button
+                  type="button"
+                  className="btn-ghost text-[var(--danger)]"
+                  disabled={saving}
+                  onClick={() => void remove(selected.id)}
+                >
+                  Delete
+                </button>
+              </div>
+            ) : null}
           </aside>
         </>
       ) : null}

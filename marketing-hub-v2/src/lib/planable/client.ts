@@ -108,35 +108,62 @@ function pickPlatforms(
   p: Record<string, unknown>,
   pagesById: Map<string, PlanablePage>
 ): string[] {
-  const directType =
-    (p.type as string | undefined) ||
-    (p.platform as string | undefined) ||
-    null;
-  if (directType && !/^(post|story|reel|video)$/i.test(directType)) {
-    return [directType];
-  }
+  const collected: string[] = [];
+  const push = (raw: string | null | undefined) => {
+    if (raw == null) return;
+    const s = String(raw).trim();
+    if (!s) return;
+    // Post content types are not platforms
+    if (/^(post|story|reel|video|carousel|image)$/i.test(s)) return;
+    collected.push(s);
+  };
+
+  push(p.platform as string | undefined);
+  push(p.type as string | undefined);
 
   const pages = p.pages as
     | Array<{ name?: string; type?: string; platform?: string }>
     | undefined;
-  if (Array.isArray(pages) && pages.length) {
-    return pages
-      .map((x) => x.platform || x.type || x.name || "")
-      .filter(Boolean)
-      .map(String);
+  if (Array.isArray(pages)) {
+    for (const x of pages) {
+      push(x.platform || x.type || x.name);
+    }
   }
 
   const pageId = p.pageId != null ? String(p.pageId) : null;
-  if (pageId && pagesById.has(pageId)) {
-    const page = pagesById.get(pageId)!;
-    if (page.platform) return [page.platform];
-    if (page.name) return [page.name];
+  const groupPageIds = Array.isArray(p.groupPageIds)
+    ? (p.groupPageIds as unknown[]).map(String).filter(Boolean)
+    : [];
+  const pageIds = Array.from(
+    new Set([...groupPageIds, ...(pageId ? [pageId] : [])])
+  );
+  for (const id of pageIds) {
+    const page = pagesById.get(id);
+    if (!page) continue;
+    push(page.platform);
+    // Only fall back to page name when platform is missing
+    if (!page.platform) push(page.name);
   }
 
   const pageName =
     (p.pageName as string | undefined) ||
     (p.page as { name?: string } | undefined)?.name;
-  return pageName ? [pageName] : [];
+  if (collected.length === 0) push(pageName);
+
+  // Dedupe by resolved platform key (keep first label per network)
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const label of collected) {
+    const key = platformKey(label);
+    if (key === "social") {
+      if (out.length === 0) out.push(label);
+      continue;
+    }
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(label);
+  }
+  return out;
 }
 
 export function platformLabelFromPlanable(platform: string | null): string {

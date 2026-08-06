@@ -4,9 +4,9 @@ import { normalizeRichTextStorage } from "@/lib/sanitize";
 import { isCanvaUrl, isImageUrl } from "@/lib/social/platforms";
 
 const PLATFORM_HINTS: { re: RegExp; channel: string }[] = [
-  { re: /\blinkedin\b|\bli\b|#linkedin/i, channel: "LinkedIn" },
   { re: /\binstagram\b|\big\b|#instagram|\breel\b/i, channel: "Instagram" },
   { re: /\bfacebook\b|\bfb\b|#facebook/i, channel: "Facebook" },
+  { re: /\blinkedin\b|\bli\b|#linkedin/i, channel: "LinkedIn" },
   { re: /\btiktok\b|#tiktok/i, channel: "TikTok" },
   { re: /\byoutube\b|\byt\b|#youtube/i, channel: "YouTube" },
   { re: /\bnewsletter\b/i, channel: "Newsletter" },

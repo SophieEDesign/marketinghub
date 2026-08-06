@@ -10,13 +10,33 @@ export type PlatformKey =
   | "social";
 
 export function platformKey(raw: string): PlatformKey {
-  const s = raw.toLowerCase();
-  if (s.includes("linkedin") || s === "li") return "linkedin";
-  if (s.includes("instagram") || s === "ig") return "instagram";
-  if (s.includes("facebook") || s === "fb") return "facebook";
-  if (s === "x" || s.includes("twitter") || s.includes("tweet")) return "x";
+  const s = raw.toLowerCase().trim();
+  if (!s) return "social";
+
+  // Exact short codes first
+  if (s === "li") return "linkedin";
+  if (s === "ig") return "instagram";
+  if (s === "fb") return "facebook";
+  if (s === "yt") return "youtube";
+  if (s === "x" || s === "twitter") return "x";
+
+  // Word-boundary matches — Instagram/Facebook before LinkedIn so a combined
+  // label like "Instagram, Facebook, LinkedIn" does not collapse to LinkedIn.
+  if (/\binstagram\b|\breels?\b/.test(s)) return "instagram";
+  if (/\bfacebook\b/.test(s)) return "facebook";
+  if (/\blinkedin\b/.test(s)) return "linkedin";
+  if (/\btiktok\b/.test(s)) return "tiktok";
+  if (/\byoutube\b/.test(s)) return "youtube";
+  if (/\btwitter\b|\btweet\b/.test(s)) return "x";
+
+  // Planable camelCase / underscored platform enums
+  if (s.includes("instagram")) return "instagram";
+  if (s.includes("facebook")) return "facebook";
+  if (s.includes("linkedin")) return "linkedin";
   if (s.includes("tiktok")) return "tiktok";
-  if (s.includes("youtube") || s === "yt") return "youtube";
+  if (s.includes("youtube")) return "youtube";
+  if (s.includes("twitter")) return "x";
+
   return "social";
 }
 
